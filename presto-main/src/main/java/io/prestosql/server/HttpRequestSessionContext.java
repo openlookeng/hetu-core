@@ -79,6 +79,7 @@ public final class HttpRequestSessionContext
     private final String schema;
     private final String path;
 
+    private final Optional<Identity> authenticatedIdentity;
     private final Identity identity;
 
     private final String source;
@@ -108,7 +109,22 @@ public final class HttpRequestSessionContext
         path = trimEmptyToNull(servletRequest.getHeader(PRESTO_PATH));
         assertRequest((catalog != null) || (schema == null), "Schema is set but catalog is not");
 
+        String authenticatedUser = (String) servletRequest.getAttribute(PRESTO_USER);
+        if (authenticatedUser != null) {
+            authenticatedIdentity = Optional.of(new Identity(
+                    authenticatedUser,
+                    Optional.ofNullable(servletRequest.getUserPrincipal()),
+                    parseRoleHeaders(servletRequest),
+                    parseExtraCredentials(servletRequest)));
+        }
+        else {
+            authenticatedIdentity = Optional.empty();
+        }
+
         String user = trimEmptyToNull(servletRequest.getHeader(PRESTO_USER));
+        if (user == null) {
+            user = authenticatedUser;
+        }
         assertRequest(user != null, "User must be set");
         identity = new Identity(
                 user,
@@ -165,6 +181,12 @@ public final class HttpRequestSessionContext
         String transactionIdHeader = servletRequest.getHeader(PRESTO_TRANSACTION_ID);
         clientTransactionSupport = transactionIdHeader != null;
         transactionId = parseTransactionId(transactionIdHeader);
+    }
+
+    @Override
+    public Optional<Identity> getAuthenticatedIdentity()
+    {
+        return authenticatedIdentity;
     }
 
     @Override

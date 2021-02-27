@@ -52,15 +52,19 @@ http-server.https.keystore.key=keystore_password
 
  
 
-| 属性                          | 描述                                                  |
-| :-------------------------------- | :----------------------------------------------------------- |
-| `http-server.authentication.type` | 对openLooKeng协调节点开启密码认证功能。必须设置为`PASSWORD`。|
-| `http-server.https.enabled`       | 对openLooKeng协调节点开启HTTPS访问功能。取值设置为`true`。默认值为`false`。|
-| `http-server.https.port`          | HTTPS服务器的端口号。                                           |
-| `http-server.https.keystore.path` |用于保证TLS安全连接的Java密钥库文件的位置。|
-| `http-server.https.keystore.key`  | 密钥库的密码。必须与创建密钥库时设置的密码一致。|
+| 属性                                                       | 描述                                                  |
+| :--------------------------------------------------------- | :----------------------------------------------------------- |
+| `http-server.authentication.type`                          | 对openLooKeng协调节点开启密码认证功能。必须设置为`PASSWORD`。|
+| `http-server.https.enabled`                                | 对openLooKeng协调节点开启HTTPS访问功能。取值设置为`true`。默认值为`false`。|
+| `http-server.https.port`                                   | HTTPS服务器的端口号。                                           |
+| `http-server.https.keystore.path`                          | 用于保证TLS安全连接的Java密钥库文件的位置。|
+| `http-server.https.keystore.key`                           | 密钥库的密码。必须与创建密钥库时设置的密码一致。|
+| `http-server.authentication.password.user-mapping.pattern` | 用于认证用户匹配的正则表达式。如果匹配，认证用户映射到正则表达式中的第一个匹配组；如果不匹配，则拒绝认证。默认值是`(.*)`。 |
+| `http-server.authentication.password.user-mapping.file`    | 包含用户映射规则的JSON文件。详见 [认证用户映射](./user-mapping.md)。 |
 
+注意
 
+`http-server.authentication.password.user-mapping.pattern`和`http-server.authentication.password.user-mapping.file`不能同时设置。
 
 #### 密码验证器配置
 

@@ -197,6 +197,11 @@ public class TestAccessControlManager
                     }
 
                     @Override
+                    public void checkCanImpersonateUser(Identity identity, String propertyName)
+                    {
+                    }
+
+                    @Override
                     public void checkCanSetSystemSessionProperty(Identity identity, String propertyName)
                     {
                     }
@@ -319,6 +324,11 @@ public class TestAccessControlManager
                 {
                     checkedPrincipal = principal;
                     checkedUserName = userName;
+                }
+
+                @Override
+                public void checkCanImpersonateUser(Identity identity, String propertyName)
+                {
                 }
 
                 @Override

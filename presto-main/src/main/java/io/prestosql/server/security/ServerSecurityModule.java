@@ -56,6 +56,7 @@ public class ServerSecurityModule
 
         for (AuthenticationType authType : authTypes) {
             if (authType == CERTIFICATE) {
+                configBinder(binder).bindConfig(CertificateConfig.class);
                 authBinder.addBinding().to(CertificateAuthenticator.class).in(Scopes.SINGLETON);
             }
             else if (authType == KERBEROS) {
@@ -63,6 +64,7 @@ public class ServerSecurityModule
                 authBinder.addBinding().to(KerberosAuthenticator.class).in(Scopes.SINGLETON);
             }
             else if (authType == PASSWORD) {
+                configBinder(binder).bindConfig(PasswordAuthenticatorConfig.class);
                 authBinder.addBinding().to(PasswordAuthenticator.class).in(Scopes.SINGLETON);
             }
             else if (authType == JWT) {

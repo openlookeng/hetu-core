@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.prestosql.plugin.base.security.ForwardingSystemAccessControl;
+import io.prestosql.plugin.base.security.ImpersonationRule;
 import io.prestosql.security.IndexAccessControlRule.IndexPrivilege;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CatalogSchemaName;
@@ -56,6 +57,7 @@ import static io.prestosql.spi.security.AccessDeniedException.denyAccessNodeInfo
 import static io.prestosql.spi.security.AccessDeniedException.denyCatalogAccess;
 import static io.prestosql.spi.security.AccessDeniedException.denyCreateIndex;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropIndex;
+import static io.prestosql.spi.security.AccessDeniedException.denyImpersonateUser;
 import static io.prestosql.spi.security.AccessDeniedException.denyRenameIndex;
 import static io.prestosql.spi.security.AccessDeniedException.denySetUser;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowIndex;
@@ -73,13 +75,19 @@ public class FileBasedSystemAccessControl
     private final Optional<List<PrincipalUserMatchRule>> principalUserMatchRules;
     private final List<NodeInformationRule> nodeInfoRules;
     private final List<IndexAccessControlRule> indexRules;
+    private final Optional<List<ImpersonationRule>> impersonationRules;
 
-    private FileBasedSystemAccessControl(List<CatalogAccessControlRule> catalogRules, Optional<List<PrincipalUserMatchRule>> principalUserMatchRules, List<NodeInformationRule> nodeInfoRules, List<IndexAccessControlRule> indexRules)
+    private FileBasedSystemAccessControl(List<CatalogAccessControlRule> catalogRules,
+            Optional<List<PrincipalUserMatchRule>> principalUserMatchRules,
+            List<NodeInformationRule> nodeInfoRules,
+            List<IndexAccessControlRule> indexRules,
+            Optional<List<ImpersonationRule>> impersonationRules)
     {
         this.catalogRules = catalogRules;
         this.principalUserMatchRules = principalUserMatchRules;
         this.nodeInfoRules = nodeInfoRules;
         this.indexRules = indexRules;
+        this.impersonationRules = impersonationRules;
     }
 
     @Override
@@ -197,6 +205,31 @@ public class FileBasedSystemAccessControl
         }
 
         denySetUser(principal, userName);
+    }
+
+    @Override
+    public void checkCanImpersonateUser(Identity identity, String userName)
+    {
+        if (!impersonationRules.isPresent()) {
+            // if there are principal user match rules, we assume that impersonation checks are
+            // handled there; otherwise, impersonation must be manually configured
+            if (!principalUserMatchRules.isPresent()) {
+                denyImpersonateUser(identity.getUser(), userName);
+            }
+            return;
+        }
+
+        for (ImpersonationRule rule : impersonationRules.get()) {
+            Optional<Boolean> allowed = rule.match(identity.getUser(), userName);
+            if (allowed.isPresent()) {
+                if (allowed.get()) {
+                    return;
+                }
+                denyImpersonateUser(identity.getUser(), userName);
+            }
+        }
+
+        denyImpersonateUser(identity.getUser(), userName);
     }
 
     @Override
@@ -476,7 +509,7 @@ public class FileBasedSystemAccessControl
                     Optional.of(Pattern.compile(".*")),
                     Optional.of(Pattern.compile("system"))));
 
-            return new FileBasedSystemAccessControl(catalogRulesBuilder.build(), rules.getPrincipalUserMatchRules(), rules.getNodeInfoRules(), rules.getIndexRules());
+            return new FileBasedSystemAccessControl(catalogRulesBuilder.build(), rules.getPrincipalUserMatchRules(), rules.getNodeInfoRules(), rules.getIndexRules(), rules.getImpersonationRules());
         }
     }
 }

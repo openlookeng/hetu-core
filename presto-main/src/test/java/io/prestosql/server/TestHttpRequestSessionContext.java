@@ -39,6 +39,7 @@ import static io.prestosql.client.PrestoHeaders.PRESTO_SESSION;
 import static io.prestosql.client.PrestoHeaders.PRESTO_SOURCE;
 import static io.prestosql.client.PrestoHeaders.PRESTO_TIME_ZONE;
 import static io.prestosql.client.PrestoHeaders.PRESTO_USER;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.testng.Assert.assertEquals;
 
 public class TestHttpRequestSessionContext
@@ -88,6 +89,32 @@ public class TestHttpRequestSessionContext
                 "bar_connector", new SelectedRole(SelectedRole.Type.NONE, Optional.empty()),
                 "foobar_connector", new SelectedRole(SelectedRole.Type.ROLE, Optional.of("role"))));
         assertEquals(context.getIdentity().getExtraCredentials(), ImmutableMap.of("test.token.foo", "bar", "test.token.abc", "xyz"));
+    }
+
+    @Test
+    public void testMappedUser()
+    {
+        MockHttpServletRequest servletRequest = new MockHttpServletRequest(
+                ImmutableListMultimap.of(PRESTO_USER, "testUser"),
+                "testRemote");
+        HttpRequestSessionContext context = new HttpRequestSessionContext(servletRequest);
+        assertEquals(context.getIdentity(), new Identity("testUser", Optional.empty()));
+
+        servletRequest = new MockHttpServletRequest(ImmutableListMultimap.of(), "testRemote");
+        servletRequest.setAttribute(PRESTO_USER, "mappedUser");
+        context = new HttpRequestSessionContext(servletRequest);
+        assertEquals(context.getIdentity(), new Identity("mappedUser", Optional.empty()));
+
+        servletRequest = new MockHttpServletRequest(
+                ImmutableListMultimap.of(PRESTO_USER, "testUser"),
+                "testRemote");
+        servletRequest.setAttribute(PRESTO_USER, "mappedUser");
+        context = new HttpRequestSessionContext(servletRequest);
+        assertEquals(context.getIdentity(), new Identity("testUser", Optional.empty()));
+
+        assertThatThrownBy(() -> new HttpRequestSessionContext(new MockHttpServletRequest(ImmutableListMultimap.of(), "testRemote")))
+                .isInstanceOf(WebApplicationException.class)
+                .matches(e -> ((WebApplicationException) e).getResponse().getStatus() == 400);
     }
 
     @Test(expectedExceptions = WebApplicationException.class)

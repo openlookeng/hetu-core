@@ -43,6 +43,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.google.common.net.HttpHeaders.AUTHORIZATION;
+import static io.prestosql.server.security.UserMapping.createUserMapping;
+import static java.util.Objects.requireNonNull;
 import static javax.security.auth.login.AppConfigurationEntry.LoginModuleControlFlag.REQUIRED;
 import static org.ietf.jgss.GSSCredential.ACCEPT_ONLY;
 import static org.ietf.jgss.GSSCredential.INDEFINITE_LIFETIME;
@@ -57,10 +59,14 @@ public class KerberosAuthenticator
     private final GSSManager gssManager = GSSManager.getInstance();
     private final LoginContext loginContext;
     private final GSSCredential serverCredential;
+    private final UserMapping userMapping;
 
     @Inject
     public KerberosAuthenticator(KerberosConfig config)
     {
+        requireNonNull(config, "config is null");
+        this.userMapping = createUserMapping(config.getUserMappingPattern(), config.getUserMappingFile());
+
         System.setProperty("java.security.krb5.conf", config.getKerberosConfig().getAbsolutePath());
 
         try {
@@ -120,22 +126,20 @@ public class KerberosAuthenticator
     }
 
     @Override
-    public Principal authenticate(HttpServletRequest request)
+    public AuthenticatedPrincipal authenticate(HttpServletRequest request)
             throws AuthenticationException
     {
         String header = request.getHeader(AUTHORIZATION);
 
         String requestSpnegoToken = null;
 
+        Principal principal = null;
         if (header != null) {
             String[] parts = header.split("\\s+");
             if (parts.length == 2 && parts[0].equals(NEGOTIATE_SCHEME)) {
                 try {
                     requestSpnegoToken = parts[1];
-                    Optional<Principal> principal = authenticate(parts[1]);
-                    if (principal.isPresent()) {
-                        return principal.get();
-                    }
+                    principal = authenticate(parts[1]).orElse(null);
                 }
                 catch (RuntimeException e) {
                     throw new RuntimeException("Authentication error for token: " + parts[1], e);
@@ -143,11 +147,20 @@ public class KerberosAuthenticator
             }
         }
 
-        if (requestSpnegoToken != null) {
-            throw new AuthenticationException("Authentication failed for token: " + requestSpnegoToken, NEGOTIATE_SCHEME);
+        if (principal == null) {
+            if (requestSpnegoToken != null) {
+                throw new AuthenticationException("Authentication failed for token: " + requestSpnegoToken, NEGOTIATE_SCHEME);
+            }
+            throw new AuthenticationException(null, NEGOTIATE_SCHEME);
         }
 
-        throw new AuthenticationException(null, NEGOTIATE_SCHEME);
+        try {
+            String authenticatedUser = userMapping.mapUser(principal.toString());
+            return new AuthenticatedPrincipal(authenticatedUser, principal);
+        }
+        catch (UserMappingException e) {
+            throw new AuthenticationException(e.getMessage(), NEGOTIATE_SCHEME);
+        }
     }
 
     private Optional<Principal> authenticate(String token)

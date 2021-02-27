@@ -87,7 +87,7 @@ public class ClientOptions
     public String accessToken;
 
     @Option(name = "--user", title = "user", description = "Username")
-    public String user = System.getProperty("user.name");
+    public String user;
 
     @Option(name = "--password", title = "password", description = "Prompt for password")
     public boolean password;
@@ -165,9 +165,19 @@ public class ClientOptions
 
     public ClientSession toClientSession()
     {
+        String clientUser = user;
+        if (user == null) {
+            if (krb5Principal != null) {
+                // Use kerberos mapping user
+                clientUser = "";
+            }
+            else {
+                clientUser = System.getProperty("user.name");
+            }
+        }
         return new ClientSession(
                 parseServer(server),
-                user,
+                clientUser,
                 source,
                 Optional.ofNullable(traceToken),
                 parseClientTags(clientTags),

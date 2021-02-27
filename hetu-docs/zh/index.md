@@ -22,6 +22,7 @@ headless: true
     - [协调节点Kerberos认证]({{< relref "./docs/security/server.md" >}})
     - [CLI接口的Kerberos认证]({{< relref "./docs/security/cli.md" >}})
     - [LDAP认证]({{< relref "./docs/security/ldap.md" >}})
+    - [认证用户映射]({{< relref "./docs/security/user-mapping.md" >}})
     - [Java密钥库和信任库]({{< relref "./docs/security/tls.md" >}})
     - [内置系统访问控制]({{< relref "./docs/security/built-in-system-access-control.md" >}})
     - [Ranger访问控制]({{< relref "./docs/security/ranger-access-control.md" >}})

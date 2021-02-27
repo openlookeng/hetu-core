@@ -34,7 +34,6 @@ import javax.servlet.http.HttpServletRequest;
 import java.io.File;
 import java.io.IOException;
 import java.security.Key;
-import java.security.Principal;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
@@ -44,6 +43,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.io.Files.asCharSource;
 import static com.google.common.net.HttpHeaders.AUTHORIZATION;
+import static io.prestosql.server.security.UserMapping.createUserMapping;
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.util.Base64.getMimeDecoder;
@@ -58,11 +58,13 @@ public class JsonWebTokenAuthenticator
 
     private final JwtParser jwtParser;
     private final Function<JwsHeader<?>, Key> keyLoader;
+    private final UserMapping userMapping;
 
     @Inject
     public JsonWebTokenAuthenticator(JsonWebTokenConfig config)
     {
         requireNonNull(config, "config is null");
+        this.userMapping = createUserMapping(config.getUserMappingPattern(), config.getUserMappingFile());
 
         if (config.getKeyFile().contains(KEY_ID_VARIABLE)) {
             keyLoader = new DynamicKeyLoader(config.getKeyFile());
@@ -100,7 +102,7 @@ public class JsonWebTokenAuthenticator
     }
 
     @Override
-    public Principal authenticate(HttpServletRequest request)
+    public AuthenticatedPrincipal authenticate(HttpServletRequest request)
             throws AuthenticationException
     {
         String header = nullToEmpty(request.getHeader(AUTHORIZATION));
@@ -117,9 +119,10 @@ public class JsonWebTokenAuthenticator
         try {
             Jws<Claims> claimsJws = jwtParser.parseClaimsJws(token);
             String subject = claimsJws.getBody().getSubject();
-            return new BasicPrincipal(subject);
+            String authenticatedUser = userMapping.mapUser(subject);
+            return new AuthenticatedPrincipal(authenticatedUser, new BasicPrincipal(subject));
         }
-        catch (JwtException e) {
+        catch (JwtException | UserMappingException e) {
             throw needAuthentication(e.getMessage());
         }
         catch (RuntimeException e) {

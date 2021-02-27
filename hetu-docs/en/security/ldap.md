@@ -52,15 +52,19 @@ http-server.https.keystore.key=keystore_password
 
  
 
-| Property                          | Description                                                  |
-| :-------------------------------- | :----------------------------------------------------------- |
-| `http-server.authentication.type` | Enable password authentication for the openLooKeng coordinator. Must be set to `PASSWORD`. |
-| `http-server.https.enabled`       | Enables HTTPS access for the openLooKeng coordinator. Should be set to `true`. Default value is `false`. |
-| `http-server.https.port`          | HTTPS server port.                                           |
-| `http-server.https.keystore.path` | The location of the Java Keystore file that will be used to secure TLS. |
-| `http-server.https.keystore.key`  | The password for the keystore. This must match the password you specified when creating the keystore. |
+| Property                                                   | Description                                                  |
+| :--------------------------------------------------------- | :----------------------------------------------------------- |
+| `http-server.authentication.type`                          | Enable password authentication for the openLooKeng coordinator. Must be set to `PASSWORD`. |
+| `http-server.https.enabled`                                | Enables HTTPS access for the openLooKeng coordinator. Should be set to `true`. Default value is `false`. |
+| `http-server.https.port`                                   | HTTPS server port.                                           |
+| `http-server.https.keystore.path`                          | The location of the Java Keystore file that will be used to secure TLS. |
+| `http-server.https.keystore.key`                           | The password for the keystore. This must match the password you specified when creating the keystore. |
+| `http-server.authentication.password.user-mapping.pattern` | Regex to match against user. If matched, user will be replaced with first regex group. If not matched, authentication is denied. Default is `(.*)`. |
+| `http-server.authentication.password.user-mapping.file`    | JSON file containing rules for mapping user. See [Authentication User Mapping](./user-mapping.md) for more information. |
 
+Note
 
+`http-server.authentication.password.user-mapping.pattern` and `http-server.authentication.password.user-mapping.file` can not both be set. 
 
 #### Password Authenticator Configuration
 

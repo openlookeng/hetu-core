@@ -17,6 +17,7 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.queryeditorui.security.UiAuthenticator;
 import io.prestosql.server.InternalAuthenticationManager;
+import io.prestosql.server.security.Authenticator.AuthenticatedPrincipal;
 import io.prestosql.spi.security.BasicPrincipal;
 
 import javax.inject.Inject;
@@ -42,6 +43,7 @@ import java.util.Set;
 import static com.google.common.io.ByteStreams.copy;
 import static com.google.common.io.ByteStreams.nullOutputStream;
 import static com.google.common.net.HttpHeaders.WWW_AUTHENTICATE;
+import static io.prestosql.client.PrestoHeaders.PRESTO_USER;
 import static java.util.Objects.requireNonNull;
 import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 
@@ -98,6 +100,7 @@ public class AuthenticationFilter
                     return;
                 }
                 // authentication succeeded
+                request.setAttribute(PRESTO_USER, authenticatedUser.get());
                 nextFilter.doFilter(withPrincipal(request, new BasicPrincipal(authenticatedUser.get())), response);
                 return;
             }
@@ -121,9 +124,9 @@ public class AuthenticationFilter
         Set<String> authenticateHeaders = new LinkedHashSet<>();
 
         for (Authenticator authenticator : authenticators) {
-            Principal principal;
+            AuthenticatedPrincipal authenticatedPrincipal;
             try {
-                principal = authenticator.authenticate(request);
+                authenticatedPrincipal = authenticator.authenticate(request);
             }
             catch (AuthenticationException e) {
                 if (e.getMessage() != null) {
@@ -134,7 +137,8 @@ public class AuthenticationFilter
             }
 
             // authentication succeeded
-            nextFilter.doFilter(withPrincipal(request, principal), response);
+            request.setAttribute(PRESTO_USER, authenticatedPrincipal.getUser());
+            nextFilter.doFilter(withPrincipal(request, authenticatedPrincipal.getPrincipal()), response);
             return;
         }
 
