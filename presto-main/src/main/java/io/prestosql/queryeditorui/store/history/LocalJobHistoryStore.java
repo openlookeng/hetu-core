@@ -108,7 +108,23 @@ public class LocalJobHistoryStore
     @Override
     public List<Job> getRecentlyRunForUser(String user, long maxResults)
     {
-        return null;
+        final ImmutableList.Builder<Job> builder = ImmutableList.builder();
+        long added = 0;
+
+        for (Iterator<Job> job = historyCache.descendingIterator(); job.hasNext(); ) {
+            Job nextJob = job.next();
+            if (!nextJob.getUser().equals(user)) {
+                continue;
+            }
+            if (added + 1 > maxResults) {
+                break;
+            }
+
+            builder.add(nextJob);
+            added += 1;
+        }
+
+        return builder.build();
     }
 
     @Override

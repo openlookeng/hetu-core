@@ -53,8 +53,8 @@ public class QueryResource
 
     @Inject
     public QueryResource(JobHistoryStore jobHistoryStore,
-            QueryStore queryStore,
-            ActiveJobsStore activeJobsStore)
+                         QueryStore queryStore,
+                         ActiveJobsStore activeJobsStore)
     {
         this.jobHistoryStore = jobHistoryStore;
         this.queryStore = queryStore;
@@ -80,7 +80,7 @@ public class QueryResource
         String user = UiAuthenticator.getUser(servletRequest);
 
         if (tables.size() < 1) {
-            recentlyRun = new HashSet<>(jobHistoryStore.getRecentlyRun(200));
+            recentlyRun = new HashSet<>(jobHistoryStore.getRecentlyRunForUser(user, 200));
             Set<Job> activeJobs = activeJobsStore.getJobsForUser(user);
             recentlyRun.addAll(activeJobs);
         }

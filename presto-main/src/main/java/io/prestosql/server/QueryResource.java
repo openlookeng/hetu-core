@@ -26,11 +26,14 @@ import io.prestosql.execution.QueryManager;
 import io.prestosql.execution.QueryState;
 import io.prestosql.execution.QueryStats;
 import io.prestosql.execution.StageId;
+import io.prestosql.queryeditorui.security.UiAuthenticator;
 import io.prestosql.server.security.SecurityRequireNonNull;
+import io.prestosql.spi.ErrorType;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 
 import javax.inject.Inject;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
@@ -38,9 +41,13 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.NoSuchElementException;
@@ -48,6 +55,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.prestosql.client.PrestoHeaders.PRESTO_USER;
 import static io.prestosql.connector.system.KillQueryProcedure.createKillQueryException;
 import static io.prestosql.connector.system.KillQueryProcedure.createPreemptQueryException;
 import static java.util.Objects.requireNonNull;
@@ -66,6 +74,12 @@ public class QueryResource
     private final DispatchManager dispatchManager;
     private final QueryManager queryManager;
 
+    public enum SortOrder
+    {
+        ASCENDING,
+        DESCENDING,
+    }
+
     @Inject
     public QueryResource(DispatchManager dispatchManager, QueryManager queryManager, HttpServerInfo httpServerInfo)
     {
@@ -75,16 +89,110 @@ public class QueryResource
     }
 
     @GET
-    public List<BasicQueryInfo> getAllQueryInfo(@QueryParam("state") String stateFilter)
+    public Response getAllQueryInfo(
+            @QueryParam("state") String stateFilter,
+            @QueryParam("failed") String failedFilter,
+            @QueryParam("sort") String sortFilter,
+            @QueryParam("sortOrder") String sortOrder,
+            @QueryParam("search") String searchFilter,
+            @QueryParam("pageNum") Integer pageNum,
+            @QueryParam("pageSize") Integer pageSize,
+            @Context HttpServletRequest servletRequest)
     {
-        QueryState expectedState = stateFilter == null ? null : QueryState.valueOf(stateFilter.toUpperCase(Locale.ENGLISH));
-        ImmutableList.Builder<BasicQueryInfo> builder = new ImmutableList.Builder<>();
-        for (BasicQueryInfo queryInfo : dispatchManager.getQueries()) {
-            if (stateFilter == null || queryInfo.getState() == expectedState) {
-                builder.add(queryInfo);
+        if (pageNum != null && pageNum <= 0) {
+            return Response.status(Status.BAD_REQUEST).build();
+        }
+        if (pageSize != null && pageSize <= 0) {
+            return Response.status(Status.BAD_REQUEST).build();
+        }
+
+        String[] states = (stateFilter == null || stateFilter.equals("")) ? new String[0] : stateFilter.split(",");
+        String[] failed = (failedFilter == null || failedFilter.equals("")) ? new String[0] : failedFilter.split(",");
+
+        HashMap<QueryState, Boolean> statesMap = new HashMap<>();
+        for (String state : states) {
+            try {
+                QueryState expectedState = QueryState.valueOf(state.toUpperCase(Locale.ENGLISH));
+                statesMap.put(expectedState, true);
+            }
+            catch (Exception ex) {
+                return Response.status(Status.BAD_REQUEST).build();
             }
         }
-        return builder.build();
+
+        HashMap<ErrorType, Boolean> failedMap = new HashMap<>();
+        for (String failedValue : failed) {
+            try {
+                ErrorType failedState = ErrorType.valueOf(failedValue.toUpperCase(Locale.ENGLISH));
+                failedMap.put(failedState, true);
+            }
+            catch (Exception ex) {
+                return Response.status(Status.BAD_REQUEST).build();
+            }
+        }
+
+        List<BasicQueryInfo> allQueries = dispatchManager.getQueries();
+        List<BasicQueryInfo> filterQueries = new ArrayList<>();
+
+        for (BasicQueryInfo queryInfo : allQueries) {
+            if (filterUser(queryInfo, servletRequest) && filterState(queryInfo, stateFilter, statesMap, failedFilter, failedMap) &&
+                    filterSearch(queryInfo, searchFilter)) {
+                filterQueries.add(queryInfo);
+            }
+        }
+
+        // default sort order ascending
+        SortOrder sortOrderValue;
+        if (sortOrder == null || sortOrder.equals("")) {
+            sortOrderValue = SortOrder.ASCENDING;
+        }
+        else {
+            try {
+                sortOrderValue = SortOrder.valueOf(sortOrder.toUpperCase(Locale.ENGLISH));
+            }
+            catch (Exception e) {
+                return Response.status(Status.BAD_REQUEST).build();
+            }
+        }
+
+        if (sortFilter != null && !sortFilter.equals("")) {
+            try {
+                QuerySortFilter sort = QuerySortFilter.valueOf(sortFilter.toUpperCase(Locale.ENGLISH));
+                if (sortOrderValue == SortOrder.DESCENDING) {
+                    filterQueries.sort(Collections.reverseOrder(sort.getCompare()));
+                }
+                else {
+                    filterQueries.sort(sort.getCompare());
+                }
+            }
+            catch (Exception ex) {
+                return Response.status(Status.BAD_REQUEST).build();
+            }
+        }
+
+        if (pageNum == null || pageSize == null) {
+            ImmutableList.Builder<BasicQueryInfo> builder = new ImmutableList.Builder<>();
+            for (BasicQueryInfo queryInfo : filterQueries) {
+                builder.add(queryInfo);
+            }
+            return Response.ok(builder.build()).build();
+        }
+
+        // pagination
+        int total = filterQueries.size();
+        if (total == 0) {
+            return Response.ok(new QueryResponse(total, filterQueries)).build();
+        }
+        else if (total - pageSize * (pageNum - 1) <= 0) {
+            return Response.status(Status.BAD_REQUEST).build();
+        }
+
+        QueryResponse res;
+        int start = (pageNum - 1) * pageSize;
+        int end = Math.min(pageNum * pageSize, total);
+        List<BasicQueryInfo> subList = filterQueries.subList(start, end);
+        res = new QueryResponse(total, subList);
+        return Response.ok(res).build();
     }
 
     @GET
@@ -296,5 +404,70 @@ public class QueryResource
     {
         String localhost = httpServerInfo.getHttpUri() != null ? httpServerInfo.getHttpUri().getHost() : httpServerInfo.getHttpsUri().getHost();
         return basicQueryInfo.getSelf().getHost().equals(localhost);
+    }
+
+    private boolean filterUser(BasicQueryInfo queryInfo, HttpServletRequest servletRequest)
+    {
+        String sessionUser = queryInfo.getSession().getUser();
+        if (sessionUser == null) {
+            return false;
+        }
+
+        // presto user
+        String user = servletRequest.getHeader(PRESTO_USER);
+        if (user != null) {
+            return sessionUser.equals(user);
+        }
+
+        // authentication user mapping
+        user = (String) servletRequest.getAttribute(PRESTO_USER);
+        if (user != null) {
+            return sessionUser.equals(user);
+        }
+
+        // principle
+        user = UiAuthenticator.getUser(servletRequest);
+        return sessionUser.equals(user);
+    }
+
+    private boolean filterState(BasicQueryInfo queryInfo,
+                                String stateFilter,
+                                HashMap<QueryState, Boolean> statesMap,
+                                String failedFilter,
+                                HashMap<ErrorType, Boolean> failedMap)
+    {
+        if (stateFilter == null) {
+            return true;
+        }
+
+        QueryState state = queryInfo.getState();
+        if (state == QueryState.FAILED) {
+            if (failedFilter == null) {
+                return statesMap.containsKey(state);
+            }
+            return statesMap.containsKey(state) && failedMap.containsKey(queryInfo.getErrorType());
+        }
+
+        return statesMap.containsKey(state);
+    }
+
+    private boolean filterSearch(BasicQueryInfo queryInfo, String searchFilter)
+    {
+        if (searchFilter == null || searchFilter.equals("")) {
+            return true;
+        }
+        String queryId = queryInfo.getQueryId().toString().toLowerCase(Locale.ENGLISH);
+        String query = queryInfo.getQuery().toLowerCase(Locale.ENGLISH);
+        String user = queryInfo.getSession().getUser().toLowerCase(Locale.ENGLISH);
+        String source = queryInfo.getSession().getSource().toString().toLowerCase(Locale.ENGLISH);
+        String resource = queryInfo.getResourceGroupId().toString().toLowerCase(Locale.ENGLISH);
+        if (queryId.contains(searchFilter) ||
+                query.contains(searchFilter) ||
+                user.contains(searchFilter) ||
+                source.contains(searchFilter) ||
+                resource.contains(searchFilter)) {
+            return true;
+        }
+        return false;
     }
 }
