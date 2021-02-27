@@ -135,9 +135,9 @@ public class HeuristicIndexerManager
     public void preloadIndex()
             throws IOException
     {
-        if (indexClient != null) {
-            if (PropertyService.containsProperty(HetuConstant.FILTER_CACHE_PRELOAD_INDICES)) {
-                String preloadNames = PropertyService.getStringProperty(HetuConstant.FILTER_CACHE_PRELOAD_INDICES);
+        if (PropertyService.getBooleanProperty(HetuConstant.FILTER_ENABLED) && indexClient != null) {
+            String preloadNames = PropertyService.getStringProperty(HetuConstant.FILTER_CACHE_PRELOAD_INDICES);
+            if (!preloadNames.isEmpty()) {
                 List<String> preloadNameList = Arrays.asList(preloadNames.split(","));
                 if (!preloadNameList.isEmpty()) {
                     try {

@@ -42,7 +42,7 @@ public class HetuConfig
     private Boolean indexCacheSoftReference = Boolean.TRUE;
     private String indexStoreUri = "/opt/hetu/indices/";
     private String indexStoreFileSystemProfile = "local-config-default";
-    private String indexToPreload;
+    private String indexToPreload = "";
     private Boolean enableEmbeddedStateStore = Boolean.FALSE;
     private Boolean enableMultipleCoordinator = Boolean.FALSE;
     private Duration stateUpdateInterval = new Duration(100, TimeUnit.MILLISECONDS);
