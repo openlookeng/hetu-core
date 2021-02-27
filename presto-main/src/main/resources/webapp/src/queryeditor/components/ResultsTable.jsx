@@ -17,6 +17,7 @@ import _ from 'lodash';
 import ResultsPreviewStore from '../stores/ResultsPreviewStore';
 import ResultsPreviewActions from '../actions/ResultsPreviewActions';
 import QueryActions from '../actions/QueryActions';
+import Pagination from 'rc-pagination';
 
 let isColumnResizing = false;
 
@@ -24,7 +25,7 @@ let isColumnResizing = false;
 function getStateFromStore() {
   return {
     query: ResultsPreviewStore.getPreviewQuery(),
-    table: ResultsPreviewStore.getResultsPreview()
+    table: ResultsPreviewStore.getResultsPreview(),
   };
 }
 
@@ -54,12 +55,19 @@ class ResultsTable
     extends React.Component {
   constructor(props) {
     super(props);
-    this.state = getStateFromStore();
+    this.state = {
+      currentPage: 1,
+      total: 0,
+      query: "",
+      table: [],
+      fileName: ""
+    };
     this._onChange = this._onChange.bind(this);
     this._enhancedData = this._enhancedData.bind(this);
     this.rowGetter = this.rowGetter.bind(this);
     this._enhancedColumns = this._enhancedColumns.bind(this);
     this._renderColumns = this._renderColumns.bind(this);
+    this.onPageChange = this.onPageChange.bind(this);
   }
 
   componentDidMount() {
@@ -87,30 +95,49 @@ class ResultsTable
   }
 
   _renderColumns() {
+    let table = this.state.table;
+    let currentPage = this.state.currentPage;
+    let total = this.state.table.total;
+    if (table === null || total === 0) {
+        this._renderEmptyMessage();
+      }
     return (
-      <div className='flex flex-column hetu-table'>
-        <div className='editor-menu'>
-          <div 
-            style={{width: this.props.tableWidth - 20}}
-            className="text-overflow-ellipsis">
-            <a href="#" onClick={selectQuery.bind(null, this.state.query)}>
-              {this.state.query.query}
-            </a>
+      <div>
+        <div className='flex flex-column hetu-table'>
+          <div className='editor-menu'>
+            <div
+                style={{width: this.props.tableWidth - 20}}
+                className="text-overflow-ellipsis">
+              <a href="#" onClick={selectQuery.bind(null, this.state.query)}>
+                {this.state.query.query}
+              </a>
+            </div>
           </div>
+          <Table
+              headerHeight={25}
+              rowHeight={40}
+              rowsCount={this.state.table.data.length}
+              width={this.props.tableWidth}
+              height={this.props.tableHeight - 39}
+              maxHeight={this.props.tableHeight - 39}
+              isResizable={isColumnResizing}
+              onColumnResizeEndCallback={this._onColumnResizeEndCallback}
+              {... this.props}>
+            {getColumns(this.state.table.columns, this.state.table.columnWidths, this.rowGetter)}
+          </Table>
         </div>
-        <Table
-          headerHeight={25}
-          rowHeight={40}
-          rowsCount={this.state.table.data.length}
-          width={this.props.tableWidth}
-          height={this.props.tableHeight - 39}
-          maxHeight={this.props.tableHeight - 39}
-          isResizable={isColumnResizing}
-          onColumnResizeEndCallback={this._onColumnResizeEndCallback}
-          {... this.props}>
-          {getColumns(this.state.table.columns, this.state.table.columnWidths, this.rowGetter)}
-        </Table>
-      </div>);
+        <div>
+          <Pagination
+              defaultCurrent={1}
+              current={currentPage}
+              total={total}
+              onChange={this.onPageChange}
+              showTotal={total => `Total ${total} items`}
+              style={{ marginTop: 10 }}
+          />
+        </div>
+      </div>
+    );
   }
 
   rowGetter(rowIndex) {
@@ -135,6 +162,20 @@ class ResultsTable
   /* Store events */
   _onChange() {
     this.setState(getStateFromStore());
+  }
+
+  onPageChange(current) {
+    let fileName = "../api/files/" + ResultsPreviewStore.getResultsPreview().fileName;
+    ResultsPreviewActions.loadResultsPreview(fileName, current);
+    let page = ResultsPreviewStore.getResultsPreview();
+    let query = ResultsPreviewStore.getPreviewQuery();
+    this.setState({
+      currentPage: current,
+      query: query,
+      table: page,
+      total: page.total,
+      fileName: page.fileName,
+    });
   }
 
   _onColumnResizeEndCallback(newColumnWidth, dataKey) {

@@ -19,7 +19,6 @@ import io.prestosql.queryeditorui.store.files.ExpiringFileStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -53,10 +52,12 @@ public class ResultsPreviewResource
     @GET
     @Path("/")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getFile(@QueryParam("fileURI") URI fileURI,
-                            @DefaultValue("100") @QueryParam("lines") int numLines)
+    public Response getFile(
+            @QueryParam("pageNum") Integer pageNum,
+            @QueryParam("pageSize") Integer pageSize,
+            @QueryParam("fileURI") URI fileURI)
     {
-        return getFilePreview(fileURI, numLines);
+        return getFilePreview(fileURI, pageNum, pageSize);
     }
 
     private String getFilename(URI fileURI)
@@ -64,33 +65,42 @@ public class ResultsPreviewResource
         return fileURI.getPath().substring(fileURI.getPath().lastIndexOf('/') + 1);
     }
 
-    private Response getPreviewFromCSV(CSVReader reader, final int numLines)
+    private Response getPreviewFromCSV(CSVReader reader, Integer pageNum, Integer pageSize, String fileName)
     {
         List<Map<String, String>> columns = new ArrayList<>();
-        List<List<String>> rows = new ArrayList<>();
+        List<List<String>> data = new ArrayList<>();
         try {
             for (final String columnName : reader.readNext()) {
-                HashMap<String, String> columnsMap = new HashMap<String, String>();
+                HashMap<String, String> columnsMap = new HashMap<>();
                 columnsMap.put("name", columnName);
                 columns.add(columnsMap);
             }
-            int counter = 0;
             for (String[] line : reader) {
-                counter++;
-                rows.add(Arrays.asList(line));
-                if (counter >= numLines) {
-                    break;
-                }
+                data.add(Arrays.asList(line));
             }
+            int total = data.toArray().length;
+
+            if (pageNum == null || pageSize == null || total == 0) {
+                return Response.ok(new PreviewResponse(columns, data, total, fileName)).build();
+            }
+            if (pageNum <= 0 || pageSize <= 0) {
+                return Response.status(Response.Status.BAD_REQUEST).build();
+            }
+            else if (total - pageSize * (pageNum - 1) <= 0) {
+                return Response.status(Response.Status.BAD_REQUEST).build();
+            }
+            int start = (pageNum - 1) * pageSize;
+            int end = Math.min(pageNum * pageSize, total);
+            List<List<String>> subData = data.subList(start, end);
+            return Response.ok(new PreviewResponse(columns, subData, total, fileName)).build();
         }
         catch (IOException e) {
             LOG.error(e.getMessage());
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
         }
-        return Response.ok(new PreviewResponse(columns, rows)).build();
     }
 
-    private Response getFilePreview(URI fileURI, int numLines)
+    private Response getFilePreview(URI fileURI, Integer pageNum, Integer pageSize)
     {
         String fileName = getFilename(fileURI);
         final File file = fileStore.get(fileName);
@@ -98,11 +108,13 @@ public class ResultsPreviewResource
             if (file == null) {
                 throw new FileNotFoundException(fileName + " could not be found");
             }
-            try (final CSVReader reader = new CSVReader(new FileReader(file))) {
-                return getPreviewFromCSV(reader, numLines);
-            }
-            catch (IOException e) {
-                return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+            else {
+                try (final CSVReader reader = new CSVReader(new FileReader(file))) {
+                    return getPreviewFromCSV(reader, pageNum, pageSize, fileName);
+                }
+                catch (IOException e) {
+                    return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+                }
             }
         }
         catch (FileNotFoundException e) {
