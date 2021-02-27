@@ -22,6 +22,7 @@ import io.prestosql.operator.OperatorFactory;
 import io.prestosql.operator.PageWithPositionComparator;
 import io.prestosql.operator.WorkProcessor;
 import io.prestosql.operator.exchange.LocalExchange.LocalExchangeFactory;
+import io.prestosql.snapshot.MultiInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -78,15 +79,16 @@ public class LocalMergeSourceOperator
         {
             checkState(!closed, "Factory is already closed");
 
-            LocalExchange localExchange = localExchangeFactory.getLocalExchange(driverContext.getLifespan());
-
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, LocalMergeSourceOperator.class.getSimpleName());
+
+            LocalExchange localExchange = localExchangeFactory.getLocalExchange(driverContext.getLifespan(), driverContext.getPipelineContext().getTaskContext(), planNodeId.toString(), operatorContext.isSnapshotEnabled());
+
             PageWithPositionComparator comparator = orderingCompiler.compilePageWithPositionComparator(types, sortChannels, orderings);
             List<LocalExchangeSource> sources = IntStream.range(0, localExchange.getBufferCount())
                     .boxed()
                     .map(index -> localExchange.getNextSource())
                     .collect(toImmutableList());
-            return new LocalMergeSourceOperator(operatorContext, sources, types, comparator);
+            return new LocalMergeSourceOperator(operatorContext, sources, types, comparator, localExchange.getSnapshotState());
         }
 
         @Override
@@ -106,10 +108,15 @@ public class LocalMergeSourceOperator
     private final List<LocalExchangeSource> sources;
     private final WorkProcessor<Page> mergedPages;
 
-    public LocalMergeSourceOperator(OperatorContext operatorContext, List<LocalExchangeSource> sources, List<Type> types, PageWithPositionComparator comparator)
+    // Snapshot: this is created for the local-exchange, but made available here,
+    // so this operator can return markers to downstream operators
+    private final MultiInputSnapshotState snapshotState;
+
+    public LocalMergeSourceOperator(OperatorContext operatorContext, List<LocalExchangeSource> sources, List<Type> types, PageWithPositionComparator comparator, MultiInputSnapshotState snapshotState)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.sources = requireNonNull(sources, "sources is null");
+        this.snapshotState = snapshotState;
         List<WorkProcessor<Page>> pageProducers = sources.stream()
                 .map(LocalExchangeSource::pages)
                 .collect(toImmutableList());
@@ -164,6 +171,13 @@ public class LocalMergeSourceOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (!mergedPages.process() || mergedPages.isFinished()) {
             return null;
         }
@@ -176,7 +190,7 @@ public class LocalMergeSourceOperator
     @Override
     public Page pollMarker()
     {
-        return null;
+        return snapshotState.nextMarker();
     }
 
     @Override

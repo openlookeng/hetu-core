@@ -42,13 +42,15 @@ public class LocalExchangeSourceOperator
         private final int operatorId;
         private final PlanNodeId planNodeId;
         private final LocalExchangeFactory localExchangeFactory;
+        private final int totalInputChannels;
         private boolean closed;
 
-        public LocalExchangeSourceOperatorFactory(int operatorId, PlanNodeId planNodeId, LocalExchangeFactory localExchangeFactory)
+        public LocalExchangeSourceOperatorFactory(int operatorId, PlanNodeId planNodeId, LocalExchangeFactory localExchangeFactory, int totalInputChannels)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.localExchangeFactory = requireNonNull(localExchangeFactory, "localExchangeFactory is null");
+            this.totalInputChannels = totalInputChannels;
         }
 
         @Override
@@ -65,7 +67,7 @@ public class LocalExchangeSourceOperator
             if (operatorContext.isSnapshotEnabled()) {
                 source = inMemoryExchange.getSource(driverContext.getDriverId());
             }
-            return new LocalExchangeSourceOperator(operatorContext, source);
+            return new LocalExchangeSourceOperator(operatorContext, source, totalInputChannels);
         }
 
         @Override
@@ -89,14 +91,17 @@ public class LocalExchangeSourceOperator
     private final OperatorContext operatorContext;
     private final MultiInputSnapshotState snapshotState;
     private final LocalExchangeSource source;
+    // Snapshot: total number of local-sinks that send data to this operator
+    private final int totalInputChannels;
 
-    public LocalExchangeSourceOperator(OperatorContext operatorContext, LocalExchangeSource source)
+    public LocalExchangeSourceOperator(OperatorContext operatorContext, LocalExchangeSource source, int totalInputChannels)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.snapshotState = operatorContext.isSnapshotEnabled()
                 ? MultiInputSnapshotState.forOperator(this, operatorContext)
                 : null;
         this.source = requireNonNull(source, "source is null");
+        this.totalInputChannels = totalInputChannels;
         operatorContext.setInfoSupplier(source::getBufferInfo);
     }
 
@@ -115,7 +120,8 @@ public class LocalExchangeSourceOperator
     @Override
     public boolean isFinished()
     {
-        return source.isFinished();
+        // Snapshot: must also use up all resumed pages
+        return source.isFinished() && (snapshotState == null || !snapshotState.hasPendingPages());
     }
 
     @Override
@@ -139,7 +145,13 @@ public class LocalExchangeSourceOperator
     @Override
     public Page getOutput()
     {
-        Page page = source.removePage();
+        Page page;
+        if (snapshotState != null) {
+            page = snapshotState.processPage(() -> source.removePage()).orElse(null);
+        }
+        else {
+            page = source.removePage();
+        }
         if (page != null) {
             operatorContext.recordProcessedInput(page.getSizeInBytes(), page.getPositionCount());
         }
@@ -155,7 +167,8 @@ public class LocalExchangeSourceOperator
     @Override
     public Optional<Set<String>> getInputChannels()
     {
-        return Optional.empty();
+        Set<String> channels = source.getAllInputChannels();
+        return totalInputChannels == channels.size() ? Optional.of(channels) : Optional.empty();
     }
 
     @Override

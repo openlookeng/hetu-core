@@ -273,7 +273,7 @@ class ClientBuffer
             // The page supplier has incremented the page reference count, and addPages below also increments
             // the reference count, so we need to drop the page supplier reference. The call dereferencePage
             // is performed outside of synchronized to avoid making a callback while holding a lock.
-            pageReferences = pagesSupplier.getPages(maxSize);
+            pageReferences = pagesSupplier.getPages(this, maxSize);
 
             // add the pages to this buffer, which will increase the reference count
             addPages(pageReferences);
@@ -462,7 +462,7 @@ class ClientBuffer
         /**
          * Gets pages up to the specified size limit or a single page that exceeds the size limit.
          */
-        List<SerializedPageReference> getPages(DataSize maxSize);
+        List<SerializedPageReference> getPages(ClientBuffer client, DataSize maxSize);
 
         /**
          * @return true if more pages may be produced; false otherwise

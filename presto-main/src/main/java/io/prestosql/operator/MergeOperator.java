@@ -17,8 +17,9 @@ import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
-import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.metadata.Split;
+import io.prestosql.snapshot.MarkerSplit;
 import io.prestosql.snapshot.MultiInputRestorable;
 import io.prestosql.snapshot.MultiInputSnapshotState;
 import io.prestosql.spi.Page;
@@ -36,6 +37,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -58,7 +60,6 @@ public class MergeOperator
         private final int operatorId;
         private final PlanNodeId sourceId;
         private final ExchangeClientSupplier exchangeClientSupplier;
-        private final PagesSerdeFactory serdeFactory;
         private final List<Type> types;
         private final List<Integer> outputChannels;
         private final List<Type> outputTypes;
@@ -71,7 +72,6 @@ public class MergeOperator
                 int operatorId,
                 PlanNodeId sourceId,
                 ExchangeClientSupplier exchangeClientSupplier,
-                PagesSerdeFactory serdeFactory,
                 OrderingCompiler orderingCompiler,
                 List<Type> types,
                 List<Integer> outputChannels,
@@ -81,7 +81,6 @@ public class MergeOperator
             this.operatorId = operatorId;
             this.sourceId = requireNonNull(sourceId, "sourceId is null");
             this.exchangeClientSupplier = requireNonNull(exchangeClientSupplier, "exchangeClientSupplier is null");
-            this.serdeFactory = requireNonNull(serdeFactory, "serdeFactory is null");
             this.types = requireNonNull(types, "types is null");
             this.outputChannels = requireNonNull(outputChannels, "outputChannels is null");
             this.outputTypes = mappedCopy(outputChannels, types::get);
@@ -106,7 +105,6 @@ public class MergeOperator
                     operatorContext,
                     sourceId,
                     exchangeClientSupplier,
-                    serdeFactory.createPagesSerde(),
                     orderingCompiler.compilePageWithPositionComparator(types, sortChannels, sortOrder),
                     outputChannels,
                     outputTypes);
@@ -122,7 +120,6 @@ public class MergeOperator
     private final OperatorContext operatorContext;
     private final PlanNodeId sourceId;
     private final ExchangeClientSupplier exchangeClientSupplier;
-    private final PagesSerde pagesSerde;
     private final PageWithPositionComparator comparator;
     private final List<Integer> outputChannels;
     private final List<Type> outputTypes;
@@ -135,13 +132,15 @@ public class MergeOperator
     private WorkProcessor<Page> mergedPages;
     private boolean closed;
 
+    private final String id;
+    private final List<ExchangeClient> clients = new ArrayList<>();
     private final MultiInputSnapshotState snapshotState;
+    private Optional<Set<String>> inputChannels = Optional.empty();
 
     public MergeOperator(
             OperatorContext operatorContext,
             PlanNodeId sourceId,
             ExchangeClientSupplier exchangeClientSupplier,
-            PagesSerde pagesSerde,
             PageWithPositionComparator comparator,
             List<Integer> outputChannels,
             List<Type> outputTypes)
@@ -149,10 +148,10 @@ public class MergeOperator
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.sourceId = requireNonNull(sourceId, "sourceId is null");
         this.exchangeClientSupplier = requireNonNull(exchangeClientSupplier, "exchangeClientSupplier is null");
-        this.pagesSerde = requireNonNull(pagesSerde, "pagesSerde is null");
         this.comparator = requireNonNull(comparator, "comparator is null");
         this.outputChannels = requireNonNull(outputChannels, "outputChannels is null");
         this.outputTypes = requireNonNull(outputTypes, "outputTypes is null");
+        this.id = operatorContext.getUniqueId();
         this.snapshotState = operatorContext.isSnapshotEnabled() ? MultiInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
@@ -166,17 +165,80 @@ public class MergeOperator
     public Supplier<Optional<UpdatablePageSource>> addSplit(Split split)
     {
         requireNonNull(split, "split is null");
+        if (split.getConnectorSplit() instanceof MarkerSplit) {
+            throw new UnsupportedOperationException("Operator doesn't support snapshotting.");
+        }
         checkArgument(split.getConnectorSplit() instanceof RemoteSplit, "split is not a remote split");
         checkState(!blockedOnSplits.isDone(), "noMoreSplits has been called already");
 
         URI location = ((RemoteSplit) split.getConnectorSplit()).getLocation();
         ExchangeClient exchangeClient = closer.register(exchangeClientSupplier.get(operatorContext.localSystemMemoryContext()));
+        if (operatorContext.isSnapshotEnabled()) {
+            exchangeClient.setSnapshotEnabled();
+            exchangeClient.setSnapshotState(snapshotState);
+        }
+        exchangeClient.addTarget(id);
+        exchangeClient.noMoreTargets();
         exchangeClient.addLocation(location);
         exchangeClient.noMoreLocations();
-        pageProducers.add(exchangeClient.pages()
-                .map(serializedPage -> {
-                    operatorContext.recordNetworkInput(serializedPage.getSizeInBytes(), serializedPage.getPositionCount());
-                    return pagesSerde.deserialize(serializedPage);
+        clients.add(exchangeClient);
+        pageProducers.add(exchangeClient.pages(id)
+                .map(new WorkProcessor.RestorableFunction<SerializedPage, Page>()
+                {
+                    @Override
+                    public Page apply(SerializedPage serializedPage)
+                    {
+                        operatorContext.recordNetworkInput(serializedPage.getSizeInBytes(), serializedPage.getPositionCount());
+                        return operatorContext.getDriverContext().getSerde().deserialize(serializedPage);
+                    }
+
+                    @Override
+                    public Object captureResult(Page result, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        if (result != null) {
+                            return ((PagesSerde) serdeProvider).serialize(result).capture(serdeProvider);
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    public Page restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        if (resultState != null) {
+                            SerializedPage serializedPage = SerializedPage.restoreSerializedPage(resultState);
+                            return ((PagesSerde) serdeProvider).deserialize(serializedPage);
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    public Object captureInput(SerializedPage input, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        if (input != null) {
+                            return input.capture(serdeProvider);
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    public SerializedPage restoreInput(Object inputState, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        if (inputState != null) {
+                            return SerializedPage.restoreSerializedPage(inputState);
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return 0;
+                    }
+
+                    @Override
+                    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                    }
                 }));
 
         return Optional::empty;
@@ -257,7 +319,20 @@ public class MergeOperator
     @Override
     public Optional<Set<String>> getInputChannels()
     {
-        return Optional.empty();
+        if (inputChannels.isPresent()) {
+            return inputChannels;
+        }
+
+        if (!blockedOnSplits.isDone()) {
+            return Optional.empty();
+        }
+
+        Set<String> channels = new HashSet<>();
+        for (ExchangeClient client : clients) {
+            channels.addAll(client.getAllClients());
+        }
+        inputChannels = Optional.of(channels);
+        return inputChannels;
     }
 
     @Override

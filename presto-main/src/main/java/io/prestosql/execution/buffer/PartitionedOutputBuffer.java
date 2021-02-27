@@ -15,15 +15,27 @@ package io.prestosql.execution.buffer;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.SystemSessionProperties;
 import io.prestosql.execution.StateMachine;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.operator.TaskContext;
+import io.prestosql.snapshot.MultiInputRestorable;
+import io.prestosql.snapshot.MultiInputSnapshotState;
+import io.prestosql.snapshot.SnapshotStateId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
+import java.io.Serializable;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
@@ -40,12 +52,19 @@ import static io.prestosql.execution.buffer.BufferState.OPEN;
 import static io.prestosql.execution.buffer.OutputBuffers.BufferType.PARTITIONED;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(stateClassName = "PartitionedOutputBufferState", uncapturedFields = {"state", "outputBuffers", "memoryManager", "taskContext", "snapshotState",
+        "partitions", "noMoreInputChannels", "inputChannels"})
 public class PartitionedOutputBuffer
-        implements OutputBuffer
+        implements OutputBuffer, MultiInputRestorable
 {
     private final StateMachine<BufferState> state;
     private final OutputBuffers outputBuffers;
     private final OutputBufferMemoryManager memoryManager;
+    // Snapshot: Output buffers can receive markers from multiple drivers
+    private TaskContext taskContext;
+    private boolean noMoreInputChannels;
+    private final Set<String> inputChannels = Sets.newConcurrentHashSet();
+    private MultiInputSnapshotState snapshotState;
 
     private final List<ClientBuffer> partitions;
 
@@ -179,14 +198,28 @@ public class PartitionedOutputBuffer
             return;
         }
 
+        int factor = 1;
+        if (snapshotState != null) {
+            // All marker related processing is handled by this utility method
+            synchronized (snapshotState) {
+                pages = snapshotState.processSerializedPages(pages);
+            }
+            // Broadcast marker to all clients
+            if (pages.size() == 1 && pages.get(0).isMarkerPage()) {
+                factor = partitions.size();
+            }
+        }
+
         // reserve memory
         long bytesAdded = pages.stream().mapToLong(SerializedPage::getRetainedSizeInBytes).sum();
-        memoryManager.updateMemoryUsage(bytesAdded);
+        memoryManager.updateMemoryUsage(bytesAdded * factor);
 
         // update stats
         long rowCount = pages.stream().mapToLong(SerializedPage::getPositionCount).sum();
-        totalRowsAdded.addAndGet(rowCount);
-        totalPagesAdded.addAndGet(pages.size());
+        totalRowsAdded.addAndGet(rowCount * factor);
+
+        long pageCount = pages.size();
+        totalPagesAdded.addAndGet(pageCount * factor);
 
         // create page reference counts with an initial single reference
         List<SerializedPageReference> serializedPageReferences = pages.stream()
@@ -194,7 +227,13 @@ public class PartitionedOutputBuffer
                 .collect(toImmutableList());
 
         // add pages to the buffer (this will increase the reference count by one)
-        partitions.get(partitionNumber).enqueuePages(serializedPageReferences);
+        if (factor == 1) {
+            partitions.get(partitionNumber).enqueuePages(serializedPageReferences);
+        }
+        else {
+            // Broadcast to all partitions
+            partitions.forEach(partition -> partition.enqueuePages(serializedPageReferences));
+        }
 
         // drop the initial reference
         serializedPageReferences.forEach(SerializedPageReference::dereferencePage);
@@ -288,5 +327,63 @@ public class PartitionedOutputBuffer
     OutputBufferMemoryManager getMemoryManager()
     {
         return memoryManager;
+    }
+
+    @Override
+    public void setTaskContext(TaskContext taskContext)
+    {
+        checkArgument(taskContext != null, "taskContext is null");
+        checkState(this.taskContext == null, "setTaskContext is called multiple times");
+        this.taskContext = taskContext;
+        this.snapshotState = SystemSessionProperties.isSnapshotEnabled(taskContext.getSession())
+                ? MultiInputSnapshotState.forTaskComponent(this, taskContext, snapshotId -> SnapshotStateId.forTaskComponent(snapshotId, taskContext, "OutputBuffer"))
+                : null;
+    }
+
+    @Override
+    public void setNoMoreInputChannels()
+    {
+        checkState(!noMoreInputChannels, "setNoMoreInputChannels is called multiple times");
+        this.noMoreInputChannels = true;
+    }
+
+    @Override
+    public void addInputChannel(String inputId)
+    {
+        checkState(!noMoreInputChannels, "addInputChannel is called after setNoMoreInputChannels");
+        inputChannels.add(inputId);
+    }
+
+    @Override
+    public Optional<Set<String>> getInputChannels()
+    {
+        return noMoreInputChannels ? Optional.of(Collections.unmodifiableSet(inputChannels)) : Optional.empty();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        PartitionedOutputBufferState myState = new PartitionedOutputBufferState();
+        myState.totalPagesAdded = totalPagesAdded.get();
+        myState.totalRowsAdded = totalRowsAdded.get();
+        // TODO-cp-I2DSGR: other fields worth capturing?
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        PartitionedOutputBufferState myState = (PartitionedOutputBufferState) state;
+        totalPagesAdded.set(myState.totalPagesAdded);
+        totalRowsAdded.set(myState.totalRowsAdded);
+    }
+
+    private static class PartitionedOutputBufferState
+            implements Serializable
+    {
+        // Do not need to capture initialPagesForNewBuffers, because pages stored there
+        // will be sent out before markers are sent to their targets.
+        private long totalPagesAdded;
+        private long totalRowsAdded;
     }
 }

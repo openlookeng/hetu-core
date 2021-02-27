@@ -69,9 +69,13 @@ public class LocalExchangeSinkOperator
             checkState(!closed, "Factory is already closed");
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, LocalExchangeSinkOperator.class.getSimpleName());
 
-            LocalExchangeSinkFactory localExchangeSinkFactory = localExchangeFactory.getLocalExchange(driverContext.getLifespan()).getSinkFactory(sinkFactoryId);
+            LocalExchangeSinkFactory localExchangeSinkFactory = localExchangeFactory.getLocalExchange(driverContext.getLifespan(),
+                    driverContext.getPipelineContext().getTaskContext(),
+                    planNodeId.toString(),
+                    operatorContext.isSnapshotEnabled()).getSinkFactory(sinkFactoryId);
 
-            return new LocalExchangeSinkOperator(operatorContext, localExchangeSinkFactory.createSink(), pagePreprocessor);
+            String sinkId = operatorContext.getUniqueId();
+            return new LocalExchangeSinkOperator(sinkId, operatorContext, localExchangeSinkFactory.createSink(sinkId), pagePreprocessor);
         }
 
         @Override
@@ -100,15 +104,22 @@ public class LocalExchangeSinkOperator
         {
             localExchangeFactory.noMoreSinkFactories();
         }
+
+        public void broadcastMarker(Lifespan lifespan, MarkerPage markerPage)
+        {
+            localExchangeFactory.getLocalExchange(lifespan).broadcastMarker(markerPage);
+        }
     }
 
+    private final String id;
     private final OperatorContext operatorContext;
     private final LocalExchangeSink sink;
     private final Function<Page, Page> pagePreprocessor;
     private final SingleInputSnapshotState snapshotState;
 
-    LocalExchangeSinkOperator(OperatorContext operatorContext, LocalExchangeSink sink, Function<Page, Page> pagePreprocessor)
+    LocalExchangeSinkOperator(String id, OperatorContext operatorContext, LocalExchangeSink sink, Function<Page, Page> pagePreprocessor)
     {
+        this.id = id;
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.sink = requireNonNull(sink, "sink is null");
         this.pagePreprocessor = requireNonNull(pagePreprocessor, "pagePreprocessor is null");
@@ -159,7 +170,7 @@ public class LocalExchangeSinkOperator
         if (!(page instanceof MarkerPage)) {
             page = pagePreprocessor.apply(page);
         }
-        sink.addPage(page);
+        sink.addPage(page.setOrigin(id));
         operatorContext.recordOutput(page.getSizeInBytes(), page.getPositionCount());
     }
 

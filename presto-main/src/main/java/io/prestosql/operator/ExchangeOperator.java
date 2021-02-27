@@ -14,7 +14,6 @@
 package io.prestosql.operator;
 
 import com.google.common.util.concurrent.ListenableFuture;
-import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.metadata.Split;
 import io.prestosql.snapshot.MultiInputRestorable;
@@ -55,8 +54,7 @@ public class ExchangeOperator
         public ExchangeOperatorFactory(
                 int operatorId,
                 PlanNodeId sourceId,
-                ExchangeClientSupplier exchangeClientSupplier,
-                PagesSerdeFactory serdeFactory)
+                ExchangeClientSupplier exchangeClientSupplier)
         {
             this.operatorId = operatorId;
             this.sourceId = sourceId;
@@ -76,31 +74,44 @@ public class ExchangeOperator
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, sourceId, ExchangeOperator.class.getSimpleName());
             if (exchangeClient == null) {
                 exchangeClient = exchangeClientSupplier.get(driverContext.getPipelineContext().localSystemMemoryContext());
+                if (operatorContext.isSnapshotEnabled()) {
+                    exchangeClient.setSnapshotEnabled();
+                }
             }
 
-            return new ExchangeOperator(
+            String uniqueId = operatorContext.getUniqueId();
+            ExchangeOperator ret = new ExchangeOperator(
+                    uniqueId,
                     operatorContext,
                     sourceId,
                     exchangeClient);
+            exchangeClient.addTarget(uniqueId);
+            return ret;
         }
 
         @Override
         public void noMoreOperators()
         {
             closed = true;
+            if (exchangeClient != null) {
+                exchangeClient.noMoreTargets();
+            }
         }
     }
 
+    private final String id;
     private final OperatorContext operatorContext;
     private final MultiInputSnapshotState snapshotState;
     private final PlanNodeId sourceId;
     private final ExchangeClient exchangeClient;
 
     public ExchangeOperator(
+            String id,
             OperatorContext operatorContext,
             PlanNodeId sourceId,
             ExchangeClient exchangeClient)
     {
+        this.id = requireNonNull(id, "id is null");
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.sourceId = requireNonNull(sourceId, "sourceId is null");
         this.exchangeClient = requireNonNull(exchangeClient, "exchangeClient is null");
@@ -150,7 +161,7 @@ public class ExchangeOperator
     @Override
     public boolean isFinished()
     {
-        return exchangeClient.isFinished();
+        return exchangeClient.isFinished() && (snapshotState == null || !snapshotState.hasPendingPages());
     }
 
     @Override
@@ -166,7 +177,13 @@ public class ExchangeOperator
     @Override
     public Page getOutput()
     {
-        SerializedPage page = exchangeClient.pollPage();
+        SerializedPage page;
+        if (snapshotState != null) {
+            page = snapshotState.processSerializedPage(() -> exchangeClient.pollPage(id)).orElse(null);
+        }
+        else {
+            page = exchangeClient.pollPage(id);
+        }
         if (page == null) {
             return null;
         }
@@ -182,7 +199,7 @@ public class ExchangeOperator
     @Override
     public Page pollMarker()
     {
-        return null;
+        return snapshotState.nextSerializedMarker(() -> exchangeClient.pollPage(id)).map(serializedPage -> serializedPage.toMarker()).orElse(null);
     }
 
     @Override
@@ -194,7 +211,12 @@ public class ExchangeOperator
     @Override
     public Optional<Set<String>> getInputChannels()
     {
-        return Optional.empty();
+        // TODO-cp-I2TIJL: it's possible that exchange client hasn't received all locations, then input channel list is not complete,
+        // and snapshot may not be complete. But we won't receive the "no more locations" signal when source splits are still being scheduled,
+        // which may last toward the end of query execution.
+        // To overcome this, we can send the list of known locations (source tasks) to the coordinator, which can compare that list against
+        // all tasks from the source stage. If they match, then snapshots can be marked as complete; otherwise they are not usable.
+        return Optional.of(exchangeClient.getAllClients());
     }
 
     @Override

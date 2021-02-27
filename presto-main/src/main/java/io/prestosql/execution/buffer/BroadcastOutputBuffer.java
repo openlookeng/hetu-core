@@ -20,18 +20,29 @@ import com.google.common.collect.Sets.SetView;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.SystemSessionProperties;
 import io.prestosql.execution.StateMachine;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.operator.TaskContext;
+import io.prestosql.snapshot.MultiInputRestorable;
+import io.prestosql.snapshot.MultiInputSnapshotState;
+import io.prestosql.snapshot.SnapshotStateId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
 import javax.annotation.concurrent.GuardedBy;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
@@ -49,12 +60,19 @@ import static io.prestosql.execution.buffer.BufferState.OPEN;
 import static io.prestosql.execution.buffer.OutputBuffers.BufferType.BROADCAST;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"state", "memoryManager", "taskContext", "snapshotState", "outputBuffers",
+        "buffers", "initialPagesForNewBuffers", "noMoreInputChannels", "inputChannels"})
 public class BroadcastOutputBuffer
-        implements OutputBuffer
+        implements OutputBuffer, MultiInputRestorable
 {
     private final String taskInstanceId;
     private final StateMachine<BufferState> state;
     private final OutputBufferMemoryManager memoryManager;
+    // Snapshot: Output buffers can receive markers from multiple drivers
+    private TaskContext taskContext;
+    private boolean noMoreInputChannels;
+    private final Set<String> inputChannels = Sets.newConcurrentHashSet();
+    private MultiInputSnapshotState snapshotState;
 
     @GuardedBy("this")
     private OutputBuffers outputBuffers = OutputBuffers.createInitialEmptyOutputBuffers(BROADCAST);
@@ -195,6 +213,13 @@ public class BroadcastOutputBuffer
         // this can happen with a limit query
         if (!state.get().canAddPages()) {
             return;
+        }
+
+        if (snapshotState != null) {
+            // All marker related processing is handled by this utility method
+            synchronized (snapshotState) {
+                pages = snapshotState.processSerializedPages(pages);
+            }
         }
 
         // reserve memory
@@ -400,5 +425,66 @@ public class BroadcastOutputBuffer
     OutputBufferMemoryManager getMemoryManager()
     {
         return memoryManager;
+    }
+
+    @Override
+    public void setTaskContext(TaskContext taskContext)
+    {
+        checkArgument(taskContext != null, "taskContext is null");
+        checkState(this.taskContext == null, "setTaskContext is called multiple times");
+        this.taskContext = taskContext;
+        this.snapshotState = SystemSessionProperties.isSnapshotEnabled(taskContext.getSession())
+                ? MultiInputSnapshotState.forTaskComponent(this, taskContext, snapshotId -> SnapshotStateId.forTaskComponent(snapshotId, taskContext, "OutputBuffer"))
+                : null;
+    }
+
+    @Override
+    public void setNoMoreInputChannels()
+    {
+        checkState(!noMoreInputChannels, "setNoMoreInputChannels is called multiple times");
+        this.noMoreInputChannels = true;
+    }
+
+    @Override
+    public void addInputChannel(String inputId)
+    {
+        checkState(!noMoreInputChannels, "addInputChannel is called after setNoMoreInputChannels");
+        inputChannels.add(inputId);
+    }
+
+    @Override
+    public Optional<Set<String>> getInputChannels()
+    {
+        return noMoreInputChannels ? Optional.of(Collections.unmodifiableSet(inputChannels)) : Optional.empty();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        BroadcastOutputBufferState myState = new BroadcastOutputBufferState();
+        myState.totalPagesAdded = totalPagesAdded.get();
+        myState.totalRowsAdded = totalRowsAdded.get();
+        myState.totalBufferedPages = totalBufferedPages.get();
+        // TODO-cp-I2DSGR: other fields worth capturing?
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        BroadcastOutputBufferState myState = (BroadcastOutputBufferState) state;
+        totalPagesAdded.set(myState.totalPagesAdded);
+        totalRowsAdded.set(myState.totalRowsAdded);
+        totalBufferedPages.set(myState.totalBufferedPages);
+    }
+
+    private static class BroadcastOutputBufferState
+            implements Serializable
+    {
+        // Do not need to capture initialPagesForNewBuffers, because pages stored there
+        // will be sent out before markers are sent to their targets.
+        private long totalPagesAdded;
+        private long totalRowsAdded;
+        private long totalBufferedPages;
     }
 }

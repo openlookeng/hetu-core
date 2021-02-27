@@ -58,6 +58,13 @@ public class PassthroughExchanger
     @Override
     public void finish()
     {
-        localExchangeSource.finish();
+        // DO NOT call finish() on the localExchangeSource, because other sinks may still need to send markers to it
+        // TODO-cp: why did this exchanger need to call finish, while others don't?
+        // localExchangeSource.finish();
+    }
+
+    public LocalExchangeSource getLocalExchangeSource()
+    {
+        return localExchangeSource;
     }
 }

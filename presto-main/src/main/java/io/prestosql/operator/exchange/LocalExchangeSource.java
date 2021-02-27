@@ -13,17 +13,26 @@
  */
 package io.prestosql.operator.exchange;
 
+import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.operator.WorkProcessor;
 import io.prestosql.operator.WorkProcessor.ProcessState;
+import io.prestosql.snapshot.MultiInputSnapshotState;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.MarkerPage;
 
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
+import javax.validation.constraints.NotNull;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicLong;
@@ -42,6 +51,10 @@ public class LocalExchangeSource
         NOT_EMPTY.set(null);
     }
 
+    // Snapshot: all local-sinks that send markers to this local-source
+    // Should include all sinks for local-exchange operator; but only 1 sink for local-merge, because of pass-through exchanger
+    private final Set<String> inputChannels = Sets.newConcurrentHashSet();
+
     private final Consumer<LocalExchangeSource> onFinish;
 
     private final BlockingQueue<PageReference> buffer = new LinkedBlockingDeque<>();
@@ -55,9 +68,14 @@ public class LocalExchangeSource
     @GuardedBy("lock")
     private boolean finishing;
 
-    public LocalExchangeSource(Consumer<LocalExchangeSource> onFinish)
+    // Only set for local-merge, to record markers.
+    // Markers may not reach the local-merge operator because it may be blocked on other channels.
+    private final MultiInputSnapshotState snapshotState;
+
+    public LocalExchangeSource(Consumer<LocalExchangeSource> onFinish, MultiInputSnapshotState snapshotState)
     {
         this.onFinish = requireNonNull(onFinish, "onFinish is null");
+        this.snapshotState = snapshotState;
     }
 
     public LocalExchangeBufferInfo getBufferInfo()
@@ -65,6 +83,16 @@ public class LocalExchangeSource
         // This must be lock free to assure task info creation is fast
         // Note: the stats my be internally inconsistent
         return new LocalExchangeBufferInfo(bufferedBytes.get(), buffer.size());
+    }
+
+    void addInputChannel(String inputChannel)
+    {
+        inputChannels.add(inputChannel);
+    }
+
+    Set<String> getAllInputChannels()
+    {
+        return Collections.unmodifiableSet(inputChannels);
     }
 
     void addPage(PageReference pageReference)
@@ -76,6 +104,25 @@ public class LocalExchangeSource
         synchronized (lock) {
             // ignore pages after finish
             if (!finishing) {
+                if (snapshotState != null) {
+                    // For local-merge
+                    Page page;
+                    synchronized (snapshotState) {
+                        page = snapshotState.processPage(() -> pageReference.peekPage()).orElse(null);
+                    }
+                    //if new input page is marker, we don't add it to buffer, it will be obtained through MultiInputSnapshotState's getPendingMarker()
+                    if (page instanceof MarkerPage || page == null) {
+                        pageReference.removePage();
+                        // whenever local exchange source sees a marker page, it's going to check whether operator after local merge is blocked by it.
+                        // if it is, this local exchange source will unblock in order for next operator to ask for output to pass down the marker.
+                        if (!this.notEmptyFuture.isDone()) {
+                            notEmptyFuture = this.notEmptyFuture;
+                            this.notEmptyFuture = NOT_EMPTY;
+                            notEmptyFuture.set(null);
+                        }
+                        return;
+                    }
+                }
                 // buffered bytes must be updated before adding to the buffer to assure
                 // the count does not go negative
                 bufferedBytes.addAndGet(pageReference.getRetainedSizeInBytes());
@@ -99,23 +146,56 @@ public class LocalExchangeSource
 
     public WorkProcessor<Page> pages()
     {
-        return WorkProcessor.create(() -> {
-            Page page = removePage();
-            if (page == null) {
-                if (isFinished()) {
-                    return ProcessState.finished();
-                }
+        return WorkProcessor.create(
+                new WorkProcessor.Process<Page>()
+                {
+                    @Override
+                    public ProcessState<Page> process()
+                    {
+                        Page page = removePage();
 
-                ListenableFuture<?> blocked = waitForReading();
-                if (!blocked.isDone()) {
-                    return ProcessState.blocked(blocked);
-                }
+                        if (page == null) {
+                            if (isFinished()) {
+                                return ProcessState.finished();
+                            }
 
-                return ProcessState.yield();
-            }
+                            ListenableFuture<?> blocked = waitForReading();
+                            if (!blocked.isDone()) {
+                                return ProcessState.blocked(blocked);
+                            }
 
-            return ProcessState.ofResult(page);
-        });
+                            return ProcessState.yield();
+                        }
+
+                        return ProcessState.ofResult(page);
+                    }
+
+                    @Override
+                    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return 0;
+                    }
+
+                    @Override
+                    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                    }
+
+                    @Override
+                    public Object captureResult(@NotNull Page result, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        SerializedPage serializedPage = ((PagesSerde) serdeProvider).serialize(result);
+                        return serializedPage.capture(serdeProvider);
+                    }
+
+                    @Override
+                    public Page restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        checkState(resultState != null);
+                        SerializedPage serializedPage = SerializedPage.restoreSerializedPage(resultState);
+                        return ((PagesSerde) serdeProvider).deserialize(serializedPage);
+                    }
+                });
     }
 
     public Page removePage()
