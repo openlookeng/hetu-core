@@ -79,6 +79,7 @@ public class TestQueryResource
         assertEquals(infos.size(), 3);
         assertStateCounts(infos, 2, 1, 0);
 
+        // test state
         infos = getQueryInfos("/v1/query?state=finished");
         assertEquals(infos.size(), 2);
         assertStateCounts(infos, 2, 0, 0);
@@ -90,6 +91,24 @@ public class TestQueryResource
         infos = getQueryInfos("/v1/query?state=running");
         assertEquals(infos.size(), 0);
         assertStateCounts(infos, 0, 0, 0);
+
+        //test failed
+        infos = getQueryInfos("/v1/query?state=failed&&failed=user_error");
+        assertEquals(infos.size(), 1);
+        assertStateCounts(infos, 0, 1, 0);
+
+        infos = getQueryInfos("/v1/query?state=failed&&failed=internal_error");
+        assertEquals(infos.size(), 0);
+        assertStateCounts(infos, 0, 0, 0);
+
+        infos = getQueryInfos("/v1/query?state=finished&&failed=user_error");
+        assertEquals(infos.size(), 2);
+        assertStateCounts(infos, 2, 0, 0);
+
+        // test search
+        infos = getQueryInfos("/v1/query?search=from");
+        assertEquals(infos.size(), 1);
+        assertStateCounts(infos, 0, 1, 0);
     }
 
     @Test
@@ -133,7 +152,7 @@ public class TestQueryResource
 
     private List<BasicQueryInfo> getQueryInfos(String path)
     {
-        Request request = prepareGet().setUri(server.resolve(path)).build();
+        Request request = prepareGet().setHeader(PRESTO_USER, "user").setUri(server.resolve(path)).build();
         return client.execute(request, createJsonResponseHandler(listJsonCodec(BasicQueryInfo.class)));
     }
 
@@ -172,7 +191,9 @@ public class TestQueryResource
         Request request = prepareGet()
                 .setUri(uri)
                 .build();
-        JsonCodec<QueryInfo> codec = server.getInstance(Key.get(new TypeLiteral<JsonCodec<QueryInfo>>() {}));
+        JsonCodec<QueryInfo> codec = server.getInstance(Key.get(new TypeLiteral<JsonCodec<QueryInfo>>()
+        {
+        }));
         return client.execute(request, createJsonResponseHandler(codec));
     }
 }

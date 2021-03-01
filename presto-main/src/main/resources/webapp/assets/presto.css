@@ -898,7 +898,7 @@ g .operator-stats:hover {
 }
 
 .queryListContainer {
-    max-height: calc(100vh - 190px);
+    max-height: calc(100vh - 220px);
     overflow: auto;
 }
 

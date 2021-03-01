@@ -82,10 +82,20 @@ public class TestQueryStateInfoResource
 
         // queries are started in the background, so they may not all be immediately visible
         while (true) {
-            List<BasicQueryInfo> queryInfos = client.execute(
-                    prepareGet().setUri(uriBuilderFrom(server.getBaseUrl()).replacePath("/v1/query").build()).build(),
+            List<BasicQueryInfo> queryInfos1 = client.execute(
+                    prepareGet()
+                            .setUri(uriBuilderFrom(server.getBaseUrl()).replacePath("/v1/query").build())
+                            .setHeader(PRESTO_USER, "user1")
+                            .build(),
                     createJsonResponseHandler(listJsonCodec(BasicQueryInfo.class)));
-            if ((queryInfos.size() == 2) && queryInfos.stream().allMatch(info -> info.getState() == RUNNING)) {
+            List<BasicQueryInfo> queryInfos2 = client.execute(
+                    prepareGet()
+                            .setUri(uriBuilderFrom(server.getBaseUrl()).replacePath("/v1/query").build())
+                            .setHeader(PRESTO_USER, "user2")
+                            .build(),
+                    createJsonResponseHandler(listJsonCodec(BasicQueryInfo.class)));
+            if ((queryInfos1.size() == 1) && queryInfos1.stream().allMatch(info -> info.getState() == RUNNING) &&
+                    (queryInfos2.size() == 1) && queryInfos2.stream().allMatch(info -> info.getState() == RUNNING)) {
                 break;
             }
         }
