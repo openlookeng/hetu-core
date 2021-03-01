@@ -473,7 +473,7 @@ public abstract class AbstractTestHiveFileSystem
 
         public TestingHiveMetastore(HiveMetastore delegate, ExecutorService executor, HiveConfig hiveConfig, Path basePath, HdfsEnvironment hdfsEnvironment)
         {
-            super(delegate, executor, hiveConfig);
+            super(delegate, executor, hiveConfig, new TestingNodeManager("fake-environment"));
             this.basePath = basePath;
             this.hdfsEnvironment = hdfsEnvironment;
         }
