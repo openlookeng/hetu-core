@@ -24,6 +24,8 @@ import io.prestosql.matching.Pattern;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.PlanNode;
@@ -45,7 +47,9 @@ import io.prestosql.sql.tree.LogicalBinaryExpression;
 import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -56,10 +60,7 @@ import static io.prestosql.matching.Pattern.empty;
 import static io.prestosql.sql.planner.plan.Patterns.Apply.correlation;
 import static io.prestosql.sql.planner.plan.Patterns.Apply.subQuery;
 import static io.prestosql.sql.planner.plan.Patterns.applyNode;
-import static io.prestosql.sql.planner.plan.Patterns.filter;
-import static io.prestosql.sql.planner.plan.Patterns.join;
 import static io.prestosql.sql.planner.plan.Patterns.project;
-import static io.prestosql.sql.planner.plan.Patterns.source;
 
 /**
  * Transforms the SelfJoin resulting in duplicate rows used for IN predicate to aggregation.
@@ -93,11 +94,8 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
         implements Rule<ApplyNode>
 {
     private static final Capture<ProjectNode> PROJECT_NODE = newCapture();
-    private static final Capture<JoinNode> JOIN_NODE = newCapture();
     private static final Pattern<ProjectNode> PROJECT_NODE_PATTERN = project()
-            .capturedAs(PROJECT_NODE)
-            .with(source().matching(filter()
-                    .with(source().matching(join().capturedAs(JOIN_NODE)))));
+            .capturedAs(PROJECT_NODE);
     private static final Pattern<ApplyNode> PATTERN = applyNode()
             .with(empty(correlation()))
             .with(subQuery().matching(PROJECT_NODE_PATTERN));
@@ -139,6 +137,15 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
         return Result.empty();
     }
 
+    private PlanNode getChildFilterNode(Context context, PlanNode node)
+    {
+        node = context.getLookup().resolve(node);
+        if (node instanceof ProjectNode) {
+            return getChildFilterNode(context, ((ProjectNode) node).getSource());
+        }
+        return node;
+    }
+
     private Optional<ProjectNode> transformProjectNode(Context context, ProjectNode projectNode)
     {
         //IN predicate requires only one projection
@@ -146,6 +153,9 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
             return Optional.empty();
         }
         PlanNode source = context.getLookup().resolve(projectNode.getSource());
+        if (source instanceof CTEScanNode) {
+            source = getChildFilterNode(context, context.getLookup().resolve(((CTEScanNode) source).getSource()));
+        }
         if (!(source instanceof FilterNode &&
                 context.getLookup().resolve(((FilterNode) source).getSource()) instanceof JoinNode)) {
             return Optional.empty();
@@ -155,7 +165,6 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
         Expression predicate = OriginalExpressionUtils.castToExpression(filter.getPredicate());
         List<SymbolReference> allPredicateSymbols = new ArrayList<>();
         getAllSymbols(predicate, allPredicateSymbols);
-
         JoinNode joinNode = (JoinNode) context.getLookup().resolve(((FilterNode) source).getSource());
         if (!isSelfJoin(projectNode, predicate, joinNode, context.getLookup())) {
             //Check next level for Self Join
@@ -191,18 +200,68 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
         //Choose the table to use based on projected output.
         TableScanNode leftTable = (TableScanNode) context.getLookup().resolve(joinNode.getLeft());
         TableScanNode rightTable = (TableScanNode) context.getLookup().resolve(joinNode.getRight());
-        TableScanNode tableToUse = leftTable.getOutputSymbols().contains(getOnlyElement(projectNode.getOutputSymbols())) ?
-                leftTable : rightTable;
+        TableScanNode tableToUse;
+        List<RowExpression> aggregationSymbols;
+        AggregationNode.GroupingSetDescriptor groupingSetDescriptor;
+        Assignments projectionsForCTE = null;
+        Assignments projectionsFromFilter = null;
         //Use non-projected column for aggregation
-        List<RowExpression> aggregationSymbols = allPredicateSymbols.stream()
-                .filter(s -> tableToUse.getOutputSymbols().contains(SymbolUtils.from(s)))
-                .filter(s -> !projectNode.getOutputSymbols().contains(SymbolUtils.from(s)))
-                .map(OriginalExpressionUtils::castToRowExpression)
-                .collect(Collectors.toList());
+        if (context.getLookup().resolve(projectNode.getSource()) instanceof CTEScanNode) {
+            CTEScanNode cteScanNode = (CTEScanNode) context.getLookup().resolve(projectNode.getSource());
+            ProjectNode childProjectOfCte = (ProjectNode) context.getLookup().resolve(cteScanNode.getSource());
+            List<Symbol> completeOutputSymbols = new ArrayList<>();
+            rightTable.getOutputSymbols().forEach((s) -> completeOutputSymbols.add(s));
+            leftTable.getOutputSymbols().forEach((s) -> completeOutputSymbols.add(s));
+            List<Symbol> outputSymbols = new ArrayList<>();
 
-        //Create aggregation
-        AggregationNode.GroupingSetDescriptor groupingSetDescriptor = new AggregationNode.GroupingSetDescriptor(
-                ImmutableList.copyOf(projectNode.getOutputSymbols()), 1, ImmutableSet.of());
+            for (int i = 0; i < completeOutputSymbols.size(); i++) {
+                Symbol outputSymbol = completeOutputSymbols.get(i);
+                for (Symbol symbol : projectNode.getOutputSymbols()) {
+                    if (childProjectOfCte.getAssignments().getMap().containsKey(symbol)) {
+                        if (((SymbolReference) OriginalExpressionUtils.castToExpression(childProjectOfCte.getAssignments().getMap().get(symbol))).getName().equals(outputSymbol.getName())) {
+                            outputSymbols.add(outputSymbol);
+                        }
+                    }
+                }
+            }
+            Map<Symbol, RowExpression> projectionsForCTEMap = new HashMap<>();
+            Map<Symbol, RowExpression> projectionsFromFilterMap = new HashMap<>();
+
+            for (Map.Entry entry : childProjectOfCte.getAssignments().getMap().entrySet()) {
+                if (entry.getKey().equals(getOnlyElement(projectNode.getOutputSymbols()))) {
+                    projectionsForCTEMap.put((Symbol) entry.getKey(), (RowExpression) entry.getValue());
+                }
+                if (entry.getKey().equals(getOnlyElement(projectNode.getOutputSymbols()))) {
+                    projectionsFromFilterMap.put(getOnlyElement(outputSymbols), (RowExpression) entry.getValue());
+                }
+            }
+
+            projectionsForCTE = new Assignments(projectionsForCTEMap);
+            projectionsFromFilter = new Assignments(projectionsFromFilterMap);
+            tableToUse = leftTable.getOutputSymbols().contains(getOnlyElement(outputSymbols)) ?
+                    leftTable : rightTable;
+            aggregationSymbols = allPredicateSymbols.stream()
+                    .filter(s -> tableToUse.getOutputSymbols().contains(SymbolUtils.from(s)))
+                    .filter(s -> !outputSymbols.contains(SymbolUtils.from(s)))
+                    .map(OriginalExpressionUtils::castToRowExpression)
+                    .collect(Collectors.toList());
+            //Create aggregation
+            groupingSetDescriptor = new AggregationNode.GroupingSetDescriptor(
+                    ImmutableList.copyOf(outputSymbols), 1, ImmutableSet.of());
+        }
+        else {
+            tableToUse = leftTable.getOutputSymbols().contains(getOnlyElement(projectNode.getOutputSymbols())) ?
+                    leftTable : rightTable;
+            aggregationSymbols = allPredicateSymbols.stream()
+                    .filter(s -> tableToUse.getOutputSymbols().contains(SymbolUtils.from(s)))
+                    .filter(s -> !projectNode.getOutputSymbols().contains(SymbolUtils.from(s)))
+                    .map(OriginalExpressionUtils::castToRowExpression)
+                    .collect(Collectors.toList());
+            //Create aggregation
+            groupingSetDescriptor = new AggregationNode.GroupingSetDescriptor(
+                    ImmutableList.copyOf(projectNode.getOutputSymbols()), 1, ImmutableSet.of());
+        }
+
         AggregationNode.Aggregation aggregation = new AggregationNode.Aggregation(
                 new Signature("count",
                         FunctionKind.AGGREGATE,
@@ -234,6 +293,16 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
                         new GenericLiteral("BIGINT", "1"))));
         //Project the aggregated+filtered rows.
         ProjectNode transformedSubquery = new ProjectNode(projectNode.getId(), filterNode, projectNode.getAssignments());
+        if (context.getLookup().resolve(projectNode.getSource()) instanceof CTEScanNode) {
+            CTEScanNode cteScanNode = (CTEScanNode) context.getLookup().resolve(projectNode.getSource());
+            PlanNode projectNodeForCTE = context.getLookup().resolve(cteScanNode.getSource());
+            PlanNode projectNodeFromFilter = context.getLookup().resolve(projectNodeForCTE);
+            projectNodeFromFilter = new ProjectNode(projectNodeFromFilter.getId(), filterNode, projectionsFromFilter);
+            projectNodeForCTE = new ProjectNode(projectNodeForCTE.getId(), projectNodeFromFilter, projectionsForCTE);
+            cteScanNode = (CTEScanNode) cteScanNode.replaceChildren(ImmutableList.of(projectNodeForCTE));
+            cteScanNode.setOutputSymbols(projectNode.getOutputSymbols());
+            transformedSubquery = new ProjectNode(projectNode.getId(), cteScanNode, projectNode.getAssignments());
+        }
         return Optional.of(transformedSubquery);
     }
 
@@ -245,6 +314,7 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
         // 1. Join should be INNER
         // 2. Both left and right should be on same Table
         // 3. Filtering should have NOT_EQUALS comparison on non-projected column and EQUALS comparison for projected column
+        //TODO FIX FOR framenwork changes
         if (joinNode.getType() == JoinNode.Type.INNER &&
                 left instanceof TableScanNode &&
                 right instanceof TableScanNode &&
@@ -258,6 +328,16 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
             SymbolReference projected = SymbolUtils.toSymbolReference(getOnlyElement(projectNode.getOutputSymbols()));
             ComparisonExpression leftPredicate = (ComparisonExpression) ((LogicalBinaryExpression) predicate).getLeft();
             ComparisonExpression rightPredicate = (ComparisonExpression) ((LogicalBinaryExpression) predicate).getRight();
+            if (lookup.resolve(projectNode.getSource()) instanceof CTEScanNode) {
+                CTEScanNode cteScanNode = (CTEScanNode) lookup.resolve(projectNode.getSource());
+                ProjectNode childProjectOfCte = (ProjectNode) lookup.resolve(cteScanNode.getSource());
+                RowExpression projectedExpresssion = (childProjectOfCte.getAssignments().get(getOnlyElement(projectNode.getOutputSymbols())));
+                for (Symbol symbol : lookup.resolve(childProjectOfCte.getSource()).getOutputSymbols()) {
+                    if (symbol.getName().equals(((SymbolReference) OriginalExpressionUtils.castToExpression(projectedExpresssion)).getName())) {
+                        projected = SymbolUtils.toSymbolReference(symbol);
+                    }
+                }
+            }
             if (leftPredicate.getChildren().contains(projected) &&
                     leftPredicate.getOperator() == ComparisonExpression.Operator.EQUAL &&
                     rightPredicate.getOperator() == ComparisonExpression.Operator.NOT_EQUAL) {

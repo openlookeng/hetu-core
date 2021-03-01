@@ -21,8 +21,8 @@ import io.prestosql.execution.buffer.BufferResult;
 import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.MemoryPoolAssignmentsRequest;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.planner.PlanFragment;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.util.List;
 import java.util.Optional;

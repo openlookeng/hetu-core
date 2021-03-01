@@ -27,6 +27,7 @@ import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.ExceptNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.IntersectNode;
@@ -50,7 +51,6 @@ import io.prestosql.sql.analyzer.RelationId;
 import io.prestosql.sql.analyzer.RelationType;
 import io.prestosql.sql.analyzer.Scope;
 import io.prestosql.sql.planner.plan.AssignmentUtils;
-import io.prestosql.sql.planner.plan.CTEScanNode;
 import io.prestosql.sql.planner.plan.JoinNodeUtils;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
 import io.prestosql.sql.planner.plan.SampleNode;
@@ -156,7 +156,7 @@ class RelationPlanner
         this.metadata = metadata;
         this.typeCoercion = new TypeCoercion(metadata::getType);
         this.session = session;
-        this.subqueryPlanner = new SubqueryPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session);
+        this.subqueryPlanner = new SubqueryPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session, namedSubPlan, uniqueIdAllocator);
         this.namedSubPlan = namedSubPlan;
         this.uniqueIdAllocator = uniqueIdAllocator;
     }
@@ -174,7 +174,7 @@ class RelationPlanner
             Type[] types = scope.getRelationType().getAllFields().stream().map(Field::getType).toArray(Type[]::new);
             RelationPlan withCoercions = addCoercions(subPlan, types);
             if ((!isCTEReuseEnabled(session) || getExecutionPolicy(session).equals("phased"))
-                            || (getCteMaxQueueSize(session) < getTaskConcurrency(session) * 2)) {
+                    || (getCteMaxQueueSize(session) < getTaskConcurrency(session) * 2) || !((Query) analysis.getStatement()).getWith().isPresent()) {
                 if (getCteMaxQueueSize(session) < getTaskConcurrency(session) * 2) {
                     LOG.info("Main queue size " + getCteMaxQueueSize(session) + "should be more than 2 times of concurrent task " + getTaskConcurrency(session));
                 }

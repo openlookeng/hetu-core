@@ -1237,7 +1237,7 @@ public class FeaturesConfig
         return maxQueueSize;
     }
 
-    @Config("optimizer.cte-max-queue-size")
+    @Config("cte.cte-max-queue-size")
     public FeaturesConfig setMaxQueueSize(int maxQueueSize)
     {
         this.maxQueueSize = maxQueueSize;
@@ -1249,7 +1249,7 @@ public class FeaturesConfig
         return maxPrefetchQueueSize;
     }
 
-    @Config("optimizer.cte-max-prefetch-queue-size")
+    @Config("cte.cte-max-prefetch-queue-size")
     public FeaturesConfig setMaxPrefetchQueueSize(int maxPrefetchQueueSize)
     {
         this.maxPrefetchQueueSize = maxPrefetchQueueSize;

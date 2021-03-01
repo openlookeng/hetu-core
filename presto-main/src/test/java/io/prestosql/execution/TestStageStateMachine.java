@@ -335,6 +335,8 @@ public class TestStageStateMachine
                 new PartitioningScheme(Partitioning.create(SINGLE_DISTRIBUTION, ImmutableList.of()), ImmutableList.of(symbol)),
                 ungroupedExecution(),
                 StatsAndCosts.empty(),
+                Optional.empty(),
+                Optional.empty(),
                 Optional.empty());
 
         return planFragment;

@@ -21,11 +21,11 @@ import io.prestosql.execution.executor.TaskExecutor;
 import io.prestosql.memory.QueryContext;
 import io.prestosql.operator.CommonTableExecutionContext;
 import io.prestosql.operator.TaskContext;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.planner.LocalExecutionPlanner;
 import io.prestosql.sql.planner.LocalExecutionPlanner.LocalExecutionPlan;
 import io.prestosql.sql.planner.PlanFragment;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.util.List;
 import java.util.Map;

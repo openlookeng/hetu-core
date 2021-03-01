@@ -167,7 +167,7 @@ class QueryPlanner
         this.metadata = metadata;
         this.typeCoercion = new TypeCoercion(metadata::getType);
         this.session = session;
-        this.subqueryPlanner = new SubqueryPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session);
+        this.subqueryPlanner = new SubqueryPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session, namedSubPlan, uniqueIdAllocator);
         this.namedSubPlan = namedSubPlan;
         this.uniqueIdAllocator = uniqueIdAllocator;
     }

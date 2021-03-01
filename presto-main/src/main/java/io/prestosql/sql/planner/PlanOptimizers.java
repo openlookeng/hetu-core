@@ -248,7 +248,7 @@ public class PlanOptimizers
         this.exporter = exporter;
         ImmutableList.Builder<PlanOptimizer> builder = ImmutableList.builder();
 
-        builder.add(new PruneCTENodes(false, false));
+        builder.add(new PruneCTENodes(false, false, false));
         Set<Rule<?>> predicatePushDownRules = ImmutableSet.of(
                 new MergeFilters());
 
@@ -516,7 +516,7 @@ public class PlanOptimizers
                         estimatedExchangesCostCalculator,
                         ImmutableSet.of(new RemoveRedundantIdentityProjections())),
                 new MetadataQueryOptimizer(metadata),
-                new PruneCTENodes(true, true),
+                new PruneCTENodes(true, true, false),
                 new IterativeOptimizer(
                         ruleStats,
                         statsCalculator,
@@ -637,6 +637,7 @@ public class PlanOptimizers
 
         builder.add(new StatsRecordingPlanOptimizer(optimizerStats, new RowExpressionPredicatePushDown(metadata, typeAnalyzer, true, true))); // Run predicate push down one more time in case we can leverage new information from layouts' effective predicate
         builder.add(new RemoveUnsupportedDynamicFilters(metadata, statsCalculator));
+        builder.add(new PruneCTENodes(false, false, true));
         builder.add(simplifyRowExpressionOptimizer); // Should be always run after PredicatePushDown
         builder.add(new IterativeOptimizer(
                 ruleStats,

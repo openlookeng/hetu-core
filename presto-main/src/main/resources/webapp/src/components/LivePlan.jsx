@@ -33,6 +33,8 @@ type StageNodeInfo = {
     stageStats: any,
     state: string,
     nodes: Map<string, any>,
+    producerCTE: string,
+    producerCTEParentId: string,
 }
 
 class StageStatistics extends React.Component<StageStatisticsProps, StageStatisticsState> {
@@ -57,7 +59,9 @@ class StageStatistics extends React.Component<StageStatisticsProps, StageStatist
             distribution: stageInfo.plan.distribution,
             stageStats: stageInfo.stageStats,
             state: stageInfo.state,
-            nodes: nodes
+            nodes: nodes,
+            producerCTE: stageInfo.plan.producerCTE,
+            parentProducerId: stageInfo.plan.producerCTEParentId,
         });
     }
 
@@ -160,6 +164,8 @@ export class LivePlan extends React.Component<LivePlanProps, LivePlanState> {
             graph: initializeGraph(),
             svg: null,
             render: new dagreD3.render(),
+            producerInfo: new Map(),
+            consumerProducerMap: new Map(),
         };
     }
 
@@ -205,43 +211,71 @@ export class LivePlan extends React.Component<LivePlanProps, LivePlanState> {
         const stageRootNodeId = "stage-" + stage.id + "-root";
         const color = getStageStateColor(stage);
 
-        graph.setNode(clusterId, {style: 'fill: ' + color, labelStyle: 'fill: #fff'});
+        //check if producer
+        if(stage.producerCTE != undefined) {
+            // add producer detail to map to keep track
+            this.state.producerInfo.set(stage.parentProducerId, stage.producerCTE);
+        }
+        // check if consumer
+        if(stage.parentProducerId != undefined && stage.producerCTE == undefined) {
+            // store consumer stage to producer stage mapping info
+            this.state.consumerProducerMap.set(stage.id, this.state.producerInfo.get(stage.parentProducerId));
+        }
+        else {
+            graph.setNode(clusterId, {style: 'fill: ' + color, labelStyle: 'fill: #fff'});
 
-        // this is a non-standard use of ReactDOMServer, but it's the cleanest way to unify DagreD3 with React
-        const html = ReactDOMServer.renderToString(<StageStatistics key={stage.id} stage={stage}/>);
+            // this is a non-standard use of ReactDOMServer, but it's the cleanest way to unify DagreD3 with React
+            const html = ReactDOMServer.renderToString(<StageStatistics key={stage.id} stage={stage}/>);
 
-        graph.setNode(stageRootNodeId, {class: "stage-stats", label: html, labelType: "html"});
-        graph.setParent(stageRootNodeId, clusterId);
-        graph.setEdge("node-" + stage.root, stageRootNodeId, {style: "visibility: hidden"});
+            graph.setNode(stageRootNodeId, {class: "stage-stats", label: html, labelType: "html"});
+            graph.setParent(stageRootNodeId, clusterId);
+            graph.setEdge("node-" + stage.root, stageRootNodeId, {style: "visibility: hidden"});
+        }
 
         stage.nodes.forEach(node => {
             const nodeId = "node-" + node.id;
             const nodeHtml = ReactDOMServer.renderToString(<PlanNode {...node}/>);
 
-            graph.setNode(nodeId, {label: nodeHtml, style: 'fill: #fff', labelType: "html"});
-            graph.setParent(nodeId, clusterId);
-
-            node.sources.forEach(source => {
-                graph.setEdge("node-" + source, nodeId, {class: "plan-edge", arrowheadClass: "plan-arrowhead"});
-            });
-
-            if (node.remoteSources.length > 0) {
-                graph.setNode(nodeId, {label: '', shape: "circle"});
-
-                node.remoteSources.forEach(sourceId => {
-                    const source = allStages.get(sourceId);
-                    if (source) {
-                        const sourceStats = source.stageStats;
-                        graph.setEdge("stage-" + sourceId + "-root", nodeId, {
-                                class: "plan-edge",
-                                style: "stroke-width: 4px",
-                                arrowheadClass: "plan-arrowhead",
-                                label: sourceStats.outputDataSize + " / " + formatRows(sourceStats.outputPositions),
-                                labelStyle: "color: #fff; font-weight: bold; font-size: 24px;",
-                                labelType: "html",
-                        });
-                    }
+            if(graph.node(nodeId) == undefined) {
+                graph.setNode(nodeId, {label: nodeHtml, style: 'fill: #fff', labelType: "html"});
+                graph.setParent(nodeId, clusterId);
+                node.sources.forEach(source => {
+                    graph.setEdge("node-" + source, nodeId, {class: "plan-edge", arrowheadClass: "plan-arrowhead"});
                 });
+
+                if (node.remoteSources.length > 0) {
+                    graph.setNode(nodeId, {label: '', shape: "circle"});
+
+                    node.remoteSources.forEach(sourceId => {
+                        const source = allStages.get(sourceId);
+                        if (source) {
+                            const sourceStats = source.stageStats;
+                            // if the exchange node has consumer as it source
+                            if(this.state.consumerProducerMap.has(sourceId)) {
+                                // create edge from producer instead of consumer to parent stage
+                                console.log("remote sources for edges is -" + this.state.consumerProducerMap.get(sourceId));
+                                graph.setEdge("stage-" + this.state.consumerProducerMap.get(sourceId) + "-root", nodeId, {
+                                    class: "plan-edge",
+                                    style: "stroke-width: 4px",
+                                    arrowheadClass: "plan-arrowhead",
+                                    label: sourceStats.outputDataSize + " / " + formatRows(sourceStats.outputPositions),
+                                    labelStyle: "color: #fff; font-weight: bold; font-size: 24px;",
+                                    labelType: "html",
+                               });
+                            }
+                            else{
+                                graph.setEdge("stage-" + sourceId + "-root", nodeId, {
+                                    class: "plan-edge",
+                                    style: "stroke-width: 4px",
+                                    arrowheadClass: "plan-arrowhead",
+                                    label: sourceStats.outputDataSize + " / " + formatRows(sourceStats.outputPositions),
+                                    labelStyle: "color: #fff; font-weight: bold; font-size: 24px;",
+                                    labelType: "html",
+                                });
+                            }
+                        }
+                    });
+                }
             }
         });
     }
@@ -260,6 +294,7 @@ export class LivePlan extends React.Component<LivePlanProps, LivePlanState> {
 
         const graph = this.state.graph;
         const stages = StageStatistics.getStages(this.state.query);
+
         stages.forEach(stage => {
             this.updateD3Stage(stage, graph, stages);
         });

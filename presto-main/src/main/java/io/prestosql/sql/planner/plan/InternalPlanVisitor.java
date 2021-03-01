@@ -13,6 +13,7 @@
  */
 package io.prestosql.sql.planner.plan;
 
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.PlanVisitor;
 
 public abstract class InternalPlanVisitor<R, C>

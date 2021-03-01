@@ -19,7 +19,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.log.Logger;
 import io.prestosql.spi.Page;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
 
 import javax.annotation.concurrent.GuardedBy;
 

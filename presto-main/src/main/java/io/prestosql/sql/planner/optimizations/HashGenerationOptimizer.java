@@ -29,6 +29,7 @@ import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
 import io.prestosql.spi.plan.JoinNode;
@@ -566,6 +567,10 @@ public class HashGenerationOptimizer
                 Function<Symbol, Optional<Symbol>> outputToInputTranslator = symbol -> Optional.of(outputToInputMap.get(symbol));
 
                 HashComputationSet sourceContext = preference.translate(outputToInputTranslator);
+
+                if (node.getSources().size() == 1 && node.getSources().get(0) instanceof CTEScanNode) {
+                    return visitExchangeForCTE(node, sourceContext);
+                }
                 PlanWithProperties child = planAndEnforce(source, sourceContext, true, sourceContext);
                 newSources.add(child.getNode());
 
@@ -590,6 +595,32 @@ public class HashGenerationOptimizer
                             newInputs.build(),
                             node.getOrderingScheme()),
                     newHashSymbols);
+        }
+
+        private PlanWithProperties visitExchangeForCTE(ExchangeNode node, HashComputationSet sourceContext)
+        {
+            Assignments.Builder assignments = Assignments.builder();
+            for (Symbol symbol : node.getOutputSymbols()) {
+                assignments.put(symbol, toVariableReference(symbol, planSymbolAllocator.getTypes().get(symbol)));
+            }
+            for (HashComputation hashComputation : sourceContext.getHashes()) {
+                Symbol hashSymbol = planSymbolAllocator.newHashSymbol();
+                assignments.put(hashSymbol, hashComputation.getHashExpression());
+            }
+            sourceContext = new HashComputationSet(Optional.empty());
+            PlanWithProperties child = planAndEnforce(node.getSources().get(0), sourceContext, true, sourceContext);
+            ExchangeNode exchangeNode = new ExchangeNode(
+                    node.getId(),
+                    node.getType(),
+                    node.getScope(),
+                    node.getPartitioningScheme(),
+                    ImmutableList.of(child.getNode()),
+                    node.getInputs(),
+                    node.getOrderingScheme());
+            return new PlanWithProperties(new ProjectNode(idAllocator.getNextId(),
+                    exchangeNode,
+                    assignments.build()),
+                    child.getHashSymbols());
         }
 
         @Override

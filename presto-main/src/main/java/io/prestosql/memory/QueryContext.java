@@ -24,8 +24,8 @@ import io.prestosql.memory.context.MemoryReservationHandler;
 import io.prestosql.memory.context.MemoryTrackingContext;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spiller.SpillSpaceTracker;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;

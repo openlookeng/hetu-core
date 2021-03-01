@@ -28,6 +28,7 @@ import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
 import io.prestosql.spi.plan.JoinNode;
@@ -187,6 +188,17 @@ public class RowExpressionPredicatePushDown
                 rewrittenNode = new FilterNode(idAllocator.getNextId(), rewrittenNode, context.get());
             }
             return rewrittenNode;
+        }
+
+        @Override
+        public PlanNode visitCTEScan(CTEScanNode node, RewriteContext<RowExpression> context)
+        {
+            if (dynamicFiltering) {
+                return context.defaultRewrite(node, context.get());
+            }
+            else {
+                return visitPlan(node, context);
+            }
         }
 
         @Override

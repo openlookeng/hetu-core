@@ -32,7 +32,7 @@ import io.prestosql.memory.QueryContext;
 import io.prestosql.memory.QueryContextVisitor;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.memory.context.MemoryTrackingContext;
-import io.prestosql.sql.planner.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeId;
 import org.joda.time.DateTime;
 
 import javax.annotation.concurrent.GuardedBy;

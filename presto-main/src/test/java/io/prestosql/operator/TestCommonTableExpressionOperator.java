@@ -21,9 +21,9 @@ import io.prestosql.SequencePageBuilder;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.scalar.AbstractTestFunctions;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.gen.ExpressionCompiler;
 import io.prestosql.sql.gen.PageFunctionCompiler;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 import io.prestosql.testing.MaterializedResult;
 import org.testng.annotations.Test;
 

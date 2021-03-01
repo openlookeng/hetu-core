@@ -37,6 +37,7 @@ import io.prestosql.sql.tree.Literal;
 import io.prestosql.sql.tree.TryExpression;
 import io.prestosql.sql.util.AstUtils;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -90,7 +91,9 @@ public class InlineProjections
                 .entrySet().stream()
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
-                        entry -> inlineReferences(entry.getValue(), assignments)));
+                        entry -> (inlineReferences(entry.getValue(), assignments)),
+                        (u, v) -> u,
+                        LinkedHashMap::new));
 
         // Synthesize identity assignments for the inputs of expressions that were inlined
         // to place in the child projection.
@@ -135,7 +138,7 @@ public class InlineProjections
                         Assignments.copyOf(parentAssignments)));
     }
 
-    private RowExpression inlineReferences(RowExpression expression, Assignments assignments)
+    private static RowExpression inlineReferences(RowExpression expression, Assignments assignments)
     {
         if (isExpression(expression)) {
             Function<Symbol, Expression> mapping = symbol -> {

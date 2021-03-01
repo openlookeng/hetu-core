@@ -91,4 +91,9 @@ public abstract class PlanVisitor<R, C>
     {
         return visitPlan(node, context);
     }
+
+    public R visitCTEScan(CTEScanNode node, C context)
+    {
+        return visitPlan(node, context);
+    }
 }

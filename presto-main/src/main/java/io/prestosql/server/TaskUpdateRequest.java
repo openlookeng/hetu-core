@@ -19,8 +19,8 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.SessionRepresentation;
 import io.prestosql.execution.TaskSource;
 import io.prestosql.execution.buffer.OutputBuffers;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.planner.PlanFragment;
-import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import java.util.List;
 import java.util.Map;

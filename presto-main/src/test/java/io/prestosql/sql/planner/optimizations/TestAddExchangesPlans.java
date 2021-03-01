@@ -18,6 +18,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
 import io.prestosql.plugin.tpch.TpchConnectorFactory;
+import io.prestosql.spi.plan.CTEScanNode;
+import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.JoinNode.DistributionType;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
@@ -26,8 +28,10 @@ import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.testing.LocalQueryRunner;
 import org.testng.annotations.Test;
 
+import java.util.List;
 import java.util.Optional;
 
+import static io.prestosql.SystemSessionProperties.CTE_REUSE_ENABLED;
 import static io.prestosql.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
 import static io.prestosql.SystemSessionProperties.JOIN_REORDERING_STRATEGY;
 import static io.prestosql.SystemSessionProperties.SPILL_ENABLED;
@@ -43,6 +47,7 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyTree;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.equiJoinClause;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.exchange;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.join;
+import static io.prestosql.sql.planner.assertions.PlanMatchPattern.node;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.tableScan;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.LOCAL;
@@ -166,6 +171,20 @@ public class TestAddExchangesPlans
                                                         tableScan("region", ImmutableMap.of("regionkey", "regionkey"))))))));
     }
 
+    @Test
+    public void testExchangeNodeAboveCTESCanNode()
+    {
+        List<PlanOptimizer> allOptimizers = getQueryRunner().getPlanOptimizers(false);
+
+        assertPlan("with ss as (select * from orders), sd as (select * from ss) " +
+                        " select * from ss,sd where ss.orderkey = sd.orderkey",
+                cteEnabledSession(),
+                anyTree(node(JoinNode.class,
+                        anyTree(exchange(node(CTEScanNode.class, anyTree(tableScan("orders"))))),
+                        anyTree(exchange(node(CTEScanNode.class, anyTree(tableScan("orders"))))))),
+                allOptimizers);
+    }
+
     private Session spillEnabledWithJoinDistributionType(JoinDistributionType joinDistributionType)
     {
         return Session.builder(getQueryRunner().getDefaultSession())
@@ -180,6 +199,13 @@ public class TestAddExchangesPlans
         return Session.builder(getQueryRunner().getDefaultSession())
                 .setSystemProperty(JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.NONE.name())
                 .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.PARTITIONED.name())
+                .build();
+    }
+
+    private Session cteEnabledSession()
+    {
+        return Session.builder(getQueryRunner().getDefaultSession())
+                .setSystemProperty(CTE_REUSE_ENABLED, "true")
                 .build();
     }
 }
