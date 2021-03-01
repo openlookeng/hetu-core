@@ -267,4 +267,4 @@ The following operations are not supported currently with Carbondata connector:
 - Materialized views are not supported.
 - Complex data types such as Arrays, Lists and Maps are not supported.
 - Alter table usage is not supported.
-- Operation on partitioned tables is not supported.
+- Create and Insert operation is not supported on partitioned tables.
