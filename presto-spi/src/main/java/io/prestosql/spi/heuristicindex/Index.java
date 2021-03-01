@@ -15,6 +15,8 @@
 
 package io.prestosql.spi.heuristicindex;
 
+import io.prestosql.spi.connector.CreateIndexMetadata;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,7 +41,7 @@ public interface Index
      *
      * @return data level on which the index should be applied on.
      */
-    Set<Level> getSupportedIndexLevels();
+    Set<CreateIndexMetadata.Level> getSupportedIndexLevels();
 
     /**
      * Gets the id of the IndexStore.
@@ -227,12 +229,5 @@ public interface Index
 
     default void close() throws IOException
     {
-    }
-
-    enum Level
-    {
-        STRIPE,
-        PARTITION,
-        TABLE
     }
 }

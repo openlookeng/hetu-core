@@ -18,7 +18,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.type.Type;
 
 import java.util.List;
@@ -33,7 +32,6 @@ import static java.util.Objects.requireNonNull;
 public class CreateIndexMetadata
 {
     public static final String LEVEL_PROP_KEY = "level";
-    public static final Index.Level LEVEL_DEFAULT = Index.Level.STRIPE;
     public static final Map<String, List<String>> INDEX_SUPPORTED_TYPES = ImmutableMap.<String, List<String>>builder()
             .put("bloom", ImmutableList.of(
                     "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"))
@@ -52,7 +50,7 @@ public class CreateIndexMetadata
     private final List<String> partitions;
     private final Properties properties;
     private final String user;
-    private final Index.Level createLevel;
+    private volatile Level createLevel;
 
     @JsonCreator
     public CreateIndexMetadata(
@@ -63,7 +61,7 @@ public class CreateIndexMetadata
             @JsonProperty("partitions") List<String> partitions,
             @JsonProperty("properties") Properties properties,
             @JsonProperty("user") String user,
-            @JsonProperty("createLevel") Index.Level createLevel)
+            @JsonProperty("createLevel") Level createLevel)
     {
         this.indexName = checkNotEmpty(indexName, "indexName");
         this.tableName = requireNonNull(tableName, "tableName is null");
@@ -72,13 +70,35 @@ public class CreateIndexMetadata
         this.partitions = partitions;
         this.properties = properties;
         this.user = requireNonNull(user, "user is null");
-        this.createLevel = createLevel == null ? LEVEL_DEFAULT : createLevel;
+        this.createLevel = requireNonNull(createLevel, "createLevel is null");
+        properties.setProperty(LEVEL_PROP_KEY, createLevel.toString());
     }
 
     @JsonProperty
-    public Index.Level getCreateLevel()
+    public Level getCreateLevel()
     {
         return createLevel;
+    }
+
+    /**
+     * When index creation has gathered enough information (index type, partitioned table or not, etc),
+     * this method will be called to finalize creationLevel
+     * <p>
+     * The level is based on index type, and whether the table is partitioned
+     *
+     * @param tableIsPartitioned if this table is partitioned
+     */
+    public synchronized void decideIndexLevel(boolean tableIsPartitioned)
+    {
+        if (createLevel == Level.UNDEFINED) {
+            if (indexType.toUpperCase(Locale.ROOT).equals("BTREE")) {
+                this.createLevel = tableIsPartitioned ? Level.PARTITION : Level.TABLE;
+            }
+            else {
+                this.createLevel = Level.STRIPE;
+            }
+            properties.setProperty(LEVEL_PROP_KEY, createLevel.toString());
+        }
     }
 
     @JsonProperty
@@ -167,5 +187,14 @@ public class CreateIndexMetadata
                 && Objects.equals(this.partitions, other.partitions)
                 && Objects.equals(this.properties, other.properties)
                 && Objects.equals(this.user, other.user);
+    }
+
+    public enum Level
+    {
+        STRIPE,
+        PARTITION,
+        TABLE,
+        // If the index creation level is not specified, it will be decided on-the-fly. See decideIndexLevel().
+        UNDEFINED
     }
 }

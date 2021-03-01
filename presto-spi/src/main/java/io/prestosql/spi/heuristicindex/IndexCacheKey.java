@@ -14,6 +14,8 @@
  */
 package io.prestosql.spi.heuristicindex;
 
+import io.prestosql.spi.connector.CreateIndexMetadata;
+
 import java.util.Objects;
 
 public class IndexCacheKey
@@ -22,7 +24,7 @@ public class IndexCacheKey
 
     private final String path;
     private final long lastModifiedTime;
-    private final Index.Level indexLevel;
+    private final CreateIndexMetadata.Level indexLevel;
     private boolean noCloseFlag;
 
     /**
@@ -30,7 +32,7 @@ public class IndexCacheKey
      * @param lastModifiedTime lastModifiedTime of the file, used to validate the indexes
      * @param indexLevel see Index.Level in presto-spi
      */
-    public IndexCacheKey(String path, long lastModifiedTime, Index.Level indexLevel)
+    public IndexCacheKey(String path, long lastModifiedTime, CreateIndexMetadata.Level indexLevel)
     {
         this.path = path;
         this.lastModifiedTime = lastModifiedTime;
@@ -45,7 +47,7 @@ public class IndexCacheKey
      */
     public IndexCacheKey(String path, long lastModifiedTime)
     {
-        this(path, lastModifiedTime, Index.Level.STRIPE);
+        this(path, lastModifiedTime, CreateIndexMetadata.Level.STRIPE);
     }
 
     public String getPath()
@@ -58,7 +60,7 @@ public class IndexCacheKey
         return lastModifiedTime;
     }
 
-    public Index.Level getIndexLevel()
+    public CreateIndexMetadata.Level getIndexLevel()
     {
         return this.indexLevel;
     }

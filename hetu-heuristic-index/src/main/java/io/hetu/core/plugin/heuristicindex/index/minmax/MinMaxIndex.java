@@ -17,6 +17,7 @@ package io.hetu.core.plugin.heuristicindex.index.minmax;
 
 import com.google.common.collect.ImmutableSet;
 import io.hetu.core.common.util.SecureObjectInputStream;
+import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.heuristicindex.Index;
@@ -102,9 +103,9 @@ public class MinMaxIndex
     }
 
     @Override
-    public Set<Level> getSupportedIndexLevels()
+    public Set<CreateIndexMetadata.Level> getSupportedIndexLevels()
     {
-        return ImmutableSet.of(Level.STRIPE);
+        return ImmutableSet.of(CreateIndexMetadata.Level.STRIPE);
     }
 
     @Override

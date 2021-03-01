@@ -15,6 +15,7 @@
 package io.prestosql.spi.heuristicindex;
 
 import com.google.common.collect.ImmutableSet;
+import io.prestosql.spi.connector.CreateIndexMetadata;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -33,9 +34,9 @@ public class TestIndexMetadata
         Index index = new Index()
         {
             @Override
-            public Set<Level> getSupportedIndexLevels()
+            public Set<CreateIndexMetadata.Level> getSupportedIndexLevels()
             {
-                return ImmutableSet.of(Level.STRIPE);
+                return ImmutableSet.of(CreateIndexMetadata.Level.STRIPE);
             }
 
             @Override

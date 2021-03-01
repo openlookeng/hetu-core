@@ -15,6 +15,7 @@
 package io.hetu.core.plugin.heuristicindex.index.bitmap;
 
 import com.google.common.collect.ImmutableSet;
+import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.predicate.Domain;
@@ -113,9 +114,9 @@ public class BitmapIndex
     private AtomicBoolean updateAllowed = new AtomicBoolean(true);
 
     @Override
-    public Set<Level> getSupportedIndexLevels()
+    public Set<CreateIndexMetadata.Level> getSupportedIndexLevels()
     {
-        return ImmutableSet.of(Level.STRIPE);
+        return ImmutableSet.of(CreateIndexMetadata.Level.STRIPE);
     }
 
     @Override

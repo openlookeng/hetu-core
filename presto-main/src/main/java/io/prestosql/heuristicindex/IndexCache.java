@@ -23,7 +23,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.airlift.log.Logger;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.HetuConstant;
-import io.prestosql.spi.heuristicindex.Index;
+import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexCacheKey;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
@@ -135,7 +135,7 @@ public class IndexCache
         }
     }
 
-    public void preloadIndex(String table, String column, String type, Index.Level level)
+    public void preloadIndex(String table, String column, String type, CreateIndexMetadata.Level level)
     {
         String filterKeyPath = table + "/" + column + "/" + type;
         IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, LAST_MODIFIED_TIME_PLACE_HOLDER, level);
@@ -253,7 +253,7 @@ public class IndexCache
         if (!partitions.isEmpty()) {
             for (String partition : partitions) {
                 String filterKeyPath = table + "/" + column + "/" + indexType + "/" + partition;
-                IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, Index.Level.PARTITION);
+                IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, CreateIndexMetadata.Level.PARTITION);
                 List<IndexMetadata> result = loadIndex(filterKey);
                 if (result != null) {
                     indices.addAll(result);
@@ -267,7 +267,7 @@ public class IndexCache
         }
 
         String filterKeyPath = table + "/" + column + "/" + indexType;
-        IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, Index.Level.TABLE);
+        IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, CreateIndexMetadata.Level.TABLE);
         List<IndexMetadata> result = loadIndex(filterKey);
         if (result != null) {
             indices.addAll(result);

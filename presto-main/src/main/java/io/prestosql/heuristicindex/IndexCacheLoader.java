@@ -15,7 +15,7 @@
 package io.prestosql.heuristicindex;
 
 import com.google.common.cache.CacheLoader;
-import io.prestosql.spi.heuristicindex.Index;
+import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexCacheKey;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
@@ -44,7 +44,7 @@ public class IndexCacheLoader
     {
         requireNonNull(key);
         requireNonNull(indexClient);
-        if (key.getIndexLevel() == Index.Level.PARTITION || key.getIndexLevel() == Index.Level.TABLE) {
+        if (key.getIndexLevel() == CreateIndexMetadata.Level.PARTITION || key.getIndexLevel() == CreateIndexMetadata.Level.TABLE) {
             return loadPartitionIndex(key);
         }
         else {

@@ -18,6 +18,7 @@ import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 import io.hetu.core.heuristicindex.PartitionIndexWriter;
 import io.hetu.core.heuristicindex.util.TypeUtils;
+import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.heuristicindex.Index;
@@ -153,9 +154,9 @@ public class BTreeIndex
     }
 
     @Override
-    public Set<Level> getSupportedIndexLevels()
+    public Set<CreateIndexMetadata.Level> getSupportedIndexLevels()
     {
-        return Sets.newHashSet(Level.PARTITION, Level.TABLE);
+        return Sets.newHashSet(CreateIndexMetadata.Level.PARTITION, CreateIndexMetadata.Level.TABLE);
     }
 
     @Override
