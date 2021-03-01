@@ -505,12 +505,14 @@ public class TableWriterNode
     {
         private final Optional<String> partition;
         private final boolean full;
+        private final boolean merge;
         private final TableHandle handle;
 
-        public VacuumTargetReference(TableHandle handle, boolean full, Optional<String> partition)
+        public VacuumTargetReference(TableHandle handle, boolean full, boolean merge, Optional<String> partition)
         {
             this.handle = requireNonNull(handle, "handle is null");
             this.full = full;
+            this.merge = merge;
             this.partition = partition;
         }
 
@@ -522,6 +524,11 @@ public class TableWriterNode
         public boolean isFull()
         {
             return full;
+        }
+
+        public boolean isMerge()
+        {
+            return merge;
         }
 
         public Optional<String> getPartition()

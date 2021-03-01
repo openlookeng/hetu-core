@@ -104,7 +104,6 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Sets.difference;
-import static io.prestosql.plugin.hive.HiveBasicStatistics.createEmptyStatistics;
 import static io.prestosql.plugin.hive.HiveUtil.PRESTO_VIEW_FLAG;
 import static io.prestosql.spi.StandardErrorCode.ALREADY_EXISTS;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -299,15 +298,14 @@ public class ThriftHiveMetastore
     }
 
     @Override
-    public PartitionStatistics getTableStatistics(HiveIdentity identity, String databaseName, String tableName)
+    public PartitionStatistics getTableStatistics(HiveIdentity identity, Table table)
     {
-        Table table = getTable(identity, databaseName, tableName)
-                .orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
         List<String> dataColumns = table.getSd().getCols().stream()
                 .map(FieldSchema::getName)
                 .collect(toImmutableList());
         HiveBasicStatistics basicStatistics = ThriftMetastoreUtil.getHiveBasicStatistics(table.getParameters());
-        Map<String, HiveColumnStatistics> columnStatistics = getTableColumnStatistics(identity, databaseName, tableName, dataColumns, basicStatistics.getRowCount());
+        Map<String, HiveColumnStatistics> columnStatistics = getTableColumnStatistics(identity, table.getDbName(), table.getTableName(),
+                dataColumns, basicStatistics.getRowCount());
         return new PartitionStatistics(basicStatistics, columnStatistics);
     }
 
@@ -335,10 +333,8 @@ public class ThriftHiveMetastore
     }
 
     @Override
-    public Map<String, PartitionStatistics> getPartitionStatistics(HiveIdentity identity, String databaseName, String tableName, Set<String> partitionNames)
+    public Map<String, PartitionStatistics> getPartitionStatistics(HiveIdentity identity, Table table, List<Partition> partitions)
     {
-        Table table = getTable(identity, databaseName, tableName)
-                .orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
         List<String> dataColumns = table.getSd().getCols().stream()
                 .map(FieldSchema::getName)
                 .collect(toImmutableList());
@@ -346,7 +342,7 @@ public class ThriftHiveMetastore
                 .map(FieldSchema::getName)
                 .collect(toImmutableList());
 
-        Map<String, HiveBasicStatistics> partitionBasicStatistics = getPartitionsByNames(identity, databaseName, tableName, ImmutableList.copyOf(partitionNames)).stream()
+        Map<String, HiveBasicStatistics> partitionBasicStatistics = partitions.stream()
                 .collect(toImmutableMap(
                         partition -> makePartName(partitionColumns, partition.getValues()),
                         partition -> ThriftMetastoreUtil.getHiveBasicStatistics(partition.getParameters())));
@@ -354,14 +350,14 @@ public class ThriftHiveMetastore
                 .collect(toImmutableMap(Map.Entry::getKey, entry -> entry.getValue().getRowCount()));
         Map<String, Map<String, HiveColumnStatistics>> partitionColumnStatistics = getPartitionColumnStatistics(
                 identity,
-                databaseName,
-                tableName,
-                partitionNames,
+                table.getDbName(),
+                table.getTableName(),
+                partitionBasicStatistics.keySet(),
                 dataColumns,
                 partitionRowCounts);
         ImmutableMap.Builder<String, PartitionStatistics> result = ImmutableMap.builder();
-        for (String partitionName : partitionNames) {
-            HiveBasicStatistics basicStatistics = partitionBasicStatistics.getOrDefault(partitionName, createEmptyStatistics());
+        for (String partitionName : partitionBasicStatistics.keySet()) {
+            HiveBasicStatistics basicStatistics = partitionBasicStatistics.get(partitionName);
             Map<String, HiveColumnStatistics> columnStatistics = partitionColumnStatistics.getOrDefault(partitionName, ImmutableMap.of());
             result.put(partitionName, new PartitionStatistics(basicStatistics, columnStatistics));
         }
@@ -438,13 +434,13 @@ public class ThriftHiveMetastore
     }
 
     @Override
-    public synchronized void updateTableStatistics(HiveIdentity identity, String databaseName, String tableName, Function<PartitionStatistics, PartitionStatistics> update)
+    public void updateTableStatistics(HiveIdentity identity, String databaseName, String tableName, Function<PartitionStatistics, PartitionStatistics> update)
     {
-        PartitionStatistics currentStatistics = getTableStatistics(identity, databaseName, tableName);
-        PartitionStatistics updatedStatistics = update.apply(currentStatistics);
-
         Table originalTable = getTable(identity, databaseName, tableName)
                 .orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
+        PartitionStatistics currentStatistics = getTableStatistics(identity, originalTable);
+        PartitionStatistics updatedStatistics = update.apply(currentStatistics);
+
         Table modifiedTable = originalTable.deepCopy();
         HiveBasicStatistics basicStatistics = updatedStatistics.getBasicStatistics();
         modifiedTable.setParameters(ThriftMetastoreUtil.updateStatisticsParameters(modifiedTable.getParameters(), basicStatistics));
@@ -511,16 +507,18 @@ public class ThriftHiveMetastore
     }
 
     @Override
-    public synchronized void updatePartitionStatistics(HiveIdentity identity, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update)
+    public void updatePartitionStatistics(HiveIdentity identity, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update)
     {
-        PartitionStatistics currentStatistics = requireNonNull(
-                getPartitionStatistics(identity, databaseName, tableName, ImmutableSet.of(partitionName)).get(partitionName), "getPartitionStatistics() returned null");
-        PartitionStatistics updatedStatistics = update.apply(currentStatistics);
-
         List<Partition> partitions = getPartitionsByNames(identity, databaseName, tableName, ImmutableList.of(partitionName));
         if (partitions.size() != 1) {
             throw new PrestoException(HiveErrorCode.HIVE_METASTORE_ERROR, "Metastore returned multiple partitions for name: " + partitionName);
         }
+
+        Table table = getTable(identity, databaseName, tableName)
+                .orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
+        PartitionStatistics currentStatistics = requireNonNull(
+                getPartitionStatistics(identity, table, partitions).get(partitionName), "getPartitionStatistics() returned null");
+        PartitionStatistics updatedStatistics = update.apply(currentStatistics);
 
         Partition originalPartition = getOnlyElement(partitions);
         Partition modifiedPartition = originalPartition.deepCopy();
@@ -528,12 +526,71 @@ public class ThriftHiveMetastore
         modifiedPartition.setParameters(ThriftMetastoreUtil.updateStatisticsParameters(modifiedPartition.getParameters(), basicStatistics));
         alterPartitionWithoutStatistics(identity, databaseName, tableName, modifiedPartition);
 
+        updatePartitionColumnStatistics(identity, modifiedPartition, databaseName, tableName, partitionName, basicStatistics, currentStatistics, updatedStatistics);
+    }
+
+    @Override
+    public synchronized void updatePartitionsStatistics(HiveIdentity identity, String databaseName, String tableName, List<String> partitionNames, List<Function<PartitionStatistics, PartitionStatistics>> updateFunctionList)
+    {
+        ImmutableList.Builder<Partition> modifiedPartitionBuilder = ImmutableList.builder();
+        ImmutableMap.Builder<String, PartitionInfo> partitionInfoMapBuilder = ImmutableMap.builder();
+        Optional<Table> table = getTable(identity, databaseName, tableName);
+        List<Partition> partitions = getPartitionsByNames(identity, databaseName, tableName, partitionNames);
+        Map<String, PartitionStatistics> partitionsStatistics = getPartitionStatistics(identity, table.get(), partitions);
+
+        if (partitions.size() != partitionsStatistics.size() || partitions.size() != partitionNames.size()) {
+            throw new PrestoException(HiveErrorCode.HIVE_METASTORE_ERROR, "Metastore returned multiple partitions");
+        }
+        for (int index = 0; index < partitionNames.size(); index++) {
+            String partitionName = partitionNames.get(index);
+            PartitionStatistics currentStatistics = requireNonNull(partitionsStatistics.get(partitionName),
+                    "getPartitionStatistics() returned null");
+
+            PartitionStatistics updatedStatistics = updateFunctionList.get(index).apply(currentStatistics);
+
+            Partition originalPartition = partitions.get(index);
+            Partition modifiedPartition = originalPartition.deepCopy();
+            HiveBasicStatistics basicStatistics = updatedStatistics.getBasicStatistics();
+            modifiedPartition.setParameters(ThriftMetastoreUtil.updateStatisticsParameters(modifiedPartition.getParameters(), basicStatistics));
+
+            modifiedPartitionBuilder.add(modifiedPartition);
+            partitionInfoMapBuilder.put(partitionName, new PartitionInfo(basicStatistics, currentStatistics, modifiedPartition, updatedStatistics));
+        }
+        alterPartitionsWithoutStatistics(databaseName, tableName, modifiedPartitionBuilder.build());
+
+        ImmutableMap<String, PartitionInfo> partitionInfoMap = partitionInfoMapBuilder.build();
+        partitionInfoMap.forEach((partName, partInfo) ->
+                updatePartitionColumnStatistics(identity, partInfo.modifiedPartition, databaseName, tableName, partName,
+                        partInfo.basicStatistics, partInfo.currentStatistics, partInfo.updatedStatistics));
+    }
+
+    private void updatePartitionColumnStatistics(HiveIdentity identity, Partition modifiedPartition, String databaseName,
+            String tableName, String partitionName, HiveBasicStatistics basicStatistics,
+            PartitionStatistics currentStatistics, PartitionStatistics updatedStatistics)
+    {
         Map<String, HiveType> columns = modifiedPartition.getSd().getCols().stream()
                 .collect(toImmutableMap(FieldSchema::getName, schema -> HiveType.valueOf(schema.getType())));
         setPartitionColumnStatistics(identity, databaseName, tableName, partitionName, columns, updatedStatistics.getColumnStatistics(), basicStatistics.getRowCount());
 
         Set<String> removedStatistics = difference(currentStatistics.getColumnStatistics().keySet(), updatedStatistics.getColumnStatistics().keySet());
         removedStatistics.forEach(column -> deletePartitionColumnStatistics(identity, databaseName, tableName, partitionName, column));
+    }
+
+    private class PartitionInfo
+    {
+        private final HiveBasicStatistics basicStatistics;
+        private final PartitionStatistics currentStatistics;
+        private final Partition modifiedPartition;
+        private final PartitionStatistics updatedStatistics;
+
+        PartitionInfo(HiveBasicStatistics basicStatistics, PartitionStatistics currentStatistics,
+                Partition modifiedPartition, PartitionStatistics updatedStatistics)
+        {
+            this.basicStatistics = basicStatistics;
+            this.currentStatistics = currentStatistics;
+            this.modifiedPartition = modifiedPartition;
+            this.updatedStatistics = updatedStatistics;
+        }
     }
 
     private void setPartitionColumnStatistics(
@@ -1136,6 +1193,30 @@ public class ThriftHiveMetastore
         }
         catch (NoSuchObjectException e) {
             throw new PartitionNotFoundException(new SchemaTableName(databaseName, tableName), partition.getValues());
+        }
+        catch (TException e) {
+            throw new PrestoException(HiveErrorCode.HIVE_METASTORE_ERROR, e);
+        }
+        catch (Exception e) {
+            throw propagate(e);
+        }
+    }
+
+    private void alterPartitionsWithoutStatistics(String databaseName, String tableName, List<Partition> partitions)
+    {
+        try {
+            retry()
+                    .stopOn(NoSuchObjectException.class, MetaException.class)
+                    .stopOnIllegalExceptions()
+                    .run("alterPartition", stats.getAlterPartition().wrap(() -> {
+                        try (ThriftMetastoreClient client = createMetastoreClient()) {
+                            client.alterPartitions(databaseName, tableName, partitions);
+                        }
+                        return null;
+                    }));
+        }
+        catch (NoSuchObjectException e) {
+            throw new PartitionNotFoundException(new SchemaTableName(databaseName, tableName), null);
         }
         catch (TException e) {
             throw new PrestoException(HiveErrorCode.HIVE_METASTORE_ERROR, e);

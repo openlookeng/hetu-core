@@ -308,7 +308,7 @@ public class OrcFileWriter
     private Block insertOperationId(Page dataPage, Block rowIdBlock, int value)
     {
         BlockBuilder builder = new IntArrayBlockBuilder(null, dataPage.getPositionCount());
-        boolean keepOriginal = acidWriteType.map(t -> (t == HiveACIDWriteType.VACUUM)).orElse(false);
+        boolean keepOriginal = acidWriteType.map(HiveACIDWriteType::isVacuum).orElse(false);
         int valueToWrite = value;
         for (int j = 0; j < dataPage.getPositionCount(); j++) {
             if (rowIdBlock != null && keepOriginal) {
@@ -373,6 +373,7 @@ public class OrcFileWriter
 
     private Block insertBucketIdBlock(Page dataPage, Block rowIdBlock, int value)
     {
+        //In case of VACUUM_MERGE need to map bucketId to fileName.
         boolean keepOriginal = acidWriteType.map(t -> (t == HiveACIDWriteType.DELETE || t == HiveACIDWriteType.VACUUM)).orElse(false);
         BlockBuilder builder = new IntArrayBlockBuilder(null, dataPage.getPositionCount());
         int valueToWrite = value;

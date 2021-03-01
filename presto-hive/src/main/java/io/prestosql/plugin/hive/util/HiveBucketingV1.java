@@ -41,9 +41,14 @@ public final class HiveBucketingV1
 
     public static int getBucketHashCode(List<TypeInfo> types, Page page, int position)
     {
-        checkArgument(types.size() == page.getChannelCount());
+        return getBucketHashCode(types, page, position, page.getChannelCount());
+    }
+
+    public static int getBucketHashCode(List<TypeInfo> types, Page page, int position, int channelCount)
+    {
+        checkArgument(types.size() == channelCount);
         int result = 0;
-        for (int i = 0; i < page.getChannelCount(); i++) {
+        for (int i = 0; i < channelCount; i++) {
             int fieldHash = hash(types.get(i), page.getBlock(i), position);
             result = result * 31 + fieldHash;
         }

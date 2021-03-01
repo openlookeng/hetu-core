@@ -27,6 +27,7 @@ import io.hetu.core.plugin.carbondata.impl.CarbondataTableCacheModel;
 import io.hetu.core.plugin.carbondata.impl.CarbondataTableReader;
 import io.prestosql.plugin.hive.BaseStorageFormat;
 import io.prestosql.plugin.hive.HdfsEnvironment;
+import io.prestosql.plugin.hive.HiveACIDWriteType;
 import io.prestosql.plugin.hive.HiveBasicStatistics;
 import io.prestosql.plugin.hive.HiveBucketProperty;
 import io.prestosql.plugin.hive.HiveBucketing;
@@ -247,22 +248,22 @@ public class CarbondataMetadata
     }
 
     public CarbondataMetadata(SemiTransactionalHiveMetastore metastore,
-                              HdfsEnvironment hdfsEnvironment, HivePartitionManager partitionManager, DateTimeZone timeZone,
-                              boolean allowCorruptWritesForTesting, boolean writesToNonManagedTablesEnabled,
-                              boolean createsOfNonManagedTablesEnabled, boolean tableCreatesWithLocationAllowed,
-                              TypeManager typeManager, LocationService locationService,
-                              JsonCodec<PartitionUpdate> partitionUpdateCodec,
-                              JsonCodec<CarbondataSegmentInfoUtil> segmentInfoCodec,
-                              TypeTranslator typeTranslator, String hetuVersion,
-                              HiveStatisticsProvider hiveStatisticsProvider, AccessControlMetadata accessControlMetadata,
-                              CarbondataTableReader carbondataTableReader, String carbondataTableStore, long carbondataMajorVacuumSegSize, long carbondataMinorVacuumSegCount,
-                              ScheduledExecutorService executorService)
+            HdfsEnvironment hdfsEnvironment, HivePartitionManager partitionManager, DateTimeZone timeZone,
+            boolean allowCorruptWritesForTesting, boolean writesToNonManagedTablesEnabled,
+            boolean createsOfNonManagedTablesEnabled, boolean tableCreatesWithLocationAllowed,
+            TypeManager typeManager, LocationService locationService,
+            JsonCodec<PartitionUpdate> partitionUpdateCodec,
+            JsonCodec<CarbondataSegmentInfoUtil> segmentInfoCodec,
+            TypeTranslator typeTranslator, String hetuVersion,
+            HiveStatisticsProvider hiveStatisticsProvider, AccessControlMetadata accessControlMetadata,
+            CarbondataTableReader carbondataTableReader, String carbondataTableStore, long carbondataMajorVacuumSegSize, long carbondataMinorVacuumSegCount,
+            ScheduledExecutorService executorService, ScheduledExecutorService hiveMetastoreClientService)
     {
         super(metastore, hdfsEnvironment, partitionManager, timeZone, allowCorruptWritesForTesting,
                 writesToNonManagedTablesEnabled, createsOfNonManagedTablesEnabled, tableCreatesWithLocationAllowed,
                 typeManager, locationService, partitionUpdateCodec, typeTranslator, hetuVersion,
                 hiveStatisticsProvider, accessControlMetadata, false, 2, 0.0, executorService,
-                Optional.of(new Duration(5, TimeUnit.MINUTES)));
+                Optional.of(new Duration(5, TimeUnit.MINUTES)), hiveMetastoreClientService);
         this.carbondataTableReader = carbondataTableReader;
         this.carbondataTableStore = carbondataTableStore;
         this.metadataLock = null;
@@ -546,8 +547,11 @@ public class CarbondataMetadata
     }
 
     @Override
-    public CarbondataVacuumTableHandle beginVacuum(ConnectorSession session, ConnectorTableHandle tableHandle, boolean full, Optional<String> partition) throws PrestoException
+    public CarbondataVacuumTableHandle beginVacuum(ConnectorSession session, ConnectorTableHandle tableHandle, boolean full, boolean merge, Optional<String> partition) throws PrestoException
     {
+        if (merge) {
+            throw new PrestoException(NOT_SUPPORTED, "This connector does not support vacuum merge");
+        }
         // Not calling carbondata's beginInsert as no need to setup committer job, just get the table handle and locks
         currentState = State.VACUUM;
         HiveInsertTableHandle insertTableHandle = super.beginInsert(session, tableHandle);
@@ -1366,12 +1370,12 @@ public class CarbondataMetadata
                 partitionUpdate.getWritePath(),
                 partitionUpdate.getFileNames(),
                 partitionStatistics,
-                false);
+                HiveACIDWriteType.INSERT_OVERWRITE);
         markSegmentsForDelete(session, table);
     }
 
     @Override
-    protected void finishInsertInNewPartition(ConnectorSession session, HiveInsertTableHandle handle, Table table, Map<String, Type> columnTypes, PartitionUpdate partitionUpdate, Map<List<String>, ComputedStatistics> partitionComputedStatistics)
+    protected void finishInsertInNewPartition(ConnectorSession session, HiveInsertTableHandle handle, Table table, Map<String, Type> columnTypes, PartitionUpdate partitionUpdate, Map<List<String>, ComputedStatistics> partitionComputedStatistics, HiveACIDWriteType acidWriteType)
     {
         // insert into new partition or overwrite existing partition
         if (partitionUpdate.getUpdateMode() == PartitionUpdate.UpdateMode.OVERWRITE) {
@@ -1389,7 +1393,7 @@ public class CarbondataMetadata
                     partitionUpdate.getWritePath(),
                     partitionUpdate.getFileNames(),
                     partitionStatistics,
-                    false);
+                    acidWriteType);
         }
         else if (partitionUpdate.getUpdateMode() == PartitionUpdate.UpdateMode.APPEND) {
             Partition partition = buildPartitionObject(session, table, partitionUpdate);
@@ -1402,7 +1406,7 @@ public class CarbondataMetadata
                     partitionUpdate.getStatistics(),
                     columnTypes,
                     getColumnStatistics(partitionComputedStatistics, partition.getValues()));
-            metastore.addPartition(session, handle.getSchemaName(), handle.getTableName(), partition, partitionUpdate.getWritePath(), partitionStatistics);
+            metastore.addPartition(session, handle.getSchemaName(), handle.getTableName(), partition, partitionUpdate.getWritePath(), partitionStatistics, acidWriteType);
         }
     }
 

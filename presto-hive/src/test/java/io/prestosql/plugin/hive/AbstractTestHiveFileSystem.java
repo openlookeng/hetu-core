@@ -194,6 +194,7 @@ public abstract class AbstractTestHiveFileSystem
                 newDirectExecutorService(),
                 vacuumExecutorService,
                 heartbeatService,
+                vacuumExecutorService,
                 TYPE_MANAGER,
                 locationService,
                 partitionUpdateCodec,

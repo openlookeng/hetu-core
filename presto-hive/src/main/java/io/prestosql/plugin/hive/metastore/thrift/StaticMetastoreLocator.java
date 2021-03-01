@@ -20,9 +20,9 @@ import org.apache.thrift.TException;
 import javax.inject.Inject;
 
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
@@ -35,6 +35,7 @@ public class StaticMetastoreLocator
     private final List<HostAndPort> addresses;
     private final MetastoreClientFactory clientFactory;
     private final String metastoreUsername;
+    private AtomicInteger nextIndex = new AtomicInteger(0);
 
     @Inject
     public StaticMetastoreLocator(StaticMetastoreConfig config, MetastoreClientFactory clientFactory)
@@ -50,6 +51,7 @@ public class StaticMetastoreLocator
                 .map(StaticMetastoreLocator::checkMetastoreUri)
                 .map(uri -> HostAndPort.fromParts(uri.getHost(), uri.getPort()))
                 .collect(toList());
+        Collections.shuffle(addresses);
         this.metastoreUsername = metastoreUsername;
         this.clientFactory = requireNonNull(clientFactory, "clientFactory is null");
     }
@@ -57,20 +59,16 @@ public class StaticMetastoreLocator
     /**
      * Create a metastore client connected to the Hive metastore.
      * <p>
-     * As per Hive HA metastore behavior, return the first metastore in the list
-     * list of available metastores (i.e. the default metastore) if a connection
-     * can be made, else try another of the metastores at random, until either a
-     * connection succeeds or there are no more fallback metastores.
+     * Connects to all metastores in round-roubin order
      */
     @Override
     public ThriftMetastoreClient createMetastoreClient()
             throws TException
     {
-        List<HostAndPort> metastores = new ArrayList<>(addresses);
-        Collections.shuffle(metastores.subList(1, metastores.size()));
-
         TException lastException = null;
-        for (HostAndPort metastore : metastores) {
+        for (int i = 0; i < addresses.size(); i++) {
+            int next = nextIndex.updateAndGet((current -> (current + 1) % addresses.size()));
+            HostAndPort metastore = addresses.get(next);
             try {
                 ThriftMetastoreClient client = clientFactory.create(metastore);
                 if (!isNullOrEmpty(metastoreUsername)) {

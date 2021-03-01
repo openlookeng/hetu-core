@@ -669,6 +669,53 @@ public class TestHiveIntegrationSmokeTest
     }
 
     @Test
+    public void testFullMergeVacuum1()
+    {
+        String table = "tab_fm_vacuum";
+        String schema = "default";
+        assertUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s", schema));
+
+        assertUpdate(String.format("CREATE TABLE %s.%s (a int, b int) with (transactional=true, format='orc')",
+                schema, table));
+
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (1, 2)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (3, 4)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (5, 6)", schema, table), 1);
+
+        assertUpdate(String.format("VACUUM TABLE %s.%s FULL UNIFY AND WAIT", schema, table), 3);
+
+        TableMetadata tableMetadata = getTableMetadata("hive", schema, table);
+        String tablePath = ((String) tableMetadata.getMetadata().getProperties().get("location"));
+
+        assertFilesAfterCleanup(tablePath, 1);
+        assertUpdate(String.format("DROP TABLE %s.%s", schema, table));
+    }
+
+    @Test
+    public void testFullMergeVacuum2()
+    {
+        String table = "tab_fm_vacuum_2";
+        String schema = "default";
+        assertUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s", schema));
+
+        assertUpdate(String.format("CREATE TABLE %s.%s (a int, b int) with (transactional=true, format='orc')",
+                schema, table));
+
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (1, 2)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (3, 4)", schema, table), 1);
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (5, 6)", schema, table), 1);
+
+        assertUpdate(String.format("VACUUM TABLE %s.%s AND WAIT", schema, table), 3);
+        assertUpdate(String.format("VACUUM TABLE %s.%s FULL UNIFY AND WAIT", schema, table), 3);
+
+        TableMetadata tableMetadata = getTableMetadata("hive", schema, table);
+        String tablePath = ((String) tableMetadata.getMetadata().getProperties().get("location"));
+
+        assertFilesAfterCleanup(tablePath, 1);
+        assertUpdate(String.format("DROP TABLE %s.%s", schema, table));
+    }
+
+    @Test
     public void testFullVacuum2()
     {
         String table = "tab3";
@@ -4360,7 +4407,7 @@ public class TestHiveIntegrationSmokeTest
                         "('c_varbinary', null, null, null, null, null, null), " +
                         "('p_varchar', null, null, null, null, null, null), " +
                         "('p_bigint', null, null, null, null, null, null), " +
-                        "(null, null, null, null, 16.0, null, null)");
+                        "(null, null, null, null, null, null, null)");
 
         // Run analyze on the whole table
         assertUpdate("ANALYZE " + tableName, 16);

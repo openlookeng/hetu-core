@@ -49,7 +49,9 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.plugin.hive.HiveMetadata.TABLE_COMMENT;
+import static io.prestosql.plugin.hive.metastore.thrift.ThriftMetastoreUtil.toMetastoreApiTable;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static java.util.Objects.requireNonNull;
 import static java.util.function.UnaryOperator.identity;
@@ -95,15 +97,19 @@ public class BridgingHiveMetastore
     }
 
     @Override
-    public PartitionStatistics getTableStatistics(HiveIdentity identity, String databaseName, String tableName)
+    public PartitionStatistics getTableStatistics(HiveIdentity identity, Table table)
     {
-        return delegate.getTableStatistics(identity, databaseName, tableName);
+        return delegate.getTableStatistics(identity, toMetastoreApiTable(table));
     }
 
     @Override
-    public Map<String, PartitionStatistics> getPartitionStatistics(HiveIdentity identity, String databaseName, String tableName, Set<String> partitionNames)
+    public Map<String, PartitionStatistics> getPartitionStatistics(HiveIdentity identity, Table table, List<Partition> partitions)
     {
-        return delegate.getPartitionStatistics(identity, databaseName, tableName, partitionNames);
+        return delegate.getPartitionStatistics(identity,
+                toMetastoreApiTable(table),
+                partitions.stream()
+                        .map(ThriftMetastoreUtil::toMetastoreApiPartition)
+                        .collect(toImmutableList()));
     }
 
     @Override
@@ -116,6 +122,12 @@ public class BridgingHiveMetastore
     public void updatePartitionStatistics(HiveIdentity identity, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update)
     {
         delegate.updatePartitionStatistics(identity, databaseName, tableName, partitionName, update);
+    }
+
+    @Override
+    public void updatePartitionsStatistics(HiveIdentity identity, String databaseName, String tableName, List<String> partitionNames, List<Function<PartitionStatistics, PartitionStatistics>> updateFunctionList)
+    {
+        delegate.updatePartitionsStatistics(identity, databaseName, tableName, partitionNames, updateFunctionList);
     }
 
     @Override

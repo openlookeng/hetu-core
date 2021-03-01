@@ -32,18 +32,30 @@ public class HivePartitioningHandle
     private final int bucketCount;
     private final List<HiveType> hiveTypes;
     private final OptionalInt maxCompatibleBucketCount;
+    private final boolean forUpdateOrDelete;
+
+    public HivePartitioningHandle(
+            BucketingVersion bucketingVersion,
+            int bucketCount,
+            List<HiveType> hiveTypes,
+            OptionalInt maxCompatibleBucketCount)
+    {
+        this(bucketingVersion, bucketCount, hiveTypes, maxCompatibleBucketCount, false);
+    }
 
     @JsonCreator
     public HivePartitioningHandle(
             @JsonProperty("bucketingVersion") BucketingVersion bucketingVersion,
             @JsonProperty("bucketCount") int bucketCount,
             @JsonProperty("hiveTypes") List<HiveType> hiveTypes,
-            @JsonProperty("maxCompatibleBucketCount") OptionalInt maxCompatibleBucketCount)
+            @JsonProperty("maxCompatibleBucketCount") OptionalInt maxCompatibleBucketCount,
+            @JsonProperty("forUpdate") boolean forUpdateOrDelete)
     {
         this.bucketingVersion = requireNonNull(bucketingVersion, "bucketingVersion is null");
         this.bucketCount = bucketCount;
         this.hiveTypes = requireNonNull(hiveTypes, "hiveTypes is null");
         this.maxCompatibleBucketCount = maxCompatibleBucketCount;
+        this.forUpdateOrDelete = forUpdateOrDelete;
     }
 
     @JsonProperty
@@ -68,6 +80,12 @@ public class HivePartitioningHandle
     public OptionalInt getMaxCompatibleBucketCount()
     {
         return maxCompatibleBucketCount;
+    }
+
+    @JsonProperty
+    public boolean isForUpdateOrDelete()
+    {
+        return forUpdateOrDelete;
     }
 
     @Override

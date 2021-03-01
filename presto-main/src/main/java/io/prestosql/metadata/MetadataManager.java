@@ -841,14 +841,14 @@ public final class MetadataManager
     }
 
     @Override
-    public VacuumTableHandle beginVacuum(Session session, TableHandle tableHandle, boolean full, Optional<String> partition)
+    public VacuumTableHandle beginVacuum(Session session, TableHandle tableHandle, boolean full, boolean merge, Optional<String> partition)
     {
         CatalogName catalogName = tableHandle.getCatalogName();
         CatalogMetadata catalogMetadata = getCatalogMetadataForWrite(session, catalogName);
         ConnectorMetadata metadata = getMetadataForWrite(session, catalogName);
         ConnectorTransactionHandle transactionHandle = catalogMetadata.getTransactionHandleFor(catalogName);
         ConnectorVacuumTableHandle vacuumTableHandle = metadata.beginVacuum(session.toConnectorSession(catalogName),
-                tableHandle.getConnectorHandle(), full, partition);
+                tableHandle.getConnectorHandle(), full, merge, partition);
         return new VacuumTableHandle(tableHandle.getCatalogName(), transactionHandle, vacuumTableHandle);
     }
 

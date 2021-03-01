@@ -211,6 +211,7 @@ public class HiveConfig
 
     private Duration vacuumCleanupRecheckInterval = new Duration(5, MINUTES);
     private int vacuumServiceThreads = 2;
+    private int metastoreClientServiceThreads = 4;
     private Optional<Duration> vacuumCollectorInterval = Optional.of(new Duration(5, MINUTES));
 
     private int maxNumbSplitsToGroup = 1;
@@ -1696,6 +1697,19 @@ public class HiveConfig
     public int getVacuumServiceThreads()
     {
         return vacuumServiceThreads;
+    }
+
+    @Config("hive.metastore-client-service-threads")
+    @ConfigDescription("Number of threads for metastore client")
+    public HiveConfig setMetastoreClientServiceThreads(int metastoreClientServiceThreads)
+    {
+        this.metastoreClientServiceThreads = metastoreClientServiceThreads;
+        return this;
+    }
+
+    public int getMetastoreClientServiceThreads()
+    {
+        return metastoreClientServiceThreads;
     }
 
     @Config("hive.vacuum-delta-num-threshold")

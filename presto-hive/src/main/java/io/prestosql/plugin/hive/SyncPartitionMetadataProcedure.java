@@ -206,7 +206,8 @@ public class SyncPartitionMetadataProcedure
                     table.getTableName(),
                     buildPartitionObject(session, table, name),
                     new Path(table.getStorage().getLocation(), name),
-                    PartitionStatistics.empty());
+                    PartitionStatistics.empty(),
+                    HiveACIDWriteType.NONE);
         }
     }
 

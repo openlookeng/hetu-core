@@ -300,7 +300,7 @@ public class HiveSplitManager
 
         if (queryType.isPresent() && queryType.get() == QueryType.VACUUM) {
             HdfsContext hdfsContext = new HdfsContext(session, table.getDatabaseName(), table.getTableName());
-            return new HiveVacuumSplitSource(splitSource, (HiveVacuumTableHandle) queryInfo.get("vacuumHandle"), hdfsEnvironment, hdfsContext);
+            return new HiveVacuumSplitSource(splitSource, (HiveVacuumTableHandle) queryInfo.get("vacuumHandle"), hdfsEnvironment, hdfsContext, session);
         }
 
         return splitSource;
@@ -351,7 +351,7 @@ public class HiveSplitManager
                 if (partition == null) {
                     throw new PrestoException(GENERIC_INTERNAL_ERROR, "Partition not loaded: " + hivePartition);
                 }
-                String partName = MetastoreUtil.makePartName(table.getPartitionColumns(), partition.getValues());
+                String partName = MetastoreUtil.makePartitionName(table.getPartitionColumns(), partition.getValues());
 
                 // verify partition is online
                 MetastoreUtil.verifyOnline(tableName, Optional.of(partName), MetastoreUtil.getProtectMode(partition), partition.getParameters());

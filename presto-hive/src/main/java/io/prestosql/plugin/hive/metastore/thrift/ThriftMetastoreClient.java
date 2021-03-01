@@ -112,6 +112,9 @@ public interface ThriftMetastoreClient
     void alterPartition(String databaseName, String tableName, Partition partition)
             throws TException;
 
+    void alterPartitions(String databaseName, String tableName, List<Partition> partitions)
+            throws TException;
+
     Partition getPartition(String databaseName, String tableName, List<String> partitionValues)
             throws TException;
 

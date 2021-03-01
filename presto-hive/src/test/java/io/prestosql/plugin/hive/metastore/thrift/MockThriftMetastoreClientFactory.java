@@ -45,6 +45,9 @@ public class MockThriftMetastoreClientFactory
         if (client == null) {
             throw new TTransportException(TTransportException.TIMED_OUT);
         }
+        if (client instanceof MockThriftMetastoreClient) {
+            ((MockThriftMetastoreClient) client).setHostAddress(address.getHost() + ":" + address.getPortOrDefault(8080));
+        }
         return client;
     }
 }

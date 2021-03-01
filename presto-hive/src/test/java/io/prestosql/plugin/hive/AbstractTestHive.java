@@ -58,6 +58,7 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorInsertTableHandle;
 import io.prestosql.spi.connector.ConnectorMetadata;
+import io.prestosql.spi.connector.ConnectorNewTableLayout;
 import io.prestosql.spi.connector.ConnectorOutputTableHandle;
 import io.prestosql.spi.connector.ConnectorPageSink;
 import io.prestosql.spi.connector.ConnectorPageSinkProvider;
@@ -590,6 +591,7 @@ public abstract class AbstractTestHive
 
     private ScheduledExecutorService heartbeatService;
     private ScheduledExecutorService vacuumExecutorService;
+    private ScheduledExecutorService hiveMetastoreClientService;
 
     @BeforeClass
     public void setupClass()
@@ -597,6 +599,7 @@ public abstract class AbstractTestHive
         executor = newCachedThreadPool(daemonThreadsNamed("hive-%s"));
         heartbeatService = newScheduledThreadPool(1);
         vacuumExecutorService = newScheduledThreadPool(1);
+        hiveMetastoreClientService = newScheduledThreadPool(1);
     }
 
     @AfterClass(alwaysRun = true)
@@ -753,6 +756,7 @@ public abstract class AbstractTestHive
                 newFixedThreadPool(2),
                 vacuumExecutorService,
                 heartbeatService,
+                hiveMetastoreClientService,
                 new HiveTypeTranslator(),
                 TEST_SERVER_VERSION,
                 SqlStandardAccessControlMetadata::new,
@@ -2722,7 +2726,7 @@ public abstract class AbstractTestHive
 
     protected void testUpdateTableStatistics(SchemaTableName tableName, PartitionStatistics initialStatistics, PartitionStatistics... statistics)
     {
-        HiveMetastore metastoreClient = getMetastoreClient();
+        HiveMetastoreClosure metastoreClient = new HiveMetastoreClosure(getMetastoreClient());
         HiveIdentity identity = new HiveIdentity(SESSION);
         assertThat(metastoreClient.getTableStatistics(identity, tableName.getSchemaName(), tableName.getTableName()))
                 .isEqualTo(initialStatistics);
@@ -2901,7 +2905,7 @@ public abstract class AbstractTestHive
         String firstPartitionName = "ds=2016-01-01";
         String secondPartitionName = "ds=2016-01-02";
 
-        HiveMetastore metastoreClient = getMetastoreClient();
+        HiveMetastoreClosure metastoreClient = new HiveMetastoreClosure(getMetastoreClient());
         HiveIdentity identity = new HiveIdentity(SESSION);
         assertThat(metastoreClient.getPartitionStatistics(identity, tableName.getSchemaName(), tableName.getTableName(), ImmutableSet.of(firstPartitionName, secondPartitionName)))
                 .isEqualTo(ImmutableMap.of(firstPartitionName, initialStatistics, secondPartitionName, initialStatistics));
@@ -2959,7 +2963,7 @@ public abstract class AbstractTestHive
         try {
             doCreateEmptyTable(tableName, ORC, columns);
 
-            HiveMetastore metastoreClient = getMetastoreClient();
+            HiveMetastoreClosure metastoreClient = new HiveMetastoreClosure(getMetastoreClient());
             HiveIdentity identity = new HiveIdentity(SESSION);
             Table table = metastoreClient.getTable(identity, tableName.getSchemaName(), tableName.getTableName())
                     .orElseThrow(() -> new TableNotFoundException(tableName));
@@ -4752,6 +4756,134 @@ public abstract class AbstractTestHive
                         .add(new TransactionDeleteInsertTestCase(true, false, COMMIT, Optional.of(new DropPartitionFailure())))
                         .add(new TransactionDeleteInsertTestCase(true, true, COMMIT, Optional.empty()))
                         .build());
+    }
+
+    @Test
+    public void testPreferredInsertLayout()
+            throws Exception
+    {
+        SchemaTableName tableName = temporaryTable("empty_partitioned_table");
+
+        try {
+            Column partitioningColumn = new Column("column2", HIVE_STRING, Optional.empty());
+            List<Column> columns = ImmutableList.of(
+                    new Column("column1", HIVE_STRING, Optional.empty()),
+                    partitioningColumn);
+            createEmptyTable(tableName, ORC, columns, ImmutableList.of(partitioningColumn));
+
+            try (Transaction transaction = newTransaction()) {
+                ConnectorMetadata metadata = transaction.getMetadata();
+                ConnectorSession session = newSession(ImmutableMap.of("write_partition_distribution", true));
+                ConnectorTableHandle tableHandle = getTableHandle(metadata, tableName);
+                Optional<ConnectorNewTableLayout> insertLayout = metadata.getInsertLayout(session, tableHandle);
+                assertTrue(insertLayout.isPresent());
+                assertFalse(insertLayout.get().getPartitioning().isPresent());
+                assertEquals(insertLayout.get().getPartitionColumns(), ImmutableList.of(partitioningColumn.getName()));
+            }
+        }
+        finally {
+            dropTable(tableName);
+        }
+    }
+
+    @Test
+    public void testInsertLayoutWithWritePartitionDistributionDisabled()
+            throws Exception
+    {
+        SchemaTableName tableName = temporaryTable("empty_partitioned_table");
+
+        try {
+            Column partitioningColumn = new Column("column2", HIVE_STRING, Optional.empty());
+            List<Column> columns = ImmutableList.of(
+                    new Column("column1", HIVE_STRING, Optional.empty()),
+                    partitioningColumn);
+            createEmptyTable(tableName, ORC, columns, ImmutableList.of(partitioningColumn));
+
+            try (Transaction transaction = newTransaction()) {
+                ConnectorMetadata metadata = transaction.getMetadata();
+                ConnectorSession session = newSession();
+                ConnectorTableHandle tableHandle = getTableHandle(metadata, tableName);
+                Optional<ConnectorNewTableLayout> insertLayout = metadata.getInsertLayout(session, tableHandle);
+                assertFalse(insertLayout.isPresent());
+            }
+        }
+        finally {
+            dropTable(tableName);
+        }
+    }
+
+    @Test
+    public void testPreferredCreateTableLayout()
+    {
+        try (Transaction transaction = newTransaction()) {
+            ConnectorMetadata metadata = transaction.getMetadata();
+            ConnectorSession session = newSession(ImmutableMap.of("write_partition_distribution", true));
+            Optional<ConnectorNewTableLayout> newTableLayout = metadata.getNewTableLayout(
+                    session,
+                    new ConnectorTableMetadata(
+                            new SchemaTableName("schema", "table"),
+                            ImmutableList.of(
+                                    new ColumnMetadata("column1", BIGINT),
+                                    new ColumnMetadata("column2", BIGINT)),
+                            ImmutableMap.of(
+                                    PARTITIONED_BY_PROPERTY, ImmutableList.of("column2"),
+                                    BUCKETED_BY_PROPERTY, ImmutableList.of(),
+                                    BUCKET_COUNT_PROPERTY, 0,
+                                    SORTED_BY_PROPERTY, ImmutableList.of())));
+            assertTrue(newTableLayout.isPresent());
+            assertFalse(newTableLayout.get().getPartitioning().isPresent());
+            assertEquals(newTableLayout.get().getPartitionColumns(), ImmutableList.of("column2"));
+        }
+    }
+
+    @Test
+    public void testCreateTableLayoutWithWriteDistributionDisabled()
+    {
+        try (Transaction transaction = newTransaction()) {
+            ConnectorMetadata metadata = transaction.getMetadata();
+            ConnectorSession session = newSession();
+            Optional<ConnectorNewTableLayout> newTableLayout = metadata.getNewTableLayout(
+                    session,
+                    new ConnectorTableMetadata(
+                            new SchemaTableName("schema", "table"),
+                            ImmutableList.of(
+                                    new ColumnMetadata("column1", BIGINT),
+                                    new ColumnMetadata("column2", BIGINT)),
+                            ImmutableMap.of(
+                                    PARTITIONED_BY_PROPERTY, ImmutableList.of("column2"),
+                                    BUCKETED_BY_PROPERTY, ImmutableList.of(),
+                                    BUCKET_COUNT_PROPERTY, 0,
+                                    SORTED_BY_PROPERTY, ImmutableList.of())));
+            assertFalse(newTableLayout.isPresent());
+        }
+    }
+
+    @Test
+    public void testUpdateLayout()
+            throws Exception
+    {
+        SchemaTableName tableName = temporaryTable("empty_partitioned_table");
+
+        try {
+            Column partitioningColumn = new Column("column2", HIVE_STRING, Optional.empty());
+            List<Column> columns = ImmutableList.of(
+                    new Column("column1", HIVE_STRING, Optional.empty()),
+                    partitioningColumn);
+            createEmptyTable(tableName, ORC, columns, ImmutableList.of(partitioningColumn));
+
+            try (Transaction transaction = newTransaction()) {
+                ConnectorMetadata metadata = transaction.getMetadata();
+                ConnectorSession session = newSession();
+                ConnectorTableHandle tableHandle = getTableHandle(metadata, tableName);
+                Optional<ConnectorNewTableLayout> updateLayout = metadata.getUpdateLayout(session, tableHandle);
+                assertTrue(updateLayout.isPresent());
+                assertTrue(updateLayout.get().getPartitioning().isPresent());
+                assertEquals(updateLayout.get().getPartitionColumns(), ImmutableList.of(partitioningColumn.getName(), HiveColumnHandle.UPDATE_ROW_ID_COLUMN_NAME.toLowerCase(ENGLISH)));
+            }
+        }
+        finally {
+            dropTable(tableName);
+        }
     }
 
     protected void doTestTransactionDeleteInsert(HiveStorageFormat storageFormat, boolean allowInsertExisting, List<TransactionDeleteInsertTestCase> testCases)

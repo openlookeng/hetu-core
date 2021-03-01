@@ -300,6 +300,7 @@ import static io.prestosql.sql.planner.RowExpressionInterpreter.Level.OPTIMIZED;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.COORDINATOR_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_ARBITRARY_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_BROADCAST_DISTRIBUTION;
+import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_HASH_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SCALED_WRITER_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
 import static io.prestosql.sql.planner.VariableReferenceSymbolConverter.toSymbol;
@@ -2617,7 +2618,13 @@ public class LocalExecutionPlanner
         {
             // Set table writer count
             if (node.getPartitioningScheme().isPresent()) {
-                context.setDriverInstanceCount(1);
+                PartitioningHandle partitioningHandle = node.getPartitioningScheme().get().getPartitioning().getHandle();
+                if (partitioningHandle.equals(FIXED_HASH_DISTRIBUTION)) {
+                    context.setDriverInstanceCount(getTaskWriterCount(session));
+                }
+                else {
+                    context.setDriverInstanceCount(1);
+                }
             }
             else {
                 context.setDriverInstanceCount(getTaskWriterCount(session));

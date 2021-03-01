@@ -134,7 +134,7 @@ statement
     | DESCRIBE INPUT identifier                                        #describeInput
     | DESCRIBE OUTPUT identifier                                       #describeOutput
     | SET PATH pathSpecification                                       #setPath
-    | VACUUM TABLE qualifiedName FULL? (PARTITION partition=string)?
+    | VACUUM TABLE qualifiedName (FULL (UNIFY)?)? (PARTITION partition=string)?
         (AND_WAIT)?                                                    #vacuumTable
     ;
 
@@ -651,6 +651,7 @@ LOCALTIME: 'LOCALTIME';
 LOCALTIMESTAMP: 'LOCALTIMESTAMP';
 LOGICAL: 'LOGICAL';
 MAP: 'MAP';
+UNIFY: 'UNIFY';
 MINUTE: 'MINUTE';
 MONTH: 'MONTH';
 NATURAL: 'NATURAL';

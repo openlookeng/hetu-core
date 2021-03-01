@@ -13,7 +13,6 @@
  */
 package io.prestosql.plugin.hive.util;
 
-import com.google.common.collect.ImmutableMap;
 import io.prestosql.plugin.hive.HiveBasicStatistics;
 import io.prestosql.plugin.hive.HiveErrorCode;
 import io.prestosql.plugin.hive.PartitionStatistics;
@@ -337,12 +336,6 @@ public final class Statistics
             Map<String, Type> columnTypes,
             long rowCount)
     {
-        return createColumnToComputedStatisticsMap(computedStatistics).entrySet().stream()
-                .collect(toImmutableMap(Entry::getKey, entry -> createHiveColumnStatistics(session, timeZone, entry.getValue(), columnTypes.get(entry.getKey()), rowCount)));
-    }
-
-    private static Map<String, Map<ColumnStatisticType, Block>> createColumnToComputedStatisticsMap(Map<ColumnStatisticMetadata, Block> computedStatistics)
-    {
         Map<String, Map<ColumnStatisticType, Block>> result = new HashMap<>();
         computedStatistics.forEach((metadata, block) -> {
             Map<ColumnStatisticType, Block> columnStatistics = result.computeIfAbsent(metadata.getColumnName(), key -> new HashMap<>());
@@ -350,7 +343,8 @@ public final class Statistics
         });
         return result.entrySet()
                 .stream()
-                .collect(toImmutableMap(Entry::getKey, entry -> ImmutableMap.copyOf(entry.getValue())));
+                .collect(toImmutableMap(Entry::getKey,
+                        entry -> createHiveColumnStatistics(session, timeZone, entry.getValue(), columnTypes.get(entry.getKey()), rowCount)));
     }
 
     private static HiveColumnStatistics createHiveColumnStatistics(

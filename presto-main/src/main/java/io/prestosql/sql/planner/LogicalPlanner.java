@@ -119,6 +119,7 @@ import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_HASH_DISTRIBUTION;
 import static io.prestosql.sql.planner.plan.TableWriterNode.CreateReference;
 import static io.prestosql.sql.planner.plan.TableWriterNode.InsertReference;
 import static io.prestosql.sql.planner.plan.TableWriterNode.WriterTarget;
@@ -482,8 +483,11 @@ public class LogicalPlanner
 
             List<Symbol> outputLayout = new ArrayList<>(symbols);
 
+            PartitioningHandle partitioningHandle = writeTableLayout.get().getPartitioning()
+                    .orElse(FIXED_HASH_DISTRIBUTION);
+
             partitioningScheme = Optional.of(new PartitioningScheme(
-                    Partitioning.create(writeTableLayout.get().getPartitioning(), partitionFunctionArguments),
+                    Partitioning.create(partitioningHandle, partitionFunctionArguments),
                     outputLayout));
         }
 
@@ -631,7 +635,7 @@ public class LogicalPlanner
         return createVacuumWriterPlan(analysis,
                 handle,
                 vacuumTable,
-                new VacuumTargetReference(handle, vacuumTable.isFull(), vacuumTable.getPartition()),
+                new VacuumTargetReference(handle, vacuumTable.isFull(), vacuumTable.isMerge(), vacuumTable.getPartition()),
                 symbols,
                 columnNames,
                 statisticsMetadata);

@@ -13,6 +13,7 @@
  */
 package io.prestosql.plugin.hive;
 
+import com.google.common.collect.ImmutableList;
 import io.prestosql.plugin.hive.HiveBucketing.BucketingVersion;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.connector.BucketFunction;
@@ -31,25 +32,42 @@ public class HiveBucketFunction
     private final BucketingVersion bucketingVersion;
     private final int bucketCount;
     private final List<TypeInfo> typeInfos;
+    private final List<TypeInfo> typeInfosForUpdate;
     private final boolean isRowIdPartitioner;
 
     public HiveBucketFunction(BucketingVersion bucketingVersion, int bucketCount, List<HiveType> hiveTypes)
+    {
+        this(bucketingVersion, bucketCount, hiveTypes, false);
+    }
+
+    public HiveBucketFunction(BucketingVersion bucketingVersion, int bucketCount, List<HiveType> hiveTypes, boolean forUpdate)
     {
         this.bucketingVersion = requireNonNull(bucketingVersion, "bucketingVersion is null");
         this.bucketCount = bucketCount;
         this.typeInfos = requireNonNull(hiveTypes, "hiveTypes is null").stream()
                 .map(HiveType::getTypeInfo)
                 .collect(Collectors.toList());
-        this.isRowIdPartitioner = bucketCount == HiveBucketing.MAX_BUCKET_NUMBER &&
-                typeInfos.size() == 1 &&
-                typeInfos.get(0).getCategory() == Category.STRUCT;
+        this.isRowIdPartitioner = forUpdate &&
+                typeInfos.get(typeInfos.size() - 1).getCategory() == Category.STRUCT;
+        if (forUpdate && typeInfos.size() > 1) {
+            typeInfosForUpdate = typeInfos.subList(0, typeInfos.size() - 1);
+        }
+        else {
+            typeInfosForUpdate = ImmutableList.of();
+        }
     }
 
     @Override
     public int getBucket(Page page, int position)
     {
         if (isRowIdPartitioner) {
-            return HiveBucketing.extractBucketNumber(page, position);
+            int bucketHashCode = 0;
+            if (page.getChannelCount() > 1) {
+                //Consider the partitioning columns also for partitioning during update to parallelize the updates of partitioned tables.
+                bucketHashCode = HiveBucketing.getBucketHashCode(bucketingVersion, typeInfosForUpdate, page, position, typeInfosForUpdate.size());
+            }
+            bucketHashCode = bucketHashCode * 31 + HiveBucketing.extractBucketNumber(page, position);
+            return HiveBucketing.getBucketNumber(bucketHashCode, bucketCount);
         }
         return HiveBucketing.getHiveBucket(bucketingVersion, bucketCount, typeInfos, page, position);
     }

@@ -166,6 +166,11 @@ public class SortingFileWriter
         return outputWriter.getValidationCpuNanos();
     }
 
+    public Path getTempFilePrefix()
+    {
+        return tempFilePrefix;
+    }
+
     @Override
     public String toString()
     {
