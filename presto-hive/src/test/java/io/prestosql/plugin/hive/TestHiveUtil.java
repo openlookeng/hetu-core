@@ -13,6 +13,12 @@
  */
 package io.prestosql.plugin.hive;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import io.prestosql.plugin.hive.metastore.Column;
+import io.prestosql.plugin.hive.metastore.Storage;
+import io.prestosql.plugin.hive.metastore.StorageFormat;
+import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
@@ -42,9 +48,12 @@ import java.util.Set;
 import static io.airlift.testing.Assertions.assertInstanceOf;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.PARTITION_KEY;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.REGULAR;
+import static io.prestosql.plugin.hive.HiveStorageFormat.ORC;
 import static io.prestosql.plugin.hive.HiveType.HIVE_LONG;
 import static io.prestosql.plugin.hive.HiveType.HIVE_STRING;
 import static io.prestosql.plugin.hive.HiveUtil.getDeserializer;
+import static io.prestosql.plugin.hive.HiveUtil.getPartitionKeyColumnHandles;
+import static io.prestosql.plugin.hive.HiveUtil.getRegularColumnHandles;
 import static io.prestosql.plugin.hive.HiveUtil.isPartitionFiltered;
 import static io.prestosql.plugin.hive.HiveUtil.parseHiveTimestamp;
 import static io.prestosql.plugin.hive.HiveUtil.toPartitionValues;
@@ -60,6 +69,30 @@ import static org.testng.Assert.assertTrue;
 
 public class TestHiveUtil
 {
+    private static final Storage STORAGE_1 = new Storage(StorageFormat.fromHiveStorageFormat(ORC), "", Optional.empty(), false, ImmutableMap.of());
+    private static final Table TABLE_1 = new Table("schema",
+            "table",
+            "user",
+            "MANAGED_TABLE",
+            STORAGE_1,
+            ImmutableList.of(new Column("col_1", HiveType.HIVE_INT, Optional.empty()), new Column("col_2", HiveType.HIVE_INT, Optional.empty()), new Column("col_3", HiveType.HIVE_INT, Optional.empty())),
+            ImmutableList.of(new Column("part_col_1", HIVE_STRING, Optional.empty())),
+            ImmutableMap.of(),
+            Optional.of("original"),
+            Optional.of("expanded"));
+    private static final HiveBucketProperty HIVE_BUCKET_PROPERTY = new HiveBucketProperty(ImmutableList.of("col_3"), HiveBucketing.BucketingVersion.BUCKETING_V2, 2, ImmutableList.of());
+    private static final Storage STORAGE_2 = new Storage(StorageFormat.fromHiveStorageFormat(ORC), "", Optional.of(HIVE_BUCKET_PROPERTY), false, ImmutableMap.of());
+    private static final Table TABLE_2 = new Table("schema",
+            "table",
+            "user",
+            "MANAGED_TABLE",
+            STORAGE_2,
+            ImmutableList.of(new Column("col_1", HiveType.HIVE_INT, Optional.empty()), new Column("col_2", HiveType.HIVE_INT, Optional.empty()), new Column("col_3", HiveType.HIVE_INT, Optional.empty())),
+            ImmutableList.of(new Column("part_col_1", HIVE_STRING, Optional.empty())),
+            ImmutableMap.of(),
+            Optional.of("original"),
+            Optional.of("expanded"));
+
     @Test
     public void testParseHiveTimestamp()
     {
@@ -144,6 +177,26 @@ public class TestHiveUtil
         nameFilter.add("Alice");
         dynamicFilters.add(new HashSetDynamicFilter("1", nameColumn, nameFilter, DynamicFilter.Type.GLOBAL));
         assertFalse(isPartitionFiltered(partitions, dynamicFilters, typeManager), "Should not filter partition if dynamicFilter is on non-partition column");
+    }
+
+    @Test
+    public void testGetRegularColumnHandles()
+    {
+        List<HiveColumnHandle> regularColumns = getRegularColumnHandles(TABLE_1);
+        assertEquals(regularColumns.get(0).isRequired(), false);
+        assertEquals(regularColumns.get(1).isRequired(), false);
+        assertEquals(regularColumns.get(2).isRequired(), false);
+        List<HiveColumnHandle> bucketedRegularColumns = getRegularColumnHandles(TABLE_2);
+        assertEquals(bucketedRegularColumns.get(0).isRequired(), false);
+        assertEquals(bucketedRegularColumns.get(1).isRequired(), false);
+        assertEquals(bucketedRegularColumns.get(2).isRequired(), true);
+    }
+
+    @Test
+    public void testGetPartitionKeyColumnHandles()
+    {
+        List<HiveColumnHandle> partitionColumns = getPartitionKeyColumnHandles(TABLE_1);
+        assertEquals(partitionColumns.get(0).isRequired(), true);
     }
 
     private static void assertToPartitionValues(String partitionName)

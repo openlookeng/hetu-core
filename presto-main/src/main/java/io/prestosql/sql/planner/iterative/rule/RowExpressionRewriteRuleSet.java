@@ -35,9 +35,11 @@ import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticAggregations;
+import io.prestosql.sql.planner.plan.TableDeleteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
+import io.prestosql.sql.relational.OriginalExpressionUtils;
 
 import java.util.HashMap;
 import java.util.List;
@@ -53,6 +55,7 @@ import static io.prestosql.sql.planner.plan.Patterns.filter;
 import static io.prestosql.sql.planner.plan.Patterns.join;
 import static io.prestosql.sql.planner.plan.Patterns.project;
 import static io.prestosql.sql.planner.plan.Patterns.spatialJoin;
+import static io.prestosql.sql.planner.plan.Patterns.tableDeleteNode;
 import static io.prestosql.sql.planner.plan.Patterns.tableFinish;
 import static io.prestosql.sql.planner.plan.Patterns.tableScan;
 import static io.prestosql.sql.planner.plan.Patterns.tableWriterNode;
@@ -89,7 +92,13 @@ public class RowExpressionRewriteRuleSet
                 aggregationRowExpressionRewriteRule(),
                 tableFinishRowExpressionRewriteRule(),
                 tableWriterRowExpressionRewriteRule(),
-                vacuumTableRowExpressionRewriteRule());
+                vacuumTableRowExpressionRewriteRule(),
+                tableDeleteRowExpressionRewriteRule());
+    }
+
+    private Rule<TableDeleteNode> tableDeleteRowExpressionRewriteRule()
+    {
+        return new TableDeleteRowExpressionRewrite();
     }
 
     public Rule<ValuesNode> valueRowExpressionRewriteRule()
@@ -620,5 +629,32 @@ public class RowExpressionRewriteRuleSet
             inputId++;
         }
         return layout;
+    }
+
+    private class TableDeleteRowExpressionRewrite
+            implements Rule<TableDeleteNode>
+    {
+        @Override
+        public Pattern<TableDeleteNode> getPattern()
+        {
+            return tableDeleteNode();
+        }
+
+        @Override
+        public Result apply(TableDeleteNode node, Captures captures, Context context)
+        {
+            if (node.getFilter().isPresent() && OriginalExpressionUtils.isExpression(node.getFilter().get())) {
+                RowExpression rewritten = rewriter.rewrite(node.getFilter().get(), context);
+                return Result.ofPlanNode(new TableDeleteNode(
+                        node.getId(),
+                        node.getSource(),
+                        Optional.of(rewritten),
+                        node.getTarget(),
+                        node.getAssignments(),
+                        node.getOutput()));
+            }
+
+            return Result.empty();
+        }
     }
 }

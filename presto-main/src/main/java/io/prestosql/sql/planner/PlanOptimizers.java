@@ -82,6 +82,7 @@ import io.prestosql.sql.planner.iterative.rule.PruneTopNColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneValuesColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneWindowColumns;
 import io.prestosql.sql.planner.iterative.rule.PushAggregationThroughOuterJoin;
+import io.prestosql.sql.planner.iterative.rule.PushDeleteAsInsertIntoConnector;
 import io.prestosql.sql.planner.iterative.rule.PushDeleteIntoConnector;
 import io.prestosql.sql.planner.iterative.rule.PushLimitIntoTableScan;
 import io.prestosql.sql.planner.iterative.rule.PushLimitThroughMarkDistinct;
@@ -457,6 +458,16 @@ public class PlanOptimizers
                                 .add(new PushPredicateIntoUpdateDelete(metadata))
                                 .add(new PushSampleIntoTableScan(metadata))
                                 .build()),
+                new IterativeOptimizer(
+                        ruleStats,
+                        statsCalculator,
+                        costCalculator,
+                        ImmutableSet.of(new PushDeleteAsInsertIntoConnector(metadata, true))),
+                new IterativeOptimizer(
+                        ruleStats,
+                        statsCalculator,
+                        costCalculator,
+                        ImmutableSet.of(new PushDeleteAsInsertIntoConnector(metadata, false))),
                 new IterativeOptimizer(
                         ruleStats,
                         statsCalculator,

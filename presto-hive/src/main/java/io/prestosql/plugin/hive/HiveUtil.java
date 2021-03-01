@@ -31,6 +31,7 @@ import io.airlift.slice.Slices;
 import io.prestosql.hadoop.TextLineLengthLimitExceededException;
 import io.prestosql.plugin.hive.avro.PrestoAvroSerDe;
 import io.prestosql.plugin.hive.metastore.Column;
+import io.prestosql.plugin.hive.metastore.SortingColumn;
 import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.plugin.hive.util.ConfigurationUtils;
 import io.prestosql.plugin.hive.util.FooterAwareRecordReader;
@@ -98,6 +99,7 @@ import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -856,12 +858,19 @@ public final class HiveUtil
     {
         ImmutableList.Builder<HiveColumnHandle> columns = ImmutableList.builder();
 
+        Optional<HiveBucketProperty> bucketProperty = table.getStorage().getBucketProperty();
+        Set<String> bucketSortColumns = new HashSet<>();
+        if (bucketProperty.isPresent()) {
+            bucketSortColumns.addAll(bucketProperty.get().getBucketedBy());
+            bucketProperty.get().getSortedBy().stream().map(SortingColumn::getColumnName).forEach(bucketSortColumns::add);
+        }
         int hiveColumnIndex = 0;
         for (Column field : table.getDataColumns()) {
             // ignore unsupported types rather than failing
             HiveType hiveType = field.getType();
             if (hiveType.isSupportedType()) {
-                columns.add(new HiveColumnHandle(field.getName(), hiveType, hiveType.getTypeSignature(), hiveColumnIndex, HiveColumnHandle.ColumnType.REGULAR, field.getComment()));
+                columns.add(new HiveColumnHandle(field.getName(), hiveType, hiveType.getTypeSignature(), hiveColumnIndex, HiveColumnHandle.ColumnType.REGULAR, field.getComment(),
+                        bucketSortColumns.contains(field.getName())));
             }
             hiveColumnIndex++;
         }
@@ -879,7 +888,7 @@ public final class HiveUtil
             if (!hiveType.isSupportedType()) {
                 throw new PrestoException(NOT_SUPPORTED, format("Unsupported Hive type %s found in partition keys of table %s.%s", hiveType, table.getDatabaseName(), table.getTableName()));
             }
-            columns.add(new HiveColumnHandle(field.getName(), hiveType, hiveType.getTypeSignature(), -1, HiveColumnHandle.ColumnType.PARTITION_KEY, field.getComment()));
+            columns.add(new HiveColumnHandle(field.getName(), hiveType, hiveType.getTypeSignature(), -1, HiveColumnHandle.ColumnType.PARTITION_KEY, field.getComment(), true));
         }
 
         return columns.build();

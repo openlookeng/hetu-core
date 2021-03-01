@@ -69,8 +69,8 @@ public class PushPredicateIntoUpdateDelete
     public Result apply(TableWriterNode writerNode, Captures captures, Context context)
     {
         TableWriterNode.WriterTarget target = writerNode.getTarget();
-        if (target instanceof TableWriterNode.UpdateReference) {
-            TableWriterNode.UpdateDeleteReference updateReference = (TableWriterNode.UpdateReference) target;
+        if (target instanceof TableWriterNode.UpdateDeleteReference) {
+            TableWriterNode.UpdateDeleteReference updateReference = (TableWriterNode.UpdateDeleteReference) target;
             if (!updateReference.getConstraint().isPresent()) {
                 return Result.empty();
             }

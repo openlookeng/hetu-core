@@ -30,6 +30,7 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
@@ -63,7 +64,9 @@ public class TestsWithHiveConnector
         }
 
         hetuServer.startServer("default", map);
+        hetuServer.execute("drop schema if exists default");
         hetuServer.execute("create schema default");
+        hetuServer.addHiveCatalogToQueryRunner(createHiveProperties());
     }
 
     @AfterClass
@@ -77,7 +80,6 @@ public class TestsWithHiveConnector
     public void block_Hive_Table_from_Carbondata()
             throws SQLException
     {
-        hetuServer.addHiveCatalogToQueryRunner(createHiveProperties());
         hetuServer.execute("CREATE TABLE hive.default.demotable (c1 int)");
 
         hetuServer.execute("use carbondata.default");
@@ -95,6 +97,90 @@ public class TestsWithHiveConnector
                 "Tables with OrcInputFormat are not supported by Carbondata connector");
 
         hetuServer.execute("DROP TABLE hive.default.demotable");
+    }
+
+    @Test
+   public void deleteTransactionTableDirc()
+            throws SQLException
+    {
+        hetuServer.execute("drop table if exists hive.default.parttable");
+        hetuServer.execute("set session DELETE_TRANSACTIONAL_TABLE_DIRECT = true");
+        hetuServer.execute("create table hive.default.parttable (orderkey int, year int) WITH (transactional = true , format = 'ORC', partitioned_by = ARRAY[ 'year' ] )");
+        hetuServer.execute("insert into hive.default.parttable values (1,2011)");
+        hetuServer.execute("insert into hive.default.parttable values (2,2012)");
+        hetuServer.execute("insert into hive.default.parttable values (3,2013)");
+        hetuServer.execute("delete from hive.default.parttable where year =2013");
+        try {
+        assertEquals(FileFactory.isFileExist(storePath +
+                "hive.store/default/parttable/year=2013", false), false);
+        } catch (IOException exception) {
+            exception.printStackTrace();
+        }
+        hetuServer.execute("DROP TABLE hive.default.parttable");
+    }
+
+    @Test
+    public void deleteTransactionTableDirUsing2tables()
+            throws SQLException
+    {
+        hetuServer.execute("drop table if exists hive.default.parttable");
+        hetuServer.execute("drop table if exists hive.default.parttable1");
+        hetuServer.execute("set session DELETE_TRANSACTIONAL_TABLE_DIRECT = true");
+        hetuServer.execute("create table hive.default.parttable (orderkey int, year int) WITH (transactional = true , format = 'ORC', partitioned_by = ARRAY[ 'year' ] )");
+        hetuServer.execute("insert into hive.default.parttable values (1,2011)");
+        hetuServer.execute("insert into hive.default.parttable values (2,2012)");
+        hetuServer.execute("insert into hive.default.parttable values (3,2013)");
+
+        hetuServer.execute("create table hive.default.parttable1 (orderkey int, year int) WITH (transactional = true , format = 'ORC', partitioned_by = ARRAY[ 'year' ] )");
+        hetuServer.execute("insert into hive.default.parttable1 values (1,2011)");
+        hetuServer.execute("insert into hive.default.parttable1 values (2,2012)");
+        hetuServer.execute("insert into hive.default.parttable1 values (3,2013)");
+
+        hetuServer.execute("delete from hive.default.parttable where year >= (select max(year) from hive.default.parttable1)  ");
+        try {
+            assertEquals(FileFactory.isFileExist(storePath +
+                    "hive.store/default/parttable/year=2013", false), false);
+        } catch (IOException exception) {
+            exception.printStackTrace();
+        }
+
+        hetuServer.execute("insert into hive.default.parttable values (4,2014)");
+        hetuServer.execute("delete from hive.default.parttable where year >= (select year from hive.default.parttable1 where orderkey=4 )  ");
+        try {
+            assertEquals(FileFactory.isFileExist(storePath +
+                    "hive.store/default/parttable/year=2014", false), false);
+        } catch (IOException exception) {
+            exception.printStackTrace();
+        }
+
+        hetuServer.execute("DROP TABLE hive.default.parttable");
+        hetuServer.execute("DROP TABLE hive.default.parttable1");
+    }
+
+    @Test
+    public void deleteTransactionTableDirDisable()
+            throws SQLException
+    {
+        hetuServer.execute("drop table if exists hive.default.parttable");
+        hetuServer.execute("set session DELETE_TRANSACTIONAL_TABLE_DIRECT = false");
+        hetuServer.execute("create table hive.default.parttable (orderkey int, year int) WITH (transactional = true , format = 'ORC', partitioned_by = ARRAY[ 'year' ] )");
+        hetuServer.execute("insert into hive.default.parttable values (1,2011)");
+        hetuServer.execute("insert into hive.default.parttable values (2,2012)");
+        hetuServer.execute("insert into hive.default.parttable values (3,2013)");
+
+        hetuServer.execute("create table hive.default.parttable1 (orderkey int, year int) WITH (transactional = true , format = 'ORC', partitioned_by = ARRAY[ 'year' ] )");
+        hetuServer.execute("insert into hive.default.parttable1 values (1,2011)");
+        hetuServer.execute("insert into hive.default.parttable1 values (2,2012)");
+        hetuServer.execute("insert into hive.default.parttable1 values (3,2013)");
+
+        hetuServer.execute("delete from hive.default.parttable where year >= (select max(year) from hive.default.parttable1)  ");
+        try {
+            assertEquals(FileFactory.isFileExist(storePath +
+                    "/hive.store/default/parttable/year=2013", false), true);
+        } catch (IOException exception) {
+            exception.printStackTrace();
+        }
+        hetuServer.execute("DROP TABLE hive.default.parttable");
     }
 
     @Test(dependsOnMethods = {"block_Hive_Table_from_Carbondata"})

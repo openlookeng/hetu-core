@@ -250,6 +250,7 @@ import static java.lang.Float.floatToRawIntBits;
 import static java.lang.Math.toIntExact;
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Collections.emptyMap;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newCachedThreadPool;
@@ -3263,9 +3264,12 @@ public abstract class AbstractTestHive
                     .map(column -> new ColumnMetadata(
                             column.getName(),
                             column.getType(),
+                            true,
                             column.getComment(),
                             columnExtraInfo(partitionedBy.contains(column.getName())),
-                            false))
+                            false,
+                            emptyMap(),
+                            partitionedBy.contains(column.getName())))
                     .collect(toList());
             assertEquals(filterNonHiddenColumnMetadata(tableMetadata.getColumns()), expectedColumns);
 

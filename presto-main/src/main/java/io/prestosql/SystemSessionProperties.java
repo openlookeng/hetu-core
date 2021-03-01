@@ -149,6 +149,7 @@ public final class SystemSessionProperties
     public static final String REUSE_TABLE_SCAN = "reuse_table_scan";
     public static final String SPILL_REUSE_TABLESCAN = "spill_reuse_tablescan";
     public static final String SPILL_THRESHOLD_REUSE_TABLESCAN = "spill_threshold_reuse_tablescan";
+    public static final String DELETE_TRANSACTIONAL_TABLE_DIRECT = "delete_transactional_table_direct";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -185,6 +186,11 @@ public final class SystemSessionProperties
                         TRANSFORM_SELF_JOIN_TO_GROUPBY,
                         "Transform Self Join to Group BY if possible",
                         featuresConfig.isTransformSelfJoinToGroupby(),
+                        false),
+                booleanProperty(
+                        DELETE_TRANSACTIONAL_TABLE_DIRECT,
+                        "Deletes the transactional table/partition directly instead of creating delta",
+                        false,
                         false),
                 stringProperty(
                         JOIN_ORDER,

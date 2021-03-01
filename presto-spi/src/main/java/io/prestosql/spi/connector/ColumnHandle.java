@@ -30,4 +30,14 @@ public interface ColumnHandle
     {
         throw new NotImplementedException();
     }
+
+    /**
+     * Whether the column represents a partitionColumn?
+     *
+     * @return
+     */
+    default boolean isPartitionKey()
+    {
+        return false;
+    }
 }

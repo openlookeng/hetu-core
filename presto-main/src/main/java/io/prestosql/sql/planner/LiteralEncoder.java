@@ -26,6 +26,7 @@ import io.prestosql.operator.scalar.VarbinaryFunctions;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.type.AbstractIntType;
 import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Decimals;
@@ -121,7 +122,10 @@ public final class LiteralEncoder
             return new Cast(new NullLiteral(), type.getTypeSignature().toString(), false, true);
         }
 
-        checkArgument(Primitives.wrap(type.getJavaType()).isInstance(object), "object.getClass (%s) and type.getJavaType (%s) do not agree", object.getClass(), type.getJavaType());
+        //AbstractIntType internally uses long as javaType. So specially handled for AbstractIntType types.
+        Class<?> wrap = Primitives.wrap(type.getJavaType());
+        checkArgument(wrap.isInstance(object) || (type instanceof AbstractIntType && wrap == Long.class && Integer.class.isInstance(object)),
+                "object.getClass (%s) and type.getJavaType (%s) do not agree", object.getClass(), type.getJavaType());
 
         if (type.equals(TINYINT)) {
             return new GenericLiteral("TINYINT", object.toString());

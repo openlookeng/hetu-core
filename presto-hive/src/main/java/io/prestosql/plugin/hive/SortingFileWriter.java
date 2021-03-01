@@ -142,16 +142,22 @@ public class SortingFileWriter
         catch (UncheckedIOException e) {
             throw new PrestoException(HIVE_WRITER_CLOSE_ERROR, "Error committing write to Hive", e);
         }
+        cleanupTempFiles();
     }
 
     @Override
     public void rollback()
     {
+        cleanupTempFiles();
+
+        outputWriter.rollback();
+    }
+
+    private void cleanupTempFiles()
+    {
         for (TempFile file : tempFiles) {
             cleanupFile(file.getPath());
         }
-
-        outputWriter.rollback();
     }
 
     @Override
@@ -173,6 +179,12 @@ public class SortingFileWriter
     public Optional<Runnable> getVerificationTask()
     {
         return outputWriter.getVerificationTask();
+    }
+
+    @Override
+    public ImmutableList<String> getExtraPartitionFiles()
+    {
+        return outputWriter.getExtraPartitionFiles();
     }
 
     private void flushToTempFile()

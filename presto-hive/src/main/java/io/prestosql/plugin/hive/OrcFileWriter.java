@@ -72,6 +72,7 @@ public class OrcFileWriter
     private final Callable<Void> rollbackAction;
     private final int[] fileInputColumnIndexes;
     private final List<Block> nullBlocks;
+    private final List<Block> dataNullBlocks;
     private final Optional<Supplier<OrcDataSource>> validationInputFactory;
 
     private final Optional<AcidOutputFormat.Options> acidOptions;
@@ -95,6 +96,7 @@ public class OrcFileWriter
             Callable<Void> rollbackAction,
             List<String> columnNames,
             List<Type> fileColumnTypes,
+            List<Type> dataFileColumnTypes,
             CompressionKind compression,
             OrcWriterOptions options,
             boolean writeLegacyVersion,
@@ -138,6 +140,13 @@ public class OrcFileWriter
             nullBlocks.add(blockBuilder.build());
         }
         this.nullBlocks = nullBlocks.build();
+        ImmutableList.Builder<Block> dataNullBlocks = ImmutableList.builder();
+        for (Type fileColumnType : dataFileColumnTypes) {
+            BlockBuilder blockBuilder = fileColumnType.createBlockBuilder(null, 1, 0);
+            blockBuilder.appendNull();
+            dataNullBlocks.add(blockBuilder.build());
+        }
+        this.dataNullBlocks = dataNullBlocks.build();
         this.validationInputFactory = validationInputFactory;
         this.acidOptions = acidOptions;
         this.lastKey = new OrcAcidRowId(-1, -1, -1);
@@ -241,7 +250,7 @@ public class OrcFileWriter
         for (int i = 0; i < fileInputColumnIndexes.length; i++) {
             int inputColumnIndex = fileInputColumnIndexes[i];
             if (inputColumnIndex < 0) {
-                dataBlocks[i] = new RunLengthEncodedBlock(nullBlocks.get(i), dataPage.getPositionCount());
+                dataBlocks[i] = new RunLengthEncodedBlock(dataNullBlocks.get(i), dataPage.getPositionCount());
             }
             else {
                 dataBlocks[i] = dataPage.getBlock(inputColumnIndex);

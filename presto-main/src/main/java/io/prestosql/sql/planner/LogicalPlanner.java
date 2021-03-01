@@ -554,9 +554,12 @@ public class LogicalPlanner
             Optional<NewTableLayout> newTableLayout = metadata.getUpdateLayout(session, handle);
             TableMetadata tableMetadata = metadata.getTableMetadata(session, handle);
             String catalogName = handle.getCatalogName().getCatalogName();
-            TableStatisticsMetadata statisticsMetadata = metadata.getStatisticsCollectionMetadataForWrite(session,
-                    catalogName, tableMetadata.getMetadata());
+            // TableStatisticsMetadata statisticsMetadata = metadata.getStatisticsCollectionMetadataForWrite(session,
+            //        catalogName, tableMetadata.getMetadata());
             Optional<Expression> constraint = deletePlan.getPredicate().isPresent() ? Optional.of(OriginalExpressionUtils.castToExpression(deletePlan.getPredicate().get())) : Optional.empty();
+            //Skip statistics collection for delete,
+            // because stats collection for delete seems to corrupt existing statistics
+            TableStatisticsMetadata statisticsMetadata = TableStatisticsMetadata.empty();
             return createTableWriterPlan(
                     analysis,
                     plan,
@@ -583,8 +586,10 @@ public class LogicalPlanner
         TableMetadata tableMetadata = metadata.getTableMetadata(session, update.getTarget());
         Optional<NewTableLayout> newTableLayout = metadata.getUpdateLayout(session, update.getTarget());
         String catalogName = update.getTarget().getCatalogName().getCatalogName();
-        TableStatisticsMetadata statisticsMetadata = metadata.getStatisticsCollectionMetadataForWrite(session, catalogName, tableMetadata.getMetadata());
+        // TableStatisticsMetadata statisticsMetadata = metadata.getStatisticsCollectionMetadataForWrite(session, catalogName, tableMetadata.getMetadata());
         Optional<Expression> constraint = updatePlan.getPredicate().isPresent() ? Optional.of(OriginalExpressionUtils.castToExpression(updatePlan.getPredicate().get())) : Optional.empty();
+        TableStatisticsMetadata statisticsMetadata = TableStatisticsMetadata.empty();
+
         return createTableWriterPlan(
                 analysis,
                 plan,
@@ -618,7 +623,7 @@ public class LogicalPlanner
         columnNames.add(rowIdHandle.getColumnName());
 
         String catalogName = handle.getCatalogName().getCatalogName();
-        TableStatisticsMetadata statisticsMetadata = metadata.getStatisticsCollectionMetadataForWrite(session, catalogName, tableMetadata.getMetadata());
+        TableStatisticsMetadata statisticsMetadata = TableStatisticsMetadata.empty();
 
         return createVacuumWriterPlan(analysis,
                 handle,

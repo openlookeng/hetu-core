@@ -1187,7 +1187,15 @@ public class PlanPrinter
         @Override
         public Void visitTableDelete(TableDeleteNode node, Void context)
         {
-            addNode(node, "TableDelete", format("[%s]", node.getTarget()));
+            String formatString = "[%s";
+            List<Object> arguments = new ArrayList<>();
+            arguments.add(node.getTarget());
+            if (node.getFilter().isPresent()) {
+                formatString += ", filterPredicate: %s";
+                arguments.add(node.getFilter().get());
+            }
+            formatString += "]";
+            addNode(node, "TableDelete", format(formatString, arguments.toArray()));
 
             return processChildren(node, context);
         }

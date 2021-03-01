@@ -251,14 +251,20 @@ class QueryPlanner
         ImmutableMap.Builder<Symbol, ColumnHandle> columnsBuilder = ImmutableMap.builder();
         ColumnMetadata rowIdColumnMetadata = metadata.getColumnMetadata(session, handle, rowIdHandle);
         ImmutableList.Builder<Field> fields = ImmutableList.builder();
+        ImmutableList.Builder<Field> projectionFields = ImmutableList.builder();
         Symbol orderBySymbol = null;
 
         // add table columns
         for (Field field : descriptor.getAllFields()) {
             Symbol symbol = planSymbolAllocator.newSymbol(field.getName().get(), field.getType());
             outputSymbols.add(symbol);
-            columnsBuilder.put(symbol, analysis.getColumn(field));
+            ColumnHandle column = analysis.getColumn(field);
+            columnsBuilder.put(symbol, column);
             fields.add(field);
+            ColumnMetadata columnMetadata = metadata.getColumnMetadata(session, handle, column);
+            if (columnMetadata.isRequired()) {
+                projectionFields.add(field);
+            }
         }
 
         // add rowId column
@@ -267,6 +273,7 @@ class QueryPlanner
         outputSymbols.add(rowIdSymbol);
         columnsBuilder.put(rowIdSymbol, rowIdHandle);
         fields.add(rowIdField);
+        projectionFields.add(rowIdField);
 
         // create table scan
         ImmutableMap<Symbol, ColumnHandle> columns = columnsBuilder.build();
@@ -298,7 +305,8 @@ class QueryPlanner
             else {
                 column = tableMetadata.getColumn(columnHandle.getColumnName());
             }
-            if (column != rowIdColumnMetadata && column.isHidden()) {
+            if (column != rowIdColumnMetadata && (column.isHidden() || !column.isRequired())) {
+                //Skip unnecessary columns as well.
                 continue;
             }
             Symbol output = planSymbolAllocator.newSymbol(column.getName(), column.getType());
@@ -318,22 +326,13 @@ class QueryPlanner
         }
 
         ProjectNode projectNode = new ProjectNode(idAllocator.getNextId(), builder.getRoot(), assignments.build());
+        builder = new PlanBuilder(translations, projectNode, analysis.getParameters());
 
-        //Sort scan results by ROW__ID column
-        PlanBuilder planBuilder = new PlanBuilder(translations, projectNode, analysis.getParameters());
-        SortOrder sortOrder = SortOrder.ASC_NULLS_LAST;
-        Symbol sortSymbol = orderBySymbol;
-        Map<Symbol, SortOrder> sortOrderMap = ImmutableMap.<Symbol, SortOrder>builder().put(sortSymbol, sortOrder).build();
-        OrderingScheme orderingScheme = new OrderingScheme(ImmutableList.of(sortSymbol), sortOrderMap);
-        builder = sort(planBuilder, Optional.of(orderingScheme));
-
-        ImmutableList.Builder<Field> projectFields = ImmutableList.builder();
-        projectFields.addAll(fields.build().stream().filter(x -> (!x.isHidden() || x == rowIdField)).collect(toImmutableList()));
-        scope = Scope.builder().withRelationType(RelationId.anonymous(), new RelationType(projectFields.build())).build();
+        scope = Scope.builder().withRelationType(RelationId.anonymous(), new RelationType(projectionFields.build())).build();
         RelationPlan plan = new RelationPlan(builder.getRoot(), scope, projectNode.getOutputSymbols());
 
         List<String> visibleTableColumnNames = tableMetadata.getColumns().stream()
-                .filter(c -> !c.isHidden())
+                .filter(c -> c.isRequired())
                 .map(ColumnMetadata::getName)
                 .collect(Collectors.toList());
         visibleTableColumnNames.add(rowIdColumnMetadata.getName());
@@ -482,14 +481,14 @@ class QueryPlanner
             }
         }
         ProjectNode projectNode = new ProjectNode(idAllocator.getNextId(), builder.getRoot(), assignments.build());
+        builder = new PlanBuilder(translations, projectNode, analysis.getParameters());
 
-        //Sort scan results by ROW__ID column
-        PlanBuilder planBuilder = new PlanBuilder(translations, projectNode, analysis.getParameters());
-        SortOrder sortOrder = SortOrder.ASC_NULLS_LAST;
-        Symbol sortSymbol = orderBySymbol;
-        Map<Symbol, SortOrder> sortOrderMap = ImmutableMap.<Symbol, SortOrder>builder().put(sortSymbol, sortOrder).build();
-        OrderingScheme orderingScheme = new OrderingScheme(ImmutableList.of(sortSymbol), sortOrderMap);
-        builder = sort(planBuilder, Optional.of(orderingScheme));
+//        //Sort scan results by ROW__ID column
+//        SortOrder sortOrder = SortOrder.ASC_NULLS_LAST;
+//        Symbol sortSymbol = orderBySymbol;
+//        Map<Symbol, SortOrder> sortOrderMap = ImmutableMap.<Symbol, SortOrder>builder().put(sortSymbol, sortOrder).build();
+//        OrderingScheme orderingScheme = new OrderingScheme(ImmutableList.of(sortSymbol), sortOrderMap);
+//        builder = sort(planBuilder, Optional.of(orderingScheme));
 
         ImmutableList.Builder<Field> projectFields = ImmutableList.builder();
         projectFields.addAll(fields.build().stream().filter(x -> (!x.isHidden() || x == rowIdField)).collect(toImmutableList()));

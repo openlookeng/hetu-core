@@ -25,6 +25,7 @@ import org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -70,6 +71,19 @@ public class HiveColumnHandle
     private final int hiveColumnIndex;
     private final ColumnType columnType;
     private final Optional<String> comment;
+    //If the column is a partitionColumn or bucketing column, then this is required
+    private final boolean required;
+
+    public HiveColumnHandle(
+            String name,
+            HiveType hiveType,
+            TypeSignature typeSignature,
+            int hiveColumnIndex,
+            ColumnType columnType,
+            Optional<String> comment)
+    {
+        this(name, hiveType, typeSignature, hiveColumnIndex, columnType, comment, false);
+    }
 
     @JsonCreator
     public HiveColumnHandle(
@@ -78,7 +92,8 @@ public class HiveColumnHandle
             @JsonProperty("typeSignature") TypeSignature typeSignature,
             @JsonProperty("hiveColumnIndex") int hiveColumnIndex,
             @JsonProperty("columnType") ColumnType columnType,
-            @JsonProperty("comment") Optional<String> comment)
+            @JsonProperty("comment") Optional<String> comment,
+            @JsonProperty("required") boolean required)
     {
         this.name = requireNonNull(name, "name is null");
         checkArgument(hiveColumnIndex >= 0 || columnType == PARTITION_KEY || columnType == SYNTHESIZED, "hiveColumnIndex is negative");
@@ -87,6 +102,7 @@ public class HiveColumnHandle
         this.typeName = requireNonNull(typeSignature, "type is null");
         this.columnType = requireNonNull(columnType, "columnType is null");
         this.comment = requireNonNull(comment, "comment is null");
+        this.required = required;
     }
 
     @JsonProperty
@@ -130,7 +146,7 @@ public class HiveColumnHandle
 
     public ColumnMetadata getColumnMetadata(TypeManager typeManager)
     {
-        return new ColumnMetadata(name, typeManager.getType(typeName), null, isHidden());
+        return new ColumnMetadata(name, typeManager.getType(typeName), true, null, null, isHidden(), Collections.emptyMap(), required);
     }
 
     @JsonProperty
@@ -151,10 +167,16 @@ public class HiveColumnHandle
         return columnType;
     }
 
+    @JsonProperty
+    public boolean isRequired()
+    {
+        return required;
+    }
+
     @Override
     public int hashCode()
     {
-        return Objects.hash(name, hiveColumnIndex, hiveType, columnType, comment);
+        return Objects.hash(name, hiveColumnIndex, hiveType, columnType, comment, required);
     }
 
     @Override
@@ -171,7 +193,8 @@ public class HiveColumnHandle
                 Objects.equals(this.hiveColumnIndex, other.hiveColumnIndex) &&
                 Objects.equals(this.hiveType, other.hiveType) &&
                 Objects.equals(this.columnType, other.columnType) &&
-                Objects.equals(this.comment, other.comment);
+                Objects.equals(this.comment, other.comment) &&
+                Objects.equals(this.required, other.required);
     }
 
     @Override

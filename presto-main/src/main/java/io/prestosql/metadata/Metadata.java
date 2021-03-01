@@ -267,6 +267,11 @@ public interface Metadata
     /**
      * Push delete into connector
      */
+    Optional<TableHandle> applyDelete(Session session, TableHandle tableHandle, Constraint constraint);
+
+    /**
+     * Push delete into connector
+     */
     Optional<TableHandle> applyDelete(Session session, TableHandle tableHandle);
 
     /**

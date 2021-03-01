@@ -272,7 +272,7 @@ public class CarbondataFileWriter
     private String getUpdateTupleIdFromRec(Page dataPage, int position)
     {
         Block tupleIdBlock = null;
-        tupleIdBlock = dataPage.getBlock(fieldCount).getLoadedBlock();
+        tupleIdBlock = dataPage.getBlock(dataPage.getChannelCount() - 1).getLoadedBlock();
 
         return tupleIdBlock.getString(position, 0, 0);
     }

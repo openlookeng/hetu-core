@@ -887,6 +887,21 @@ public final class MetadataManager
     }
 
     @Override
+    public Optional<TableHandle> applyDelete(Session session, TableHandle table, Constraint constraint)
+    {
+        CatalogName catalogName = table.getCatalogName();
+        ConnectorMetadata metadata = getMetadata(session, catalogName);
+
+        if (metadata.usesLegacyTableLayouts()) {
+            return Optional.empty();
+        }
+
+        ConnectorSession connectorSession = session.toConnectorSession(catalogName);
+        return metadata.applyDelete(connectorSession, table.getConnectorHandle(), constraint)
+                .map(newHandle -> new TableHandle(catalogName, newHandle, table.getTransaction(), Optional.empty()));
+    }
+
+    @Override
     public OptionalLong executeDelete(Session session, TableHandle table)
     {
         CatalogName catalogName = table.getCatalogName();

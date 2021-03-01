@@ -49,6 +49,15 @@ public class TestHiveColumnHandle
         testRoundTrip(expectedRegularColumn);
     }
 
+    @Test
+    public void testRequiredColumn()
+    {
+        HiveColumnHandle expectedRegularColumn = new HiveColumnHandle("name", HiveType.HIVE_FLOAT, parseTypeSignature(StandardTypes.DOUBLE), 88, REGULAR, Optional.empty(), false);
+        testRoundTrip(expectedRegularColumn);
+        HiveColumnHandle expectedPartitionColumn = new HiveColumnHandle("name", HiveType.HIVE_FLOAT, parseTypeSignature(StandardTypes.DOUBLE), 88, PARTITION_KEY, Optional.empty(), true);
+        testRoundTrip(expectedPartitionColumn);
+    }
+
     private void testRoundTrip(HiveColumnHandle expected)
     {
         String json = codec.toJson(expected);
@@ -58,5 +67,6 @@ public class TestHiveColumnHandle
         assertEquals(actual.getHiveType(), expected.getHiveType());
         assertEquals(actual.getHiveColumnIndex(), expected.getHiveColumnIndex());
         assertEquals(actual.isPartitionKey(), expected.isPartitionKey());
+        assertEquals(actual.isRequired(), expected.isRequired());
     }
 }

@@ -171,6 +171,7 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static java.lang.String.format;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 import static java.util.function.Function.identity;
@@ -1723,8 +1724,10 @@ public class HiveMetadata
     public HiveDeleteAsInsertTableHandle beginDeletesAsInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, Optional.empty(), HiveACIDWriteType.DELETE);
+        //Delete needs only partitionColumn and bucketing columns data
+        List<HiveColumnHandle> inputColumns = insertTableHandle.getInputColumns().stream().filter(HiveColumnHandle::isRequired).collect(toList());
         return new HiveDeleteAsInsertTableHandle(insertTableHandle.getSchemaName(), insertTableHandle.getTableName(),
-                insertTableHandle.getInputColumns(), insertTableHandle.getPageSinkMetadata(),
+                inputColumns, insertTableHandle.getPageSinkMetadata(),
                 insertTableHandle.getLocationHandle(), insertTableHandle.getBucketProperty(),
                 insertTableHandle.getTableStorageFormat(), insertTableHandle.getPartitionStorageFormat());
     }
@@ -2015,6 +2018,19 @@ public class HiveMetadata
     public Optional<ConnectorTableHandle> applyDelete(ConnectorSession session, ConnectorTableHandle handle)
     {
         return Optional.of(handle);
+    }
+
+    @Override
+    public Optional<ConnectorTableHandle> applyDelete(ConnectorSession session, ConnectorTableHandle handle, Constraint constraint)
+    {
+        HiveTableHandle hiveTableHandle = (HiveTableHandle) handle;
+        if (constraint == null) {
+            return Optional.of(handle);
+        }
+        HiveIdentity identity = new HiveIdentity(session);
+        HivePartitionResult partitionResult = partitionManager.getPartitions(metastore, identity, handle, constraint);
+        HiveTableHandle newHandle = partitionManager.applyPartitionResult(hiveTableHandle, partitionResult);
+        return Optional.of(newHandle);
     }
 
     @Override
@@ -2748,9 +2764,12 @@ public class HiveMetadata
         return handle -> new ColumnMetadata(
                 handle.getName(),
                 typeManager.getType(handle.getTypeSignature()),
+                true,
                 columnComment.get(handle.getName()).orElse(null),
                 columnExtraInfo(handle.isPartitionKey()),
-                handle.isHidden());
+                handle.isHidden(),
+                emptyMap(),
+                handle.isRequired());
     }
 
     @Override

@@ -35,26 +35,32 @@ public class ColumnMetadata
     private final String comment;
     private final String extraInfo;
     private final boolean hidden;
+    private final boolean required;
     private final Map<String, Object> properties;
 
     public ColumnMetadata(String name, Type type)
     {
-        this(name, type, true, null, null, false, emptyMap());
+        this(name, type, true, null, null, false, emptyMap(), false);
     }
 
     public ColumnMetadata(String name, Type type, String comment, boolean hidden)
     {
-        this(name, type, true, comment, null, hidden, emptyMap());
+        this(name, type, true, comment, null, hidden, emptyMap(), false);
     }
 
     public ColumnMetadata(String name, Type type, String comment, String extraInfo, boolean hidden)
     {
-        this(name, type, true, comment, extraInfo, hidden, emptyMap());
+        this(name, type, true, comment, extraInfo, hidden, emptyMap(), false);
     }
 
     public ColumnMetadata(String name, Type type, String comment, String extraInfo, boolean hidden, Map<String, Object> properties)
     {
         this(name, type, true, comment, extraInfo, hidden, properties);
+    }
+
+    public ColumnMetadata(String name, Type type, boolean nullable, String comment, String extraInfo, boolean hidden, Map<String, Object> properties)
+    {
+        this(name, type, nullable, comment, extraInfo, hidden, properties, false);
     }
 
     @JsonCreator
@@ -65,7 +71,8 @@ public class ColumnMetadata
             @JsonProperty("comment") String comment,
             @JsonProperty("extraInfo") String extraInfo,
             @JsonProperty("hidden") boolean hidden,
-            @JsonProperty("properties") Map<String, Object> properties)
+            @JsonProperty("properties") Map<String, Object> properties,
+            @JsonProperty("required") boolean required)
     {
         checkNotEmpty(name, "name");
         requireNonNull(type, "type is null");
@@ -78,6 +85,7 @@ public class ColumnMetadata
         this.hidden = hidden;
         this.properties = properties.isEmpty() ? emptyMap() : unmodifiableMap(new LinkedHashMap<>(properties));
         this.nullable = nullable;
+        this.required = required;
     }
 
     @JsonProperty
@@ -117,6 +125,12 @@ public class ColumnMetadata
     }
 
     @JsonProperty
+    public boolean isRequired()
+    {
+        return required;
+    }
+
+    @JsonProperty
     public Map<String, Object> getProperties()
     {
         return properties;
@@ -138,6 +152,9 @@ public class ColumnMetadata
         if (hidden) {
             sb.append(", hidden");
         }
+        if (required) {
+            sb.append(", required");
+        }
         if (!properties.isEmpty()) {
             sb.append(", properties=").append(properties);
         }
@@ -148,7 +165,7 @@ public class ColumnMetadata
     @Override
     public int hashCode()
     {
-        return Objects.hash(name, type, nullable, comment, extraInfo, hidden);
+        return Objects.hash(name, type, nullable, comment, extraInfo, hidden, required);
     }
 
     @Override
@@ -166,6 +183,7 @@ public class ColumnMetadata
                 Objects.equals(this.nullable, other.nullable) &&
                 Objects.equals(this.comment, other.comment) &&
                 Objects.equals(this.extraInfo, other.extraInfo) &&
+                Objects.equals(this.required, other.required) &&
                 Objects.equals(this.hidden, other.hidden);
     }
 }

@@ -66,10 +66,10 @@ import java.util.OptionalInt;
 import java.util.Properties;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_FILESYSTEM_ERROR;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_INVALID_METADATA;
@@ -473,8 +473,9 @@ public class HiveWriterFactory
         }
 
         schema.putAll(additionalTableParameters);
-
-        validateSchema(partitionName, schema);
+        if (acidWriteType != HiveACIDWriteType.DELETE) {
+            validateSchema(partitionName, schema);
+        }
 
         Path path;
         Optional<AcidOutputFormat.Options> acidOptions;
@@ -612,19 +613,30 @@ public class HiveWriterFactory
                     hiveWriter.getRowCount()));
         };
 
-        if (!sortedBy.isEmpty()) {
+        if (!sortedBy.isEmpty() || (isTxnTable() && HiveACIDWriteType.isUpdateOrDelete(acidWriteType))) {
             List<Type> types = dataColumns.stream()
                     .map(column -> column.getHiveType().getType(typeManager))
-                    .collect(toImmutableList());
+                    .collect(Collectors.toList());
 
             Map<String, Integer> columnIndexes = new HashMap<>();
             for (int i = 0; i < dataColumns.size(); i++) {
                 columnIndexes.put(dataColumns.get(i).getName(), i);
             }
+            if (sortedBy.isEmpty() &&
+                    isTxnTable() && HiveACIDWriteType.isUpdateOrDelete(acidWriteType)) {
+                //Add $rowId column as the last column in the page
+                types.add(HiveColumnHandle.updateRowIdHandle().getHiveType().getType(typeManager));
+                columnIndexes.put(HiveColumnHandle.UPDATE_ROW_ID_COLUMN_NAME, dataColumns.size());
+            }
 
             List<Integer> sortFields = new ArrayList<>();
             List<SortOrder> sortOrders = new ArrayList<>();
-            for (SortingColumn column : sortedBy) {
+            List<SortingColumn> sortigColumns = this.sortedBy;
+            if (sortedBy.isEmpty() &&
+                    isTxnTable() && HiveACIDWriteType.isUpdateOrDelete(acidWriteType)) {
+                sortigColumns = ImmutableList.of(new SortingColumn(HiveColumnHandle.UPDATE_ROW_ID_COLUMN_NAME, SortingColumn.Order.ASCENDING));
+            }
+            for (SortingColumn column : sortigColumns) {
                 Integer index = columnIndexes.get(column.getColumnName());
                 if (index == null) {
                     throw new PrestoException(HIVE_INVALID_METADATA, format("Sorting column '%s' does exist in table '%s.%s'", column.getColumnName(), schemaName, tableName));
@@ -633,9 +645,13 @@ public class HiveWriterFactory
                 sortOrders.add(column.getOrder().getSortOrder());
             }
 
+            FileSystem sortFileSystem = fileSystem;
+            String child = ".tmp-sort." + path.getName();
+            Path tempFilePrefix = new Path(path.getParent(), child);
+
             hiveFileWriter = new SortingFileWriter(
-                    fileSystem,
-                    new Path(path.getParent(), ".tmp-sort." + path.getName()),
+                    sortFileSystem,
+                    tempFilePrefix,
                     hiveFileWriter,
                     sortBufferSize,
                     maxOpenSortFiles,

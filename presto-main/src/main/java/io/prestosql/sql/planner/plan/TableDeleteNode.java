@@ -16,14 +16,20 @@ package io.prestosql.sql.planner.plan;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.RowExpression;
 
 import javax.annotation.concurrent.Immutable;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
@@ -33,15 +39,32 @@ public class TableDeleteNode
 {
     private final TableHandle target;
     private final Symbol output;
+    private final PlanNode source;
+    private final Optional<RowExpression> filter;
+    private final Map<Symbol, ColumnHandle> assignments;
 
-    @JsonCreator
     public TableDeleteNode(
             @JsonProperty("id") PlanNodeId id,
             @JsonProperty("target") TableHandle target,
             @JsonProperty("output") Symbol output)
     {
+        this(id, null, Optional.empty(), target, ImmutableMap.of(), output);
+    }
+
+    @JsonCreator
+    public TableDeleteNode(
+            @JsonProperty("id") PlanNodeId id,
+            @JsonProperty("source") PlanNode source,
+            @JsonProperty("filter") Optional<RowExpression> filter,
+            @JsonProperty("target") TableHandle target,
+            @JsonProperty("assignments") Map<Symbol, ColumnHandle> assignments,
+            @JsonProperty("output") Symbol output)
+    {
         super(id);
+        this.source = source;
+        this.filter = requireNonNull(filter, "filter is null");
         this.target = requireNonNull(target, "target is null");
+        this.assignments = requireNonNull(assignments, "assignments is null");
         this.output = requireNonNull(output, "output is null");
     }
 
@@ -63,10 +86,31 @@ public class TableDeleteNode
         return ImmutableList.of(output);
     }
 
+    @JsonProperty
+    public PlanNode getSource()
+    {
+        return source;
+    }
+
+    @JsonProperty
+    public Optional<RowExpression> getFilter()
+    {
+        return filter;
+    }
+
+    @JsonProperty
+    public Map<Symbol, ColumnHandle> getAssignments()
+    {
+        return assignments;
+    }
+
     @Override
     public List<PlanNode> getSources()
     {
-        return ImmutableList.of();
+        if (source == null) {
+            return ImmutableList.of();
+        }
+        return ImmutableList.of(source);
     }
 
     @Override
@@ -78,6 +122,9 @@ public class TableDeleteNode
     @Override
     public PlanNode replaceChildren(List<PlanNode> newChildren)
     {
-        return new TableDeleteNode(getId(), target, output);
+        if (newChildren.isEmpty()) {
+            return new TableDeleteNode(getId(), target, output);
+        }
+        return new TableDeleteNode(getId(), Iterables.getOnlyElement(newChildren), filter, target, assignments, output);
     }
 }

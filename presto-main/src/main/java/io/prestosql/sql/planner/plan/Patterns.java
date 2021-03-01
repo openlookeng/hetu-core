@@ -163,6 +163,11 @@ public class Patterns
         return typeOf(VacuumTableNode.class);
     }
 
+    public static Pattern<TableDeleteNode> tableDeleteNode()
+    {
+        return typeOf(TableDeleteNode.class);
+    }
+
     public static Pattern<TopNNode> topN()
     {
         return typeOf(TopNNode.class);
@@ -228,6 +233,14 @@ public class Patterns
                 (PlanNode node, Lookup lookup) -> node.getSources().stream()
                         .map(source -> lookup.resolve(source))
                         .collect(toImmutableList()));
+    }
+
+    public static class TableWriter
+    {
+        public static Property<TableWriterNode, Lookup, TableWriterNode.WriterTarget> target()
+        {
+            return property("target", TableWriterNode::getTarget);
+        }
     }
 
     public static class Aggregation

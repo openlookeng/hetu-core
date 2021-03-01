@@ -32,6 +32,7 @@ import io.prestosql.spi.PageIndexer;
 import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.IntArrayBlockBuilder;
 import io.prestosql.spi.block.RowBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
@@ -111,6 +112,7 @@ public class HivePageSink
     private final List<HiveWriter> writers = new ArrayList<>();
 
     protected final ConnectorSession session;
+    private final List<Block> nullBlocks;
 
     private long rows;
     private long writtenBytes;
@@ -165,6 +167,7 @@ public class HivePageSink
         // and determine the input index and type of bucketing columns
         ImmutableList.Builder<Integer> partitionColumns = ImmutableList.builder();
         ImmutableList.Builder<Integer> dataColumnsInputIndex = ImmutableList.builder();
+        ImmutableList.Builder<Type> dataColumnTypes = ImmutableList.builder();
         Object2IntMap<String> dataColumnNameToIdMap = new Object2IntOpenHashMap<>();
         Map<String, HiveType> dataColumnNameToTypeMap = new HashMap<>();
         // sample weight column is passed separately, so index must be calculated without this column
@@ -178,6 +181,7 @@ public class HivePageSink
                 dataColumnsInputIndex.add(inputIndex);
                 dataColumnNameToIdMap.put(column.getName(), inputIndex);
                 dataColumnNameToTypeMap.put(column.getName(), column.getHiveType());
+                dataColumnTypes.add(typeManager.getType(column.getTypeSignature()));
             }
         }
         rowIdColumnIndex = HiveACIDWriteType.isRowIdNeeded(acidWriteType) ? inputIndex : -1;
@@ -206,6 +210,20 @@ public class HivePageSink
         else {
             bucketColumns = null;
             bucketFunction = null;
+        }
+
+        if (acidWriteType == HiveACIDWriteType.DELETE) {
+            //Null blocks will be used in case of delete
+            ImmutableList.Builder<Block> nullBlocks = ImmutableList.builder();
+            for (Type dataColumnType : dataColumnTypes.build()) {
+                BlockBuilder blockBuilder = dataColumnType.createBlockBuilder(null, 1, 0);
+                blockBuilder.appendNull();
+                nullBlocks.add(blockBuilder.build());
+            }
+            this.nullBlocks = nullBlocks.build();
+        }
+        else {
+            this.nullBlocks = ImmutableList.of();
         }
 
         this.session = requireNonNull(session, "session is null");
@@ -751,8 +769,15 @@ public class HivePageSink
             blocks = new Block[dataColumnInputIndex.length];
         }
         for (int i = 0; i < dataColumnInputIndex.length; i++) {
-            int dataColumn = dataColumnInputIndex[i];
-            blocks[i] = page.getBlock(dataColumn);
+            if (acidWriteType == HiveACIDWriteType.DELETE) {
+                //For delete remaining data not required as these will be ignored during write.
+                //But this will reduce the data size of sort buffer
+                blocks[i] = new RunLengthEncodedBlock(nullBlocks.get(i), page.getPositionCount());
+            }
+            else {
+                int dataColumn = dataColumnInputIndex[i];
+                blocks[i] = page.getBlock(dataColumn);
+            }
         }
         return new Page(page.getPositionCount(), blocks);
     }

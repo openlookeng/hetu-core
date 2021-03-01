@@ -586,6 +586,18 @@ public interface ConnectorMetadata
     }
 
     /**
+     * Attempt to push down a delete operation into the connector. If a connector
+     * can execute a delete for the table handle on its own, it should return a
+     * table handle, which will be passed back to {@link #executeDelete} during
+     * query executing to actually execute the delete.
+     * This supports filtering partitions based on constraint.
+     */
+    default Optional<ConnectorTableHandle> applyDelete(ConnectorSession session, ConnectorTableHandle handle, Constraint constraint)
+    {
+        return Optional.empty();
+    }
+
+    /**
      * Execute the delete operation on the handle returned from {@link #applyDelete}.
      */
     default OptionalLong executeDelete(ConnectorSession session, ConnectorTableHandle handle)

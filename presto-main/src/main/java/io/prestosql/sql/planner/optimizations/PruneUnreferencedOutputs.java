@@ -67,6 +67,7 @@ import io.prestosql.sql.planner.plan.SortNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticAggregations;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
+import io.prestosql.sql.planner.plan.TableDeleteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
@@ -736,6 +737,21 @@ public class PruneUnreferencedOutputs
                     node.getRowCountSymbol(),
                     node.getStatisticsAggregation(),
                     node.getStatisticsAggregationDescriptor());
+        }
+
+        @Override
+        public PlanNode visitTableDelete(TableDeleteNode node, RewriteContext<Set<Symbol>> context)
+        {
+            if (node.getSource() == null) {
+                return visitPlan(node, context);
+            }
+            PlanNode source = context.rewrite(node.getSource(), ImmutableSet.copyOf(node.getSource().getOutputSymbols()));
+            return new TableDeleteNode(node.getId(),
+                    source,
+                    node.getFilter(),
+                    node.getTarget(),
+                    node.getAssignments(),
+                    Iterables.getOnlyElement(node.getOutputSymbols()));
         }
 
         @Override

@@ -2651,9 +2651,16 @@ public class LocalExecutionPlanner
         @Override
         public PhysicalOperation visitTableDelete(TableDeleteNode node, LocalExecutionPlanContext context)
         {
-            OperatorFactory operatorFactory = new TableDeleteOperatorFactory(context.getNextOperatorId(), node.getId(), metadata, session, node.getTarget());
+            Optional<PhysicalOperation> source = Optional.empty();
+            Optional<Map<Symbol, Integer>> sourceLayout = Optional.empty();
+            if (node.getSource() != null) {
+                source = Optional.of(node.getSource().accept(this, context));
+                sourceLayout = Optional.of(source.get().getLayout());
+            }
+            OperatorFactory operatorFactory = new TableDeleteOperatorFactory(context.getNextOperatorId(), node.getId(), metadata, session, node.getTarget(),
+                    sourceLayout, node.getFilter(), node.getAssignments(), context.getTypes());
 
-            return new PhysicalOperation(operatorFactory, makeLayout(node), context, UNGROUPED_EXECUTION);
+            return new PhysicalOperation(operatorFactory, makeLayout(node), context, source, UNGROUPED_EXECUTION);
         }
 
         @Override

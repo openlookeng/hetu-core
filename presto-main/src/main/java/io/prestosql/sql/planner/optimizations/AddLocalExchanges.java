@@ -53,6 +53,7 @@ import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SortNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
+import io.prestosql.sql.planner.plan.TableDeleteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.DeleteAsInsertReference;
@@ -203,6 +204,17 @@ public class AddLocalExchanges
             // analyze finish requires that all data be in one stream
             // this node changes the input organization completely, so we do not pass through parent preferences
             return planAndEnforceChildren(node, singleStream(), defaultParallelism(session));
+        }
+
+        @Override
+        public PlanWithProperties visitTableDelete(TableDeleteNode node, StreamPreferredProperties context)
+        {
+            if (node.getSource() != null) {
+                // table delete requires that all data be in one stream
+                // this node changes the input organization completely, so we do not pass through parent preferences
+                return planAndEnforceChildren(node, singleStream(), defaultParallelism(session));
+            }
+            return super.visitTableDelete(node, context);
         }
 
         @Override

@@ -592,11 +592,28 @@ public class AddExchanges
         @Override
         public PlanWithProperties visitTableDelete(TableDeleteNode node, PreferredProperties context)
         {
-            return new PlanWithProperties(
-                    node,
-                    ActualProperties.builder()
-                            .global(singleStreamPartition())
-                            .build());
+            if (node.getSource() == null) {
+                return new PlanWithProperties(
+                        node,
+                        ActualProperties.builder()
+                                .global(singleStreamPartition())
+                                .build());
+            }
+
+            PlanWithProperties child = planChild(node, PreferredProperties.any());
+
+            // if the child is already a gathering exchange, don't add another
+            if ((child.getNode() instanceof ExchangeNode) && ((ExchangeNode) child.getNode()).getType().equals(GATHER)) {
+                return rebaseAndDeriveProperties(node, child);
+            }
+
+            if (!child.getProperties().isCoordinatorOnly()) {
+                child = withDerivedProperties(
+                        gatheringExchange(idAllocator.getNextId(), REMOTE, child.getNode()),
+                        child.getProperties());
+            }
+
+            return rebaseAndDeriveProperties(node, child);
         }
 
         @Override

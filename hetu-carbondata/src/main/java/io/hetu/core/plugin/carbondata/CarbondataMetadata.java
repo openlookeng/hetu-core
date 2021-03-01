@@ -444,6 +444,7 @@ public class CarbondataMetadata
     {
         currentState = State.DELETE;
         HiveInsertTableHandle parent = super.beginInsert(session, tableHandle);
+        List<HiveColumnHandle> inputColumns = parent.getInputColumns().stream().filter(HiveColumnHandle::isRequired).collect(toList());
         SchemaTableName tableName = parent.getSchemaTableName();
         Optional<Table> table =
                 this.metastore.getTable(new HiveIdentity(session), tableName.getSchemaName(), tableName.getTableName());
@@ -504,7 +505,7 @@ public class CarbondataMetadata
         }
         return new CarbonDeleteAsInsertTableHandle(parent.getSchemaName(),
                 parent.getTableName(),
-                parent.getInputColumns(),
+                inputColumns,
                 parent.getPageSinkMetadata(),
                 parent.getLocationHandle(),
                 parent.getBucketProperty(),

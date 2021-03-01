@@ -137,6 +137,7 @@ public class OrcFileWriterFactory
         List<Type> fileColumnTypes = getColumnTypes(schema).stream()
                 .map(hiveType -> hiveType.getType(typeManager))
                 .collect(toList());
+        List<Type> dataFileColumnTypes = fileColumnTypes;
 
         int[] fileInputColumnIndexes = fileColumnNames.stream()
                 .mapToInt(inputColumnNames::indexOf)
@@ -205,6 +206,7 @@ public class OrcFileWriterFactory
                     rollbackAction,
                     fileColumnNames,
                     fileColumnTypes,
+                    dataFileColumnTypes,
                     compression,
                     orcWriterOptions
                             .withStripeMinSize(HiveSessionProperties.getOrcOptimizedWriterMinStripeSize(session))
