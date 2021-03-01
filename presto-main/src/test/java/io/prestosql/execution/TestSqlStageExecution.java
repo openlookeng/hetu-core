@@ -186,6 +186,8 @@ public class TestSqlStageExecution
                 new PartitioningScheme(Partitioning.create(SINGLE_DISTRIBUTION, ImmutableList.of()), planNode.getOutputSymbols()),
                 ungroupedExecution(),
                 StatsAndCosts.empty(),
+                Optional.empty(),
+                Optional.empty(),
                 Optional.empty());
     }
 }

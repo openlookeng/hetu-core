@@ -156,6 +156,11 @@ public class FeaturesConfig
     //transform selfjoin to aggregates if applicable
     private boolean transformSelfJoinToGroupby = true;
 
+    // CTE optimization parameters
+    private boolean cteReuseEnabled;
+    private int maxQueueSize = 1024;
+    private int maxPrefetchQueueSize = 512;
+
     public enum JoinReorderingStrategy
     {
         NONE,
@@ -1212,6 +1217,42 @@ public class FeaturesConfig
     public FeaturesConfig setSpillOperatorThresholdReuseExchange(int spillOperatorThresholdReuseExchange)
     {
         this.spillOperatorThresholdReuseExchange = spillOperatorThresholdReuseExchange;
+        return this;
+    }
+
+    public boolean isCteReuseEnabled()
+    {
+        return cteReuseEnabled;
+    }
+
+    @Config("optimizer.cte-reuse-enabled")
+    public FeaturesConfig setCteReuseEnabled(boolean cteReuseEnabled)
+    {
+        this.cteReuseEnabled = cteReuseEnabled;
+        return this;
+    }
+
+    public int getMaxQueueSize()
+    {
+        return maxQueueSize;
+    }
+
+    @Config("cte.cte-max-queue-size")
+    public FeaturesConfig setMaxQueueSize(int maxQueueSize)
+    {
+        this.maxQueueSize = maxQueueSize;
+        return this;
+    }
+
+    public int getMaxPrefetchQueueSize()
+    {
+        return maxPrefetchQueueSize;
+    }
+
+    @Config("cte.cte-max-prefetch-queue-size")
+    public FeaturesConfig setMaxPrefetchQueueSize(int maxPrefetchQueueSize)
+    {
+        this.maxPrefetchQueueSize = maxPrefetchQueueSize;
         return this;
     }
 }

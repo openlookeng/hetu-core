@@ -20,6 +20,7 @@ import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.AggregationNode.Aggregation;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.ExceptNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
@@ -711,6 +712,14 @@ public final class ValidateDependenciesChecker
             Set<Symbol> filterSymbols = SymbolsExtractor.extractUnique(node.getFilter());
 
             checkDependencies(inputs, filterSymbols, "filter symbols (%s) not in sources (%s)", filterSymbols, inputs);
+
+            return null;
+        }
+
+        @Override
+        public Void visitCTEScan(CTEScanNode node, Set<Symbol> boundSymbols)
+        {
+            node.getSource().accept(this, boundSymbols); // visit child
 
             return null;
         }

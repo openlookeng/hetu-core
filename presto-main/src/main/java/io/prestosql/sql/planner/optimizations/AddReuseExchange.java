@@ -21,6 +21,7 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.Constraint;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.PlanNode;
@@ -84,7 +85,12 @@ public class AddReuseExchange
             PlanNode newNode = SimplePlanRewriter.rewriteWith(optimizedPlanRewriter, plan);
             optimizedPlanRewriter.setSecondVisit();
 
-            return SimplePlanRewriter.rewriteWith(optimizedPlanRewriter, newNode);
+            if (!optimizedPlanRewriter.isPlanNodeListHashMapEmpty()) {
+                return SimplePlanRewriter.rewriteWith(optimizedPlanRewriter, newNode);
+            }
+            else {
+                return plan;
+            }
         }
     }
 
@@ -201,6 +207,11 @@ public class AddReuseExchange
                     .collect(Collectors.summingDouble(Double::doubleValue));
         }
 
+        private boolean isPlanNodeListHashMapEmpty()
+        {
+            return planNodeListHashMap.isEmpty();
+        }
+
         private void visitTableScanInternal(TableScanNode node, TupleDomain<ColumnHandle> newDomain)
         {
             if (!isNodeAlreadyVisited && node.getTable().getConnectorHandle().isReuseTableScanSupported()) {
@@ -289,6 +300,13 @@ public class AddReuseExchange
                 return new ProjectNode(node.getId(), node.getSource(), newAssignments.build());
             }
 
+            return node;
+        }
+
+        @Override
+        public PlanNode visitCTEScan(CTEScanNode node, RewriteContext<Void> context)
+        {
+            planNodeListHashMap.clear();
             return node;
         }
 

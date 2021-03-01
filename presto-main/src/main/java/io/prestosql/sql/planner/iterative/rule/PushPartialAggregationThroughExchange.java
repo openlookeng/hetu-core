@@ -22,6 +22,7 @@ import io.prestosql.operator.aggregation.InternalAggregationFunction;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
@@ -86,6 +87,11 @@ public class PushPartialAggregationThroughExchange
     public Result apply(AggregationNode aggregationNode, Captures captures, Context context)
     {
         ExchangeNode exchangeNode = captures.get(EXCHANGE_NODE);
+        // Do not push down aggregation since CTEScanNode requires an exchange node above it
+        if (exchangeNode.getSources().size() == 1 &&
+                context.getLookup().resolve(exchangeNode.getSources().get(0)) instanceof CTEScanNode) {
+            return Result.empty();
+        }
 
         boolean decomposable = isDecomposable(aggregationNode, metadata);
 

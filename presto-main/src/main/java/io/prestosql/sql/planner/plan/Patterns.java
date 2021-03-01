@@ -16,6 +16,7 @@ package io.prestosql.sql.planner.plan;
 import io.prestosql.matching.Pattern;
 import io.prestosql.matching.Property;
 import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.ExceptNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
@@ -211,6 +212,11 @@ public class Patterns
     public static Pattern<GroupIdNode> groupId()
     {
         return typeOf(GroupIdNode.class);
+    }
+
+    public static Pattern<CTEScanNode> cteScan()
+    {
+        return typeOf(CTEScanNode.class);
     }
 
     public static Property<PlanNode, Lookup, PlanNode> source()

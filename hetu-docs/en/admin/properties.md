@@ -475,6 +475,15 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > Use Reuse Exchange to cache data in memory if the query contains tables or Common Table Expressions(CTE) which are present more than one time with the same projections and filters on them. Enabling this feature will reduce the time taken to execute the query by caching data in memory and avoiding reading from disk multiple times.
 > This can also be specified on a per-query basis using the `reuse_table_scan` session property. 
 
+### `optimizer.cte-reuse-enabled`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Enable this flag to execute Common Table Expressions (CTE) only once irrespective of number of times same CTE is being used in the main query.
+> This will help to improve query execution performance when same CTE is used more than once.
+> This can also be specified on a per-query basis using the `cte_reuse_enabled` session property.
+
 ## Regular Expression Function Properties
 
 The following properties allow tuning the [regexp](../functions/regexp.md).
@@ -648,3 +657,23 @@ helps with cache affinity scheduling.
 > Number of threads used for Auto vacuum functionality. Min value is 1 and Max value is 16.
 >
 > **Note:** This should be configured only in coordinator.
+
+## CTE (Common Table Expression) Properties
+
+### `cte.cte-max-queue-size`
+
+> -   **Type:** `int`
+> -   **Default value:** `1024`
+>
+> The maximum number of pages per processing queue.  The number of processing queues is equal to the number of the CTE references in the main query. 
+> This can also be specified on a per-query basis using the `cte_max_queue_size` session property.
+
+### `cte.cte-max-prefetch-queue-size`
+
+> -   **Type:** `int`
+> -   **Default value:** `512`
+>
+> The maximum number of pages which can be held by the prefetch queue when processing queue is full. Prefetch queues are used to eagerly fetch the data so that query execution need not wait on I/O.
+> This can also be specified on a per-query basis using the `cte_max_prefetch_queue_size` session property.
+>
+> **Note:** This should be configured in all workers.

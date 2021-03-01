@@ -115,6 +115,11 @@ public class BasePlanTest
         assertPlanWithSession(sql, session, true, pattern);
     }
 
+    protected void assertPlan(String sql, Session session, PlanMatchPattern pattern, List<PlanOptimizer> optimizers)
+    {
+        assertPlanWithSession(sql, session, pattern, optimizers);
+    }
+
     protected void assertPlan(String sql, LogicalPlanner.Stage stage, PlanMatchPattern pattern)
     {
         List<PlanOptimizer> optimizers = queryRunner.getPlanOptimizers(true);
@@ -180,6 +185,15 @@ public class BasePlanTest
     {
         queryRunner.inTransaction(session, transactionSession -> {
             Plan actualPlan = queryRunner.createPlan(transactionSession, sql, LogicalPlanner.Stage.OPTIMIZED_AND_VALIDATED, forceSingleNode, WarningCollector.NOOP);
+            PlanAssert.assertPlan(transactionSession, queryRunner.getMetadata(), queryRunner.getStatsCalculator(), actualPlan, pattern);
+            return null;
+        });
+    }
+
+    protected void assertPlanWithSession(@Language("SQL") String sql, Session session, PlanMatchPattern pattern, List<PlanOptimizer> optimizers)
+    {
+        queryRunner.inTransaction(session, transactionSession -> {
+            Plan actualPlan = queryRunner.createPlan(transactionSession, sql, optimizers, WarningCollector.NOOP);
             PlanAssert.assertPlan(transactionSession, queryRunner.getMetadata(), queryRunner.getStatsCalculator(), actualPlan, pattern);
             return null;
         });

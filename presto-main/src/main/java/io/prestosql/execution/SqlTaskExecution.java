@@ -22,6 +22,7 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.concurrent.SetThreadName;
+import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.prestosql.event.SplitMonitor;
 import io.prestosql.execution.StateMachine.StateChangeListener;
@@ -108,6 +109,7 @@ public class SqlTaskExecution
     // * a driver could belong to pipeline 1 and driver life cycle 42.
     // * another driver could belong to pipeline 3 and task-wide driver life cycle.
 
+    private static final Logger log = Logger.get(SqlTaskExecution.class);
     private final TaskId taskId;
     private final TaskStateMachine taskStateMachine;
     private final TaskContext taskContext;
@@ -223,7 +225,7 @@ public class SqlTaskExecution
                             .collect(toImmutableMap(DriverFactory::getPipelineId, DriverFactory::getPipelineExecutionStrategy)));
             this.schedulingLifespanManager = new SchedulingLifespanManager(localExecutionPlan.getPartitionedSourceOrder(), localExecutionPlan.getStageExecutionDescriptor(), this.status);
 
-            checkArgument(this.driverRunnerFactoriesWithSplitLifeCycle.keySet().equals(partitionedSources),
+            checkArgument(!localExecutionPlan.getProducerCTEId().isPresent() || this.driverRunnerFactoriesWithSplitLifeCycle.keySet().equals(partitionedSources),
                     "Fragment is partitioned, but not all partitioned drivers were found");
 
             // Pre-register Lifespans for ungrouped partitioned drivers in case they end up get no splits.

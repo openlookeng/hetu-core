@@ -113,7 +113,9 @@ public class TestSqlTask
                 ImmutableList.of(),
                 createInitialEmptyOutputBuffers(PARTITIONED)
                         .withNoMoreBufferIds(),
-                OptionalInt.empty());
+                OptionalInt.empty(),
+                Optional.empty(),
+                null);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
 
         taskInfo = sqlTask.getTaskInfo();
@@ -124,7 +126,9 @@ public class TestSqlTask
                 ImmutableList.of(new TaskSource(TABLE_SCAN_NODE_ID, ImmutableSet.of(), true)),
                 createInitialEmptyOutputBuffers(PARTITIONED)
                         .withNoMoreBufferIds(),
-                OptionalInt.empty());
+                OptionalInt.empty(),
+                Optional.empty(),
+                null);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.FINISHED);
 
         taskInfo = sqlTask.getTaskInfo();
@@ -141,7 +145,9 @@ public class TestSqlTask
                 Optional.of(PLAN_FRAGMENT),
                 ImmutableList.of(new TaskSource(TABLE_SCAN_NODE_ID, ImmutableSet.of(SPLIT), true)),
                 createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds(),
-                OptionalInt.empty());
+                OptionalInt.empty(),
+                Optional.empty(),
+                null);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
 
         taskInfo = sqlTask.getTaskInfo();
@@ -179,7 +185,9 @@ public class TestSqlTask
                 createInitialEmptyOutputBuffers(PARTITIONED)
                         .withBuffer(OUT, 0)
                         .withNoMoreBufferIds(),
-                OptionalInt.empty());
+                OptionalInt.empty(),
+                Optional.empty(),
+                null);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
         assertNull(taskInfo.getStats().getEndTime());
 
@@ -206,7 +214,9 @@ public class TestSqlTask
                 Optional.of(PLAN_FRAGMENT),
                 ImmutableList.of(new TaskSource(TABLE_SCAN_NODE_ID, ImmutableSet.of(SPLIT), true)),
                 createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds(),
-                OptionalInt.empty());
+                OptionalInt.empty(),
+                Optional.empty(),
+                null);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
 
         taskInfo = sqlTask.getTaskInfo();
@@ -311,7 +321,8 @@ public class TestSqlTask
                 new DataSize(1, MEGABYTE),
                 new SpillSpaceTracker(new DataSize(1, GIGABYTE)));
 
-        queryContext.addTaskContext(new TaskStateMachine(taskId, taskNotificationExecutor), testSessionBuilder().build(), false, false, OptionalInt.empty());
+        queryContext.addTaskContext(new TaskStateMachine(taskId, taskNotificationExecutor), testSessionBuilder().build(), false, false, OptionalInt.empty(),
+                Optional.empty());
 
         return createSqlTask(
                 taskId,

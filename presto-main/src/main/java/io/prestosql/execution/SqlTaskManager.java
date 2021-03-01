@@ -40,8 +40,10 @@ import io.prestosql.memory.MemoryPoolAssignmentsRequest;
 import io.prestosql.memory.NodeMemoryConfig;
 import io.prestosql.memory.QueryContext;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.operator.CommonTableExecutionContext;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spiller.LocalSpillManager;
 import io.prestosql.spiller.NodeSpillConfig;
 import io.prestosql.sql.planner.LocalExecutionPlanner;
@@ -58,8 +60,10 @@ import javax.inject.Inject;
 
 import java.io.Closeable;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -108,6 +112,8 @@ public class SqlTaskManager
     private String coordinatorId;
 
     private final CounterStat failedTasks = new CounterStat();
+
+    private static Map<String, CommonTableExecutionContext> cteCtx = new ConcurrentHashMap<>();
 
     @Inject
     public SqlTaskManager(
@@ -348,7 +354,7 @@ public class SqlTaskManager
     }
 
     @Override
-    public TaskInfo updateTask(Session session, TaskId taskId, Optional<PlanFragment> fragment, List<TaskSource> sources, OutputBuffers outputBuffers, OptionalInt totalPartitions)
+    public TaskInfo updateTask(Session session, TaskId taskId, Optional<PlanFragment> fragment, List<TaskSource> sources, OutputBuffers outputBuffers, OptionalInt totalPartitions, Optional<PlanNodeId> consumer)
     {
         requireNonNull(session, "session is null");
         requireNonNull(taskId, "taskId is null");
@@ -363,7 +369,7 @@ public class SqlTaskManager
 
         SqlTask sqlTask = tasks.getUnchecked(taskId);
         sqlTask.recordHeartbeat();
-        return sqlTask.updateTask(session, fragment, sources, outputBuffers, totalPartitions);
+        return sqlTask.updateTask(session, fragment, sources, outputBuffers, totalPartitions, consumer, cteCtx);
     }
 
     @Override
@@ -484,5 +490,10 @@ public class SqlTaskManager
 
     {
         return queryContexts.getUnchecked(queryId);
+    }
+
+    public static void cleanupContext(String queryId)
+    {
+        cteCtx.keySet().removeIf(x -> x.contains(queryId));
     }
 }

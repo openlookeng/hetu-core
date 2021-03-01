@@ -33,6 +33,7 @@ import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
 import io.prestosql.spi.plan.JoinNode;
@@ -492,6 +493,12 @@ public class DistributedExecutionPlanner
         public Map<PlanNodeId, SplitSource> visitCreateIndex(CreateIndexNode node, Void context)
         {
             return node.getSource().accept(this, context);
+        }
+
+        @Override
+        public Map<PlanNodeId, SplitSource> visitCTEScan(CTEScanNode node, Void context)
+        {
+            return processSources(node.getSources(), context);
         }
 
         @Override

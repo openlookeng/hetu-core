@@ -17,6 +17,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.OrderingScheme;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -140,6 +141,15 @@ public class ExchangeNode
         if (partitioningScheme.getPartitioning().getHandle().isSingleNode()) {
             return gatheringExchange(id, scope, child);
         }
+
+        // CTEScanNode adds one exchange node on top of it,
+        // so if upper node going to have another ExchangeNode then we should omit previous one.
+        // In order to find this, we check if child node is already exchange node and it has only one source
+        // and that source CTE node.
+        if (scope == REMOTE && child instanceof ExchangeNode && child.getSources().size() == 1 && child.getSources().get(0) instanceof CTEScanNode) {
+            child = child.getSources().get(0);
+        }
+
         return new ExchangeNode(
                 id,
                 ExchangeNode.Type.REPARTITION,
@@ -152,6 +162,12 @@ public class ExchangeNode
 
     public static ExchangeNode replicatedExchange(PlanNodeId id, Scope scope, PlanNode child)
     {
+        // CTEScanNode adds one exchange node on top of it,
+        // so if upper node going to have another ExchangeNode then we should omit previous one.
+        if (scope == REMOTE && child instanceof ExchangeNode && child.getSources().size() == 1 && child.getSources().get(0) instanceof CTEScanNode) {
+            child = child.getSources().get(0);
+        }
+
         return new ExchangeNode(
                 id,
                 ExchangeNode.Type.REPLICATE,
@@ -164,6 +180,12 @@ public class ExchangeNode
 
     public static ExchangeNode gatheringExchange(PlanNodeId id, Scope scope, PlanNode child)
     {
+        // CTEScanNode adds one exchange node on top of it,
+        // so if upper node going to have another ExchangeNode then we should omit previous one.
+        if (scope == REMOTE && child instanceof ExchangeNode && child.getSources().size() == 1 && child.getSources().get(0) instanceof CTEScanNode) {
+            child = child.getSources().get(0);
+        }
+
         return new ExchangeNode(
                 id,
                 ExchangeNode.Type.GATHER,
@@ -185,6 +207,12 @@ public class ExchangeNode
 
     public static ExchangeNode mergingExchange(PlanNodeId id, Scope scope, PlanNode child, OrderingScheme orderingScheme)
     {
+        // CTEScanNode adds one exchange node on top of it,
+        // so if upper node going to have another ExchangeNode then we should omit previous one.
+        if (scope == REMOTE && child instanceof ExchangeNode && child.getSources().size() == 1 && child.getSources().get(0) instanceof CTEScanNode) {
+            child = child.getSources().get(0);
+        }
+
         PartitioningHandle partitioningHandle = scope == LOCAL ? FIXED_PASSTHROUGH_DISTRIBUTION : SINGLE_DISTRIBUTION;
         return new ExchangeNode(
                 id,

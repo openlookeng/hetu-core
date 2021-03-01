@@ -159,28 +159,30 @@ public final class HttpRemoteTask
 
     private final AtomicBoolean aborting = new AtomicBoolean(false);
     private final boolean isBinaryEncoding;
+    private Optional<PlanNodeId> parent;
 
     public HttpRemoteTask(Session session,
-            TaskId taskId,
-            String nodeId,
-            URI location,
-            PlanFragment planFragment,
-            Multimap<PlanNodeId, Split> initialSplits,
-            OptionalInt totalPartitions,
-            OutputBuffers outputBuffers,
-            HttpClient httpClient,
-            Executor executor,
-            ScheduledExecutorService updateScheduledExecutor,
-            ScheduledExecutorService errorScheduledExecutor,
-            Duration maxErrorDuration,
-            Duration taskStatusRefreshMaxWait,
-            Duration taskInfoUpdateInterval,
-            boolean summarizeTaskInfo,
-            Codec<TaskStatus> taskStatusCodec,
-            Codec<TaskInfo> taskInfoCodec,
-            Codec<TaskUpdateRequest> taskUpdateRequestCodec,
-            PartitionedSplitCountTracker partitionedSplitCountTracker,
-            RemoteTaskStats stats, boolean isBinaryEncoding)
+                          TaskId taskId,
+                          String nodeId,
+                          URI location,
+                          PlanFragment planFragment,
+                          Multimap<PlanNodeId, Split> initialSplits,
+                          OptionalInt totalPartitions,
+                          OutputBuffers outputBuffers,
+                          HttpClient httpClient,
+                          Executor executor,
+                          ScheduledExecutorService updateScheduledExecutor,
+                          ScheduledExecutorService errorScheduledExecutor,
+                          Duration maxErrorDuration,
+                          Duration taskStatusRefreshMaxWait,
+                          Duration taskInfoUpdateInterval,
+                          boolean summarizeTaskInfo,
+                          Codec<TaskStatus> taskStatusCodec,
+                          Codec<TaskInfo> taskInfoCodec,
+                          Codec<TaskUpdateRequest> taskUpdateRequestCodec,
+                          PartitionedSplitCountTracker partitionedSplitCountTracker,
+                          RemoteTaskStats stats, boolean isBinaryEncoding,
+                          Optional<PlanNodeId> parent)
     {
         requireNonNull(session, "session is null");
         requireNonNull(taskId, "taskId is null");
@@ -196,6 +198,7 @@ public final class HttpRemoteTask
         requireNonNull(taskUpdateRequestCodec, "taskUpdateRequestCodec is null");
         requireNonNull(partitionedSplitCountTracker, "partitionedSplitCountTracker is null");
         requireNonNull(stats, "stats is null");
+        requireNonNull(parent, "parent is null");
 
         try (SetThreadName ignored = new SetThreadName("HttpRemoteTask-%s", taskId)) {
             this.taskId = taskId;
@@ -214,6 +217,7 @@ public final class HttpRemoteTask
             this.partitionedSplitCountTracker = requireNonNull(partitionedSplitCountTracker, "partitionedSplitCountTracker is null");
             this.stats = stats;
             this.isBinaryEncoding = isBinaryEncoding;
+            this.parent = parent;
 
             for (Entry<PlanNodeId, Split> entry : requireNonNull(initialSplits, "initialSplits is null").entries()) {
                 ScheduledSplit scheduledSplit = new ScheduledSplit(nextSplitId.getAndIncrement(), entry.getKey(), entry.getValue());
@@ -515,7 +519,8 @@ public final class HttpRemoteTask
                 fragment,
                 sources,
                 outputBuffers.get(),
-                totalPartitions);
+                totalPartitions,
+                parent);
         byte[] taskUpdateRequestJson = taskUpdateRequestCodec.toBytes(updateRequest);
         if (fragment.isPresent()) {
             stats.updateWithPlanBytes(taskUpdateRequestJson.length);

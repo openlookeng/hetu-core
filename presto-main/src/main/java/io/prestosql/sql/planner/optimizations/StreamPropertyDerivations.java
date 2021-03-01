@@ -24,6 +24,7 @@ import io.prestosql.metadata.TableProperties;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.LocalProperty;
 import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
 import io.prestosql.spi.plan.JoinNode;
@@ -607,6 +608,12 @@ public final class StreamPropertyDerivations
 
         @Override
         public StreamProperties visitSample(SampleNode node, List<StreamProperties> inputProperties)
+        {
+            return Iterables.getOnlyElement(inputProperties);
+        }
+
+        @Override
+        public StreamProperties visitCTEScan(CTEScanNode node, List<StreamProperties> inputProperties)
         {
             return Iterables.getOnlyElement(inputProperties);
         }

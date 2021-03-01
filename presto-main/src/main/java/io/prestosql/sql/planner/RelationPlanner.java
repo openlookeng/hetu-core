@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.UnmodifiableIterator;
+import io.airlift.log.Logger;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -26,6 +27,7 @@ import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.ExceptNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.IntersectNode;
@@ -88,6 +90,7 @@ import io.prestosql.type.TypeCoercion;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -100,6 +103,10 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static io.prestosql.SystemSessionProperties.getCteMaxQueueSize;
+import static io.prestosql.SystemSessionProperties.getExecutionPolicy;
+import static io.prestosql.SystemSessionProperties.getTaskConcurrency;
+import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
 import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
 import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.sql.analyzer.SemanticExceptions.notSupportedException;
@@ -112,6 +119,8 @@ import static java.util.Objects.requireNonNull;
 class RelationPlanner
         extends DefaultTraversalVisitor<RelationPlan, Void>
 {
+    private static final Logger LOG = Logger.get(RelationPlanner.class);
+
     private final Analysis analysis;
     private final PlanSymbolAllocator planSymbolAllocator;
     private final PlanNodeIdAllocator idAllocator;
@@ -120,6 +129,8 @@ class RelationPlanner
     private final TypeCoercion typeCoercion;
     private final Session session;
     private final SubqueryPlanner subqueryPlanner;
+    private final Map<QualifiedName, Integer> namedSubPlan;
+    private final UniqueIdAllocator uniqueIdAllocator;
 
     RelationPlanner(
             Analysis analysis,
@@ -127,7 +138,9 @@ class RelationPlanner
             PlanNodeIdAllocator idAllocator,
             Map<NodeRef<LambdaArgumentDeclaration>, Symbol> lambdaDeclarationToSymbolMap,
             Metadata metadata,
-            Session session)
+            Session session,
+            Map<QualifiedName, Integer> namedSubPlan,
+            UniqueIdAllocator uniqueIdAllocator)
     {
         requireNonNull(analysis, "analysis is null");
         requireNonNull(planSymbolAllocator, "symbolAllocator is null");
@@ -143,15 +156,16 @@ class RelationPlanner
         this.metadata = metadata;
         this.typeCoercion = new TypeCoercion(metadata::getType);
         this.session = session;
-        this.subqueryPlanner = new SubqueryPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session);
+        this.subqueryPlanner = new SubqueryPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session, namedSubPlan, uniqueIdAllocator);
+        this.namedSubPlan = namedSubPlan;
+        this.uniqueIdAllocator = uniqueIdAllocator;
     }
 
     @Override
     protected RelationPlan visitTable(Table node, Void context)
     {
-        Query namedQuery = analysis.getNamedQuery(node);
         Scope scope = analysis.getScope(node);
-
+        Query namedQuery = analysis.getNamedQuery(node);
         if (namedQuery != null) {
             RelationPlan subPlan = process(namedQuery, null);
 
@@ -159,7 +173,32 @@ class RelationPlanner
             // of the view (e.g., if the underlying tables referenced by the view changed)
             Type[] types = scope.getRelationType().getAllFields().stream().map(Field::getType).toArray(Type[]::new);
             RelationPlan withCoercions = addCoercions(subPlan, types);
-            return new RelationPlan(withCoercions.getRoot(), scope, withCoercions.getFieldMappings());
+            if ((!isCTEReuseEnabled(session) || getExecutionPolicy(session).equals("phased"))
+                    || (getCteMaxQueueSize(session) < getTaskConcurrency(session) * 2) || !((Query) analysis.getStatement()).getWith().isPresent()) {
+                if (getCteMaxQueueSize(session) < getTaskConcurrency(session) * 2) {
+                    LOG.info("Main queue size " + getCteMaxQueueSize(session) + "should be more than 2 times of concurrent task " + getTaskConcurrency(session));
+                }
+                return new RelationPlan(withCoercions.getRoot(), scope, withCoercions.getFieldMappings());
+            }
+
+            Integer commonCTERefNum;
+            if (namedSubPlan.containsKey(node.getName())) {
+                commonCTERefNum = namedSubPlan.get(node.getName());
+            }
+            else {
+                commonCTERefNum = uniqueIdAllocator.getNextId();
+                namedSubPlan.put(node.getName(), commonCTERefNum);
+            }
+
+            PlanNode cteNode = new CTEScanNode(idAllocator.getNextId(),
+                    withCoercions.getRoot(),
+                    withCoercions.getFieldMappings(),
+                    Optional.empty(),
+                    node.getName().toString(),
+                    new HashSet<>(),
+                    commonCTERefNum);
+            subPlan = new RelationPlan(cteNode, scope, withCoercions.getFieldMappings());
+            return subPlan;
         }
 
         TableHandle handle = analysis.getTableHandle(node);
@@ -719,14 +758,14 @@ class RelationPlanner
     @Override
     protected RelationPlan visitQuery(Query node, Void context)
     {
-        return new QueryPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session)
+        return new QueryPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session, namedSubPlan, uniqueIdAllocator)
                 .plan(node);
     }
 
     @Override
     protected RelationPlan visitQuerySpecification(QuerySpecification node, Void context)
     {
-        return new QueryPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session)
+        return new QueryPlanner(analysis, planSymbolAllocator, idAllocator, lambdaDeclarationToSymbolMap, metadata, session, namedSubPlan, uniqueIdAllocator)
                 .plan(node);
     }
 

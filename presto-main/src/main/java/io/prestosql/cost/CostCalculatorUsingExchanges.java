@@ -17,6 +17,7 @@ package io.prestosql.cost;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
 import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
 import io.prestosql.spi.plan.GroupReference;
@@ -341,6 +342,13 @@ public class CostCalculatorUsingExchanges
             // or in CostCalculatorWithEstimatedExchanges#CostEstimator#visitUnion
             // This stub is needed just to avoid the cumulative cost being set to unknown
             return costForStreaming(node, LocalCostEstimate.zero());
+        }
+
+        @Override
+        public PlanCostEstimate visitCTEScan(CTEScanNode node, Void context)
+        {
+            LocalCostEstimate localCost = LocalCostEstimate.ofCpu(getStats(node).getOutputSizeInBytes(node.getOutputSymbols(), types));
+            return costForStreaming(node, localCost);
         }
 
         private PlanCostEstimate costForSource(PlanNode node, LocalCostEstimate localCost)

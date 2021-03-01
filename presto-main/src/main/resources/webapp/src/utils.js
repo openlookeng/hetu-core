@@ -233,6 +233,7 @@ export function getChildren(nodeInfo: any)
         case 'delete':
         case 'tableDelete':
         case 'tablecommit':
+        case 'ctescan':
         case 'groupid':
         case 'unnest':
         case 'scalar':

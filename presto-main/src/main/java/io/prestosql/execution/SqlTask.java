@@ -32,6 +32,7 @@ import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.QueryContext;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.operator.CommonTableExecutionContext;
 import io.prestosql.operator.PipelineContext;
 import io.prestosql.operator.PipelineStatus;
 import io.prestosql.operator.TaskContext;
@@ -44,6 +45,7 @@ import javax.annotation.Nullable;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
@@ -367,7 +369,8 @@ public class SqlTask
         return Futures.transform(futureTaskState, input -> getTaskInfo(), directExecutor());
     }
 
-    public TaskInfo updateTask(Session session, Optional<PlanFragment> fragment, List<TaskSource> sources, OutputBuffers outputBuffers, OptionalInt totalPartitions)
+    public TaskInfo updateTask(Session session, Optional<PlanFragment> fragment, List<TaskSource> sources, OutputBuffers outputBuffers, OptionalInt totalPartitions, Optional<PlanNodeId> consumer,
+                                    Map<String, CommonTableExecutionContext> cteCtx)
     {
         try {
             // The LazyOutput buffer does not support write methods, so the actual
@@ -387,7 +390,7 @@ public class SqlTask
                 if (taskExecution == null) {
                     checkState(fragment.isPresent(), "fragment must be present");
                     loadDCCatalogForUpdateTask(metadata, sources);
-                    taskExecution = sqlTaskExecutionFactory.create(session, queryContext, taskStateMachine, outputBuffer, fragment.get(), sources, totalPartitions);
+                    taskExecution = sqlTaskExecutionFactory.create(session, queryContext, taskStateMachine, outputBuffer, fragment.get(), sources, totalPartitions, consumer, cteCtx);
                     taskHolderReference.compareAndSet(taskHolder, new TaskHolder(taskExecution));
                     needsPlan.set(false);
                 }

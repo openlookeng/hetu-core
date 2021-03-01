@@ -97,6 +97,7 @@ import io.prestosql.utils.OptimizerUtils;
 
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -147,6 +148,8 @@ public class LogicalPlanner
     private final StatsCalculator statsCalculator;
     private final CostCalculator costCalculator;
     private final WarningCollector warningCollector;
+    private final Map<QualifiedName, Integer> namedSubPlan = new HashMap<>();
+    private final UniqueIdAllocator uniqueIdAllocator = new UniqueIdAllocator();
 
     public LogicalPlanner(Session session,
             List<PlanOptimizer> planOptimizers,
@@ -546,7 +549,7 @@ public class LogicalPlanner
     {
         TableHandle handle = analysis.getTableHandle(node.getTable());
         if (handle.getConnectorHandle().isDeleteAsInsertSupported()) {
-            QueryPlanner.UpdateDeleteRelationPlan deletePlan = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session)
+            QueryPlanner.UpdateDeleteRelationPlan deletePlan = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session, namedSubPlan, uniqueIdAllocator)
                         .planDeleteRowAsInsert(node);
 
             RelationPlan plan = deletePlan.getPlan();
@@ -569,7 +572,7 @@ public class LogicalPlanner
                     statisticsMetadata);
         }
         else {
-            DeleteNode deleteNode = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session)
+            DeleteNode deleteNode = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session, namedSubPlan, uniqueIdAllocator)
                     .plan(node);
             TableFinishNode commitNode = new TableFinishNode(idAllocator.getNextId(), deleteNode, deleteNode.getTarget(), planSymbolAllocator.newSymbol("rows", BIGINT),
                     Optional.empty(), Optional.empty());
@@ -579,7 +582,7 @@ public class LogicalPlanner
 
     private RelationPlan createUpdatePlan(Analysis analysis, Update updateStatement)
     {
-        QueryPlanner.UpdateDeleteRelationPlan updatePlan = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session)
+        QueryPlanner.UpdateDeleteRelationPlan updatePlan = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session, namedSubPlan, uniqueIdAllocator)
                 .plan(updateStatement);
         RelationPlan plan = updatePlan.getPlan();
         Analysis.Update update = analysis.getUpdate().get();
@@ -711,7 +714,7 @@ public class LogicalPlanner
 
     private RelationPlan createRelationPlan(Analysis analysis, Node node)
     {
-        return new RelationPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session)
+        return new RelationPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session, namedSubPlan, uniqueIdAllocator)
                 .process(node, null);
     }
 

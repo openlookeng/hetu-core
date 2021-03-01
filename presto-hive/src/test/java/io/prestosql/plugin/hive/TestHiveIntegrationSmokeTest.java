@@ -92,6 +92,7 @@ import static com.google.common.io.MoreFiles.deleteRecursively;
 import static com.google.common.io.RecursiveDeleteOption.ALLOW_INSECURE;
 import static io.airlift.json.JsonCodec.jsonCodec;
 import static io.airlift.tpch.TpchTable.CUSTOMER;
+import static io.airlift.tpch.TpchTable.LINE_ITEM;
 import static io.airlift.tpch.TpchTable.ORDERS;
 import static io.prestosql.SystemSessionProperties.COLOCATED_JOIN;
 import static io.prestosql.SystemSessionProperties.CONCURRENT_LIFESPANS_PER_NODE;
@@ -157,7 +158,7 @@ public class TestHiveIntegrationSmokeTest
     @SuppressWarnings("unused")
     public TestHiveIntegrationSmokeTest()
     {
-        this(() -> HiveQueryRunner.createQueryRunner(ORDERS, CUSTOMER),
+        this(() -> HiveQueryRunner.createQueryRunner(ORDERS, CUSTOMER, LINE_ITEM),
                 HiveQueryRunner.createBucketedSession(Optional.of(new SelectedRole(ROLE, Optional.of("admin")))),
                 HiveQueryRunner.createAutoVacuumSession(Optional.of(new SelectedRole(SelectedRole.Type.ALL, Optional.empty()))),
                 HiveQueryRunner.HIVE_CATALOG,
@@ -5233,5 +5234,27 @@ public class TestHiveIntegrationSmokeTest
         assertUpdate("delete from tab_bkt_009 where mm=date'2019-09-14'", 2);
 
         assertUpdate(String.format("DROP TABLE tab_bkt_009"));
+    }
+
+    @Test
+    public void testCteReuse()
+    {
+        MaterializedResult result = getQueryRunner().execute("with customer_total_return " +
+                " as (select lineitem.orderkey, sum(totalprice) as finalprice " +
+                " from   lineitem, " +
+                "orders " +
+                " where  lineitem.orderkey=orders.orderkey  " +
+                " group  by lineitem.orderkey) " +
+                "select ctr1.orderkey " +
+                "from   customer_total_return ctr1, orders " +
+                "where  ctr1.finalprice < (select Avg(finalprice) * 1.2 " +
+                "from   customer_total_return ctr2 " +
+                "where ctr2.orderkey=ctr1.orderkey) " +
+                "and ctr1.orderkey=orders.orderkey limit 100");
+        assertEquals(result.getRowCount(), 100);
+
+        result = getQueryRunner().execute("with ss as (select * from orders), sd as (select * from ss) " +
+                " select * from ss,sd where ss.orderkey = sd.orderkey");
+        assertEquals(result.getRowCount(), 15000);
     }
 }

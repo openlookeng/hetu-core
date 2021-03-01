@@ -119,6 +119,8 @@ public final class SqlStageExecution
     @GuardedBy("SqlStageExecution.class")
     public static Map<QueryId, List<Integer>> queryIdReuseTableScanMappingIdFinishedMap = new ConcurrentHashMap<>();
 
+    private PlanNodeId parentId;
+
     public static SqlStageExecution createSqlStageExecution(
             StageId stageId,
             URI location,
@@ -485,7 +487,8 @@ public final class SqlStageExecution
                 totalPartitions,
                 outputBuffers,
                 nodeTaskMap.createPartitionedSplitCountTracker(node, taskId),
-                summarizeTaskInfo);
+                summarizeTaskInfo,
+                Optional.ofNullable(parentId));
 
         completeSources.forEach(task::noMoreSplits);
 
@@ -704,5 +707,15 @@ public final class SqlStageExecution
                 executor.execute(() -> listener.accept(payload));
             }
         }
+    }
+
+    public PlanNodeId getParentId()
+    {
+        return parentId;
+    }
+
+    public void setParentId(PlanNodeId parentId)
+    {
+        this.parentId = parentId;
     }
 }

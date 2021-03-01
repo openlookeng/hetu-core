@@ -16,6 +16,7 @@ package io.prestosql.sql.planner.sanity;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.planner.TypeAnalyzer;
@@ -37,6 +38,7 @@ public class NoDuplicatePlanNodeIdsChecker
     {
         Map<PlanNodeId, PlanNode> planNodeIds = new HashMap<>();
         searchFrom(planNode)
+                .recurseOnlyWhen(CTEScanNode::isNotCTEScanNode)
                 .findAll()
                 .forEach(node -> planNodeIds.merge(node.getId(), node, this::reportDuplicateId));
     }

@@ -256,19 +256,22 @@ public class TestSqlTaskManager
                 Optional.of(PLAN_FRAGMENT),
                 ImmutableList.of(new TaskSource(TABLE_SCAN_NODE_ID, splits, true)),
                 outputBuffers,
-                OptionalInt.empty());
+                OptionalInt.empty(),
+                Optional.empty());
     }
 
     private TaskInfo createTask(SqlTaskManager sqlTaskManager, TaskId taskId, OutputBuffers outputBuffers)
     {
         sqlTaskManager.getQueryContext(taskId.getQueryId())
-                .addTaskContext(new TaskStateMachine(taskId, directExecutor()), testSessionBuilder().build(), false, false, OptionalInt.empty());
+                .addTaskContext(new TaskStateMachine(taskId, directExecutor()), testSessionBuilder().build(), false, false, OptionalInt.empty(),
+                        Optional.empty());
         return sqlTaskManager.updateTask(TEST_SESSION,
                 taskId,
                 Optional.of(PLAN_FRAGMENT),
                 ImmutableList.of(),
                 outputBuffers,
-                OptionalInt.empty());
+                OptionalInt.empty(),
+                Optional.empty());
     }
 
     public static class MockExchangeClientSupplier

@@ -149,6 +149,10 @@ public final class SystemSessionProperties
     public static final String REUSE_TABLE_SCAN = "reuse_table_scan";
     public static final String SPILL_REUSE_TABLESCAN = "spill_reuse_tablescan";
     public static final String SPILL_THRESHOLD_REUSE_TABLESCAN = "spill_threshold_reuse_tablescan";
+    // CTE Optimization configurations
+    public static final String CTE_REUSE_ENABLED = "cte_reuse_enabled";
+    public static final String CTE_MAX_QUEUE_SIZE = "cte_max_queue_size";
+    public static final String CTE_MAX_PREFETCH_QUEUE_SIZE = "cte_max_prefetch_queue_size";
     public static final String DELETE_TRANSACTIONAL_TABLE_DIRECT = "delete_transactional_table_direct";
 
     private final List<PropertyMetadata<?>> sessionProperties;
@@ -690,6 +694,21 @@ public final class SystemSessionProperties
                         SPILL_THRESHOLD_REUSE_TABLESCAN,
                         "Spiller Threshold (in MB) for TableScanOperator and WorkProcessorSourceOperatorAdapter for Reuse Exchange",
                         featuresConfig.getSpillOperatorThresholdReuseExchange(),
+                        false),
+                booleanProperty(
+                        CTE_REUSE_ENABLED,
+                        "Enabled CTE reuse",
+                        featuresConfig.isCteReuseEnabled(),
+                        false),
+                integerProperty(
+                        CTE_MAX_QUEUE_SIZE,
+                        "Max queue size to store cte data (for every cte reference)",
+                        featuresConfig.getMaxQueueSize(),
+                        false),
+                integerProperty(
+                        CTE_MAX_PREFETCH_QUEUE_SIZE,
+                        "Max prefetch queue size",
+                        featuresConfig.getMaxPrefetchQueueSize(),
                         false));
     }
 
@@ -1212,5 +1231,20 @@ public final class SystemSessionProperties
     public static int getSpillOperatorThresholdReuseExchange(Session session)
     {
         return session.getSystemProperty(SPILL_THRESHOLD_REUSE_TABLESCAN, Integer.class);
+    }
+
+    public static boolean isCTEReuseEnabled(Session session)
+    {
+        return session.getSystemProperty(CTE_REUSE_ENABLED, Boolean.class);
+    }
+
+    public static int getCteMaxPrefetchQueueSize(Session session)
+    {
+        return session.getSystemProperty(CTE_MAX_PREFETCH_QUEUE_SIZE, Integer.class);
+    }
+
+    public static int getCteMaxQueueSize(Session session)
+    {
+        return session.getSystemProperty(CTE_MAX_QUEUE_SIZE, Integer.class);
     }
 }

@@ -112,6 +112,7 @@ public final class HiveQueryRunner
         else {
             Map<String, String> configProperties = new HashMap<>();
             configProperties.put("auto-vacuum.enabled", "true");
+            configProperties.put("optimizer.cte-reuse-enabled", "true");
             configProperties.put("auto-vacuum.scan.interval", "15s");
             configProperties.put("hetu.split-cache-map.enabled", "true");
 

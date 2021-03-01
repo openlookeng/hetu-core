@@ -23,6 +23,7 @@ import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
 import io.prestosql.spi.plan.JoinNode;
@@ -189,6 +190,17 @@ public class PredicatePushDown
                 rewrittenNode = new FilterNode(idAllocator.getNextId(), rewrittenNode, castToRowExpression(context.get()));
             }
             return rewrittenNode;
+        }
+
+        @Override
+        public PlanNode visitCTEScan(CTEScanNode node, RewriteContext<Expression> context)
+        {
+            if (dynamicFiltering) {
+                return context.defaultRewrite(node, context.get());
+            }
+            else {
+                return visitPlan(node, context);
+            }
         }
 
         @Override

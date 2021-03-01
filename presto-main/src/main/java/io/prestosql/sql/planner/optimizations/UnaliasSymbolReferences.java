@@ -27,6 +27,7 @@ import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.ExceptNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
@@ -639,6 +640,12 @@ public class UnaliasSymbolReferences
             PlanNode source = context.rewrite(node.getSource());
             SymbolMapper mapper = new SymbolMapper(mapping, types);
             return mapper.map(node, source);
+        }
+
+        @Override
+        public PlanNode visitCTEScan(CTEScanNode node, RewriteContext<Void> context)
+        {
+            return node;
         }
 
         @Override

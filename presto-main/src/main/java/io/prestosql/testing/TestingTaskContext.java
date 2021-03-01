@@ -26,6 +26,7 @@ import io.prestosql.spi.QueryId;
 import io.prestosql.spi.memory.MemoryPoolId;
 import io.prestosql.spiller.SpillSpaceTracker;
 
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
@@ -71,7 +72,8 @@ public final class TestingTaskContext
                 session,
                 true,
                 true,
-                OptionalInt.empty());
+                OptionalInt.empty(),
+                Optional.empty());
     }
 
     public static Builder builder(Executor notificationExecutor, ScheduledExecutorService yieldExecutor, Session session)

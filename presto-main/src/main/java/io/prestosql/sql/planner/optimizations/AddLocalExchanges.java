@@ -24,6 +24,7 @@ import io.prestosql.spi.connector.GroupingProperty;
 import io.prestosql.spi.connector.LocalProperty;
 import io.prestosql.spi.connector.SortingProperty;
 import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.LimitNode;
 import io.prestosql.spi.plan.MarkDistinctNode;
@@ -677,6 +678,13 @@ public class AddLocalExchanges
             PlanWithProperties index = new PlanWithProperties(node.getIndexSource(), indexStreamProperties);
 
             return rebaseAndDeriveProperties(node, ImmutableList.of(probe, index));
+        }
+
+        @Override
+        public PlanWithProperties visitCTEScan(CTEScanNode node, StreamPreferredProperties parentPreferences)
+        {
+            PlanWithProperties planWithProperties = visitPlan(node, parentPreferences);
+            return planWithProperties;
         }
 
         //

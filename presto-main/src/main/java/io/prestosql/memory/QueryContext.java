@@ -24,6 +24,7 @@ import io.prestosql.memory.context.MemoryReservationHandler;
 import io.prestosql.memory.context.MemoryTrackingContext;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spiller.SpillSpaceTracker;
 
 import javax.annotation.concurrent.GuardedBy;
@@ -33,6 +34,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
@@ -246,7 +248,7 @@ public class QueryContext
         return memoryPool;
     }
 
-    public TaskContext addTaskContext(TaskStateMachine taskStateMachine, Session session, boolean perOperatorCpuTimerEnabled, boolean cpuTimerEnabled, OptionalInt totalPartitions)
+    public TaskContext addTaskContext(TaskStateMachine taskStateMachine, Session session, boolean perOperatorCpuTimerEnabled, boolean cpuTimerEnabled, OptionalInt totalPartitions, Optional<PlanNodeId> parent)
     {
         TaskContext taskContext = TaskContext.createTaskContext(
                 this,
@@ -258,7 +260,8 @@ public class QueryContext
                 queryMemoryContext.newMemoryTrackingContext(),
                 perOperatorCpuTimerEnabled,
                 cpuTimerEnabled,
-                totalPartitions);
+                totalPartitions,
+                parent.orElse(null));
         taskContexts.put(taskStateMachine.getTaskId(), taskContext);
         return taskContext;
     }
@@ -352,5 +355,15 @@ public class QueryContext
                 .toString();
 
         return format("%s, Top Consumers: %s", additionalInfo, topConsumers);
+    }
+
+    public QueryId getQueryId()
+    {
+        return queryId;
+    }
+
+    public int getTaskCount()
+    {
+        return taskContexts.size();
     }
 }

@@ -36,6 +36,7 @@ import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.AggregationNode.Aggregation;
 import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.ExceptNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
@@ -373,6 +374,8 @@ public class PlanPrinter
                 new PartitioningScheme(Partitioning.create(SINGLE_DISTRIBUTION, ImmutableList.of()), plan.getOutputSymbols()),
                 ungroupedExecution(),
                 StatsAndCosts.empty(),
+                Optional.empty(),
+                Optional.empty(),
                 Optional.empty());
         return GraphvizPrinter.printLogical(ImmutableList.of(fragment));
     }
@@ -1242,6 +1245,13 @@ public class PlanPrinter
                             node.getCorrelation(),
                             node.getFilter().equals(TRUE_LITERAL) ? "" : " " + node.getFilter()));
 
+            return processChildren(node, context);
+        }
+
+        @Override
+        public Void visitCTEScan(CTEScanNode node, Void context)
+        {
+            addNode(node, "CTEScan[CTE = " + node.getCteRefName() + "]");
             return processChildren(node, context);
         }
 

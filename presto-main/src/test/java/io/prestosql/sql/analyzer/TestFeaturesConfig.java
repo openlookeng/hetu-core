@@ -135,7 +135,10 @@ public class TestFeaturesConfig
                 .setRewriteFilteringSemiJoinToInnerJoin(false)
                 .setSpillReuseExchange(false)
                 .setSpillOperatorThresholdReuseExchange(10)
-                .setReuseTableScanEnabled(false));
+                .setReuseTableScanEnabled(false)
+                .setCteReuseEnabled(false)
+                .setMaxQueueSize(1024)
+                .setMaxPrefetchQueueSize(512));
     }
 
     @Test
@@ -225,6 +228,9 @@ public class TestFeaturesConfig
                 .put("optimizer.reuse-table-scan", "true")
                 .put("experimental.spill-reuse-tablescan", "true")
                 .put("experimental.spill-threshold-reuse-tablescan", "100")
+                .put("optimizer.cte-reuse-enabled", "true")
+                .put("cte.cte-max-queue-size", "2048")
+                .put("cte.cte-max-prefetch-queue-size", "1024")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -310,7 +316,10 @@ public class TestFeaturesConfig
                 .setTransformSelfJoinToGroupby(false)
                 .setReuseTableScanEnabled(true)
                 .setSpillReuseExchange(true)
-                .setSpillOperatorThresholdReuseExchange(100);
+                .setSpillOperatorThresholdReuseExchange(100)
+                .setCteReuseEnabled(true)
+                .setMaxQueueSize(2048)
+                .setMaxPrefetchQueueSize(1024);
         assertFullMapping(properties, expected);
     }
 

@@ -30,6 +30,7 @@ import io.prestosql.spi.connector.GroupingProperty;
 import io.prestosql.spi.connector.LocalProperty;
 import io.prestosql.spi.connector.SortingProperty;
 import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
 import io.prestosql.spi.plan.JoinNode;
@@ -796,6 +797,15 @@ public class PropertyDerivations
         public ActualProperties visitCreateIndex(CreateIndexNode node, List<ActualProperties> inputProperties)
         {
             return Iterables.getOnlyElement(inputProperties);
+        }
+
+        @Override
+        public ActualProperties visitCTEScan(CTEScanNode node, List<ActualProperties> inputProperties)
+        {
+            ActualProperties properties = Iterables.getOnlyElement(inputProperties);
+            return ActualProperties.builderFrom(properties)
+                    .local(LocalProperties.grouped(node.getOutputSymbols()))
+                    .build();
         }
 
         private Global deriveGlobalProperties(TableProperties layout, Map<ColumnHandle, Symbol> assignments, Map<ColumnHandle, NullableValue> constants)

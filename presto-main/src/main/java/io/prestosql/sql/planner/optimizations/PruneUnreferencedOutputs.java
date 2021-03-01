@@ -26,6 +26,7 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.AggregationNode.Aggregation;
 import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.ExceptNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
@@ -943,6 +944,14 @@ public class PruneUnreferencedOutputs
             }
 
             return new LateralJoinNode(node.getId(), input, subquery, newCorrelation, node.getType(), node.getFilter(), node.getOriginSubquery());
+        }
+
+        @Override
+        public PlanNode visitCTEScan(CTEScanNode node, SimplePlanRewriter.RewriteContext<Set<Symbol>> context)
+        {
+            PlanNode source = context.rewrite(node.getSource(), ImmutableSet.copyOf(node.getOutputSymbols()));
+            node.replaceChildren(ImmutableList.of(source));
+            return node;
         }
     }
 }

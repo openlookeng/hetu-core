@@ -76,6 +76,7 @@ import javax.ws.rs.core.UriInfo;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -213,7 +214,7 @@ public class TestHttpRemoteTask
                 OptionalInt.empty(),
                 createInitialEmptyOutputBuffers(OutputBuffers.BufferType.BROADCAST),
                 new NodeTaskMap.PartitionedSplitCountTracker(i -> {}),
-                true);
+                true, Optional.empty());
     }
 
     private static HttpRemoteTaskFactory createHttpRemoteTaskFactory(TestingTaskResource testingTaskResource)

@@ -13,6 +13,7 @@
  */
 package io.prestosql.sql.planner.plan;
 
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.PlanVisitor;
 
 public abstract class InternalPlanVisitor<R, C>
@@ -149,6 +150,11 @@ public abstract class InternalPlanVisitor<R, C>
     }
 
     public R visitLateralJoin(LateralJoinNode node, C context)
+    {
+        return visitPlan(node, context);
+    }
+
+    public R visitCTEScan(CTEScanNode node, C context)
     {
         return visitPlan(node, context);
     }
