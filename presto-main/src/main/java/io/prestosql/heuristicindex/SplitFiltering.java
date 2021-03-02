@@ -23,7 +23,6 @@ import io.prestosql.metadata.Split;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexCacheKey;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexFilter;
@@ -121,7 +120,7 @@ public class SplitFiltering
 
         for (IndexRecord record : indexToPreload) {
             LOG.info("Preloading index for split filtering: " + record);
-            Index.Level indexLevel = Index.Level.valueOf(record.getProperty(CreateIndexMetadata.LEVEL_PROP_KEY).toUpperCase(Locale.ROOT));
+            CreateIndexMetadata.Level indexLevel = CreateIndexMetadata.Level.valueOf(record.getProperty(CreateIndexMetadata.LEVEL_PROP_KEY).toUpperCase(Locale.ROOT));
             indexCache.preloadIndex(record.qualifiedTable, String.join(",", record.columns), record.indexType, indexLevel);
         }
     }

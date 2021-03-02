@@ -46,12 +46,12 @@ public class TestHindex
         if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
             if (dataType.toLowerCase(Locale.ROOT).equals("boolean")) {
                 assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                                indexType + " ON " + tableName + " (data_col2) WITH (level='table')",
+                                indexType + " ON " + tableName + " (data_col2)",
                         "Index creation on boolean column is not supported");
             }
             else {
                 assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                        indexType + " ON " + tableName + " (data_col2) WITH (level='table')");
+                        indexType + " ON " + tableName + " (data_col2)");
             }
         }
         else {
@@ -106,14 +106,8 @@ public class TestHindex
         int splitsBeforeIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
 
         // Create index to use for testing splits
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                    indexType + " ON " + tableName + " (" + queryVariable + ") WITH (level='table')");
-        }
-        else {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                    indexType + " ON " + tableName + " (" + queryVariable + ")");
-        }
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
+                indexType + " ON " + tableName + " (" + queryVariable + ")");
 
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(7, 'new1'), (8, 'new2')");
 
@@ -171,14 +165,8 @@ public class TestHindex
         int splitsBeforeIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
 
         // Create index to use for testing splits
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                    indexType + " ON " + tableName + " (" + queryVariable + ") WITH (level='table')");
-        }
-        else {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                    indexType + " ON " + tableName + " (" + queryVariable + ")");
-        }
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
+                indexType + " ON " + tableName + " (" + queryVariable + ")");
 
         Pair<Integer, MaterializedResult> resultPairLoadingIndex = getSplitAndMaterializedResult(testerQuery);
         int splitsLoadingIndex = resultPairLoadingIndex.getFirst();
@@ -247,14 +235,8 @@ public class TestHindex
         MaterializedResult resultBeforeIndex = resultPairBeforeIndex.getSecond();
 
         // Create index to use for testing splits
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                    indexType + " ON " + tableName + " (" + queryVariable + ") WITH (level='table')");
-        }
-        else {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                    indexType + " ON " + tableName + " (" + queryVariable + ")");
-        }
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
+                indexType + " ON " + tableName + " (" + queryVariable + ")");
 
         int splitsLoadingIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
 
@@ -304,7 +286,7 @@ public class TestHindex
 
         // Create indices
         String indexName1 = getNewIndexName();
-        assertQuerySucceeds("CREATE INDEX " + indexName1 + " USING btree ON " + tableName + " (id) WITH (level='table')");
+        assertQuerySucceeds("CREATE INDEX " + indexName1 + " USING btree ON " + tableName + " (id)");
         String indexName2 = getNewIndexName();
         assertQuerySucceeds("CREATE INDEX " + indexName2 + " USING bitmap ON " + tableName + " (id)");
         String indexName3 = getNewIndexName();
@@ -351,14 +333,8 @@ public class TestHindex
         MaterializedResult resultBeforeIndex = resultPairBeforeIndex.getSecond();
 
         // Create index
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                    indexType + " ON " + tableName + " (id) WITH (level='table')");
-        }
-        else {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                    indexType + " ON " + tableName + " (id)");
-        }
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
+                indexType + " ON " + tableName + " (id)");
 
         // Drop index before changes
         assertQuerySucceeds("DROP INDEX " + indexName);
@@ -390,14 +366,8 @@ public class TestHindex
         createTable1(tableName);
 
         // Create index
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQuerySucceeds("CREATE INDEX IF NOT EXISTS " + indexName + " USING " +
-                    indexType + " ON " + tableName + " (id) WITH (level='table')");
-        }
-        else {
-            assertQuerySucceeds("CREATE INDEX IF NOT EXISTS " + indexName + " USING " +
-                    indexType + " ON " + tableName + " (id)");
-        }
+        assertQuerySucceeds("CREATE INDEX IF NOT EXISTS " + indexName + " USING " +
+                indexType + " ON " + tableName + " (id)");
 
         // Validate if created
         String testerQuery = "SHOW INDEX";
@@ -469,13 +439,8 @@ public class TestHindex
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(3, 'data'), (9, 'ttt'), (5, 'num')");
 
         String indexName = getNewIndexName();
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " + indexType +
-                    " ON " + tableName + " (P1) WITH (level='table')");
-        }
-        else {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " + indexType + " ON " + tableName + " (P1)");
-        }
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " + indexType +
+                " ON " + tableName + " (P1)");
     }
 
     @Test(dataProvider = "queryOperatorTest")
@@ -487,14 +452,8 @@ public class TestHindex
         testerQuery = "SELECT * FROM " + tableName + " WHERE " + testerQuery;
         String indexName = getNewIndexName();
 
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                    indexType + " ON " + tableName + " (id) WITH (level='table')");
-        }
-        else {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                    indexType + " ON " + tableName + " (id)");
-        }
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
+                indexType + " ON " + tableName + " (id)");
 
         MaterializedResult resultLoadingIndex = computeActual(testerQuery);
 

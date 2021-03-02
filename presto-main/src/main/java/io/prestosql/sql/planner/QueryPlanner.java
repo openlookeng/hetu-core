@@ -26,7 +26,6 @@ import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.CreateIndexMetadata;
-import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.AggregationNode;
@@ -114,7 +113,6 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Streams.stream;
 import static io.prestosql.SystemSessionProperties.isSkipRedundantSort;
 import static io.prestosql.spi.connector.CreateIndexMetadata.INDEX_SUPPORTED_TYPES;
-import static io.prestosql.spi.connector.CreateIndexMetadata.LEVEL_DEFAULT;
 import static io.prestosql.spi.connector.CreateIndexMetadata.LEVEL_PROP_KEY;
 import static io.prestosql.spi.plan.AggregationNode.groupingSets;
 import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
@@ -643,14 +641,15 @@ class QueryPlanner
         }
 
         Properties indexProperties = new Properties();
-        Index.Level indexCreationLevel = LEVEL_DEFAULT;
-        indexProperties.setProperty(LEVEL_PROP_KEY, String.valueOf(LEVEL_DEFAULT));
+        CreateIndexMetadata.Level indexCreationLevel = CreateIndexMetadata.Level.UNDEFINED;
+        indexProperties.setProperty(LEVEL_PROP_KEY, indexCreationLevel.toString());
 
         for (Property property : createIndex.getProperties()) {
             String key = extractPropertyValue(property.getName());
             String val = extractPropertyValue(property.getValue()).toUpperCase(Locale.ENGLISH);
             if (key.equals(LEVEL_PROP_KEY)) {
-                indexCreationLevel = Index.Level.valueOf(val);
+                indexCreationLevel = CreateIndexMetadata.Level.valueOf(val);
+                continue;
             }
             indexProperties.setProperty(key, val);
         }

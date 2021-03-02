@@ -185,6 +185,12 @@ public class CreateIndexOperator
             return;
         }
 
+        if (createIndexMetadata.getCreateLevel() == CreateIndexMetadata.Level.UNDEFINED) {
+            boolean tableIsPartitioned = getPartitionName(page.getPageMetadata().getProperty(HetuConstant.DATASOURCE_FILE_PATH),
+                    createIndexMetadata.getTableName()) != null;
+            createIndexMetadata.decideIndexLevel(tableIsPartitioned);
+        }
+
         Map<String, List<Object>> values = new HashMap<>();
 
         for (int blockId = 0; blockId < page.getChannelCount(); blockId++) {
@@ -213,6 +219,9 @@ public class CreateIndexOperator
                 case PARTITION: {
                     String partition = getPartitionName(page.getPageMetadata().getProperty(HetuConstant.DATASOURCE_FILE_PATH),
                             createIndexMetadata.getTableName());
+                    if (partition == null) {
+                        throw new IllegalStateException("Partition level is not supported for non partitioned table.");
+                    }
                     levelWriter.putIfAbsent(partition, heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata));
                     persistBy.putIfAbsent(levelWriter.get(partition), this);
                     levelWriter.get(partition).addData(values, connectorMetadata);
@@ -316,6 +325,15 @@ public class CreateIndexOperator
         return obj;
     }
 
+    /**
+     * This is a hacky way to tell if the table is partitioned and get the partition of table
+     * <p>
+     * Should be replaced if a better solution is available
+     *
+     * @param uri page data path uri
+     * @param tableName table name
+     * @return partition name if table is partitioned. {@code null} if no partition is found in the path.
+     */
     private static String getPartitionName(String uri, String tableName)
     {
         Path path = Paths.get(uri);
@@ -328,6 +346,6 @@ public class CreateIndexOperator
             }
         }
 
-        throw new IllegalStateException("Partition level is not supported for non partitioned table.");
+        return null;
     }
 }

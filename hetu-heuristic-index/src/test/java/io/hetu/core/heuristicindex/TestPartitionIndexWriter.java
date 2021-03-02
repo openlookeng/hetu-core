@@ -17,7 +17,6 @@ package io.hetu.core.heuristicindex;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
-import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.type.Type;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
@@ -56,7 +55,7 @@ public class TestPartitionIndexWriter
                 partitions,
                 properties,
                 "testuser",
-                Index.Level.PARTITION);
+                CreateIndexMetadata.Level.PARTITION);
         HetuFileSystemClient fileSystemClient = Mockito.mock(HetuFileSystemClient.class);
         Properties connectorMetadata = new Properties();
         connectorMetadata.setProperty(HetuConstant.DATASOURCE_FILE_MODIFICATION, String.valueOf(System.currentTimeMillis()));
@@ -90,7 +89,7 @@ public class TestPartitionIndexWriter
                 partitions,
                 properties,
                 "testuser",
-                Index.Level.PARTITION);
+                CreateIndexMetadata.Level.PARTITION);
         HetuFileSystemClient fileSystemClient = Mockito.mock(HetuFileSystemClient.class);
         Properties connectorMetadata1 = new Properties();
         connectorMetadata1.setProperty(HetuConstant.DATASOURCE_FILE_MODIFICATION, String.valueOf(System.currentTimeMillis()));

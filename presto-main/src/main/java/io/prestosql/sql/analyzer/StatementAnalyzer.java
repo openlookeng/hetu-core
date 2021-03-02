@@ -190,6 +190,7 @@ import static io.prestosql.spi.StandardErrorCode.INVALID_COLUMN_MASK;
 import static io.prestosql.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static io.prestosql.spi.StandardErrorCode.INVALID_ROW_FILTER;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
+import static io.prestosql.spi.connector.CreateIndexMetadata.Level.UNDEFINED;
 import static io.prestosql.spi.connector.StandardWarningCode.REDUNDANT_ORDER_BY;
 import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static io.prestosql.spi.function.FunctionKind.WINDOW;
@@ -1106,7 +1107,7 @@ class StatementAnalyzer
                             partitions,
                             properties,
                             session.getUser(),
-                            null);
+                            UNDEFINED);
 
                     synchronized (StatementAnalyzer.class) {
                         IndexClient.RecordStatus recordStatus = heuristicIndexerManager.getIndexClient().lookUpIndexRecord(placeHolder);

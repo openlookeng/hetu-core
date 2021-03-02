@@ -33,7 +33,7 @@ public class TestHindexBTreeIndex
 
         String indexName = getNewIndexName();
         assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
-                " (key2) WITH (level=partition) WHERE key2 = 11");
+                " (key2) WHERE key2 = 11");
         assertQuerySucceeds("DROP INDEX " + indexName);
     }
 
@@ -57,7 +57,7 @@ public class TestHindexBTreeIndex
 
         String indexName = getNewIndexName();
         assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
-                " (key1) WITH (level=partition) WHERE key2 = 11");
+                " (key1) WHERE key2 = 11");
         assertQuerySucceeds("DROP INDEX " + indexName + " WHERE key2 = 11");
     }
 
@@ -69,7 +69,7 @@ public class TestHindexBTreeIndex
 
         String indexName = getNewIndexName();
         assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
-                " (key1) WITH (level=partition) WHERE key2 = 11");
+                " (key1) WHERE key2 = 11");
         try {
             assertQuerySucceeds("DROP INDEX " + indexName + " WHERE key2 = 10");
         }
@@ -87,7 +87,7 @@ public class TestHindexBTreeIndex
 
         String indexName = getNewIndexName();
         assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
-                " (key2) WITH (level=partition) WHERE key2 = 11");
+                " (key2) WHERE key2 = 11");
 
         String testerQuery = "SELECT * FROM " + tableName + " WHERE key2 = 11";
 
@@ -114,7 +114,7 @@ public class TestHindexBTreeIndex
 
         String indexName = getNewIndexName();
         assertQueryFails("CREATE INDEX " + indexName + " USING btree ON " + tableName +
-                        " (key2) WITH (level=partition) WHERE key1 = 1",
+                        " (key2) WHERE key1 = 1",
                 "line 1:18: Heuristic index creation is only supported for predicates on partition columns");
     }
 
@@ -127,7 +127,7 @@ public class TestHindexBTreeIndex
 
         String indexName = getNewIndexName();
         assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
-                " (key2) WITH (level=partition) WHERE key2 = 12");
+                " (key2) WHERE key2 = 12");
 
         String testerQuery = "SELECT * FROM " + tableName + " WHERE key2 = 12";
 
@@ -156,7 +156,7 @@ public class TestHindexBTreeIndex
 
         String indexName = getNewIndexName();
         assertQueryFails("CREATE INDEX " + indexName + " USING btree ON " + tableName +
-                        " (key2) WITH (level=partition) WHERE key1 = 1",
+                        " (key2) WHERE key1 = 1",
                 "line 1:18: Heuristic index creation is only supported for predicates on partition columns");
     }
 
@@ -170,7 +170,7 @@ public class TestHindexBTreeIndex
         String indexName = getNewIndexName();
         try {
             assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
-                    " (key2) WITH (level=partition) WHERE " + condition);
+                    " (key2) WHERE " + condition);
         }
         catch (AssertionError e) {
             assertNotEquals(condition, "key2 = 11");
@@ -188,7 +188,7 @@ public class TestHindexBTreeIndex
 
         String indexName1 = getNewIndexName();
         assertQuerySucceeds("CREATE INDEX " + indexName1 + " USING btree ON " + tableName +
-                " (key1) WITH (level=partition) WHERE key3 = 222");
+                " (key1) WHERE key3 = 222");
 
         String testerQuery1 = "SELECT * FROM " + tableName + " WHERE key1 = 2";
 
@@ -210,7 +210,7 @@ public class TestHindexBTreeIndex
 
         String indexName2 = getNewIndexName();
         assertQuerySucceeds("CREATE INDEX " + indexName2 + " USING btree ON " + tableName +
-                " (key2) WITH (level=partition) WHERE key5 = 22222");
+                " (key2) WHERE key5 = 22222");
 
         String testerQuery2 = "SELECT * FROM " + tableName + " WHERE key2 = 22";
 

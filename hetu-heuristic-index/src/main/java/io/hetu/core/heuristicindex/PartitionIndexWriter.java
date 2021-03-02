@@ -86,7 +86,7 @@ public class PartitionIndexWriter
         Path path = Paths.get(connectorMetadata.getProperty(HetuConstant.DATASOURCE_FILE_PATH));
 
         if (Strings.isNullOrEmpty(partition)) {
-            if (createIndexMetadata.getCreateLevel() == Index.Level.PARTITION) {
+            if (createIndexMetadata.getCreateLevel() == CreateIndexMetadata.Level.PARTITION) {
                 partition = path.getName(path.getNameCount() - 2).toString();
             }
         }
