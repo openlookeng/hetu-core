@@ -489,13 +489,6 @@ class QueryPlanner
         ProjectNode projectNode = new ProjectNode(idAllocator.getNextId(), builder.getRoot(), assignments.build());
         builder = new PlanBuilder(translations, projectNode, analysis.getParameters());
 
-//        //Sort scan results by ROW__ID column
-//        SortOrder sortOrder = SortOrder.ASC_NULLS_LAST;
-//        Symbol sortSymbol = orderBySymbol;
-//        Map<Symbol, SortOrder> sortOrderMap = ImmutableMap.<Symbol, SortOrder>builder().put(sortSymbol, sortOrder).build();
-//        OrderingScheme orderingScheme = new OrderingScheme(ImmutableList.of(sortSymbol), sortOrderMap);
-//        builder = sort(planBuilder, Optional.of(orderingScheme));
-
         ImmutableList.Builder<Field> projectFields = ImmutableList.builder();
         projectFields.addAll(fields.build().stream().filter(x -> (!x.isHidden() || x == rowIdField)).collect(toImmutableList()));
         scope = Scope.builder().withRelationType(RelationId.anonymous(), new RelationType(projectFields.build())).build();

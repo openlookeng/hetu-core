@@ -6,7 +6,7 @@ Synopsis
 --------
 
 ``` sql
-VACUUM TABLE table_name [FULL] [PARTITION partition_value]? [AND WAIT]?
+VACUUM TABLE table_name [FULL [UNIFY]] [PARTITION partition_value]? [AND WAIT]?
 ```
 
 Description
@@ -30,6 +30,10 @@ delete\_delta directory. The base file will not be changed. The old, smaller del
 **FULL**
 
 FULL vacuum can be treated as the next level of merging of all data sets of table. These will be less frequent and takes longer time to complete compare to default vacuum.
+
+**FULL UNIFY**
+
+UNIFY option shall help to combine multiple bucket file of each partition into single bucket file with bucket number as zero. 
 
 *Hive:*
 
@@ -62,6 +66,14 @@ Example 3: FULL vacuum and wait for completion:
 ```sql
 VACUUM TABLE compact_test_table_with_partition FULL AND WAIT;
 ```
+
+Example 4: Unify all small files within 1 partition:
+
+```sql
+VACUUM TABLE catalog_sales FULL UNIFY PARTITION 'partition_key';
+```
+
+
 
 See Also
 --------
