@@ -18,10 +18,10 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ListMultimap;
 import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.SymbolsExtractor;
-import io.prestosql.sql.tree.Expression;
 
 import java.util.HashMap;
 import java.util.List;
@@ -36,7 +36,7 @@ public class DynamicFilterContext
 {
     private final List<DynamicFilters.Descriptor> descriptors;
     private ListMultimap<String, String> filterIds = ArrayListMultimap.create();
-    private Map<String, Optional<Expression>> filters = new HashMap<>();
+    private Map<String, Optional<RowExpression>> filters = new HashMap<>();
 
     public DynamicFilterContext(List<DynamicFilters.Descriptor> descriptors, Map<Integer, Symbol> layOut)
     {
@@ -56,7 +56,7 @@ public class DynamicFilterContext
         return filterIds.get(column.getName());
     }
 
-    public Optional<Expression> getFilter(String id)
+    public Optional<RowExpression> getFilter(String id)
     {
         return filters.getOrDefault(id, Optional.empty());
     }
@@ -74,7 +74,6 @@ public class DynamicFilterContext
     private void initFilterIds(Map<Integer, Symbol> layOut)
     {
         for (DynamicFilters.Descriptor dynamicFilter : descriptors) {
-            // if (dynamicFilter.getInput() instanceof SymbolReference) {  /// TODO(Nitin): conflict check!!
             if (dynamicFilter.getInput() instanceof VariableReferenceExpression) {
                 String colName = ((VariableReferenceExpression) dynamicFilter.getInput()).getName();
                 filterIds.put(colName, dynamicFilter.getId());

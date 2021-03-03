@@ -31,6 +31,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -310,7 +311,7 @@ public class RowExpressionUtils
                     List<RowExpression> arguments = new ArrayList<>();
                     arguments.add(call.getArguments().get(1));
                     arguments.add(call.getArguments().get(0));
-                    return new CallExpression(signature, call.getType(), arguments);
+                    return new CallExpression(signature, call.getType(), arguments, Optional.empty());
                 }
             }
         }
@@ -325,7 +326,7 @@ public class RowExpressionUtils
         List<RowExpression> arguments = new ArrayList<>(2);
         arguments.add(varRef);
         arguments.add(constantExpression);
-        return new CallExpression(sig, BOOLEAN, arguments);
+        return new CallExpression(sig, BOOLEAN, arguments, Optional.empty());
     }
 
     /**

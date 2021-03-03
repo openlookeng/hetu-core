@@ -29,12 +29,12 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.VarcharType;
 import io.prestosql.sql.planner.FunctionCallBuilder;
-import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.SymbolReference;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -43,6 +43,7 @@ import java.util.function.Predicate;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.slice.Slices.utf8Slice;
+import static io.prestosql.spi.function.Signature.unmangleOperator;
 import static io.prestosql.spi.sql.RowExpressionUtils.extractConjuncts;
 import static io.prestosql.spi.type.StandardTypes.BOOLEAN;
 import static io.prestosql.spi.type.StandardTypes.VARCHAR;
@@ -69,12 +70,12 @@ public final class DynamicFilters
                 .build();
     }
 
-    public static RowExpression createDynamicFilterRowExpression(Metadata metadata, TypeManager typeManager, String id, Type inputType, SymbolReference input)
+    public static RowExpression createDynamicFilterRowExpression(Metadata metadata, TypeManager typeManager, String id, Type inputType, SymbolReference input, Optional<RowExpression> filter)
     {
         ConstantExpression string = new ConstantExpression(utf8Slice(id), VarcharType.VARCHAR);
         VariableReferenceExpression expression = new VariableReferenceExpression(input.getName(), inputType);
         Signature signature = metadata.resolveFunction(QualifiedName.of(Function.NAME), fromTypes(VarcharType.VARCHAR, inputType));
-        return call(signature, typeManager.getType(signature.getReturnType()), string, expression);
+        return call(signature, typeManager.getType(signature.getReturnType()), Arrays.asList(string, expression), filter);
     }
 
     public static ExtractResult extractDynamicFilters(RowExpression expression)
@@ -121,38 +122,69 @@ public final class DynamicFilters
         checkArgument(firstArgument instanceof ConstantExpression, "firstArgument is expected to be an instance of ConstantExpression: %s", firstArgument.getClass().getSimpleName());
         Object firstArgumentValue = ((ConstantExpression) firstArgument).getValue();
         String id = (firstArgumentValue instanceof String) ? (String) (firstArgumentValue) : ((Slice) (firstArgumentValue)).toStringUtf8();
-        return Optional.of(new Descriptor(id, arguments.get(1))); /* Fixme(Nitin): Resolve the filter expression from the dynamic filter */
+        return Optional.of(new Descriptor(id, arguments.get(1), callExpression.getFilter())); /* Fixme(Nitin): Resolve the filter expression from the dynamic filter */
     }
 
-    public static Optional<Predicate<List>> createDynamicFilterPredicate(Optional<Expression> filter)
+    public static Optional<Predicate<List>> createDynamicFilterPredicate(Optional<RowExpression> filter)
     {
         if (filter.isPresent()) {
-            return Optional.of((values) -> {
-                //TODO-VINAY Need to implement filter evaluation with more generic code using generated code.
-                Object probeValue = values.get(0);
-                Object buildValue = values.get(1);
-                if (filter.get() instanceof ComparisonExpression) {
-                    ComparisonExpression comparisonExpression = (ComparisonExpression) filter.get();
-                    Long probeLiteral = (Long) probeValue;
-                    Long buildLiteral = (Long) buildValue;
-                    if (comparisonExpression.getOperator() == ComparisonExpression.Operator.GREATER_THAN_OR_EQUAL) {
-                        return probeLiteral.compareTo(buildLiteral) >= 0;
-                    }
-                    else if (comparisonExpression.getOperator() == ComparisonExpression.Operator.LESS_THAN_OR_EQUAL) {
-                        return probeLiteral.compareTo(buildLiteral) <= 0;
-                    }
-                    else if (comparisonExpression.getOperator() == ComparisonExpression.Operator.LESS_THAN) {
-                        return probeLiteral.compareTo(buildLiteral) < 0;
-                    }
-                    else if (comparisonExpression.getOperator() == ComparisonExpression.Operator.GREATER_THAN) {
-                        return probeLiteral.compareTo(buildLiteral) > 0;
+            if (filter.get() instanceof CallExpression) {
+                CallExpression call = (CallExpression) filter.get();
+                String name = call.getSignature().getName();
+                if (name.contains("$operator$") && unmangleOperator(name).isComparisonOperator()) {
+                    if (call.getArguments().get(1) instanceof VariableReferenceExpression &&
+                            call.getArguments().get(0) instanceof VariableReferenceExpression) {
+                        switch (unmangleOperator(name)) {
+                            case LESS_THAN:
+                                return Optional.of((values) -> {
+                                    Object probeValue = values.get(0);
+                                    Object buildValue = values.get(1);
+                                    if (!(probeValue instanceof Long) || !(buildValue instanceof Long)) {
+                                        return true;
+                                    }
+                                    Long probeLiteral = (Long) probeValue;
+                                    Long buildLiteral = (Long) buildValue;
+                                    return probeLiteral.compareTo(buildLiteral) < 0;
+                                });
+                            case LESS_THAN_OR_EQUAL:
+                                return Optional.of((values) -> {
+                                    Object probeValue = values.get(0);
+                                    Object buildValue = values.get(1);
+                                    if (!(probeValue instanceof Long) || !(buildValue instanceof Long)) {
+                                        return true;
+                                    }
+                                    Long probeLiteral = (Long) probeValue;
+                                    Long buildLiteral = (Long) buildValue;
+                                    return probeLiteral.compareTo(buildLiteral) <= 0;
+                                });
+                            case GREATER_THAN:
+                                return Optional.of((values) -> {
+                                    Object probeValue = values.get(0);
+                                    Object buildValue = values.get(1);
+                                    if (!(probeValue instanceof Long) || !(buildValue instanceof Long)) {
+                                        return true;
+                                    }
+                                    Long probeLiteral = (Long) probeValue;
+                                    Long buildLiteral = (Long) buildValue;
+                                    return probeLiteral.compareTo(buildLiteral) > 0;
+                                });
+                            case GREATER_THAN_OR_EQUAL:
+                                return Optional.of((values) -> {
+                                    Object probeValue = values.get(0);
+                                    Object buildValue = values.get(1);
+                                    if (!(probeValue instanceof Long) || !(buildValue instanceof Long)) {
+                                        return true;
+                                    }
+                                    Long probeLiteral = (Long) probeValue;
+                                    Long buildLiteral = (Long) buildValue;
+                                    return probeLiteral.compareTo(buildLiteral) >= 0;
+                                });
+                            default:
+                                return Optional.empty();
+                        }
                     }
                 }
-                else {
-                    throw new IllegalArgumentException("Unsupported filter type for dynamic filter :" + filter.get());
-                }
-                return true;
-            });
+            }
         }
         return Optional.empty();
     }
@@ -183,14 +215,14 @@ public final class DynamicFilters
     {
         private final String id;
         private final RowExpression input;
-        private final Optional<Expression> filter; // TODO(nitin) conflict check
+        private final Optional<RowExpression> filter;
 
         public Descriptor(String id, RowExpression input)
         {
             this(id, input, Optional.empty());
         }
 
-        public Descriptor(String id, RowExpression input, Optional<Expression> filter)
+        public Descriptor(String id, RowExpression input, Optional<RowExpression> filter)
         {
             this.id = requireNonNull(id, "id is null");
             this.input = requireNonNull(input, "input is null");
@@ -207,7 +239,7 @@ public final class DynamicFilters
             return input;
         }
 
-        public Optional<Expression> getFilter()
+        public Optional<RowExpression> getFilter()
         {
             return filter;
         }

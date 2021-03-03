@@ -22,6 +22,7 @@ import org.testng.annotations.Test;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -57,7 +58,8 @@ public class TestInCodeGenerator
                         INTEGER.getTypeSignature(),
                         DOUBLE.getTypeSignature()),
                 INTEGER,
-                Collections.singletonList(constant(12345678901234.0, DOUBLE))));
+                Collections.singletonList(constant(12345678901234.0, DOUBLE)),
+                Optional.empty()));
         assertEquals(checkSwitchGenerationCase(INTEGER, values), DIRECT_SWITCH);
 
         for (int i = 6; i <= 32; ++i) {
@@ -87,7 +89,8 @@ public class TestInCodeGenerator
                         BIGINT.getTypeSignature(),
                         DOUBLE.getTypeSignature()),
                 BIGINT,
-                Collections.singletonList(constant(12345678901234.0, DOUBLE))));
+                Collections.singletonList(constant(12345678901234.0, DOUBLE)),
+                Optional.empty()));
         assertEquals(checkSwitchGenerationCase(BIGINT, values), HASH_SWITCH);
 
         for (long i = 6; i <= 32; ++i) {

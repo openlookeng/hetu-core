@@ -165,7 +165,7 @@ public class BaseJdbcSqlStatementWriter
     {
         VariableReferenceExpression aggVariable = new VariableReferenceExpression(aggregationExpression, returnType);
         Signature castSignature = Signature.internalOperator(OperatorType.CAST, returnType.getTypeSignature(), returnType.getTypeSignature());
-        return converter.visitCall(new CallExpression(castSignature, returnType, ImmutableList.of(aggVariable)), null);
+        return converter.visitCall(new CallExpression(castSignature, returnType, ImmutableList.of(aggVariable), Optional.empty()), null);
     }
 
     @Override

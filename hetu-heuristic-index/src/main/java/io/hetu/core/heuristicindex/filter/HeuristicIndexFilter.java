@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public class HeuristicIndexFilter
         implements IndexFilter
@@ -60,15 +61,15 @@ public class HeuristicIndexFilter
                     Signature sigRight = Signature.internalOperator(OperatorType.LESS_THAN_OR_EQUAL,
                             specialForm.getType().getTypeSignature(),
                             specialForm.getArguments().get(2).getType().getTypeSignature());
-                    CallExpression left = new CallExpression(sigLeft, specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(1)));
-                    CallExpression right = new CallExpression(sigRight, specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(2)));
+                    CallExpression left = new CallExpression(sigLeft, specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(1)), Optional.empty());
+                    CallExpression right = new CallExpression(sigRight, specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(2)), Optional.empty());
                     return matches(left) && matches(right);
                 case IN:
                     Signature sigEqual = Signature.internalOperator(OperatorType.EQUAL,
                             specialForm.getType().getTypeSignature(),
                             specialForm.getArguments().get(1).getType().getTypeSignature());
                     for (RowExpression exp : specialForm.getArguments().subList(1, specialForm.getArguments().size())) {
-                        if (matches(new CallExpression(sigEqual, specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), exp)))) {
+                        if (matches(new CallExpression(sigEqual, specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), exp), Optional.empty()))) {
                             return true;
                         }
                     }

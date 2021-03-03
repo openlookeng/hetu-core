@@ -38,6 +38,7 @@ import io.prestosql.sql.tree.NodeRef;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -74,7 +75,8 @@ public class TranslateExpressions
                         callExpression.getType(),
                         callExpression.getArguments().stream()
                                 .map(expression -> removeOriginalExpression(expression, session, types, context))
-                                .collect(toImmutableList()));
+                                .collect(toImmutableList()),
+                        Optional.empty());
             }
 
             private Map<NodeRef<Expression>, Type> analyzeCallExpressionTypes(CallExpression callExpression, Session session, TypeProvider typeProvider)

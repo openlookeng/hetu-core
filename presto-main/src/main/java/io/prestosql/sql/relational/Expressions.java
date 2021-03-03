@@ -29,6 +29,7 @@ import io.prestosql.spi.type.Type;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 public final class Expressions
@@ -54,12 +55,17 @@ public final class Expressions
 
     public static CallExpression call(Signature signature, Type returnType, RowExpression... arguments)
     {
-        return new CallExpression(signature, returnType, Arrays.asList(arguments));
+        return new CallExpression(signature, returnType, Arrays.asList(arguments), Optional.empty());
     }
 
     public static CallExpression call(Signature signature, Type returnType, List<RowExpression> arguments)
     {
-        return new CallExpression(signature, returnType, arguments);
+        return new CallExpression(signature, returnType, arguments, Optional.empty());
+    }
+
+    public static CallExpression call(Signature signature, Type returnType, List<RowExpression> arguments, Optional<RowExpression> filter)
+    {
+        return new CallExpression(signature, returnType, arguments, filter);
     }
 
     public static InputReferenceExpression field(int field, Type type)

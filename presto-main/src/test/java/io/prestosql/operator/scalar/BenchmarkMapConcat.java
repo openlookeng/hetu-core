@@ -147,7 +147,8 @@ public class BenchmarkMapConcat
             projectionsBuilder.add(new CallExpression(
                     signature,
                     mapType,
-                    ImmutableList.of(field(0, mapType), field(1, mapType))));
+                    ImmutableList.of(field(0, mapType), field(1, mapType)),
+                    Optional.empty()));
 
             ImmutableList<RowExpression> projections = projectionsBuilder.build();
             pageProcessor = compiler.compilePageProcessor(Optional.empty(), projections).get();

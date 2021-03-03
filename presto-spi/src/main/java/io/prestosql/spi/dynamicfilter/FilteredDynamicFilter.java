@@ -42,11 +42,11 @@ public class FilteredDynamicFilter
             return super.contains(value);
         }
         for (Object dynamicFilterValue : valueSet) {
-            if (!filter.get().test(ImmutableList.of(value, dynamicFilterValue))) {
-                return false;
+            if (filter.get().test(ImmutableList.of(value, dynamicFilterValue))) {
+                return true;
             }
         }
-        return true;
+        return false;
     }
 
     @Override

@@ -320,7 +320,8 @@ public class ExtractSpatialJoins
                 newComparison = new CallExpression(
                         spatialComparison.getSignature(),
                         spatialComparison.getType(),
-                        ImmutableList.of(spatialComparison.getArguments().get(0), mapToExpression(newRadiusSymbol, radius, context)));
+                        ImmutableList.of(spatialComparison.getArguments().get(0), mapToExpression(newRadiusSymbol, radius, context)),
+                        Optional.empty());
             }
             else {
                 return Result.empty();
@@ -338,7 +339,7 @@ public class ExtractSpatialJoins
                 newComparison = new CallExpression(
                         newSignature,
                         spatialComparison.getType(),
-                        ImmutableList.of(spatialComparison.getArguments().get(1), mapToExpression(newRadiusSymbol, radius, context)));
+                        ImmutableList.of(spatialComparison.getArguments().get(1), mapToExpression(newRadiusSymbol, radius, context)), Optional.empty());
             }
             else {
                 return Result.empty();
@@ -447,7 +448,8 @@ public class ExtractSpatialJoins
         CallExpression newSpatialFunction = new CallExpression(
                 spatialFunction.getSignature(),
                 spatialFunction.getType(),
-                ImmutableList.of(newFirstArgument, newSecondArgument));
+                ImmutableList.of(newFirstArgument, newSecondArgument),
+                Optional.empty());
 
         RowExpression newFilter = replaceExpression(filter, ImmutableMap.of(spatialFunction, newSpatialFunction));
 
@@ -609,7 +611,7 @@ public class ExtractSpatialJoins
         ConstantExpression kdbConstant = Expressions.constant(utf8Slice(KdbTreeUtils.toJson(kdbTree)), VARCHAR);
         Signature signature = Signature.internalOperator(OperatorType.CAST, parseTypeSignature(KDB_TREE_TYPENAME), VARCHAR.getTypeSignature());
         ImmutableList.Builder partitioningArgumentsBuilder = ImmutableList.builder()
-                .add(new CallExpression(signature, metadata.getType(parseTypeSignature(KDB_TREE_TYPENAME)), ImmutableList.of(kdbConstant)))
+                .add(new CallExpression(signature, metadata.getType(parseTypeSignature(KDB_TREE_TYPENAME)), ImmutableList.of(kdbConstant), Optional.empty()))
                 .add(geometry);
 
         radius.map(partitioningArgumentsBuilder::add);
@@ -620,7 +622,7 @@ public class ExtractSpatialJoins
                 new ArrayType(INTEGER).getTypeSignature(), partitioningArguments.stream().map(RowExpression::getType)
                 .map(Type::getTypeSignature)
                 .collect(toImmutableList())),
-                new ArrayType(INTEGER), partitioningArguments);
+                new ArrayType(INTEGER), partitioningArguments, Optional.empty());
 
         Symbol partitionsSymbol = context.getSymbolAllocator().newSymbol(partitioningFunction);
         projections.put(partitionsSymbol, partitioningFunction);

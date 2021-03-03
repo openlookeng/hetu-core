@@ -266,7 +266,8 @@ public class DataCenterPlanOptimizer
                     assignments.put(symbol, new CallExpression(
                             Signature.internalOperator(OperatorType.CAST, prestoType.getTypeSignature(), ImmutableList.of(dcType.getTypeSignature())),
                             prestoType,
-                            ImmutableList.of(new VariableReferenceExpression(scanSymbol.getName(), dcType))));
+                            ImmutableList.of(new VariableReferenceExpression(scanSymbol.getName(), dcType)),
+                            Optional.empty()));
                 }
             }
 

@@ -114,7 +114,7 @@ public class BenchmarkArraySort
                 Type elementType = TYPES.get(i);
                 ArrayType arrayType = new ArrayType(elementType);
                 Signature signature = new Signature(name, FunctionKind.SCALAR, arrayType.getTypeSignature(), arrayType.getTypeSignature());
-                projectionsBuilder.add(new CallExpression(signature, arrayType, ImmutableList.of(field(i, arrayType))));
+                projectionsBuilder.add(new CallExpression(signature, arrayType, ImmutableList.of(field(i, arrayType)), Optional.empty()));
                 blocks[i] = createChannel(POSITIONS, ARRAY_SIZE, arrayType);
             }
 

@@ -153,7 +153,7 @@ public final class SortExpressionExtractor
                         specialForm.getArguments().get(0).getType().getTypeSignature(),
                         specialForm.getArguments().get(1).getType().getTypeSignature());
                 Optional<SortExpressionContext> left = visitCall(new CallExpression(signatureLeft,
-                        BOOLEAN, ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(1))), context);
+                        BOOLEAN, ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(1)), Optional.empty()), context);
                 if (left.isPresent()) {
                     return left;
                 }
@@ -162,7 +162,7 @@ public final class SortExpressionExtractor
                         specialForm.getArguments().get(0).getType().getTypeSignature(),
                         specialForm.getArguments().get(2).getType().getTypeSignature());
                 Optional<SortExpressionContext> right = visitCall(new CallExpression(signatureRight,
-                        BOOLEAN, ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(2))), context);
+                        BOOLEAN, ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(2)), Optional.empty()), context);
                 return right;
             }
             return Optional.empty();

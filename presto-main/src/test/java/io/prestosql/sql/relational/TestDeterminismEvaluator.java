@@ -20,6 +20,8 @@ import io.prestosql.spi.relation.InputReferenceExpression;
 import io.prestosql.spi.type.StandardTypes;
 import org.testng.annotations.Test;
 
+import java.util.Optional;
+
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.function.OperatorType.LESS_THAN;
@@ -47,16 +49,17 @@ public class TestDeterminismEvaluator
                         parseTypeSignature(StandardTypes.BIGINT),
                         parseTypeSignature(StandardTypes.BIGINT)),
                 BIGINT,
-                singletonList(constant(10L, BIGINT)));
+                singletonList(constant(10L, BIGINT)),
+                Optional.empty());
         assertFalse(determinismEvaluator.isDeterministic(random));
 
         InputReferenceExpression col0 = field(0, BIGINT);
         Signature lessThan = internalOperator(LESS_THAN, BOOLEAN, ImmutableList.of(BIGINT, BIGINT));
 
-        CallExpression lessThanExpression = new CallExpression(lessThan, BOOLEAN, ImmutableList.of(col0, constant(10L, BIGINT)));
+        CallExpression lessThanExpression = new CallExpression(lessThan, BOOLEAN, ImmutableList.of(col0, constant(10L, BIGINT)), Optional.empty());
         assertTrue(determinismEvaluator.isDeterministic(lessThanExpression));
 
-        CallExpression lessThanRandomExpression = new CallExpression(lessThan, BOOLEAN, ImmutableList.of(col0, random));
+        CallExpression lessThanRandomExpression = new CallExpression(lessThan, BOOLEAN, ImmutableList.of(col0, random), Optional.empty());
         assertFalse(determinismEvaluator.isDeterministic(lessThanRandomExpression));
     }
 }

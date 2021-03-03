@@ -27,10 +27,10 @@ import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilterFactory;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.rewrite.DynamicFilterContext;
-import io.prestosql.sql.tree.Expression;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.util.HashMap;
@@ -161,7 +161,7 @@ public class LocalDynamicFiltersCollector
 
                 // Local dynamic filters
                 if (predicates.containsKey(filterId)) {
-                    Optional<Expression> filter = context.getFilter(filterId);
+                    Optional<RowExpression> filter = context.getFilter(filterId);
                     Optional<Predicate<List>> filterPredicate = DynamicFilters.createDynamicFilterPredicate(filter);
                     DynamicFilter dynamicFilter = DynamicFilterFactory.create(filterId, columnHandle, predicates.get(filterId), LOCAL, filterPredicate);
                     cachedDynamicFilters.put(filterId, dynamicFilter);
