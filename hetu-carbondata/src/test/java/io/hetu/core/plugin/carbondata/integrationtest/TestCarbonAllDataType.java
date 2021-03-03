@@ -918,33 +918,33 @@ public class TestCarbonAllDataType
     @Test
     public void testVacuumRollback() throws SQLException
     {
-        hetuServer.execute("CREATE TABLE testdb.myECTable (a int, b int)");
-        hetuServer.execute("INSERT INTO testdb.myECTable VALUES (1, 2)");
-        hetuServer.execute("INSERT INTO testdb.myECTable VALUES (2, 4)");
-        hetuServer.execute("INSERT INTO testdb.myECTable VALUES (3, 6)");
-        hetuServer.execute("INSERT INTO testdb.myECTable VALUES (4, 8)");
+        hetuServer.execute("CREATE TABLE testdb.myectable (a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.myectable VALUES (1, 2)");
+        hetuServer.execute("INSERT INTO testdb.myectable VALUES (2, 4)");
+        hetuServer.execute("INSERT INTO testdb.myectable VALUES (3, 6)");
+        hetuServer.execute("INSERT INTO testdb.myectable VALUES (4, 8)");
 
         try {
             CarbonUtil.deleteFoldersAndFiles(FileFactory.getCarbonFile(storePath +
-                    "/carbon.store/testdb/myECTable"));
+                    "/carbon.store/testdb/myectable"));
             try {
-                hetuServer.execute("VACUUM TABLE testdb.myECTable");
+                hetuServer.execute("VACUUM TABLE testdb.myectable");
             }
             catch (Exception e) {
                 Boolean ret = e.getMessage().contains("Failed while reading metadata of the table");
                 assertEquals("true", ret.toString());
                 CarbonUtil.deleteFoldersAndFiles(FileFactory.getCarbonFile(storePath +
-                        "/carbon.store/testdb/myECTable"));
+                        "/carbon.store/testdb/myectable"));
                 return;
             }
 
         }
         catch (IOException | InterruptedException e) {
-            hetuServer.execute("DROP TABLE if exists testdb.myECTable");
+            hetuServer.execute("DROP TABLE if exists testdb.myectable");
             e.printStackTrace();
         }
 
-        hetuServer.execute("DROP TABLE if exists testdb.myECTable");
+        hetuServer.execute("DROP TABLE if exists testdb.myectable");
     }
 
     @Test

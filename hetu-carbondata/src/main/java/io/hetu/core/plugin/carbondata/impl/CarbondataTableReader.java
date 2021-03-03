@@ -180,7 +180,7 @@ public class CarbondataTableReader
                 return cache;
             }
             // multiple tasks can be launched in a worker concurrently. Hence need to synchronize this.
-            synchronized (this) {
+            synchronized (CarbondataTableReader.class) {
                 // cache might be filled by another thread, so if filled use that cache.
                 CarbondataTableCacheModel cacheModel = getValidCacheBySchemaTableName(table);
                 if (cacheModel != null) {
