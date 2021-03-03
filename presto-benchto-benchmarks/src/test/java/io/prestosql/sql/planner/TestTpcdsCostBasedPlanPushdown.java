@@ -118,7 +118,7 @@ public class TestTpcdsCostBasedPlanPushdown
             queryRunner.execute("create  table web_sales with (format='orc') as select * from tpcds.tiny.web_sales");
             queryRunner.execute("create  table web_site with (format='orc') as select * from tpcds.tiny.web_site");
             return queryRunner;
-        }, true);
+        }, true, false);
     }
 
     @Override

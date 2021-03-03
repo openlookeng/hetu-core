@@ -99,6 +99,7 @@ import static io.prestosql.spi.sql.RowExpressionUtils.extractConjuncts;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.sql.DynamicFilters.createDynamicFilterRowExpression;
+import static io.prestosql.sql.DynamicFilters.extractDynamicFilters;
 import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.VariableReferenceSymbolConverter.toSymbol;
 import static io.prestosql.sql.planner.VariableReferenceSymbolConverter.toVariableReference;
@@ -193,7 +194,8 @@ public class RowExpressionPredicatePushDown
         @Override
         public PlanNode visitCTEScan(CTEScanNode node, RewriteContext<RowExpression> context)
         {
-            if (dynamicFiltering) {
+            if (dynamicFiltering && extractDynamicFilters(context.get()).getStaticConjuncts().size() == 0) {
+                //Currently we pushdown only if dynamic filter expression there.
                 return context.defaultRewrite(node, context.get());
             }
             else {

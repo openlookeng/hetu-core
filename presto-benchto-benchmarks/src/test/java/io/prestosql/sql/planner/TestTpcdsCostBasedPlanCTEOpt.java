@@ -24,6 +24,7 @@ import io.prestosql.testing.LocalQueryRunner;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static io.prestosql.SystemSessionProperties.CTE_REUSE_ENABLED;
 import static io.prestosql.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
 import static io.prestosql.SystemSessionProperties.JOIN_REORDERING_STRATEGY;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
@@ -33,7 +34,7 @@ import static java.lang.String.format;
  * This class tests cost-based optimization rules related to joins. It contains unmodified TPCDS queries.
  * This class is using TPCDS connector configured in way to mock Hive connector with unpartitioned TPCDS tables.
  */
-public class TestTpcdsCostBasedPlan
+public class TestTpcdsCostBasedPlanCTEOpt
         extends AbstractCostBasedPlanTest
 {
     /*
@@ -43,7 +44,7 @@ public class TestTpcdsCostBasedPlan
      * large amount of data.
      */
 
-    public TestTpcdsCostBasedPlan()
+    public TestTpcdsCostBasedPlanCTEOpt()
     {
         super(() -> {
             String catalog = "local";
@@ -52,7 +53,8 @@ public class TestTpcdsCostBasedPlan
                     .setSchema("sf3000.0")
                     .setSystemProperty("task_concurrency", "1") // these tests don't handle exchanges from local parallel
                     .setSystemProperty(JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.AUTOMATIC.name())
-                    .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name());
+                    .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name())
+                    .setSystemProperty(CTE_REUSE_ENABLED, "true");
 
             LocalQueryRunner queryRunner = LocalQueryRunner.queryRunnerWithFakeNodeCountForStats(sessionBuilder.build(), 8);
             queryRunner.createCatalog(
@@ -60,13 +62,13 @@ public class TestTpcdsCostBasedPlan
                     new TpcdsConnectorFactory(1),
                     ImmutableMap.of());
             return queryRunner;
-        }, false, false);
+        }, false, true);
     }
 
     @Override
     protected Stream<String> getQueryResourcePaths()
     {
-        return IntStream.range(22, 23)
+        return IntStream.of(1, 2, 4, 11, 14, 23, 24, 30, 31, 39, 47, 57, 59, 64, 74, 75, 81, 95)
                 .boxed()
                 .flatMap(i -> {
                     String queryId = format("q%02d", i);
@@ -88,7 +90,7 @@ public class TestTpcdsCostBasedPlan
         public static void main(String[] args)
                 throws Exception
         {
-            new TestTpcdsCostBasedPlan().generate();
+            new TestTpcdsCostBasedPlanCTEOpt().generate();
         }
     }
 }

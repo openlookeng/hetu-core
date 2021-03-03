@@ -64,7 +64,7 @@ public class TestTpchCostBasedPlan
                     new TpchConnectorFactory(1, false, false),
                     ImmutableMap.of(TPCH_COLUMN_NAMING_PROPERTY, ColumnNaming.SIMPLIFIED.name()));
             return queryRunner;
-        }, false);
+        }, false, false);
     }
 
     @Override

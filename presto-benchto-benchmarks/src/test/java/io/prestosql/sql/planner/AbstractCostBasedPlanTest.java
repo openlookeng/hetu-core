@@ -22,6 +22,8 @@ import io.prestosql.plugin.tpcds.TpcdsTableHandle;
 import io.prestosql.plugin.tpch.TpchTableHandle;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.CTEScanNode;
+import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.plan.ValuesNode;
@@ -56,11 +58,13 @@ public abstract class AbstractCostBasedPlanTest
         extends BasePlanTest
 {
     private final boolean pushdown;
+    private final boolean cteReuse;
 
-    public AbstractCostBasedPlanTest(LocalQueryRunnerSupplier supplier, boolean pushdown)
+    public AbstractCostBasedPlanTest(LocalQueryRunnerSupplier supplier, boolean pushdown, boolean cteReuse)
     {
         super(supplier);
         this.pushdown = pushdown;
+        this.cteReuse = cteReuse;
     }
 
     protected abstract Stream<String> getQueryResourcePaths();
@@ -84,6 +88,10 @@ public abstract class AbstractCostBasedPlanTest
         if (pushdown) {
             fileName = ".push" + fileName;
         }
+        else if (cteReuse) {
+            fileName = ".cte" + fileName;
+        }
+
         return queryResourcePath.replaceAll("\\.sql$", fileName);
     }
 
@@ -131,7 +139,7 @@ public abstract class AbstractCostBasedPlanTest
                 .replace("\"${database}\".\"${schema}\".\"${prefix}", "\"");
         Plan plan = plan(sql, LogicalPlanner.Stage.OPTIMIZED_AND_VALIDATED, false);
 
-        JoinOrderPrinter joinOrderPrinter = new JoinOrderPrinter();
+        JoinOrderPrinter joinOrderPrinter = new JoinOrderPrinter(cteReuse);
         plan.getRoot().accept(joinOrderPrinter, 0);
         return joinOrderPrinter.result();
     }
@@ -155,6 +163,12 @@ public abstract class AbstractCostBasedPlanTest
             extends SimplePlanVisitor<Integer>
     {
         private final StringBuilder result = new StringBuilder();
+        private final boolean cteReuse;
+
+        public JoinOrderPrinter(boolean cteReuse)
+        {
+            this.cteReuse = cteReuse;
+        }
 
         public String result()
         {
@@ -245,6 +259,22 @@ public abstract class AbstractCostBasedPlanTest
             output(indent, "values (%s rows)", node.getRows().size());
 
             return null;
+        }
+
+        @Override
+        public Void visitCTEScan(CTEScanNode node, Integer indent)
+        {
+            output(indent, "cte %s", node.getCteRefName());
+            return visitPlan(node, indent + 1);
+        }
+
+        @Override
+        public Void visitFilter(FilterNode node, Integer indent)
+        {
+            if (cteReuse) {
+                output(indent, "Filter");
+            }
+            return visitPlan(node, cteReuse ? (indent + 1) : indent);
         }
 
         private void output(int indent, String message, Object... args)
