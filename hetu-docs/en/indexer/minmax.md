@@ -1,19 +1,26 @@
 
-# MinMax Index
+# MinMaxIndex
 
-MinMax simply keeps tracks of the largest and smallest value.
+MinMaxIndex simply keeps tracks of the largest and smallest value.
 The size of the index is extremely small.
 However, this index will only be useful if the table is sorted
 on the indexed column.
 
-## Filtering
+## Use case(s)
 
-1. MinMax Index is used on coordinator for filtering splits during scheduling
+**Note: Currently, Heuristic Index only supports the Hive connector with 
+tables using ORC storage format.**
 
-## Selecting column for MinMax Index
+MinMaxIndex is used on coordinator for filtering splits during scheduling.
 
-MinMax Index will only work well on columns on which the table is sorted.
-For example, ID or age.
+## Selecting column for MinMaxIndex
+
+Queries that have a filter predicate on a column on which data is sorted
+can benefit from MinMaxIndex.
+
+For example, a query like `SELECT name FROM users WHERE age>25`
+can benefit from having a MinMaxIndex on the `age` column if
+the data is sorted on `age` column.
 
 ## Supported operators
 
