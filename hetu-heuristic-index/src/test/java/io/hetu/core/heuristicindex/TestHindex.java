@@ -31,36 +31,32 @@ public class TestHindex
     // Tests to see the difference in number of splits used without and with the usage of index with specified data.
     @Test(dataProvider = "splitsWithIndexAndData")
     public void testSplitsWithIndexAndData(String indexType, String dataType)
-            throws InterruptedException
+            throws Exception
     {
         String tableName = getNewTableName();
         String indexName = getNewIndexName();
         String testerQuery = createTableDataTypeWithQuery(tableName, dataType);
+        String baseQuery = "SELECT * FROM " + tableName;
 
         // Get splits and result
-        Pair<Integer, MaterializedResult> resultPairBeforeIndex = getSplitAndMaterializedResult(testerQuery);
-        int splitsBeforeIndex = resultPairBeforeIndex.getFirst();
-        MaterializedResult resultBeforeIndex = resultPairBeforeIndex.getSecond();
+        assertQuerySucceeds(baseQuery);
+        long inputRowsBaseQuery = getInputRowsOfLastQueryExecution(baseQuery);
 
         // Create index
         if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            if (dataType.toLowerCase(Locale.ROOT).equals("boolean")) {
-                assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                                indexType + " ON " + tableName + " (data_col2)",
-                        "Index creation on boolean column is not supported");
-            }
-            else {
-                assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                        indexType + " ON " + tableName + " (data_col2)");
-            }
+            safeCreateIndex("CREATE INDEX " + indexName + " USING " +
+                    indexType + " ON " + tableName + " (data_col2) WITH (level='table')");
         }
         else {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
+            safeCreateIndex("CREATE INDEX " + indexName + " USING " +
                     indexType + " ON " + tableName + " (data_col2)");
         }
 
         // Get splits and result
-        int splitsLoadingIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
+        Pair<Integer, MaterializedResult> resultPairLoadingIndex = getSplitAndMaterializedResult(testerQuery);
+        int splitsLoadingIndex = resultPairLoadingIndex.getFirst();
+        MaterializedResult resultLoadingIndex = resultPairLoadingIndex.getSecond();
+        long inputRowsLoadingIndex = getInputRowsOfLastQueryExecution(testerQuery);
 
         // Wait before continuing
         Thread.sleep(1000);
@@ -69,34 +65,31 @@ public class TestHindex
         Pair<Integer, MaterializedResult> resultPairIndexLoaded = getSplitAndMaterializedResult(testerQuery);
         int splitsIndexLoaded = resultPairIndexLoaded.getFirst();
         MaterializedResult resultIndexLoaded = resultPairIndexLoaded.getSecond();
+        long inputRowsIndexLoaded = getInputRowsOfLastQueryExecution(testerQuery);
 
-        assertEquals(splitsBeforeIndex, splitsLoadingIndex,
-                "The splits prior to index loaded should be the same:" +
-                        " Splits1: " + splitsBeforeIndex +
-                        " Splits2: " + splitsLoadingIndex +
-                        " Splits3: " + splitsIndexLoaded);
-        if (indexType.toLowerCase(Locale.ROOT).equals("bitmap") || dataType.toLowerCase(Locale.ROOT).equals("boolean")) {
-            assertEquals(splitsBeforeIndex, splitsIndexLoaded,
-                    "The splits with index loaded should be the same as splits before index:" +
-                            " Splits1: " + splitsBeforeIndex +
-                            " Splits2: " + splitsLoadingIndex +
-                            " Splits3: " + splitsIndexLoaded);
+        assertTrue(verifyEqualResults(resultLoadingIndex, resultIndexLoaded), "The results should be equal for" +
+                " index type: " + indexType + ", data type: " + dataType);
+        if (indexType.toLowerCase(Locale.ROOT).equals("bitmap")) {
+            assertTrue(inputRowsBaseQuery > inputRowsLoadingIndex,
+                    "The numbers of input rows for base query should be the largest:" +
+                            " index type: " + indexType + " data type: " + dataType +
+                            " inputRowsBaseQuery: " + inputRowsBaseQuery +
+                            " inputRowsLoadingIndex: " + inputRowsLoadingIndex +
+                            " inputRowsIndexLoaded: " + inputRowsIndexLoaded);
         }
         else {
-            assertTrue(splitsBeforeIndex > splitsIndexLoaded,
+            assertTrue(splitsLoadingIndex > splitsIndexLoaded,
                     "The splits with index loaded should be lower than splits before index:" +
-                            " Splits1: " + splitsBeforeIndex +
-                            " Splits2: " + splitsLoadingIndex +
-                            " Splits3: " + splitsIndexLoaded);
+                            " index type: " + indexType + " data type: " + dataType +
+                            " splitsLoadingIndex: " + splitsLoadingIndex +
+                            " splitsIndexLoaded: " + splitsIndexLoaded);
         }
-
-        assertTrue(verifyEqualResults(resultBeforeIndex, resultIndexLoaded), "The results should be equal.");
     }
 
     // Tests data consistency and splits for which table data is changed after index creation.
     @Test(dataProvider = "tableData1")
     public void testDataConsistencyWithAdditionChange(String indexType, String queryVariable, String queryValue)
-            throws InterruptedException
+            throws Exception
     {
         String tableName = getNewTableName();
         createTable1(tableName);
@@ -106,7 +99,7 @@ public class TestHindex
         int splitsBeforeIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
 
         // Create index to use for testing splits
-        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
+        safeCreateIndex("CREATE INDEX " + indexName + " USING " +
                 indexType + " ON " + tableName + " (" + queryVariable + ")");
 
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(7, 'new1'), (8, 'new2')");
@@ -155,7 +148,7 @@ public class TestHindex
     // Tests data consistency when data is deleted after index is created.
     @Test(dataProvider = "tableData2")
     public void testDataConsistencyWithDataDeletionChange(String indexType, String queryVariable, String queryValue)
-            throws InterruptedException
+            throws Exception
     {
         String tableName = getNewTableName();
         createTable2(tableName);
@@ -165,7 +158,7 @@ public class TestHindex
         int splitsBeforeIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
 
         // Create index to use for testing splits
-        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
+        safeCreateIndex("CREATE INDEX " + indexName + " USING " +
                 indexType + " ON " + tableName + " (" + queryVariable + ")");
 
         Pair<Integer, MaterializedResult> resultPairLoadingIndex = getSplitAndMaterializedResult(testerQuery);
@@ -223,7 +216,7 @@ public class TestHindex
     // Tests the index type handles the cases of table having NULL values without intermediate errors.
     @Test(dataProvider = "nullDataHandling")
     public void testNullDataHandling(String indexType, String queryVariable, String queryValue)
-            throws InterruptedException
+            throws Exception
     {
         String tableName = getNewTableName();
         createTableNullData(tableName);
@@ -235,7 +228,7 @@ public class TestHindex
         MaterializedResult resultBeforeIndex = resultPairBeforeIndex.getSecond();
 
         // Create index to use for testing splits
-        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
+        safeCreateIndex("CREATE INDEX " + indexName + " USING " +
                 indexType + " ON " + tableName + " (" + queryVariable + ")");
 
         int splitsLoadingIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
@@ -273,7 +266,7 @@ public class TestHindex
     // Tests the case of creating all four types of index
     @Test
     public void testIndexAllFourTypesTogether()
-            throws InterruptedException
+            throws Exception
     {
         String tableName = getNewTableName();
         String testerQuery = "SELECT * FROM " + tableName + " WHERE id = 2";
@@ -286,13 +279,13 @@ public class TestHindex
 
         // Create indices
         String indexName1 = getNewIndexName();
-        assertQuerySucceeds("CREATE INDEX " + indexName1 + " USING btree ON " + tableName + " (id)");
+        safeCreateIndex("CREATE INDEX " + indexName1 + " USING btree ON " + tableName + " (id)");
         String indexName2 = getNewIndexName();
-        assertQuerySucceeds("CREATE INDEX " + indexName2 + " USING bitmap ON " + tableName + " (id)");
+        safeCreateIndex("CREATE INDEX " + indexName2 + " USING bitmap ON " + tableName + " (id)");
         String indexName3 = getNewIndexName();
-        assertQuerySucceeds("CREATE INDEX " + indexName3 + " USING bloom ON " + tableName + " (id)");
+        safeCreateIndex("CREATE INDEX " + indexName3 + " USING bloom ON " + tableName + " (id)");
         String indexName4 = getNewIndexName();
-        assertQuerySucceeds("CREATE INDEX " + indexName4 + " USING minmax ON " + tableName + " (id)");
+        safeCreateIndex("CREATE INDEX " + indexName4 + " USING minmax ON " + tableName + " (id)");
 
         // Get splits and result
         int splitsLoadingIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
@@ -320,7 +313,7 @@ public class TestHindex
     // Tests the case of deleting index when generating an index. Result is that splits and info are same.
     @Test(dataProvider = "indexTypes")
     public void testIndexDeletionBeforeSplitsAffected(String indexType)
-            throws InterruptedException
+            throws Exception
     {
         String tableName = getNewTableName();
         String indexName = getNewIndexName();
@@ -333,7 +326,7 @@ public class TestHindex
         MaterializedResult resultBeforeIndex = resultPairBeforeIndex.getSecond();
 
         // Create index
-        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
+        safeCreateIndex("CREATE INDEX " + indexName + " USING " +
                 indexType + " ON " + tableName + " (id)");
 
         // Drop index before changes
@@ -360,13 +353,14 @@ public class TestHindex
     // Tests the case of creating index with if not exists.
     @Test(dataProvider = "indexTypes")
     public void testIndexIfNotExistsCreation(String indexType)
+            throws Exception
     {
         String tableName = getNewTableName();
         String indexName = getNewIndexName();
         createTable1(tableName);
 
         // Create index
-        assertQuerySucceeds("CREATE INDEX IF NOT EXISTS " + indexName + " USING " +
+        safeCreateIndex("CREATE INDEX IF NOT EXISTS " + indexName + " USING " +
                 indexType + " ON " + tableName + " (id)");
 
         // Validate if created
@@ -431,6 +425,7 @@ public class TestHindex
     // Tests the case of creating index where variable name is capitalized. Expected to pass regardless of variable case.
     @Test(dataProvider = "indexTypes")
     public void testIndexWithCapitalColumnNameCreation(String indexType)
+            throws Exception
     {
         String tableName = getNewTableName();
         assertQuerySucceeds("CREATE TABLE " + tableName + " (P1 INTEGER, P2 VARCHAR(10))");
@@ -439,20 +434,19 @@ public class TestHindex
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(3, 'data'), (9, 'ttt'), (5, 'num')");
 
         String indexName = getNewIndexName();
-        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " + indexType +
-                " ON " + tableName + " (P1)");
+        safeCreateIndex("CREATE INDEX " + indexName + " USING " + indexType + " ON " + tableName + " (P1)");
     }
 
     @Test(dataProvider = "queryOperatorTest")
     public void testQueryOperator(String testerQuery, String indexType)
-            throws InterruptedException
+            throws Exception
     {
         String tableName = getNewTableName();
         createTable1(tableName);
         testerQuery = "SELECT * FROM " + tableName + " WHERE " + testerQuery;
         String indexName = getNewIndexName();
 
-        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
+        safeCreateIndex("CREATE INDEX " + indexName + " USING " +
                 indexType + " ON " + tableName + " (id)");
 
         MaterializedResult resultLoadingIndex = computeActual(testerQuery);

@@ -27,66 +27,72 @@ public class TestHindexBTreeIndex
 {
     @Test
     public void testBtreeIndexOnPartitionedColumnCreateAndDelete()
+            throws Exception
     {
         String tableName = getNewTableName();
         createBtreeTable1(tableName);
 
         String indexName = getNewIndexName();
-        assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
+        safeCreateIndex("CREATE INDEX " + indexName + " USING btree ON " + tableName +
                 " (key2) WHERE key2 = 11");
         assertQuerySucceeds("DROP INDEX " + indexName);
     }
 
     @Test
     public void testBtreeIndexOnNonePartitionedColumnCreateAndDelete()
+            throws Exception
     {
         String tableName = getNewTableName();
         createBtreeTable1(tableName);
 
         String indexName = getNewIndexName();
-        assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
-                " (key1) WITH (level=partition) WHERE key2 = 11");
+        safeCreateIndex("CREATE INDEX " + indexName + " USING btree ON " + tableName +
+                " (key1) WHERE key2 = 11");
         assertQuerySucceeds("DROP INDEX " + indexName);
     }
 
     @Test
     public void testBtreeIndexHasKeyWhereDelete()
+            throws Exception
     {
         String tableName = getNewTableName();
         createBtreeTable1(tableName);
 
         String indexName = getNewIndexName();
-        assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
+        safeCreateIndex("CREATE INDEX " + indexName + " USING btree ON " + tableName +
                 " (key1) WHERE key2 = 11");
         assertQuerySucceeds("DROP INDEX " + indexName + " WHERE key2 = 11");
     }
 
     @Test
     public void testBtreeIndexInvalidKeyWhereDelete()
+            throws Exception
     {
         String tableName = getNewTableName();
         createBtreeTable1(tableName);
 
         String indexName = getNewIndexName();
-        assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
+        safeCreateIndex("CREATE INDEX " + indexName + " USING btree ON " + tableName +
                 " (key1) WHERE key2 = 11");
         try {
             assertQuerySucceeds("DROP INDEX " + indexName + " WHERE key2 = 10");
+            throw new AssertionError("Expected drop index query to fail.");
         }
         catch (AssertionError e) {
             assertTrue(e.getCause().toString().contains("line 1:1: Index '" + indexName + "' does not contain partitions: [key2=10]"));
+            return;
         }
     }
 
     @Test
     public void testBtreeIndexCreationWherePartitionedColumn()
-            throws InterruptedException
+            throws Exception
     {
         String tableName = getNewTableName();
         createBtreeTable1(tableName);
 
         String indexName = getNewIndexName();
-        assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
+        safeCreateIndex("CREATE INDEX " + indexName + " USING btree ON " + tableName +
                 " (key2) WHERE key2 = 11");
 
         String testerQuery = "SELECT * FROM " + tableName + " WHERE key2 = 11";
@@ -120,13 +126,13 @@ public class TestHindexBTreeIndex
 
     @Test
     public void testBtreeIndexTransactional()
-            throws InterruptedException
+            throws Exception
     {
         String tableName = getNewTableName();
         createBtreeTableTransact1(tableName);
 
         String indexName = getNewIndexName();
-        assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
+        safeCreateIndex("CREATE INDEX " + indexName + " USING btree ON " + tableName +
                 " (key2) WHERE key2 = 12");
 
         String testerQuery = "SELECT * FROM " + tableName + " WHERE key2 = 12";
@@ -181,13 +187,13 @@ public class TestHindexBTreeIndex
 
     @Test
     public void testBtreeIndexMultiPartitionedColumn()
-            throws InterruptedException
+            throws Exception
     {
         String tableName = getNewTableName();
         createBtreeTableMultiPart1(tableName);
 
         String indexName1 = getNewIndexName();
-        assertQuerySucceeds("CREATE INDEX " + indexName1 + " USING btree ON " + tableName +
+        safeCreateIndex("CREATE INDEX " + indexName1 + " USING btree ON " + tableName +
                 " (key1) WHERE key3 = 222");
 
         String testerQuery1 = "SELECT * FROM " + tableName + " WHERE key1 = 2";
@@ -209,7 +215,7 @@ public class TestHindexBTreeIndex
         // Create second index and do query again on different keys
 
         String indexName2 = getNewIndexName();
-        assertQuerySucceeds("CREATE INDEX " + indexName2 + " USING btree ON " + tableName +
+        safeCreateIndex("CREATE INDEX " + indexName2 + " USING btree ON " + tableName +
                 " (key2) WHERE key5 = 22222");
 
         String testerQuery2 = "SELECT * FROM " + tableName + " WHERE key2 = 22";

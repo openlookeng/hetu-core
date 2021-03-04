@@ -43,6 +43,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -57,7 +58,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static io.hetu.core.heuristicindex.util.TypeUtils.getNativeValue;
+import static io.prestosql.spi.heuristicindex.TypeUtils.getActualValue;
 
 /**
  * <pre>
@@ -104,6 +105,7 @@ public class BitmapIndex
     private static final String DATE = "DATE";
     private static final String BOOLEAN = "BOOLEAN";
     private static final String STRING = "STRING";
+    private static final String BIGDECIMAL = "BIGDECIMAL";
 
     private Properties properties;
     private int maxValuesPerNode = DEFAULT_MAX_VALUES_PER_NODE;
@@ -142,41 +144,37 @@ public class BitmapIndex
             throw new UnsupportedOperationException("Only single column is supported.");
         }
 
-        try {
-            List<Object> columnValues = values.get(0).getSecond();
+        List<Object> columnValues = values.get(0).getSecond();
 
-            Map<Object, ArrayList<Integer>> positions = new HashMap<>();
+        Map<Object, ArrayList<Integer>> positions = new HashMap<>();
 
-            for (int i = 0; i < columnValues.size(); i++) {
-                Object value = columnValues.get(i);
-                if (value != null) {
-                    positions.computeIfAbsent(value, k -> new ArrayList<>()).add(i);
-                }
+        for (int i = 0; i < columnValues.size(); i++) {
+            Object value = columnValues.get(i);
+            if (value != null) {
+                positions.computeIfAbsent(value, k -> new ArrayList<>()).add(i);
             }
-
-            if (positions.isEmpty()) {
-                return true;
-            }
-
-            List<kotlin.Pair> bitmaps = new ArrayList<>(positions.size());
-            for (Map.Entry<Object, ArrayList<Integer>> e : positions.entrySet()) {
-                int[] valuePositions = ArrayUtils.toPrimitive(e.getValue().toArray(new Integer[0]));
-                RoaringBitmap rr = RoaringBitmap.bitmapOf(valuePositions);
-                rr.runOptimize();
-                ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                DataOutputStream dos = new DataOutputStream(bos);
-                rr.serialize(dos);
-                dos.close();
-                Object value = convertToSupportedType(e.getKey());
-
-                bitmaps.add(new kotlin.Pair(value, bos.toByteArray()));
-            }
-            Collections.sort(bitmaps, (o1, o2) -> ((Comparable) o1.component1()).compareTo(o2.component1()));
-            getBtreeWriteOptimized(bitmaps.iterator().next().component1(), bitmaps.iterator());
         }
-        catch (IOException err) {
-            throw new RuntimeException(err);
+
+        if (positions.isEmpty()) {
+            return true;
         }
+
+        List<kotlin.Pair> bitmaps = new ArrayList<>(positions.size());
+        for (Map.Entry<Object, ArrayList<Integer>> e : positions.entrySet()) {
+            int[] valuePositions = ArrayUtils.toPrimitive(e.getValue().toArray(new Integer[0]));
+            RoaringBitmap rr = RoaringBitmap.bitmapOf(valuePositions);
+            rr.runOptimize();
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            DataOutputStream dos = new DataOutputStream(bos);
+            rr.serialize(dos);
+            dos.close();
+            Object value = convertToSupportedType(e.getKey());
+
+            bitmaps.add(new kotlin.Pair(value, bos.toByteArray()));
+        }
+        Collections.sort(bitmaps, (o1, o2) -> ((Comparable) o1.component1()).compareTo(o2.component1()));
+        getBtreeWriteOptimized(bitmaps.iterator().next().component1(), bitmaps.iterator());
+
         return true;
     }
 
@@ -214,7 +212,6 @@ public class BitmapIndex
         if (expression instanceof Domain) {
             Domain predicate = (Domain) expression;
             List<Range> ranges = ((SortedRangeSet) (predicate.getValues())).getOrderedRanges();
-            Class<?> javaType = predicate.getValues().getType().getJavaType();
 
             try {
                 btree = getBtreeReadOptimized();
@@ -222,7 +219,7 @@ public class BitmapIndex
                 for (Range range : ranges) {
                     if (range.isSingleValue()) {
                         // unique value(for example: id=1, id in (1,2) (IN operator gives single exact values one by one)), bound: EXACTLY
-                        RoaringBitmap bitmap = lookUpSingle(getNativeValue(range.getSingleValue()));
+                        RoaringBitmap bitmap = lookUpSingle(getActualValue(predicate.getType(), range.getSingleValue()));
                         if (bitmap != null) {
                             allMatches.add(bitmap);
                         }
@@ -274,7 +271,7 @@ public class BitmapIndex
                         }
 
                         for (Object i : concurrentNavigableMap.keySet()) {
-                            RoaringBitmap bitmap = lookUpSingle(getNativeValue(i));
+                            RoaringBitmap bitmap = lookUpSingle(getActualValue(predicate.getType(), i));
                             allMatches.add(bitmap);
                         }
                     }
@@ -471,7 +468,8 @@ public class BitmapIndex
                 || (obj instanceof Float)
                 || (obj instanceof Date)
                 || (obj instanceof Boolean)
-                || (obj instanceof String)) {
+                || (obj instanceof String)
+                || (obj instanceof BigDecimal)) {
             return obj;
         }
         else if (obj instanceof Integer) {
@@ -501,6 +499,8 @@ public class BitmapIndex
                 return Serializer.BOOLEAN;
             case STRING:
                 return Serializer.STRING;
+            case BIGDECIMAL:
+                return Serializer.BIG_DECIMAL;
             default:
                 throw new UnsupportedOperationException("Unexpected value: " + name);
         }
@@ -528,6 +528,9 @@ public class BitmapIndex
         }
         else if (obj instanceof String) {
             return STRING;
+        }
+        else if (obj instanceof BigDecimal) {
+            return BIGDECIMAL;
         }
         else {
             throw new IOException("Unsupported type " + obj.getClass());

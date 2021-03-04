@@ -26,6 +26,7 @@ import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexRecord;
+import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.metastore.HetuMetastore;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
@@ -163,7 +164,7 @@ public class HeuristicIndexClient
     {
         IndexRecord sameNameRecord = indexRecordManager.lookUpIndexRecord(createIndexMetadata.getIndexName());
         IndexRecord sameIndexRecord = indexRecordManager.lookUpIndexRecord(createIndexMetadata.getTableName(),
-                createIndexMetadata.getIndexColumns().stream().map(Map.Entry::getKey).toArray(String[]::new),
+                createIndexMetadata.getIndexColumns().stream().map(Pair::getFirst).toArray(String[]::new),
                 createIndexMetadata.getIndexType());
 
         if (sameNameRecord == null) {
@@ -223,7 +224,7 @@ public class HeuristicIndexClient
                 createIndexMetadata.getIndexName(),
                 createIndexMetadata.getUser(),
                 createIndexMetadata.getTableName(),
-                createIndexMetadata.getIndexColumns().stream().map(Map.Entry::getKey).toArray(String[]::new),
+                createIndexMetadata.getIndexColumns().stream().map(Pair::getFirst).toArray(String[]::new),
                 createIndexMetadata.getIndexType(),
                 properties,
                 createIndexMetadata.getPartitions());
@@ -241,14 +242,18 @@ public class HeuristicIndexClient
             throws IOException
     {
         IndexRecord indexRecord = indexRecordManager.lookUpIndexRecord(indexName);
-        Path toDelete = root.resolve(indexRecord.qualifiedTable).resolve(String.join(",", indexRecord.columns)).resolve(indexRecord.indexType);
 
-        if (!fs.exists(toDelete)) {
+        // dir structure example: root/catalog.schema.table/column1,column2/BLOOM
+        Path tablePath = root.resolve(indexRecord.qualifiedTable);
+        Path columnPath = tablePath.resolve(String.join(",", indexRecord.columns));
+        Path indexLevelPath = columnPath.resolve(indexRecord.indexType);
+
+        if (!fs.exists(indexLevelPath)) {
             indexRecordManager.deleteIndexRecord(indexName, partitionsToDelete);
             return;
         }
 
-        Lock lock = new FileBasedLock(fs, toDelete.getParent());
+        Lock lock = new FileBasedLock(fs, indexLevelPath.getParent());
         try {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 lock.unlock();
@@ -262,10 +267,10 @@ public class HeuristicIndexClient
             lock.lock();
 
             if (partitionsToDelete.isEmpty()) {
-                fs.deleteRecursively(toDelete);
+                fs.deleteRecursively(indexLevelPath);
             }
             else {
-                List<Path> toDeletePartitions = fs.walk(toDelete)
+                List<Path> toDeletePartitions = fs.walk(indexLevelPath)
                         .filter(fs::isDirectory)
                         .filter(path -> partitionsToDelete.contains(path.getFileName().toString()))
                         .collect(Collectors.toList());
@@ -273,6 +278,19 @@ public class HeuristicIndexClient
                 for (Path path : toDeletePartitions) {
                     fs.deleteRecursively(path);
                 }
+            }
+
+            try {
+                // clean empty directories
+                if (fs.list(columnPath).allMatch(FileBasedLock::isLockUtilFile)) {
+                    fs.deleteRecursively(columnPath);
+                }
+                if (fs.list(tablePath).allMatch(FileBasedLock::isLockUtilFile)) {
+                    fs.deleteRecursively(tablePath);
+                }
+            }
+            catch (Exception e) {
+                LOG.debug("failed to clean empty index directory", e);
             }
         }
         finally {

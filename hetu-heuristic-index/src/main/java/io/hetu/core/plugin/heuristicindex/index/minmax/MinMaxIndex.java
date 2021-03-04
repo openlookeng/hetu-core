@@ -35,7 +35,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static io.hetu.core.heuristicindex.util.IndexConstants.TYPES_WHITELIST;
-import static io.hetu.core.heuristicindex.util.TypeUtils.extractSingleValue;
+import static io.prestosql.spi.heuristicindex.TypeUtils.extractValueFromRowExpression;
 
 /**
  * MinMax index implementation. It can be used to check whether a value is in or out of the given range.
@@ -116,7 +116,7 @@ public class MinMaxIndex
             Optional<OperatorType> operatorOptional = Signature.getOperatorType(((CallExpression) expression).getSignature().getName());
             if (operatorOptional.isPresent()) {
                 OperatorType operator = operatorOptional.get();
-                Comparable value = (Comparable) extractSingleValue(callExp.getArguments().get(1));
+                Comparable value = (Comparable) extractValueFromRowExpression(callExp.getArguments().get(1));
                 switch (operator) {
                     case EQUAL:
                         return (value.compareTo(min) > 0 || value.compareTo(min) == 0)

@@ -17,15 +17,14 @@ package io.hetu.core.plugin.heuristicindex.index.btree;
 import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 import io.hetu.core.heuristicindex.PartitionIndexWriter;
-import io.hetu.core.heuristicindex.util.TypeUtils;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.heuristicindex.SerializationUtils;
+import io.prestosql.spi.heuristicindex.TypeUtils;
 import io.prestosql.spi.relation.CallExpression;
-import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.SpecialForm;
 import org.apache.commons.compress.utils.IOUtils;
@@ -60,8 +59,7 @@ import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-import static io.hetu.core.heuristicindex.util.TypeUtils.extractSingleValue;
-import static io.hetu.core.heuristicindex.util.TypeUtils.getComparator;
+import static io.prestosql.spi.heuristicindex.TypeUtils.extractValueFromRowExpression;
 
 public class BTreeIndex
         implements Index
@@ -125,6 +123,11 @@ public class BTreeIndex
             case "int":
             case "Integer":
                 return Serializer.INTEGER;
+            case "float":
+            case "Float":
+                return Serializer.FLOAT;
+            case "BigDecimal":
+                return Serializer.BIG_DECIMAL;
         }
         throw new RuntimeException("Index is not supported for type: (" + type + ")");
     }
@@ -180,7 +183,12 @@ public class BTreeIndex
         if (source == null) {
             keyType = TypeUtils.extractType(input.get(0).getSecond().get(0).getFirst());
             valueType = TypeUtils.extractType(input.get(0).getSecond().get(0).getSecond());
-            source = new TreeSet<>(getComparator(keyType));
+            source = new TreeSet<>((o1, o2) -> {
+                if (input.get(0).getSecond().get(0).getFirst() instanceof Comparable) {
+                    return ((Comparable) o1.getFirst()).compareTo(o2.getFirst());
+                }
+                throw new RuntimeException("Type is not supported");
+            });
         }
         if (input.size() == 1) {
             for (Pair<Comparable<? extends Comparable<?>>, String> pair : input.get(0).getSecond()) {
@@ -225,7 +233,7 @@ public class BTreeIndex
 
         if (expression instanceof CallExpression) {
             CallExpression callExp = (CallExpression) expression;
-            Object key = extractSingleValue(callExp.getArguments().get(1));
+            Object key = extractValueFromRowExpression(callExp.getArguments().get(1));
             Optional<OperatorType> operatorOptional = Signature.getOperatorType(((CallExpression) expression).getSignature().getName());
             if (operatorOptional.isPresent()) {
                 OperatorType operator = operatorOptional.get();
@@ -260,14 +268,14 @@ public class BTreeIndex
             SpecialForm specialForm = (SpecialForm) expression;
             switch (specialForm.getForm()) {
                 case BETWEEN:
-                    Object left = extractSingleValue((ConstantExpression) specialForm.getArguments().get(1));
-                    Object right = extractSingleValue((ConstantExpression) specialForm.getArguments().get(2));
+                    Object left = extractValueFromRowExpression(specialForm.getArguments().get(1));
+                    Object right = extractValueFromRowExpression(specialForm.getArguments().get(2));
                     ConcurrentNavigableMap<Object, String> concurrentNavigableMap = dataMap.subMap(left, true, right, true);
                     result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
                     break;
                 case IN:
                     for (RowExpression exp : specialForm.getArguments().subList(1, specialForm.getArguments().size())) {
-                        Object key = extractSingleValue((ConstantExpression) exp);
+                        Object key = extractValueFromRowExpression(exp);
                         if (dataMap.containsKey(key)) {
                             result.addAll(translateSymbols(dataMap.get(key)));
                         }

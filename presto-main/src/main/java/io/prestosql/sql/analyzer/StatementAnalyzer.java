@@ -46,6 +46,7 @@ import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.heuristicindex.IndexClient;
+import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.security.AccessDeniedException;
 import io.prestosql.spi.security.Identity;
@@ -162,7 +163,6 @@ import io.prestosql.utils.HeuristicIndexUtils;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -1085,9 +1085,9 @@ class StatementAnalyzer
                     throw new SemanticException(NOT_SUPPORTED, table, "Heuristic index creation is only supported for predicates on partition columns");
                 }
 
-                List<Map.Entry<String, Type>> indexColumns = new LinkedList<>();
+                List<Pair<String, Type>> indexColumns = new LinkedList<>();
                 for (Identifier i : createIndex.getColumnAliases()) {
-                    indexColumns.add(new AbstractMap.SimpleEntry<>(i.toString(), BIGINT));
+                    indexColumns.add(new Pair<>(i.toString(), BIGINT));
                 }
 
                 // For now, creating index for multiple columns is not supported
