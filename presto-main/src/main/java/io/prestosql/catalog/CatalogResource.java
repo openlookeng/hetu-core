@@ -146,6 +146,20 @@ public class CatalogResource
             throw badRequest(BAD_REQUEST, "The length of catalog name is too long");
         }
 
+        // check dc
+        int dotIndex = catalogName.indexOf(".");
+        if (dotIndex >= 0) {
+            if (dotIndex == 0 || dotIndex == catalogName.length() - 1) {
+                throw badRequest(BAD_REQUEST, "Invalid catalog name");
+            }
+            String dc = catalogName.substring(0, dotIndex);
+            String catalog = catalogName.substring(dotIndex + 1);
+            if (!dc.matches(VALID_CATALOG_NAME_REGEX) || !catalog.matches(VALID_CATALOG_NAME_REGEX)) {
+                throw badRequest(BAD_REQUEST, "Invalid catalog name");
+            }
+            return;
+        }
+
         if (!catalogName.matches(VALID_CATALOG_NAME_REGEX)) {
             throw badRequest(BAD_REQUEST, "Invalid catalog name");
         }
@@ -171,9 +185,9 @@ public class CatalogResource
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     @Produces(MediaType.APPLICATION_JSON)
     public Response createCatalog(@FormDataParam("catalogInformation") String catalogInfoJson,
-            @FormDataParam("catalogConfigurationFiles") List<FormDataBodyPart> catalogConfigFileBodyParts,
-            @FormDataParam("globalConfigurationFiles") List<FormDataBodyPart> globalConfigFilesBodyParts,
-            @Context HttpServletRequest servletRequest)
+                                  @FormDataParam("catalogConfigurationFiles") List<FormDataBodyPart> catalogConfigFileBodyParts,
+                                  @FormDataParam("globalConfigurationFiles") List<FormDataBodyPart> globalConfigFilesBodyParts,
+                                  @Context HttpServletRequest servletRequest)
     {
         CatalogInfo catalogInfo = toCatalogInfo(catalogInfoJson);
 
@@ -198,9 +212,9 @@ public class CatalogResource
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     @Produces(MediaType.APPLICATION_JSON)
     public Response updateCatalog(@FormDataParam("catalogInformation") String catalogInfoJson,
-            @FormDataParam("catalogConfigurationFiles") List<FormDataBodyPart> catalogConfigFileBodyParts,
-            @FormDataParam("globalConfigurationFiles") List<FormDataBodyPart> globalConfigFilesBodyParts,
-            @Context HttpServletRequest servletRequest)
+                                  @FormDataParam("catalogConfigurationFiles") List<FormDataBodyPart> catalogConfigFileBodyParts,
+                                  @FormDataParam("globalConfigurationFiles") List<FormDataBodyPart> globalConfigFilesBodyParts,
+                                  @Context HttpServletRequest servletRequest)
     {
         CatalogInfo catalogInfo = toCatalogInfo(catalogInfoJson);
 
@@ -225,7 +239,7 @@ public class CatalogResource
     @Path("/{catalogName}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response dropCatalog(@NotNull @PathParam("catalogName") String catalogName,
-            @Context HttpServletRequest servletRequest)
+                                @Context HttpServletRequest servletRequest)
     {
         checkCatalogName(catalogName);
         Response response;

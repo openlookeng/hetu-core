@@ -115,27 +115,27 @@ class ResultsTable
           </div>
           <Table
               headerHeight={25}
-              rowHeight={40}
+              rowHeight={30}
               rowsCount={this.state.table.data.length}
               width={this.props.tableWidth}
-              height={this.props.tableHeight - 39}
-              maxHeight={this.props.tableHeight - 39}
+              maxHeight={this.props.tableHeight - 130}
               isResizable={isColumnResizing}
               onColumnResizeEndCallback={this._onColumnResizeEndCallback}
               {... this.props}>
             {getColumns(this.state.table.columns, this.state.table.columnWidths, this.rowGetter)}
           </Table>
-        </div>
-        <div>
-          <Pagination
+          <div>
+            <Pagination
               defaultCurrent={1}
               current={currentPage}
               total={total}
               onChange={this.onPageChange}
               showTotal={total => `Total ${total} items`}
               style={{ marginTop: 10 }}
-          />
+            />
         </div>
+        </div>
+        
       </div>
     );
   }
