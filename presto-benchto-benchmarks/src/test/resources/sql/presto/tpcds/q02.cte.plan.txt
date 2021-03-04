@@ -1,0 +1,53 @@
+remote exchange (GATHER, SINGLE, [])
+    local exchange (GATHER, UNKNOWN, [])
+        remote exchange (REPARTITION, ROUND_ROBIN, [])
+            join (INNER, PARTITIONED):
+                remote exchange (REPARTITION, HASH, ["expr_71"])
+                    join (INNER, REPLICATED):
+                        remote exchange (REPARTITION, HASH, ["expr_71", "expr_72", "expr_73", "expr_74", "expr_75", "expr_76", "expr_77", "expr_78"])
+                            cte wswscs
+                                final aggregation over (d_week_seq$gid)
+                                    local exchange (GATHER, SINGLE, [])
+                                        remote exchange (REPARTITION, HASH, ["d_week_seq$gid"])
+                                            partial aggregation over (d_week_seq$gid)
+                                                join (INNER, REPLICATED):
+                                                    remote exchange (REPARTITION, HASH, ["expr_23", "expr_24"])
+                                                        cte wscs
+                                                            remote exchange (REPARTITION, ROUND_ROBIN, [])
+                                                                Filter
+                                                                    scan web_sales
+                                                                Filter
+                                                                    scan catalog_sales
+                                                    local exchange (GATHER, SINGLE, [])
+                                                        remote exchange (REPLICATE, BROADCAST, [])
+                                                            Filter
+                                                                scan date_dim
+                        local exchange (GATHER, SINGLE, [])
+                            remote exchange (REPLICATE, BROADCAST, [])
+                                Filter
+                                    scan date_dim
+                local exchange (GATHER, SINGLE, [])
+                    remote exchange (REPARTITION, HASH, ["expr_395"])
+                        join (INNER, REPLICATED):
+                            remote exchange (REPARTITION, HASH, ["expr_304", "expr_305", "expr_306", "expr_307", "expr_308", "expr_309", "expr_310", "expr_311"])
+                                cte wswscs
+                                    final aggregation over (d_week_seq$gid_264)
+                                        local exchange (GATHER, SINGLE, [])
+                                            remote exchange (REPARTITION, HASH, ["d_week_seq$gid_264"])
+                                                partial aggregation over (d_week_seq$gid_264)
+                                                    join (INNER, REPLICATED):
+                                                        remote exchange (REPARTITION, HASH, ["expr_226", "expr_227"])
+                                                            cte wscs
+                                                                remote exchange (REPARTITION, ROUND_ROBIN, [])
+                                                                    Filter
+                                                                        scan web_sales
+                                                                    Filter
+                                                                        scan catalog_sales
+                                                        local exchange (GATHER, SINGLE, [])
+                                                            remote exchange (REPLICATE, BROADCAST, [])
+                                                                Filter
+                                                                    scan date_dim
+                            local exchange (GATHER, SINGLE, [])
+                                remote exchange (REPLICATE, BROADCAST, [])
+                                    Filter
+                                        scan date_dim
