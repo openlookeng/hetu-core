@@ -17,7 +17,7 @@
 **注意：当前，启发式索引仅支持ORC存储格式的Hive数据源。**
 
 1. BloomIndex，MinMaxIndex和BtreeIndex可以在Coordinator上使用，以在调度期间过滤Splits
-2. 在读取ORC文件时，为了过滤Splits，可以使用MinMaxIndex或者在workers上使用BloomIndex
+2. 在读取ORC文件时，为了过滤Splits，可以在workers上使用MinMaxIndex或者BloomIndex
 3. 在读取ORC文件时，BitmapIndex可以在workers上用于过滤数据行
 
 ### 1.查询过程中过滤预定分片
