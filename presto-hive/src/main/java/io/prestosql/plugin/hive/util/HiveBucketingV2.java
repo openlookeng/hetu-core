@@ -19,6 +19,7 @@ import io.airlift.slice.Slice;
 import io.prestosql.plugin.hive.HiveType;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.type.Chars;
 import io.prestosql.spi.type.Type;
 import org.apache.hadoop.hive.serde2.typeinfo.ListTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.MapTypeInfo;
@@ -108,6 +109,8 @@ public final class HiveBucketingV2
                         return Murmur3.hash32(prestoType.getSlice(block, position).getBytes());
                     case VARCHAR:
                         return Murmur3.hash32(prestoType.getSlice(block, position).getBytes());
+                    case CHAR:
+                        return Murmur3.hash32(Chars.truncateToLengthAndTrimSpaces(prestoType.getSlice(block, position), prestoType).getBytes());
                     case DATE:
                         // day offset from 1970-01-01
                         return Murmur3.hash32(bytes(toIntExact(prestoType.getLong(block, position))));
@@ -158,6 +161,8 @@ public final class HiveBucketingV2
                     case STRING:
                         return Murmur3.hash32(((Slice) value).getBytes());
                     case VARCHAR:
+                        return Murmur3.hash32(((Slice) value).getBytes());
+                    case CHAR:
                         return Murmur3.hash32(((Slice) value).getBytes());
                     case DATE:
                         // day offset from 1970-01-01

@@ -112,6 +112,10 @@ public class TestHiveBucketing
         assertBucketEquals("string", "\u5f3a\u5927\u7684Hetu\u5f15\u64ce", 889847277, 1436831192); // 3-byte UTF-8 sequences (in Basic Plane, i.e. Plane 0)
         assertBucketEquals("string", "\uD843\uDFFC\uD843\uDFFD\uD843\uDFFE\uD843\uDFFF", -1810797254, -697348811); // 4 code points: 20FFC - 20FFF. 4-byte UTF-8 sequences in Supplementary Plane 2
 
+        assertBucketEquals("char(6)", null, 0, 0);
+        assertBucketEquals("char(6)", "", 1, -965378730);
+        assertBucketEquals("char(6)", "test_1", 10333957, 1284522943);
+
         assertBucketEquals("date", null, 0, 0);
         assertBucketEquals("date", Date.valueOf("1970-01-01"), 0, 1362653161);
         assertBucketEquals("date", Date.valueOf("2015-11-19"), 16758, 8542395);
@@ -308,6 +312,8 @@ public class TestHiveBucketing
             case StandardTypes.DOUBLE:
                 return hiveValue;
             case StandardTypes.VARCHAR:
+                return Slices.utf8Slice(hiveValue.toString());
+            case StandardTypes.CHAR:
                 return Slices.utf8Slice(hiveValue.toString());
             case StandardTypes.DATE:
                 long daysSinceEpochInLocalZone = ((Date) hiveValue).toLocalDate().toEpochDay();
