@@ -50,6 +50,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -424,6 +425,26 @@ public class HivePageSource
 
             // clear reference to loader to free resources, since load was successful
             block = null;
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+            RowFilterLazyBlockLoader other = (RowFilterLazyBlockLoader) obj;
+            return Arrays.equals(this.rowsToKeep, other.rowsToKeep) &&
+                    Objects.equals(this.block, other.block);
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(Arrays.hashCode(rowsToKeep), block);
         }
     }
 

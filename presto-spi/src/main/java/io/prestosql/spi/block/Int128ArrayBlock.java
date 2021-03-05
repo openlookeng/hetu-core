@@ -20,6 +20,8 @@ import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
 
+import java.util.Arrays;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -280,5 +282,31 @@ public class Int128ArrayBlock
         val[1] = values[((position + positionOffset) * 2) + 1];
 
         return val;
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        Int128ArrayBlock other = (Int128ArrayBlock) obj;
+        return Objects.equals(this.INSTANCE_SIZE, other.INSTANCE_SIZE) &&
+                Objects.equals(this.INT128_BYTES, other.INT128_BYTES) &&
+                Objects.equals(this.positionOffset, other.positionOffset) &&
+                Objects.equals(this.positionCount, other.positionCount) &&
+                Arrays.equals(this.valueIsNull, other.valueIsNull) &&
+                Arrays.equals(this.values, other.values) &&
+                Objects.equals(this.sizeInBytes, other.sizeInBytes) &&
+                Objects.equals(this.retainedSizeInBytes, other.retainedSizeInBytes);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(INSTANCE_SIZE, INT128_BYTES, positionOffset, positionCount, Arrays.hashCode(valueIsNull), Arrays.hashCode(values), sizeInBytes, retainedSizeInBytes);
     }
 }

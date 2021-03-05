@@ -19,6 +19,8 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.type.MapType;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.util.Arrays;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 
 import static io.airlift.slice.SizeOf.sizeOf;
@@ -404,5 +406,30 @@ public class SingleMapBlock<T>
         if (equalsResult == null) {
             throw new PrestoException(NOT_SUPPORTED, "map key cannot be null or contain nulls");
         }
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        SingleMapBlock other = (SingleMapBlock) obj;
+        return Objects.equals(this.INSTANCE_SIZE, other.INSTANCE_SIZE) &&
+                Objects.equals(this.mapType, other.mapType) &&
+                Objects.equals(this.offset, other.offset) &&
+                Objects.equals(this.positionCount, other.positionCount) &&
+                Objects.equals(this.keyBlock, other.keyBlock) &&
+                Objects.equals(this.valueBlock, other.valueBlock) &&
+                Arrays.equals(this.hashTable, other.hashTable);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(INSTANCE_SIZE, mapType, offset, positionCount, keyBlock, valueBlock, Arrays.hashCode(hashTable));
     }
 }

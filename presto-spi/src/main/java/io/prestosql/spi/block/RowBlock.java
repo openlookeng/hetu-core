@@ -17,6 +17,8 @@ import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
 
+import java.util.Arrays;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 
@@ -214,5 +216,38 @@ public class RowBlock<T>
                 rowIsNull,
                 fieldBlockOffsets,
                 loadedFieldBlocks);
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        RowBlock other = (RowBlock) obj;
+        return Objects.equals(this.INSTANCE_SIZE, other.INSTANCE_SIZE) &&
+                Objects.equals(this.startOffset, other.startOffset) &&
+                Objects.equals(this.positionCount, other.positionCount) &&
+                Arrays.equals(this.rowIsNull, other.rowIsNull) &&
+                Arrays.equals(this.fieldBlockOffsets, other.fieldBlockOffsets) &&
+                Arrays.equals(this.fieldBlocks, other.fieldBlocks) &&
+                Objects.equals(this.sizeInBytes, other.sizeInBytes) &&
+                Objects.equals(this.retainedSizeInBytes, other.retainedSizeInBytes);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(INSTANCE_SIZE,
+                startOffset,
+                positionCount,
+                Arrays.hashCode(rowIsNull),
+                Arrays.hashCode(fieldBlockOffsets),
+                Arrays.hashCode(fieldBlocks),
+                sizeInBytes,
+                retainedSizeInBytes);
     }
 }

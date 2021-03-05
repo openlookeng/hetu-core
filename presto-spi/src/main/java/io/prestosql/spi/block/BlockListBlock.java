@@ -16,6 +16,8 @@ package io.prestosql.spi.block;
 import io.airlift.slice.Slice;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.util.Arrays;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 
 import static io.airlift.slice.SizeOf.sizeOf;
@@ -319,5 +321,31 @@ public class BlockListBlock<T>
     {
         int blockIdx = lookupBlockForPosition(position);
         return (T) blocks[blockIdx].get(position - positionMap[blockIdx]);
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        BlockListBlock other = (BlockListBlock) obj;
+        return Objects.equals(this.INSTANCE_SIZE, other.INSTANCE_SIZE) &&
+                Arrays.equals(this.blocks, other.blocks) &&
+                Objects.equals(this.blockCount, other.blockCount) &&
+                Objects.equals(this.positionCount, other.positionCount) &&
+                Arrays.equals(this.positionMap, other.positionMap) &&
+                Objects.equals(this.sizeInBytes, other.sizeInBytes) &&
+                Objects.equals(this.retainedSizeInBytes, other.retainedSizeInBytes) &&
+                Objects.equals(this.hasNulls, other.hasNulls);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(INSTANCE_SIZE, Arrays.hashCode(blocks), blockCount, positionCount, Arrays.hashCode(positionMap), sizeInBytes, retainedSizeInBytes, hasNulls);
     }
 }
