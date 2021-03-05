@@ -4,7 +4,7 @@
 ## 摘要
 
 ``` sql
-VACUUM TABLE table_name [FULL] [PARTITION partition_value]? [AND WAIT]?
+VACUUM TABLE table_name [FULL [UNIFY]] [PARTITION partition_value]? [AND WAIT]?
 ```
 
 ## 说明
@@ -26,6 +26,10 @@ VACUUM TABLE table_name [FULL] [PARTITION partition_value]? [AND WAIT]?
 **FULL**
 
 可以将 FULL VACUUM 视为合并表的所有数据集的下一级。与默认 VACUUM 相比，该操作发生的频率更低，完成时间也更长。
+
+**FULL UNIFY**
+
+UNIFY选项有助于将每个分区的多个桶文件合并为单个桶文件，桶号为0。
 
 *Hive：*
 
@@ -55,6 +59,12 @@ VACUUM TABLE table_name [FULL] [PARTITION partition_value]? [AND WAIT]?
 
 ``` sql
     VACUUM TABLE compact_test_table_with_partition FULL AND WAIT;
+```
+
+示例 4：对一个分区内的所有小文件进行Unify操作：
+
+```sql
+VACUUM TABLE catalog_sales FULL UNIFY PARTITION 'partition_key';
 ```
 
 ## 另请参见
