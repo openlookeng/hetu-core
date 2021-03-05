@@ -101,7 +101,7 @@ connection-password=<远端openLooKeng密码>
 
 ### 远端Nginx配置
 
-在远端开启AA，同时使用Nginx作为代理时，需要对Nginx的配置进行一定修改：
+在远端开启HA，同时使用Nginx作为代理时，需要对Nginx的配置进行一定修改：
 
 ```nginx
 http {
