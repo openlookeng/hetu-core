@@ -29,27 +29,23 @@ public class MarkerPage
 {
     private final long snapshotId;
     private final boolean isResuming;
-    // It's possible for resume attempt ot fail, and more attempts are needed.
-    // The resumeId is used to distinguish between these attempts.
-    private final int resumeId;
 
     public static MarkerPage snapshotPage(long snapshotId)
     {
-        return new MarkerPage(snapshotId, false, 0);
+        return new MarkerPage(snapshotId, false);
     }
 
-    public static MarkerPage resumePage(long snapshotId, int resumeId)
+    public static MarkerPage resumePage(long snapshotId)
     {
-        return new MarkerPage(snapshotId, true, resumeId);
+        return new MarkerPage(snapshotId, true);
     }
 
-    public MarkerPage(long snapshotId, boolean isResuming, int resumeId)
+    public MarkerPage(long snapshotId, boolean isResuming)
     {
         // positionCount can't be 0, to maintain assumptions about what a page does; blocks can't be null
         super(1);
         this.snapshotId = snapshotId;
         this.isResuming = isResuming;
-        this.resumeId = resumeId;
     }
 
     public long getSnapshotId()
@@ -62,15 +58,10 @@ public class MarkerPage
         return isResuming;
     }
 
-    public int getResumeId()
-    {
-        return resumeId;
-    }
-
     // TODO-cp-I361XN: remove this. Only used in LocalExchange.
     public MarkerPage clone()
     {
-        return (MarkerPage) new MarkerPage(snapshotId, isResuming, resumeId).setOrigin(getOrigin().orElse(null));
+        return (MarkerPage) new MarkerPage(snapshotId, isResuming).setOrigin(getOrigin().orElse(null));
     }
 
     @Override
@@ -87,7 +78,7 @@ public class MarkerPage
         }
         if (obj instanceof MarkerPage) {
             MarkerPage other = (MarkerPage) obj;
-            return other.snapshotId == snapshotId && other.isResuming == isResuming && other.resumeId == resumeId;
+            return other.snapshotId == snapshotId && other.isResuming == isResuming;
         }
         return false;
     }
@@ -98,7 +89,6 @@ public class MarkerPage
         return new StringBuilder("MarkerPage{")
                 .append("snapshotId=").append(snapshotId)
                 .append(",isResuming=").append(isResuming)
-                .append(",resumeId=").append(resumeId)
                 .append("}")
                 .toString();
     }
@@ -109,7 +99,6 @@ public class MarkerPage
         return ByteBuffer.allocate(size)
                 .putLong(snapshotId)
                 .put((byte) (isResuming ? 1 : 0))
-                .putInt(resumeId)
                 .array();
     }
 
@@ -118,7 +107,6 @@ public class MarkerPage
         ByteBuffer buffer = ByteBuffer.wrap(bytes);
         long snapshotId = buffer.getLong();
         boolean isResuming = buffer.get() != 0;
-        int resumeId = buffer.getInt();
-        return new MarkerPage(snapshotId, isResuming, resumeId);
+        return new MarkerPage(snapshotId, isResuming);
     }
 }

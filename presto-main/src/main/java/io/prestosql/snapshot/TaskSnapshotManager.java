@@ -45,8 +45,7 @@ public class TaskSnapshotManager
     // LinkedHashMap can be used to keep ordering
     private final Map<Long, SnapshotComponentCounter<SnapshotStateId>> captureComponentCounters = Collections.synchronizedMap(new LinkedHashMap<>());
     private final Map<Long, SnapshotResult> captureResults = new LinkedHashMap<>();
-    // Key is "snapshotId-resumeId"
-    private final Map<String, SnapshotComponentCounter<SnapshotStateId>> restoreComponentCounters = Collections.synchronizedMap(new LinkedHashMap<>());
+    private final Map<Long, SnapshotComponentCounter<SnapshotStateId>> restoreComponentCounters = Collections.synchronizedMap(new LinkedHashMap<>());
     private final RestoreResult restoreResult = new RestoreResult();
 
     @Inject
@@ -104,19 +103,19 @@ public class TaskSnapshotManager
         updateCapture(componentId, SnapshotComponentCounter.ComponentState.FAILED);
     }
 
-    public void succeededToRestore(SnapshotStateId componentId, int resumeId)
+    public void succeededToRestore(SnapshotStateId componentId)
     {
-        updateRestore(componentId, resumeId, SnapshotComponentCounter.ComponentState.SUCCESSFUL);
+        updateRestore(componentId, SnapshotComponentCounter.ComponentState.SUCCESSFUL);
     }
 
-    public void failedToRestore(SnapshotStateId componentId, int resumeId, boolean fatal)
+    public void failedToRestore(SnapshotStateId componentId, boolean fatal)
     {
         LOG.debug("Failed (fatal=%b) to restore snapshot %d for component %s", fatal, componentId.getSnapshotId(), componentId);
         if (fatal) {
-            updateRestore(componentId, resumeId, SnapshotComponentCounter.ComponentState.FAILED_FATAL);
+            updateRestore(componentId, SnapshotComponentCounter.ComponentState.FAILED_FATAL);
         }
         else {
-            updateRestore(componentId, resumeId, SnapshotComponentCounter.ComponentState.FAILED);
+            updateRestore(componentId, SnapshotComponentCounter.ComponentState.FAILED);
         }
     }
 
@@ -163,21 +162,20 @@ public class TaskSnapshotManager
         }
     }
 
-    private void updateRestore(SnapshotStateId componentId, int resumeId, SnapshotComponentCounter.ComponentState componentState)
+    private void updateRestore(SnapshotStateId componentId, SnapshotComponentCounter.ComponentState componentState)
     {
         TaskId taskId = componentId.getTaskId();
         checkState(totalComponents > 0);
         long snapshotId = componentId.getSnapshotId();
-        String snapshotResumeId = snapshotId + "-" + resumeId;
         // update restoredSnapshotComponentCounterMap
         SnapshotComponentCounter<SnapshotStateId> counter =
-                restoreComponentCounters.computeIfAbsent(snapshotResumeId, k -> new SnapshotComponentCounter<>(totalComponents));
+                restoreComponentCounters.computeIfAbsent(snapshotId, k -> new SnapshotComponentCounter<>(totalComponents));
 
         if (counter.updateComponent(componentId, componentState)) {
             SnapshotResult snapshotResult = counter.getSnapshotResult();
             boolean changed;
             synchronized (restoreResult) {
-                changed = restoreResult.setSnapshotResult(snapshotId, resumeId, snapshotResult);
+                changed = restoreResult.setSnapshotResult(snapshotId, snapshotResult);
             }
             if (changed && snapshotResult.isDone()) {
                 if (querySnapshotManager.isCoordinator()) {

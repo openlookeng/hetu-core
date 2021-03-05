@@ -33,12 +33,11 @@ public class ValuesNode
     private final List<Symbol> outputSymbols;
     private final List<List<RowExpression>> rows;
     private Long resumeSnapshotId;
-    private int resumeId;
     private long nextSnapshotId;
 
     public ValuesNode(PlanNodeId id, List<Symbol> outputSymbols, List<List<RowExpression>> rows)
     {
-        this(id, outputSymbols, rows, null, 0, 0);
+        this(id, outputSymbols, rows, null, 0);
     }
 
     @JsonCreator
@@ -46,7 +45,6 @@ public class ValuesNode
             @JsonProperty("outputSymbols") List<Symbol> outputSymbols,
             @JsonProperty("rows") List<List<RowExpression>> rows,
             @JsonProperty("resumeSnapshotId") Long resumeSnapshotId,
-            @JsonProperty("resumeId") int resumeId,
             @JsonProperty("nextSnapshotId") long nextSnapshotId)
     {
         super(id);
@@ -59,7 +57,6 @@ public class ValuesNode
         }
 
         this.resumeSnapshotId = resumeSnapshotId;
-        this.resumeId = resumeId;
         this.nextSnapshotId = nextSnapshotId;
     }
 
@@ -89,12 +86,6 @@ public class ValuesNode
     }
 
     @JsonProperty
-    public int getResumeId()
-    {
-        return resumeId;
-    }
-
-    @JsonProperty
     public long getNextSnapshotId()
     {
         return nextSnapshotId;
@@ -120,10 +111,9 @@ public class ValuesNode
                 .collect(toImmutableList());
     }
 
-    public void setupSnapshot(Long resumeSnapshotId, int resumeId, long nextSnapshotId)
+    public void setupSnapshot(Long resumeSnapshotId, long nextSnapshotId)
     {
         this.resumeSnapshotId = resumeSnapshotId;
-        this.resumeId = resumeId;
         this.nextSnapshotId = nextSnapshotId;
     }
 }

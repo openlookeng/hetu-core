@@ -38,7 +38,6 @@ import static io.prestosql.SessionTestUtils.TEST_SNAPSHOT_SESSION;
 import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -51,8 +50,8 @@ public class TestSingleInputSnapshotState
     private static final Page regularPage = new Page(1);
     private static final MarkerPage marker1 = MarkerPage.snapshotPage(1);
     private static final MarkerPage marker2 = MarkerPage.snapshotPage(2);
-    private static final MarkerPage resume1 = MarkerPage.resumePage(1, 1);
-    private static final MarkerPage resume2 = MarkerPage.resumePage(2, 1);
+    private static final MarkerPage resume1 = MarkerPage.resumePage(1);
+    private static final MarkerPage resume2 = MarkerPage.resumePage(2);
     private static final SnapshotStateId snapshotId1 = createSnapshotStateId(1);
     private static final SnapshotStateId snapshotId2 = createSnapshotStateId(2);
 
@@ -235,8 +234,8 @@ public class TestSingleInputSnapshotState
         state.processPage(resume1);
         verify(snapshotManager, times(2)).storeFile(anyObject(), anyObject());
         verify(snapshotManager, times(4)).loadFile(anyObject(), anyObject());
-        verify(snapshotManager, times(1)).succeededToRestore(anyObject(), anyInt());
-        verify(snapshotManager, times(2)).failedToRestore(anyObject(), anyInt(), anyBoolean());
+        verify(snapshotManager, times(1)).succeededToRestore(anyObject());
+        verify(snapshotManager, times(2)).failedToRestore(anyObject(), anyBoolean());
     }
 
     private static class TestingRestorable

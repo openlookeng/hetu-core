@@ -61,7 +61,7 @@ public class QuerySnapshotManager
     // LinkedHashMap can be used to keep ordering
     private final Map<Long, SnapshotComponentCounter<TaskId>> captureComponentCounters = Collections.synchronizedMap(new LinkedHashMap<>());
     private final Map<Long, SnapshotResult> captureResults = Collections.synchronizedMap(new LinkedHashMap<>());
-    private final Map<String, SnapshotComponentCounter<TaskId>> restoreComponentCounters = Collections.synchronizedMap(new LinkedHashMap<>());
+    private final Map<Long, SnapshotComponentCounter<TaskId>> restoreComponentCounters = Collections.synchronizedMap(new LinkedHashMap<>());
     private final RestoreResult restoreResult = new RestoreResult();
     private final List<Consumer<RestoreResult>> restoreCompleteListeners = Collections.synchronizedList(new ArrayList<>());
 
@@ -368,7 +368,7 @@ public class QuerySnapshotManager
         captureComponentCounters.clear();
         captureResults.clear();
         restoreComponentCounters.clear();
-        restoreResult.setSnapshotResult(0, 0, SnapshotResult.IN_PROGRESS);
+        restoreResult.setSnapshotResult(0, SnapshotResult.IN_PROGRESS);
         restoreCompleteListeners.clear();
     }
 
@@ -403,17 +403,16 @@ public class QuerySnapshotManager
         if (restoreResult.isPresent()) {
             SnapshotResult result = restoreResult.get().getSnapshotResult();
             long snapshotId = restoreResult.get().getSnapshotId();
-            int resumeId = restoreResult.get().getResumeId();
             if (result == SnapshotResult.FAILED) {
-                updateQueryRestore(snapshotId, taskId, resumeId, SnapshotComponentCounter.ComponentState.FAILED);
+                updateQueryRestore(snapshotId, taskId, SnapshotComponentCounter.ComponentState.FAILED);
                 LOG.debug("[FATAL] Failed to resume for: " + taskId + ", snapshot " + snapshotId);
             }
             else if (result == SnapshotResult.FAILED_FATAL) {
-                updateQueryRestore(snapshotId, taskId, resumeId, SnapshotComponentCounter.ComponentState.FAILED_FATAL);
+                updateQueryRestore(snapshotId, taskId, SnapshotComponentCounter.ComponentState.FAILED_FATAL);
                 LOG.debug("Failed to resume for: " + taskId + ", snapshot " + snapshotId);
             }
             else if (result == SnapshotResult.SUCCESSFUL) {
-                updateQueryRestore(snapshotId, taskId, resumeId, SnapshotComponentCounter.ComponentState.SUCCESSFUL);
+                updateQueryRestore(snapshotId, taskId, SnapshotComponentCounter.ComponentState.SUCCESSFUL);
             }
         }
     }
@@ -458,12 +457,10 @@ public class QuerySnapshotManager
         }
     }
 
-    private void updateQueryRestore(long snapshotId, TaskId taskId, int resumeId, SnapshotComponentCounter.ComponentState componentState)
+    private void updateQueryRestore(long snapshotId, TaskId taskId, SnapshotComponentCounter.ComponentState componentState)
     {
-        String snapshotResumeId = snapshotId + "-" + resumeId;
-
         // update queryToRestoredSnapshotComponentCounterMap
-        SnapshotComponentCounter<TaskId> counter = restoreComponentCounters.computeIfAbsent(snapshotResumeId, k ->
+        SnapshotComponentCounter<TaskId> counter = restoreComponentCounters.computeIfAbsent(snapshotId, k ->
                 // A snapshot is considered complete if tasks either finished their snapshots or have completed
                 new SnapshotComponentCounter<>(ids -> ids.containsAll(unfinishedTasks)));
 
@@ -474,7 +471,7 @@ public class QuerySnapshotManager
             SnapshotResult snapshotResult = counter.getSnapshotResult();
             boolean changed;
             synchronized (restoreResult) {
-                changed = restoreResult.setSnapshotResult(snapshotId, resumeId, snapshotResult);
+                changed = restoreResult.setSnapshotResult(snapshotId, snapshotResult);
             }
             if (changed && snapshotResult.isDone()) {
                 LOG.debug("Finished restoring snapshot %d for query %s. Result is %s.", snapshotId, queryId.getId(), snapshotResult);

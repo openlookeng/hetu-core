@@ -267,7 +267,7 @@ public class TestDistributedExecutionPlanner
 
     private void test(SubPlan root, Multimap<String, String> must, Multimap<String, String> mustNot)
     {
-        planner.plan(root, session, SNAPSHOT, null, 0, 0);
+        planner.plan(root, session, SNAPSHOT, null, 0);
         Multimap<String, String> missing = Multimaps.filterEntries(must, e -> !dependencies.containsEntry(e.getKey(), e.getValue()));
         assertTrue(missing.isEmpty(), "Missing dependency: " + missing);
         Multimap<String, String> wrong = Multimaps.filterEntries(mustNot, e -> dependencies.containsEntry(e.getKey(), e.getValue()));
@@ -285,13 +285,11 @@ public class TestDistributedExecutionPlanner
         SubPlan root = makePlan(1,
                 join(a, b),
                 ImmutableList.of());
-        planner.plan(root, session, SNAPSHOT, null, 0, 7);
+        planner.plan(root, session, SNAPSHOT, null, 7);
 
         assertNull(a.getResumeSnapshotId());
-        assertEquals(a.getResumeId(), 0);
         assertEquals(a.getNextSnapshotId(), 7);
         assertNull(b.getResumeSnapshotId());
-        assertEquals(b.getResumeId(), 0);
         assertEquals(b.getNextSnapshotId(), 7);
     }
 
@@ -304,13 +302,11 @@ public class TestDistributedExecutionPlanner
         SubPlan root = makePlan(1,
                 join(a, b),
                 ImmutableList.of());
-        planner.plan(root, session, RESUME, null, 2, 7);
+        planner.plan(root, session, RESUME, null, 7);
 
         assertNull(a.getResumeSnapshotId());
-        assertEquals(a.getResumeId(), 2);
         assertEquals(a.getNextSnapshotId(), 7);
         assertNull(b.getResumeSnapshotId());
-        assertEquals(b.getResumeId(), 2);
         assertEquals(b.getNextSnapshotId(), 7);
     }
 
@@ -323,13 +319,11 @@ public class TestDistributedExecutionPlanner
         SubPlan root = makePlan(1,
                 join(a, b),
                 ImmutableList.of());
-        planner.plan(root, session, RESUME, 5L, 2, 7);
+        planner.plan(root, session, RESUME, 5L, 7);
 
         assertEquals(a.getResumeSnapshotId().longValue(), 5);
-        assertEquals(a.getResumeId(), 2);
         assertEquals(a.getNextSnapshotId(), 7);
         assertEquals(b.getResumeSnapshotId().longValue(), 5);
-        assertEquals(b.getResumeId(), 2);
         assertEquals(b.getNextSnapshotId(), 7);
     }
 

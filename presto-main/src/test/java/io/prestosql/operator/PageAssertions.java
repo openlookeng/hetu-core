@@ -37,7 +37,6 @@ public final class PageAssertions
             MarkerPage expected = (MarkerPage) expectedPage;
             assertEquals(actual.getSnapshotId(), expected.getSnapshotId());
             assertEquals(actual.isResuming(), expected.isResuming());
-            assertEquals(actual.getResumeId(), expected.getResumeId());
             return;
         }
 

@@ -154,7 +154,7 @@ public class TestMarkerSplitSource
 
     private void resumeSnapshot()
     {
-        markerSource.resumeSnapshot(5, 1);
+        markerSource.resumeSnapshot(5);
         // Ignore resume marker
         markerSource.getNextBatch(null, lifespan, 2);
     }
@@ -163,7 +163,7 @@ public class TestMarkerSplitSource
     {
         when(announcer.shouldGenerateMarker(anyObject())).thenReturn(OptionalLong.of(5));
         markerSource.getNextBatch(null, lifespan, 3);
-        markerSource.resumeSnapshot(4, 1);
+        markerSource.resumeSnapshot(4);
         // Ignore resume marker
         markerSource.getNextBatch(null, lifespan, 2);
     }
@@ -172,7 +172,7 @@ public class TestMarkerSplitSource
     {
         when(announcer.shouldGenerateMarker(anyObject())).thenReturn(OptionalLong.of(5));
         markerSource.getNextBatch(null, lifespan, 3);
-        markerSource.resumeSnapshot(5, 1);
+        markerSource.resumeSnapshot(5);
         // Ignore resume marker
         markerSource.getNextBatch(null, lifespan, 2);
     }
@@ -187,7 +187,7 @@ public class TestMarkerSplitSource
                 .thenReturn(OptionalLong.of(6));
         markerSource.getNextBatch(null, lifespan, 3);
         markerSource.getNextBatch(null, lifespan, 3);
-        markerSource.resumeSnapshot(6, 1);
+        markerSource.resumeSnapshot(6);
         // Ignore resume marker
         markerSource.getNextBatch(null, lifespan, 2);
     }
@@ -197,7 +197,7 @@ public class TestMarkerSplitSource
     {
         when(announcer.shouldGenerateMarker(anyObject())).thenReturn(OptionalLong.of(5));
         markerSource.getNextBatch(null, lifespan, 3);
-        markerSource.resumeSnapshot(7, 1);
+        markerSource.resumeSnapshot(7);
         // Ignore resume marker
         markerSource.getNextBatch(null, lifespan, 2);
     }
@@ -222,7 +222,7 @@ public class TestMarkerSplitSource
             assertEquals(batch.get().getSplits().size(), lastBatch.getSplits().size());
         }
 
-        markerSource.resumeSnapshot(3, 1);
+        markerSource.resumeSnapshot(3);
         SplitBatch result = markerSource.getNextBatch(null, lifespan, 2).get();
         assertFalse(result.isLastBatch());
         List<Split> splits = result.getSplits();
@@ -232,7 +232,6 @@ public class TestMarkerSplitSource
         MarkerSplit marker = (MarkerSplit) split;
         assertEquals(marker.getSnapshotId(), 3);
         assertTrue(marker.isResuming());
-        assertEquals(marker.getResumeId(), 1);
     }
 
     @Test
@@ -328,19 +327,19 @@ public class TestMarkerSplitSource
         markerSource.getNextBatch(null, lifespan, 3); // Snapshot 4
         markerSource.getNextBatch(null, lifespan, 3); // 5
         markerSource.getNextBatch(null, lifespan, 3); // 6
-        markerSource.resumeSnapshot(2, 1);
+        markerSource.resumeSnapshot(2);
         markerSource.getNextBatch(null, lifespan, 3); // Resume 2
 
         markerSource.getNextBatch(null, lifespan, 3); // Read 3 splits
         markerSource.getNextBatch(null, lifespan, 3); // 11
         markerSource.getNextBatch(null, lifespan, 3); // 12
-        markerSource.resumeSnapshot(2, 1);
+        markerSource.resumeSnapshot(2);
         markerSource.getNextBatch(null, lifespan, 3); // Resume 2
 
         markerSource.getNextBatch(null, lifespan, 3); // Read 3 splits
         markerSource.getNextBatch(null, lifespan, 3); // 15
         markerSource.getNextBatch(null, lifespan, 3); // 16
-        markerSource.resumeSnapshot(13, 1);
+        markerSource.resumeSnapshot(13);
         markerSource.getNextBatch(null, lifespan, 3); // Resume 13
 
         SplitBatch batch = markerSource.getNextBatch(null, lifespan, 4).get();
@@ -364,7 +363,7 @@ public class TestMarkerSplitSource
         splits = result.get().getSplits();
         assertTrue(!splits.isEmpty());
 
-        markerSource.resumeSnapshot(0, 1);
+        markerSource.resumeSnapshot(0);
         result = markerSource.getNextBatch(null, lifespan, 2);
         splits = result.get().getSplits();
         assertTrue(splits.isEmpty());

@@ -117,7 +117,7 @@ public class TestMarkerAnnouncer
     private long resumeSnapshot()
     {
         announcer.deactivateSplitSource(markerSplitSource2);
-        announcer.resumeSnapshot(5, 1);
+        announcer.resumeSnapshot(5);
         return 2;
     }
 }

@@ -458,7 +458,7 @@ public class TestLocalExchange
 
             MarkerPage marker1 = MarkerPage.snapshotPage(1);
             MarkerPage marker2 = MarkerPage.snapshotPage(2);
-            MarkerPage resume1 = MarkerPage.resumePage(1, 1);
+            MarkerPage resume1 = MarkerPage.resumePage(1);
             long markerSize = marker1.getRetainedSizeInBytes();
 
             sinkA.addPage(marker1.setOrigin(sinkAId));

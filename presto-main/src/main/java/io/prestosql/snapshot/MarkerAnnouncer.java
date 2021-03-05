@@ -211,13 +211,13 @@ public class MarkerAnnouncer
     }
 
     // Resume to specified snapshot id. Also forward this request to all the split sources.
-    public synchronized void resumeSnapshot(long snapshotId, int resumeId)
+    public synchronized void resumeSnapshot(long snapshotId)
     {
-        LOG.debug("Resuming to snapshot %d, with resumeId %d", snapshotId, resumeId);
+        LOG.debug("Resuming to snapshot %d", snapshotId);
         activeSplitSources.clear();
         activeSplitSources.addAll(allSplitSources.values());
         for (MarkerSplitSource source : activeSplitSources) {
-            source.resumeSnapshot(snapshotId, resumeId);
+            source.resumeSnapshot(snapshotId);
         }
         // Abandon current snapshot id, to ensure snapshots taken after resume to not overlap with those from before resume
         setupNewSnapshotId();

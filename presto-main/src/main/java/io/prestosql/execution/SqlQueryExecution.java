@@ -535,14 +535,12 @@ public class SqlQueryExecution
         // This MUST be done BEFORE creating the new scheduler, because it resets the snapshotManager internal states.
         OptionalLong snapshotId = snapshotManager.getResumeSnapshotId();
         MarkerAnnouncer announcer = splitManager.getMarkerAnnouncer(stateMachine.getSession());
-        // TODO-cp-I2D61F: provide proper valuesResumeId
-        int resumeId = 1;
-        announcer.resumeSnapshot(snapshotId.orElse(0), resumeId);
+        announcer.resumeSnapshot(snapshotId.orElse(0));
 
         // Create a new scheduler, to schedule new stages and tasks
         DistributedExecutionPlanner distributedExecutionPlanner = new DistributedExecutionPlanner(splitManager, metadata);
         StageExecutionPlan executionPlan = distributedExecutionPlanner.plan(plan.getRoot(), stateMachine.getSession(),
-                RESUME, snapshotId.isPresent() ? snapshotId.getAsLong() : null, resumeId, announcer.currentSnapshotId());
+                RESUME, snapshotId.isPresent() ? snapshotId.getAsLong() : null, announcer.currentSnapshotId());
         // build the stage execution objects (this doesn't schedule execution)
         SqlQueryScheduler scheduler = createSqlQueryScheduler(
                 stateMachine,
@@ -674,10 +672,10 @@ public class SqlQueryExecution
             // Snapshot: need to plan different when snapshot is enabled.
             // See the "plan" method for difference between the different modes.
             MarkerAnnouncer announcer = splitManager.getMarkerAnnouncer(session);
-            outputStageExecutionPlan = distributedPlanner.plan(plan.getRoot(), session, SNAPSHOT, null, 0, announcer.currentSnapshotId());
+            outputStageExecutionPlan = distributedPlanner.plan(plan.getRoot(), session, SNAPSHOT, null, announcer.currentSnapshotId());
         }
         else {
-            outputStageExecutionPlan = distributedPlanner.plan(plan.getRoot(), session, NORMAL, null, 0, 0);
+            outputStageExecutionPlan = distributedPlanner.plan(plan.getRoot(), session, NORMAL, null, 0);
         }
         stateMachine.endDistributedPlanning();
 

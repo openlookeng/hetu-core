@@ -54,7 +54,6 @@ public class MarkerSplitSource
 
     // When resuming from a snapshot, the first split sent from a source is a resume marker split
     private OptionalLong resumingSnapshotId = OptionalLong.empty();
-    private int resumeId;
 
     // Keep track of all splits sent from this source, so that they can be replayed after a resume.
     // The bufferPosition indicates the next split to send. If it's not at the end of the buffer, and split source is not exhausted,
@@ -106,7 +105,7 @@ public class MarkerSplitSource
         if (resumingSnapshotId.isPresent()) {
             long snapshotId = resumingSnapshotId.getAsLong();
             resumingSnapshotId = OptionalLong.empty();
-            Split marker = new Split(getCatalogName(), MarkerSplit.resumeSplit(getCatalogName(), snapshotId, resumeId), lifespan);
+            Split marker = new Split(getCatalogName(), MarkerSplit.resumeSplit(getCatalogName(), snapshotId), lifespan);
             List<Split> splits = Collections.singletonList(marker);
             boolean lastBatch = sourceExhausted && bufferPosition == splitBuffer.size();
             LOG.debug("Sending out resuming marker %d after %d splits for source: %s (%s)", snapshotId, bufferPosition, getCatalogName(), toString());
@@ -222,7 +221,7 @@ public class MarkerSplitSource
         return batch;
     }
 
-    public void resumeSnapshot(long snapshotId, int resumeId)
+    public void resumeSnapshot(long snapshotId)
     {
         Integer position = snapshotBufferPositions.get(snapshotId);
         if (position != null) {
@@ -248,7 +247,6 @@ public class MarkerSplitSource
         // Don't send a resume marker if resuming from the beginning
         if (snapshotId != 0) {
             resumingSnapshotId = OptionalLong.of(snapshotId);
-            this.resumeId = resumeId;
         }
 
         remainingDependencies.clear();

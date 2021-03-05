@@ -28,12 +28,11 @@ public class TestMarkerPage
     @Test
     public void testSerde()
     {
-        MarkerPage page = new MarkerPage(100, true, 3);
+        MarkerPage page = new MarkerPage(100, true);
         SerializedPage spage = SerializedPage.forMarker(page);
         page = spage.toMarker();
         Assert.assertEquals(page.getSnapshotId(), 100);
         Assert.assertTrue(page.isResuming());
-        Assert.assertEquals(page.getResumeId(), 3);
     }
 
     @Test
@@ -49,14 +48,13 @@ public class TestMarkerPage
         Assert.assertEquals(marker1.getSnapshotId(), 1);
         Assert.assertFalse(marker1.isResuming());
 
-        MarkerPage resume1 = MarkerPage.resumePage(1, 1);
+        MarkerPage resume1 = MarkerPage.resumePage(1);
         serializedPage = serde.serialize(resume1);
         deserializedPage = serde.deserialize(serializedPage);
         Assert.assertTrue(deserializedPage instanceof MarkerPage);
         resume1 = (MarkerPage) deserializedPage;
         Assert.assertEquals(resume1.getSnapshotId(), 1);
         Assert.assertTrue(resume1.isResuming());
-        Assert.assertEquals(resume1.getResumeId(), 1);
 
         Page regular = new Page(1);
         serializedPage = serde.serialize(regular);
@@ -71,14 +69,12 @@ public class TestMarkerPage
         MarkerPage marker2 = marker1.clone();
         Assert.assertEquals(marker2.getSnapshotId(), marker1.getSnapshotId());
         Assert.assertEquals(marker2.isResuming(), marker1.isResuming());
-        Assert.assertEquals(marker2.getResumeId(), marker1.getResumeId());
         Assert.assertEquals(marker2.getOrigin(), marker1.getOrigin());
 
         marker1.setOrigin("origin");
         marker2 = marker1.clone();
         Assert.assertEquals(marker2.getSnapshotId(), marker1.getSnapshotId());
         Assert.assertEquals(marker2.isResuming(), marker1.isResuming());
-        Assert.assertEquals(marker2.getResumeId(), marker1.getResumeId());
         Assert.assertEquals(marker2.getOrigin(), marker1.getOrigin());
     }
 }

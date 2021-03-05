@@ -305,10 +305,10 @@ public class MultiInputSnapshotState
         }
     }
 
-    private SnapshotState snapshotStateById(long snapshotId)
+    private SnapshotState snapshotStateById(MarkerPage marker)
     {
         for (SnapshotState snapshot : states) {
-            if (snapshot.snapshotId == snapshotId) {
+            if (snapshot.snapshotId == marker.getSnapshotId() && snapshot.resuming == marker.isResuming()) {
                 return snapshot;
             }
         }
@@ -320,9 +320,9 @@ public class MultiInputSnapshotState
         boolean ret = false;
 
         long snapshotId = marker.getSnapshotId();
-        SnapshotState snapshot = snapshotStateById(snapshotId);
+        SnapshotState snapshot = snapshotStateById(marker);
         SnapshotStateId componentId = snapshotStateIdGenerator.apply(snapshotId);
-        if (snapshot == null || snapshot.resumeId < marker.getResumeId()) {
+        if (snapshot == null) {
             // There won't be 2 resuming attempts for different snapshot ids happening at the same time.
             // Currently it's also not possible to have 2 attempts with the same snapshot id, but different attempt ids,
             // but the code below supports this scenario.
@@ -331,11 +331,11 @@ public class MultiInputSnapshotState
             try {
                 Optional<Object> storedState = snapshotManager.loadState(componentId);
                 if (!storedState.isPresent()) {
-                    snapshotManager.failedToRestore(componentId, marker.getResumeId(), true);
+                    snapshotManager.failedToRestore(componentId, true);
                     LOG.warn("Can't locate saved state for snapshot %d, component %s", snapshotId, restorableId);
                 }
                 else if (storedState.get() == QuerySnapshotManager.NO_STATE) {
-                    snapshotManager.failedToRestore(componentId, marker.getResumeId(), true);
+                    snapshotManager.failedToRestore(componentId, true);
                     LOG.error("BUG! State of component %s has never been stored successfully before snapshot %d", restorableId, snapshotId);
                 }
                 else {
@@ -343,20 +343,16 @@ public class MultiInputSnapshotState
                     pendingPages = storedStates.listIterator();
                     restorable.restore(pendingPages.next(), pagesSerde);
                     LOG.debug("Successfully restored state to snapshot %d for %s", snapshotId, restorableId);
-                    snapshotManager.succeededToRestore(componentId, marker.getResumeId());
+                    snapshotManager.succeededToRestore(componentId);
                 }
             }
             catch (Exception e) {
                 LOG.warn(e, "Failed to restore snapshot " + snapshotId + " for " + restorableId);
-                snapshotManager.failedToRestore(componentId, marker.getResumeId(), false);
+                snapshotManager.failedToRestore(componentId, false);
             }
 
             snapshot = new SnapshotState(marker);
             states.add(snapshot);
-        }
-        else if (snapshot.resumeId > marker.getResumeId()) {
-            // This marker is for a previous resume attempt. Ignore it.
-            return true;
         }
         else {
             // Seen marker with same snapshot id. Don't need to pass on this marker.
@@ -386,7 +382,7 @@ public class MultiInputSnapshotState
         boolean ret = false;
 
         long snapshotId = marker.getSnapshotId();
-        SnapshotState snapshot = snapshotStateById(snapshotId);
+        SnapshotState snapshot = snapshotStateById(marker);
         if (snapshot == null) {
             // First time a marker is received for a snapshot. Store operator state and make marker available.
             snapshot = new SnapshotState(marker);
@@ -434,7 +430,7 @@ public class MultiInputSnapshotState
                     SnapshotState failedState = states.remove(0);
                     componentId = snapshotStateIdGenerator.apply(failedState.snapshotId);
                     if (failedState.resuming) {
-                        snapshotManager.failedToRestore(componentId, failedState.resumeId, false);
+                        snapshotManager.failedToRestore(componentId, false);
                     }
                     else {
                         snapshotManager.failedToCapture(componentId);
@@ -499,7 +495,6 @@ public class MultiInputSnapshotState
     {
         private final long snapshotId;
         private final boolean resuming;
-        private final int resumeId;
         // Which channels have received the marker
         private final Set<String> markedChannels;
         // First entry is snapshot of the operator, followed by inputs from various channels as SerializedPage instances.
@@ -510,7 +505,6 @@ public class MultiInputSnapshotState
         {
             this.snapshotId = marker.getSnapshotId();
             this.resuming = marker.isResuming();
-            this.resumeId = marker.getResumeId();
             this.markedChannels = new HashSet<>();
         }
     }

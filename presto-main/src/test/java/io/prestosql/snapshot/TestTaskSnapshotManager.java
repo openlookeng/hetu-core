@@ -85,28 +85,27 @@ public class TestTaskSnapshotManager
         snapshotManager2.setTotalComponents(3);
 
         // Test restore successfully
-        snapshotManager1.succeededToRestore(new SnapshotStateId(1, taskId1, "component1"), 1);
+        snapshotManager1.succeededToRestore(new SnapshotStateId(1, taskId1, "component1"));
         RestoreResult result = snapshotManager1.getSnapshotRestoreResult();
         Assert.assertEquals(result.getSnapshotId(), 1L);
-        Assert.assertEquals(result.getResumeId(), 1);
         Assert.assertEquals(result.getSnapshotResult(), SnapshotResult.IN_PROGRESS);
-        snapshotManager1.succeededToRestore(new SnapshotStateId(1, taskId1, "component2"), 1);
+        snapshotManager1.succeededToRestore(new SnapshotStateId(1, taskId1, "component2"));
         Assert.assertEquals(snapshotManager1.getSnapshotRestoreResult().getSnapshotResult(), SnapshotResult.SUCCESSFUL);
 
         // Test restore failed
         try {
-            snapshotManager2.failedToRestore(new SnapshotStateId(1, taskId2, "component1"), 1, false);
+            snapshotManager2.failedToRestore(new SnapshotStateId(1, taskId2, "component1"), false);
         }
         catch (Exception e) { // Ignore
         }
         Assert.assertEquals(snapshotManager2.getSnapshotRestoreResult().getSnapshotResult(), SnapshotResult.IN_PROGRESS_FAILED);
         try {
-            snapshotManager2.failedToRestore(new SnapshotStateId(1, taskId2, "component2"), 1, true);
+            snapshotManager2.failedToRestore(new SnapshotStateId(1, taskId2, "component2"), true);
         }
         catch (Exception e) { // Ignore
         }
         Assert.assertEquals(snapshotManager2.getSnapshotRestoreResult().getSnapshotResult(), SnapshotResult.IN_PROGRESS_FAILED_FATAL);
-        snapshotManager2.succeededToRestore(new SnapshotStateId(1, taskId2, "component3"), 1);
+        snapshotManager2.succeededToRestore(new SnapshotStateId(1, taskId2, "component3"));
         Assert.assertEquals(snapshotManager2.getSnapshotRestoreResult().getSnapshotResult(), SnapshotResult.FAILED_FATAL);
     }
 

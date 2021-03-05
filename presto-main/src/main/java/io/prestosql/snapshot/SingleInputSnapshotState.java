@@ -96,11 +96,11 @@ public class SingleInputSnapshotState
             try {
                 Optional<Object> state = snapshotManager.loadState(componentId);
                 if (!state.isPresent()) {
-                    snapshotManager.failedToRestore(componentId, marker.getResumeId(), true);
+                    snapshotManager.failedToRestore(componentId, true);
                     LOG.warn("Can't locate saved state for snapshot %d, component %s", snapshotId, restorableId);
                 }
                 else if (state.get() == QuerySnapshotManager.NO_STATE) {
-                    snapshotManager.failedToRestore(componentId, marker.getResumeId(), true);
+                    snapshotManager.failedToRestore(componentId, true);
                     LOG.error("BUG! State of component %s has never been stored successfully before snapshot %d", restorableId, snapshotId);
                 }
                 else {
@@ -109,19 +109,19 @@ public class SingleInputSnapshotState
                     if (restorable instanceof Spillable && ((Spillable) restorable).isSpilled()) {
                         Boolean result = loadSpilledFiles(snapshotId, (Spillable) restorable);
                         if (result == null) {
-                            snapshotManager.failedToRestore(componentId, marker.getResumeId(), true);
+                            snapshotManager.failedToRestore(componentId, true);
                             LOG.error("BUG! Spilled file of component %s has never been stored successfully before snapshot %d", restorableId, snapshotId);
                             successful = false;
                         }
                         else if (!result) {
-                            snapshotManager.failedToRestore(componentId, marker.getResumeId(), true);
+                            snapshotManager.failedToRestore(componentId, true);
                             LOG.warn("Can't locate spilled file for snapshot %d, component %s", snapshotId, restorableId);
                             successful = false;
                         }
                     }
                     if (successful) {
                         LOG.debug("Successfully restored state to snapshot %d for %s", snapshotId, restorableId);
-                        snapshotManager.succeededToRestore(componentId, marker.getResumeId());
+                        snapshotManager.succeededToRestore(componentId);
                     }
                 }
                 // Previous pending snapshots no longer need to be carried out
@@ -129,7 +129,7 @@ public class SingleInputSnapshotState
             }
             catch (Exception e) {
                 LOG.warn(e, "Failed to restore snapshot state");
-                snapshotManager.failedToRestore(componentId, marker.getResumeId(), false);
+                snapshotManager.failedToRestore(componentId, false);
             }
         }
         else {

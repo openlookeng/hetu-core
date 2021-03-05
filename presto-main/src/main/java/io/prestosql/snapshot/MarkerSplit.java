@@ -35,31 +35,26 @@ public class MarkerSplit
     private final CatalogName catalogName;
     private final long snapshotId;
     private final boolean isResuming;
-    // It's possible for resume attempt ot fail, and more attempts are needed.
-    // The resumeId is used to distinguish between these attempts.
-    private final int resumeId;
 
     public static MarkerSplit snapshotSplit(CatalogName catalogName, long snapshotId)
     {
-        return new MarkerSplit(catalogName, snapshotId, false, 0);
+        return new MarkerSplit(catalogName, snapshotId, false);
     }
 
-    public static MarkerSplit resumeSplit(CatalogName catalogName, long snapshotId, int resumeId)
+    public static MarkerSplit resumeSplit(CatalogName catalogName, long snapshotId)
     {
-        return new MarkerSplit(catalogName, snapshotId, true, resumeId);
+        return new MarkerSplit(catalogName, snapshotId, true);
     }
 
     @JsonCreator
     public MarkerSplit(
             @JsonProperty("catalogName") CatalogName catalogName,
             @JsonProperty("snapshotId") long snapshotId,
-            @JsonProperty("isResuming") boolean isResuming,
-            @JsonProperty("resumeId") int resumeId)
+            @JsonProperty("isResuming") boolean isResuming)
     {
         this.catalogName = requireNonNull(catalogName, "catalogName is null");
         this.snapshotId = snapshotId;
         this.isResuming = isResuming;
-        this.resumeId = resumeId;
     }
 
     @Override
@@ -104,14 +99,8 @@ public class MarkerSplit
         return isResuming;
     }
 
-    @JsonProperty("resumeId")
-    public int getResumeId()
-    {
-        return resumeId;
-    }
-
     public MarkerPage toMarkerPage()
     {
-        return new MarkerPage(snapshotId, isResuming, resumeId);
+        return new MarkerPage(snapshotId, isResuming);
     }
 }

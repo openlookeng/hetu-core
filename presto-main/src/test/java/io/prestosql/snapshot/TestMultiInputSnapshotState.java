@@ -59,8 +59,7 @@ public class TestMultiInputSnapshotState
     private static final Page regularPage = new Page(1);
     private static final MarkerPage marker1 = MarkerPage.snapshotPage(1);
     private static final MarkerPage marker2 = MarkerPage.snapshotPage(2);
-    private static final MarkerPage resume1 = MarkerPage.resumePage(1, 1);
-    private static final MarkerPage resume1_2 = MarkerPage.resumePage(1, 2);
+    private static final MarkerPage resume1 = MarkerPage.resumePage(1);
     private static final SnapshotStateId snapshotId1 = createSnapshotStateId(1);
     private static final SnapshotStateId snapshotId2 = createSnapshotStateId(2);
 
@@ -294,38 +293,6 @@ public class TestMultiInputSnapshotState
         processPage(source1, resume1);
 
         Optional<Page> ret = processPage(source2, marker1);
-        assertFalse(ret.isPresent());
-    }
-
-    @Test
-    public void testNewerResumeId()
-            throws Exception
-    {
-        processPage(source1, marker1);
-        processPage(source2, marker1);
-        verify(snapshotManager).storeState(eq(snapshotId1), argument.capture());
-        Object savedState = argument.getValue();
-
-        when(snapshotManager.loadState(snapshotId1)).thenReturn(Optional.of(savedState));
-        processPage(source1, resume1);
-
-        when(snapshotManager.loadState(snapshotId1)).thenReturn(Optional.of(savedState));
-        Page ret = processPage(source1, resume1_2).get();
-        Assert.assertEquals(ret, resume1_2);
-    }
-
-    @Test
-    public void testEarlierResumeId()
-            throws Exception
-    {
-        processPage(source1, marker1);
-        processPage(source2, marker1);
-        verify(snapshotManager).storeState(eq(snapshotId1), argument.capture());
-
-        when(snapshotManager.loadState(snapshotId1)).thenReturn(Optional.of(argument.getValue()));
-        processPage(source1, resume1_2);
-
-        Optional<Page> ret = processPage(source1, resume1);
         assertFalse(ret.isPresent());
     }
 

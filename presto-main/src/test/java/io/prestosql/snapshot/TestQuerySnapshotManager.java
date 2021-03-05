@@ -248,7 +248,7 @@ public class TestQuerySnapshotManager
         snapshotManager.addNewTask(taskId);
         snapshotManager.updateQueryCapture(taskId, Collections.singletonMap(1L, SnapshotResult.SUCCESSFUL));
         OptionalLong sid = snapshotManager.getResumeSnapshotId();
-        snapshotManager.updateQueryRestore(taskId, Optional.of(new RestoreResult(sid.getAsLong(), 1, SnapshotResult.FAILED)));
+        snapshotManager.updateQueryRestore(taskId, Optional.of(new RestoreResult(sid.getAsLong(), SnapshotResult.FAILED)));
 
         verify(rescheduler).run();
     }
@@ -307,13 +307,13 @@ public class TestQuerySnapshotManager
         TaskId taskId = new TaskId(queryId.getId(), 2, 3);
         snapshotManager.addNewTask(taskId);
 
-        snapshotManager.updateQueryRestore(taskId, Optional.of(new RestoreResult(1, 1, SnapshotResult.SUCCESSFUL)));
+        snapshotManager.updateQueryRestore(taskId, Optional.of(new RestoreResult(1, SnapshotResult.SUCCESSFUL)));
         assertEquals(snapshotManager.getQuerySnapshotRestoreResult().getSnapshotResult(), SnapshotResult.SUCCESSFUL);
 
-        snapshotManager.updateQueryRestore(taskId, Optional.of(new RestoreResult(2, 1, SnapshotResult.FAILED)));
+        snapshotManager.updateQueryRestore(taskId, Optional.of(new RestoreResult(2, SnapshotResult.FAILED)));
         assertEquals(snapshotManager.getQuerySnapshotRestoreResult().getSnapshotResult(), SnapshotResult.FAILED);
 
-        snapshotManager.updateQueryRestore(taskId, Optional.of(new RestoreResult(3, 1, SnapshotResult.FAILED_FATAL)));
+        snapshotManager.updateQueryRestore(taskId, Optional.of(new RestoreResult(3, SnapshotResult.FAILED_FATAL)));
         assertEquals(snapshotManager.getQuerySnapshotRestoreResult().getSnapshotResult(), SnapshotResult.FAILED_FATAL);
     }
 

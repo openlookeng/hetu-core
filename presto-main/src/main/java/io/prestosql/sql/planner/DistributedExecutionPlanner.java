@@ -125,12 +125,12 @@ public class DistributedExecutionPlanner
         this.metadata = requireNonNull(metadata, "metadata is null");
     }
 
-    public StageExecutionPlan plan(SubPlan root, Session session, Mode mode, Long resumeSnapshotId, int resumeId, long nextSnapshotId)
+    public StageExecutionPlan plan(SubPlan root, Session session, Mode mode, Long resumeSnapshotId, long nextSnapshotId)
     {
         ImmutableList.Builder<SplitSource> allSplitSources = ImmutableList.builder();
         try {
             if (mode != Mode.SNAPSHOT) {
-                return doPlan(mode, root, session, resumeSnapshotId, resumeId, nextSnapshotId, allSplitSources, null, null);
+                return doPlan(mode, root, session, resumeSnapshotId, nextSnapshotId, allSplitSources, null, null);
             }
 
             // Capture dependencies among table scan sources. Only need to do this for the initial planning.
@@ -138,7 +138,7 @@ public class DistributedExecutionPlanner
             Map<PlanFragmentId, Object> leftmostSources = new HashMap<>();
             // Source dependency. Key is SplitSource or ValuesNode or RemoteSourceNode; value is SplitSource or ValuesNode or RemoteSourceNode
             Multimap<Object, Object> sourceDependencies = HashMultimap.create();
-            StageExecutionPlan ret = doPlan(mode, root, session, resumeSnapshotId, resumeId, nextSnapshotId, allSplitSources, leftmostSources, sourceDependencies);
+            StageExecutionPlan ret = doPlan(mode, root, session, resumeSnapshotId, nextSnapshotId, allSplitSources, leftmostSources, sourceDependencies);
 
             for (Map.Entry<Object, Object> entry : sourceDependencies.entries()) {
                 List<MarkerSplitSource> right = collectSources(leftmostSources, entry.getValue());
@@ -195,7 +195,6 @@ public class DistributedExecutionPlanner
             SubPlan root,
             Session session,
             Long resumeSnapshotId,
-            int resumeId,
             long nextSnapshotId,
             ImmutableList.Builder<SplitSource> allSplitSources,
             Map<PlanFragmentId, Object> leftmostSources,
@@ -217,7 +216,7 @@ public class DistributedExecutionPlanner
                 break;
             case RESUME:
                 splitSources = currentFragment.getRoot().accept(new UpdateValuesVisitor(session, currentFragment.getStageExecutionDescriptor(),
-                        resumeSnapshotId, resumeId, nextSnapshotId, allSplitSources), null);
+                        resumeSnapshotId, nextSnapshotId, allSplitSources), null);
                 break;
             default:
                 throw new RuntimeException("Unexpected mode: " + mode);
@@ -226,7 +225,7 @@ public class DistributedExecutionPlanner
         // create child stages
         ImmutableList.Builder<StageExecutionPlan> dependencies = ImmutableList.builder();
         for (SubPlan childPlan : root.getChildren()) {
-            dependencies.add(doPlan(mode, childPlan, session, resumeSnapshotId, resumeId, nextSnapshotId, allSplitSources, leftmostSources, sourceDependencies));
+            dependencies.add(doPlan(mode, childPlan, session, resumeSnapshotId, nextSnapshotId, allSplitSources, leftmostSources, sourceDependencies));
         }
 
         // extract TableInfo
@@ -591,27 +590,24 @@ public class DistributedExecutionPlanner
             extends Visitor
     {
         private final Long resumeSnapshotId;
-        private final int resumeId;
         private final long nextSnapshotId;
 
         private UpdateValuesVisitor(
                 Session session,
                 StageExecutionDescriptor stageExecutionDescriptor,
                 Long resumeSnapshotId,
-                int resumeId,
                 long nextSnapshotId,
                 ImmutableList.Builder<SplitSource> allSplitSources)
         {
             super(session, stageExecutionDescriptor, allSplitSources);
             this.resumeSnapshotId = resumeSnapshotId;
-            this.resumeId = resumeId;
             this.nextSnapshotId = nextSnapshotId;
         }
 
         @Override
         public Map<PlanNodeId, SplitSource> visitValues(ValuesNode node, Void context)
         {
-            node.setupSnapshot(resumeSnapshotId, resumeId, nextSnapshotId);
+            node.setupSnapshot(resumeSnapshotId, nextSnapshotId);
             return super.visitValues(node, context);
         }
     }
@@ -691,7 +687,7 @@ public class DistributedExecutionPlanner
         @Override
         public Map<PlanNodeId, SplitSource> visitValues(ValuesNode node, Void context)
         {
-            node.setupSnapshot(null, 0, nextSnapshotId);
+            node.setupSnapshot(null, nextSnapshotId);
             handleLeafNode(node);
             return super.visitValues(node, context);
         }

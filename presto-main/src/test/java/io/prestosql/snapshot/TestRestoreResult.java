@@ -27,18 +27,16 @@ public class TestRestoreResult
     {
         // Test getters and setters
         long snapshotId = 1;
-        int resumeId = 2;
         RestoreResult restoreResult = new RestoreResult();
-        restoreResult.setSnapshotResult(snapshotId, resumeId, SnapshotResult.IN_PROGRESS);
+        restoreResult.setSnapshotResult(snapshotId, SnapshotResult.IN_PROGRESS);
         Assert.assertEquals(restoreResult.getSnapshotId(), snapshotId);
-        Assert.assertEquals(restoreResult.getResumeId(), resumeId);
         Assert.assertEquals(restoreResult.getSnapshotResult(), SnapshotResult.IN_PROGRESS);
-        restoreResult.setSnapshotResult(snapshotId, resumeId, SnapshotResult.SUCCESSFUL);
+        restoreResult.setSnapshotResult(snapshotId, SnapshotResult.SUCCESSFUL);
         Assert.assertEquals(restoreResult.getSnapshotResult(), SnapshotResult.SUCCESSFUL);
 
         // Test equals
-        RestoreResult restoreResult2 = new RestoreResult(snapshotId, resumeId, SnapshotResult.SUCCESSFUL);
-        RestoreResult restoreResult3 = new RestoreResult(snapshotId, resumeId, SnapshotResult.FAILED);
+        RestoreResult restoreResult2 = new RestoreResult(snapshotId, SnapshotResult.SUCCESSFUL);
+        RestoreResult restoreResult3 = new RestoreResult(snapshotId, SnapshotResult.FAILED);
         Assert.assertTrue(restoreResult.equals(restoreResult2));
         Assert.assertFalse(restoreResult.equals(restoreResult3));
 

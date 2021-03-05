@@ -127,7 +127,7 @@ public class TestValuesOperator
     @Test
     public void testResume()
     {
-        List<Page> pages = ImmutableList.of(new Page(1), MarkerPage.resumePage(1, 1), MarkerPage.snapshotPage(2));
+        List<Page> pages = ImmutableList.of(new Page(1), MarkerPage.resumePage(1), MarkerPage.snapshotPage(2));
         ValuesOperator operator = new ValuesOperator(mockOperatorContext(true), pages, 1);
         Page page = operator.getOutput();
         assertTrue(page instanceof MarkerPage && ((MarkerPage) page).isResuming());
@@ -140,7 +140,7 @@ public class TestValuesOperator
     @Test
     public void testResumePeekMarker()
     {
-        List<Page> pages = ImmutableList.of(new Page(1), MarkerPage.resumePage(1, 1), MarkerPage.snapshotPage(2));
+        List<Page> pages = ImmutableList.of(new Page(1), MarkerPage.resumePage(1), MarkerPage.snapshotPage(2));
         ValuesOperator operator = new ValuesOperator(mockOperatorContext(true), pages, 1);
         Page page = operator.pollMarker();
         assertTrue(page instanceof MarkerPage && ((MarkerPage) page).isResuming());

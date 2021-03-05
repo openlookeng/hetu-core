@@ -17,29 +17,24 @@ package io.prestosql.snapshot;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.util.Objects;
-
 /**
  * RestoreResult contains information of restoring process from snapshot, and report to coordinator
  */
 public class RestoreResult
 {
     private long snapshotId;
-    private int resumeId;
     private SnapshotResult snapshotResult;
 
     public RestoreResult()
     {
-        this(0, 0, SnapshotResult.IN_PROGRESS);
+        this(0, SnapshotResult.IN_PROGRESS);
     }
 
     @JsonCreator
     public RestoreResult(@JsonProperty("snapshotId") long snapshotId,
-            @JsonProperty("resumeId") int resumeId,
             @JsonProperty("snapshotResult") SnapshotResult snapshotResult)
     {
         this.snapshotId = snapshotId;
-        this.resumeId = resumeId;
         this.snapshotResult = snapshotResult;
     }
 
@@ -50,26 +45,16 @@ public class RestoreResult
     }
 
     @JsonProperty
-    public int getResumeId()
-    {
-        return resumeId;
-    }
-
-    @JsonProperty
     public SnapshotResult getSnapshotResult()
     {
         return snapshotResult;
     }
 
-    boolean setSnapshotResult(long snapshotId, int resumeId, SnapshotResult snapshotResult)
+    boolean setSnapshotResult(long snapshotId, SnapshotResult snapshotResult)
     {
         boolean changed = false;
         if (this.snapshotId != snapshotId) {
             this.snapshotId = snapshotId;
-            changed = true;
-        }
-        if (this.resumeId != resumeId) {
-            this.resumeId = resumeId;
             changed = true;
         }
         if (this.snapshotResult != snapshotResult) {
@@ -90,13 +75,12 @@ public class RestoreResult
         }
         RestoreResult that = (RestoreResult) o;
         return snapshotId == that.snapshotId &&
-                resumeId == that.resumeId &&
                 snapshotResult == that.snapshotResult;
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(snapshotId, resumeId);
+        return Long.hashCode(snapshotId);
     }
 }
