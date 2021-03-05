@@ -17,7 +17,7 @@ package io.prestosql.plugin.hive;
 public enum HiveACIDWriteType
 {
     VACUUM(-2),
-    VACUUM_MERGE(-2),
+    VACUUM_UNIFY(-2),
     NONE(-1),
     INSERT(0),
     INSERT_OVERWRITE(0),
@@ -48,6 +48,6 @@ public enum HiveACIDWriteType
 
     public static boolean isVacuum(HiveACIDWriteType writeType)
     {
-        return writeType == VACUUM || writeType == VACUUM_MERGE;
+        return writeType == VACUUM || writeType == VACUUM_UNIFY;
     }
 }
