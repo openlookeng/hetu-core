@@ -14,8 +14,11 @@
  */
 package io.prestosql.sql.rewrite;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ListMultimap;
 import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.SymbolsExtractor;
@@ -23,6 +26,7 @@ import io.prestosql.sql.planner.SymbolsExtractor;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -31,7 +35,8 @@ import java.util.Set;
 public class DynamicFilterContext
 {
     private final List<DynamicFilters.Descriptor> descriptors;
-    private Map<String, String> filterIds = new HashMap<>();
+    private ListMultimap<String, String> filterIds = ArrayListMultimap.create();
+    private Map<String, Optional<RowExpression>> filters = new HashMap<>();
 
     public DynamicFilterContext(List<DynamicFilters.Descriptor> descriptors, Map<Integer, Symbol> layOut)
     {
@@ -46,9 +51,14 @@ public class DynamicFilterContext
      * @param column column symbol
      * @return Id of dynamic filter for the column
      */
-    public String getId(Symbol column)
+    public List<String> getId(Symbol column)
     {
         return filterIds.get(column.getName());
+    }
+
+    public Optional<RowExpression> getFilter(String id)
+    {
+        return filters.getOrDefault(id, Optional.empty());
     }
 
     /**
@@ -66,14 +76,17 @@ public class DynamicFilterContext
         for (DynamicFilters.Descriptor dynamicFilter : descriptors) {
             if (dynamicFilter.getInput() instanceof VariableReferenceExpression) {
                 String colName = ((VariableReferenceExpression) dynamicFilter.getInput()).getName();
-                filterIds.putIfAbsent(colName, dynamicFilter.getId());
+                filterIds.put(colName, dynamicFilter.getId());
             }
             else {
                 List<Symbol> symbolList = SymbolsExtractor.extractAll(dynamicFilter.getInput(), layOut);
                 for (Symbol symbol : symbolList) {
                     //FIXME: KEN: is it possible to override?
-                    filterIds.putIfAbsent(symbol.getName(), dynamicFilter.getId());
+                    filterIds.put(symbol.getName(), dynamicFilter.getId());
                 }
+            }
+            if (dynamicFilter.getFilter().isPresent()) {
+                filters.put(dynamicFilter.getId(), dynamicFilter.getFilter());
             }
         }
     }

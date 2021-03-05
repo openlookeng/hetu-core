@@ -122,7 +122,7 @@ public class BenchmarkArrayIntersect
             ArrayType arrayType = new ArrayType(elementType);
             Signature signature = new Signature(name, FunctionKind.SCALAR, arrayType.getTypeSignature(), arrayType.getTypeSignature(), arrayType.getTypeSignature());
             ImmutableList<RowExpression> projections = ImmutableList.of(
-                    new CallExpression(signature, arrayType, ImmutableList.of(field(0, arrayType), field(1, arrayType))));
+                    new CallExpression(signature, arrayType, ImmutableList.of(field(0, arrayType), field(1, arrayType)), Optional.empty()));
 
             Metadata metadata = createTestMetadataManager();
             ExpressionCompiler compiler = new ExpressionCompiler(metadata, new PageFunctionCompiler(metadata, 0));

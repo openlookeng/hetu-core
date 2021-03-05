@@ -157,7 +157,8 @@ public class BenchmarkMapSubscript
                 projectionsBuilder.add(new CallExpression(
                         signature,
                         mapType.getValueType(),
-                        ImmutableList.of(field(0, mapType), constant(utf8Slice(keys.get(i)), createUnboundedVarcharType()))));
+                        ImmutableList.of(field(0, mapType), constant(utf8Slice(keys.get(i)), createUnboundedVarcharType())),
+                        Optional.empty()));
             }
 
             ImmutableList<RowExpression> projections = projectionsBuilder.build();

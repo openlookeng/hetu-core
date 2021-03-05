@@ -141,7 +141,7 @@ public class BenchmarkArrayHashCodeOperator
             }
             ArrayType arrayType = new ArrayType(elementType);
             Signature signature = new Signature(name, FunctionKind.SCALAR, BIGINT.getTypeSignature(), arrayType.getTypeSignature());
-            projectionsBuilder.add(new CallExpression(signature, BIGINT, ImmutableList.of(field(0, arrayType))));
+            projectionsBuilder.add(new CallExpression(signature, BIGINT, ImmutableList.of(field(0, arrayType)), Optional.empty()));
             blocks[0] = createChannel(POSITIONS, ARRAY_SIZE, arrayType);
 
             ImmutableList<RowExpression> projections = projectionsBuilder.build();

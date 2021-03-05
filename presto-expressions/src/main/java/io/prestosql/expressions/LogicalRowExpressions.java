@@ -217,7 +217,7 @@ public final class LogicalRowExpressions
                                                         parseTypeSignature(StandardTypes.BOOLEAN),
                                                         ImmutableList.of(parseTypeSignature(StandardTypes.BOOLEAN))),
                     BOOLEAN,
-                    singletonList(expression));
+                    singletonList(expression), Optional.empty());
             }
             checkArgument(expression.getArguments().size() == 2, "Comparison expression must have exactly two arguments");
             RowExpression left = expression.getArguments().get(0).accept(this, null);
@@ -225,7 +225,7 @@ public final class LogicalRowExpressions
             return new CallExpression(
                     Signature.internalOperator(newOperator, BOOLEAN, asList(left.getType(), right.getType())),
                     BOOLEAN,
-                    asList(left, right));
+                    asList(left, right), Optional.empty());
         }
 
         @Override
@@ -570,7 +570,7 @@ public final class LogicalRowExpressions
                                         parseTypeSignature(StandardTypes.BOOLEAN),
                                         ImmutableList.of(parseTypeSignature(StandardTypes.BOOLEAN))),
                 BOOLEAN,
-                singletonList(argument));
+                singletonList(argument), Optional.empty());
     }
 
     private static OperatorType negate(OperatorType operator)

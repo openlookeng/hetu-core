@@ -43,6 +43,7 @@ import io.prestosql.spi.type.RowType.Field;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
+import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.InterpretedFunctionInvoker;
 import io.prestosql.sql.analyzer.ExpressionAnalyzer;
 import io.prestosql.sql.analyzer.Scope;
@@ -910,11 +911,13 @@ public class ExpressionInterpreter
             if (optimize && (!function.isDeterministic() || hasUnresolvedValue(argumentValues) || node.getName().equals(QualifiedName.of("fail")))) {
                 verify(!node.isDistinct(), "window does not support distinct");
                 verify(!node.getOrderBy().isPresent(), "window does not support order by");
-                verify(!node.getFilter().isPresent(), "window does not support filter");
+                //DynamicFilter can have filter now.
+                verify(!node.getFilter().isPresent() || node.getName().toString().equals(DynamicFilters.Function.NAME), "window does not support filter");
                 return new FunctionCallBuilder(metadata)
                         .setName(node.getName())
                         .setWindow(node.getWindow())
                         .setArguments(argumentTypes, toExpressions(argumentValues, argumentTypes))
+                        .setFilter(node.getFilter())
                         .build();
             }
             return functionInvoker.invoke(functionSignature, session, argumentValues);

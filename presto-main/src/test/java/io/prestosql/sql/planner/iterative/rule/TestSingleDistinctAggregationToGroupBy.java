@@ -91,7 +91,7 @@ public class TestSingleDistinctAggregationToGroupBy
     public void testDistinctWithFilter()
     {
         Signature moreThan = internalOperator(OperatorType.GREATER_THAN, BOOLEAN, ImmutableList.of(BIGINT, BIGINT));
-        CallExpression filterExpression = new CallExpression(moreThan, BOOLEAN, ImmutableList.of(new VariableReferenceExpression("input2", BIGINT), constant(10L, BIGINT)));
+        CallExpression filterExpression = new CallExpression(moreThan, BOOLEAN, ImmutableList.of(new VariableReferenceExpression("input2", BIGINT), constant(10L, BIGINT)), Optional.empty());
         tester().assertThat(new SingleDistinctAggregationToGroupBy())
                 .on(p -> p.aggregation(builder -> builder
                         .globalGrouping()

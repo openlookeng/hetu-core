@@ -2146,12 +2146,39 @@ public class LocalExecutionPlanner
                     node.getId(),
                     nestedLoopJoinBridgeManager);
 
-            checkArgument(buildContext.getDriverInstanceCount().orElse(1) == 1, "Expected local execution to not be parallel");
+            int taskCount = buildContext.getDriverInstanceCount().orElse(1);
+            checkArgument(taskCount == 1, "Expected local execution to not be parallel");
+
+            ImmutableList.Builder<OperatorFactory> factoriesBuilder = ImmutableList.builder();
+            factoriesBuilder.addAll(buildSource.getOperatorFactories());
+
+            createDynamicFilter(node, context, taskCount).ifPresent(
+                    filter -> {
+                        List<DynamicFilterSourceOperator.Channel> filterBuildChannels = filter
+                                .getBuildChannels()
+                                .entrySet()
+                                .stream()
+                                .map(entry -> {
+                                    String filterId = entry.getKey();
+                                    int index = entry.getValue();
+                                    Type type = buildSource.getTypes().get(index);
+                                    return new DynamicFilterSourceOperator.Channel(filterId, type, index, context.getSession().getQueryId().toString());
+                                })
+                                .collect(Collectors.toList());
+                        factoriesBuilder.add(
+                                new DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory(
+                                        buildContext.getNextOperatorId(),
+                                        node.getId(),
+                                        filter.getValueConsumer(), /** the consumer to process all values collected to build the dynamic filter */
+                                        filterBuildChannels,
+                                        getDynamicFilteringMaxPerDriverValueCount(buildContext.getSession()),
+                                        getDynamicFilteringMaxPerDriverSize(buildContext.getSession())));
+                    });
+
             context.addDriverFactory(
                     buildContext.isInputDriver(),
                     false,
-                    ImmutableList.<OperatorFactory>builder()
-                            .addAll(buildSource.getOperatorFactories())
+                    factoriesBuilder
                             .add(nestedLoopBuildOperatorFactory)
                             .build(),
                     buildContext.getDriverInstanceCount(),

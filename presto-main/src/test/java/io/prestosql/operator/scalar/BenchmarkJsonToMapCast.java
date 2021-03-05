@@ -114,7 +114,7 @@ public class BenchmarkJsonToMapCast
             }
 
             List<RowExpression> projections = ImmutableList.of(
-                    new CallExpression(signature, mapType(VARCHAR, valueType), ImmutableList.of(field(0, JSON))));
+                    new CallExpression(signature, mapType(VARCHAR, valueType), ImmutableList.of(field(0, JSON)), Optional.empty()));
 
             Metadata metadata = createTestMetadataManager();
             pageProcessor = new ExpressionCompiler(metadata, new PageFunctionCompiler(metadata, 0))

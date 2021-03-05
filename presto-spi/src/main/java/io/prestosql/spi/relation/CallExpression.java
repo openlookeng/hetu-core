@@ -25,6 +25,7 @@ import javax.annotation.concurrent.Immutable;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
@@ -35,20 +36,24 @@ public final class CallExpression
     private final Signature signature;
     private final Type returnType;
     private final List<RowExpression> arguments;
+    private final Optional<RowExpression> filter;
 
     @JsonCreator
     public CallExpression(
             @JsonProperty("signature") Signature signature,
             @JsonProperty("returnType") Type returnType,
-            @JsonProperty("arguments") List<RowExpression> arguments)
+            @JsonProperty("arguments") List<RowExpression> arguments,
+            @JsonProperty("filter") Optional<RowExpression> filter)
     {
         requireNonNull(signature, "signature is null");
         requireNonNull(arguments, "arguments is null");
         requireNonNull(returnType, "returnType is null");
+        requireNonNull(filter, "filter object is null");
 
         this.signature = signature;
         this.returnType = returnType;
         this.arguments = ImmutableList.copyOf(arguments);
+        this.filter = filter;
     }
 
     @JsonProperty
@@ -68,6 +73,12 @@ public final class CallExpression
     public List<RowExpression> getArguments()
     {
         return arguments;
+    }
+
+    @JsonProperty
+    public Optional<RowExpression> getFilter()
+    {
+        return filter;
     }
 
     @Override

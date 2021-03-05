@@ -28,7 +28,7 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter.DataType;
-import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilterFactory;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.PlanNode;
@@ -60,6 +60,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -67,9 +68,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.concurrent.Threads.threadsNamed;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringDataType;
@@ -164,6 +167,7 @@ public class DynamicFilterService
                 final String filterId = columnToDynamicFilterEntry.getKey();
                 final Type filterType = columnToDynamicFilterEntry.getValue().getType();
                 final DataType filterDataType = columnToDynamicFilterEntry.getValue().getDataType();
+                final Optional<Predicate<List>> dfFilter = columnToDynamicFilterEntry.getValue().getFilter();
                 final Symbol column = columnToDynamicFilterEntry.getValue().getSymbol();
                 final String filterKey = createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId);
 
@@ -191,7 +195,7 @@ public class DynamicFilterService
                     }
                     else if (filterDataType == HASHSET) {
                         Set mergedSet = mergeHashSets(results);
-                        mergedFilter = new HashSetDynamicFilter(filterKey, null, mergedSet, filterType);
+                        mergedFilter = DynamicFilterFactory.create(filterKey, null, mergedSet, filterType, dfFilter);
 
                         if (filterType == GLOBAL) {
                             mergedDynamicFilters.put(filterKey, mergedSet);
@@ -306,6 +310,7 @@ public class DynamicFilterService
             else {
                 log.warn("registerTasks is empty");
             }
+        //    registerTasksHelper(node, (joinNode.getCriteria().isEmpty() ? null : joinNode.getCriteria().get(0).getRight()), joinNode.getDynamicFilters(), taskIds, workers, stateMachine);
         }
         else if (node instanceof SemiJoinNode) {
             SemiJoinNode semiJoinNode = (SemiJoinNode) node;
@@ -320,14 +325,15 @@ public class DynamicFilterService
         final StateStore stateStore = stateStoreProvider.getStateStore();
         String queryId = stateMachine.getSession().getQueryId().toString();
         for (Map.Entry<String, Symbol> entry : dynamicFiltersMap.entrySet()) {
-            if (entry.getValue().getName().equals(buildSymbol.getName())) {
+            Symbol buildSymbolToCheck = buildSymbol != null ? buildSymbol : node.getOutputSymbols().contains(entry.getValue()) ? entry.getValue() : null;
+            if (buildSymbolToCheck != null && entry.getValue().getName().equals(buildSymbol.getName())) {
                 String filterId = entry.getKey();
                 stateStore.createStateCollection(createKey(DynamicFilterUtils.TASKSPREFIX, filterId, queryId), SET);
                 stateStore.createStateCollection(createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId), SET);
                 dynamicFilters.putIfAbsent(queryId, new ConcurrentHashMap<>());
                 Map<String, DynamicFilterRegistryInfo> filters = dynamicFilters.get(queryId);
                 if (node instanceof JoinNode) {
-                    filters.put(filterId, extractDynamicFilterRegistryInfo((JoinNode) node, stateMachine.getSession()));
+                    filters.put(filterId, extractDynamicFilterRegistryInfo((JoinNode) node, stateMachine.getSession(), filterId));
                 }
                 else if (node instanceof SemiJoinNode) {
                     filters.put(filterId, extractDynamicFilterRegistryInfo((SemiJoinNode) node, stateMachine.getSession()));
@@ -436,16 +442,40 @@ public class DynamicFilterService
         return resultBuilder.build();
     }
 
-    private static DynamicFilterRegistryInfo extractDynamicFilterRegistryInfo(JoinNode node, Session session)
+    private static DynamicFilterRegistryInfo extractDynamicFilterRegistryInfo(JoinNode node, Session session, String filterId)
     {
-        Symbol symbol = node.getCriteria().get(0).getLeft();
+        Symbol symbol = node.getCriteria().isEmpty() ? null : node.getCriteria().get(0).getLeft();
         List<FilterNode> filterNodes = findFilterNodeInStage(node);
 
         if (filterNodes.isEmpty()) {
-            return new DynamicFilterRegistryInfo(symbol, GLOBAL, session);
+            return new DynamicFilterRegistryInfo(symbol, GLOBAL, session, Optional.empty());
         }
         else {
-            return new DynamicFilterRegistryInfo(symbol, LOCAL, session);
+            Optional<Predicate<List>> filterPredicate = Optional.empty();
+            if (symbol == null) {
+                //Symbol is not found in Join Node. It must have been pushed down to filters.
+                for (FilterNode filter : filterNodes) {
+                    DynamicFilters.ExtractResult extractResult = DynamicFilters.extractDynamicFilters(filter.getPredicate());
+                    List<DynamicFilters.Descriptor> dynamicConjuncts = extractResult.getDynamicConjuncts();
+                    for (DynamicFilters.Descriptor desc : dynamicConjuncts) {
+                        if (desc.getId().equals(filterId)) {
+                            checkArgument(desc.getInput() instanceof VariableReferenceExpression, "Expression not symbol reference");
+                            symbol = new Symbol(((VariableReferenceExpression) desc.getInput()).getName());
+                            if (desc.getFilter().isPresent()) {
+                                filterPredicate = DynamicFilters.createDynamicFilterPredicate(desc.getFilter());
+                            }
+                            break;
+                        }
+                    }
+                    if (symbol != null) {
+                        break;
+                    }
+                }
+                if (symbol == null) {
+                    throw new IllegalStateException("DynamicFilter symbol not found to register");
+                }
+            }
+            return new DynamicFilterRegistryInfo(symbol, LOCAL, session, filterPredicate);
         }
     }
 
@@ -455,10 +485,10 @@ public class DynamicFilterService
         List<FilterNode> filterNodes = findFilterNodeInStage(node);
 
         if (filterNodes.isEmpty()) {
-            return new DynamicFilterRegistryInfo(symbol, GLOBAL, session);
+            return new DynamicFilterRegistryInfo(symbol, GLOBAL, session, Optional.empty());
         }
         else {
-            return new DynamicFilterRegistryInfo(symbol, LOCAL, session);
+            return new DynamicFilterRegistryInfo(symbol, LOCAL, session, Optional.empty());
         }
     }
 
@@ -468,13 +498,15 @@ public class DynamicFilterService
         private final Type type;
         private final DataType dataType;
         private boolean isMerged;
+        private Optional<Predicate<List>> filter;
 
-        public DynamicFilterRegistryInfo(Symbol symbol, Type type, Session session)
+        public DynamicFilterRegistryInfo(Symbol symbol, Type type, Session session, Optional<Predicate<List>> filter)
         {
             this.symbol = symbol;
             this.type = type;
             this.dataType = getDynamicFilterDataType(type, getDynamicFilteringDataType(session));
             this.isMerged = false;
+            this.filter = filter;
         }
 
         public Symbol getSymbol()
@@ -500,6 +532,11 @@ public class DynamicFilterService
         public void setMerged()
         {
             this.isMerged = true;
+        }
+
+        public Optional<Predicate<List>> getFilter()
+        {
+            return filter;
         }
     }
 }

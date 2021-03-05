@@ -95,7 +95,7 @@ public class BenchmarkRowToRowCast
             Signature signature = new Signature("$operator$CAST", SCALAR, RowType.anonymous(fromFieldTypes).getTypeSignature(), RowType.anonymous(toFieldTypes).getTypeSignature());
 
             List<RowExpression> projections = ImmutableList.of(
-                    new CallExpression(signature, RowType.anonymous(fromFieldTypes), ImmutableList.of(field(0, RowType.anonymous(toFieldTypes)))));
+                    new CallExpression(signature, RowType.anonymous(fromFieldTypes), ImmutableList.of(field(0, RowType.anonymous(toFieldTypes))), Optional.empty()));
 
             Metadata metadata = createTestMetadataManager();
             pageProcessor = new ExpressionCompiler(metadata, new PageFunctionCompiler(metadata, 0))

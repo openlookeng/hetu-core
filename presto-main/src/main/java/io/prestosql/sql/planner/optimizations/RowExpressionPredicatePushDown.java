@@ -73,6 +73,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -87,6 +88,8 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Iterables.filter;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
 import static io.prestosql.spi.function.OperatorType.EQUAL;
+import static io.prestosql.spi.function.Signature.internalOperator;
+import static io.prestosql.spi.function.Signature.unmangleOperator;
 import static io.prestosql.spi.plan.JoinNode.DistributionType.PARTITIONED;
 import static io.prestosql.spi.plan.JoinNode.DistributionType.REPLICATED;
 import static io.prestosql.spi.plan.JoinNode.Type.FULL;
@@ -110,6 +113,8 @@ import static io.prestosql.sql.relational.Expressions.call;
 import static io.prestosql.sql.relational.Expressions.constant;
 import static io.prestosql.sql.relational.Expressions.constantNull;
 import static io.prestosql.sql.relational.Expressions.uniqueSubExpressions;
+import static io.prestosql.sql.tree.BooleanLiteral.FALSE_LITERAL;
+import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static java.util.Objects.requireNonNull;
 import static java.util.function.Function.identity;
 
@@ -517,8 +522,13 @@ public class RowExpressionPredicatePushDown
                 }
             }
 
+            Optional<RowExpression> newJoinFilter = Optional.of(RowExpressionUtils.combineConjuncts(joinFilterBuilder.build()));
+            if (newJoinFilter.get() == TRUE_CONSTANT) {
+                newJoinFilter = Optional.empty();
+            }
+
             //extract expression to be pushed down to tablescan and leverage dynamic filter for filtering
-            DynamicFiltersResult dynamicFiltersResult = createDynamicFilters(node, equiJoinClauses, session, idAllocator);
+            DynamicFiltersResult dynamicFiltersResult = createDynamicFilters(node, equiJoinClauses, newJoinFilter, session, idAllocator);
             Map<String, Symbol> dynamicFilters = dynamicFiltersResult.getDynamicFilters();
 
             //the result leftPredicate will have the dynamic filter predicate 'AND' to it.
@@ -534,11 +544,6 @@ public class RowExpressionPredicatePushDown
             else {
                 leftSource = context.rewrite(node.getLeft(), leftPredicate);
                 rightSource = context.rewrite(node.getRight(), rightPredicate);
-            }
-
-            Optional<RowExpression> newJoinFilter = Optional.of(RowExpressionUtils.combineConjuncts(joinFilterBuilder.build()));
-            if (newJoinFilter.get() == TRUE_CONSTANT) {
-                newJoinFilter = Optional.empty();
             }
 
             if (node.getType() == INNER && newJoinFilter.isPresent() && equiJoinClauses.isEmpty()) {
@@ -603,7 +608,9 @@ public class RowExpressionPredicatePushDown
             return output;
         }
 
-        private DynamicFiltersResult createDynamicFilters(JoinNode node, List<JoinNode.EquiJoinClause> equiJoinClauses, Session session, PlanNodeIdAllocator idAllocator)
+        private DynamicFiltersResult createDynamicFilters(JoinNode node, List<JoinNode.EquiJoinClause> equiJoinClauses,
+                                                          Optional<RowExpression> newJoinFilter, Session session,
+                                                          PlanNodeIdAllocator idAllocator)
         {
             Map<String, Symbol> dynamicFilters = ImmutableMap.of();
             List<RowExpression> predicates = ImmutableList.of();
@@ -618,8 +625,66 @@ public class RowExpressionPredicatePushDown
                     Symbol probeSymbol = clause.getLeft();
                     Symbol buildSymbol = clause.getRight();
                     String id = idAllocator.getNextId().toString();
-                    predicatesBuilder.add(createDynamicFilterRowExpression(metadata, typeManager, id, planSymbolAllocator.getTypes().get(probeSymbol), toSymbolReference(probeSymbol)));
+                    predicatesBuilder.add(createDynamicFilterRowExpression(metadata, typeManager, id, planSymbolAllocator.getTypes().get(probeSymbol), toSymbolReference(probeSymbol), Optional.empty()));
                     dynamicFiltersBuilder.put(id, buildSymbol);
+                }
+                if (newJoinFilter.isPresent() && (!newJoinFilter.get().equals(TRUE_LITERAL) || newJoinFilter.get().equals(FALSE_LITERAL))) {
+                    RowExpression joinFilter = newJoinFilter.get();
+                    List<RowExpression> expressions = RowExpressionUtils.extractConjuncts(joinFilter);
+                    Set<Symbol> usedSymbols = new HashSet<>();
+                    for (RowExpression expression : expressions) {
+                        if (expression instanceof CallExpression) {
+                            CallExpression call = (CallExpression) expression;
+                            String name = call.getSignature().getName();
+                            if (name.contains("$operator$") && unmangleOperator(name).isComparisonOperator()) {
+                                if (call.getArguments().stream().allMatch(VariableReferenceExpression.class::isInstance)) {
+                                    if (call.getArguments().get(0).getType() != BIGINT) {
+                                        continue;
+                                    }
+
+                                    Symbol probeSymbol = null;
+                                    Symbol buildSymbol = null;
+                                    Symbol left = new Symbol(((VariableReferenceExpression) call.getArguments().get(0)).getName());
+                                    Symbol right = new Symbol(((VariableReferenceExpression) call.getArguments().get(1)).getName());
+
+                                    Optional<RowExpression> filter = Optional.empty();
+                                    if (node.getLeft().getOutputSymbols().contains(left) && node.getRight().getOutputSymbols().contains(right)) {
+                                        probeSymbol = left;
+                                        buildSymbol = right;
+                                        if (unmangleOperator(name) != OperatorType.EQUAL) {
+                                            //To skip dependency checker, both arguments are same.
+                                            Signature signature = internalOperator(unmangleOperator(name),
+                                                    call.getSignature().getReturnType(),
+                                                    call.getSignature().getArgumentTypes().get(0),
+                                                    call.getSignature().getArgumentTypes().get(1));
+                                            List<RowExpression> arguments = new ArrayList<>();
+                                            arguments.add(call.getArguments().get(0));
+                                            arguments.add(call.getArguments().get(1));
+
+                                            filter = Optional.of(new CallExpression(signature, call.getType(), arguments, Optional.empty()));
+                                        }
+                                    }
+                                    else if (node.getRight().getOutputSymbols().contains(left) && node.getLeft().getOutputSymbols().contains(right)) {
+                                        probeSymbol = right;
+                                        buildSymbol = left;
+
+                                        filter = Optional.of(RowExpressionUtils.flip(call));
+                                    }
+
+                                    if (probeSymbol == null || usedSymbols.contains(buildSymbol) || usedSymbols.contains(probeSymbol)) {
+                                        continue;
+                                    }
+
+                                    usedSymbols.add(buildSymbol);
+                                    usedSymbols.add(probeSymbol);
+
+                                    String id = idAllocator.getNextId().toString();
+                                    predicatesBuilder.add(createDynamicFilterRowExpression(metadata, typeManager, id, planSymbolAllocator.getTypes().get(probeSymbol), toSymbolReference(probeSymbol), filter));
+                                    dynamicFiltersBuilder.put(id, buildSymbol);
+                                }
+                            }
+                        }
+                    }
                 }
                 dynamicFilters = dynamicFiltersBuilder.build();
                 predicates = predicatesBuilder.build();
@@ -1272,7 +1337,7 @@ public class RowExpressionPredicatePushDown
             if (!dynamicFilterId.isPresent() && isEnableDynamicFiltering(session) && dynamicFiltering) {
                 dynamicFilterId = Optional.of(idAllocator.getNextId().toString());
                 Symbol sourceSymbol = node.getSourceJoinSymbol();
-                sourceConjuncts.add(createDynamicFilterRowExpression(metadata, typeManager, dynamicFilterId.get(), planSymbolAllocator.getTypes().get(sourceSymbol), SymbolUtils.toSymbolReference(sourceSymbol)));
+                sourceConjuncts.add(createDynamicFilterRowExpression(metadata, typeManager, dynamicFilterId.get(), planSymbolAllocator.getTypes().get(sourceSymbol), SymbolUtils.toSymbolReference(sourceSymbol), Optional.empty()));
             }
 
             PlanNode rewrittenSource = context.rewrite(node.getSource(), RowExpressionUtils.combineConjuncts(sourceConjuncts));

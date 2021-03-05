@@ -114,7 +114,7 @@ public class BenchmarkJsonToArrayCast
             Signature signature = new Signature("$operator$CAST", FunctionKind.SCALAR, new ArrayType(elementType).getTypeSignature(), JSON.getTypeSignature());
 
             List<RowExpression> projections = ImmutableList.of(
-                    new CallExpression(signature, new ArrayType(elementType), ImmutableList.of(field(0, JSON))));
+                    new CallExpression(signature, new ArrayType(elementType), ImmutableList.of(field(0, JSON)), Optional.empty()));
 
             Metadata metadata = createTestMetadataManager();
             pageProcessor = new ExpressionCompiler(metadata, new PageFunctionCompiler(metadata, 0))

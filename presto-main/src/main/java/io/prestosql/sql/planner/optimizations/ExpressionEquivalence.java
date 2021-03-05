@@ -42,6 +42,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -123,7 +124,8 @@ public class ExpressionEquivalence
                     call.getType(),
                     call.getArguments().stream()
                             .map(expression -> expression.accept(this, context))
-                            .collect(toImmutableList()));
+                            .collect(toImmutableList()),
+                    call.getFilter());
 
             String callName = call.getSignature().getName();
 
@@ -132,7 +134,8 @@ public class ExpressionEquivalence
                 return new CallExpression(
                         call.getSignature(),
                         call.getType(),
-                        ROW_EXPRESSION_ORDERING.sortedCopy(call.getArguments()));
+                        ROW_EXPRESSION_ORDERING.sortedCopy(call.getArguments()),
+                        Optional.empty());
             }
 
             if (callName.equals(mangleOperatorName(GREATER_THAN)) || callName.equals(mangleOperatorName(GREATER_THAN_OR_EQUAL))) {
@@ -147,7 +150,8 @@ public class ExpressionEquivalence
                                 swapPair(call.getSignature().getArgumentTypes()),
                                 false),
                         call.getType(),
-                        swapPair(call.getArguments()));
+                        swapPair(call.getArguments()),
+                        Optional.empty());
             }
 
             return call;

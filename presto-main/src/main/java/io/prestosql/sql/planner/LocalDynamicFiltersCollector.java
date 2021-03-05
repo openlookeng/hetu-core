@@ -27,6 +27,7 @@ import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilterFactory;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.rewrite.DynamicFilterContext;
@@ -39,6 +40,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 
 import static io.prestosql.SystemSessionProperties.isCrossRegionDynamicFilterEnabled;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
@@ -58,7 +60,7 @@ public class LocalDynamicFiltersCollector
      * May contains domains for dynamic filters for different table scans
      * (e.g. in case of co-located joins).
      */
-    private final Map<Symbol, Set<?>> predicates = new ConcurrentHashMap<>();
+    private final Map<String, Set<?>> predicates = new ConcurrentHashMap<>();
     private final Map<String, DynamicFilter> cachedDynamicFilters = new ConcurrentHashMap<>();
     private final DynamicFilterCacheManager dynamicFilterCacheManager;
     private final String queryId;
@@ -89,9 +91,9 @@ public class LocalDynamicFiltersCollector
         }
     }
 
-    void intersectDynamicFilter(Map<Symbol, Set> predicate)
+    void intersectDynamicFilter(Map<String, Set> predicate)
     {
-        for (Map.Entry<Symbol, Set> entry : predicate.entrySet()) {
+        for (Map.Entry<String, Set> entry : predicate.entrySet()) {
             if (!predicates.containsKey(entry.getKey())) {
                 predicates.put(entry.getKey(), entry.getValue());
                 continue;
@@ -126,29 +128,45 @@ public class LocalDynamicFiltersCollector
                 // ignore this exception, maybe some implementation class not implement the default method.
             }
 
-            final String filterId = context.getId(columnSymbol);
-            if (filterId == null) {
+            final List<String> filterIds = context.getId(columnSymbol);
+            if (filterIds == null || filterIds.isEmpty()) {
                 continue;
             }
 
-            // Try to get dynamic filter from local cache first
-            String cacheKey = createCacheKey(filterId, queryId);
-            DynamicFilter cachedDynamicFilter = cachedDynamicFilters.get(filterId);
-            if (cachedDynamicFilter == null) {
-                cachedDynamicFilter = dynamicFilterCacheManager.getDynamicFilter(cacheKey);
-            }
+            for (String filterId : filterIds) {
+                // Try to get dynamic filter from local cache first
+                String cacheKey = createCacheKey(filterId, queryId);
+                DynamicFilter cachedDynamicFilter = cachedDynamicFilters.get(filterId);
+                if (cachedDynamicFilter == null) {
+                    cachedDynamicFilter = dynamicFilterCacheManager.getDynamicFilter(cacheKey);
+                }
 
-            if (cachedDynamicFilter != null) {
-                cachedDynamicFilter.setColumnHandle(columnHandle);
-                result.put(columnHandle, cachedDynamicFilter);
-                continue;
-            }
+                if (cachedDynamicFilter != null) {
+                    //Combine multiple dynamic filters for same column handle
+                    DynamicFilter dynamicFilter = result.get(columnHandle);
+                    //Same dynamic filter might be referred in multiple table scans for different columns due multi table joins.
+                    //So clone before setting the columnHandle to avoid race in setting the columnHandle.
+                    cachedDynamicFilter = cachedDynamicFilter.clone();
+                    cachedDynamicFilter.setColumnHandle(columnHandle);
+                    if (dynamicFilter == null) {
+                        dynamicFilter = cachedDynamicFilter;
+                    }
+                    else {
+                        dynamicFilter = DynamicFilterFactory.combine(columnHandle, dynamicFilter, cachedDynamicFilter);
+                    }
+                    dynamicFilter.setColumnHandle(columnHandle);
+                    result.put(columnHandle, dynamicFilter);
+                    continue;
+                }
 
-            // Local dynamic filters
-            if (predicates.containsKey(columnSymbol)) {
-                DynamicFilter dynamicFilter = DynamicFilterFactory.create(filterId, columnHandle, predicates.get(columnSymbol), LOCAL);
-                cachedDynamicFilters.put(filterId, dynamicFilter);
-                result.put(columnHandle, dynamicFilter);
+                // Local dynamic filters
+                if (predicates.containsKey(filterId)) {
+                    Optional<RowExpression> filter = context.getFilter(filterId);
+                    Optional<Predicate<List>> filterPredicate = DynamicFilters.createDynamicFilterPredicate(filter);
+                    DynamicFilter dynamicFilter = DynamicFilterFactory.create(filterId, columnHandle, predicates.get(filterId), LOCAL, filterPredicate);
+                    cachedDynamicFilters.put(filterId, dynamicFilter);
+                    result.put(columnHandle, dynamicFilter);
+                }
             }
         }
 

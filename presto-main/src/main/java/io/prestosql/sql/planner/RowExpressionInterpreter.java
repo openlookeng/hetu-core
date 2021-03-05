@@ -292,7 +292,7 @@ public class RowExpressionInterpreter
                             hasUnresolvedValue(argumentValues) ||
                             isDynamicFilter(node) ||
                             node.getSignature().getName().equals("fail"))) {
-                return call(node.getSignature(), node.getType(), toRowExpressions(argumentValues, node.getArguments()));
+                return call(node.getSignature(), node.getType(), toRowExpressions(argumentValues, node.getArguments()), node.getFilter());
             }
 
             Object value = functionInvoker.invoke(coercionSignature, session, argumentValues);

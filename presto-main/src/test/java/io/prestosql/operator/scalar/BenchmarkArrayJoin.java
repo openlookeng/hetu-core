@@ -94,7 +94,8 @@ public class BenchmarkArrayJoin
             List<RowExpression> projections = ImmutableList.of(
                     new CallExpression(signature, VARCHAR, ImmutableList.of(
                             field(0, new ArrayType(BIGINT)),
-                            constant(Slices.wrappedBuffer(",".getBytes(UTF_8)), VARCHAR))));
+                            constant(Slices.wrappedBuffer(",".getBytes(UTF_8)), VARCHAR)),
+                            Optional.empty()));
 
             Metadata metadata = createTestMetadataManager();
             pageProcessor = new ExpressionCompiler(metadata, new PageFunctionCompiler(metadata, 0))

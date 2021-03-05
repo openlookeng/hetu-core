@@ -285,7 +285,7 @@ public class RowExpressionRewriteRuleSet
                 ImmutableList.Builder<RowExpression> newArguments = ImmutableList.builder();
                 CallExpression callExpression = new CallExpression(entry.getValue().getSignature(),
                         metadata.getType(entry.getValue().getSignature().getReturnType()),
-                        entry.getValue().getArguments());
+                        entry.getValue().getArguments(), Optional.empty());
                 for (RowExpression argument : callExpression.getArguments()) {
                     RowExpression rewritten = rewriter.rewrite(argument, context);
                     if (rewritten != argument) {
@@ -609,7 +609,7 @@ public class RowExpressionRewriteRuleSet
 
     private AggregationNode.Aggregation rewriteAggregation(AggregationNode.Aggregation aggregation, Type returnType, Rule.Context context)
     {
-        CallExpression callExpression = new CallExpression(aggregation.getSignature(), returnType, aggregation.getArguments());
+        CallExpression callExpression = new CallExpression(aggregation.getSignature(), returnType, aggregation.getArguments(), Optional.empty());
         RowExpression expression = rewriter.rewrite(callExpression, context);
         return new AggregationNode.Aggregation(
                 aggregation.getSignature(),

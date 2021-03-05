@@ -88,6 +88,7 @@ import io.prestosql.sql.tree.WhenClause;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -377,8 +378,9 @@ public final class SqlToRowExpressionTranslator
                     .collect(toImmutableList());
 
             Signature signature = new Signature(node.getName().getSuffix(), functionKind, getType(node).getTypeSignature(), argumentTypes);
+            Optional<RowExpression> filter = (node.getFilter().isPresent()) ? Optional.of(process(node.getFilter().get(), context)) : Optional.empty();
 
-            return call(signature, getType(node), arguments);
+            return call(signature, getType(node), arguments, filter);
         }
 
         @Override

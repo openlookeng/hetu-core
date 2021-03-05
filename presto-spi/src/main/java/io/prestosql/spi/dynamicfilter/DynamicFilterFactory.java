@@ -16,7 +16,10 @@ package io.prestosql.spi.dynamicfilter;
 
 import io.prestosql.spi.connector.ColumnHandle;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 
 public class DynamicFilterFactory
 {
@@ -32,5 +35,20 @@ public class DynamicFilterFactory
     public static HashSetDynamicFilter create(String filterId, ColumnHandle columnHandle, Set values, DynamicFilter.Type type)
     {
         return new HashSetDynamicFilter(filterId, columnHandle, values, type);
+    }
+
+    public static HashSetDynamicFilter create(String filterId, ColumnHandle columnHandle, Set values, DynamicFilter.Type type, Optional<Predicate<List>> filter)
+    {
+        if (filter.isPresent()) {
+            return new FilteredDynamicFilter(filterId, columnHandle, values, type, filter);
+        }
+        else {
+            return create(filterId, columnHandle, values, type);
+        }
+    }
+
+    public static CombinedDynamicFilter combine(ColumnHandle columnHandle, DynamicFilter filter1, DynamicFilter filter2)
+    {
+        return new CombinedDynamicFilter(columnHandle, filter1, filter2);
     }
 }

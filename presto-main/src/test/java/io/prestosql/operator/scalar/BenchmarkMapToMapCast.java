@@ -94,7 +94,7 @@ public class BenchmarkMapToMapCast
             Signature signature = new Signature("$operator$CAST", FunctionKind.SCALAR, mapType(BIGINT, DOUBLE).getTypeSignature(), mapType(DOUBLE, BIGINT).getTypeSignature());
 
             List<RowExpression> projections = ImmutableList.of(
-                    new CallExpression(signature, mapType(BIGINT, DOUBLE), ImmutableList.of(field(0, mapType(DOUBLE, BIGINT)))));
+                    new CallExpression(signature, mapType(BIGINT, DOUBLE), ImmutableList.of(field(0, mapType(DOUBLE, BIGINT))), Optional.empty()));
 
             Metadata metadata = createTestMetadataManager();
             pageProcessor = new ExpressionCompiler(metadata, new PageFunctionCompiler(metadata, 0))

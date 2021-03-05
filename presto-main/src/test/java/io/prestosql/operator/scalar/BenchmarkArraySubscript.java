@@ -146,7 +146,7 @@ public class BenchmarkArraySubscript
                 projectionsBuilder.add(new CallExpression(
                         signature,
                         arrayType.getElementType(),
-                        ImmutableList.of(field(0, arrayType), constant((long) i + 1, BIGINT))));
+                        ImmutableList.of(field(0, arrayType), constant((long) i + 1, BIGINT)), Optional.empty()));
             }
 
             ImmutableList<RowExpression> projections = projectionsBuilder.build();

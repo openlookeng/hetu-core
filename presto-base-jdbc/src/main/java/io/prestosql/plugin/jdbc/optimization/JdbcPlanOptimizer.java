@@ -253,7 +253,8 @@ public class JdbcPlanOptimizer
                     assignments.put(symbol, new CallExpression(
                             Signature.internalOperator(OperatorType.CAST, prestoType.getTypeSignature(), ImmutableList.of(jdbcType.getTypeSignature())),
                             prestoType,
-                            ImmutableList.of(new VariableReferenceExpression(scanSymbol.getName(), jdbcType))));
+                            ImmutableList.of(new VariableReferenceExpression(scanSymbol.getName(), jdbcType)),
+                            Optional.empty()));
                 }
             }
 

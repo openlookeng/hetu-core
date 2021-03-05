@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.sql.relational.Expressions.field;
@@ -82,7 +83,8 @@ public final class PageFieldsToInputParametersRewriter
                     call.getType(),
                     call.getArguments().stream()
                             .map(expression -> expression.accept(this, context))
-                            .collect(toImmutableList()));
+                            .collect(toImmutableList()),
+                    Optional.empty());
         }
 
         @Override

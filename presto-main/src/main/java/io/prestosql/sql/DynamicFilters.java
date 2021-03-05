@@ -34,13 +34,16 @@ import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.SymbolReference;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.slice.Slices.utf8Slice;
+import static io.prestosql.spi.function.Signature.unmangleOperator;
 import static io.prestosql.spi.sql.RowExpressionUtils.extractConjuncts;
 import static io.prestosql.spi.type.StandardTypes.BOOLEAN;
 import static io.prestosql.spi.type.StandardTypes.VARCHAR;
@@ -54,19 +57,25 @@ public final class DynamicFilters
 
     public static Expression createDynamicFilterExpression(Metadata metadata, String id, Type inputType, SymbolReference input)
     {
+        return createDynamicFilterExpression(metadata, id, inputType, input, Optional.empty());
+    }
+
+    public static Expression createDynamicFilterExpression(Metadata metadata, String id, Type inputType, SymbolReference input, Optional<Expression> filter)
+    {
         return new FunctionCallBuilder(metadata)
                 .setName(QualifiedName.of(Function.NAME))
                 .addArgument(VarcharType.VARCHAR, new StringLiteral(id))
                 .addArgument(inputType, input)
+                .setFilter(filter)
                 .build();
     }
 
-    public static RowExpression createDynamicFilterRowExpression(Metadata metadata, TypeManager typeManager, String id, Type inputType, SymbolReference input)
+    public static RowExpression createDynamicFilterRowExpression(Metadata metadata, TypeManager typeManager, String id, Type inputType, SymbolReference input, Optional<RowExpression> filter)
     {
         ConstantExpression string = new ConstantExpression(utf8Slice(id), VarcharType.VARCHAR);
         VariableReferenceExpression expression = new VariableReferenceExpression(input.getName(), inputType);
         Signature signature = metadata.resolveFunction(QualifiedName.of(Function.NAME), fromTypes(VarcharType.VARCHAR, inputType));
-        return call(signature, typeManager.getType(signature.getReturnType()), string, expression);
+        return call(signature, typeManager.getType(signature.getReturnType()), Arrays.asList(string, expression), filter);
     }
 
     public static ExtractResult extractDynamicFilters(RowExpression expression)
@@ -113,7 +122,71 @@ public final class DynamicFilters
         checkArgument(firstArgument instanceof ConstantExpression, "firstArgument is expected to be an instance of ConstantExpression: %s", firstArgument.getClass().getSimpleName());
         Object firstArgumentValue = ((ConstantExpression) firstArgument).getValue();
         String id = (firstArgumentValue instanceof String) ? (String) (firstArgumentValue) : ((Slice) (firstArgumentValue)).toStringUtf8();
-        return Optional.of(new Descriptor(id, arguments.get(1)));
+        return Optional.of(new Descriptor(id, arguments.get(1), callExpression.getFilter())); /* Fixme(Nitin): Resolve the filter expression from the dynamic filter */
+    }
+
+    public static Optional<Predicate<List>> createDynamicFilterPredicate(Optional<RowExpression> filter)
+    {
+        if (filter.isPresent()) {
+            if (filter.get() instanceof CallExpression) {
+                CallExpression call = (CallExpression) filter.get();
+                String name = call.getSignature().getName();
+                if (name.contains("$operator$") && unmangleOperator(name).isComparisonOperator()) {
+                    if (call.getArguments().get(1) instanceof VariableReferenceExpression &&
+                            call.getArguments().get(0) instanceof VariableReferenceExpression) {
+                        switch (unmangleOperator(name)) {
+                            case LESS_THAN:
+                                return Optional.of((values) -> {
+                                    Object probeValue = values.get(0);
+                                    Object buildValue = values.get(1);
+                                    if (!(probeValue instanceof Long) || !(buildValue instanceof Long)) {
+                                        return true;
+                                    }
+                                    Long probeLiteral = (Long) probeValue;
+                                    Long buildLiteral = (Long) buildValue;
+                                    return probeLiteral.compareTo(buildLiteral) < 0;
+                                });
+                            case LESS_THAN_OR_EQUAL:
+                                return Optional.of((values) -> {
+                                    Object probeValue = values.get(0);
+                                    Object buildValue = values.get(1);
+                                    if (!(probeValue instanceof Long) || !(buildValue instanceof Long)) {
+                                        return true;
+                                    }
+                                    Long probeLiteral = (Long) probeValue;
+                                    Long buildLiteral = (Long) buildValue;
+                                    return probeLiteral.compareTo(buildLiteral) <= 0;
+                                });
+                            case GREATER_THAN:
+                                return Optional.of((values) -> {
+                                    Object probeValue = values.get(0);
+                                    Object buildValue = values.get(1);
+                                    if (!(probeValue instanceof Long) || !(buildValue instanceof Long)) {
+                                        return true;
+                                    }
+                                    Long probeLiteral = (Long) probeValue;
+                                    Long buildLiteral = (Long) buildValue;
+                                    return probeLiteral.compareTo(buildLiteral) > 0;
+                                });
+                            case GREATER_THAN_OR_EQUAL:
+                                return Optional.of((values) -> {
+                                    Object probeValue = values.get(0);
+                                    Object buildValue = values.get(1);
+                                    if (!(probeValue instanceof Long) || !(buildValue instanceof Long)) {
+                                        return true;
+                                    }
+                                    Long probeLiteral = (Long) probeValue;
+                                    Long buildLiteral = (Long) buildValue;
+                                    return probeLiteral.compareTo(buildLiteral) >= 0;
+                                });
+                            default:
+                                return Optional.empty();
+                        }
+                    }
+                }
+            }
+        }
+        return Optional.empty();
     }
 
     public static class ExtractResult
@@ -142,11 +215,18 @@ public final class DynamicFilters
     {
         private final String id;
         private final RowExpression input;
+        private final Optional<RowExpression> filter;
 
         public Descriptor(String id, RowExpression input)
         {
+            this(id, input, Optional.empty());
+        }
+
+        public Descriptor(String id, RowExpression input, Optional<RowExpression> filter)
+        {
             this.id = requireNonNull(id, "id is null");
             this.input = requireNonNull(input, "input is null");
+            this.filter = requireNonNull(filter, "filter is null");
         }
 
         public String getId()
@@ -157,6 +237,11 @@ public final class DynamicFilters
         public RowExpression getInput()
         {
             return input;
+        }
+
+        public Optional<RowExpression> getFilter()
+        {
+            return filter;
         }
 
         @Override
@@ -170,13 +255,14 @@ public final class DynamicFilters
             }
             Descriptor that = (Descriptor) o;
             return Objects.equals(id, that.id) &&
-                    Objects.equals(input, that.input);
+                    Objects.equals(input, that.input) &&
+                    Objects.equals(filter, that.filter);
         }
 
         @Override
         public int hashCode()
         {
-            return Objects.hash(id, input);
+            return Objects.hash(id, input, filter);
         }
 
         @Override
@@ -185,6 +271,7 @@ public final class DynamicFilters
             return toStringHelper(this)
                     .add("id", id)
                     .add("input", input)
+                    .add("filter", filter)
                     .toString();
         }
     }

@@ -5159,6 +5159,39 @@ public class TestHiveIntegrationSmokeTest
     }
 
     @Test
+    public void testNonEqualDynamicFilter()
+    {
+        Session session = getSession();
+        Session sessionTest = Session.builder(session)
+                .setCatalogSessionProperty(session.getCatalog().get(), "orc_predicate_pushdown_enabled", "true")
+                .setCatalogSessionProperty(session.getCatalog().get(), "dynamic_filtering_filter_rows_threshold", "20000")
+                .setSystemProperty("dynamic_filtering_max_per_driver_value_count", "100000")
+                .setSystemProperty("enable_dynamic_filtering", "true")
+                .setSystemProperty("optimize_dynamic_filter_generation", "false")
+                .build();
+
+        Session sessionCtrl = Session.builder(session)
+                .setCatalogSessionProperty(session.getCatalog().get(), "orc_predicate_pushdown_enabled", "false")
+                .setSystemProperty("enable_dynamic_filtering", "false")
+                .build();
+
+        String query = "SELECT COUNT(*) FROM " +
+                "(SELECT orderkey FROM lineitem WHERE orderkey < 1000) a " +
+                "JOIN " +
+                "(SELECT orderkey FROM orders) b " +
+                "ON NOT (a.orderkey <= b.orderkey)";
+
+        MaterializedResult expected = computeActual(query);
+        MaterializedResult expected2 = computeActual(sessionCtrl, query);
+        MaterializedResult resultDynamicFilter = computeActual(sessionTest, query);
+
+        assertEquals(expected.getMaterializedRows(), resultDynamicFilter.getMaterializedRows());
+        assertEquals(expected2.getMaterializedRows(), resultDynamicFilter.getMaterializedRows());
+
+        System.out.println(">>>>>>>>> result " + resultDynamicFilter);
+    }
+
+    @Test
     public void testPushdownWithNullRows()
     {
         Session session = getSession();
