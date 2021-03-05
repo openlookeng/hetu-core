@@ -16,6 +16,8 @@ package io.prestosql.spi.block;
 
 import org.openjdk.jol.info.ClassLayout;
 
+import java.util.Arrays;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 
 import static java.lang.String.format;
@@ -113,5 +115,25 @@ public class SingleRowBlock<T>
             return this;
         }
         return new SingleRowBlock(rowIndex, loadedFieldBlocks);
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        SingleRowBlock other = (SingleRowBlock) obj;
+        return Objects.equals(this.INSTANCE_SIZE, other.INSTANCE_SIZE) &&
+                Arrays.equals(this.fieldBlocks, other.fieldBlocks);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(INSTANCE_SIZE, Arrays.hashCode(fieldBlocks));
     }
 }

@@ -20,6 +20,7 @@ import org.openjdk.jol.info.ClassLayout;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
@@ -494,5 +495,42 @@ public class DictionaryBlock<T>
             return null;
         }
         return dictionary.get(getId(position));
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        DictionaryBlock other = (DictionaryBlock) obj;
+        return Objects.equals(this.INSTANCE_SIZE, other.INSTANCE_SIZE) &&
+                Objects.equals(this.positionCount, other.positionCount) &&
+                Objects.equals(this.dictionary, other.dictionary) &&
+                Objects.equals(this.idsOffset, other.idsOffset) &&
+                Arrays.equals(this.ids, other.ids) &&
+                Objects.equals(this.retainedSizeInBytes, other.retainedSizeInBytes) &&
+                Objects.equals(this.sizeInBytes, other.sizeInBytes) &&
+                Objects.equals(this.logicalSizeInBytes, other.logicalSizeInBytes) &&
+                Objects.equals(this.uniqueIds, other.uniqueIds) &&
+                Objects.equals(this.dictionarySourceId, other.dictionarySourceId);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(INSTANCE_SIZE,
+                positionCount,
+                dictionary,
+                idsOffset,
+                Arrays.hashCode(ids),
+                retainedSizeInBytes,
+                sizeInBytes,
+                logicalSizeInBytes,
+                uniqueIds,
+                dictionarySourceId);
     }
 }
