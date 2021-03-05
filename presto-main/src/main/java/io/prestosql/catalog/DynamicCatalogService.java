@@ -17,6 +17,7 @@ package io.prestosql.catalog;
 
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
+import io.prestosql.connector.DataCenterConnectorManager;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.security.AccessControl;
 import io.prestosql.server.HttpRequestSessionContext;
@@ -49,14 +50,17 @@ public class DynamicCatalogService
     private final DynamicCatalogStore dynamicCatalogStore;
     private final AccessControl accessControl;
     private final SecurityKeyManager securityKeyManager;
+    private final DataCenterConnectorManager dataCenterConnectorManager;
 
     @Inject
-    public DynamicCatalogService(CatalogManager catalogManager, DynamicCatalogStore dynamicCatalogStore, AccessControl accessControl, SecurityKeyManager securityKeyManager)
+    public DynamicCatalogService(CatalogManager catalogManager, DynamicCatalogStore dynamicCatalogStore, AccessControl accessControl,
+                                 SecurityKeyManager securityKeyManager, DataCenterConnectorManager dataCenterConnectorManager)
     {
         this.catalogManager = requireNonNull(catalogManager, "catalogManager is null");
         this.dynamicCatalogStore = requireNonNull(dynamicCatalogStore, "dynamicCatalogStore is null");
         this.accessControl = requireNonNull(accessControl, "accessControl is null");
         this.securityKeyManager = securityKeyManager;
+        this.dataCenterConnectorManager = dataCenterConnectorManager;
     }
 
     public static WebApplicationException badRequest(Response.Status status, String message)
@@ -96,8 +100,8 @@ public class DynamicCatalogService
     }
 
     public synchronized Response createCatalog(CatalogInfo catalogInfo,
-            CatalogFileInputStream configFiles,
-            HttpRequestSessionContext sessionContext)
+                                               CatalogFileInputStream configFiles,
+                                               HttpRequestSessionContext sessionContext)
             throws IOException
     {
         String catalogName = catalogInfo.getCatalogName();
@@ -161,8 +165,8 @@ public class DynamicCatalogService
     }
 
     public synchronized Response updateCatalog(CatalogInfo catalogInfo,
-            CatalogFileInputStream configFiles,
-            HttpRequestSessionContext sessionContext)
+                                               CatalogFileInputStream configFiles,
+                                               HttpRequestSessionContext sessionContext)
             throws IOException
     {
         String catalogName = catalogInfo.getCatalogName();
@@ -228,6 +232,25 @@ public class DynamicCatalogService
         }
         catch (Exception ex) {
             throw badRequest(UNAUTHORIZED, "No permission");
+        }
+
+        // datacenter catalog
+        if (catalogName.indexOf(".") > 0) {
+            String dc = catalogName.substring(0, catalogName.indexOf("."));
+            if (!dataCenterConnectorManager.isDCCatalog(dc)) {
+                throw badRequest(NOT_FOUND, "The datacenter [" + dc + "] does not exist");
+            }
+
+            Lock lock = tryLock(dc);
+            try {
+                dataCenterConnectorManager.dropDCConnection(dc);
+                deleteSecurityKey((dc));
+                dynamicCatalogStore.deleteCatalogShareFiles(dc);
+            }
+            finally {
+                lock.unlock();
+            }
+            return Response.status(NO_CONTENT).build();
         }
 
         Lock lock = tryLock(catalogName);
