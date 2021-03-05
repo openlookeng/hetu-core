@@ -97,20 +97,14 @@ An openLooKeng node (coordinator or worker) can be in one of 5 states:
 - Isolated
 - Shutting down
 
-Shutdown and isolation operations move nodes among these states. The following table shows which transitions are allowed, where "-" indicates that the transition is allowed but has no effect.
+Shutdown and isolation operations move nodes among these states.
 
-|from\to|inactive|active|isolating|isolated|shutting_down|exit|
-|-|-|-|-|-|-|-|
-|inactive| | | | | 5 | |
-|active| | - | 2 | 3 | 5 | |
-|isolating| | 1 | - | 3, 4 | 5 | |
-|isolated| | 1 | 2 | - | 5 | |
-|shutting_down| | | | | - | 6 |
+![node-state-transitions](../images/node-state-transitions.png)
 
-Transition details:
-1. Restore the node back to normal operation
+1. Other than `INACTIVE`, transitions to current state are allowed, but have no effect
 1. Request to isolate the node, by not assigning new workload on it, and waiting for existing workloads to finish
 1. Immediately isolate the node, by not assigning new workload. If there are existing workloads, they are deemed unimportant and may not finish
 1. Automatic transition when a node is `ISOLATING` and active workloads finish
+1. Restore the node back to normal operation
 1. Request to shut down the node, by not assigning new workload on it, and waiting for existing workloads to finish
 1. Automatic transition when a node is `SHUTTING_DOWN` and active workloads finish
