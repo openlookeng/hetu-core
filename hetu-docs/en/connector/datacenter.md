@@ -102,7 +102,7 @@ You can set following properties in the `etc/config.properties`:
 
 ### Nginx Configuration
 
-When AA is enabled at the remote end and Nginx is used as the proxy, the configuration of Nginx needs to be modified: 
+When HA is enabled at the remote end and Nginx is used as the proxy, the configuration of Nginx needs to be modified: 
 
 ```nginx
 http {
