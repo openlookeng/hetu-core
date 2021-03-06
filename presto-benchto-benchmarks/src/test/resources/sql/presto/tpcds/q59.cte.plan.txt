@@ -1,7 +1,7 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
         join (INNER, PARTITIONED):
-            remote exchange (REPARTITION, HASH, ["d_week_seq_63", "s_store_id"])
+            remote exchange (REPARTITION, HASH, ["d_week_seq", "s_store_id"])
                 join (INNER, REPLICATED):
                     join (INNER, REPLICATED):
                         remote exchange (REPARTITION, HASH, ["d_week_seq", "ss_store_sk", "sum", "sum_10", "sum_11", "sum_12", "sum_13", "sum_8", "sum_9"])

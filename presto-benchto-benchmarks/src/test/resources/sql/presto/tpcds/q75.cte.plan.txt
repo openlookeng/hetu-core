@@ -5,7 +5,7 @@ local exchange (GATHER, SINGLE, [])
                 final aggregation over (d_year_172, expr_177, expr_178, i_brand_id_173, i_category_id_175, i_class_id_174, i_manufact_id_176)
                     local exchange (REPARTITION, HASH, ["d_year_172", "i_brand_id_173", "i_category_id_175", "i_class_id_174", "i_manufact_id_176"])
                         remote exchange (REPARTITION, HASH, ["i_brand_id", "i_category_id", "i_class_id", "i_manufact_id"])
-                            partial aggregation over (d_year, expr_19, expr_20, i_brand_id, i_category_id, i_class_id, i_manufact_id)
+                            partial aggregation over (d_year, expr, expr_13, i_brand_id, i_category_id, i_class_id, i_manufact_id)
                                 join (RIGHT, PARTITIONED):
                                     remote exchange (REPARTITION, HASH, ["cr_item_sk", "cr_order_number"])
                                         Filter
@@ -25,7 +25,7 @@ local exchange (GATHER, SINGLE, [])
                                                         Filter
                                                             scan date_dim
                         remote exchange (REPARTITION, HASH, ["i_brand_id_28", "i_category_id_32", "i_class_id_30", "i_manufact_id_34"])
-                            partial aggregation over (d_year_51, expr_91, expr_92, i_brand_id_28, i_category_id_32, i_class_id_30, i_manufact_id_34)
+                            partial aggregation over (d_year_51, expr_84, expr_85, i_brand_id_28, i_category_id_32, i_class_id_30, i_manufact_id_34)
                                 join (RIGHT, PARTITIONED):
                                     remote exchange (REPARTITION, HASH, ["sr_item_sk", "sr_ticket_number"])
                                         Filter
@@ -45,7 +45,7 @@ local exchange (GATHER, SINGLE, [])
                                                         Filter
                                                             scan date_dim
                         remote exchange (REPARTITION, HASH, ["i_brand_id_107", "i_category_id_111", "i_class_id_109", "i_manufact_id_113"])
-                            partial aggregation over (d_year_130, expr_170, expr_171, i_brand_id_107, i_category_id_111, i_class_id_109, i_manufact_id_113)
+                            partial aggregation over (d_year_130, expr_163, expr_164, i_brand_id_107, i_category_id_111, i_class_id_109, i_manufact_id_113)
                                 join (RIGHT, PARTITIONED):
                                     remote exchange (REPARTITION, HASH, ["wr_item_sk", "wr_order_number"])
                                         Filter
@@ -68,7 +68,7 @@ local exchange (GATHER, SINGLE, [])
                 final aggregation over (d_year_619, expr_624, expr_625, i_brand_id_620, i_category_id_622, i_class_id_621, i_manufact_id_623)
                     local exchange (GATHER, SINGLE, [])
                         remote exchange (REPARTITION, HASH, ["i_brand_id_275", "i_category_id_279", "i_class_id_277", "i_manufact_id_281"])
-                            partial aggregation over (d_year_298, expr_365, expr_366, i_brand_id_275, i_category_id_279, i_class_id_277, i_manufact_id_281)
+                            partial aggregation over (d_year_298, expr_358, expr_359, i_brand_id_275, i_category_id_279, i_class_id_277, i_manufact_id_281)
                                 join (RIGHT, PARTITIONED):
                                     remote exchange (REPARTITION, HASH, ["cr_item_sk_324", "cr_order_number_338"])
                                         Filter
@@ -88,7 +88,7 @@ local exchange (GATHER, SINGLE, [])
                                                         Filter
                                                             scan date_dim
                         remote exchange (REPARTITION, HASH, ["i_brand_id_397", "i_category_id_401", "i_class_id_399", "i_manufact_id_403"])
-                            partial aggregation over (d_year_420, expr_480, expr_481, i_brand_id_397, i_category_id_401, i_class_id_399, i_manufact_id_403)
+                            partial aggregation over (d_year_420, expr_473, expr_474, i_brand_id_397, i_category_id_401, i_class_id_399, i_manufact_id_403)
                                 join (RIGHT, PARTITIONED):
                                     remote exchange (REPARTITION, HASH, ["sr_item_sk_446", "sr_ticket_number_453"])
                                         Filter
@@ -108,7 +108,7 @@ local exchange (GATHER, SINGLE, [])
                                                         Filter
                                                             scan date_dim
                         remote exchange (REPARTITION, HASH, ["i_brand_id_530", "i_category_id_534", "i_class_id_532", "i_manufact_id_536"])
-                            partial aggregation over (d_year_553, expr_617, expr_618, i_brand_id_530, i_category_id_534, i_class_id_532, i_manufact_id_536)
+                            partial aggregation over (d_year_553, expr_610, expr_611, i_brand_id_530, i_category_id_534, i_class_id_532, i_manufact_id_536)
                                 join (RIGHT, PARTITIONED):
                                     remote exchange (REPARTITION, HASH, ["wr_item_sk_579", "wr_order_number_590"])
                                         Filter
