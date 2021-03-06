@@ -108,7 +108,7 @@
         <module>presto-jdbc</module>
         <module>presto-cli</module>
         <module>presto-benchmark-driver</module>
-<!--        <module>presto-docs</module>-->
+        <!--        <module>presto-docs</module>-->
         <module>presto-verifier</module>
         <module>presto-testing-server-launcher</module>
         <module>presto-plugin-toolkit</module>
@@ -873,6 +873,12 @@
             </dependency>
 
             <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-stdlib</artifactId>
+                <version>1.4.30</version>
+            </dependency>
+
+            <dependency>
                 <groupId>org.postgresql</groupId>
                 <artifactId>postgresql</artifactId>
                 <version>42.2.14</version>
@@ -1308,6 +1314,12 @@
             </dependency>
 
             <dependency>
+                <groupId>org.objenesis</groupId>
+                <artifactId>objenesis</artifactId>
+                <version>3.1</version>
+            </dependency>
+
+            <dependency>
                 <groupId>io.prestosql.cassandra</groupId>
                 <artifactId>cassandra-driver</artifactId>
                 <version>3.1.4-2</version>
@@ -1346,12 +1358,12 @@
             <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpcore</artifactId>
-                <version>4.4.11</version>
+                <version>4.4.13</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpclient</artifactId>
-                <version>4.5.9</version>
+                <version>4.5.11</version>
                 <exclusions>
                     <exclusion>
                         <groupId>commons-logging</groupId>
@@ -1575,9 +1587,9 @@
                     <version>2.3</version>
                     <configuration>
                         <validHeaders>
-                            <item> ${air.main.basedir}/src/main/resource/license/license-header.txt</item>
-                            <item> ${air.main.basedir}/src/main/resource/license/license-header-alternate-2010.txt</item>
-                            <item> ${air.main.basedir}/src/main/resource/license/license-header-alternate-2012.txt</item>
+                            <item>${air.main.basedir}/src/main/resource/license/license-header.txt</item>
+                            <item>${air.main.basedir}/src/main/resource/license/license-header-alternate-2010.txt</item>
+                            <item>${air.main.basedir}/src/main/resource/license/license-header-alternate-2012.txt</item>
                         </validHeaders>
                     </configuration>
                 </plugin>
