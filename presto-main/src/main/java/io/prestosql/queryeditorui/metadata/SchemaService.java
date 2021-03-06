@@ -23,11 +23,9 @@ import io.prestosql.queryeditorui.execution.QueryClient;
 import io.prestosql.queryeditorui.execution.QueryRunner;
 import io.prestosql.queryeditorui.protocol.CatalogSchema;
 import io.prestosql.queryeditorui.protocol.Table;
-import io.prestosql.queryeditorui.security.UiAuthenticator;
 import org.joda.time.Duration;
 
 import javax.annotation.Nullable;
-import javax.servlet.http.HttpServletRequest;
 
 import java.util.HashSet;
 import java.util.List;
@@ -49,9 +47,8 @@ public class SchemaService
         this.queryRunnerFactory = requireNonNull(queryRunnerFactory, "queryRunnerFactory session was null!");
     }
 
-    public ImmutableList<Table> queryTables(String catalogName, String schemaName, HttpServletRequest servletRequest)
+    public ImmutableList<Table> queryTables(String catalogName, String schemaName, String user)
     {
-        String user = UiAuthenticator.getUser(servletRequest);
         QueryRunner queryRunner = queryRunnerFactory.create(QueryEditorUIModule.UI_QUERY_SOURCE, user);
         String statement = format("SHOW TABLES FROM %s.%s", catalogName, schemaName);
 
@@ -64,9 +61,8 @@ public class SchemaService
         return builder.build();
     }
 
-    public CatalogSchema querySchemas(String catalogName, HttpServletRequest servletRequest)
+    public CatalogSchema querySchemas(String catalogName, String user)
     {
-        String user = UiAuthenticator.getUser(servletRequest);
         QueryRunner queryRunner = queryRunnerFactory.create(QueryEditorUIModule.UI_QUERY_SOURCE, user);
         String statement = format("SHOW SCHEMAS FROM %s", catalogName);
 
@@ -74,20 +70,19 @@ public class SchemaService
         return new CatalogSchema(catalogName, ImmutableList.copyOf(schemasResult));
     }
 
-    public ImmutableList<CatalogSchema> querySchemas(HttpServletRequest servletRequest)
+    public ImmutableList<CatalogSchema> querySchemas(String user)
     {
-        Set<String> catalogs = queryCatalogs(servletRequest);
+        Set<String> catalogs = queryCatalogs(user);
 
         final ImmutableList.Builder<CatalogSchema> builder = ImmutableList.builder();
         for (String catalogName : catalogs) {
-            builder.add(querySchemas(catalogName, servletRequest));
+            builder.add(querySchemas(catalogName, user));
         }
         return builder.build();
     }
 
-    public Set<String> queryCatalogs(HttpServletRequest servletRequest)
+    public Set<String> queryCatalogs(String user)
     {
-        String user = UiAuthenticator.getUser(servletRequest);
         QueryRunner queryRunner = queryRunnerFactory.create(QueryEditorUIModule.UI_QUERY_SOURCE, user);
         String statement = "SHOW CATALOGS";
 

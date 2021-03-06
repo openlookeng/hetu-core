@@ -16,13 +16,18 @@ package io.prestosql.queryeditorui.resources;
 import com.google.inject.Inject;
 import com.opencsv.CSVReader;
 import io.prestosql.queryeditorui.store.files.ExpiringFileStore;
+import io.prestosql.security.AccessControl;
+import io.prestosql.security.AccessControlUtil;
+import io.prestosql.server.ServerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
@@ -36,17 +41,22 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Path("/api/preview")
 public class ResultsPreviewResource
 {
     private static final Logger LOG = LoggerFactory.getLogger(ResultsPreviewResource.class);
     private final ExpiringFileStore fileStore;
+    private final AccessControl accessControl;
+    private final ServerConfig serverConfig;
 
     @Inject
-    public ResultsPreviewResource(ExpiringFileStore fileStore)
+    public ResultsPreviewResource(ExpiringFileStore fileStore, AccessControl accessControl, ServerConfig serverConfig)
     {
         this.fileStore = fileStore;
+        this.accessControl = accessControl;
+        this.serverConfig = serverConfig;
     }
 
     @GET
@@ -55,9 +65,13 @@ public class ResultsPreviewResource
     public Response getFile(
             @QueryParam("pageNum") Integer pageNum,
             @QueryParam("pageSize") Integer pageSize,
-            @QueryParam("fileURI") URI fileURI)
+            @QueryParam("fileURI") URI fileURI,
+            @Context HttpServletRequest servletRequest)
     {
-        return getFilePreview(fileURI, pageNum, pageSize);
+        // if the user is admin, don't filter results by user.
+        Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest);
+
+        return getFilePreview(fileURI, pageNum, pageSize, filterUser);
     }
 
     private String getFilename(URI fileURI)
@@ -100,10 +114,10 @@ public class ResultsPreviewResource
         }
     }
 
-    private Response getFilePreview(URI fileURI, Integer pageNum, Integer pageSize)
+    private Response getFilePreview(URI fileURI, Integer pageNum, Integer pageSize, Optional<String> user)
     {
         String fileName = getFilename(fileURI);
-        final File file = fileStore.get(fileName);
+        final File file = fileStore.get(fileName, user);
         try {
             if (file == null) {
                 throw new FileNotFoundException(fileName + " could not be found");

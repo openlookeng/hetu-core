@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableSet;
 import io.prestosql.queryeditorui.protocol.Job;
 
 import java.util.Collections;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -27,13 +28,20 @@ public class InMemoryActiveJobsStore
     private ConcurrentMap<String, Set<Job>> activeJobs = new ConcurrentHashMap<>();
 
     @Override
-    public Set<Job> getJobsForUser(String user)
+    public Set<Job> getJobsForUser(Optional<String> user)
     {
-        if (!activeJobs.containsKey(user)) {
-            return Collections.emptySet();
+        if (user.isPresent()) {
+            Set<Job> tmp = activeJobs.get(user.get());
+            if (tmp == null) {
+                return Collections.emptySet();
+            }
+            return ImmutableSet.copyOf(tmp);
         }
-
-        return ImmutableSet.copyOf(activeJobs.get(user));
+        Set<Job> jobsForUser = Collections.newSetFromMap(new ConcurrentHashMap<Job, Boolean>());
+        for (Set<Job> tmp : activeJobs.values()) {
+            jobsForUser.addAll(tmp);
+        }
+        return ImmutableSet.copyOf(jobsForUser);
     }
 
     @Override

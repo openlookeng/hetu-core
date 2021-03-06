@@ -13,8 +13,11 @@
  */
 package io.prestosql.queryeditorui.resources;
 
+import com.google.inject.Inject;
 import io.prestosql.queryeditorui.protocol.UserInfo;
-import io.prestosql.queryeditorui.security.UiAuthenticator;
+import io.prestosql.security.AccessControl;
+import io.prestosql.security.AccessControlUtil;
+import io.prestosql.server.HttpRequestSessionContext;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
@@ -28,12 +31,21 @@ import javax.ws.rs.core.SecurityContext;
 @Path("/api/user")
 public class UserResource
 {
+    private final AccessControl accessControl;
+
+    @Inject
+    public UserResource(AccessControl accessControl)
+    {
+        this.accessControl = accessControl;
+    }
+
     @GET
     @Path("")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getCurrentUser(@Context HttpServletRequest request,
             @Context SecurityContext securityContext)
     {
-        return Response.ok(new UserInfo(UiAuthenticator.getUser(request), securityContext.isSecure())).build();
+        String user = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(request));
+        return Response.ok(new UserInfo(user, securityContext.isSecure())).build();
     }
 }

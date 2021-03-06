@@ -17,18 +17,15 @@ import io.prestosql.queryeditorui.protocol.Job;
 import io.prestosql.queryeditorui.protocol.Table;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface JobHistoryStore
 {
-    List<Job> getRecentlyRun(long maxResults);
+    List<Job> getRecentlyRunForUser(Optional<String> user, long maxResults);
 
-    List<Job> getRecentlyRun(long maxResults, Table table1, Table... otherTables);
+    List<Job> getRecentlyRunForUser(Optional<String> user, long maxResults, Iterable<Table> tables);
 
-    List<Job> getRecentlyRun(long maxResults, Iterable<Table> tables);
-
-    List<Job> getRecentlyRunForUser(String user, long maxResults);
-
-    List<Job> getRecentlyRunForUser(String user, long maxResults, Iterable<Table> tables);
+    List<Job> getRecentlyRunForUser(Optional<String> user, long maxResults, Table table1, Table... otherTables);
 
     void addRun(Job job);
 }

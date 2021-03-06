@@ -22,6 +22,7 @@ import io.prestosql.execution.resourcegroups.NoOpResourceGroupManager;
 import io.prestosql.execution.resourcegroups.ResourceGroupManager;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.failuredetector.NoOpFailureDetector;
+import io.prestosql.queryeditorui.QueryEditorConfig;
 import io.prestosql.server.security.NoOpWebUIAuthenticator;
 import io.prestosql.server.security.WebUIAuthenticator;
 import io.prestosql.statestore.NoOpStateStoreLauncher;
@@ -32,6 +33,7 @@ import io.prestosql.transaction.TransactionManager;
 import javax.inject.Singleton;
 
 import static com.google.common.reflect.Reflection.newProxy;
+import static io.airlift.configuration.ConfigBinder.configBinder;
 
 public class WorkerModule
         implements Module
@@ -39,6 +41,7 @@ public class WorkerModule
     @Override
     public void configure(Binder binder)
     {
+        configBinder(binder).bindConfig(QueryEditorConfig.class);
         // Install no-op session supplier on workers, since only coordinators create sessions.
         binder.bind(SessionSupplier.class).to(NoOpSessionSupplier.class).in(Scopes.SINGLETON);
 

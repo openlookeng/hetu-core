@@ -31,6 +31,7 @@ public class TestServerConfig
     {
         assertRecordedDefaults(ConfigAssertions.recordDefaults(ServerConfig.class)
                 .setCoordinator(true)
+                .setAdmins(null)
                 .setPrestoVersion(null)
                 .setIncludeExceptionInResponse(true)
                 .setGracePeriod(new Duration(2, MINUTES))
@@ -42,6 +43,7 @@ public class TestServerConfig
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
                 .put("coordinator", "false")
+                .put("openlookeng.admins", "user1,user2")
                 .put("presto.version", "test")
                 .put("http.include-exception-in-response", "false")
                 .put("shutdown.grace-period", "5m")
@@ -50,6 +52,7 @@ public class TestServerConfig
 
         ServerConfig expected = new ServerConfig()
                 .setCoordinator(false)
+                .setAdmins("user1,user2")
                 .setPrestoVersion("test")
                 .setIncludeExceptionInResponse(false)
                 .setGracePeriod(new Duration(5, MINUTES))

@@ -26,7 +26,8 @@ import io.prestosql.execution.QueryManager;
 import io.prestosql.execution.QueryState;
 import io.prestosql.execution.QueryStats;
 import io.prestosql.execution.StageId;
-import io.prestosql.queryeditorui.security.UiAuthenticator;
+import io.prestosql.security.AccessControl;
+import io.prestosql.security.AccessControlUtil;
 import io.prestosql.server.security.SecurityRequireNonNull;
 import io.prestosql.spi.ErrorType;
 import io.prestosql.spi.PrestoException;
@@ -55,7 +56,6 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.prestosql.client.PrestoHeaders.PRESTO_USER;
 import static io.prestosql.connector.system.KillQueryProcedure.createKillQueryException;
 import static io.prestosql.connector.system.KillQueryProcedure.createPreemptQueryException;
 import static java.util.Objects.requireNonNull;
@@ -74,6 +74,10 @@ public class QueryResource
     private final DispatchManager dispatchManager;
     private final QueryManager queryManager;
 
+    private final AccessControl accessControl;
+
+    private final ServerConfig serverConfig;
+
     public enum SortOrder
     {
         ASCENDING,
@@ -81,11 +85,17 @@ public class QueryResource
     }
 
     @Inject
-    public QueryResource(DispatchManager dispatchManager, QueryManager queryManager, HttpServerInfo httpServerInfo)
+    public QueryResource(DispatchManager dispatchManager,
+                         QueryManager queryManager,
+                         HttpServerInfo httpServerInfo,
+                         AccessControl accessControl,
+                         ServerConfig serverConfig)
     {
         this.dispatchManager = requireNonNull(dispatchManager, "dispatchManager is null");
         this.queryManager = requireNonNull(queryManager, "queryManager is null");
         this.httpServerInfo = requireNonNull(httpServerInfo, "httpServerInfo is null");
+        this.accessControl = requireNonNull(accessControl, "httpServerInfo is null");
+        this.serverConfig = requireNonNull(serverConfig, "httpServerInfo is null");
     }
 
     @GET
@@ -99,6 +109,9 @@ public class QueryResource
             @QueryParam("pageSize") Integer pageSize,
             @Context HttpServletRequest servletRequest)
     {
+        // if the user is admin, don't filter results by user.
+        Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest);
+
         if (pageNum != null && pageNum <= 0) {
             return Response.status(Status.BAD_REQUEST).build();
         }
@@ -135,7 +148,7 @@ public class QueryResource
         List<BasicQueryInfo> filterQueries = new ArrayList<>();
 
         for (BasicQueryInfo queryInfo : allQueries) {
-            if (filterUser(queryInfo, servletRequest) && filterState(queryInfo, stateFilter, statesMap, failedFilter, failedMap) &&
+            if (filterUser(queryInfo, filterUser) && filterState(queryInfo, stateFilter, statesMap, failedFilter, failedMap) &&
                     filterSearch(queryInfo, searchFilter)) {
                 filterQueries.add(queryInfo);
             }
@@ -406,28 +419,18 @@ public class QueryResource
         return basicQueryInfo.getSelf().getHost().equals(localhost);
     }
 
-    private boolean filterUser(BasicQueryInfo queryInfo, HttpServletRequest servletRequest)
+    private boolean filterUser(BasicQueryInfo queryInfo, Optional<String> user)
     {
         String sessionUser = queryInfo.getSession().getUser();
         if (sessionUser == null) {
             return false;
         }
 
-        // presto user
-        String user = servletRequest.getHeader(PRESTO_USER);
-        if (user != null) {
-            return sessionUser.equals(user);
+        if (user.isPresent()) {
+            return sessionUser.equals(user.get());
         }
 
-        // authentication user mapping
-        user = (String) servletRequest.getAttribute(PRESTO_USER);
-        if (user != null) {
-            return sessionUser.equals(user);
-        }
-
-        // principle
-        user = UiAuthenticator.getUser(servletRequest);
-        return sessionUser.equals(user);
+        return true;
     }
 
     private boolean filterState(BasicQueryInfo queryInfo,

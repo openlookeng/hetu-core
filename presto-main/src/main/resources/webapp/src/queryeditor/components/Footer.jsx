@@ -29,7 +29,7 @@ class Footer
                 </div>
                 <div className='flex justify-flex-end'>
                     <div className='flex flex-initial'>
-                        <p>Copyright © 2020 <a href={"https://openlookeng.io"} target="_blank">openLooKeng</a>. All rights reserved</p>
+                        <p>Copyright © 2021 <a href={"https://openlookeng.io"} target="_blank">openLooKeng</a>. All rights reserved</p>
                     </div>
                 </div>
             </div>

@@ -20,6 +20,7 @@ import io.airlift.log.Logger;
 import io.prestosql.connector.DataCenterConnectorManager;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.security.AccessControl;
+import io.prestosql.security.AccessControlUtil;
 import io.prestosql.server.HttpRequestSessionContext;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.security.SecurityKeyException;
@@ -108,6 +109,7 @@ public class DynamicCatalogService
 
         // check the permission.
         try {
+            AccessControlUtil.checkCanImpersonateUser(accessControl, sessionContext);
             accessControl.checkCanCreateCatalog(sessionContext.getIdentity(), catalogName);
         }
         catch (Exception ex) {
@@ -173,6 +175,7 @@ public class DynamicCatalogService
 
         // check the permission.
         try {
+            AccessControlUtil.checkCanImpersonateUser(accessControl, sessionContext);
             accessControl.checkCanUpdateCatalog(sessionContext.getIdentity(), catalogName);
         }
         catch (Exception ex) {
@@ -228,6 +231,7 @@ public class DynamicCatalogService
     {
         // check the permission.
         try {
+            AccessControlUtil.checkCanImpersonateUser(accessControl, sessionContext);
             accessControl.checkCanDropCatalog(sessionContext.getIdentity(), catalogName);
         }
         catch (Exception ex) {
@@ -279,6 +283,7 @@ public class DynamicCatalogService
         Set<String> catalogNames = dynamicCatalogStore.listCatalogNames(SHARE);
         Set<String> allowedCatalogs;
         try {
+            AccessControlUtil.checkCanImpersonateUser(accessControl, sessionContext);
             allowedCatalogs = accessControl.filterCatalogs(sessionContext.getIdentity(), catalogNames);
             return Response.ok(allowedCatalogs).build();
         }

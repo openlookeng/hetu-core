@@ -18,11 +18,12 @@ import io.prestosql.queryeditorui.protocol.queries.UserSavedQuery;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface QueryStore
 {
-    List<SavedQuery> getSavedQueries(String user);
+    List<SavedQuery> getSavedQueries(Optional<String> user);
 
     boolean saveQuery(UserSavedQuery query) throws IOException;
 

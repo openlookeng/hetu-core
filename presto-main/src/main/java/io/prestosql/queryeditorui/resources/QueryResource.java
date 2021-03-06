@@ -21,10 +21,13 @@ import io.prestosql.queryeditorui.protocol.Table;
 import io.prestosql.queryeditorui.protocol.queries.CreateSavedQueryBuilder;
 import io.prestosql.queryeditorui.protocol.queries.SavedQuery;
 import io.prestosql.queryeditorui.protocol.queries.UserSavedQuery;
-import io.prestosql.queryeditorui.security.UiAuthenticator;
 import io.prestosql.queryeditorui.store.history.JobHistoryStore;
 import io.prestosql.queryeditorui.store.jobs.jobs.ActiveJobsStore;
 import io.prestosql.queryeditorui.store.queries.QueryStore;
+import io.prestosql.security.AccessControl;
+import io.prestosql.security.AccessControlUtil;
+import io.prestosql.server.HttpRequestSessionContext;
+import io.prestosql.server.ServerConfig;
 import org.joda.time.DateTime;
 
 import javax.servlet.http.HttpServletRequest;
@@ -42,6 +45,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Path("/api/query")
@@ -50,15 +54,21 @@ public class QueryResource
     private final JobHistoryStore jobHistoryStore;
     private final ActiveJobsStore activeJobsStore;
     private final QueryStore queryStore;
+    private final AccessControl accessControl;
+    private final ServerConfig serverConfig;
 
     @Inject
     public QueryResource(JobHistoryStore jobHistoryStore,
-                         QueryStore queryStore,
-                         ActiveJobsStore activeJobsStore)
+                QueryStore queryStore,
+                ActiveJobsStore activeJobsStore,
+                AccessControl accessControl,
+                ServerConfig serverConfig)
     {
         this.jobHistoryStore = jobHistoryStore;
         this.queryStore = queryStore;
         this.activeJobsStore = activeJobsStore;
+        this.accessControl = accessControl;
+        this.serverConfig = serverConfig;
     }
 
     public static final Function<Job, DateTime> JOB_ORDERING = (input) ->
@@ -76,28 +86,20 @@ public class QueryResource
             @QueryParam("table") List<Table> tables,
             @Context HttpServletRequest servletRequest)
     {
-        Set<Job> recentlyRun;
-        String user = UiAuthenticator.getUser(servletRequest);
+        // if the user is admin, don't filter results by user.
+        Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest);
 
+        Set<Job> recentlyRun;
         if (tables.size() < 1) {
-            recentlyRun = new HashSet<>(jobHistoryStore.getRecentlyRunForUser(user, 200));
-            Set<Job> activeJobs = activeJobsStore.getJobsForUser(user);
+            recentlyRun = new HashSet<>(jobHistoryStore.getRecentlyRunForUser(filterUser, 200));
+            Set<Job> activeJobs = activeJobsStore.getJobsForUser(filterUser);
             recentlyRun.addAll(activeJobs);
         }
         else {
             Table[] tablesArray = tables.toArray(new Table[tables.size()]);
             Table[] restTables = Arrays.copyOfRange(tablesArray, 1, tablesArray.length);
-
-            recentlyRun = new HashSet<>(jobHistoryStore.getRecentlyRun(200, tablesArray[0], restTables));
+            recentlyRun = new HashSet<>(jobHistoryStore.getRecentlyRunForUser(filterUser, 200, tablesArray[0], restTables));
         }
-
-//        ImmutableList.Builder<Job> filtered = ImmutableList.builder();
-//        for (Job job : recentlyRun) {
-//            if (job.getTablesUsed().isEmpty() && (job.getState() == JobState.FAILED)) {
-//                filtered.add(job);
-//                continue;
-//            }
-//        }
 
         List<Job> sortedResult = Ordering
                 .natural()
@@ -112,8 +114,10 @@ public class QueryResource
     @Produces(MediaType.APPLICATION_JSON)
     public Response getSaved(@Context HttpServletRequest servletRequest)
     {
-        String user = UiAuthenticator.getUser(servletRequest);
-        return Response.ok(queryStore.getSavedQueries(user)).build();
+        // if the user is admin, don't filter results by user.
+        Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest);
+
+        return Response.ok(queryStore.getSavedQueries(filterUser)).build();
     }
 
     @POST
@@ -125,8 +129,7 @@ public class QueryResource
             @FormParam("query") String query,
             @Context HttpServletRequest servletRequest) throws IOException
     {
-        //TODO: Get the user from the session
-        String user = UiAuthenticator.getUser(servletRequest);
+        String user = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(servletRequest));
         CreateSavedQueryBuilder createFeaturedQueryRequest = CreateSavedQueryBuilder.notFeatured()
                 .description(description)
                 .name(name)

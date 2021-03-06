@@ -22,6 +22,7 @@ import io.prestosql.queryeditorui.QueryEditorConfig;
 import io.prestosql.server.security.PasswordAuthenticatorManager;
 import io.prestosql.server.security.WebUIAuthenticator;
 import io.prestosql.spi.security.AccessDeniedException;
+import io.prestosql.spi.security.PasswordAuthenticator;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Cookie;
@@ -31,7 +32,6 @@ import javax.ws.rs.core.UriBuilder;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.security.Principal;
 import java.security.SecureRandom;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
@@ -41,7 +41,6 @@ import java.util.function.Function;
 
 import static com.google.common.base.Strings.emptyToNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
-import static io.prestosql.client.PrestoHeaders.PRESTO_USER;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
@@ -53,14 +52,15 @@ public class UiAuthenticator
     private static final String PRESTO_UI_COOKIE = "Presto-UI-Token";
     public static final String LOGIN_FORM = "/ui/login.html";
     public static final URI LOGIN_FORM_URI = URI.create(LOGIN_FORM);
-    static final String DISABLED_LOCATION = "/ui/disabled.html";
-    static final URI DISABLED_LOCATION_URI = URI.create(DISABLED_LOCATION);
+    public static final String DISABLED_LOCATION = "/ui/disabled.html";
+    public static final URI DISABLED_LOCATION_URI = URI.create(DISABLED_LOCATION);
     public static final String UI_LOCATION = "/ui/";
     private static final URI UI_LOCATION_URI = URI.create(UI_LOCATION);
 
     private PasswordAuthenticatorManager passwordAuthenticatorManager;
     private final Function<String, String> jwtParser;
     private final Function<String, String> jwtGenerator;
+    private final QueryEditorConfig config;
 
     @Inject
     public UiAuthenticator(QueryEditorConfig config, PasswordAuthenticatorManager passwordAuthenticatorManager)
@@ -74,6 +74,7 @@ public class UiAuthenticator
             new SecureRandom().nextBytes(hmac);
         }
 
+        this.config = config;
         this.jwtParser = jwt -> parseJwt(hmac, jwt);
 
         long sessionTimeoutNanos = config.getSessionTimeout().roundTo(NANOSECONDS);
@@ -130,33 +131,39 @@ public class UiAuthenticator
         return Response.seeOther(redirectLocation);
     }
 
-    public static String getUser(HttpServletRequest servletRequest)
-    {
-        String user = servletRequest.getHeader(PRESTO_USER);
-        if (user != null) {
-            return user.trim();
-        }
-
-        user = (String) servletRequest.getAttribute(PRESTO_USER);
-        if (user != null) {
-            return user;
-        }
-        return servletRequest.getUserPrincipal() != null ? servletRequest.getUserPrincipal().getName() : "lk";
-    }
-
+    @Override
     public Optional<NewCookie> checkLoginCredentials(String username, String password, boolean secure)
     {
-        try {
-            Principal authenticatedPrincipal = passwordAuthenticatorManager.getAuthenticator().createAuthenticatedPrincipal(username, password);
-            if (authenticatedPrincipal != null) {
-                return Optional.of(createAuthenticationCookie(username, secure));
-            }
-        }
-        catch (AccessDeniedException e) {
+        if (isValidCredential(username, password, secure)) {
+            return Optional.of(createAuthenticationCookie(username, secure));
         }
         return Optional.empty();
     }
 
+    private boolean isValidCredential(String username, String password, boolean secure)
+    {
+        if (username == null) {
+            return false;
+        }
+
+        if (!secure) {
+            return config.isAllowInsecureOverHttp() && password == null;
+        }
+
+        PasswordAuthenticator authenticator = passwordAuthenticatorManager.getAuthenticator();
+        try {
+            authenticator.createAuthenticatedPrincipal(username, password);
+            return true;
+        }
+        catch (AccessDeniedException e) {
+            return false;
+        }
+        catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    @Override
     public Optional<String> getAuthenticatedUsername(HttpServletRequest request)
     {
         javax.servlet.http.Cookie[] cookies = request.getCookies();

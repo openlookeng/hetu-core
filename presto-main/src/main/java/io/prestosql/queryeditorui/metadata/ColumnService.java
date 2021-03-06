@@ -23,14 +23,12 @@ import io.prestosql.queryeditorui.QueryEditorUIModule;
 import io.prestosql.queryeditorui.execution.QueryClient;
 import io.prestosql.queryeditorui.execution.QueryRunner;
 import io.prestosql.queryeditorui.execution.QueryRunner.QueryRunnerFactory;
-import io.prestosql.queryeditorui.security.UiAuthenticator;
 import io.prestosql.server.protocol.Query;
 import io.prestosql.spi.type.TypeSignature;
 import org.joda.time.Duration;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
-import javax.servlet.http.HttpServletRequest;
 
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -52,14 +50,13 @@ public class ColumnService
     }
 
     public List<Column> getColumns(String catalogName, String schemaName,
-            String tableName, HttpServletRequest servletRequest) throws ExecutionException
+            String tableName, String user) throws ExecutionException
     {
-        return queryColumns(FQN_JOINER.join(catalogName, schemaName, tableName), servletRequest);
+        return queryColumns(FQN_JOINER.join(catalogName, schemaName, tableName), user);
     }
 
-    private List<Column> queryColumns(String fqnTableName, HttpServletRequest servletRequest)
+    private List<Column> queryColumns(String fqnTableName, String user)
     {
-        String user = UiAuthenticator.getUser(servletRequest);
         String statement = format("SHOW COLUMNS FROM %s", fqnTableName);
         QueryRunner queryRunner = queryRunnerFactory.create(QueryEditorUIModule.UI_QUERY_SOURCE, user);
         QueryClient queryClient = new QueryClient(queryRunner, Duration.standardSeconds(60), statement);

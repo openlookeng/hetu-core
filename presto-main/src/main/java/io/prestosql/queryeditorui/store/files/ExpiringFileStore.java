@@ -17,13 +17,15 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import io.airlift.units.DataSize;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.StandardErrorCode;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
 public class ExpiringFileStore
@@ -45,45 +47,45 @@ public class ExpiringFileStore
                 }).build(new CacheLoader<String, FileWithMetadata>()
                 {
                     @Override
-                    public FileWithMetadata load(String key)
-                            throws Exception
+                    public FileWithMetadata load(String key) throws Exception
                     {
-                        File file = new File(basePath, key);
-                        if (file.exists()) {
-                            return new FileWithMetadata(file, new DataSize(file.length(), DataSize.Unit.BYTE), DateTime.now());
-                        }
-
-                        throw new FileNotFoundException();
+                        throw new PrestoException(StandardErrorCode.PERMISSION_DENIED, "No permission");
                     }
                 });
     }
 
-    public File get(String key)
+    public File get(String key, Optional<String> user)
     {
         try {
-            return fileWithMetadataCache.get(key).getFile();
+            FileWithMetadata fileWithMetadata = fileWithMetadataCache.get(key);
+            if (user.isPresent()) {
+                return user.get().equals(fileWithMetadata.getUser()) ? fileWithMetadata.getFile() : null;
+            }
+            return fileWithMetadata.getFile();
         }
         catch (ExecutionException e) {
             return null;
         }
     }
 
-    public void addFile(String key, File file)
+    public void addFile(String key, String user, File file)
             throws IOException
     {
         long fileSize = file.length();
-        fileWithMetadataCache.put(key, new FileWithMetadata(file, new DataSize(fileSize, DataSize.Unit.BYTE), DateTime.now()));
+        fileWithMetadataCache.put(key, new FileWithMetadata(file, user, new DataSize(fileSize, DataSize.Unit.BYTE), DateTime.now()));
     }
 
     private static class FileWithMetadata
     {
         private final File file;
+        private final String user;
         private final DataSize size;
         private final DateTime createdAt;
 
-        public FileWithMetadata(File file, DataSize size, DateTime createdAt)
+        public FileWithMetadata(File file, String user, DataSize size, DateTime createdAt)
         {
             this.file = file;
+            this.user = user;
             this.size = size;
             this.createdAt = createdAt;
         }
@@ -91,6 +93,11 @@ public class ExpiringFileStore
         public File getFile()
         {
             return file;
+        }
+
+        public String getUser()
+        {
+            return user;
         }
 
         public DataSize getSize()

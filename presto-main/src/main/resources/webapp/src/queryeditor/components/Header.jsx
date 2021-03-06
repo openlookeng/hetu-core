@@ -122,16 +122,14 @@ class Header
               <i className='glyphicon glyphicon-user'/>
               {this.state.user.name}
             </div>
-            {this.state.user.secure ?
-                <div className="logout">
-                  <form method="post" action="../ui/api/logout">
-                    <button type="submit" className="btn btn-sm">
-                      <i className='fa fa-sign-out'/>
-                      Logout
-                    </button>
-                  </form>
-                </div>
-                : null}
+            <div className="logout">
+              <form method="post" action="../ui/api/logout">
+                <button type="submit" className="btn btn-sm">
+                  <i className='fa fa-sign-out'/>
+                  Logout
+                </button>
+              </form>
+            </div>
           </div>
           {/*<div className='flex flex-initial permissions'>*/}
           {/*  <i className='glyphicon glyphicon-lock' />*/}
