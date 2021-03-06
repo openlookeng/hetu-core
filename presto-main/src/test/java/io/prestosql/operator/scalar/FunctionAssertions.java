@@ -97,6 +97,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -880,7 +881,7 @@ public final class FunctionAssertions
                     ImmutableList.of(projection.getType()),
                     new DataSize(0, BYTE),
                     0,
-                    ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
+                    ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), false, Optional.empty(), 0, 0);
         }
         catch (Throwable e) {
             if (e instanceof UncheckedExecutionException) {

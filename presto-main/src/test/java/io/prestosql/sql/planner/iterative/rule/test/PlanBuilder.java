@@ -101,6 +101,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -527,7 +528,7 @@ public class PlanBuilder
                 enforcedConstraint,
                 Optional.empty(),
                 ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
-                0,
+                new UUID(0, 0),
                 0,
                 false);
     }

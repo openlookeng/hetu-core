@@ -43,6 +43,7 @@ import org.testng.annotations.Test;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
@@ -107,7 +108,7 @@ public class TestSystemMemoryBlocking
                         .addSequencePage(10, 1)
                         .build()),
                 TEST_TABLE_HANDLE,
-                ImmutableList.of(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, types, false, Optional.empty(), 0, 0);
+                ImmutableList.of(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), types, false, Optional.empty(), 0, 0);
         PageConsumerOperator sink = createSinkOperator(types);
         Driver driver = Driver.createDriver(driverContext, source, sink);
         assertSame(driver.getDriverContext(), driverContext);

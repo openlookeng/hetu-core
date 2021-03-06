@@ -25,6 +25,8 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * Singleton Class for storing Split Assignment Information used for Reuse-Exchange optimizer
@@ -32,8 +34,8 @@ import java.util.HashMap;
 public class TableSplitAssignmentInfo
 {
     private static TableSplitAssignmentInfo tableSplitAssignmentInfo;
-    private HashMap<Integer, Multimap<InternalNode, Split>> reuseTableScanMappingIdSplitAssignmentMap;
-    private HashMap<Integer, HashMap<SplitKey, InternalNode>> perTableReuseTableScanMappingIdSplitKeyNodeAssignment;
+    private HashMap<UUID, Multimap<InternalNode, Split>> reuseTableScanMappingIdSplitAssignmentMap;
+    private HashMap<UUID, HashMap<SplitKey, InternalNode>> perTableReuseTableScanMappingIdSplitKeyNodeAssignment;
     private static final Logger log = Logger.get(TableSplitAssignmentInfo.class);
 
     /**
@@ -60,7 +62,7 @@ public class TableSplitAssignmentInfo
      * reuseTableScanMappingId number uniquely identifies a producer-consumer pair for a reused table
      * @return HashMap containing reuseTableScanMappingId number as key and node-split multimap as value for all tables in this query
      */
-    public HashMap<Integer, Multimap<InternalNode, Split>> getReuseTableScanMappingIdSplitAssignmentMap()
+    public HashMap<UUID, Multimap<InternalNode, Split>> getReuseTableScanMappingIdSplitAssignmentMap()
     {
         return reuseTableScanMappingIdSplitAssignmentMap;
     }
@@ -71,7 +73,7 @@ public class TableSplitAssignmentInfo
      * @param reuseTableScanMappingId unique identifier for producer-consumer pair for a reused table
      * @param assignmentInformation node-split assignment multimap created as part of the stage that processes this table
      */
-    public void setTableSplitAssignment(QualifiedObjectName qualifiedTableName, int reuseTableScanMappingId, Multimap<InternalNode, Split> assignmentInformation)
+    public void setTableSplitAssignment(QualifiedObjectName qualifiedTableName, UUID reuseTableScanMappingId, Multimap<InternalNode, Split> assignmentInformation)
     {
         Multimap<InternalNode, Split> assignmentMap = HashMultimap.create();
         assignmentMap.putAll(assignmentInformation);
@@ -84,7 +86,7 @@ public class TableSplitAssignmentInfo
      * @return map of splitkey-node mapping for corresponding reuseTableScanMappingId number
      * NOTE: Works only with Hive data as other connectors don't support SplitKey currently
      */
-    public HashMap<SplitKey, InternalNode> getSplitKeyNodeAssignment(int reuseTableScanMappingId)
+    public HashMap<SplitKey, InternalNode> getSplitKeyNodeAssignment(UUID reuseTableScanMappingId)
     {
         return perTableReuseTableScanMappingIdSplitKeyNodeAssignment.get(reuseTableScanMappingId);
     }
@@ -96,7 +98,7 @@ public class TableSplitAssignmentInfo
      * @param assignmentInformation node-split assignment multimap created as part of the stage that processes this table
      * NOTE: Works only with Hive data as other connectors don't support SplitKey currently
      */
-    private void setPerTablesplitKeyNodeAssignment(QualifiedObjectName qualifiedTableName, int reuseTableScanMappingId, Multimap<InternalNode, Split> assignmentInformation)
+    private void setPerTablesplitKeyNodeAssignment(QualifiedObjectName qualifiedTableName, UUID reuseTableScanMappingId, Multimap<InternalNode, Split> assignmentInformation)
     {
         String catalog = qualifiedTableName.getCatalogName();
         String schema = qualifiedTableName.getSchemaName();
@@ -129,6 +131,18 @@ public class TableSplitAssignmentInfo
         catch (NotImplementedException e) {
             log.error("Unsupported split type: " + e);
             throw new UnsupportedOperationException("Unsupported split type: " + e);
+        }
+    }
+
+    public void removeFromTableSplitAssignmentInfo(List<UUID> uuidList)
+    {
+        for (UUID uuid : uuidList) {
+            if (reuseTableScanMappingIdSplitAssignmentMap.containsKey(uuid)) {
+                reuseTableScanMappingIdSplitAssignmentMap.remove(uuid);
+            }
+            if (perTableReuseTableScanMappingIdSplitKeyNodeAssignment.containsKey(uuid)) {
+                perTableReuseTableScanMappingIdSplitKeyNodeAssignment.remove(uuid);
+            }
         }
     }
 }

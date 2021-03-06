@@ -46,6 +46,7 @@ import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -178,7 +179,7 @@ public class TestDriver
                 TEST_TABLE_HANDLE,
                 ImmutableList.of(),
                 ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
-                0,
+                new UUID(0, 0),
                 types,
                 false,
                 Optional.empty(),
@@ -477,7 +478,7 @@ public class TestDriver
                 TableHandle table,
                 Iterable<ColumnHandle> columns)
         {
-            super(operatorContext, planNodeId, pageSourceProvider, table, columns, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, new ArrayList<Type>(), false, Optional.empty(), 0, 0);
+            super(operatorContext, planNodeId, pageSourceProvider, table, columns, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), new ArrayList<Type>(), false, Optional.empty(), 0, 0);
         }
 
         @Override
@@ -502,7 +503,7 @@ public class TestDriver
                 TableHandle table,
                 Iterable<ColumnHandle> columns)
         {
-            super(operatorContext, planNodeId, pageSourceProvider, table, columns, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, new ArrayList<Type>(), false, Optional.empty(), 0, 0);
+            super(operatorContext, planNodeId, pageSourceProvider, table, columns, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), new ArrayList<Type>(), false, Optional.empty(), 0, 0);
         }
 
         @Override

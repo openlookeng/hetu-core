@@ -37,6 +37,7 @@ import org.testng.annotations.Test;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -182,7 +183,7 @@ public class TestPhasedExecutionSchedule
                 new PlanNodeId(name),
                 TEST_TABLE_HANDLE,
                 ImmutableList.of(symbol),
-                ImmutableMap.of(symbol, new TestingColumnHandle("column")), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0, false);
+                ImmutableMap.of(symbol, new TestingColumnHandle("column")), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0, false);
 
         RemoteSourceNode remote = new RemoteSourceNode(new PlanNodeId("build_id"), buildFragment.getId(), ImmutableList.of(), Optional.empty(), REPLICATE);
         PlanNode join = new JoinNode(
@@ -235,7 +236,7 @@ public class TestPhasedExecutionSchedule
                 new PlanNodeId(name),
                 TEST_TABLE_HANDLE,
                 ImmutableList.of(symbol),
-                ImmutableMap.of(symbol, new TestingColumnHandle("column")), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0, false);
+                ImmutableMap.of(symbol, new TestingColumnHandle("column")), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0, false);
 
         return createFragment(planNode);
     }

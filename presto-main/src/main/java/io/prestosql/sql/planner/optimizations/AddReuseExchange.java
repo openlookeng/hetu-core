@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static io.prestosql.SystemSessionProperties.getSpillOperatorThresholdReuseExchange;
@@ -107,7 +108,7 @@ public class AddReuseExchange
 
         private Map<WrapperScanNode, Integer> planNodeListHashMap = new HashMap<>();
         private final Map<WrapperScanNode, TableHandle> nodeToTempHandleMapping = new HashMap<>();
-        private final Map<WrapperScanNode, Integer> track = new HashMap<>();
+        private final Map<WrapperScanNode, UUID> track = new HashMap<>();
         private final Map<WrapperScanNode, Integer> reuseTableScanMappingIdConsumerTableScanNodeCount = new HashMap<>();
 
         private OptimizedPlanRewriter(Session session, Metadata metadata, TypeProvider typeProvider, Boolean isNodeAlreadyVisited)
@@ -251,7 +252,7 @@ public class AddReuseExchange
             else {
                 Integer pos = planNodeListHashMap.get(node);
                 if (pos != null && pos != 0) {
-                    Integer reuseTableScanMappingId = track.get(node);
+                    UUID reuseTableScanMappingId = track.get(node);
                     if (pos > 1) {
                         if (nodeToTempHandleMapping.get(node) == null) {
                             nodeToTempHandleMapping.put(node, tableScanNode.getTable());

@@ -103,6 +103,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkState;
@@ -305,7 +306,7 @@ public class LogicalPlanner
                 idAllocator.getNextId(),
                 new AggregationNode(
                         idAllocator.getNextId(),
-                        TableScanNode.newInstance(idAllocator.getNextId(), targetTable, tableScanOutputs.build(), symbolToColumnHandle.build(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0, false),
+                        TableScanNode.newInstance(idAllocator.getNextId(), targetTable, tableScanOutputs.build(), symbolToColumnHandle.build(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0, false),
                         statisticAggregations.getAggregations(),
                         singleGroupingSet(groupingSymbols),
                         ImmutableList.of(),

@@ -57,6 +57,7 @@ import static io.prestosql.execution.scheduler.NodeScheduler.selectDistributionN
 import static io.prestosql.execution.scheduler.NodeScheduler.selectExactNodes;
 import static io.prestosql.execution.scheduler.NodeScheduler.selectNodes;
 import static io.prestosql.execution.scheduler.NodeScheduler.toWhenHasSplitQueueSpaceFuture;
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static java.util.Comparator.comparingInt;
 import static java.util.Objects.requireNonNull;
@@ -265,37 +266,29 @@ public class SimpleNodeSelector
     {
         Multimap<InternalNode, Split> assignment = HashMultimap.create();
         for (Split split : splits) {
+            Split aSplit;
             if (split.getConnectorSplit().getSplitCount() > 1) {
-                boolean matched = false;
-                for (Split unwrappedSplit : split.getSplits()) {
-                    SplitKey splitKey = new SplitKey(unwrappedSplit, tableName.getCatalogName(),
-                            tableName.getSchemaName(), tableName.getObjectName());
-                    for (Iterator<SplitKey> it = splitKeySet.iterator(); it.hasNext(); ) {
-                        SplitKey producerSplitKey = it.next();
-                        if (splitKey.equals(producerSplitKey)) {
-                            InternalNode node = splitKeyNodeAssignment.get(producerSplitKey);
-                            assignment.put(node, split);
-                            matched = true;
-                            break;
-                        }
-                    }
-
-                    if (matched) {
-                        break;
-                    }
-                }
+                aSplit = split.getSplits().get(0);
             }
             else {
-                SplitKey splitKey = new SplitKey(split, tableName.getCatalogName(),
-                        tableName.getSchemaName(), tableName.getObjectName());
-                for (Iterator<SplitKey> it = splitKeySet.iterator(); it.hasNext(); ) {
-                    SplitKey producerSplitKey = it.next();
-                    if (splitKey.equals(producerSplitKey)) {
-                        InternalNode node = splitKeyNodeAssignment.get(producerSplitKey);
-                        assignment.put(node, split);
-                        break;
-                    }
+                aSplit = split;
+            }
+
+            boolean matched = false;
+            SplitKey splitKey = new SplitKey(aSplit, tableName.getCatalogName(),
+                    tableName.getSchemaName(), tableName.getObjectName());
+            for (Iterator<SplitKey> it = splitKeySet.iterator(); it.hasNext(); ) {
+                SplitKey producerSplitKey = it.next();
+                if (splitKey.equals(producerSplitKey)) {
+                    InternalNode node = splitKeyNodeAssignment.get(producerSplitKey);
+                    assignment.put(node, split);
+                    matched = true;
+                    break;
                 }
+            }
+            if (matched == false) {
+                log.debug("split not matched: " + aSplit);
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Producer & consumer splits are not same");
             }
         }
         return assignment;

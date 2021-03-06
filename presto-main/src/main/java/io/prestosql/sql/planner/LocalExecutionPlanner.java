@@ -226,6 +226,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -1393,7 +1394,7 @@ public class LocalExecutionPlanner
             List<ColumnHandle> columns = null;
             PhysicalOperation source = null;
             ReuseExchangeOperator.STRATEGY strategy = REUSE_STRATEGY_DEFAULT;
-            Integer reuseTableScanMappingId = 0;
+            UUID reuseTableScanMappingId = new UUID(0, 0);
             Integer consumerTableScanNodeCount = 0;
             if (sourceNode instanceof TableScanNode) {
                 TableScanNode tableScanNode = (TableScanNode) sourceNode;

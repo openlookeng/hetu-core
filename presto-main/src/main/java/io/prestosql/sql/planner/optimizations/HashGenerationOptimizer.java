@@ -80,6 +80,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -146,9 +147,9 @@ public class HashGenerationOptimizer
         private final PlanNodeIdAllocator idAllocator;
         private final PlanSymbolAllocator planSymbolAllocator;
         private final TypeProvider types;
-        private final Set<Integer> removedReuseTableScanMappingIds;
-        private final Map<Integer, List> reuseTableScanMappingIdSymbols;
-        private final Map<Integer, List> reuseTableScanMappingIdNodes;
+        private final Set<UUID> removedReuseTableScanMappingIds;
+        private final Map<UUID, List> reuseTableScanMappingIdSymbols;
+        private final Map<UUID, List> reuseTableScanMappingIdNodes;
 
         private Rewriter(Metadata metadata, PlanNodeIdAllocator idAllocator, PlanSymbolAllocator planSymbolAllocator, TypeProvider types)
         {
@@ -840,7 +841,7 @@ public class HashGenerationOptimizer
                     isDerivedExpr = !fields.stream().filter(field -> node.getAssignments().get(field) == null).findAny().equals(Optional.empty());
                 }
 
-                Integer reuseTableScanMappingId = node.getReuseTableScanMappingId();
+                UUID reuseTableScanMappingId = node.getReuseTableScanMappingId();
                 if (reuseTableScanMappingIdNodes.get(reuseTableScanMappingId) == null) {
                     reuseTableScanMappingIdSymbols.put(reuseTableScanMappingId, fields);
                     List<TableScanNode> nodes = new ArrayList<>();
@@ -852,17 +853,17 @@ public class HashGenerationOptimizer
                     List<Symbol> nodeFields = reuseTableScanMappingIdSymbols.get(reuseTableScanMappingId);
                     if (removedReuseTableScanMappingIds.contains(reuseTableScanMappingId)) {
                         node.setStrategy(REUSE_STRATEGY_DEFAULT);
-                        node.setReuseTableScanMappingId(-1);
+                        node.setReuseTableScanMappingId(new UUID(0, 0));
                     }
                     else if (!node.isSymbolsEqual(nodeFields, fields) || isDerivedExpr) {
                         // means two symbol fields are not same.
                         node.setStrategy(REUSE_STRATEGY_DEFAULT);
-                        node.setReuseTableScanMappingId(-1);
+                        node.setReuseTableScanMappingId(new UUID(0, 0));
                         removedReuseTableScanMappingIds.add(reuseTableScanMappingId);
                         List<TableScanNode> scanNodes = reuseTableScanMappingIdNodes.get(reuseTableScanMappingId);
                         scanNodes.forEach(x -> {
                             x.setStrategy(REUSE_STRATEGY_DEFAULT);
-                            x.setReuseTableScanMappingId(-1); });
+                            x.setReuseTableScanMappingId(new UUID(0, 0)); });
                     }
                     else {
                         List<TableScanNode> nodes = reuseTableScanMappingIdNodes.get(reuseTableScanMappingId);

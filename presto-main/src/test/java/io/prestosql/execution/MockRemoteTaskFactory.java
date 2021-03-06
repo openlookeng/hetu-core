@@ -64,6 +64,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -113,7 +114,7 @@ public class MockRemoteTaskFactory
                         ImmutableList.of(symbol),
                         ImmutableMap.of(symbol, new TestingColumnHandle("column")),
                         ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
-                        0,
+                        new UUID(0, 0),
                         0,
                         false),
                 ImmutableMap.of(symbol, VARCHAR),

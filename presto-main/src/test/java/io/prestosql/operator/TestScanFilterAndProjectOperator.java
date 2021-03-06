@@ -46,6 +46,7 @@ import org.testng.annotations.Test;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Supplier;
@@ -116,7 +117,7 @@ public class TestScanFilterAndProjectOperator
                 new DataSize(0, BYTE),
                 0,
                 ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
-                0,
+                new UUID(0, 0),
                 false,
                 Optional.empty(),
                 0,
@@ -165,7 +166,7 @@ public class TestScanFilterAndProjectOperator
                 ImmutableList.of(BIGINT),
                 new DataSize(64, KILOBYTE),
                 2,
-                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), false, Optional.empty(), 0, 0);
 
         SourceOperator operator = factory.createOperator(newDriverContext());
         operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));
@@ -212,7 +213,7 @@ public class TestScanFilterAndProjectOperator
                 new DataSize(0, BYTE),
                 0,
                 ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
-                0,
+                new UUID(0, 0),
                 false,
                 Optional.empty(),
                 0,
@@ -252,7 +253,7 @@ public class TestScanFilterAndProjectOperator
                 ImmutableList.of(VARCHAR),
                 new DataSize(0, BYTE),
                 0,
-                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), false, Optional.empty(), 0, 0);
 
         SourceOperator operator = factory.createOperator(driverContext);
         operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));
@@ -306,7 +307,7 @@ public class TestScanFilterAndProjectOperator
                 ImmutableList.of(BIGINT),
                 new DataSize(0, BYTE),
                 0,
-                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), false, Optional.empty(), 0, 0);
 
         SourceOperator operator = factory.createOperator(driverContext);
         operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));
@@ -373,7 +374,7 @@ public class TestScanFilterAndProjectOperator
                 ImmutableList.of(BIGINT),
                 new DataSize(0, BYTE),
                 0,
-                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), false, Optional.empty(), 0, 0);
 
         SourceOperator operator = factory.createOperator(driverContext);
         operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));

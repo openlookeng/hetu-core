@@ -14,17 +14,16 @@
  */
 package io.prestosql.sql.planner;
 
+import java.util.UUID;
+
 public class ScanTableIdAllocator
 {
-    private static int nextId;
-
-    private ScanTableIdAllocator(int value)
+    private ScanTableIdAllocator()
     {
-        nextId = value;
     }
 
-    public static synchronized Integer getNextId()
+    public static synchronized UUID getNextId()
     {
-        return nextId++;
+        return UUID.randomUUID();
     }
 }

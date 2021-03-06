@@ -58,6 +58,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
@@ -534,7 +535,7 @@ public class ScanFilterAndProjectOperator
         private Optional<Metadata> metadataOptional = Optional.empty();
         private Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional = Optional.empty();
         private ReuseExchangeOperator.STRATEGY strategy;
-        private Integer reuseTableScanMappingId;
+        private UUID reuseTableScanMappingId;
         private boolean spillEnabled;
         private final Optional<SpillerFactory> spillerFactory;
         private Integer spillerThreshold;
@@ -558,7 +559,7 @@ public class ScanFilterAndProjectOperator
                 DataSize minOutputPageSize,
                 int minOutputPageRowCount,
                 ReuseExchangeOperator.STRATEGY strategy,
-                Integer reuseTableScanMappingId,
+                UUID reuseTableScanMappingId,
                 boolean spillEnabled,
                 Optional<SpillerFactory> spillerFactory,
                 Integer spillerThreshold,
@@ -593,7 +594,7 @@ public class ScanFilterAndProjectOperator
                 DataSize minOutputPageSize,
                 int minOutputPageRowCount,
                 ReuseExchangeOperator.STRATEGY strategy,
-                Integer reuseTableScanMappingId,
+                UUID reuseTableScanMappingId,
                 boolean spillEnabled,
                 Optional<SpillerFactory> spillerFactory,
                 Integer spillerThreshold,

@@ -104,7 +104,7 @@ public class TestTypeValidator
                 TupleDomain.all(),
                 Optional.empty(),
                 ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
-                0,
+                new UUID(0, 0),
                 0,
                 false);
     }

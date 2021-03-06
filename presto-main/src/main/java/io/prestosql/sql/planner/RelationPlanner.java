@@ -97,6 +97,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -214,7 +215,7 @@ class RelationPlanner
 
         List<Symbol> outputSymbols = outputSymbolsBuilder.build();
         boolean isDeleteTarget = analysis.isDeleteTarget(createQualifiedObjectName(session, node, node.getName()));
-        PlanNode root = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols, columns.build(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0, isDeleteTarget);
+        PlanNode root = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols, columns.build(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0, isDeleteTarget);
         RelationPlan tableScan = new RelationPlan(root, scope, outputSymbols);
         tableScan = addRowFilters(node, tableScan);
         tableScan = addColumnMasks(node, tableScan);

@@ -90,6 +90,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
@@ -389,7 +390,7 @@ public class CachedSqlQueryExecution
             connectorTransactionHandleMap.put(tableHandle.getTransaction(), newTableHandle.getTransaction());
 
             // Return a new table handle with the ID, output symbols, assignments, and enforced constraints of the cached table handle
-            return new TableScanNode(node.getId(), newTableHandle, node.getOutputSymbols(), node.getAssignments(), node.getEnforcedConstraint(), node.getPredicate(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0, false);
+            return new TableScanNode(node.getId(), newTableHandle, node.getOutputSymbols(), node.getAssignments(), node.getEnforcedConstraint(), node.getPredicate(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0, false);
         }
 
         @Override

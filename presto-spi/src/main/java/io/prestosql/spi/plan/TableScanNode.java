@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -49,7 +50,7 @@ public class TableScanNode
     private final boolean forDelete;
 
     private ReuseExchangeOperator.STRATEGY strategy;
-    private Integer reuseTableScanMappingId;
+    private UUID reuseTableScanMappingId;
     private RowExpression filterExpr;
     private Integer consumerTableScanNodeCount;
 
@@ -62,7 +63,7 @@ public class TableScanNode
             List<Symbol> outputs,
             Map<Symbol, ColumnHandle> assignments,
             ReuseExchangeOperator.STRATEGY strategy,
-            Integer reuseTableScanMappingId, Integer consumerTableScanNodeCount, boolean forDelete)
+            UUID reuseTableScanMappingId, Integer consumerTableScanNodeCount, boolean forDelete)
     {
         return new TableScanNode(id, table, outputs, assignments, TupleDomain.all(), Optional.empty(), strategy, reuseTableScanMappingId, consumerTableScanNodeCount, forDelete);
     }
@@ -75,7 +76,7 @@ public class TableScanNode
             @JsonProperty("assignments") Map<Symbol, ColumnHandle> assignments,
             @JsonProperty("predicate") Optional<RowExpression> predicate,
             @JsonProperty("strategy") ReuseExchangeOperator.STRATEGY strategy,
-            @JsonProperty("reuseTableScanMappingId") Integer reuseTableScanMappingId,
+            @JsonProperty("reuseTableScanMappingId") UUID reuseTableScanMappingId,
             @JsonProperty("consumerTableScanNodeCount") Integer consumerTableScanNodeCount,
             @JsonProperty("forDelete") boolean forDelete)
     {
@@ -102,7 +103,7 @@ public class TableScanNode
             TupleDomain<ColumnHandle> enforcedConstraint,
             Optional<RowExpression> predicate,
             ReuseExchangeOperator.STRATEGY strategy,
-            Integer reuseTableScanMappingId,
+            UUID reuseTableScanMappingId,
             Integer consumerTableScanNodeCount,
             boolean forDelete)
     {
@@ -135,7 +136,7 @@ public class TableScanNode
         this.strategy = strategy;
     }
 
-    public void setReuseTableScanMappingId(Integer reuseTableScanMappingId)
+    public void setReuseTableScanMappingId(UUID reuseTableScanMappingId)
     {
         this.reuseTableScanMappingId = reuseTableScanMappingId;
     }
@@ -172,7 +173,7 @@ public class TableScanNode
     }
 
     @JsonProperty("reuseTableScanMappingId")
-    public Integer getReuseTableScanMappingId()
+    public UUID getReuseTableScanMappingId()
     {
         return reuseTableScanMappingId;
     }

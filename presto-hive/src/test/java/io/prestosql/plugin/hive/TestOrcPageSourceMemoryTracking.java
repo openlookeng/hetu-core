@@ -93,6 +93,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Properties;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -531,7 +532,7 @@ public class TestOrcPageSourceMemoryTracking
                     columns.stream().map(columnHandle -> (ColumnHandle) columnHandle).collect(toList()),
                     types,
                     DataSize.valueOf("462304B"),
-                    5, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
+                    5, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), false, Optional.empty(), 0, 0);
             SourceOperator operator = sourceOperatorFactory.createOperator(driverContext);
             operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));
             return operator;
@@ -559,7 +560,7 @@ public class TestOrcPageSourceMemoryTracking
                     types,
                     new DataSize(0, BYTE),
                     0,
-                    ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, false, Optional.empty(), 0, 0);
+                    ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), false, Optional.empty(), 0, 0);
             SourceOperator operator = sourceOperatorFactory.createOperator(driverContext);
             operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));
             operator.noMoreSplits();

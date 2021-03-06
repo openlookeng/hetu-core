@@ -21,6 +21,7 @@ import io.prestosql.spiller.Spiller;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
@@ -28,7 +29,7 @@ import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STR
 public class ReuseExchangeTableScanMappingIdState
 {
     private ReuseExchangeOperator.STRATEGY strategy;
-    private Integer reuseTableScanMappingId;
+    private UUID reuseTableScanMappingId;
     private List<Page> pageCaches;
     private List<Page> pagesToSpill;
     private ConcurrentLinkedQueue<String> sourceNodeModifiedIdList;
@@ -37,8 +38,9 @@ public class ReuseExchangeTableScanMappingIdState
     private int curConsumerScanNodeRefCount;
     private int totalConsumerScanNodeCount;
     private OperatorContext operatorContext;
+    public boolean cacheUpdateInProgress;
 
-    public ReuseExchangeTableScanMappingIdState(ReuseExchangeOperator.STRATEGY strategy, Integer reuseTableScanMappingId, OperatorContext operatorContext, int curConsumerScanNodeRefCount)
+    public ReuseExchangeTableScanMappingIdState(ReuseExchangeOperator.STRATEGY strategy, UUID reuseTableScanMappingId, OperatorContext operatorContext, int curConsumerScanNodeRefCount)
     {
         this.strategy = strategy;
         this.reuseTableScanMappingId = reuseTableScanMappingId;
@@ -54,6 +56,7 @@ public class ReuseExchangeTableScanMappingIdState
         pagesToSpill = new ArrayList<>();
         sourceNodeModifiedIdList = new ConcurrentLinkedQueue<>();
         spiller = Optional.empty();
+        cacheUpdateInProgress = false;
     }
 
     public ReuseExchangeOperator.STRATEGY getStrategy()
@@ -66,12 +69,12 @@ public class ReuseExchangeTableScanMappingIdState
         this.strategy = strategy;
     }
 
-    public Integer getReuseTableScanMappingId()
+    public UUID getReuseTableScanMappingId()
     {
         return reuseTableScanMappingId;
     }
 
-    public void setReuseTableScanMappingId(Integer reuseTableScanMappingId)
+    public void setReuseTableScanMappingId(UUID reuseTableScanMappingId)
     {
         this.reuseTableScanMappingId = reuseTableScanMappingId;
     }
@@ -133,7 +136,7 @@ public class ReuseExchangeTableScanMappingIdState
 
     public int getCurConsumerScanNodeRefCount()
     {
-        return curConsumerScanNodeRefCount;
+        return this.curConsumerScanNodeRefCount;
     }
 
     public void setCurConsumerScanNodeRefCount(int curConsumerScanNodeRefCount)

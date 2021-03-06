@@ -124,7 +124,7 @@ public class TestUtil
                 TupleDomain.none(),
                 Optional.empty(),
                 ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
-                0,
+                new UUID(0, 0),
                 0,
                 false);
         PlanBuilder planBuilder = new PlanBuilder(new PlanNodeIdAllocator(), dummyMetadata());

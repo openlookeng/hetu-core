@@ -54,6 +54,7 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -117,7 +118,7 @@ public final class SqlStageExecution
     private final AtomicBoolean dynamicFilterSchedulingInfoPropagated = new AtomicBoolean();
 
     @GuardedBy("SqlStageExecution.class")
-    public static Map<QueryId, List<Integer>> queryIdReuseTableScanMappingIdFinishedMap = new ConcurrentHashMap<>();
+    public static Map<QueryId, List<UUID>> queryIdReuseTableScanMappingIdFinishedMap = new ConcurrentHashMap<>();
 
     private PlanNodeId parentId;
 
@@ -575,7 +576,7 @@ public final class SqlStageExecution
         }
 
         TableScanNode scanNode = state.getProducerScanNode();
-        List<Integer> reuseTableScanMappingIdList = queryIdReuseTableScanMappingIdFinishedMap.get(state.getStageId().getQueryId());
+        List<UUID> reuseTableScanMappingIdList = queryIdReuseTableScanMappingIdFinishedMap.get(state.getStageId().getQueryId());
         if (reuseTableScanMappingIdList == null) {
             reuseTableScanMappingIdList = new ArrayList<>();
             reuseTableScanMappingIdList.add(scanNode.getReuseTableScanMappingId());
@@ -593,8 +594,18 @@ public final class SqlStageExecution
             return true;
         }
 
-        List<Integer> reuseTableScanMappingIdList = queryIdReuseTableScanMappingIdFinishedMap.get(state.getStageId().getQueryId());
+        List<UUID> reuseTableScanMappingIdList = queryIdReuseTableScanMappingIdFinishedMap.get(state.getStageId().getQueryId());
         return reuseTableScanMappingIdList != null && reuseTableScanMappingIdList.contains(state.getConsumerScanNode().getReuseTableScanMappingId());
+    }
+
+    public static synchronized List<UUID> removeReuseTableScanMappingIdStatus(StageStateMachine state)
+    {
+        if (queryIdReuseTableScanMappingIdFinishedMap.containsKey(state.getStageId().getQueryId())) {
+            List<UUID> uuidList = queryIdReuseTableScanMappingIdFinishedMap.get(state.getStageId().getQueryId());
+            queryIdReuseTableScanMappingIdFinishedMap.remove(state.getStageId().getQueryId());
+            return uuidList;
+        }
+        return null;
     }
 
     private synchronized void updateFinalTaskInfo(TaskInfo finalTaskInfo)

@@ -65,6 +65,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -249,10 +250,12 @@ public class SqlQueryScheduler
         rootStage.addStateChangeListener(state -> {
             if (state == FINISHED) {
                 queryStateMachine.transitionToFinishing();
+                cleanupReuseExchangeMappingIdStatus(rootStage);
             }
             else if (state == CANCELED) {
                 // output stage was canceled
                 queryStateMachine.transitionToCanceled();
+                cleanupReuseExchangeMappingIdStatus(rootStage);
             }
         });
 
@@ -262,9 +265,11 @@ public class SqlQueryScheduler
                     return;
                 }
                 if (state == FAILED) {
+                    cleanupReuseExchangeMappingIdStatus(rootStage);
                     queryStateMachine.transitionToFailed(stage.getStageInfo().getFailureCause().toException());
                 }
                 else if (state == ABORTED) {
+                    cleanupReuseExchangeMappingIdStatus(rootStage);
                     // this should never happen, since abort can only be triggered in query clean up after the query is finished
                     queryStateMachine.transitionToFailed(new PrestoException(GENERIC_INTERNAL_ERROR, "Query stage was aborted"));
                 }
@@ -775,6 +780,17 @@ public class SqlQueryScheduler
                 for (OutputBufferManager child : childOutputBufferManagers) {
                     child.addOutputBuffers(newOutputBuffers, noMoreTasks);
                 }
+            }
+        }
+    }
+
+    private void cleanupReuseExchangeMappingIdStatus(SqlStageExecution sqlStageExecution)
+    {
+        List<UUID> uuidList = SqlStageExecution.removeReuseTableScanMappingIdStatus(sqlStageExecution.getStateMachine());
+        if (null != uuidList) {
+            TableSplitAssignmentInfo tableSplitAssignmentInfo = TableSplitAssignmentInfo.getInstance();
+            if (null != tableSplitAssignmentInfo) {
+                tableSplitAssignmentInfo.removeFromTableSplitAssignmentInfo(uuidList);
             }
         }
     }

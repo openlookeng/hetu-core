@@ -103,6 +103,7 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -281,7 +282,7 @@ class QueryPlanner
 
         // create table scan
         ImmutableMap<Symbol, ColumnHandle> columns = columnsBuilder.build();
-        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0, false);
+        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0, false);
         Scope scope = Scope.builder().withRelationType(RelationId.anonymous(), new RelationType(fields.build())).build();
         RelationPlan relationPlan = new RelationPlan(tableScan, scope, outputSymbols.build());
 
@@ -369,7 +370,7 @@ class QueryPlanner
         fields.add(rowIdField);
 
         // create table scan
-        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns.build(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0, true);
+        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns.build(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0, true);
         Scope scope = Scope.builder().withRelationType(RelationId.anonymous(), new RelationType(fields.build())).build();
         RelationPlan relationPlan = new RelationPlan(tableScan, scope, outputSymbols.build());
 
@@ -419,7 +420,7 @@ class QueryPlanner
 
         // create table scan
         ImmutableMap<Symbol, ColumnHandle> columns = columnsBuilder.build();
-        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, 0, 0, true);
+        PlanNode tableScan = TableScanNode.newInstance(idAllocator.getNextId(), handle, outputSymbols.build(), columns, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0, true);
         Scope scope = Scope.builder().withRelationType(RelationId.anonymous(), new RelationType(fields.build())).build();
         RelationPlan relationPlan = new RelationPlan(tableScan, scope, outputSymbols.build());
 

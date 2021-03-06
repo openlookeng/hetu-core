@@ -71,6 +71,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Function;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -819,7 +820,7 @@ public class TestCostCalculator
                 TupleDomain.all(),
                 Optional.empty(),
                 ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
-                0,
+                new UUID(0, 0),
                 0,
                 false);
     }

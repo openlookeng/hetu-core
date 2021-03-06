@@ -63,6 +63,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.UUID;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -284,7 +285,7 @@ public class JdbcPlanOptimizer
                                     TupleDomain.all(),
                                     Optional.empty(),
                                     ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
-                                    0,
+                                    new UUID(0, 0),
                                     0,
                                     false),
                             new Assignments(assignments.build())));

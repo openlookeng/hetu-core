@@ -68,6 +68,7 @@ import io.prestosql.util.FinalizerService;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.UUID;
 
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
@@ -102,7 +103,7 @@ public final class TaskTestUtils
                     ImmutableList.of(SYMBOL),
                     ImmutableMap.of(SYMBOL, new TestingColumnHandle("column", 0, BIGINT)),
                     ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
-                    0,
+                    new UUID(0, 0),
                     0,
                     false),
             ImmutableMap.of(SYMBOL, VARCHAR),
