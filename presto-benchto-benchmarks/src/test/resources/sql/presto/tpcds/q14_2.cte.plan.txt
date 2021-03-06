@@ -24,7 +24,7 @@ local exchange (GATHER, SINGLE, [])
                                                                 Filter
                                                                     scan item
                                                 local exchange (GATHER, SINGLE, [])
-                                                    remote exchange (REPARTITION, HASH, ["expr_229"])
+                                                    remote exchange (REPARTITION, HASH, ["i_item_sk_1"])
                                                         cte cross_items
                                                             join (INNER, PARTITIONED):
                                                                 remote exchange (REPARTITION, HASH, ["i_brand_id_8", "i_category_id_12", "i_class_id_10"])
@@ -33,8 +33,8 @@ local exchange (GATHER, SINGLE, [])
                                                                 Filter
                                                                     final aggregation over (expr_216, expr_217, expr_218)
                                                                         local exchange (GATHER, SINGLE, [])
-                                                                            remote exchange (REPARTITION, HASH, ["expr_1199", "expr_1200", "expr_1201"])
-                                                                                partial aggregation over (expr_1199, expr_1200, expr_1201)
+                                                                            remote exchange (REPARTITION, HASH, ["i_brand_id_53", "i_category_id_57", "i_class_id_55"])
+                                                                                partial aggregation over (i_brand_id_53, i_category_id_57, i_class_id_55)
                                                                                     join (INNER, REPLICATED):
                                                                                         join (INNER, REPLICATED):
                                                                                             Filter
@@ -46,8 +46,8 @@ local exchange (GATHER, SINGLE, [])
                                                                                         local exchange (GATHER, SINGLE, [])
                                                                                             remote exchange (REPLICATE, BROADCAST, [])
                                                                                                 scan item
-                                                                            remote exchange (REPARTITION, HASH, ["expr_1205", "expr_1206", "expr_1207"])
-                                                                                partial aggregation over (expr_1205, expr_1206, expr_1207)
+                                                                            remote exchange (REPARTITION, HASH, ["i_brand_id_108", "i_category_id_112", "i_class_id_110"])
+                                                                                partial aggregation over (i_brand_id_108, i_category_id_112, i_class_id_110)
                                                                                     join (INNER, REPLICATED):
                                                                                         join (INNER, REPLICATED):
                                                                                             Filter
@@ -59,8 +59,8 @@ local exchange (GATHER, SINGLE, [])
                                                                                         local exchange (GATHER, SINGLE, [])
                                                                                             remote exchange (REPLICATE, BROADCAST, [])
                                                                                                 scan item
-                                                                            remote exchange (REPARTITION, HASH, ["expr_1211", "expr_1212", "expr_1213"])
-                                                                                partial aggregation over (expr_1211, expr_1212, expr_1213)
+                                                                            remote exchange (REPARTITION, HASH, ["i_brand_id_167", "i_category_id_171", "i_class_id_169"])
+                                                                                partial aggregation over (i_brand_id_167, i_category_id_171, i_class_id_169)
                                                                                     join (INNER, REPLICATED):
                                                                                         join (INNER, REPLICATED):
                                                                                             Filter
@@ -133,7 +133,7 @@ local exchange (GATHER, SINGLE, [])
                                                                 Filter
                                                                     scan item
                                                 local exchange (GATHER, SINGLE, [])
-                                                    remote exchange (REPARTITION, HASH, ["expr_875"])
+                                                    remote exchange (REPARTITION, HASH, ["i_item_sk_578"])
                                                         cte cross_items
                                                             join (INNER, PARTITIONED):
                                                                 remote exchange (REPARTITION, HASH, ["i_brand_id_585", "i_category_id_589", "i_class_id_587"])
@@ -142,8 +142,8 @@ local exchange (GATHER, SINGLE, [])
                                                                 Filter
                                                                     final aggregation over (expr_862, expr_863, expr_864)
                                                                         local exchange (GATHER, SINGLE, [])
-                                                                            remote exchange (REPARTITION, HASH, ["expr_1223", "expr_1224", "expr_1225"])
-                                                                                partial aggregation over (expr_1223, expr_1224, expr_1225)
+                                                                            remote exchange (REPARTITION, HASH, ["i_brand_id_630", "i_category_id_634", "i_class_id_632"])
+                                                                                partial aggregation over (i_brand_id_630, i_category_id_634, i_class_id_632)
                                                                                     join (INNER, REPLICATED):
                                                                                         join (INNER, REPLICATED):
                                                                                             Filter
@@ -155,8 +155,8 @@ local exchange (GATHER, SINGLE, [])
                                                                                         local exchange (GATHER, SINGLE, [])
                                                                                             remote exchange (REPLICATE, BROADCAST, [])
                                                                                                 scan item
-                                                                            remote exchange (REPARTITION, HASH, ["expr_1229", "expr_1230", "expr_1231"])
-                                                                                partial aggregation over (expr_1229, expr_1230, expr_1231)
+                                                                            remote exchange (REPARTITION, HASH, ["i_brand_id_720", "i_category_id_724", "i_class_id_722"])
+                                                                                partial aggregation over (i_brand_id_720, i_category_id_724, i_class_id_722)
                                                                                     join (INNER, REPLICATED):
                                                                                         join (INNER, REPLICATED):
                                                                                             Filter
@@ -168,8 +168,8 @@ local exchange (GATHER, SINGLE, [])
                                                                                         local exchange (GATHER, SINGLE, [])
                                                                                             remote exchange (REPLICATE, BROADCAST, [])
                                                                                                 scan item
-                                                                            remote exchange (REPARTITION, HASH, ["expr_1235", "expr_1236", "expr_1237"])
-                                                                                partial aggregation over (expr_1235, expr_1236, expr_1237)
+                                                                            remote exchange (REPARTITION, HASH, ["i_brand_id_813", "i_category_id_817", "i_class_id_815"])
+                                                                                partial aggregation over (i_brand_id_813, i_category_id_817, i_class_id_815)
                                                                                     join (INNER, REPLICATED):
                                                                                         join (INNER, REPLICATED):
                                                                                             Filter

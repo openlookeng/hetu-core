@@ -26,7 +26,7 @@ final aggregation over ()
                                                     Filter
                                                         scan web_site
                                     local exchange (GATHER, SINGLE, [])
-                                        remote exchange (REPARTITION, HASH, ["expr_80"])
+                                        remote exchange (REPARTITION, HASH, ["ws_order_number_17"])
                                             cte ws_wh
                                                 Filter
                                                     single aggregation over (ws_order_number_17)
@@ -41,7 +41,7 @@ final aggregation over ()
                                             Filter
                                                 scan web_returns
                                         local exchange (GATHER, SINGLE, [])
-                                            remote exchange (REPARTITION, HASH, ["expr_170"])
+                                            remote exchange (REPARTITION, HASH, ["ws_order_number_107"])
                                                 cte ws_wh
                                                     Filter
                                                         single aggregation over (ws_order_number_107)

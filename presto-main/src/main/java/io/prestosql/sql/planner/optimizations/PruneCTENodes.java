@@ -31,6 +31,8 @@ import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 import io.prestosql.sql.relational.OriginalExpressionUtils;
+import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,6 +42,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
 import static java.util.Objects.requireNonNull;
 
 /*
@@ -159,15 +162,23 @@ public class PruneCTENodes
             return null;
         }
 
-        private static boolean isBaseColumn(RowExpression expression)
+        private static boolean isSymbolBaseColumn(String name)
+        {
+            return !(name.startsWith("sum") || name.startsWith("avg") || name.startsWith("count")
+                        || name.startsWith("max") || name.startsWith("min"));
+        }
+
+        private static boolean isExprBaseColumn(RowExpression rowExpression)
         {
             // This is temp way to continue optimization of queries where Filter node is there on top of CTE
             // but filter is on derived expression.
             // Later anyway this will be removed to support optimization for such cases also.
-            if (OriginalExpressionUtils.isExpression(expression)) {
-                return !expression.toString().startsWith("sum")
-                        || expression.toString().startsWith("avg")
-                        || expression.toString().startsWith("count");
+            if (OriginalExpressionUtils.isExpression(rowExpression)) {
+                Expression expression = castToExpression(rowExpression);
+                if (expression instanceof SymbolReference) {
+                    SymbolReference symbol = (SymbolReference) expression;
+                    return isSymbolBaseColumn(symbol.getName());
+                }
             }
 
             return false;
@@ -189,16 +200,18 @@ public class PruneCTENodes
                     if (node.getSource() instanceof ProjectNode) {
                         ProjectNode projectNode = (ProjectNode) node.getSource();
                         deterministicSymbols = projectNode.getAssignments().entrySet().stream()
-                                .filter(entry -> isBaseColumn(entry.getValue()))
+                                .filter(entry -> isExprBaseColumn(entry.getValue()))
                                 .map(Map.Entry::getKey)
                                 .collect(Collectors.toList());
                     }
                     else {
-                        deterministicSymbols = node.getOutputSymbols();
+                        deterministicSymbols = node.getOutputSymbols().stream()
+                                                .filter(entry -> isSymbolBaseColumn(entry.getName()))
+                                                .collect(Collectors.toList());
                     }
 
                     if (SymbolsExtractor.extractUnique(context.get().getPredicate()).stream().anyMatch(deterministicSymbols::contains)
-                                && !(node.getSource().getSources().get(0) instanceof WindowNode)) {
+                            && !(!node.getSource().getSources().isEmpty() && node.getSource().getSources().get(0) instanceof WindowNode)) {
                         // If there is any filter on top of CTE, then we dont apply optimization; so return child from here.
                         node = (CTEScanNode) visitPlan(node, context);
                         return node.getSource();

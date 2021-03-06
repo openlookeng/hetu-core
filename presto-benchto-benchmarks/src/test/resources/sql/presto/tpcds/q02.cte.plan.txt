@@ -2,16 +2,16 @@ remote exchange (GATHER, SINGLE, [])
     local exchange (GATHER, UNKNOWN, [])
         remote exchange (REPARTITION, ROUND_ROBIN, [])
             join (INNER, PARTITIONED):
-                remote exchange (REPARTITION, HASH, ["expr_71"])
+                remote exchange (REPARTITION, HASH, ["d_week_seq"])
                     join (INNER, REPLICATED):
-                        remote exchange (REPARTITION, HASH, ["expr_71", "expr_72", "expr_73", "expr_74", "expr_75", "expr_76", "expr_77", "expr_78"])
+                        remote exchange (REPARTITION, HASH, ["d_week_seq", "sum", "sum_33", "sum_34", "sum_35", "sum_36", "sum_37", "sum_38"])
                             cte wswscs
-                                final aggregation over (d_week_seq$gid)
+                                final aggregation over (d_week_seq)
                                     local exchange (GATHER, SINGLE, [])
-                                        remote exchange (REPARTITION, HASH, ["d_week_seq$gid"])
-                                            partial aggregation over (d_week_seq$gid)
+                                        remote exchange (REPARTITION, HASH, ["d_week_seq"])
+                                            partial aggregation over (d_week_seq)
                                                 join (INNER, REPLICATED):
-                                                    remote exchange (REPARTITION, HASH, ["expr_23", "expr_24"])
+                                                    remote exchange (REPARTITION, HASH, ["sales_price_18", "sold_date_sk_17"])
                                                         cte wscs
                                                             remote exchange (REPARTITION, ROUND_ROBIN, [])
                                                                 Filter
@@ -29,14 +29,14 @@ remote exchange (GATHER, SINGLE, [])
                 local exchange (GATHER, SINGLE, [])
                     remote exchange (REPARTITION, HASH, ["expr_395"])
                         join (INNER, REPLICATED):
-                            remote exchange (REPARTITION, HASH, ["expr_304", "expr_305", "expr_306", "expr_307", "expr_308", "expr_309", "expr_310", "expr_311"])
+                            remote exchange (REPARTITION, HASH, ["d_week_seq_232", "sum_265", "sum_266", "sum_267", "sum_268", "sum_269", "sum_270", "sum_271"])
                                 cte wswscs
-                                    final aggregation over (d_week_seq$gid_264)
+                                    final aggregation over (d_week_seq_232)
                                         local exchange (GATHER, SINGLE, [])
-                                            remote exchange (REPARTITION, HASH, ["d_week_seq$gid_264"])
-                                                partial aggregation over (d_week_seq$gid_264)
+                                            remote exchange (REPARTITION, HASH, ["d_week_seq_232"])
+                                                partial aggregation over (d_week_seq_232)
                                                     join (INNER, REPLICATED):
-                                                        remote exchange (REPARTITION, HASH, ["expr_226", "expr_227"])
+                                                        remote exchange (REPARTITION, HASH, ["sales_price_221", "sold_date_sk_220"])
                                                             cte wscs
                                                                 remote exchange (REPARTITION, ROUND_ROBIN, [])
                                                                     Filter

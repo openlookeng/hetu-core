@@ -181,7 +181,7 @@ public class TestAddExchangesPlans
                 cteEnabledSession(),
                 anyTree(node(JoinNode.class,
                         anyTree(exchange(node(CTEScanNode.class, anyTree(tableScan("orders"))))),
-                        anyTree(exchange(node(CTEScanNode.class, anyTree(tableScan("orders"))))))),
+                        anyTree(exchange(node(CTEScanNode.class, tableScan("orders")))))),
                 allOptimizers);
     }
 

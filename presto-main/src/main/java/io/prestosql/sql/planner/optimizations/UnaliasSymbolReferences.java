@@ -645,7 +645,9 @@ public class UnaliasSymbolReferences
         @Override
         public PlanNode visitCTEScan(CTEScanNode node, RewriteContext<Void> context)
         {
-            return node;
+            PlanNode source = context.rewrite(node.getSource());
+            return new CTEScanNode(node.getId(), source, source.getOutputSymbols(), node.getPredicate(), node.getCteRefName(),
+                    node.getConsumerPlans(), node.getCommonCTERefNum());
         }
 
         @Override
