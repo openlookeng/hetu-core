@@ -88,7 +88,7 @@ public class LocalMergeSourceOperator
                     .boxed()
                     .map(index -> localExchange.getNextSource())
                     .collect(toImmutableList());
-            return new LocalMergeSourceOperator(operatorContext, sources, types, comparator, localExchange.getSnapshotState());
+            return new LocalMergeSourceOperator(operatorContext, sources, types, comparator, localExchange.getSnapshotState(), planNodeId.toString());
         }
 
         @Override
@@ -111,8 +111,12 @@ public class LocalMergeSourceOperator
     // Snapshot: this is created for the local-exchange, but made available here,
     // so this operator can return markers to downstream operators
     private final MultiInputSnapshotState snapshotState;
+    // For taskSnapshotManager.updateFinishedComponents(), LocalMergeSourceOperator needs to report the same id as LocalExchange
+    // because SnapshotState is affiliated with LocalExchange rather than LocalMergeSourceOperator. LocalExchange is identified by
+    // planNodeId, so LocalMerge will also store a copy to identify itself so it won't get counted as a new component.
+    private final String planNodeId;
 
-    public LocalMergeSourceOperator(OperatorContext operatorContext, List<LocalExchangeSource> sources, List<Type> types, PageWithPositionComparator comparator, MultiInputSnapshotState snapshotState)
+    public LocalMergeSourceOperator(OperatorContext operatorContext, List<LocalExchangeSource> sources, List<Type> types, PageWithPositionComparator comparator, MultiInputSnapshotState snapshotState, String planNodeId)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.sources = requireNonNull(sources, "sources is null");
@@ -126,12 +130,18 @@ public class LocalMergeSourceOperator
                 types,
                 operatorContext.aggregateUserMemoryContext(),
                 operatorContext.getDriverContext().getYieldSignal());
+        this.planNodeId = planNodeId;
     }
 
     @Override
     public OperatorContext getOperatorContext()
     {
         return operatorContext;
+    }
+
+    public String getPlanNodeId()
+    {
+        return planNodeId;
     }
 
     @Override

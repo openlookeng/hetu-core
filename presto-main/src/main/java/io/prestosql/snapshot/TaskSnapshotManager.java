@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.prestosql.execution.TaskId;
 import io.prestosql.operator.Operator;
+import io.prestosql.operator.exchange.LocalMergeSourceOperator;
 
 import javax.inject.Inject;
 
@@ -197,6 +198,12 @@ public class TaskSnapshotManager
             for (Long snapshotId : captureComponentCounters.keySet()) {
                 for (Operator operator : finishedOperators) {
                     SnapshotStateId operatorId = SnapshotStateId.forOperator(snapshotId, operator.getOperatorContext());
+                    if (operator instanceof LocalMergeSourceOperator) {
+                        // For local merge, MultiInputSnapshotState is associated with the local-exchange,
+                        // so "updateCapture" needs to use the same operatorId as what's used by local-exchange,
+                        // i.e. based on dthe plan node id
+                        operatorId = SnapshotStateId.forTaskComponent(snapshotId, operator.getOperatorContext().getDriverContext().getPipelineContext().getTaskContext(), ((LocalMergeSourceOperator) operator).getPlanNodeId());
+                    }
                     updateCapture(operatorId, SnapshotComponentCounter.ComponentState.SUCCESSFUL);
                 }
             }

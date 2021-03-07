@@ -19,7 +19,6 @@ import com.google.common.util.concurrent.SettableFuture;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.metadata.Split;
-import io.prestosql.snapshot.MarkerSplit;
 import io.prestosql.snapshot.MultiInputRestorable;
 import io.prestosql.snapshot.MultiInputSnapshotState;
 import io.prestosql.spi.Page;
@@ -165,9 +164,6 @@ public class MergeOperator
     public Supplier<Optional<UpdatablePageSource>> addSplit(Split split)
     {
         requireNonNull(split, "split is null");
-        if (split.getConnectorSplit() instanceof MarkerSplit) {
-            throw new UnsupportedOperationException("Operator doesn't support snapshotting.");
-        }
         checkArgument(split.getConnectorSplit() instanceof RemoteSplit, "split is not a remote split");
         checkState(!blockedOnSplits.isDone(), "noMoreSplits has been called already");
 
@@ -281,6 +277,11 @@ public class MergeOperator
     public ListenableFuture<?> isBlocked()
     {
         if (!blockedOnSplits.isDone()) {
+            if (snapshotState != null) {
+                // So markers can be received and returned before all remote tasks are known
+                // TODO-cp-I3AJIP: this may unblock too often
+                return NOT_BLOCKED;
+            }
             return blockedOnSplits;
         }
 
@@ -319,13 +320,19 @@ public class MergeOperator
     @Override
     public Optional<Set<String>> getInputChannels()
     {
-        if (inputChannels.isPresent()) {
-            return inputChannels;
-        }
+//        if (inputChannels.isPresent()) {
+//            return inputChannels;
+//        }
 
-        if (!blockedOnSplits.isDone()) {
-            return Optional.empty();
-        }
+        // TODO-cp-I2TIJL: it's possible that merge operator hasn't received all locations, then input channel list is not complete,
+        // and snapshot may not be complete. But we won't receive the "no more splits" signal when source splits are still being scheduled,
+        // which may last toward the end of query execution.
+        // To overcome this, we can send the list of known locations (source tasks) to the coordinator, which can compare that list against
+        // all tasks from the source stage. If they match, then snapshots can be marked as complete; otherwise they are not usable.
+
+//        if (!blockedOnSplits.isDone()) {
+//            return Optional.empty();
+//        }
 
         Set<String> channels = new HashSet<>();
         for (ExchangeClient client : clients) {

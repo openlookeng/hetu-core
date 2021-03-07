@@ -494,12 +494,8 @@ public class ExchangeClient
                             processedPage = snapshotState.processSerializedPage(() -> page).orElse(null);
                         }
                         if (processedPage == null || processedPage.isMarkerPage()) {
-                            //Merge operator blocked by this exchange client, there is a Marker available, unblock so Marker will be passed on.
-                            if (!blockedCallers.get(0).isDone()) {
-                                SettableFuture<?> caller = blockedCallers.get(0);
-                                blockedCallers.clear();
-                                scheduler.execute(() -> caller.set(null));
-                            }
+                            // Don't add markers to the buffer, otherwise it may affect the order in which these buffers are accessed.
+                            // Instead, markers are stored in and returned by the snapshot state.
                             continue;
                         }
                     }

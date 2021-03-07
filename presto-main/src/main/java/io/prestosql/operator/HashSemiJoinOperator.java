@@ -131,6 +131,7 @@ public class HashSemiJoinOperator
     public ListenableFuture<?> isBlocked()
     {
         if (snapshotState != null && allowMarker()) {
+            // TODO-cp-I3AJIP: this may unblock too often
             return NOT_BLOCKED;
         }
 
