@@ -18,7 +18,7 @@ The Heuristic Indexer allows creating indexes on existing data but stores the in
 tables using ORC storage format.**
 
 1. BloomIndex, MinMaxIndex and BtreeIndex can be used on a coordinator for filtering splits during scheduling
-2. When reading ORC files, to filter Stripes, MinMaxIndex can be used or BloomIndex can be used on workers
+2. When reading ORC files, to filter Stripes, MinMaxIndex and BloomIndex can be used on workers
 2. BitmapIndex can used on workers for filtering rows when reading ORC files
 
 ### 1. Filtering scheduled Splits during query execution
