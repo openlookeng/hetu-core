@@ -26,6 +26,7 @@ import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.CreateIndexMetadata;
+import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.AggregationNode;
@@ -91,7 +92,6 @@ import io.prestosql.sql.tree.WindowFrame;
 import io.prestosql.type.TypeCoercion;
 import io.prestosql.utils.HeuristicIndexUtils;
 
-import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -661,7 +661,7 @@ class QueryPlanner
                 new CreateIndexMetadata(createIndex.getIndexName().toString(),
                         tableName,
                         createIndex.getIndexType(),
-                        createIndex.getColumnAliases().stream().map(identifier -> new AbstractMap.SimpleEntry<>(identifier.toString(),
+                        createIndex.getColumnAliases().stream().map(identifier -> new Pair<>(identifier.toString(),
                                 columnTypes.get(identifier.toString().toLowerCase(Locale.ROOT)))).collect(Collectors.toList()),
                         partitions,
                         indexProperties,

@@ -39,8 +39,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.hetu.core.heuristicindex.util.TypeUtils.extractSingleValue;
 import static io.prestosql.spi.function.OperatorType.EQUAL;
+import static io.prestosql.spi.heuristicindex.TypeUtils.extractValueFromRowExpression;
 
 /**
  * Util class for creating external index.
@@ -259,7 +259,7 @@ public class IndexServiceUtils
             CallExpression callExp = (CallExpression) expression;
             Optional<OperatorType> operatorOptional = Signature.getOperatorType(((CallExpression) expression).getSignature().getName());
 
-            Object value = extractSingleValue(callExp.getArguments().get(1));
+            Object value = extractValueFromRowExpression(callExp.getArguments().get(1));
 
             if (operatorOptional.isPresent() && operatorOptional.get() == EQUAL) {
                 return matchingFunction.apply(value);

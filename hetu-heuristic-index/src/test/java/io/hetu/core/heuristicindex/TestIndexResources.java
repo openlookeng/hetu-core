@@ -36,15 +36,20 @@ public class TestIndexResources
         super(HindexQueryRunner::createQueryRunner);
     }
 
-    @DataProvider(name = "splitsWithIndexAndData")
-    public Object[][] splitsWithIndexAndData()
+    void safeCreateIndex(String sql)
+            throws Exception
     {
-        return new Object[][] {
-                {"bitmap", "bigint"}, {"bloom", "bigint"}, {"minmax", "bigint"}, {"btree", "bigint"},
-                {"bitmap", "boolean"}, {"bloom", "boolean"}, {"minmax", "boolean"}, {"btree", "boolean"},
-                {"bitmap", "int"}, {"bloom", "int"}, {"minmax", "int"}, {"btree", "int"},
-                {"bitmap", "smallint"}, {"bloom", "smallint"}, {"minmax", "smallint"}, {"btree", "smallint"},
-                {"bitmap", "tinyint"}, {"bloom", "tinyint"}, {"minmax", "tinyint"}, {"btree", "tinyint"}};
+        Exception e = null;
+        for (int i = 0; i < 3; i++) {
+            try {
+                assertQuerySucceeds(sql);
+                return;
+            }
+            catch (Exception newE) {
+                e = newE;
+            }
+        }
+        throw e;
     }
 
     @DataProvider(name = "tableData1")
@@ -198,6 +203,23 @@ public class TestIndexResources
                 " (6, 66, 666, 6666, 66666), (7, 77, 777, 7777, 77777), (2, 22, 222, 2222, 22222), (2, 22, 222, 2222, 22222)");
     }
 
+    @DataProvider(name = "splitsWithIndexAndData")
+    public Object[][] splitsWithIndexAndData()
+    {
+        return new Object[][] {
+                {"bitmap", "bigint"}, {"bloom", "bigint"}, {"minmax", "bigint"}, {"btree", "bigint"},
+                {"bitmap", "boolean"}, {"bloom", "boolean"}, {"minmax", "boolean"},
+                {"bitmap", "char"}, {"bloom", "char"}, {"minmax", "char"},
+                {"bitmap", "date"}, {"bloom", "date"}, {"minmax", "date"}, {"btree", "date"},
+                {"bitmap", "decimal"}, {"bloom", "decimal"}, {"minmax", "decimal"}, {"btree", "decimal"},
+                {"bitmap", "double"}, {"bloom", "double"}, {"minmax", "double"},
+                {"bitmap", "int"}, {"bloom", "int"}, {"minmax", "int"}, {"btree", "int"},
+                {"bitmap", "real"}, {"bloom", "real"}, {"minmax", "real"}, {"btree", "real"},
+                {"bitmap", "smallint"}, {"bloom", "smallint"}, {"minmax", "smallint"}, {"btree", "smallint"},
+                {"bitmap", "tinyint"}, {"bloom", "tinyint"}, {"minmax", "tinyint"}, {"btree", "tinyint"},
+                {"bitmap", "varchar"}, {"bloom", "varchar"}, {"minmax", "varchar"}, {"btree", "varchar"}};
+    }
+
     String createTableDataTypeWithQuery(String tableName, String dataType)
             throws InterruptedException
     {
@@ -210,19 +232,19 @@ public class TestIndexResources
                 break;
             case "boolean":
                 createTableBoolean(tableName);
-                query = query.substring(0, query.length() - 1);
+                query += "BOOLEAN 'true'";
                 break;
             case "char":
                 createTableChar(tableName);
-                query += "'z'";
+                query += "CHAR 'z'";
                 break;
             case "date":
                 createTableDate(tableName);
-                query += "'2021-12-21'";
+                query += "DATE '2021-12-21'";
                 break;
             case "decimal":
                 createTableDecimal(tableName);
-                query += "DECIMAL '21.21'";
+                query += "DECIMAL '43.21'";
                 break;
             case "double":
                 createTableDouble(tableName);
@@ -234,27 +256,15 @@ public class TestIndexResources
                 break;
             case "real":
                 createTableReal(tableName);
-                query += "21.21";
+                query += "REAL '21.21'";
                 break;
             case "smallint":
                 createTableSmallInt(tableName);
                 query += "32767";
                 break;
-            case "string":
-                createTableString(tableName);
-                query += "";
-                break;
-            case "timestamp":
-                createTableTimestamp(tableName);
-                query += "";
-                break;
             case "tinyint":
                 createTableTinyInt(tableName);
                 query += "0";
-                break;
-            case "varbinary":
-                createTableVarBinary(tableName);
-                query += "AAA";
                 break;
             case "varchar":
                 createTableVarChar(tableName);
@@ -282,36 +292,36 @@ public class TestIndexResources
     void createTableBoolean(String tableName)
     {
         assertQuerySucceeds("CREATE TABLE " + tableName + " (data_col1 BOOLEAN, data_col2 BOOLEAN, data_col3 BOOLEAN)");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN '0', BOOLEAN '0', BOOLEAN '0')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN '0', BOOLEAN '0', BOOLEAN '1')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN '0', BOOLEAN '1', BOOLEAN '0')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN '0', BOOLEAN '1', BOOLEAN '1')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN '1', BOOLEAN '0', BOOLEAN '0')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN '1', BOOLEAN '0', BOOLEAN '1')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN '1', BOOLEAN '1', BOOLEAN '0')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN '1', BOOLEAN '1', BOOLEAN '1')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN 'false', BOOLEAN 'false', BOOLEAN 'false')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN 'false', BOOLEAN 'false', BOOLEAN 'true')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN 'false', BOOLEAN 'true', BOOLEAN 'false')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN 'false', BOOLEAN 'true', BOOLEAN 'true')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN 'true', BOOLEAN 'false', BOOLEAN 'false')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN 'true', BOOLEAN 'false', BOOLEAN 'true')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN 'true', BOOLEAN 'true', BOOLEAN 'false')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN 'true', BOOLEAN 'true', BOOLEAN 'true')");
     }
 
     void createTableChar(String tableName)
     {
-        assertQuerySucceeds("CREATE TABLE " + tableName + " (data_col1 CHAR(1), data_col2 CHAR(1), data_col3 CHAR(1))");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('a', 'a', 'a')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('b', 'b', 'b')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('c', 'c', 'c')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('d', 'd', 'd')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('e', 'e', 'e')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('z', 'z', 'z')");
+        assertQuerySucceeds("CREATE TABLE " + tableName + " (data_col1 CHAR, data_col2 CHAR, data_col3 CHAR)");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(CHAR 'a', CHAR 'a', CHAR 'a')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(CHAR 'b', CHAR 'b', CHAR 'b')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(CHAR 'c', CHAR 'c', CHAR 'c')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(CHAR 'd', CHAR 'd', CHAR 'd')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(CHAR 'e', CHAR 'e', CHAR 'e')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(CHAR 'z', CHAR 'z', CHAR 'z')");
     }
 
     void createTableDate(String tableName)
     {
         assertQuerySucceeds("CREATE TABLE " + tableName + " (data_col1 DATE, data_col2 DATE, data_col3 DATE)");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DATE'1997-01-01', DATE'1997-01-01', DATE'1997-01-01')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DATE'2021-02-09', DATE'2021-02-09', DATE'2021-02-09')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DATE'2020-03-08', DATE'2020-03-08', DATE'2020-03-08')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DATE'2022-04-07', DATE'2022-04-07', DATE'2022-04-07')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DATE'1899-05-06', DATE'1997-05-06', DATE'1899-05-06')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DATE'2021-12-21', DATE'2021-12-21', DATE'2021-12-21')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DATE '1997-01-01', DATE '1997-01-01', DATE '1997-01-01')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DATE '2021-02-09', DATE '2021-02-09', DATE '2021-02-09')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DATE '2020-03-08', DATE '2020-03-08', DATE '2020-03-08')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DATE '2022-04-07', DATE '2022-04-07', DATE '2022-04-07')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DATE '1899-05-06', DATE '1997-05-06', DATE '1899-05-06')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DATE '2021-12-21', DATE '2021-12-21', DATE '2021-12-21')");
     }
 
     void createTableDecimal(String tableName)
@@ -320,11 +330,14 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DECIMAL '11.11', DECIMAL '11.11', DECIMAL '11.11')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DECIMAL '21.21', DECIMAL '21.21', DECIMAL '21.21')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DECIMAL '12.34', DECIMAL '43.21', DECIMAL '88.34')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DECIMAL '12.11', DECIMAL '12.11', DECIMAL '11.11')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DECIMAL '13.21', DECIMAL '13.21', DECIMAL '21.21')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DECIMAL '34.45', DECIMAL '34.45', DECIMAL '34.45')");
     }
 
     void createTableDouble(String tableName)
     {
-        assertQuerySucceeds("CREATE TABLE " + tableName + " (data_col1 DOUBLE(4,2), data_col2 DOUBLE(4,2), data_col3 DOUBLE(4,2))");
+        assertQuerySucceeds("CREATE TABLE " + tableName + " (data_col1 DOUBLE, data_col2 DOUBLE, data_col3 DOUBLE)");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DOUBLE '11.11', DOUBLE '11.11', DOUBLE '11.11')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DOUBLE '21.21', DOUBLE '21.21', DOUBLE '21.21')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DOUBLE '12.34', DOUBLE '43.21', DOUBLE '88.34')");
@@ -344,7 +357,7 @@ public class TestIndexResources
 
     void createTableReal(String tableName)
     {
-        assertQuerySucceeds("CREATE TABLE " + tableName + " (data_col1 REAL(4,2), data_col2 REAL(4,2), data_col3 REAL(4,2))");
+        assertQuerySucceeds("CREATE TABLE " + tableName + " (data_col1 REAL, data_col2 REAL, data_col3 REAL)");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(REAL '11.11', REAL '11.11', REAL '11.11')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(REAL '21.21', REAL '21.21', REAL '21.21')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(REAL '12.34', REAL '43.21', REAL '88.34')");
@@ -361,16 +374,6 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(SMALLINT '-32768', SMALLINT '32767', SMALLINT '0')");
     }
 
-    void createTableString(String tableName)
-    {
-        assertQuerySucceeds("CREATE TABLE " + tableName + " (data_col1 STRING, data_col2 STRING, data_col3 STRING)");
-    }
-
-    void createTableTimestamp(String tableName)
-    {
-        assertQuerySucceeds("CREATE TABLE " + tableName + " (data_col1 TIMESTAMP, data_col2 TIMESTAMP, data_col3 TIMESTAMP)");
-    }
-
     void createTableTinyInt(String tableName)
     {
         assertQuerySucceeds("CREATE TABLE " + tableName + " (data_col1 TINYINT, data_col2 TINYINT, data_col3 TINYINT)");
@@ -382,20 +385,9 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(TINYINT '-127', TINYINT '0', TINYINT '127')");
     }
 
-    void createTableVarBinary(String tableName)
-    {
-        assertQuerySucceeds("CREATE TABLE " + tableName + " (data_col1 VARBINARY(5), data_col2 VARBINARY(5), data_col3 VARBINARY(5))");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('11111', '11111', '11111')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('22222', '22222', '22222')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('33333', '33333', '33333')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('44444', '44444', '44444')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('55555', '55555', '55555')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('12351', '12341', '15311')");
-    }
-
     void createTableVarChar(String tableName)
     {
-        assertQuerySucceeds("CREATE TABLE " + tableName + " (data_col1 VARCHAR(10), data_col2 VARCHAR(10), data_col3 VARCHAR(10))");
+        assertQuerySucceeds("CREATE TABLE " + tableName + " (data_col1 VARCHAR, data_col2 VARCHAR, data_col3 VARCHAR)");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('aaa', 'aaa', 'aaa')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('bbb', 'bbb', 'bbb')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('ccc', 'ccc', 'ccc')");
@@ -424,10 +416,12 @@ public class TestIndexResources
         // Select the entry with specifics
         MaterializedResult queryResult = computeActual(testerQuery);
 
+        String doublyQuotedQuery = testerQuery.replaceAll("'", "''");
+
         // Get queries executed and query ID to find the task with sum of splits
         String splits = "select sum(splits) from system.runtime.tasks where query_id in " +
                 "(select query_id from system.runtime.queries " +
-                "where query='" + testerQuery + "' order by created desc limit 1)";
+                "where query='" + doublyQuotedQuery + "' order by created desc limit 1)";
 
         MaterializedResult rows = computeActual(splits);
 
@@ -460,8 +454,10 @@ public class TestIndexResources
 
     long getInputRowsOfLastQueryExecution(String sql)
     {
+        String doublyQuotedQuery = sql.replaceAll("'", "''");
+
         String inputRowsSql = "select sum(raw_input_rows) from system.runtime.tasks where query_id in " +
-                "(select query_id from system.runtime.queries where query='" + sql + "' order by created desc limit 1)";
+                "(select query_id from system.runtime.queries where query='" + doublyQuotedQuery + "' order by created desc limit 1)";
 
         MaterializedResult rows = computeActual(inputRowsSql);
 

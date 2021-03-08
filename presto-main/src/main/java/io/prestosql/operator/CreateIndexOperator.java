@@ -23,6 +23,7 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexWriter;
+import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeUtils;
@@ -42,6 +43,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkState;
+import static io.prestosql.spi.heuristicindex.TypeUtils.getActualValue;
 import static java.util.Objects.requireNonNull;
 
 public class CreateIndexOperator
@@ -195,12 +197,14 @@ public class CreateIndexOperator
 
         for (int blockId = 0; blockId < page.getChannelCount(); blockId++) {
             Block block = page.getBlock(blockId);
-            Map.Entry<String, Type> entry = createIndexMetadata.getIndexColumns().get(blockId);
-            String indexColumn = entry.getKey();
-            Type type = entry.getValue();
+            Pair<String, Type> entry = createIndexMetadata.getIndexColumns().get(blockId);
+            String indexColumn = entry.getFirst();
+            Type type = entry.getSecond();
 
             for (int position = 0; position < block.getPositionCount(); ++position) {
-                values.computeIfAbsent(indexColumn, k -> new ArrayList<>()).add(getNativeValue(type, block, position));
+                Object value = getNativeValue(type, block, position);
+                value = getActualValue(type, value);
+                values.computeIfAbsent(indexColumn, k -> new ArrayList<>()).add(value);
             }
         }
 

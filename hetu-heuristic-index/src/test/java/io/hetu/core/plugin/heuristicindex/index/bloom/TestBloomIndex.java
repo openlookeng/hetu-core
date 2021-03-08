@@ -78,9 +78,8 @@ public class TestBloomIndex
         stringBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", testValues)));
 
         ValueSet valueSet = mock(ValueSet.class);
-        Type mockType = mock(Type.class);
         when(valueSet.isSingleValue()).thenReturn(true);
-        when(valueSet.getType()).thenReturn(mockType);
+        when(valueSet.getType()).thenReturn(VARCHAR);
 
         when(valueSet.getSingleValue()).thenReturn("a");
         assertTrue(stringBloomIndex.matches(Domain.create(valueSet, false)));

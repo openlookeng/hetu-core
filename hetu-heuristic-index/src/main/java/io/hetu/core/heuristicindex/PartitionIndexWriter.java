@@ -156,12 +156,12 @@ public class PartitionIndexWriter
             }
 
             String dbPath = "";
-            for (Map.Entry<String, Type> entry : createIndexMetadata.getIndexColumns()) {
+            for (Pair<String, Type> entry : createIndexMetadata.getIndexColumns()) {
                 if (partition != null) {
-                    dbPath = this.root + "/" + createIndexMetadata.getTableName() + "/" + entry.getKey() + "/" + createIndexMetadata.getIndexType().toUpperCase() + "/" + partition;
+                    dbPath = this.root + "/" + createIndexMetadata.getTableName() + "/" + entry.getFirst() + "/" + createIndexMetadata.getIndexType().toUpperCase() + "/" + partition;
                 }
                 else {
-                    dbPath = this.root + "/" + createIndexMetadata.getTableName() + "/" + entry.getKey() + "/" + createIndexMetadata.getIndexType().toUpperCase();
+                    dbPath = this.root + "/" + createIndexMetadata.getTableName() + "/" + entry.getFirst() + "/" + createIndexMetadata.getIndexType().toUpperCase();
                 }
                 partitionIndex = HeuristicIndexFactory.createIndex(createIndexMetadata.getIndexType());
             }
@@ -170,7 +170,7 @@ public class PartitionIndexWriter
             for (Map.Entry<Comparable<? extends Comparable<?>>, String> entry : dataMap.entrySet()) {
                 values.add(new Pair<>(entry.getKey(), entry.getValue()));
             }
-            String columnName = createIndexMetadata.getIndexColumns().get(0).getKey();
+            String columnName = createIndexMetadata.getIndexColumns().get(0).getFirst();
             partitionIndex.addKeyValues(Collections.singletonList(new Pair<>(columnName, values)));
 
             properties.put(SYMBOL_TABLE_KEY_NAME, serializedSymbolTable);

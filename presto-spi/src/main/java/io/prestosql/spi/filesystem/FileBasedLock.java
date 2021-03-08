@@ -57,6 +57,8 @@ public class FileBasedLock
 {
     private static final Logger LOG = Logger.get(FileBasedLock.class);
 
+    public static final String LOCK_FILE_NAME = ".lockFile";
+    public static final String LOCK_INFO_NAME = ".lockInfo";
     public static final String LOCK_TIMEOUT_CONFIG = "lock.timeout";
     public static final String LOCK_DIR_CONFIG = "lock.dir";
     public static final String LOCK_RETRY_INTERVAL_CONFIG = "lock.retry.millis";
@@ -153,12 +155,18 @@ public class FileBasedLock
         fs.createDirectories(lockFileDir);
         this.fs = fs;
         this.uuid = UUID.randomUUID();
-        this.lockFilePath = lockFileDir.resolve(".lockFile");
-        this.lockInfoPath = lockFileDir.resolve(".lockInfo");
+        this.lockFilePath = lockFileDir.resolve(LOCK_FILE_NAME);
+        this.lockInfoPath = lockFileDir.resolve(LOCK_INFO_NAME);
         this.lockFileTimeout = lockFileTimeout;
         this.retryInterval = retryInterval;
         this.refreshRate = refreshRate;
         this.lockAlreadyUsed = false;
+    }
+
+    public static boolean isLockUtilFile(Path path)
+    {
+        return LOCK_FILE_NAME.equals(path.getFileName().toString())
+                || LOCK_INFO_NAME.equals(path.getFileName().toString());
     }
 
     /**

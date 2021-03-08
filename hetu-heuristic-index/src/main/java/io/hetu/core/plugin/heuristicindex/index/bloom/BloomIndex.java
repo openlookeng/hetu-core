@@ -16,7 +16,6 @@
 package io.hetu.core.plugin.heuristicindex.index.bloom;
 
 import com.google.common.collect.ImmutableSet;
-import io.airlift.slice.Slice;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.Pair;
@@ -32,6 +31,7 @@ import java.util.Properties;
 import java.util.Set;
 
 import static io.hetu.core.heuristicindex.util.IndexServiceUtils.matchCallExpEqual;
+import static io.prestosql.spi.heuristicindex.TypeUtils.getActualValue;
 
 /**
  * Bloom index implementation
@@ -80,8 +80,8 @@ public class BloomIndex
         if (expression instanceof Domain) {
             Domain predicate = (Domain) expression;
             if (predicate.isSingleValue()) {
-                Class<?> javaType = predicate.getValues().getType().getJavaType();
-                return getFilter().test(rangeValueToString(predicate.getSingleValue(), javaType).getBytes());
+                Object value = getActualValue(predicate.getType(), predicate.getSingleValue());
+                return getFilter().test(value.toString().getBytes());
             }
         }
         else if (expression instanceof CallExpression) {
@@ -147,20 +147,6 @@ public class BloomIndex
         }
 
         return filter;
-    }
-
-    /**
-     * <pre>
-     *  get range value, if it is slice, we should change it to string
-     * </pre>
-     *
-     * @param object value
-     * @param javaType value java type
-     * @return string
-     */
-    private String rangeValueToString(Object object, Class<?> javaType)
-    {
-        return javaType == Slice.class ? ((Slice) object).toStringUtf8() : object.toString();
     }
 
     @Override

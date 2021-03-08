@@ -14,24 +14,30 @@
  */
 package io.prestosql.spi.heuristicindex;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class Pair<K, V>
 {
-    private final K key;
-    private final V value;
+    private final K first;
+    private final V second;
 
-    public Pair(K key, V value)
+    @JsonCreator
+    public Pair(@JsonProperty("first") K first, @JsonProperty("second") V second)
     {
-        this.key = key;
-        this.value = value;
+        this.first = first;
+        this.second = second;
     }
 
+    @JsonProperty
     public K getFirst()
     {
-        return this.key;
+        return this.first;
     }
 
+    @JsonProperty
     public V getSecond()
     {
-        return this.value;
+        return this.second;
     }
 }

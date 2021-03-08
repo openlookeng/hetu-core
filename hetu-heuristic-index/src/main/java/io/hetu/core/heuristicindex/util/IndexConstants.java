@@ -18,6 +18,9 @@ package io.hetu.core.heuristicindex.util;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.type.SqlDate;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+
 /**
  * Global constants used in hetu-heuristic-index
  */
@@ -32,20 +35,21 @@ public class IndexConstants
 
     // The canonical names of Java type classes that the supported Presto types link to
     public static final String[] TYPES_WHITELIST = ImmutableList.of(
-            Number.class,
-            Byte.class,
-            Short.class,
-            Integer.class,
-            Long.class,
-            Float.class,
-            Double.class,
-            Character.class,
-            String.class,
-            Boolean.class,
-            SqlDate.class)
-            .stream()
-            .map(Class::getCanonicalName)
-            .toArray(String[]::new);
+            Number.class.getCanonicalName(),
+            Byte.class.getCanonicalName(),
+            Short.class.getCanonicalName(),
+            Integer.class.getCanonicalName(),
+            Long.class.getCanonicalName(),
+            Float.class.getCanonicalName(),
+            Double.class.getCanonicalName(),
+            Character.class.getCanonicalName(),
+            String.class.getCanonicalName(),
+            Boolean.class.getCanonicalName(),
+            SqlDate.class.getCanonicalName(),
+            BigDecimal.class.getCanonicalName(),
+            BigInteger.class.getCanonicalName(),
+            byte[].class.getName()) // name [B but not canonical name byte will be used when deserializing
+            .toArray(new String[0]);
 
     private IndexConstants()
     {

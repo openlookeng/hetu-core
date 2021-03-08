@@ -19,14 +19,19 @@ import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
 import io.hetu.core.metastore.hetufilesystem.HetuFsMetastore;
 import io.hetu.core.metastore.hetufilesystem.HetuFsMetastoreConfig;
+import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
+import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.metastore.HetuMetastore;
 import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Properties;
 
+import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 public class TestHeuristicIndexClient
@@ -44,17 +49,25 @@ public class TestHeuristicIndexClient
             assertTrue(tableFolder.mkdir());
             File columnFolder = new File(tableFolder, "testColumn");
             assertTrue(columnFolder.mkdirs());
-            File indexTypeFolder = new File(columnFolder, "bloom");
+            File indexTypeFolder = new File(columnFolder, "BLOOM");
             assertTrue(indexTypeFolder.mkdirs());
             assertTrue(new File(indexTypeFolder, "testIndex.index").createNewFile());
 
             HetuFileSystemClient fs = new HetuLocalFileSystemClient(new LocalConfig(new Properties()), folder.getRoot().toPath());
-            HetuMetastore testMetaStore = new HetuFsMetastore(new HetuFsMetastoreConfig().setHetuFileSystemMetastorePath("/tmp/test"), fs);
+            HetuMetastore testMetaStore = new HetuFsMetastore(new HetuFsMetastoreConfig().setHetuFileSystemMetastorePath(folder.getRoot().getPath()), fs);
 
             HeuristicIndexClient client = new HeuristicIndexClient(fs, testMetaStore, folder.getRoot().toPath());
-//            client.deleteIndex(tableName, new String[] {"testColumn"}, "bloom");
-//
-//            assertFalse(indexTypeFolder.exists());
+            client.addIndexRecord(new CreateIndexMetadata("idx1",
+                    tableName,
+                    "BLOOM",
+                    Collections.singletonList(new Pair<>("testColumn", VARCHAR)),
+                    Collections.emptyList(),
+                    new Properties(),
+                    "user",
+                    CreateIndexMetadata.Level.UNDEFINED));
+            client.deleteIndex("idx1", Collections.emptyList());
+
+            assertFalse(indexTypeFolder.exists());
         }
     }
 }

@@ -17,6 +17,7 @@ package io.hetu.core.heuristicindex;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
+import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.type.Type;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
@@ -24,7 +25,7 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,8 +46,8 @@ public class TestPartitionIndexWriter
     public void testAddValue()
             throws IOException
     {
-        List<Map.Entry<String, Type>> columns = new ArrayList<>();
-        List<String> partitions = Arrays.asList("partition1");
+        List<Pair<String, Type>> columns = new ArrayList<>();
+        List<String> partitions = Collections.singletonList("partition1");
         Properties properties = new Properties();
         CreateIndexMetadata createIndexMetadata = new CreateIndexMetadata("hetu_partition_idx",
                 "testTable",
@@ -79,8 +80,8 @@ public class TestPartitionIndexWriter
     public void testAddValueMultThread()
             throws InterruptedException
     {
-        List<Map.Entry<String, Type>> columns = new ArrayList<>();
-        List<String> partitions = Arrays.asList("partition1");
+        List<Pair<String, Type>> columns = new ArrayList<>();
+        List<String> partitions = Collections.singletonList("partition1");
         Properties properties = new Properties();
         CreateIndexMetadata createIndexMetadata = new CreateIndexMetadata("hetu_partition_idx",
                 "testTable",

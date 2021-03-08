@@ -19,8 +19,6 @@ import io.prestosql.sql.analyzer.SemanticException;
 import io.prestosql.sql.parser.ParsingException;
 import org.testng.annotations.Test;
 
-import java.util.Locale;
-
 import static org.testng.Assert.assertTrue;
 
 public class TestHindexFailure
@@ -31,20 +29,16 @@ public class TestHindexFailure
     // using catalog name, wrong catalog name, schema name, wrong schema name, table name, wrong table name, column name, wrong column name
     @Test(dataProvider = "indexTypes")
     public void testIndexDeletionWithWrongNames(String indexType)
+            throws Exception
     {
         String tableName = getNewTableName();
         String indexName = getNewIndexName();
         createTable1(tableName);
 
         // Create index
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                    indexType + " ON " + tableName + " (id) WITH (level='table')");
-        }
-        else {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                    indexType + " ON " + tableName + " (id)");
-        }
+        safeCreateIndex("CREATE INDEX " + indexName + " USING " +
+                indexType + " ON " + tableName + " (id)");
+
         assertQueryFails("DROP INDEX hive", "line 1:1: Index 'hive' does not exist");
         assertQueryFails("DROP INDEX HDFS", "line 1:1: Index 'hdfs' does not exist");
         assertQueryFails("DROP INDEX TEST", "line 1:1: Index 'test' does not exist");
@@ -60,20 +54,15 @@ public class TestHindexFailure
     // Tests the case of failing to delete index because index is already deleted
     @Test(dataProvider = "indexTypes")
     public void testIndexDuplicateDeletion(String indexType)
+            throws Exception
     {
         String tableName = getNewTableName();
         String indexName = getNewIndexName();
         createTable1(tableName);
 
         // Create index
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                    indexType + " ON " + tableName + " (id) WITH (level='table')");
-        }
-        else {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                    indexType + " ON " + tableName + " (id)");
-        }
+        safeCreateIndex("CREATE INDEX " + indexName + " USING " +
+                indexType + " ON " + tableName + " (id)");
 
         assertQuerySucceeds("DROP INDEX " + indexName);
         assertQueryFails("DROP INDEX " + indexName,
@@ -83,34 +72,25 @@ public class TestHindexFailure
     // Tests the case where more than one index is created on the same table and same column (Error case).
     @Test(dataProvider = "tableData3")
     public void testMultipleSameIndexCreation(String indexType, String queryVariable)
+            throws Exception
     {
         String tableName = getNewTableName();
         createTable1(tableName);
 
         String indexName1 = getNewIndexName();
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQuerySucceeds("CREATE INDEX " + indexName1 + " USING " +
-                    indexType + " ON " + tableName + " (" + queryVariable + ") WITH (level='table')");
-        }
-        else {
-            assertQuerySucceeds("CREATE INDEX " + indexName1 + " USING " +
-                    indexType + " ON " + tableName + " (" + queryVariable + ")");
-        }
+        safeCreateIndex("CREATE INDEX " + indexName1 + " USING " +
+                indexType + " ON " + tableName + " (" + queryVariable + ")");
 
         String indexName2 = getNewIndexName();
         try {
-            if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-                assertQuerySucceeds("CREATE INDEX " + indexName2 + " USING " +
-                        indexType + " ON " + tableName + " (" + queryVariable + ") WITH (level='table')");
-            }
-            else {
-                assertQuerySucceeds("CREATE INDEX " + indexName2 + " USING " +
-                        indexType + " ON " + tableName + " (" + queryVariable + ")");
-            }
+            assertQuerySucceeds("CREATE INDEX " + indexName2 + " USING " +
+                    indexType + " ON " + tableName + " (" + queryVariable + ")");
+            throw new AssertionError("Expected create index to fail.");
         }
         catch (AssertionError except) {
             // Catch error
             assertTrue(except.getCause().toString().contains("line 1:1: Index with same (table,column,indexType) already exists"));
+            return;
         }
     }
 
@@ -123,16 +103,9 @@ public class TestHindexFailure
         createEmptyTable(tableName);
 
         String indexName = getNewIndexName();
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + tableName + " (" + queryVariable + ") WITH (level='table')",
-                    "The table is empty. No index will be created.");
-        }
-        else {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + tableName + " (" + queryVariable + ")",
-                    "The table is empty. No index will be created.");
-        }
+        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+                        indexType + " ON " + tableName + " (" + queryVariable + ")",
+                "The table is empty. No index will be created.");
     }
 
     // Tests the case where index is trying to be created without catalog name (Error case).
@@ -145,16 +118,9 @@ public class TestHindexFailure
         createEmptyTable(tableName);
 
         String indexName = getNewIndexName();
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + wrongTableName + " (" + queryVariable + ") WITH (level='table')",
-                    "The table is empty. No index will be created.");
-        }
-        else {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
-                    "The table is empty. No index will be created.");
-        }
+        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+                        indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
+                "The table is empty. No index will be created.");
     }
 
     // Tests the case where index is trying to be created with a wrong catalog name (Error case).
@@ -167,16 +133,9 @@ public class TestHindexFailure
         createEmptyTable(tableName);
 
         String indexName = getNewIndexName();
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + wrongTableName + " (" + queryVariable + ") WITH (level='table')",
-                    "line 1:1: CREATE INDEX is not supported in catalog 'system'");
-        }
-        else {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
-                    "line 1:1: CREATE INDEX is not supported in catalog 'system'");
-        }
+        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+                        indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
+                "line 1:1: CREATE INDEX is not supported in catalog 'system'");
     }
 
     // Tests the case where index is trying to be created with a wrong catalog name (Error case).
@@ -189,16 +148,9 @@ public class TestHindexFailure
         createEmptyTable(tableName);
 
         String indexName = getNewIndexName();
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + wrongTableName + " (" + queryVariable + ") WITH (level='table')",
-                    "line 1:1: CREATE INDEX is not supported in catalog 'nonexisting'");
-        }
-        else {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
-                    "line 1:1: CREATE INDEX is not supported in catalog 'nonexisting'");
-        }
+        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+                        indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
+                "line 1:1: CREATE INDEX is not supported in catalog 'nonexisting'");
     }
 
     // Tests the case where index is trying to be created without schema name (Error case).
@@ -211,16 +163,9 @@ public class TestHindexFailure
         createEmptyTable(tableName);
 
         String indexName = getNewIndexName();
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + wrongTableName + " (" + queryVariable + ") WITH (level='table')",
-                    "line 1:16: Schema hive does not exist");
-        }
-        else {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
-                    "line 1:16: Schema hive does not exist");
-        }
+        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+                        indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
+                "line 1:16: Schema hive does not exist");
     }
 
     // Tests the case where index is trying to be created with a wrong schema name (Error case).
@@ -233,16 +178,9 @@ public class TestHindexFailure
         createEmptyTable(tableName);
 
         String indexName = getNewIndexName();
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + wrongTableName + " (" + queryVariable + ") WITH (level='table')",
-                    "line 1:16: Schema nonexisting does not exist");
-        }
-        else {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
-                    "line 1:16: Schema nonexisting does not exist");
-        }
+        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+                        indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
+                "line 1:16: Schema nonexisting does not exist");
     }
 
     // Tests the case where index is trying to be created without table name (Error case).
@@ -253,16 +191,9 @@ public class TestHindexFailure
         String wrongTableName = "hive.test";
 
         String indexName = getNewIndexName();
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + wrongTableName + " (" + queryVariable + ") WITH (level='table')",
-                    "line 1:16: Schema hive does not exist");
-        }
-        else {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
-                    "line 1:16: Schema hive does not exist");
-        }
+        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+                        indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
+                "line 1:16: Schema hive does not exist");
     }
 
     // Tests the case where index is trying to be created with a wrong table name (Error case).
@@ -275,16 +206,9 @@ public class TestHindexFailure
         createEmptyTable(tableName);
 
         String indexName = getNewIndexName();
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + wrongTableName + " (" + queryVariable + ") WITH (level='table')",
-                    "line 1:16: Table " + wrongTableName + " does not exist");
-        }
-        else {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
-                    "line 1:16: Table " + wrongTableName + " does not exist");
-        }
+        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+                        indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
+                "line 1:16: Table " + wrongTableName + " does not exist");
     }
 
     // Tests the case where index is trying to be created without column name (Error case).
@@ -298,17 +222,13 @@ public class TestHindexFailure
 
         String indexName = getNewIndexName();
         try {
-            if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-                assertQuerySucceeds("CREATE INDEX " + indexName + " USING " + indexType +
-                        " ON " + tableName + " () WITH (level='table')");
-            }
-            else {
-                assertQuerySucceeds("CREATE INDEX " + indexName + " USING " + indexType +
-                        " ON " + tableName + " ()");
-            }
+            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " + indexType +
+                    " ON " + tableName + " ()");
+            throw new AssertionError("Expected create index to fail.");
         }
         catch (AssertionError e) {
             assertTrue(e.getCause().toString().contains("mismatched input ')'"));
+            return;
         }
     }
 
@@ -321,16 +241,9 @@ public class TestHindexFailure
         createTable1(tableName);
 
         String indexName = getNewIndexName();
-        if (indexType.toLowerCase(Locale.ROOT).equals("btree")) {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + tableName + " (wrong_column) WITH (level='table')",
-                    "line 1:8: Column 'wrong_column' cannot be resolved");
-        }
-        else {
-            assertQueryFails("CREATE INDEX " + indexName + " USING " +
-                            indexType + " ON " + tableName + " (wrong_column)",
-                    "line 1:8: Column 'wrong_column' cannot be resolved");
-        }
+        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+                        indexType + " ON " + tableName + " (wrong_column)",
+                "line 1:8: Column 'wrong_column' cannot be resolved");
     }
 
     // Tests the case where index is trying to be created with a wrong filter name (Error case).

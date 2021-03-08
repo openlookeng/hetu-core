@@ -24,7 +24,7 @@ public class TestHindexBitmapIndex
 {
     @Test(dataProvider = "bitmapOperatorInputRowsTest")
     public void testBitmapOperatorInputRows(String predicateQuery, String baseQuery)
-            throws InterruptedException
+            throws Exception
     {
         String tableName = getNewTableName();
         createTable2(tableName);
@@ -39,7 +39,7 @@ public class TestHindexBitmapIndex
         MaterializedResult baseQueryResult = computeActual(baseQuery);
         long baseQueryInputRows = getInputRowsOfLastQueryExecution(baseQuery);
 
-        assertQuerySucceeds("CREATE INDEX " + indexName + " USING bitmap ON " + tableName + " (key)");
+        safeCreateIndex("CREATE INDEX " + indexName + " USING bitmap ON " + tableName + " (key)");
 
         MaterializedResult predicateQueryResultLoadingIndex = computeActual(predicateQuery);
 

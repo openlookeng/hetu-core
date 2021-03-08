@@ -18,6 +18,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.type.Type;
 
 import java.util.List;
@@ -34,19 +35,19 @@ public class CreateIndexMetadata
     public static final String LEVEL_PROP_KEY = "level";
     public static final Map<String, List<String>> INDEX_SUPPORTED_TYPES = ImmutableMap.<String, List<String>>builder()
             .put("bloom", ImmutableList.of(
-                    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"))
+                    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date", "decimal"))
             .put("bitmap", ImmutableList.of(
-                    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"))
+                    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date", "decimal"))
             .put("minmax", ImmutableList.of(
-                    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"))
+                    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date", "decimal"))
             .put("btree", ImmutableList.of(
-                    "integer", "smallint", "bigint", "tinyint", "varchar", "real", "date"))
+                    "integer", "smallint", "bigint", "tinyint", "varchar", "real", "date", "decimal"))
             .build();
 
     private final String indexName;
     private final String tableName;
     private final String indexType;
-    private final List<Map.Entry<String, Type>> indexColumns;
+    private final List<Pair<String, Type>> indexColumns;
     private final List<String> partitions;
     private final Properties properties;
     private final String user;
@@ -57,7 +58,7 @@ public class CreateIndexMetadata
             @JsonProperty("indexName") String indexName,
             @JsonProperty("tableName") String tableName,
             @JsonProperty("indexType") String indexType,
-            @JsonProperty("indexColumns") List<Map.Entry<String, Type>> indexColumns,
+            @JsonProperty("indexColumns") List<Pair<String, Type>> indexColumns,
             @JsonProperty("partitions") List<String> partitions,
             @JsonProperty("properties") Properties properties,
             @JsonProperty("user") String user,
@@ -120,7 +121,7 @@ public class CreateIndexMetadata
     }
 
     @JsonProperty
-    public List<Map.Entry<String, Type>> getIndexColumns()
+    public List<Pair<String, Type>> getIndexColumns()
     {
         return indexColumns;
     }

@@ -176,7 +176,7 @@ public class FileIndexWriter
         }
         // Package index files for one File and write to remote filesystem
         String table = createIndexMetadata.getTableName();
-        String column = createIndexMetadata.getIndexColumns().iterator().next().getKey(); // Support indexing on only one column for now
+        String column = createIndexMetadata.getIndexColumns().iterator().next().getFirst(); // Support indexing on only one column for now
         String type = createIndexMetadata.getIndexType();
         String lastModifiedFileName = IndexConstants.LAST_MODIFIED_FILE_PREFIX + dataSourceFileLastModifiedTime + ".tar";
 
