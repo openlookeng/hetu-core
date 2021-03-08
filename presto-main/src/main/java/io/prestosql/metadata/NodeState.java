@@ -19,5 +19,6 @@ public enum NodeState
     INACTIVE,
     ISOLATING,
     ISOLATED,
-    SHUTTING_DOWN
+    SHUTTING_DOWN,
+    DISCONNECTION
 }
