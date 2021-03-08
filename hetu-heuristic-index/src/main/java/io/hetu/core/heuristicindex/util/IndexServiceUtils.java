@@ -15,6 +15,7 @@
 
 package io.hetu.core.heuristicindex.util;
 
+import io.airlift.slice.Slice;
 import io.hetu.core.common.util.SecurePathWhiteList;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.function.OperatorType;
@@ -23,15 +24,19 @@ import io.prestosql.spi.relation.CallExpression;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.utils.IOUtils;
+import org.mapdb.Serializer;
+import org.mapdb.serializer.GroupSerializer;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
+import java.util.Date;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
@@ -280,5 +285,68 @@ public class IndexServiceUtils
     private static String toStringRemoveQuotes(Object input)
     {
         return input == null ? null : input.toString().replace("\"", "").replace("'", "");
+    }
+
+    public static GroupSerializer getSerializer(String type)
+    {
+        switch (type) {
+            case "long":
+            case "Long":
+                return Serializer.LONG;
+            case "Slice":
+            case "String":
+                return Serializer.STRING;
+            case "int":
+            case "Integer":
+                return Serializer.INTEGER;
+            case "float":
+            case "Float":
+                return Serializer.FLOAT;
+            case "double":
+            case "Double":
+                return Serializer.DOUBLE;
+            case "boolean":
+            case "Boolean":
+                return Serializer.BOOLEAN;
+            case "BigDecimal":
+                return Serializer.BIG_DECIMAL;
+            case "Date":
+                return Serializer.DATE;
+        }
+        throw new RuntimeException("Index is not supported for type: (" + type + ")");
+    }
+
+    public static String extractType(Object object)
+    {
+        if (object instanceof Long) {
+            return "Long";
+        }
+        else if (object instanceof String) {
+            return "String";
+        }
+        else if (object instanceof Integer) {
+            return "Integer";
+        }
+        else if (object instanceof Boolean) {
+            return "boolean";
+        }
+        else if (object instanceof Slice) {
+            return "String";
+        }
+        else if (object instanceof Float) {
+            return "Float";
+        }
+        else if (object instanceof Double) {
+            return "Double";
+        }
+        else if (object instanceof BigDecimal) {
+            return "BigDecimal";
+        }
+        else if (object instanceof Date) {
+            return "Date";
+        }
+        else {
+            throw new UnsupportedOperationException("Not a valid type to create index: " + object.getClass());
+        }
     }
 }

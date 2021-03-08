@@ -17,13 +17,13 @@ package io.hetu.core.plugin.heuristicindex.index.btree;
 import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 import io.hetu.core.heuristicindex.PartitionIndexWriter;
+import io.hetu.core.heuristicindex.util.IndexServiceUtils;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.heuristicindex.SerializationUtils;
-import io.prestosql.spi.heuristicindex.TypeUtils;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.SpecialForm;
@@ -32,7 +32,6 @@ import org.mapdb.BTreeMap;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.Serializer;
-import org.mapdb.serializer.GroupSerializer;
 import org.xerial.snappy.SnappyInputStream;
 import org.xerial.snappy.SnappyOutputStream;
 
@@ -59,6 +58,7 @@ import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import static io.hetu.core.heuristicindex.util.IndexServiceUtils.getSerializer;
 import static io.prestosql.spi.heuristicindex.TypeUtils.extractValueFromRowExpression;
 
 public class BTreeIndex
@@ -111,27 +111,6 @@ public class BTreeIndex
         }
     }
 
-    private GroupSerializer getSerializer(String type)
-    {
-        switch (type) {
-            case "long":
-            case "Long":
-                return Serializer.LONG;
-            case "Slice":
-            case "String":
-                return Serializer.STRING;
-            case "int":
-            case "Integer":
-                return Serializer.INTEGER;
-            case "float":
-            case "Float":
-                return Serializer.FLOAT;
-            case "BigDecimal":
-                return Serializer.BIG_DECIMAL;
-        }
-        throw new RuntimeException("Index is not supported for type: (" + type + ")");
-    }
-
     private synchronized void createBatchWriteDBMap(String keyType, String valueType)
     {
         if (dataMap == null) {
@@ -181,8 +160,8 @@ public class BTreeIndex
             setupDB();
         }
         if (source == null) {
-            keyType = TypeUtils.extractType(input.get(0).getSecond().get(0).getFirst());
-            valueType = TypeUtils.extractType(input.get(0).getSecond().get(0).getSecond());
+            keyType = IndexServiceUtils.extractType(input.get(0).getSecond().get(0).getFirst());
+            valueType = IndexServiceUtils.extractType(input.get(0).getSecond().get(0).getSecond());
             source = new TreeSet<>((o1, o2) -> {
                 if (input.get(0).getSecond().get(0).getFirst() instanceof Comparable) {
                     return ((Comparable) o1.getFirst()).compareTo(o2.getFirst());

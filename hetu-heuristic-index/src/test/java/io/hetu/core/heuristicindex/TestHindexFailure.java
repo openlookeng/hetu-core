@@ -19,8 +19,6 @@ import io.prestosql.sql.analyzer.SemanticException;
 import io.prestosql.sql.parser.ParsingException;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertTrue;
-
 public class TestHindexFailure
         extends TestIndexResources
 {
@@ -39,16 +37,16 @@ public class TestHindexFailure
         safeCreateIndex("CREATE INDEX " + indexName + " USING " +
                 indexType + " ON " + tableName + " (id)");
 
-        assertQueryFails("DROP INDEX hive", "line 1:1: Index 'hive' does not exist");
-        assertQueryFails("DROP INDEX HDFS", "line 1:1: Index 'hdfs' does not exist");
-        assertQueryFails("DROP INDEX TEST", "line 1:1: Index 'test' does not exist");
-        assertQueryFails("DROP INDEX wrongtest", "line 1:1: Index 'wrongtest' does not exist");
+        assertContains("DROP INDEX hive", "Index 'hive' does not exist");
+        assertContains("DROP INDEX HDFS", "Index 'hdfs' does not exist");
+        assertContains("DROP INDEX TEST", "Index 'test' does not exist");
+        assertContains("DROP INDEX wrongtest", "Index 'wrongtest' does not exist");
         String[] table = tableName.split("\\.");
-        assertQueryFails("DROP INDEX " + table[2], "line 1:1: Index '" + table[2] + "' does not exist");
-        assertQueryFails("DROP INDEX " + table[2] + "uncreated",
+        assertContains("DROP INDEX " + table[2], "Index '" + table[2] + "' does not exist");
+        assertContains("DROP INDEX " + table[2] + "uncreated",
                 "line 1:1: Index '" + table[2] + "uncreated' does not exist");
-        assertQueryFails("DROP INDEX id", "line 1:1: Index 'id' does not exist");
-        assertQueryFails("DROP INDEX wrongcolumn", "line 1:1: Index 'wrongcolumn' does not exist");
+        assertContains("DROP INDEX id", "Index 'id' does not exist");
+        assertContains("DROP INDEX wrongcolumn", "Index 'wrongcolumn' does not exist");
     }
 
     // Tests the case of failing to delete index because index is already deleted
@@ -65,8 +63,8 @@ public class TestHindexFailure
                 indexType + " ON " + tableName + " (id)");
 
         assertQuerySucceeds("DROP INDEX " + indexName);
-        assertQueryFails("DROP INDEX " + indexName,
-                "line 1:1: Index '" + indexName + "' does not exist");
+        assertContains("DROP INDEX " + indexName,
+                "Index '" + indexName + "' does not exist");
     }
 
     // Tests the case where more than one index is created on the same table and same column (Error case).
@@ -82,16 +80,9 @@ public class TestHindexFailure
                 indexType + " ON " + tableName + " (" + queryVariable + ")");
 
         String indexName2 = getNewIndexName();
-        try {
-            assertQuerySucceeds("CREATE INDEX " + indexName2 + " USING " +
-                    indexType + " ON " + tableName + " (" + queryVariable + ")");
-            throw new AssertionError("Expected create index to fail.");
-        }
-        catch (AssertionError except) {
-            // Catch error
-            assertTrue(except.getCause().toString().contains("line 1:1: Index with same (table,column,indexType) already exists"));
-            return;
-        }
+        assertContains("CREATE INDEX " + indexName2 + " USING " +
+                        indexType + " ON " + tableName + " (" + queryVariable + ")",
+                "Index with same (table,column,indexType) already exists");
     }
 
     // Tests the case where the table at which the index is trying to be created is empty (Error case).
@@ -103,7 +94,7 @@ public class TestHindexFailure
         createEmptyTable(tableName);
 
         String indexName = getNewIndexName();
-        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+        assertContains("CREATE INDEX " + indexName + " USING " +
                         indexType + " ON " + tableName + " (" + queryVariable + ")",
                 "The table is empty. No index will be created.");
     }
@@ -118,7 +109,7 @@ public class TestHindexFailure
         createEmptyTable(tableName);
 
         String indexName = getNewIndexName();
-        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+        assertContains("CREATE INDEX " + indexName + " USING " +
                         indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
                 "The table is empty. No index will be created.");
     }
@@ -133,9 +124,9 @@ public class TestHindexFailure
         createEmptyTable(tableName);
 
         String indexName = getNewIndexName();
-        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+        assertContains("CREATE INDEX " + indexName + " USING " +
                         indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
-                "line 1:1: CREATE INDEX is not supported in catalog 'system'");
+                "CREATE INDEX is not supported in catalog 'system'");
     }
 
     // Tests the case where index is trying to be created with a wrong catalog name (Error case).
@@ -148,9 +139,9 @@ public class TestHindexFailure
         createEmptyTable(tableName);
 
         String indexName = getNewIndexName();
-        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+        assertContains("CREATE INDEX " + indexName + " USING " +
                         indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
-                "line 1:1: CREATE INDEX is not supported in catalog 'nonexisting'");
+                "CREATE INDEX is not supported in catalog 'nonexisting'");
     }
 
     // Tests the case where index is trying to be created without schema name (Error case).
@@ -163,9 +154,9 @@ public class TestHindexFailure
         createEmptyTable(tableName);
 
         String indexName = getNewIndexName();
-        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+        assertContains("CREATE INDEX " + indexName + " USING " +
                         indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
-                "line 1:16: Schema hive does not exist");
+                "Schema hive does not exist");
     }
 
     // Tests the case where index is trying to be created with a wrong schema name (Error case).
@@ -178,9 +169,9 @@ public class TestHindexFailure
         createEmptyTable(tableName);
 
         String indexName = getNewIndexName();
-        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+        assertContains("CREATE INDEX " + indexName + " USING " +
                         indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
-                "line 1:16: Schema nonexisting does not exist");
+                "Schema nonexisting does not exist");
     }
 
     // Tests the case where index is trying to be created without table name (Error case).
@@ -191,9 +182,9 @@ public class TestHindexFailure
         String wrongTableName = "hive.test";
 
         String indexName = getNewIndexName();
-        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+        assertContains("CREATE INDEX " + indexName + " USING " +
                         indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
-                "line 1:16: Schema hive does not exist");
+                "Schema hive does not exist");
     }
 
     // Tests the case where index is trying to be created with a wrong table name (Error case).
@@ -206,9 +197,9 @@ public class TestHindexFailure
         createEmptyTable(tableName);
 
         String indexName = getNewIndexName();
-        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+        assertContains("CREATE INDEX " + indexName + " USING " +
                         indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
-                "line 1:16: Table " + wrongTableName + " does not exist");
+                "Table " + wrongTableName + " does not exist");
     }
 
     // Tests the case where index is trying to be created without column name (Error case).
@@ -217,19 +208,12 @@ public class TestHindexFailure
     {
         String tableName = getNewTableName();
         createTable1(tableName);
-        // Error of "line 1:115: mismatched input ')'. Expecting: <identifier>" exists
+        // Error of "mismatched input ')'. Expecting: <identifier>" exists
         // But code style does not allow ) to exist inside a string without having ( before it.
 
         String indexName = getNewIndexName();
-        try {
-            assertQuerySucceeds("CREATE INDEX " + indexName + " USING " + indexType +
-                    " ON " + tableName + " ()");
-            throw new AssertionError("Expected create index to fail.");
-        }
-        catch (AssertionError e) {
-            assertTrue(e.getCause().toString().contains("mismatched input ')'"));
-            return;
-        }
+        assertContains("CREATE INDEX " + indexName + " USING " + indexType +
+                " ON " + tableName + " ()", "mismatched input ')'");
     }
 
     // Tests the case where index is trying to be created with a wrong column name (Error case).
@@ -241,9 +225,9 @@ public class TestHindexFailure
         createTable1(tableName);
 
         String indexName = getNewIndexName();
-        assertQueryFails("CREATE INDEX " + indexName + " USING " +
+        assertContains("CREATE INDEX " + indexName + " USING " +
                         indexType + " ON " + tableName + " (wrong_column)",
-                "line 1:8: Column 'wrong_column' cannot be resolved");
+                "Column 'wrong_column' cannot be resolved");
     }
 
     // Tests the case where index is trying to be created with a wrong filter name (Error case).
@@ -255,7 +239,7 @@ public class TestHindexFailure
         createTable1(tableName);
 
         String indexName = getNewIndexName();
-        assertQueryFails("CREATE INDEX " + indexName + " USING wrong_filter ON " + tableName + " (id)",
-                "line 1:26: mismatched input 'wrong_filter'. Expecting: '.', 'USING'");
+        assertContains("CREATE INDEX " + indexName + " USING wrong_filter ON " + tableName + " (id)",
+                "mismatched input 'wrong_filter'");
     }
 }

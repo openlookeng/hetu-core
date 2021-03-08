@@ -111,29 +111,4 @@ public class TypeUtils
 
         throw new UnsupportedOperationException("Not Implemented Exception: " + rowExpression.toString());
     }
-
-    public static String extractType(Object object)
-    {
-        if (object instanceof Long) {
-            return "Long";
-        }
-        else if (object instanceof String) {
-            return "String";
-        }
-        else if (object instanceof Integer) {
-            return "Integer";
-        }
-        else if (object instanceof Slice) {
-            return "String";
-        }
-        else if (object instanceof Float) {
-            return "Float";
-        }
-        else if (object instanceof BigDecimal) {
-            return "BigDecimal";
-        }
-        else {
-            throw new UnsupportedOperationException("Not a valid type to create index: " + object.getClass());
-        }
-    }
 }

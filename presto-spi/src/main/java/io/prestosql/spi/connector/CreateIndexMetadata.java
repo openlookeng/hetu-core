@@ -41,7 +41,7 @@ public class CreateIndexMetadata
             .put("minmax", ImmutableList.of(
                     "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date", "decimal"))
             .put("btree", ImmutableList.of(
-                    "integer", "smallint", "bigint", "tinyint", "varchar", "real", "date", "decimal"))
+                    "integer", "smallint", "bigint", "tinyint", "varchar", "double", "real", "date", "decimal"))
             .build();
 
     private final String indexName;

@@ -26,6 +26,7 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 public class TestIndexResources
         extends AbstractTestQueryFramework
@@ -50,6 +51,18 @@ public class TestIndexResources
             }
         }
         throw e;
+    }
+
+    void assertContains(String query, String contained)
+    {
+        try {
+            assertQuerySucceeds(query);
+            throw new AssertionError("Expected create index to fail.");
+        }
+        catch (AssertionError e) {
+            assertTrue(e.getCause().toString().contains(contained));
+            return;
+        }
     }
 
     @DataProvider(name = "tableData1")
