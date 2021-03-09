@@ -14,7 +14,6 @@
  */
 package io.prestosql.heuristicindex;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
 import io.prestosql.execution.QueryInfo;
@@ -35,8 +34,6 @@ import io.prestosql.testing.NoOpIndexClient;
 import io.prestosql.testing.NoOpIndexWriter;
 
 import java.io.IOException;
-import java.nio.file.FileSystemException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -75,17 +72,6 @@ public class HeuristicIndexerManager
         HeuristicIndexerManager.factory = indexFactory;
     }
 
-    @VisibleForTesting
-    protected static void checkFilesystemTimePrecision(String timeStamp)
-            throws FileSystemException
-    {
-        if (!timeStamp.matches(".*?:\\d+:\\d+\\.\\d{3,}Z")) {
-            throw new FileSystemException(String.format("The filesystem specified by hetu.heuristicindex.indexstore.filesystem.profile is not " +
-                    "supported by Heuristic Index because the precision for Files.getLastModifiedTime(): %s is too low. " +
-                    "Precision must at least be milliseconds.", timeStamp));
-        }
-    }
-
     public IndexClient getIndexClient()
     {
         return indexClient;
@@ -117,10 +103,9 @@ public class HeuristicIndexerManager
             root = Paths.get(indexStoreRoot);
             fs = fileSystemClientManager.getFileSystemClient(fsProfile, root);
             if (fileSystemClientManager.isFileSystemLocal(fsProfile)) {
-                LOG.warn("Profile %s is not a shared filesystem. It may not work properly if the cluster has more than 1 nodes.");
-                String fileLastModifiedTimeSample = Files.getLastModifiedTime(Paths.get(System.getProperty("user.dir"))).toString();
-                checkFilesystemTimePrecision(fileLastModifiedTimeSample);
+                throw new IllegalArgumentException("Indexer does not support local filesystem: " + fsProfile);
             }
+
             metastore = hetuMetaStoreManager.getHetuMetastore();
             if (metastore == null) {
                 throw new IllegalStateException("Hetu metastore is not properly configured. Heuristic indexer needs it to manage index metadata. " +

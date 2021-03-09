@@ -61,7 +61,6 @@ public class TestIndexResources
         }
         catch (AssertionError e) {
             assertTrue(e.getCause().toString().contains(contained));
-            return;
         }
     }
 
@@ -225,7 +224,7 @@ public class TestIndexResources
                 {"bitmap", "char"}, {"bloom", "char"}, {"minmax", "char"},
                 {"bitmap", "date"}, {"bloom", "date"}, {"minmax", "date"}, {"btree", "date"},
                 {"bitmap", "decimal"}, {"bloom", "decimal"}, {"minmax", "decimal"}, {"btree", "decimal"},
-                {"bitmap", "double"}, {"bloom", "double"}, {"minmax", "double"},
+                {"bitmap", "double"}, {"bloom", "double"}, {"minmax", "double"}, {"btree", "double"},
                 {"bitmap", "int"}, {"bloom", "int"}, {"minmax", "int"}, {"btree", "int"},
                 {"bitmap", "real"}, {"bloom", "real"}, {"minmax", "real"}, {"btree", "real"},
                 {"bitmap", "smallint"}, {"bloom", "smallint"}, {"minmax", "smallint"}, {"btree", "smallint"},

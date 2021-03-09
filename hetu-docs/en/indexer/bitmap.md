@@ -48,7 +48,9 @@ data is being filtered on both columns and they both have low cardinality.
     IN      IN set
 
 ## Supported column types
-    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"
+    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date", "decimal"
+
+**Note:** Index cannot be created on unsupported data types.
 
 ## Examples
 
@@ -68,7 +70,7 @@ select * from hive.hindex.users where age>20
 select * from hive.hindex.users where age<25
 select * from hive.hindex.users where age>=21
 select * from hive.hindex.users where age<=24
-select * from hive.hindex.users where age between (20, 25)
+select * from hive.hindex.users where age between 20 AND 25
 select * from hive.hindex.users where age in (22, 23)
 ```
 

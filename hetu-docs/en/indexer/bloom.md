@@ -31,7 +31,9 @@ data is being filtered on the column and `phone` column has a high cardinality.
     =       Equality
 
 ## Supported column types
-    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"
+    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date", "decimal"
+
+**Note:** Index cannot be created on unsupported data types.
 
 ## Configurations
 

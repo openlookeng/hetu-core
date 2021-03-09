@@ -62,6 +62,11 @@ For a complete list of configuration properties see [Properties](../admin/proper
 
 ### 1. Configure indexer settings
 
+Heuristic indexer uses Hetu Metastore to manage its metadata. Hetu Metastore is a shared metadata management
+utility used by multiple openLooKeng features. For more information about how to configure it,
+please check [Hetu Metastore](../admin/meta-store.md).
+Note: Indexer won't work if Hetu Metastore is not properly configured!
+
 In `etc/config.properties`, add these lines:
 
     hetu.heuristicindex.filter.enabled=true
@@ -72,7 +77,7 @@ In `etc/config.properties`, add these lines:
 Path whitelist：`["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`
 
 **Note**：
-- `LOCAL` filesystem type is NOT supported.
+- `LOCAL` filesystem type is NOT supported. Local filesystem should NOT be used in Hetu metastore as well.
 - `HDFS` filesystem type should be used in production in order for the index to be accessible by all nodes in the cluster.
 - All nodes should be configured to use the same filesystem profile.
 - Heuristic Index can be disabled while the engine is running by setting: `set session heuristicindex_filter_enabled=false;`
@@ -127,8 +132,6 @@ Subsequent queries will utilize the index to reduce the amount of data read
 | hetu.heuristicindex.indexstore.filesystem.profile | local-config-default| No      | This property defines the filesystem profile used to read and write index|
 | hetu.heuristicindex.filter.cache.preload-indices  |                     | No      | Preload the specified indices (comma-separated) when the server starts. Put `ALL` to load all indices|
 
-Heuristic indexer now uses Hetu Metastore to manage its metadata. Please check [Hetu Metastore](../admin/meta-store.md) for more information.
-
 ## Index Statements
 
 See [Heuristic Index Statements](./hindex-statements.md).
@@ -144,8 +147,9 @@ See [Heuristic Index Statements](./hindex-statements.md).
 | [MinMax](./minmax.md)   | Split<br>Stripe | Column which table is sorted on            | `=` `>` `>=` `<` `<=` | `create index idx using bloom on hive.hindex.users (age);`<br>(assuming users is sorted by age)<br>`select name from hive.hindex.users where age>25`                                                              |
 | [Bitmap](./bitmap.md)   | Row             | Low cardinality<br>(such as Gender column) | `=` `>` `>=` `<` `<=` `IN` `BETWEEN` | `create index idx using bitmap on hive.hindex.users (gender);`<br>`select name from hive.hindex.users where gender='female'`                                                                                      |
 
-**Note:** unsupported operators will still function correctly but will not benefit from the index.
-
+**Notes:**  
+· Unsupported operators will still function correctly but will not benefit from the index.  
+· Additional data types are not supported if not listed by the individual index types.
 
 ## Choosing Index Type
 
@@ -158,6 +162,10 @@ number of total rows. For example, an `ID` column has a high cardinality
 because IDs are unique. Whereas `employeeType` will have low cardinality
 because there are likely only a few different types (e.g. Manager, Developer,
 Tester).
+
+Disk usage and creation speed might also be the factors to be taken into consideration when choosing the best index.
+BTree index uses significantly more space and more time when creating, compared to other split filtering indices, such
+as Bloom and Minmax.
 
 ![index-decision](../images/index-decision.png)
 
@@ -197,3 +205,11 @@ See [Adding your own Index Type](./new-index.md).
 ## Access Control
 
 See [Built-in System Access Control](../security/built-in-system-access-control.md).
+
+## Troubleshooting
+
+### When index creation gets stuck and lasts too long (Usually happens on low-performance machines, e.g. dev laptop, k8s env with few cores)
+
+The machine might not have enough threads to complete the task. Try reducing the task concurrency by setting 
+the session property: `set session task_concurrency=X;`, where X is recommended to be less than or equal to the CPU
+cores/threads. For example, if the CPU has 8 threads, 8 can be set.

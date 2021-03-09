@@ -17,8 +17,8 @@
 **注意：当前，启发式索引仅支持ORC存储格式的Hive数据源。**
 
 1. BloomIndex，MinMaxIndex和BtreeIndex可以在Coordinator上使用，以在调度期间过滤Splits
-2. 在读取ORC文件时，为了过滤Splits，可以在workers上使用MinMaxIndex或者BloomIndex
-3. 在读取ORC文件时，BitmapIndex可以在workers上用于过滤数据行
+2. 在读取ORC文件时，可以在worker上使用MinMaxIndex或者BloomIndex过滤stripe
+3. 在读取ORC文件时，可以在worker上使用BitmapIndex过滤数据行
 
 ### 1.查询过程中过滤预定分片
 
@@ -52,6 +52,10 @@
 
 ### 1. 配置索引
 
+索引功能现使用Hetu Metastore管理元数据。Hetu Metastore是一个被整个OLK集群多个功能共用的元数据管理器，
+请参阅 [Hetu Metastore](../admin/meta-store.md) 获取关于如何配置的更多信息。
+注意：必须先配置好Hetu Metastore，启发式索引才能正常运行！
+
 在 `etc/config.properties` 中加入这些行：
 
     hetu.heuristicindex.filter.enabled=true
@@ -64,7 +68,7 @@
 避免选择根目录；路径不能包含../；如果配置了node.data_dir,那么当前工作目录为node.data_dir的父目录；如果没有配置，那么当前工作目录为openlookeng server的目录
 
 **注意**：
-- `LOCAL` 本地文件系统是*不*被支持的。
+- `LOCAL` 本地文件系统是*不*被支持的。同时在Hetu Metastore中也不应该选择本地文件系统。
 - `HDFS` 应用于生产环境来在集群中共享数据。
 - 所有节点必须有相同的文件系统配置。
 - 在服务器运行中可以通过`set session heuristicindex_filter_enabled=false;`关闭启发式索引。
@@ -112,8 +116,6 @@
 | hetu.heuristicindex.indexstore.filesystem.profile | local-config-default| 否    | 用于存储索引文件的文件系统属性描述文件名称|
 | hetu.heuristicindex.filter.cache.preload-indices  |                     | 否    | 在服务器启动时预加载指定名称的索引(用逗号分隔), 当值为`ALL`时将预载入全部索引|
 
-索引功能现使用Hetu Metastore管理元数据。请参阅 [Hetu Metastore](../admin/meta-store.md) 获取关于如何配置的更多信息。
-
 ## 索引语句
 
 参见 [Heuristic Index Statements](./hindex-statements.md).
@@ -129,8 +131,9 @@
 | [MinMax](./minmax.md)   | Split<br>Stripe | 列数据被排序            | `=` `>` `>=` `<` `<=` | `create index idx using bloom on hive.hindex.users (age);`<br>(假设数据根据年龄已排序)<br>`select name from hive.hindex.users where age>25`                                                              |
 | [Bitmap](./bitmap.md)   | Row             | 少量不同数据值<br>(如性别) | `=` `>` `>=` `<` `<=` `IN` `BETWEEN` | `create index idx using bitmap on hive.hindex.users (gender);`<br>`select name from hive.hindex.users where gender='female'`                                                                                      |
 
-**注意:** 包含不支持的运算符的语句依然会正常运行，但是不会从启发式索引中获得性能提升。
-
+**注意:**  
+· 包含不支持的运算符的语句依然会正常运行，但是不会从启发式索引中获得性能提升。  
+· 对应每个index type，不支持其它除了列出以外的数据类。
 
 ## 选择索引类型
 
@@ -138,6 +141,9 @@
 
 Cardinality 是指数据集中值域的大小。例如，`ID`列通常有很大的cardinality，
 而`employeeType`列通常cardinality很小(如 Manager, Developer, Tester)。
+
+在有些使用场景中，创建索引的速度和索引占用的磁盘空间也可能是需要考虑的因素。与其他主要用于分片过滤的索引，如
+Bloom和Minmax索引相比，创建BTree索引需要的时间和索引使用的空间明显更大。
 
 ![index-decision](../images/index-decision.png)
 
@@ -171,3 +177,10 @@ Cardinality 是指数据集中值域的大小。例如，`ID`列通常有很大�
 ## 权限控制
 
 参见 [Built-in System Access Control](../security/built-in-system-access-control.md).
+
+## 常见问题
+
+### 如果索引创建卡住，并且长时间都没有变化（常发生在性能较差的环境中，例如开发人员的笔记本，核分配不多的k8s环境）
+
+当前机器可能没有足够的线程资源来完成任务。请尝试通过设置会话属性降低任务并发度：`set session task_concurrency=X;`，
+其中X建议小于等于机器CPU的线程数。例如，如果处理器可用线程数为8，则X可设置为8。

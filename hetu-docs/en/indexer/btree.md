@@ -44,7 +44,9 @@ When selecting between BTreeIndex and BloomIndex, the following should be consid
     IN      IN set
 
 ## Supported column types
-    "integer", "smallint", "bigint", "tinyint", "varchar", "real", "date"
+    "integer", "smallint", "bigint", "tinyint", "varchar", "double", "real", "date", "decimal"
+
+**Note:** Index cannot be created on unsupported data types.
 
 ## Examples
 
@@ -65,7 +67,7 @@ select * from hive.hindex.orders where orderid>12345
 select * from hive.hindex.orders where orderid<12345
 select * from hive.hindex.orders where orderid>=12345
 select * from hive.hindex.orders where orderid<=12345
-select * from hive.hindex.orders where orderid between (10000, 20000)
+select * from hive.hindex.orders where orderid between 10000 AND 20000
 select * from hive.hindex.orders where orderid in (12345, 7890)
 ```
 
