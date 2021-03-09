@@ -58,6 +58,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static io.hetu.core.heuristicindex.util.IndexServiceUtils.extractType;
+import static io.hetu.core.heuristicindex.util.IndexServiceUtils.getSerializer;
 import static io.prestosql.spi.heuristicindex.TypeUtils.getActualValue;
 
 /**
@@ -96,16 +98,6 @@ public class BitmapIndex
 
     private static final String BTREE_MAP_ID = "MAP";
     private static final String BTREE_MAP_KEY_TYPE = "BTREE_KEY_TYPE";
-
-    // supported value types
-    private static final String INTEGER = "INTEGER";
-    private static final String DOUBLE = "DOUBLE";
-    private static final String LONG = "LONG";
-    private static final String FLOAT = "FLOAT";
-    private static final String DATE = "DATE";
-    private static final String BOOLEAN = "BOOLEAN";
-    private static final String STRING = "STRING";
-    private static final String BIGDECIMAL = "BIGDECIMAL";
 
     private Properties properties;
     private int maxValuesPerNode = DEFAULT_MAX_VALUES_PER_NODE;
@@ -396,7 +388,7 @@ public class BitmapIndex
         if (btree == null) {
             // store the btree's key serializer type in the db, this will be required during reading
             // because when SerializerCompressionWrapper is used, the type must be explicitly known
-            String serializerName = getSerializerName(key);
+            String serializerName = extractType(key);
             GroupSerializer keySerializer = getSerializer(serializerName);
             getDbWriteOptimized().atomicString(BTREE_MAP_KEY_TYPE, serializerName).create();
 
@@ -479,61 +471,6 @@ public class BitmapIndex
         else {
             throw new UnsupportedOperationException("Unsupported value type. " +
                     "BitmapIndex does not support " + obj.getClass().toString());
-        }
-    }
-
-    private GroupSerializer getSerializer(String name) throws IOException
-    {
-        switch (name) {
-            case INTEGER:
-                return Serializer.INTEGER;
-            case DOUBLE:
-                return Serializer.DOUBLE;
-            case LONG:
-                return Serializer.LONG;
-            case FLOAT:
-                return Serializer.FLOAT;
-            case DATE:
-                return Serializer.DATE;
-            case BOOLEAN:
-                return Serializer.BOOLEAN;
-            case STRING:
-                return Serializer.STRING;
-            case BIGDECIMAL:
-                return Serializer.BIG_DECIMAL;
-            default:
-                throw new UnsupportedOperationException("Unexpected value: " + name);
-        }
-    }
-
-    private String getSerializerName(Object obj) throws IOException
-    {
-        if (obj instanceof Integer) {
-            return INTEGER;
-        }
-        else if (obj instanceof Double) {
-            return DOUBLE;
-        }
-        else if (obj instanceof Long) {
-            return LONG;
-        }
-        else if (obj instanceof Float) {
-            return FLOAT;
-        }
-        else if (obj instanceof Date) {
-            return DATE;
-        }
-        else if (obj instanceof Boolean) {
-            return BOOLEAN;
-        }
-        else if (obj instanceof String) {
-            return STRING;
-        }
-        else if (obj instanceof BigDecimal) {
-            return BIGDECIMAL;
-        }
-        else {
-            throw new IOException("Unsupported type " + obj.getClass());
         }
     }
 

@@ -29,7 +29,6 @@ import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.MetadataUtil;
 import io.prestosql.metadata.OperatorNotFoundException;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.TableMetadata;
@@ -176,6 +175,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -1161,105 +1161,7 @@ class StatementAnalyzer
         protected Scope visitTable(Table table, Optional<Scope> scope)
         {
             if (analysis.getOriginalStatement() instanceof CreateIndex) {
-                CreateIndex createIndex = (CreateIndex) analysis.getOriginalStatement();
-                QualifiedObjectName tableFullName = MetadataUtil.createQualifiedObjectName(session, createIndex, createIndex.getTableName());
-                accessControl.checkCanCreateIndex(session.getRequiredTransactionId(), session.getIdentity(), tableFullName);
-                String tableName = tableFullName.toString();
-                // check whether catalog support create index
-                if (!metadata.isHeuristicIndexSupported(session, tableFullName)) {
-                    throw new SemanticException(NOT_SUPPORTED, createIndex,
-                            "CREATE INDEX is not supported in catalog '%s'",
-                            tableFullName.getCatalogName());
-                }
-
-                List<String> partitions = new ArrayList<>();
-                String partitionColumn = null;
-                if (createIndex.getExpression().isPresent()) {
-                    partitions = HeuristicIndexUtils.extractPartitions(createIndex.getExpression().get());
-                    // check partition name validate, create index …… where pt_d = xxx;
-                    // pt_d must be partition column
-                    Set<String> partitionColumns = partitions.stream().map(k -> k.substring(0, k.indexOf("="))).collect(Collectors.toSet());
-                    if (partitionColumns.size() > 1) {
-                        // currently only support one partition column
-                        throw new IllegalArgumentException("Heuristic index only supports predicates on one column");
-                    }
-                    // The only entry in set should be the only partition column name
-                    partitionColumn = partitionColumns.iterator().next();
-                }
-
-                Optional<TableHandle> tableHandle = metadata.getTableHandle(session, tableFullName);
-                if (tableHandle.isPresent() && !tableHandle.get().getConnectorHandle().isHeuristicIndexSupported()) {
-                    throw new SemanticException(NOT_SUPPORTED, table, "Catalog supported, but table storage format is not supported by heuristic index");
-                }
-                if (tableHandle.isPresent() && partitionColumn != null
-                        && !tableHandle.get().getConnectorHandle().isPartitionColumn(partitionColumn)) {
-                    throw new SemanticException(NOT_SUPPORTED, table, "Heuristic index creation is only supported for predicates on partition columns");
-                }
-
-                List<Pair<String, Type>> indexColumns = new LinkedList<>();
-                for (Identifier i : createIndex.getColumnAliases()) {
-                    indexColumns.add(new Pair<>(i.toString(), BIGINT));
-                }
-
-                // For now, creating index for multiple columns is not supported
-                if (indexColumns.size() > 1) {
-                    throw new SemanticException(NOT_SUPPORTED, table, "Multi-column indexes are currently not supported");
-                }
-
-                try {
-                    // Use this place holder to check the existence of index and lock the place
-                    Properties properties = new Properties();
-                    properties.setProperty(INPROGRESS_PROPERTY_KEY, "TRUE");
-                    CreateIndexMetadata placeHolder = new CreateIndexMetadata(
-                            createIndex.getIndexName().toString(),
-                            tableName,
-                            createIndex.getIndexType(),
-                            indexColumns,
-                            partitions,
-                            properties,
-                            session.getUser(),
-                            UNDEFINED);
-
-                    synchronized (StatementAnalyzer.class) {
-                        IndexClient.RecordStatus recordStatus = heuristicIndexerManager.getIndexClient().lookUpIndexRecord(placeHolder);
-                        switch (recordStatus) {
-                            case SAME_NAME:
-                                throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
-                                        "Index '%s' already exists", createIndex.getIndexName().toString());
-                            case SAME_CONTENT:
-                                throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
-                                        "Index with same (table,column,indexType) already exists");
-                            case SAME_INDEX_PART_CONFLICT:
-                                throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
-                                        "Index with same (table,column,indexType) already exists and partition(s) contain conflicts");
-                            case IN_PROGRESS_SAME_NAME:
-                                throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
-                                        "Index '%s' is being created by another user. Check running queries for details. If there is no running query for this index, " +
-                                                "the index may be in an unexpected error state and should be dropped using 'DROP INDEX %s'",
-                                        createIndex.getIndexName().toString(), createIndex.getIndexName().toString());
-                            case IN_PROGRESS_SAME_CONTENT:
-                                throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
-                                        "Index with same (table,column,indexType) is being created by another user. Check running queries for details. " +
-                                                "If there is no running query for this index, the index may be in an unexpected error state and should be dropped using 'DROP INDEX'");
-                            case IN_PROGRESS_SAME_INDEX_PART_CONFLICT:
-                                if (partitions.isEmpty()) {
-                                    throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
-                                            "Index with same (table,column,indexType) is being created by another user. Check running queries for details. " +
-                                                    "If there is no running query for this index, the index may be in an unexpected error state and should be dropped using 'DROP INDEX %s'",
-                                            createIndex.getIndexName().toString());
-                                }
-                                // allow different queries to run with explicitly same partitions
-                            case SAME_INDEX_PART_CAN_MERGE:
-                            case IN_PROGRESS_SAME_INDEX_PART_CAN_MERGE:
-                                break;
-                            case NOT_FOUND:
-                                heuristicIndexerManager.getIndexClient().addIndexRecord(placeHolder);
-                        }
-                    }
-                }
-                catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
+                validateCreateIndex(table, scope);
             }
 
             if (!table.getName().getPrefix().isPresent()) {
@@ -2868,5 +2770,117 @@ class StatementAnalyzer
         }
 
         return false;
+    }
+
+    private void validateCreateIndex(Table table, Optional<Scope> scope)
+    {
+        CreateIndex createIndex = (CreateIndex) analysis.getOriginalStatement();
+        QualifiedObjectName tableFullName = createQualifiedObjectName(session, createIndex, createIndex.getTableName());
+        accessControl.checkCanCreateIndex(session.getRequiredTransactionId(), session.getIdentity(), tableFullName);
+        String tableName = tableFullName.toString();
+        // check whether catalog support create index
+        if (!metadata.isHeuristicIndexSupported(session, tableFullName)) {
+            throw new SemanticException(NOT_SUPPORTED, createIndex,
+                    "CREATE INDEX is not supported in catalog '%s'",
+                    tableFullName.getCatalogName());
+        }
+
+        List<String> partitions = new ArrayList<>();
+        String partitionColumn = null;
+        if (createIndex.getExpression().isPresent()) {
+            partitions = HeuristicIndexUtils.extractPartitions(createIndex.getExpression().get());
+            // check partition name validate, create index …… where pt_d = xxx;
+            // pt_d must be partition column
+            Set<String> partitionColumns = partitions.stream().map(k -> k.substring(0, k.indexOf("="))).collect(Collectors.toSet());
+            if (partitionColumns.size() > 1) {
+                // currently only support one partition column
+                throw new IllegalArgumentException("Heuristic index only supports predicates on one column");
+            }
+            // The only entry in set should be the only partition column name
+            partitionColumn = partitionColumns.iterator().next();
+        }
+
+        Optional<TableHandle> tableHandle = metadata.getTableHandle(session, tableFullName);
+        if (tableHandle.isPresent()) {
+            if (!tableHandle.get().getConnectorHandle().isHeuristicIndexSupported()) {
+                throw new SemanticException(NOT_SUPPORTED, table, "Catalog supported, but table storage format is not supported by heuristic index");
+            }
+            TableMetadata tableMetadata = metadata.getTableMetadata(session, tableHandle.get());
+            List<String> availableColumns = tableMetadata.getColumns().stream().map(ColumnMetadata::getName).collect(Collectors.toList());
+            for (Identifier column : createIndex.getColumnAliases()) {
+                if (!availableColumns.contains(column.getValue().toLowerCase(Locale.ROOT))) {
+                    throw new SemanticException(MISSING_ATTRIBUTE, table, "Column '%s' cannot be resolved", column.getValue());
+                }
+            }
+        }
+        if (tableHandle.isPresent() && partitionColumn != null
+                && !tableHandle.get().getConnectorHandle().isPartitionColumn(partitionColumn)) {
+            throw new SemanticException(NOT_SUPPORTED, table, "Heuristic index creation is only supported for predicates on partition columns");
+        }
+
+        List<Pair<String, Type>> indexColumns = new LinkedList<>();
+        for (Identifier i : createIndex.getColumnAliases()) {
+            indexColumns.add(new Pair<>(i.toString(), UNKNOWN));
+        }
+
+        // For now, creating index for multiple columns is not supported
+        if (indexColumns.size() > 1) {
+            throw new SemanticException(NOT_SUPPORTED, table, "Multi-column indexes are currently not supported");
+        }
+
+        try {
+            // Use this place holder to check the existence of index and lock the place
+            Properties properties = new Properties();
+            properties.setProperty(INPROGRESS_PROPERTY_KEY, "TRUE");
+            CreateIndexMetadata placeHolder = new CreateIndexMetadata(
+                    createIndex.getIndexName().toString(),
+                    tableName,
+                    createIndex.getIndexType(),
+                    indexColumns,
+                    partitions,
+                    properties,
+                    session.getUser(),
+                    UNDEFINED);
+
+            synchronized (StatementAnalyzer.class) {
+                IndexClient.RecordStatus recordStatus = heuristicIndexerManager.getIndexClient().lookUpIndexRecord(placeHolder);
+                switch (recordStatus) {
+                    case SAME_NAME:
+                        throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                "Index '%s' already exists", createIndex.getIndexName().toString());
+                    case SAME_CONTENT:
+                        throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                "Index with same (table,column,indexType) already exists");
+                    case SAME_INDEX_PART_CONFLICT:
+                        throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                "Index with same (table,column,indexType) already exists and partition(s) contain conflicts");
+                    case IN_PROGRESS_SAME_NAME:
+                        throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                "Index '%s' is being created by another user. Check running queries for details. If there is no running query for this index, " +
+                                        "the index may be in an unexpected error state and should be dropped using 'DROP INDEX %s'",
+                                createIndex.getIndexName().toString(), createIndex.getIndexName().toString());
+                    case IN_PROGRESS_SAME_CONTENT:
+                        throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                "Index with same (table,column,indexType) is being created by another user. Check running queries for details. " +
+                                        "If there is no running query for this index, the index may be in an unexpected error state and should be dropped using 'DROP INDEX'");
+                    case IN_PROGRESS_SAME_INDEX_PART_CONFLICT:
+                        if (partitions.isEmpty()) {
+                            throw new SemanticException(INDEX_ALREADY_EXISTS, createIndex,
+                                    "Index with same (table,column,indexType) is being created by another user. Check running queries for details. " +
+                                            "If there is no running query for this index, the index may be in an unexpected error state and should be dropped using 'DROP INDEX %s'",
+                                    createIndex.getIndexName().toString());
+                        }
+                        // allow different queries to run with explicitly same partitions
+                    case SAME_INDEX_PART_CAN_MERGE:
+                    case IN_PROGRESS_SAME_INDEX_PART_CAN_MERGE:
+                        break;
+                    case NOT_FOUND:
+                        heuristicIndexerManager.getIndexClient().addIndexRecord(placeHolder);
+                }
+            }
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 }
