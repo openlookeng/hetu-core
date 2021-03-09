@@ -453,7 +453,7 @@ public class BroadcastOutputBuffer
     }
 
     @Override
-    public Optional<Set<String>> getInputChannels()
+    public Optional<Set<String>> getInputChannels(int expectedChannelCount)
     {
         return noMoreInputChannels ? Optional.of(Collections.unmodifiableSet(inputChannels)) : Optional.empty();
     }

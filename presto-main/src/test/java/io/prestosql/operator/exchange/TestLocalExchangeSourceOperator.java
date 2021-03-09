@@ -96,21 +96,21 @@ public class TestLocalExchangeSourceOperator
 
         LocalExchange exchange = localExchangeFactory.getLocalExchange(Lifespan.taskWide());
 
-        assertFalse(operatorA.getInputChannels().isPresent());
-        assertFalse(operatorB.getInputChannels().isPresent());
+        assertFalse(operatorA.getInputChannels(0).isPresent());
+        assertFalse(operatorB.getInputChannels(0).isPresent());
 
         LocalExchange.LocalExchangeSinkFactory sinkFactory = exchange.getSinkFactory(localExchangeSinkFactoryId);
         final String sinkAId = "sinkA";
         LocalExchangeSink sinkA = sinkFactory.createSink(sinkAId);
-        assertFalse(operatorA.getInputChannels().isPresent());
-        assertFalse(operatorB.getInputChannels().isPresent());
+        assertFalse(operatorA.getInputChannels(0).isPresent());
+        assertFalse(operatorB.getInputChannels(0).isPresent());
 
         final String sinkBId = "sinkB";
         LocalExchangeSink sinkB = sinkFactory.createSink(sinkBId);
-        assertTrue(operatorA.getInputChannels().isPresent());
-        assertEquals(operatorA.getInputChannels().get(), Sets.newHashSet(sinkAId, sinkBId));
-        assertTrue(operatorB.getInputChannels().isPresent());
-        assertEquals(operatorB.getInputChannels().get(), Sets.newHashSet(sinkAId, sinkBId));
+        assertTrue(operatorA.getInputChannels(0).isPresent());
+        assertEquals(operatorA.getInputChannels(0).get(), Sets.newHashSet(sinkAId, sinkBId));
+        assertTrue(operatorB.getInputChannels(0).isPresent());
+        assertEquals(operatorB.getInputChannels(0).get(), Sets.newHashSet(sinkAId, sinkBId));
 
         sinkFactory.close();
         sinkFactory.noMoreSinkFactories();

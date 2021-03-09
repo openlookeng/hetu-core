@@ -237,6 +237,11 @@ public class MergeOperator
                     }
                 }));
 
+        if (snapshotState != null) {
+            // When inputChannels is not empty, then we should have received all locations
+            checkState(!inputChannels.isPresent());
+        }
+
         return Optional::empty;
     }
 
@@ -318,28 +323,32 @@ public class MergeOperator
     }
 
     @Override
-    public Optional<Set<String>> getInputChannels()
+    public Optional<Set<String>> getInputChannels(int expectedChannelCount)
     {
-//        if (inputChannels.isPresent()) {
-//            return inputChannels;
-//        }
+        if (inputChannels.isPresent()) {
+            return inputChannels;
+        }
 
-        // TODO-cp-I2TIJL: it's possible that merge operator hasn't received all locations, then input channel list is not complete,
-        // and snapshot may not be complete. But we won't receive the "no more splits" signal when source splits are still being scheduled,
-        // which may last toward the end of query execution.
-        // To overcome this, we can send the list of known locations (source tasks) to the coordinator, which can compare that list against
-        // all tasks from the source stage. If they match, then snapshots can be marked as complete; otherwise they are not usable.
-
-//        if (!blockedOnSplits.isDone()) {
-//            return Optional.empty();
-//        }
+        if (expectedChannelCount == 0 && !blockedOnSplits.isDone()) {
+            // Need to wait for all splits/locations/channels to be added
+            return Optional.empty();
+        }
 
         Set<String> channels = new HashSet<>();
         for (ExchangeClient client : clients) {
             channels.addAll(client.getAllClients());
         }
-        inputChannels = Optional.of(channels);
-        return inputChannels;
+
+        if (expectedChannelCount == 0 || channels.size() == expectedChannelCount) {
+            // All channels have been added (i.e. blockedOnSplits is done) or have received expected number of input channels.
+            // Because markers are sent to all potential table-scan tasks, expectedChannelCount should be the same as the final count,
+            // so the input channel list won't change again, and can be cached.
+            inputChannels = Optional.of(channels);
+            return inputChannels;
+        }
+        else {
+            return Optional.empty();
+        }
     }
 
     @Override

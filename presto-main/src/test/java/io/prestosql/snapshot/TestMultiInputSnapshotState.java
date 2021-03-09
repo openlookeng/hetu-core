@@ -21,6 +21,7 @@ import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.execution.TaskId;
 import io.prestosql.operator.DriverContext;
 import io.prestosql.operator.OperatorContext;
+import io.prestosql.operator.PageAssertions;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -48,7 +49,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 @Test(singleThreaded = true)
 public class TestMultiInputSnapshotState
@@ -136,7 +139,7 @@ public class TestMultiInputSnapshotState
     public void testRegularPage()
     {
         Page ret = processPage(source1, regularPage).get();
-        Assert.assertEquals(ret, regularPage);
+        assertEquals(ret, regularPage);
     }
 
     @Test
@@ -144,7 +147,7 @@ public class TestMultiInputSnapshotState
     {
         SerializedPage ret = processSerializedPage(source1, serde.serialize(regularPage)).get();
         Page page = serde.deserialize(ret);
-        Assert.assertTrue(isRegularPage(page));
+        assertTrue(isRegularPage(page));
     }
 
     @Test
@@ -155,7 +158,7 @@ public class TestMultiInputSnapshotState
 
         int saved = restorable.state;
         Optional<Page> ret = processPage(source1, marker1);
-        Assert.assertEquals(ret.get(), marker1);
+        assertEquals(ret.get(), marker1);
 
         processPage(source2, regularPage);
         processPage(source1, regularPage);
@@ -165,9 +168,9 @@ public class TestMultiInputSnapshotState
 
         verify(snapshotManager).storeState(eq(snapshotId1), argument.capture());
         List<Object> savedState = argument.getValue();
-        Assert.assertEquals(savedState.size(), 2);
-        Assert.assertEquals(savedState.get(0), saved);
-        Assert.assertTrue(savedState.get(1).getClass().getName().contains("SerializedPageState"));
+        assertEquals(savedState.size(), 2);
+        assertEquals(savedState.get(0), saved);
+        assertTrue(savedState.get(1).getClass().getName().contains("SerializedPageState"));
     }
 
     @Test
@@ -179,7 +182,7 @@ public class TestMultiInputSnapshotState
         int saved = restorable.state;
         SerializedPage serializedMarker = SerializedPage.forMarker(marker1);
         Optional<SerializedPage> ret = processSerializedPage(source1, serializedMarker);
-        Assert.assertEquals(ret.get(), serializedMarker);
+        assertEquals(ret.get().toMarker(), marker1);
 
         processPage(source2, regularPage);
         processPage(source1, regularPage);
@@ -189,9 +192,9 @@ public class TestMultiInputSnapshotState
 
         verify(snapshotManager).storeState(eq(snapshotId1), argument.capture());
         List<Object> savedState = argument.getValue();
-        Assert.assertEquals(savedState.size(), 2);
-        Assert.assertEquals(savedState.get(0), saved);
-        Assert.assertTrue(savedState.get(1).getClass().getName().contains("SerializedPageState"));
+        assertEquals(savedState.size(), 2);
+        assertEquals(savedState.get(0), saved);
+        assertTrue(savedState.get(1).getClass().getName().contains("SerializedPageState"));
     }
 
     @Test
@@ -205,16 +208,16 @@ public class TestMultiInputSnapshotState
 
         int saved2 = restorable.state;
         Optional<Page> ret = processPage(source1, marker2);
-        Assert.assertEquals(ret.get(), marker2);
+        assertEquals(ret.get(), marker2);
 
         processPage(source2, regularPage);
         processPage(source2, marker1);
 
         verify(snapshotManager).storeState(eq(snapshotId1), argument.capture());
         List<Object> savedState = argument.getValue();
-        Assert.assertEquals(savedState.size(), 2);
-        Assert.assertEquals(savedState.get(0), saved1);
-        Assert.assertTrue(savedState.get(1).getClass().getName().contains("SerializedPageState"));
+        assertEquals(savedState.size(), 2);
+        assertEquals(savedState.get(0), saved1);
+        assertTrue(savedState.get(1).getClass().getName().contains("SerializedPageState"));
 
         processPage(source2, regularPage);
         ret = processPage(source2, marker2);
@@ -222,10 +225,10 @@ public class TestMultiInputSnapshotState
 
         verify(snapshotManager).storeState(eq(snapshotId2), argument.capture());
         savedState = argument.getValue();
-        Assert.assertEquals(savedState.size(), 3);
-        Assert.assertEquals(savedState.get(0), saved2);
-        Assert.assertTrue(savedState.get(1).getClass().getName().contains("SerializedPageState"));
-        Assert.assertTrue(savedState.get(2).getClass().getName().contains("SerializedPageState"));
+        assertEquals(savedState.size(), 3);
+        assertEquals(savedState.get(0), saved2);
+        assertTrue(savedState.get(1).getClass().getName().contains("SerializedPageState"));
+        assertTrue(savedState.get(2).getClass().getName().contains("SerializedPageState"));
     }
 
     @Test
@@ -244,9 +247,9 @@ public class TestMultiInputSnapshotState
 
         when(snapshotManager.loadState(snapshotId1)).thenReturn(Optional.of(argument.getValue()));
         Optional<Page> ret = processPageKeepState(source2, resume1);
-        Assert.assertEquals(ret.get(), resume1);
+        assertEquals(ret.get(), resume1);
 
-        Assert.assertEquals(restorable.state, saved);
+        assertEquals(restorable.state, saved);
         Assert.assertNotNull(processPageKeepState(null, null));
         Assert.assertNotNull(processSerializedPageKeepState(null, null));
         assertFalse(processPageKeepState(null, null).isPresent());
@@ -292,8 +295,8 @@ public class TestMultiInputSnapshotState
         when(snapshotManager.loadState(snapshotId1)).thenReturn(Optional.of(argument.getValue()));
         processPage(source1, resume1);
 
-        Optional<Page> ret = processPage(source2, marker1);
-        assertFalse(ret.isPresent());
+        Optional<Page> ret = processPage(source2, marker2);
+        assertEquals(ret.get(), marker2);
     }
 
     @Test
@@ -309,20 +312,20 @@ public class TestMultiInputSnapshotState
 
         Optional<Page> ret = processPage(source1, regularPage);
         // Page is available even though the other channel has not received the restore marker.
-        Assert.assertEquals(ret.get(), regularPage);
+        assertEquals(ret.get(), regularPage);
 
         processPage(source2, resume1);
         ret = processPage(source2, regularPage);
-        Assert.assertEquals(ret.get(), regularPage);
+        assertEquals(ret.get(), regularPage);
     }
 
     @Test
     public void testPages()
     {
         List<Page> pages = processPages(source1, Arrays.asList(regularPage, regularPage));
-        Assert.assertEquals(pages.size(), 2);
-        Assert.assertEquals(pages.get(0), regularPage);
-        Assert.assertEquals(pages.get(1), regularPage);
+        assertEquals(pages.size(), 2);
+        assertEquals(pages.get(0), regularPage);
+        assertEquals(pages.get(1), regularPage);
     }
 
     @Test
@@ -330,9 +333,9 @@ public class TestMultiInputSnapshotState
     {
         SerializedPage serializedPage = serde.serialize(regularPage);
         List<SerializedPage> pages = processSerializedPages(source1, Arrays.asList(serializedPage, serializedPage));
-        Assert.assertEquals(pages.size(), 2);
-        Assert.assertEquals(pages.get(0), serializedPage);
-        Assert.assertEquals(pages.get(1), serializedPage);
+        assertEquals(pages.size(), 2);
+        PageAssertions.assertPageEquals(ImmutableList.of(), serde.deserialize(pages.get(0)), regularPage);
+        PageAssertions.assertPageEquals(ImmutableList.of(), serde.deserialize(pages.get(1)), regularPage);
     }
 
     @Test
@@ -340,21 +343,21 @@ public class TestMultiInputSnapshotState
             throws Exception
     {
         List<Page> pages = processPages(source1, Arrays.asList(marker1, regularPage));
-        Assert.assertEquals(pages.size(), 2);
-        Assert.assertEquals(pages.get(0), marker1);
+        assertEquals(pages.size(), 2);
+        assertEquals(pages.get(0), marker1);
 
         pages = processPages(source2, Arrays.asList(regularPage, marker1, regularPage));
-        Assert.assertEquals(pages.size(), 2);
-        Assert.assertEquals(pages.get(0), regularPage);
-        Assert.assertEquals(pages.get(1), regularPage);
+        assertEquals(pages.size(), 2);
+        assertEquals(pages.get(0), regularPage);
+        assertEquals(pages.get(1), regularPage);
 
         verify(snapshotManager).storeState(eq(snapshotId1), argument.capture());
         when(snapshotManager.loadState(snapshotId1)).thenReturn(Optional.of(argument.getValue()));
 
         pages = processPages(source1, Arrays.asList(resume1));
-        Assert.assertEquals(pages.size(), 2);
-        Assert.assertEquals(pages.get(0), resume1);
-        Assert.assertTrue(isRegularPage(pages.get(1)));
+        assertEquals(pages.size(), 2);
+        assertEquals(pages.get(0), resume1);
+        assertTrue(isRegularPage(pages.get(1)));
     }
 
     @Test
@@ -375,11 +378,11 @@ public class TestMultiInputSnapshotState
         marker = state.nextMarker(() -> null);
         Assert.assertFalse(marker.isPresent());
         Optional<Page> page = state.processPage(() -> null);
-        Assert.assertTrue(page.isPresent());
+        assertTrue(page.isPresent());
 
         // Marker
         marker = state.nextMarker(() -> marker1);
-        Assert.assertTrue(marker.isPresent());
+        assertTrue(marker.isPresent());
 
         // Resumed page
         when(snapshotManager.loadState(anyObject())).thenReturn(Optional.of(ImmutableList.of(0, serde.serialize(regularPage).capture(serde))));
@@ -387,7 +390,7 @@ public class TestMultiInputSnapshotState
         marker = state.nextMarker(() -> null);
         Assert.assertFalse(marker.isPresent());
         page = state.processPage(() -> null);
-        Assert.assertTrue(page.isPresent());
+        assertTrue(page.isPresent());
     }
 
     @Test
@@ -408,11 +411,11 @@ public class TestMultiInputSnapshotState
         marker = state.nextSerializedMarker(() -> null);
         Assert.assertFalse(marker.isPresent());
         Optional<SerializedPage> page = state.processSerializedPage(() -> null);
-        Assert.assertTrue(page.isPresent());
+        assertTrue(page.isPresent());
 
         // Marker
         marker = state.nextSerializedMarker(() -> SerializedPage.forMarker(marker1));
-        Assert.assertTrue(marker.isPresent());
+        assertTrue(marker.isPresent());
 
         // Resumed page
         when(snapshotManager.loadState(anyObject())).thenReturn(Optional.of(ImmutableList.of(0, serde.serialize(regularPage).capture(serde))));
@@ -420,7 +423,7 @@ public class TestMultiInputSnapshotState
         marker = state.nextSerializedMarker(() -> null);
         Assert.assertFalse(marker.isPresent());
         page = state.processSerializedPage(() -> null);
-        Assert.assertTrue(page.isPresent());
+        assertTrue(page.isPresent());
     }
 
     @Test
@@ -445,10 +448,10 @@ public class TestMultiInputSnapshotState
             throws Exception
     {
         Page ret = processPage(null, marker1).get();
-        Assert.assertEquals(ret, marker1);
+        assertEquals(ret, marker1);
 
         ret = processPage(null, resume1).get();
-        Assert.assertEquals(ret, resume1);
+        assertEquals(ret, resume1);
 
         verify(snapshotManager, never()).storeState(anyObject(), anyObject());
         verify(snapshotManager, never()).loadState(anyObject());
@@ -472,7 +475,7 @@ public class TestMultiInputSnapshotState
         }
 
         @Override
-        public Optional<Set<String>> getInputChannels()
+        public Optional<Set<String>> getInputChannels(int expectedChannelCount)
         {
             return Optional.of(Sets.newHashSet(source1, source2));
         }
@@ -483,7 +486,7 @@ public class TestMultiInputSnapshotState
             extends TestingRestorable
     {
         @Override
-        public Optional<Set<String>> getInputChannels()
+        public Optional<Set<String>> getInputChannels(int expectedChannelCount)
         {
             return Optional.empty();
         }

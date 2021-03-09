@@ -36,7 +36,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(uncapturedFields = {"snapshotState", "sourceId", "exchangeClient"})
+@RestorableConfig(uncapturedFields = {"sourceId", "exchangeClient", "snapshotState", "noMoreSplits", "inputChannels"})
 public class ExchangeOperator
         implements SourceOperator, MultiInputRestorable, Closeable
 {
@@ -101,9 +101,12 @@ public class ExchangeOperator
 
     private final String id;
     private final OperatorContext operatorContext;
-    private final MultiInputSnapshotState snapshotState;
     private final PlanNodeId sourceId;
     private final ExchangeClient exchangeClient;
+
+    private final MultiInputSnapshotState snapshotState;
+    private boolean noMoreSplits;
+    private Optional<Set<String>> inputChannels = Optional.empty();
 
     public ExchangeOperator(
             String id,
@@ -137,12 +140,18 @@ public class ExchangeOperator
         URI location = ((RemoteSplit) split.getConnectorSplit()).getLocation();
         exchangeClient.addLocation(location);
 
+        if (snapshotState != null) {
+            // When inputChannels is not empty, then we should have received all locations
+            checkState(!inputChannels.isPresent());
+        }
+
         return Optional::empty;
     }
 
     @Override
     public void noMoreSplits()
     {
+        noMoreSplits = true;
         exchangeClient.noMoreLocations();
     }
 
@@ -209,14 +218,29 @@ public class ExchangeOperator
     }
 
     @Override
-    public Optional<Set<String>> getInputChannels()
+    public Optional<Set<String>> getInputChannels(int expectedChannelCount)
     {
-        // TODO-cp-I2TIJL: it's possible that exchange client hasn't received all locations, then input channel list is not complete,
-        // and snapshot may not be complete. But we won't receive the "no more locations" signal when source splits are still being scheduled,
-        // which may last toward the end of query execution.
-        // To overcome this, we can send the list of known locations (source tasks) to the coordinator, which can compare that list against
-        // all tasks from the source stage. If they match, then snapshots can be marked as complete; otherwise they are not usable.
-        return Optional.of(exchangeClient.getAllClients());
+        if (inputChannels.isPresent()) {
+            return inputChannels;
+        }
+
+        if (expectedChannelCount == 0 && !noMoreSplits) {
+            // Need to wait for all splits/locations/channels to be added
+            return Optional.empty();
+        }
+
+        Set<String> channels = exchangeClient.getAllClients();
+
+        if (expectedChannelCount == 0 || channels.size() == expectedChannelCount) {
+            // All channels have been added (i.e. noMoreSplits is true) or have received expected number of input channels.
+            // Because markers are sent to all potential table-scan tasks, expectedChannelCount should be the same as the final count,
+            // so the input channel list won't change again, and can be cached.
+            inputChannels = Optional.of(channels);
+            return inputChannels;
+        }
+        else {
+            return Optional.empty();
+        }
     }
 
     @Override

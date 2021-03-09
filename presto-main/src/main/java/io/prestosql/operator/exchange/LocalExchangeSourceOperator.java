@@ -165,7 +165,7 @@ public class LocalExchangeSourceOperator
     }
 
     @Override
-    public Optional<Set<String>> getInputChannels()
+    public Optional<Set<String>> getInputChannels(int expectedChannelCount)
     {
         Set<String> channels = source.getAllInputChannels();
         return totalInputChannels == channels.size() ? Optional.of(channels) : Optional.empty();

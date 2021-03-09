@@ -28,7 +28,9 @@ public interface MultiInputRestorable
     /**
      * Retrieve all input channel identifiers
      *
+     * @param expectedChannelCount if not 0, then it indicates how many total channels are expected to be returned.
+     * Only applicable to components that receive markers from remote tasks.
      * @return A set of channel identifiers; empty if it cannot be determined at this point
      */
-    Optional<Set<String>> getInputChannels();
+    Optional<Set<String>> getInputChannels(int expectedChannelCount);
 }

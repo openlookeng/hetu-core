@@ -320,6 +320,8 @@ public class SourcePartitionedScheduler
                         for (InternalNode node : allNodes) {
                             splitAssignment.put(node, firstSplit);
                         }
+                        // Remember how many tasks will receive this marker
+                        ((MarkerSplit) firstSplit.getConnectorSplit()).setTaskCount(allNodes.size());
                     }
                     else {
                         // MarkerSplit should be in its own batch.

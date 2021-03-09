@@ -34,6 +34,8 @@ import org.testng.annotations.Test;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -51,6 +53,7 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -371,5 +374,35 @@ public class TestMergeOperator
         assertTrue(operator.isFinished(), "Expected operator to be finished");
 
         return outputPages;
+    }
+
+    @Test
+    public void testGetInputChannels()
+    {
+        List<Type> types = ImmutableList.of(BIGINT);
+        MergeOperator operator = createMergeOperator(types, ImmutableList.of(0), ImmutableList.of(0), ImmutableList.of(ASC_NULLS_FIRST));
+
+        // Not enough channels are known
+        assertFalse(operator.getInputChannels(1).isPresent());
+
+        operator.addSplit(createRemoteSplit(TASK_1_ID));
+        // Not all channels are known
+        assertFalse(operator.getInputChannels(0).isPresent());
+        // Not enough channels are known
+        assertFalse(operator.getInputChannels(2).isPresent());
+
+        operator.addSplit(createRemoteSplit(TASK_2_ID));
+        // Not all channels are known
+        assertFalse(operator.getInputChannels(0).isPresent());
+        // At least expected channels are known
+        assertTrue(operator.getInputChannels(2).isPresent());
+
+        operator.noMoreSplits();
+        Optional<Set<String>> channels = operator.getInputChannels(0);
+        assertTrue(channels.isPresent());
+        assertEquals(channels.get().size(), 2);
+
+        Optional<Set<String>> channels1 = operator.getInputChannels(0);
+        assertTrue(channels == channels1);
     }
 }

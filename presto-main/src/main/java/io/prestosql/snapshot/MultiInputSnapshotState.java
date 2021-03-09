@@ -214,6 +214,7 @@ public class MultiInputSnapshotState
             if (pageInTransition instanceof SerializedPage) {
                 serializedPage = (SerializedPage) pageInTransition;
                 channel = serializedPage.getOrigin();
+                page = pagesSerde.deserialize(serializedPage);
             }
             else {
                 page = (Page) pageInTransition;
@@ -221,52 +222,43 @@ public class MultiInputSnapshotState
             }
 
             // Not a restored pending page, so must be a new input that may need snapshot related processing
-            if (processNewPage(channel, page, serializedPage)) {
+            if (processNewPage(channel, page)) {
                 // Some markers are not passed on
                 return null;
             }
 
             if (markerOnly) {
-                // If new page is marker, then return it; otherwise store it in pending list and return null
-                if (serializedPage != null) {
-                    if (serializedPage.isMarkerPage()) {
-                        return (T) serializedPage;
+                if (page instanceof MarkerPage) {
+                    // If new page is marker, then return it; otherwise store it in pending list and return null
+                    if (serializedPage != null) {
+                        return (T) pagesSerde.serialize(page);
                     }
-                    pendingPages = Iterators.singletonIterator(serializedPage);
-                }
-                else {
-                    if (page instanceof MarkerPage) {
+                    else {
                         return (T) page;
                     }
-                    pendingPages = Iterators.singletonIterator(pagesSerde.serialize(page));
                 }
+                pendingPages = Iterators.singletonIterator(pagesSerde.serialize(page));
                 return null;
             }
+        }
+        else {
+            page = pagesSerde.deserialize(serializedPage);
         }
 
         // Prepare for correct output type
         if (serialized) {
-            if (serializedPage == null) {
-                serializedPage = pagesSerde.serialize(page);
-            }
-            return (T) serializedPage;
+            return (T) pagesSerde.serialize(page);
         }
         else {
-            if (page == null) {
-                page = pagesSerde.deserialize(serializedPage);
-            }
             return (T) page;
         }
     }
 
-    private boolean processNewPage(Optional<String> channel, Page page, SerializedPage serializedPage)
+    private boolean processNewPage(Optional<String> channel, Page page)
     {
         MarkerPage marker = null;
         if (page instanceof MarkerPage) {
             marker = (MarkerPage) page;
-        }
-        else if (serializedPage != null && serializedPage.isMarkerPage()) {
-            marker = serializedPage.toMarker();
         }
 
         if (!channel.isPresent()) {
@@ -301,7 +293,7 @@ public class MultiInputSnapshotState
             }
         }
         else {
-            return processInput(channel.get(), page, serializedPage);
+            return processInput(channel.get(), page);
         }
     }
 
@@ -365,7 +357,12 @@ public class MultiInputSnapshotState
             LOG.error(message);
         }
 
-        inputChannels = restorable.getInputChannels();
+        inputChannels = restorable.getInputChannels(marker.getTaskCount());
+        // Only need to use the channel count when the marker is received for the first time,
+        // which corresponds to Merge or Exchange operator receiving from a table-scan stage.
+        // For all other cases, either the channel count is known (local exchange/merge), or
+        // no-more-splits can be used to determine if all remote channels are known.
+        marker.setTaskCount(0);
         if (inputChannels.isPresent()) {
             checkState(inputChannels.get().containsAll(snapshot.markedChannels));
             if (inputChannels.get().size() == snapshot.markedChannels.size()) {
@@ -408,7 +405,12 @@ public class MultiInputSnapshotState
             LOG.error(message);
         }
 
-        inputChannels = restorable.getInputChannels();
+        inputChannels = restorable.getInputChannels(marker.getTaskCount());
+        // Only need to use the channel count when the marker is received for the first time,
+        // which corresponds to Merge or Exchange operator receiving from a table-scan stage.
+        // For all other cases, either the channel count is known (local exchange/merge), or
+        // no-more-splits can be used to determine if all remote channels are known.
+        marker.setTaskCount(0);
         if (inputChannels.isPresent()) {
             checkState(inputChannels.get().containsAll(snapshot.markedChannels));
             if (inputChannels.get().size() == snapshot.markedChannels.size()) {
@@ -442,7 +444,7 @@ public class MultiInputSnapshotState
         return ret;
     }
 
-    private boolean processInput(String channel, Page page, SerializedPage serializedPage)
+    private boolean processInput(String channel, Page page)
     {
         Object channelSnapshot = null;
         for (SnapshotState snapshot : states) {
@@ -450,10 +452,7 @@ public class MultiInputSnapshotState
             // need to capture the input as part of channel state.
             if (!snapshot.markedChannels.contains(channel)) {
                 if (channelSnapshot == null) {
-                    if (serializedPage == null) {
-                        serializedPage = pagesSerde.serialize(page);
-                    }
-                    channelSnapshot = serializedPage.capture(pagesSerde);
+                    channelSnapshot = pagesSerde.serialize(page).capture(pagesSerde);
                 }
                 snapshot.states.add(channelSnapshot);
             }

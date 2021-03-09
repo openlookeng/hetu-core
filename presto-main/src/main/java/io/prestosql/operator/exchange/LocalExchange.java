@@ -308,7 +308,7 @@ public class LocalExchange
     }
 
     @Override
-    public Optional<Set<String>> getInputChannels()
+    public Optional<Set<String>> getInputChannels(int expectedChannelCount)
     {
         if (allInputChannels.isPresent()) {
             return allInputChannels;

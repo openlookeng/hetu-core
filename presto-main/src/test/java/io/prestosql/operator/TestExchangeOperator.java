@@ -56,6 +56,7 @@ import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -146,19 +147,31 @@ public class TestExchangeOperator
 
     @Test
     public void testGetInputChannels()
-            throws Exception
     {
         ExchangeOperator operator = (ExchangeOperator) createExchangeOperator();
 
+        // Not enough channels are known
+        assertFalse(operator.getInputChannels(1).isPresent());
+
         operator.addSplit(newRemoteSplit(TASK_1_ID));
-        // Exchange operator always returns channel list, even when some channels may be missing
-        assertTrue(operator.getInputChannels().isPresent());
+        // Not all channels are known
+        assertFalse(operator.getInputChannels(0).isPresent());
+        // Not enough channels are known
+        assertFalse(operator.getInputChannels(2).isPresent());
 
         operator.addSplit(newRemoteSplit(TASK_2_ID));
+        // Not all channels are known
+        assertFalse(operator.getInputChannels(0).isPresent());
+        // At least expected channels are known
+        assertTrue(operator.getInputChannels(2).isPresent());
+
         operator.noMoreSplits();
-        Optional<Set<String>> channels = operator.getInputChannels();
+        Optional<Set<String>> channels = operator.getInputChannels(0);
         assertTrue(channels.isPresent());
         assertEquals(channels.get().size(), 2);
+
+        Optional<Set<String>> channels1 = operator.getInputChannels(0);
+        assertTrue(channels == channels1);
     }
 
     @Test

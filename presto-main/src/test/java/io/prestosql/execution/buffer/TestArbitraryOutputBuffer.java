@@ -1191,12 +1191,12 @@ public class TestArbitraryOutputBuffer
         OutputBuffer buffer = createOutputBuffer(bufferType);
 
         buffer.addInputChannel("1");
-        Optional<Set<String>> inputChannels = ((MultiInputRestorable) buffer).getInputChannels();
+        Optional<Set<String>> inputChannels = ((MultiInputRestorable) buffer).getInputChannels(0);
         assertFalse(inputChannels.isPresent());
 
         buffer.addInputChannel("2");
         buffer.setNoMoreInputChannels();
-        inputChannels = ((MultiInputRestorable) buffer).getInputChannels();
+        inputChannels = ((MultiInputRestorable) buffer).getInputChannels(0);
         assertTrue(inputChannels.isPresent());
         assertEquals(inputChannels.get(), Sets.newHashSet("1", "2"));
     }
