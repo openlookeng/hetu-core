@@ -669,7 +669,7 @@ public class TestHiveIntegrationSmokeTest
     }
 
     @Test
-    public void testFullMergeVacuum1()
+    public void testFullUnifyVacuum1()
     {
         String table = "tab_fm_vacuum";
         String schema = "default";
@@ -692,7 +692,7 @@ public class TestHiveIntegrationSmokeTest
     }
 
     @Test
-    public void testFullMergeVacuum2()
+    public void testFullUnifyVacuum2()
     {
         String table = "tab_fm_vacuum_2";
         String schema = "default";

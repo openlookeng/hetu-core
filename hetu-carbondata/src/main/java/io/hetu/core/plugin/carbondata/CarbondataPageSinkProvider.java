@@ -183,7 +183,7 @@ public class CarbondataPageSinkProvider
                 vacuumTableHandle.getTableStorageFormat(),
                 vacuumTableHandle.getPartitionStorageFormat(),
                 vacuumTableHandle.isFullVacuum(),
-                vacuumTableHandle.isMerge(),
+                vacuumTableHandle.isUnifyVacuum(),
                 null);
         return createPageSink(hiveVacuumTableHandle, session, HiveACIDWriteType.VACUUM, ImmutableMap.of(), vacuumTableHandle.getAdditionalConf(), false);
     }

@@ -140,7 +140,7 @@ public class HivePageSinkProvider
     public ConnectorPageSink createPageSink(ConnectorTransactionHandle transaction, ConnectorSession session, ConnectorVacuumTableHandle tableHandle)
     {
         HiveVacuumTableHandle handle = (HiveVacuumTableHandle) tableHandle;
-        return createPageSink(handle, false, handle.isMerge() ? HiveACIDWriteType.VACUUM_UNIFY : HiveACIDWriteType.VACUUM, session, ImmutableMap.of());
+        return createPageSink(handle, false, handle.isUnifyVacuum() ? HiveACIDWriteType.VACUUM_UNIFY : HiveACIDWriteType.VACUUM, session, ImmutableMap.of());
     }
 
     @Override

@@ -1256,7 +1256,7 @@ public final class SqlFormatter
 
             if (node.isFull()) {
                 builder.append(" FULL");
-                if (node.isMerge()) {
+                if (node.isUnify()) {
                     builder.append(" UNIFY");
                 }
             }

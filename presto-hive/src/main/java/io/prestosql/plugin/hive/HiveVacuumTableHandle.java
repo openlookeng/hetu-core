@@ -36,7 +36,7 @@ public class HiveVacuumTableHandle
         implements ConnectorVacuumTableHandle
 {
     private boolean full;
-    private boolean merge;
+    private boolean unify;
     Map<String, List<Range>> ranges;
 
     @JsonCreator
@@ -50,7 +50,7 @@ public class HiveVacuumTableHandle
             @JsonProperty("tableStorageFormat") HiveStorageFormat tableStorageFormat,
             @JsonProperty("partitionStorageFormat") HiveStorageFormat partitionStorageFormat,
             @JsonProperty("full") boolean full,
-            @JsonProperty("merge") boolean merge,
+            @JsonProperty("unify") boolean unify,
             @JsonProperty("ranges") Map<String, List<Range>> ranges)
     {
         super(
@@ -64,7 +64,7 @@ public class HiveVacuumTableHandle
                 partitionStorageFormat,
                 false);
         this.full = full;
-        this.merge = merge;
+        this.unify = unify;
         this.ranges = ranges;
     }
 
@@ -159,10 +159,10 @@ public class HiveVacuumTableHandle
         return full;
     }
 
-    @JsonProperty("merge")
-    public boolean isMerge()
+    @JsonProperty("unify")
+    public boolean isUnifyVacuum()
     {
-        return merge;
+        return unify;
     }
 
     @JsonProperty("ranges")

@@ -132,7 +132,7 @@ class HiveVacuumSplitSource
                 List<ConnectorSplit> splits = splitBatch.getSplits();
                 for (ConnectorSplit split : splits) {
                     HiveSplit hiveSplit = ((HiveSplitWrapper) split).getSplits().get(0);
-                    int bucketNumber = vacuumTableHandle.isMerge() ? 0 : getBucketNumber(hiveSplit); //In case of merge there are no bucket numbers
+                    int bucketNumber = vacuumTableHandle.isUnifyVacuum() ? 0 : getBucketNumber(hiveSplit); //In case of unify there are no bucket numbers
                     boolean isDeleteDelta = isDeleteDelta(hiveSplit);
                     List<HiveSplit> hiveSplits = getHiveSplitsFor(bucketNumber, hiveSplit.getPartitionName(), isDeleteDelta);
                     hiveSplits.add(hiveSplit);
@@ -170,7 +170,7 @@ class HiveVacuumSplitSource
         while (partitions.hasNext()) {
             Entry<String, Map<Integer, Map<Boolean, List<HiveSplit>>>> currentPartitionEntry = partitions.next();
             String currentPartition = currentPartitionEntry.getKey();
-            if (vacuumTableHandle.isMerge() && currentPartition.contains(HivePartitionKey.HIVE_DEFAULT_DYNAMIC_PARTITION)) {
+            if (vacuumTableHandle.isUnifyVacuum() && currentPartition.contains(HivePartitionKey.HIVE_DEFAULT_DYNAMIC_PARTITION)) {
                 //skip the dynamic partition for now.
                 partitions.remove();
                 continue;
