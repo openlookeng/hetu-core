@@ -21,6 +21,7 @@ import io.prestosql.sql.tree.Cache;
 import io.prestosql.sql.tree.Call;
 import io.prestosql.sql.tree.Comment;
 import io.prestosql.sql.tree.Commit;
+import io.prestosql.sql.tree.CreateCube;
 import io.prestosql.sql.tree.CreateIndex;
 import io.prestosql.sql.tree.CreateRole;
 import io.prestosql.sql.tree.CreateSchema;
@@ -33,6 +34,7 @@ import io.prestosql.sql.tree.DescribeInput;
 import io.prestosql.sql.tree.DescribeOutput;
 import io.prestosql.sql.tree.DropCache;
 import io.prestosql.sql.tree.DropColumn;
+import io.prestosql.sql.tree.DropCube;
 import io.prestosql.sql.tree.DropIndex;
 import io.prestosql.sql.tree.DropRole;
 import io.prestosql.sql.tree.DropSchema;
@@ -42,6 +44,7 @@ import io.prestosql.sql.tree.Explain;
 import io.prestosql.sql.tree.Grant;
 import io.prestosql.sql.tree.GrantRoles;
 import io.prestosql.sql.tree.Insert;
+import io.prestosql.sql.tree.InsertCube;
 import io.prestosql.sql.tree.Prepare;
 import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.RenameColumn;
@@ -59,6 +62,7 @@ import io.prestosql.sql.tree.ShowCache;
 import io.prestosql.sql.tree.ShowCatalogs;
 import io.prestosql.sql.tree.ShowColumns;
 import io.prestosql.sql.tree.ShowCreate;
+import io.prestosql.sql.tree.ShowCubes;
 import io.prestosql.sql.tree.ShowFunctions;
 import io.prestosql.sql.tree.ShowGrants;
 import io.prestosql.sql.tree.ShowIndex;
@@ -96,12 +100,14 @@ public final class StatementUtils
 
         builder.put(CreateTableAsSelect.class, QueryType.INSERT);
         builder.put(Insert.class, QueryType.INSERT);
+        builder.put(InsertCube.class, QueryType.INSERT);
         builder.put(Update.class, QueryType.UPDATE);
 
         builder.put(Delete.class, QueryType.DELETE);
 
         builder.put(ShowCatalogs.class, QueryType.DESCRIBE);
         builder.put(ShowCreate.class, QueryType.DESCRIBE);
+        builder.put(ShowCubes.class, QueryType.DESCRIBE);
         builder.put(ShowFunctions.class, QueryType.DESCRIBE);
         builder.put(ShowGrants.class, QueryType.DESCRIBE);
         builder.put(ShowRoles.class, QueryType.DESCRIBE);
@@ -127,6 +133,8 @@ public final class StatementUtils
         builder.put(RenameColumn.class, QueryType.DATA_DEFINITION);
         builder.put(DropColumn.class, QueryType.DATA_DEFINITION);
         builder.put(DropTable.class, QueryType.DATA_DEFINITION);
+        builder.put(CreateCube.class, QueryType.DATA_DEFINITION);
+        builder.put(DropCube.class, QueryType.DATA_DEFINITION);
         builder.put(DropCache.class, QueryType.DATA_DEFINITION);
         builder.put(DropIndex.class, QueryType.DATA_DEFINITION);
         builder.put(CreateView.class, QueryType.DATA_DEFINITION);

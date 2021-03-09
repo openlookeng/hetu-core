@@ -54,6 +54,13 @@ statement
     | DROP CACHE (IF EXISTS)? qualifiedName
         (WHERE booleanExpression)?                                     #dropCache
     | SHOW CACHE qualifiedName?                            #showCache
+    | CREATE CUBE (IF NOT EXISTS)? cubeName=qualifiedName
+        ON tableName=qualifiedName
+        WITH '(' AGGREGATIONS EQ '(' aggregations ')' ',' GROUP EQ '(' cubeGroup ')' (',' cubeProperties)? ')'   #createCube
+    | INSERT INTO CUBE cubeName=qualifiedName WHERE expression     #insertCube
+    | INSERT OVERWRITE CUBE cubeName=qualifiedName WHERE expression     #insertOverwriteCube
+    | DROP CUBE (IF EXISTS)? cubeName=qualifiedName                    #dropCube
+    | SHOW CUBES (FOR tableName=qualifiedName)?                                 #showCubes
     | CREATE INDEX (IF NOT EXISTS)? indexName=qualifiedName
         USING indexType
         ON tableName=qualifiedName columnAliases
@@ -167,6 +174,10 @@ likeClause
     : LIKE qualifiedName (optionType=(INCLUDING | EXCLUDING) PROPERTIES)?
     ;
 
+cubeProperties
+    : property (',' property)*
+    ;
+
 properties
     : '(' property (',' property)* ')'
     ;
@@ -221,6 +232,10 @@ groupingElement
 groupingSet
     : '(' (expression (',' expression)*)? ')'
     | expression
+    ;
+
+cubeGroup
+    : (identifier (',' identifier)*)?
     ;
 
 namedQuery
@@ -377,6 +392,10 @@ comparisonOperator
 
 comparisonQuantifier
     : ALL | SOME | ANY
+    ;
+
+aggregations
+    :  expression (',' expression)*
     ;
 
 booleanValue
@@ -550,6 +569,7 @@ nonReserved
 
 ADD: 'ADD';
 ADMIN: 'ADMIN';
+AGGREGATIONS: 'AGGREGATIONS';
 ALL: 'ALL';
 ALTER: 'ALTER';
 ANALYZE: 'ANALYZE';
@@ -578,6 +598,7 @@ CONSTRAINT: 'CONSTRAINT';
 CREATE: 'CREATE';
 CROSS: 'CROSS';
 CUBE: 'CUBE';
+CUBES: 'CUBES';
 CURRENT: 'CURRENT';
 CURRENT_DATE: 'CURRENT_DATE';
 CURRENT_PATH: 'CURRENT_PATH';

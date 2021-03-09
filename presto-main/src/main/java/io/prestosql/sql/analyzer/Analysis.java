@@ -118,6 +118,7 @@ public class Analysis
     private final ListMultimap<NodeRef<Node>, QuantifiedComparisonExpression> quantifiedComparisonSubqueries = ArrayListMultimap.create();
 
     private final Map<NodeRef<Table>, TableHandle> tables = new LinkedHashMap<>();
+    private final Map<TableHandle, List<TableHandle>> cubes = new LinkedHashMap<>();
 
     private final Map<NodeRef<Expression>, Type> types = new LinkedHashMap<>();
     private final Map<NodeRef<Expression>, Type> coercions = new LinkedHashMap<>();
@@ -161,6 +162,8 @@ public class Analysis
 
     // for create index
     private Statement originalStatement;
+    private CubeInsert cubeInsert;
+    private boolean cubeOverwrite;
 
     public Analysis(@Nullable Statement root, List<Expression> parameters, boolean isDescribe)
     {
@@ -671,6 +674,26 @@ public class Analysis
         return isInsertOverwrite;
     }
 
+    public Optional<CubeInsert> getCubeInsert()
+    {
+        return Optional.ofNullable(this.cubeInsert);
+    }
+
+    public void setCubeInsert(CubeInsert cubeInsert)
+    {
+        this.cubeInsert = cubeInsert;
+    }
+
+    public boolean isCubeOverwrite()
+    {
+        return cubeOverwrite;
+    }
+
+    public void setCubeOverwrite(boolean cubeOverwrite)
+    {
+        this.cubeOverwrite = cubeOverwrite;
+    }
+
     public void setUpdate(Update update)
     {
         this.update = Optional.of(update);
@@ -831,6 +854,40 @@ public class Analysis
     public boolean isOrderByRedundant(OrderBy orderBy)
     {
         return redundantOrderBy.contains(NodeRef.of(orderBy));
+    }
+
+    public void registerCubeForTable(TableHandle original, TableHandle cube)
+    {
+        this.cubes.computeIfAbsent(original, key -> new ArrayList<>()).add(cube);
+    }
+
+    public List<TableHandle> getCubes(TableHandle original)
+    {
+        return this.cubes.getOrDefault(original, ImmutableList.of());
+    }
+
+    @Immutable
+    public static final class CubeInsert
+    {
+        private final TableHandle target;
+        private final List<ColumnHandle> columns;
+
+        public CubeInsert(TableHandle target, List<ColumnHandle> columns)
+        {
+            this.target = requireNonNull(target, "target is null");
+            this.columns = requireNonNull(columns, "columns is null");
+            checkArgument(columns.size() > 0, "No columns given to insert");
+        }
+
+        public List<ColumnHandle> getColumns()
+        {
+            return columns;
+        }
+
+        public TableHandle getTarget()
+        {
+            return target;
+        }
     }
 
     @Immutable

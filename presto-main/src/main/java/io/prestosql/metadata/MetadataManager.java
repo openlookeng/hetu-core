@@ -117,6 +117,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.LongSupplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -1098,6 +1099,13 @@ public final class MetadataManager
     }
 
     @Override
+    public boolean isPreAggregationSupported(Session session, CatalogName catalogName)
+    {
+        ConnectorMetadata metadata = getMetadata(session, catalogName);
+        return metadata.isPreAggregationSupported(session.toConnectorSession());
+    }
+
+    @Override
     public Optional<LimitApplicationResult<TableHandle>> applyLimit(Session session, TableHandle table, long limit)
     {
         CatalogName catalogName = table.getCatalogName();
@@ -1441,6 +1449,15 @@ public final class MetadataManager
     public boolean isAggregationFunction(QualifiedName name)
     {
         return functions.isAggregationFunction(name);
+    }
+
+    @Override
+    public LongSupplier getTableLastModifiedTimeSupplier(Session session, TableHandle tableHandle)
+    {
+        CatalogName catalogName = getTableMetadata(session, tableHandle).getCatalogName();
+        ConnectorMetadata connectorMetadata = getMetadata(session, catalogName);
+        long modificationTime = connectorMetadata.getTableModificationTime(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle());
+        return () -> modificationTime;
     }
 
     @Override

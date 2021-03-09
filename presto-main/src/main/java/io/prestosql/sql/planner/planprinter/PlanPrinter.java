@@ -78,6 +78,7 @@ import io.prestosql.sql.planner.optimizations.JoinNodeUtils;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
+import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
@@ -1096,6 +1097,14 @@ public class PlanPrinter
                 printStatisticAggregations(nodeOutput, node.getStatisticsAggregation().get(), node.getStatisticsAggregationDescriptor().get());
             }
 
+            return processChildren(node, context);
+        }
+
+        @Override
+        public Void visitCubeFinish(CubeFinishNode node, Void context)
+        {
+            NodeRepresentation nodeOutput = addNode(node, "CubeCommit", format("[%s]", "target"));
+            nodeOutput.appendDetailsLine("CubeFinishMetadataCreation");
             return processChildren(node, context);
         }
 

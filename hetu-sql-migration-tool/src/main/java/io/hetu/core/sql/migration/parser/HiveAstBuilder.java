@@ -994,6 +994,41 @@ public class HiveAstBuilder
     }
 
     @Override
+    public Node visitCreateCube(HiveSqlParser.CreateCubeContext context)
+    {
+        addDiff(DiffType.UNSUPPORTED, context.CUBE().getText(), "[CREATE CUBE] is not supported");
+        throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Create Cube", context);
+    }
+
+    @Override
+    public Node visitInsertCube(HiveSqlParser.InsertCubeContext context)
+    {
+        addDiff(DiffType.UNSUPPORTED, context.CUBE().getText(), "[INSERT CUBE] is not supported");
+        throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Create Cube", context);
+    }
+
+    @Override
+    public Node visitInsertOverwriteCube(HiveSqlParser.InsertOverwriteCubeContext context)
+    {
+        addDiff(DiffType.UNSUPPORTED, context.CUBE().getText(), "[INSERT OVERWRITE CUBE] is not supported");
+        throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Create Cube", context);
+    }
+
+    @Override
+    public Node visitDropCube(HiveSqlParser.DropCubeContext context)
+    {
+        addDiff(DiffType.UNSUPPORTED, context.CUBE().getText(), "[DROP CUBE] is not supported");
+        throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Drop Cube", context);
+    }
+
+    @Override
+    public Node visitShowCubes(HiveSqlParser.ShowCubesContext context)
+    {
+        addDiff(DiffType.UNSUPPORTED, context.CUBES().getText(), "[SHOW CUBES] is not supported");
+        throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported statement: Show Cubes", context);
+    }
+
+    @Override
     public Node visitCreateIndex(HiveSqlParser.CreateIndexContext context)
     {
         addDiff(DiffType.UNSUPPORTED, context.INDEX().getText(), "[CREATE INDEX] is not supported");

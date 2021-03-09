@@ -719,6 +719,14 @@ public class ClassLoaderSafeConnectorMetadata
         }
     }
 
+    @Override
+    public long getTableModificationTime(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.getTableModificationTime(session, tableHandle);
+        }
+    }
+
     /**
      * Hetu can only cache execution plans for supported connectors.
      * This method checks if the property for supporting execution plan caching is enabled for a given connector.
@@ -745,6 +753,14 @@ public class ClassLoaderSafeConnectorMetadata
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             return delegate.getTablesForVacuum();
+        }
+    }
+
+    @Override
+    public boolean isPreAggregationSupported(ConnectorSession session)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.isPreAggregationSupported(session);
         }
     }
 }

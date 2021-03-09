@@ -165,6 +165,12 @@ public class TpcdsMetadata
     }
 
     @Override
+    public long getTableModificationTime(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        return -1L;
+    }
+
+    @Override
     public Map<String, ColumnHandle> getColumnHandles(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         ImmutableMap.Builder<String, ColumnHandle> builder = ImmutableMap.builder();

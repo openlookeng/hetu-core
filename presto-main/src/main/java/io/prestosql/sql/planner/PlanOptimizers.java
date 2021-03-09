@@ -20,6 +20,7 @@ import io.prestosql.cost.CostCalculator.EstimatedExchanges;
 import io.prestosql.cost.CostComparator;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.cost.TaskCountEstimator;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.TaskManagerConfig;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.metadata.InternalNodeManager;
@@ -157,6 +158,7 @@ import io.prestosql.sql.planner.optimizations.PruneUnreferencedOutputs;
 import io.prestosql.sql.planner.optimizations.ReplicateSemiJoinInDelete;
 import io.prestosql.sql.planner.optimizations.RowExpressionPredicatePushDown;
 import io.prestosql.sql.planner.optimizations.SetFlatteningOptimizer;
+import io.prestosql.sql.planner.optimizations.StarTreeAggregationRule;
 import io.prestosql.sql.planner.optimizations.StatsRecordingPlanOptimizer;
 import io.prestosql.sql.planner.optimizations.TableDeleteOptimizer;
 import io.prestosql.sql.planner.optimizations.TransformQuantifiedComparisonApplyToLateralJoin;
@@ -197,7 +199,8 @@ public class PlanOptimizers
             CostCalculator costCalculator,
             @EstimatedExchanges CostCalculator estimatedExchangesCostCalculator,
             CostComparator costComparator,
-            TaskCountEstimator taskCountEstimator)
+            TaskCountEstimator taskCountEstimator,
+            CubeManager cubeManager)
     {
         this(metadata,
                 typeAnalyzer,
@@ -212,7 +215,8 @@ public class PlanOptimizers
                 costCalculator,
                 estimatedExchangesCostCalculator,
                 costComparator,
-                taskCountEstimator);
+                taskCountEstimator,
+                cubeManager);
     }
 
     @PostConstruct
@@ -243,7 +247,8 @@ public class PlanOptimizers
             CostCalculator costCalculator,
             CostCalculator estimatedExchangesCostCalculator,
             CostComparator costComparator,
-            TaskCountEstimator taskCountEstimator)
+            TaskCountEstimator taskCountEstimator,
+            CubeManager cubeManager)
     {
         this.exporter = exporter;
         ImmutableList.Builder<PlanOptimizer> builder = ImmutableList.builder();
@@ -365,6 +370,7 @@ public class PlanOptimizers
                                         new RemoveRedundantTopN(),
                                         new RemoveRedundantDistinctLimit(),
                                         new ImplementFilteredAggregations(),
+                                        new StarTreeAggregationRule(cubeManager, metadata),
                                         new SingleDistinctAggregationToGroupBy(),
                                         new MultipleDistinctAggregationToMarkDistinct(),
                                         new MergeLimitWithDistinct(),

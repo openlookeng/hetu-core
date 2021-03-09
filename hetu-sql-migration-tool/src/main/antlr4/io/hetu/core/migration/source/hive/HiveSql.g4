@@ -172,6 +172,13 @@ statement
     | DROP MATERIALIZED VIEW qualifiedName                                                  #dropMaterializedView
     | ALTER MATERIALIZED VIEW qualifiedName (ENABLE | DISABLE) REWRITE                      #alterMaterializedView
     | SHOW MATERIALIZED VIEWS ((IN | FROM) qualifiedName)? (LIKE pattern=string)?           #showMaterializedViews
+    | CREATE CUBE (IF NOT EXISTS)? cubeName=qualifiedName
+        ON tableName=qualifiedName
+        WITH '(' AGGREGATIONS EQ '(' aggregations ')' ',' GROUP EQ '(' cubeGroup ')' (',' PROPERTIES EQ properties)? ')'   #createCube
+    | INSERT INTO CUBE cubeName=qualifiedName WHERE expression     #insertCube
+    | INSERT OVERWRITE CUBE cubeName=qualifiedName WHERE expression     #insertOverwriteCube
+    | DROP CUBE (IF EXISTS)? cubeName=qualifiedName                    #dropCube
+    | SHOW CUBES (FOR tableName=qualifiedName)?                                 #showCubes
     | CREATE INDEX identifier ON TABLE? qualifiedName columnAliases
         AS identifier createIndexOptions*                                                      #createIndex
     | DROP INDEX (IF EXISTS)? identifier ON qualifiedName                                      #dropIndex
@@ -392,6 +399,10 @@ groupingSet
     | expression
     ;
 
+cubeGroup
+    : (identifier (',' identifier)*)?
+    ;
+
 namedQuery
     : name=identifier (columnAliases)? AS '(' query ')'
     ;
@@ -542,6 +553,10 @@ comparisonOperator
     : EQ | NEQ | LT | LTE | GT | GTE
     ;
 
+aggregations
+    :  expression (',' expression)*
+    ;
+
 comparisonQuantifier
     : ALL | SOME | ANY
     ;
@@ -683,6 +698,7 @@ ABORT: 'ABORT';
 ADD: 'ADD';
 ADMIN: 'ADMIN';
 AFTER: 'AFTER';
+AGGREGATIONS: 'AGGREGATIONS';
 ALL: 'ALL';
 ALTER: 'ALTER';
 ANALYZE: 'ANALYZE';
@@ -736,6 +752,7 @@ CONSTRAINT: 'CONSTRAINT';
 CREATE: 'CREATE';
 CROSS: 'CROSS';
 CUBE: 'CUBE';
+CUBES: 'CUBES';
 CURRENT: 'CURRENT';
 CURRENT_DATE: 'CURRENT_DATE';
 CURRENT_PATH: 'CURRENT_PATH';

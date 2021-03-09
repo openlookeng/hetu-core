@@ -16,6 +16,7 @@
 package io.prestosql.sql.rewrite;
 
 import io.prestosql.Session;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
@@ -43,9 +44,11 @@ public class CreateIndexRewrite
     public Statement rewrite(
             Session session,
             Metadata metadata,
+            CubeManager cubeManager,
             SqlParser parser,
             Optional<QueryExplainer> queryExplainer,
-            Statement node, List<Expression> parameters,
+            Statement node,
+            List<Expression> parameters,
             AccessControl accessControl,
             WarningCollector warningCollector,
             HeuristicIndexerManager heuristicIndexerManager)

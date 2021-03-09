@@ -41,6 +41,7 @@ import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.iterative.Lookup;
+import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.ExplainAnalyzeNode;
 import io.prestosql.sql.planner.plan.InternalPlanVisitor;
@@ -300,6 +301,13 @@ public class PlanFragmenter
 
         @Override
         public PlanNode visitTableFinish(TableFinishNode node, RewriteContext<FragmentProperties> context)
+        {
+            context.get().setCoordinatorOnlyDistribution();
+            return context.defaultRewrite(node, context.get());
+        }
+
+        @Override
+        public PlanNode visitCubeFinish(CubeFinishNode node, RewriteContext<FragmentProperties> context)
         {
             context.get().setCoordinatorOnlyDistribution();
             return context.defaultRewrite(node, context.get());

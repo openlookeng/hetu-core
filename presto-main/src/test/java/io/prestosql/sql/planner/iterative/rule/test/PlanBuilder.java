@@ -501,7 +501,10 @@ public class PlanBuilder
     public TableScanNode tableScan(List<Symbol> symbols, Map<Symbol, ColumnHandle> assignments)
     {
         return tableScan(
-                new TableHandle(new CatalogName("testConnector"), new TestingTableHandle(), TestingTransactionHandle.create(), Optional.of(TestingHandle.INSTANCE)),
+                new TableHandle(new CatalogName("testConnector"),
+                        new TestingTableHandle(),
+                        TestingTransactionHandle.create(),
+                        Optional.of(TestingHandle.INSTANCE)),
                 symbols,
                 assignments);
     }

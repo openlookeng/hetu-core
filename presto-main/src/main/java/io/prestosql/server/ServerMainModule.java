@@ -42,6 +42,7 @@ import io.prestosql.connector.CatalogConnectorStore;
 import io.prestosql.connector.ConnectorManager;
 import io.prestosql.connector.DataCenterConnectorManager;
 import io.prestosql.connector.system.SystemConnectorModule;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.event.SplitMonitor;
 import io.prestosql.execution.ExecutionFailureInfo;
@@ -446,6 +447,9 @@ public class ServerMainModule
         // binding the DataCenterConnectorStore class for storing the
         // DC connector objects and their properties
         binder.bind(CatalogConnectorStore.class).in(Scopes.SINGLETON);
+
+        // Cube manager
+        binder.bind(CubeManager.class).in(Scopes.SINGLETON);
 
         // system connector
         binder.install(new SystemConnectorModule());

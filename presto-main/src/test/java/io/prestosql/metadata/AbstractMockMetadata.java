@@ -661,6 +661,12 @@ public abstract class AbstractMockMetadata
         return Optional.empty();
     }
 
+    @Override
+    public boolean isPreAggregationSupported(Session session, CatalogName catalogName)
+    {
+        return true;
+    }
+
     /**
      * Hetu can only cache execution plans for supported connectors.
      * This method overrides {@link ConnectorMetadata} returns true to indicate

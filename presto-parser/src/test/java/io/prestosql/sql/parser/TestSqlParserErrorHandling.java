@@ -88,7 +88,7 @@ public class TestSqlParserErrorHandling
                 {"select foo(DISTINCT ,1)",
                         "line 1:21: mismatched input ','. Expecting: <expression>"},
                 {"CREATE )",
-                        "line 1:8: mismatched input ')'. Expecting: 'DATABASE', 'INDEX', 'OR', 'ROLE', 'SCHEMA', 'TABLE', 'VIEW'"},
+                        "line 1:8: mismatched input ')'. Expecting: 'CUBE', 'DATABASE', 'INDEX', 'OR', 'ROLE', 'SCHEMA', 'TABLE', 'VIEW'"},
                 {"CREATE TABLE ) AS (VALUES 1)",
                         "line 1:14: mismatched input ')'. Expecting: 'IF', <identifier>"},
                 {"CREATE TABLE foo ",

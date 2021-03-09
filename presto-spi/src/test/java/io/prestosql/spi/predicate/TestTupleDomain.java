@@ -396,6 +396,47 @@ public class TestTupleDomain
                 ImmutableMap.of(
                         A, Domain.singleValue(BIGINT, 0L),
                         B, Domain.none(VARCHAR))));
+        assertTrue(contains(
+                ImmutableMap.of(A,
+                        Domain.create(
+                                ValueSet.ofRanges(Range.range(BIGINT, 1L, true, 10L, false)),
+                                false)),
+                ImmutableMap.of(A,
+                        Domain.create(
+                                ValueSet.ofRanges(Range.range(BIGINT, 5L, true, 8L, true)),
+                                false))));
+
+        assertTrue(contains(
+                ImmutableMap.of(A,
+                        Domain.create(
+                                ValueSet.ofRanges(Range.range(BIGINT, 1L, true, 10L, false)),
+                                false)),
+                ImmutableMap.of(A,
+                        Domain.create(
+                                ValueSet.ofRanges(Range.range(BIGINT, 5L, true, 8L, true)),
+                                false),
+                        B,
+                        Domain.singleValue(VARCHAR, utf8Slice("20200101")))));
+
+        assertTrue(overlaps(
+                ImmutableMap.of(A,
+                        Domain.create(
+                                ValueSet.ofRanges(Range.range(BIGINT, 1L, true, 10L, false)),
+                                false)),
+                ImmutableMap.of(A,
+                        Domain.create(
+                                ValueSet.ofRanges(Range.range(BIGINT, 5L, true, 18L, true)),
+                                false))));
+
+        assertFalse(contains(
+                ImmutableMap.of(A,
+                        Domain.create(
+                                ValueSet.ofRanges(Range.range(BIGINT, 1L, true, 10L, false)),
+                                false)),
+                ImmutableMap.of(A,
+                        Domain.create(
+                                ValueSet.ofRanges(Range.range(BIGINT, 5L, true, 18L, true)),
+                                false))));
     }
 
     @Test

@@ -16,6 +16,7 @@ package io.prestosql.matching;
 import io.prestosql.matching.pattern.CapturePattern;
 import io.prestosql.matching.pattern.EqualsPattern;
 import io.prestosql.matching.pattern.FilterPattern;
+import io.prestosql.matching.pattern.OptionalCapturePattern;
 import io.prestosql.matching.pattern.TypeOfPattern;
 import io.prestosql.matching.pattern.WithPattern;
 
@@ -69,6 +70,18 @@ public class DefaultPrinter
     {
         visitPrevious(pattern);
         appendLine("filter(%s)", pattern.predicate());
+    }
+
+    /**
+     * This method visits the OptionalCapturePattern.
+     *
+     * @param pattern the OptionalCapturePattern
+     */
+    @Override
+    public void visitOptionalCapture(OptionalCapturePattern<?> pattern)
+    {
+        visitPrevious(pattern);
+        appendLine("capturedAsIf(%s)", pattern.capture().description());
     }
 
     private void appendLine(String template, Object... arguments)

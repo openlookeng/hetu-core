@@ -94,6 +94,7 @@ import io.prestosql.spi.statistics.TableStatisticsMetadata;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.VarcharType;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
@@ -601,6 +602,12 @@ public class HiveMetadata
     }
 
     @Override
+    public boolean isPreAggregationSupported(ConnectorSession session)
+    {
+        return true;
+    }
+
+    @Override
     public List<SchemaTableName> listTables(ConnectorSession session, Optional<String> optionalSchemaName)
     {
         ImmutableList.Builder<SchemaTableName> tableNames = ImmutableList.builder();
@@ -628,6 +635,25 @@ public class HiveMetadata
                 .orElseThrow(() -> new TableNotFoundException(tableName));
         return hiveColumnHandles(table).stream()
                 .collect(toImmutableMap(HiveColumnHandle::getName, identity()));
+    }
+
+    @Override
+    public long getTableModificationTime(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        SchemaTableName tableName = ((HiveTableHandle) tableHandle).getSchemaTableName();
+        Table table = metastore.getTable(new HiveIdentity(session), tableName.getSchemaName(), tableName.getTableName())
+                .orElseThrow(() -> new TableNotFoundException(tableName));
+        String tableLocation = table.getStorage().getLocation();
+        Path tablePath = new Path(tableLocation);
+        try {
+            FileSystem fileSystem = this.hdfsEnvironment.getFileSystem(new HdfsContext(session, tableName.getSchemaName()), tablePath);
+            // We use the directory modification time to represent the table modification time
+            // since HDFS is append-only and any table modification will trigger directory update.
+            return fileSystem.getFileStatus(tablePath).getModificationTime();
+        }
+        catch (IOException exception) {
+            throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, "Cannot get the modification time.");
+        }
     }
 
     @SuppressWarnings("TryWithIdenticalCatches")
@@ -1548,18 +1574,18 @@ public class HiveMetadata
 
     @Override
     public Optional<ConnectorOutputMetadata> finishInsert(ConnectorSession session,
-                                                          ConnectorInsertTableHandle insertHandle,
-                                                          Collection<Slice> fragments,
-                                                          Collection<ComputedStatistics> computedStatistics)
+                                                           ConnectorInsertTableHandle insertHandle,
+                                                           Collection<Slice> fragments,
+                                                           Collection<ComputedStatistics> computedStatistics)
     {
         return finishInsertInternal(session, insertHandle, fragments, computedStatistics, null, HiveACIDWriteType.INSERT);
     }
 
     public Optional<ConnectorOutputMetadata> finishInsert(ConnectorSession session,
-                                                          ConnectorInsertTableHandle insertHandle,
-                                                          Collection<Slice> fragments,
-                                                          Collection<ComputedStatistics> computedStatistics,
-                                                          List<PartitionUpdate> partitions)
+                                                           ConnectorInsertTableHandle insertHandle,
+                                                           Collection<Slice> fragments,
+                                                           Collection<ComputedStatistics> computedStatistics,
+                                                           List<PartitionUpdate> partitions)
     {
         return finishInsertInternal(session, insertHandle, fragments, computedStatistics, partitions, HiveACIDWriteType.INSERT);
     }

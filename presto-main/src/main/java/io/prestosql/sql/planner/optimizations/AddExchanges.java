@@ -57,6 +57,7 @@ import io.prestosql.sql.planner.iterative.rule.PushPredicateIntoTableScan;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.ChildReplacer;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
+import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
@@ -656,6 +657,25 @@ public class AddExchanges
 
         @Override
         public PlanWithProperties visitTableFinish(TableFinishNode node, PreferredProperties preferredProperties)
+        {
+            PlanWithProperties child = planChild(node, PreferredProperties.any());
+
+            // if the child is already a gathering exchange, don't add another
+            if ((child.getNode() instanceof ExchangeNode) && ((ExchangeNode) child.getNode()).getType().equals(GATHER)) {
+                return rebaseAndDeriveProperties(node, child);
+            }
+
+            if (!child.getProperties().isCoordinatorOnly()) {
+                child = withDerivedProperties(
+                        gatheringExchange(idAllocator.getNextId(), REMOTE, child.getNode()),
+                        child.getProperties());
+            }
+
+            return rebaseAndDeriveProperties(node, child);
+        }
+
+        @Override
+        public PlanWithProperties visitCubeFinish(CubeFinishNode node, PreferredProperties preferredProperties)
         {
             PlanWithProperties child = planChild(node, PreferredProperties.any());
 

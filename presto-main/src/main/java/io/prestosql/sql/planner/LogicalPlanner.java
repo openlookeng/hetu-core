@@ -58,6 +58,7 @@ import io.prestosql.sql.analyzer.RelationType;
 import io.prestosql.sql.analyzer.Scope;
 import io.prestosql.sql.planner.StatisticsAggregationPlanner.TableStatisticAggregation;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
+import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.ExplainAnalyzeNode;
 import io.prestosql.sql.planner.plan.OutputNode;
@@ -82,12 +83,14 @@ import io.prestosql.sql.tree.GenericLiteral;
 import io.prestosql.sql.tree.Identifier;
 import io.prestosql.sql.tree.IfExpression;
 import io.prestosql.sql.tree.Insert;
+import io.prestosql.sql.tree.InsertCube;
 import io.prestosql.sql.tree.LambdaArgumentDeclaration;
 import io.prestosql.sql.tree.Node;
 import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.sql.tree.NullLiteral;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.Query;
+import io.prestosql.sql.tree.QuerySpecification;
 import io.prestosql.sql.tree.Statement;
 import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.Update;
@@ -203,7 +206,7 @@ public class LogicalPlanner
             for (PlanOptimizer optimizer : planOptimizers) {
                 if (OptimizerUtils.isEnabledLegacy(optimizer, session, root)) {
                     root = optimizer.optimize(root, session, planSymbolAllocator.getTypes(), planSymbolAllocator, idAllocator,
-                        warningCollector);
+                            warningCollector);
                     requireNonNull(root, format("%s returned a null plan", optimizer.getClass().getName()));
                 }
             }
@@ -222,7 +225,7 @@ public class LogicalPlanner
 
     public PlanNode planStatement(Analysis analysis, Statement statement)
     {
-        if (statement instanceof CreateTableAsSelect && analysis.isCreateTableAsSelectNoOp()) {
+        if ((statement instanceof CreateTableAsSelect) && analysis.isCreateTableAsSelectNoOp()) {
             checkState(analysis.getCreateTableDestination().isPresent(), "Table destination is missing");
             Symbol symbol = planSymbolAllocator.newSymbol("rows", BIGINT);
             PlanNode source = new ValuesNode(idAllocator.getNextId(), ImmutableList.of(symbol), ImmutableList.of(ImmutableList.of(new ConstantExpression(0L, BIGINT))));
@@ -246,6 +249,10 @@ public class LogicalPlanner
             checkState(analysis.getInsert().isPresent(), "Insert handle is missing");
             return createInsertPlan(analysis, (Insert) statement);
         }
+        else if (statement instanceof InsertCube) {
+            checkState(analysis.getCubeInsert().isPresent(), "Cube insert handle is missing");
+            return createInsertCubePlan(analysis, (InsertCube) statement);
+        }
         else if (statement instanceof Delete) {
             return createDeletePlan(analysis, (Delete) statement);
         }
@@ -256,7 +263,7 @@ public class LogicalPlanner
             return createVacuumTablePlan(analysis, (VacuumTable) statement);
         }
         else if (statement instanceof Query) {
-            return createRelationPlan(analysis, (Query) statement);
+            return createRelationPlan(analysis, statement);
         }
         else if (statement instanceof Explain && ((Explain) statement).isAnalyze()) {
             return createExplainAnalyzePlan(analysis, (Explain) statement);
@@ -411,6 +418,71 @@ public class LogicalPlanner
                 visibleTableColumnNames,
                 newTableLayout,
                 statisticsMetadata);
+    }
+
+    private RelationPlan createInsertCubePlan(Analysis analysis, InsertCube insertCubeStatement)
+    {
+        Analysis.CubeInsert insert = analysis.getCubeInsert().get();
+        TableMetadata tableMetadata = metadata.getTableMetadata(session, insert.getTarget());
+        List<ColumnMetadata> visibleTableColumns = tableMetadata.getColumns().stream()
+                .filter(column -> !column.isHidden())
+                .collect(toImmutableList());
+        List<String> visibleTableColumnNames = visibleTableColumns.stream()
+                .map(ColumnMetadata::getName)
+                .collect(toImmutableList());
+        RelationPlan plan = createRelationPlan(analysis, insertCubeStatement.getQuery());
+        Map<String, ColumnHandle> columns = metadata.getColumnHandles(session, insert.getTarget());
+        Assignments.Builder assignments = Assignments.builder();
+        for (ColumnMetadata column : tableMetadata.getColumns()) {
+            if (column.isHidden()) {
+                continue;
+            }
+            Symbol output = planSymbolAllocator.newSymbol(column.getName(), column.getType());
+            int index = insert.getColumns().indexOf(columns.get(column.getName()));
+            if (index < 0) {
+                Expression cast = new Cast(new NullLiteral(), column.getType().getTypeSignature().toString());
+                assignments.put(output, castToRowExpression(cast));
+            }
+            else {
+                Symbol input = plan.getSymbol(index);
+                Type tableType = column.getType();
+                Type queryType = planSymbolAllocator.getTypes().get(input);
+                if (queryType.equals(tableType) || typeCoercion.isTypeOnlyCoercion(queryType, tableType)) {
+                    assignments.put(output, castToRowExpression(toSymbolReference(input)));
+                }
+                else {
+                    Expression cast = noTruncationCast(toSymbolReference(input), queryType, tableType);
+                    assignments.put(output, castToRowExpression(cast));
+                }
+            }
+        }
+        ProjectNode projectNode = new ProjectNode(idAllocator.getNextId(), plan.getRoot(), assignments.build());
+        List<Field> fields = visibleTableColumns.stream()
+                .map(column -> Field.newUnqualified(column.getName(), column.getType()))
+                .collect(toImmutableList());
+        Scope scope = Scope.builder().withRelationType(RelationId.anonymous(), new RelationType(fields)).build();
+        plan = new RelationPlan(projectNode, scope, projectNode.getOutputSymbols());
+        Optional<NewTableLayout> newTableLayout = metadata.getInsertLayout(session, insert.getTarget());
+        String catalogName = insert.getTarget().getCatalogName().getCatalogName();
+        TableStatisticsMetadata statisticsMetadata = metadata.getStatisticsCollectionMetadataForWrite(session, catalogName, tableMetadata.getMetadata());
+        RelationPlan tableWriterPlan = createTableWriterPlan(
+                analysis,
+                plan,
+                new InsertReference(insert.getTarget(), analysis.isCubeOverwrite()),
+                visibleTableColumnNames,
+                newTableLayout,
+                statisticsMetadata);
+        Expression cubeWhere = analysis.getWhere((QuerySpecification) (insertCubeStatement.getQuery().getQueryBody()));
+        Expression rewritten = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session, namedSubPlan, uniqueIdAllocator)
+                .rewriteExpression(tableWriterPlan, cubeWhere, analysis, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator));
+        CubeFinishNode cubeFinishNode = new CubeFinishNode(
+                idAllocator.getNextId(),
+                tableWriterPlan.getRoot(),
+                planSymbolAllocator.newSymbol("rows", BIGINT),
+                tableMetadata.getQualifiedName().toString(),
+                rewritten,
+                insertCubeStatement.isOverwrite());
+        return new RelationPlan(cubeFinishNode, analysis.getScope(insertCubeStatement), cubeFinishNode.getOutputSymbols());
     }
 
     private Expression noTruncationCast(Expression expression, Type fromType, Type toType)

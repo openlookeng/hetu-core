@@ -22,6 +22,7 @@ import io.prestosql.connector.system.GlobalSystemTransactionHandle;
 import io.prestosql.connector.system.SystemTransactionHandle;
 import io.prestosql.cost.CostCalculator;
 import io.prestosql.cost.StatsCalculator;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterService;
 import io.prestosql.execution.LocationFactory;
 import io.prestosql.execution.NodeTaskMap;
@@ -104,7 +105,7 @@ public class CachedSqlQueryExecution
     private final BeginTableWrite beginTableWrite;
 
     public CachedSqlQueryExecution(QueryPreparer.PreparedQuery preparedQuery, QueryStateMachine stateMachine,
-                                   String slug, Metadata metadata, AccessControl accessControl, SqlParser sqlParser, SplitManager splitManager,
+                                   String slug, Metadata metadata, CubeManager cubeManager, AccessControl accessControl, SqlParser sqlParser, SplitManager splitManager,
                                    NodePartitioningManager nodePartitioningManager, NodeScheduler nodeScheduler,
                                    List<PlanOptimizer> planOptimizers, PlanFragmenter planFragmenter, RemoteTaskFactory remoteTaskFactory,
                                    LocationFactory locationFactory, int scheduleSplitBatchSize, ExecutorService queryExecutor,
@@ -114,7 +115,7 @@ public class CachedSqlQueryExecution
                                    DynamicFilterService dynamicFilterService, Optional<Cache<Integer, CachedSqlQueryExecutionPlan>> cache,
                                    HeuristicIndexerManager heuristicIndexerManager, StateStoreProvider stateStoreProvider)
     {
-        super(preparedQuery, stateMachine, slug, metadata, accessControl, sqlParser, splitManager,
+        super(preparedQuery, stateMachine, slug, metadata, cubeManager, accessControl, sqlParser, splitManager,
                 nodePartitioningManager, nodeScheduler, planOptimizers, planFragmenter, remoteTaskFactory, locationFactory,
                 scheduleSplitBatchSize, queryExecutor, schedulerExecutor, failureDetector, nodeTaskMap, queryExplainer,
                 executionPolicy, schedulerStats, statsCalculator, costCalculator, warningCollector, dynamicFilterService, heuristicIndexerManager, stateStoreProvider);
@@ -376,6 +377,9 @@ public class CachedSqlQueryExecution
             Map<String, TableHandle> tables = new HashMap<>();
             for (TableHandle handle : analysis.getTables()) {
                 tables.put(handle.getFullyQualifiedName(), handle);
+                analysis.getCubes(handle).forEach(cubeHandle -> {
+                    tables.putIfAbsent(cubeHandle.getFullyQualifiedName(), cubeHandle);
+                });
             }
             this.tables = tables;
         }
@@ -434,7 +438,8 @@ public class CachedSqlQueryExecution
             // New connector transaction handle may not have the correct transaction ID so it is explicitly rewritten here
             return new TableHandle(oldTableHandle.getCatalogName(),
                     newTableHandle.getConnectorHandle().createFrom(oldTableHandle.getConnectorHandle()),
-                    toNewConnectorTransactionHandle(newTableHandle, transactionId), newTableHandle.getLayout());
+                    toNewConnectorTransactionHandle(newTableHandle, transactionId),
+                    newTableHandle.getLayout());
         }
 
         private static ConnectorTransactionHandle toNewConnectorTransactionHandle(TableHandle tableHandle, TransactionId transactionId)

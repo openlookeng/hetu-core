@@ -19,6 +19,7 @@ import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.connector.informationschema.InformationSchemaConnector;
 import io.prestosql.connector.system.SystemConnector;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.QueryManagerConfig;
 import io.prestosql.execution.TaskManagerConfig;
 import io.prestosql.execution.warnings.WarningCollector;
@@ -1926,7 +1927,8 @@ public class TestAnalyzer
                 new AllowAllAccessControl(),
                 Optional.empty(),
                 emptyList(),
-                WarningCollector.NOOP);
+                WarningCollector.NOOP,
+                CubeManager.getNoOpCubeManager());
     }
 
     private void analyze(@Language("SQL") String query)

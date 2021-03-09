@@ -32,6 +32,7 @@ import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.planner.PartitioningScheme;
 import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.StatisticAggregations;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
@@ -237,6 +238,17 @@ public class SymbolMapper
                 map(node.getRowCountSymbol()),
                 node.getStatisticsAggregation().map(this::map),
                 node.getStatisticsAggregationDescriptor().map(descriptor -> descriptor.map(this::map)));
+    }
+
+    public CubeFinishNode map(CubeFinishNode node, PlanNode source)
+    {
+        return new CubeFinishNode(
+                node.getId(),
+                source,
+                map(node.getRowCountSymbol()),
+                node.getCubeName(),
+                node.getDataPredicate(),
+                node.isOverwrite());
     }
 
     private PartitioningScheme canonicalize(PartitioningScheme scheme, PlanNode source)

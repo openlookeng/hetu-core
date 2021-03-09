@@ -109,6 +109,11 @@ public abstract class InternalPlanVisitor<R, C>
         return visitPlan(node, context);
     }
 
+    public R visitCubeFinish(CubeFinishNode node, C context)
+    {
+        return visitPlan(node, context);
+    }
+
     public R visitStatisticsWriterNode(StatisticsWriterNode node, C context)
     {
         return visitPlan(node, context);

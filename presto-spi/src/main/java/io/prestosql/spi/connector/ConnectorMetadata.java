@@ -127,6 +127,7 @@ public interface ConnectorMetadata
      * The provided table layout handle must be one that the connector can transparently convert to from
      * the original partitioning handle associated with the provided table layout handle,
      * as promised by {@link #getCommonPartitioningHandle}.
+     *
      * @deprecated use the version without layouts
      */
     @Deprecated
@@ -312,6 +313,14 @@ public interface ConnectorMetadata
     default void dropColumn(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle column)
     {
         throw new PrestoException(NOT_SUPPORTED, "This connector does not support dropping columns");
+    }
+
+    /**
+     * Returns the modification time of a table if possible.
+     */
+    default long getTableModificationTime(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "The connector does not support getting table modification time");
     }
 
     /**
@@ -809,10 +818,10 @@ public interface ConnectorMetadata
      * invocation, even if the connector generally supports pushdown. Doing otherwise can cause the optimizer
      * to loop indefinitely.
      * </p>
-     *
+     * <p>
      * If the method returns a result, the list of projections in the result *replaces* the existing ones, and the
      * list of assignments is the new set of columns exposed by the derived table.
-     *
+     * <p>
      * As an example, given the following plan:
      *
      * <pre>
@@ -825,7 +834,7 @@ public interface ConnectorMetadata
      *       b = CH1
      *       c = CH2
      * </pre>
-     *
+     * <p>
      * The optimizer would call {@link #applyProjection} with the following arguments:
      *
      * <pre>
@@ -841,7 +850,7 @@ public interface ConnectorMetadata
      *     c = CH2
      * ]
      * </pre>
-     *
+     * <p>
      * Assuming the connector knows how to handle f1(...) and f2(...), it would return:
      *
      * <pre>
@@ -884,7 +893,7 @@ public interface ConnectorMetadata
     /**
      * Hetu can only cache execution plans for supported connectors.
      * By default, caching is not enabled for connectors and must be explicitly overwritten.
-     *
+     * <p>
      * Other methods to be overwritten:
      * io.prestosql.spi.connector.ColumnHandle#getColumnName()
      * io.prestosql.spi.connector.ConnectorTableHandle#createFrom(io.prestosql.spi.connector.ConnectorTableHandle)
@@ -902,6 +911,18 @@ public interface ConnectorMetadata
      * Hetu can only create index for supported connectors.
      */
     default boolean isHeuristicIndexSupported()
+    {
+        return false;
+    }
+
+    /**
+     * Hetu can only support pre-aggregation for supported connectors.
+     *
+     * @param session Hetu session
+     * @return true, if connector supports pre aggregation
+     *         false, otherwise
+     */
+    default boolean isPreAggregationSupported(ConnectorSession session)
     {
         return false;
     }

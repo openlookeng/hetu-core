@@ -22,11 +22,13 @@ import io.prestosql.cost.CostCalculatorUsingExchanges;
 import io.prestosql.cost.CostCalculatorWithEstimatedExchanges;
 import io.prestosql.cost.CostComparator;
 import io.prestosql.cost.TaskCountEstimator;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.QueryManagerConfig;
 import io.prestosql.execution.TaskManagerConfig;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.spi.security.AccessDeniedException;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.analyzer.FeaturesConfig;
@@ -349,6 +351,7 @@ public abstract class AbstractTestQueryFramework
         boolean forceSingleNode = queryRunner.getNodeCount() == 1;
         TaskCountEstimator taskCountEstimator = new TaskCountEstimator(queryRunner::getNodeCount);
         CostCalculator costCalculator = new CostCalculatorUsingExchanges(taskCountEstimator);
+        HetuMetaStoreManager hetuMetaStoreManager = new HetuMetaStoreManager();
         List<PlanOptimizer> optimizers = new PlanOptimizers(
                 metadata,
                 new TypeAnalyzer(sqlParser, metadata),
@@ -363,7 +366,8 @@ public abstract class AbstractTestQueryFramework
                 costCalculator,
                 new CostCalculatorWithEstimatedExchanges(costCalculator, taskCountEstimator),
                 new CostComparator(featuresConfig),
-                taskCountEstimator).get();
+                taskCountEstimator,
+                new CubeManager(featuresConfig, hetuMetaStoreManager)).get();
         return new QueryExplainer(
                 optimizers,
                 new PlanFragmenter(metadata, queryRunner.getNodePartitioningManager(), new QueryManagerConfig()),
@@ -373,7 +377,8 @@ public abstract class AbstractTestQueryFramework
                 queryRunner.getStatsCalculator(),
                 costCalculator,
                 ImmutableMap.of(),
-                new HeuristicIndexerManager(null, null));
+                new HeuristicIndexerManager(null, null),
+                new CubeManager(featuresConfig, hetuMetaStoreManager));
     }
 
     protected static void skipTestUnless(boolean requirement)

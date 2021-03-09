@@ -344,6 +344,12 @@ class QueryPlanner
         return new UpdateDeleteRelationPlan(plan, visibleTableColumnNames, columns, predicate);
     }
 
+    public Expression rewriteExpression(RelationPlan relationPlan, Expression expression, Analysis analysis, Map<NodeRef<LambdaArgumentDeclaration>, Symbol> lambdaDeclarationToSymbolMap)
+    {
+        TranslationMap translationMap = new TranslationMap(relationPlan, analysis, lambdaDeclarationToSymbolMap);
+        return translationMap.rewrite(expression);
+    }
+
     public DeleteNode plan(Delete node)
     {
         RelationType descriptor = analysis.getOutputDescriptor(node.getTable());

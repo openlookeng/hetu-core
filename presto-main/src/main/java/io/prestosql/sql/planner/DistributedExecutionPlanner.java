@@ -57,6 +57,7 @@ import io.prestosql.split.SplitSource;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
+import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
@@ -79,7 +80,6 @@ import io.prestosql.sql.planner.plan.TableWriterNode.VacuumTarget;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import javax.inject.Inject;
 
@@ -226,21 +226,10 @@ public class DistributedExecutionPlanner
                 dynamicFilterSupplier = DynamicFilterService.getDynamicFilterSupplier(session.getQueryId(), dynamicFilters, assignments);
             }
 
-            //TODO: Find a better to wrap the Cache Predicates
             //How would this change when we add support to cache  small tables entirely without the need to provide predicates
             Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates = ImmutableSet.of();
-            Optional<String> fqTableName;
-            try {
-                fqTableName = Optional.ofNullable(tableHandle.getFullyQualifiedName());
-            }
-            catch (NotImplementedException ignored) {
-                //TODO: Need to revisit as part of Affinity Scheduling
-                //Exception is thrown for Memory connector. We can ignore exception as ORC Cache supported only by Hive connector.
-                fqTableName = Optional.empty();
-            }
-
-            if (PropertyService.getBooleanProperty(HetuConstant.SPLIT_CACHE_MAP_ENABLED) && fqTableName.isPresent()) {
-                userDefinedCachePredicates = SplitCacheMap.getInstance().getCachePredicateTupleDomains(fqTableName.get());
+            if (PropertyService.getBooleanProperty(HetuConstant.SPLIT_CACHE_MAP_ENABLED) && tableHandle.getConnectorHandle().isTableCacheable()) {
+                userDefinedCachePredicates = SplitCacheMap.getInstance().getCachePredicateTupleDomains(tableHandle.getFullyQualifiedName());
             }
 
             // get dataSource for table
@@ -444,6 +433,12 @@ public class DistributedExecutionPlanner
 
         @Override
         public Map<PlanNodeId, SplitSource> visitTableFinish(TableFinishNode node, Void context)
+        {
+            return node.getSource().accept(this, context);
+        }
+
+        @Override
+        public Map<PlanNodeId, SplitSource> visitCubeFinish(CubeFinishNode node, Void context)
         {
             return node.getSource().accept(this, context);
         }

@@ -841,4 +841,24 @@ public abstract class AstVisitor<R, C>
     {
         return visitStatement(node, context);
     }
+
+    protected R visitCreateCube(CreateCube node, C context)
+    {
+        return visitStatement(node, context);
+    }
+
+    protected R visitDropCube(DropCube node, C context)
+    {
+        return visitStatement(node, context);
+    }
+
+    protected R visitShowCubes(ShowCubes node, C context)
+    {
+        return visitStatement(node, context);
+    }
+
+    protected R visitInsertCube(InsertCube node, C context)
+    {
+        return visitStatement(node, context);
+    }
 }

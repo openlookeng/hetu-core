@@ -16,6 +16,7 @@ package io.prestosql.matching;
 import com.google.common.collect.Iterables;
 import io.prestosql.matching.pattern.CapturePattern;
 import io.prestosql.matching.pattern.FilterPattern;
+import io.prestosql.matching.pattern.OptionalCapturePattern;
 import io.prestosql.matching.pattern.TypeOfPattern;
 import io.prestosql.matching.pattern.WithPattern;
 
@@ -67,6 +68,18 @@ public abstract class Pattern<T>
     public Pattern<T> capturedAs(Capture<T> capture)
     {
         return new CapturePattern<>(capture, this);
+    }
+
+    /**
+     * Builds a OptionalCapturePattern using the expected
+     * class and the capture on this Pattern.
+     *
+     * @param predicate only if the predicate is true, it will be captured
+     * @param capture the Capture object to capture the optional object
+     */
+    public Pattern<T> capturedAsIf(Predicate<T> predicate, Capture<Optional<T>> capture)
+    {
+        return new OptionalCapturePattern<>(predicate, capture, this);
     }
 
     public Pattern<T> matching(Predicate<? super T> predicate)

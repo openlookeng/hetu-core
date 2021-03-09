@@ -42,6 +42,7 @@ import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.optimizations.JoinNodeUtils;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
@@ -244,6 +245,13 @@ public final class GraphvizPrinter
         public Void visitTableFinish(TableFinishNode node, Void context)
         {
             printNode(node, format("TableFinish[%s]", Joiner.on(", ").join(node.getOutputSymbols())), NODE_COLORS.get(NodeType.TABLE_FINISH));
+            return node.getSource().accept(this, context);
+        }
+
+        @Override
+        public Void visitCubeFinish(CubeFinishNode node, Void context)
+        {
+            printNode(node, format("CubeFinish[%s]", Joiner.on(", ").join(node.getOutputSymbols())), NODE_COLORS.get(NodeType.TABLE_FINISH));
             return node.getSource().accept(this, context);
         }
 

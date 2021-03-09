@@ -42,6 +42,7 @@ import static io.prestosql.sql.analyzer.FeaturesConfig.SPILLER_SPILL_PATH;
 import static io.prestosql.sql.analyzer.FeaturesConfig.SPILL_ENABLED;
 import static io.prestosql.sql.analyzer.RegexLibrary.JONI;
 import static io.prestosql.sql.analyzer.RegexLibrary.RE2J;
+import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -132,13 +133,17 @@ public class TestFeaturesConfig
                 .setPushTableThroughSubquery(false)
                 .setRewriteFilteringSemiJoinToInnerJoin(false)
                 .setTransformSelfJoinToGroupby(true)
-                .setRewriteFilteringSemiJoinToInnerJoin(false)
                 .setSpillReuseExchange(false)
                 .setSpillOperatorThresholdReuseExchange(10)
                 .setReuseTableScanEnabled(false)
                 .setCteReuseEnabled(false)
                 .setMaxQueueSize(1024)
-                .setMaxPrefetchQueueSize(512));
+                .setMaxPrefetchQueueSize(512)
+                .setReuseTableScanEnabled(false)
+                .setEnableStarTreeIndex(false)
+                .setCubeMetadataCacheSize(5)
+                .setCubeMetadataCacheTtl(new Duration(1, HOURS))
+                .setImplicitConversionEnabled(false));
     }
 
     @Test
@@ -231,6 +236,9 @@ public class TestFeaturesConfig
                 .put("optimizer.cte-reuse-enabled", "true")
                 .put("cte.cte-max-queue-size", "2048")
                 .put("cte.cte-max-prefetch-queue-size", "1024")
+                .put("cube.metadata-cache-size", "10")
+                .put("cube.metadata-cache-ttl", "10m")
+                .put("optimizer.enable-star-tree-index", "true")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -319,7 +327,11 @@ public class TestFeaturesConfig
                 .setSpillOperatorThresholdReuseExchange(100)
                 .setCteReuseEnabled(true)
                 .setMaxQueueSize(2048)
-                .setMaxPrefetchQueueSize(1024);
+                .setMaxPrefetchQueueSize(1024)
+                .setSpillOperatorThresholdReuseExchange(100)
+                .setEnableStarTreeIndex(true)
+                .setCubeMetadataCacheSize(10)
+                .setCubeMetadataCacheTtl(new Duration(10, MINUTES));
         assertFullMapping(properties, expected);
     }
 

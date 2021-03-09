@@ -15,6 +15,7 @@ package io.prestosql.sql.rewrite;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
@@ -38,13 +39,15 @@ public final class StatementRewrite
             new ShowStatsRewrite(),
             new ExplainRewrite(),
             new CacheTableRewrite(),
-            new CreateIndexRewrite());
+            new CreateIndexRewrite(),
+            new InsertCubeRewrite());
 
     private StatementRewrite() {}
 
     public static Statement rewrite(
             Session session,
             Metadata metadata,
+            CubeManager cubeManager,
             SqlParser parser,
             Optional<QueryExplainer> queryExplainer,
             Statement node,
@@ -54,7 +57,7 @@ public final class StatementRewrite
             HeuristicIndexerManager heuristicIndexerManager)
     {
         for (Rewrite rewrite : REWRITES) {
-            node = requireNonNull(rewrite.rewrite(session, metadata, parser, queryExplainer, node, parameters, accessControl, warningCollector, heuristicIndexerManager),
+            node = requireNonNull(rewrite.rewrite(session, metadata, cubeManager, parser, queryExplainer, node, parameters, accessControl, warningCollector, heuristicIndexerManager),
                     "Statement rewrite returned null");
         }
         return node;
@@ -65,6 +68,7 @@ public final class StatementRewrite
         Statement rewrite(
                 Session session,
                 Metadata metadata,
+                CubeManager cubeManager,
                 SqlParser parser,
                 Optional<QueryExplainer> queryExplainer,
                 Statement node,

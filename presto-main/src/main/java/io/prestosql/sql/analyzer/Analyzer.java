@@ -16,6 +16,7 @@ package io.prestosql.sql.analyzer;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import io.prestosql.Session;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
@@ -46,6 +47,7 @@ public class Analyzer
     private final List<Expression> parameters;
     private final WarningCollector warningCollector;
     private HeuristicIndexerManager heuristicIndexerManager;
+    private final CubeManager cubeManager;
 
     public Analyzer(Session session,
             Metadata metadata,
@@ -53,9 +55,10 @@ public class Analyzer
             AccessControl accessControl,
             Optional<QueryExplainer> queryExplainer,
             List<Expression> parameters,
-            WarningCollector warningCollector)
+            WarningCollector warningCollector,
+            CubeManager cubeManager)
     {
-        this(session, metadata, sqlParser, accessControl, queryExplainer, parameters, warningCollector, HeuristicIndexerManager.getNoOpHeuristicIndexerManager());
+        this(session, metadata, sqlParser, accessControl, queryExplainer, parameters, warningCollector, HeuristicIndexerManager.getNoOpHeuristicIndexerManager(), cubeManager);
     }
 
     public Analyzer(Session session,
@@ -65,7 +68,8 @@ public class Analyzer
             Optional<QueryExplainer> queryExplainer,
             List<Expression> parameters,
             WarningCollector warningCollector,
-            HeuristicIndexerManager heuristicIndexerManager)
+            HeuristicIndexerManager heuristicIndexerManager,
+            CubeManager cubeManager)
     {
         this.session = requireNonNull(session, "session is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
@@ -74,6 +78,7 @@ public class Analyzer
         this.queryExplainer = requireNonNull(queryExplainer, "query explainer is null");
         this.parameters = parameters;
         this.warningCollector = requireNonNull(warningCollector, "warningCollector is null");
+        this.cubeManager = cubeManager;
         this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
     }
 
@@ -84,11 +89,11 @@ public class Analyzer
 
     public Analysis analyze(Statement statement, boolean isDescribe)
     {
-        Statement rewrittenStatement = StatementRewrite.rewrite(session, metadata, sqlParser, queryExplainer, statement, parameters, accessControl, warningCollector, heuristicIndexerManager);
+        Statement rewrittenStatement = StatementRewrite.rewrite(session, metadata, cubeManager, sqlParser, queryExplainer, statement, parameters, accessControl, warningCollector, heuristicIndexerManager);
         Analysis analysis = new Analysis(rewrittenStatement, parameters, isDescribe);
         analysis.setOriginalStatement(statement);
 
-        StatementAnalyzer analyzer = new StatementAnalyzer(analysis, metadata, sqlParser, accessControl, session, warningCollector, heuristicIndexerManager);
+        StatementAnalyzer analyzer = new StatementAnalyzer(analysis, metadata, sqlParser, accessControl, session, warningCollector, heuristicIndexerManager, cubeManager);
         analyzer.analyze(rewrittenStatement, Optional.empty());
 
         // check column access permissions for each table

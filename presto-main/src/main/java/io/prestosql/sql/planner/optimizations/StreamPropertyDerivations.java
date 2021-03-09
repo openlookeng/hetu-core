@@ -47,6 +47,7 @@ import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
+import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
@@ -417,6 +418,14 @@ public final class StreamPropertyDerivations
 
         @Override
         public StreamProperties visitTableFinish(TableFinishNode node, List<StreamProperties> inputProperties)
+        {
+            StreamProperties properties = Iterables.getOnlyElement(inputProperties);
+            // table finish only outputs the row count
+            return properties.withUnspecifiedPartitioning();
+        }
+
+        @Override
+        public StreamProperties visitCubeFinish(CubeFinishNode node, List<StreamProperties> inputProperties)
         {
             StreamProperties properties = Iterables.getOnlyElement(inputProperties);
             // table finish only outputs the row count

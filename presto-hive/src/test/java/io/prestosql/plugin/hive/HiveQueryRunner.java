@@ -18,7 +18,10 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import io.airlift.log.Logging;
+import io.airlift.testing.mysql.TestingMySqlServer;
 import io.airlift.tpch.TpchTable;
+import io.hetu.core.cube.startree.StarTreePlugin;
+import io.hetu.core.metastore.HetuMetastorePlugin;
 import io.prestosql.Session;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.plugin.hive.authentication.HiveIdentity;
@@ -34,7 +37,10 @@ import io.prestosql.tests.DistributedQueryRunner;
 import org.intellij.lang.annotations.Language;
 import org.joda.time.DateTimeZone;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -81,19 +87,31 @@ public final class HiveQueryRunner
         return createQueryRunner(tables, ImmutableMap.of(), Optional.empty());
     }
 
+    public static DistributedQueryRunner createQueryRunnerWithMetaStore(Iterable<TpchTable<?>> tables, TestingMySqlServer mySqlServer)
+            throws Exception
+    {
+        return createQueryRunner(tables, ImmutableMap.of(), "sql-standard", ImmutableMap.of(), Optional.empty(), false, mySqlServer.getJdbcUrl("hive"));
+    }
+
     public static DistributedQueryRunner createQueryRunnerWithStateStore(Iterable<TpchTable<?>> tables)
             throws Exception
     {
-        return createQueryRunner(tables, ImmutableMap.of(), "sql-standard", ImmutableMap.of(), Optional.empty(), true);
+        return createQueryRunner(tables, ImmutableMap.of(), "sql-standard", ImmutableMap.of(), Optional.empty(), true, "");
     }
 
     public static DistributedQueryRunner createQueryRunner(Iterable<TpchTable<?>> tables, Map<String, String> extraProperties, Optional<Path> baseDataDir)
             throws Exception
     {
-        return createQueryRunner(tables, extraProperties, "sql-standard", ImmutableMap.of(), baseDataDir, false);
+        return createQueryRunner(tables, extraProperties, "sql-standard", ImmutableMap.of(), baseDataDir, false, "");
     }
 
     public static DistributedQueryRunner createQueryRunner(Iterable<TpchTable<?>> tables, Map<String, String> extraProperties, String security, Map<String, String> extraHiveProperties, Optional<Path> baseDataDir, boolean hasStateStore)
+            throws Exception
+    {
+        return createQueryRunner(tables, extraProperties, security, extraHiveProperties, baseDataDir, hasStateStore, "");
+    }
+
+    public static DistributedQueryRunner createQueryRunner(Iterable<TpchTable<?>> tables, Map<String, String> extraProperties, String security, Map<String, String> extraHiveProperties, Optional<Path> baseDataDir, boolean hasStateStore, String jdbcUrl)
             throws Exception
     {
         assertEquals(DateTimeZone.getDefault(), TIME_ZONE, "Timezone not configured correctly. Add -Duser.timezone=America/Bahia_Banderas to your JVM arguments");
@@ -126,6 +144,38 @@ public final class HiveQueryRunner
         }
 
         try {
+            if (jdbcUrl != null && !jdbcUrl.isEmpty()) {
+                File directory = new File("");
+                String courseFile = directory.getCanonicalPath();
+                System.setProperty("config", courseFile + "/etc/");
+                String configDir = System.getProperty("config");
+                String hetumetastoreConfig = configDir + "hetu-metastore.properties";
+                File file = new File(configDir);
+                if (!file.exists()) {
+                    file.mkdirs();
+                }
+                File file2 = new File(configDir, "hetu-metastore.properties");
+                if (!file2.exists()) {
+                    try {
+                        file2.createNewFile();
+                    }
+                    catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                try (BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(hetumetastoreConfig))) {
+                    bufferedWriter.write("hetu.metastore.db.url = " + jdbcUrl);
+                    bufferedWriter.write("\n");
+                    bufferedWriter.write("hetu.metastore.type = jdbc\n");
+                    bufferedWriter.write("hetu.metastore.db.user = user\n");
+                    bufferedWriter.write("hetu.metastore.db.password = testpass\n");
+                }
+                queryRunner.installPlugin(new HetuMetastorePlugin());
+                queryRunner.getCoordinator().loadMetastore();
+                queryRunner.installPlugin(new StarTreePlugin());
+            }
+
             queryRunner.installPlugin(new TpchPlugin());
             queryRunner.createCatalog("tpch", "tpch");
 

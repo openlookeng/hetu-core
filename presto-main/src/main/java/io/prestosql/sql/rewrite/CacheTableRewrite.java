@@ -16,6 +16,7 @@ package io.prestosql.sql.rewrite;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.SplitCacheMap;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
@@ -85,6 +86,7 @@ final class CacheTableRewrite
     public Statement rewrite(
             Session session,
             Metadata metadata,
+            CubeManager cubeManager,
             SqlParser parser,
             Optional<QueryExplainer> queryExplainer,
             Statement node,

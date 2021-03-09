@@ -15,6 +15,7 @@ package io.prestosql.execution;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.Session;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
@@ -105,7 +106,7 @@ public class CreateViewTask
 
     private Analysis analyzeStatement(Statement statement, Session session, Metadata metadata, AccessControl accessControl, List<Expression> parameters, WarningCollector warningCollector)
     {
-        Analyzer analyzer = new Analyzer(session, metadata, sqlParser, accessControl, Optional.empty(), parameters, warningCollector);
+        Analyzer analyzer = new Analyzer(session, metadata, sqlParser, accessControl, Optional.empty(), parameters, warningCollector, CubeManager.getNoOpCubeManager());
         return analyzer.analyze(statement);
     }
 }

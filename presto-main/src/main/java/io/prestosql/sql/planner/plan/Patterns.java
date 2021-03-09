@@ -249,6 +249,42 @@ public class Patterns
         }
     }
 
+    /**
+     * Find an optional source PlanNode of a given type. If the optional
+     * source node is found, it will be passed to the next pattern otherwise the parent node itself will be passed
+     * to the next pattern.
+     * <p>
+     * Use this method with the {@link io.hetu.core.matching.pattern.OptionalCapturePattern} to capture the optional node.
+     *
+     * @param expectedClass the class of the optional node
+     * @param <T> the expected node type
+     * @return a Property to extract the optional node
+     */
+    public static <T extends PlanNode> Property<PlanNode, Lookup, PlanNode> optionalSource(Class<T> expectedClass)
+    {
+        return optionalProperty(
+                "optionalSource",
+                (node, lookup) -> {
+                    if (node.getSources().size() == 1) {
+                        PlanNode source = lookup.resolve(getOnlyElement(node.getSources()));
+                        if (source.getClass().equals(expectedClass)) {
+                            return Optional.of(source);
+                        }
+                    }
+                    return Optional.of(node);
+                });
+    }
+
+    /**
+     * Match any PlanNode objects.
+     *
+     * @return TypeOfPattern of PlanNode
+     */
+    public static Pattern<PlanNode> anyPlan()
+    {
+        return typeOf(PlanNode.class);
+    }
+
     public static class Aggregation
     {
         public static Property<AggregationNode, Lookup, List<Symbol>> groupingColumns()

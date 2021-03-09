@@ -44,6 +44,7 @@ import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
+import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
@@ -602,6 +603,14 @@ public final class ValidateDependenciesChecker
         public Void visitTableFinish(TableFinishNode node, Set<Symbol> boundSymbols)
         {
             node.getSource().accept(this, boundSymbols); // visit child
+
+            return null;
+        }
+
+        @Override
+        public Void visitCubeFinish(CubeFinishNode node, Set<Symbol> boundSymbols)
+        {
+            node.getSource().accept(this, boundSymbols); //visit child
 
             return null;
         }

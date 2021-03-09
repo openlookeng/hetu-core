@@ -20,9 +20,12 @@ import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
+import io.hetu.core.spi.cube.CubeAggregateFunction;
+import io.hetu.core.spi.cube.io.CubeMetaStore;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.connector.DataCenterUtility;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
@@ -74,6 +77,7 @@ import io.prestosql.sql.tree.AssignmentItem;
 import io.prestosql.sql.tree.Call;
 import io.prestosql.sql.tree.Comment;
 import io.prestosql.sql.tree.Commit;
+import io.prestosql.sql.tree.CreateCube;
 import io.prestosql.sql.tree.CreateIndex;
 import io.prestosql.sql.tree.CreateSchema;
 import io.prestosql.sql.tree.CreateTable;
@@ -86,6 +90,7 @@ import io.prestosql.sql.tree.Delete;
 import io.prestosql.sql.tree.DereferenceExpression;
 import io.prestosql.sql.tree.DropCache;
 import io.prestosql.sql.tree.DropColumn;
+import io.prestosql.sql.tree.DropCube;
 import io.prestosql.sql.tree.DropIndex;
 import io.prestosql.sql.tree.DropSchema;
 import io.prestosql.sql.tree.DropTable;
@@ -108,6 +113,7 @@ import io.prestosql.sql.tree.GroupingOperation;
 import io.prestosql.sql.tree.GroupingSets;
 import io.prestosql.sql.tree.Identifier;
 import io.prestosql.sql.tree.Insert;
+import io.prestosql.sql.tree.InsertCube;
 import io.prestosql.sql.tree.Intersect;
 import io.prestosql.sql.tree.Join;
 import io.prestosql.sql.tree.JoinCriteria;
@@ -185,6 +191,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Iterables.getLast;
 import static com.google.common.collect.Iterables.transform;
 import static io.prestosql.SystemSessionProperties.getMaxGroupingSets;
+import static io.prestosql.cube.CubeManager.STAR_TREE;
 import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
 import static io.prestosql.spi.StandardErrorCode.INVALID_COLUMN_MASK;
 import static io.prestosql.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
@@ -224,6 +231,7 @@ import static io.prestosql.sql.analyzer.SemanticErrorCode.DUPLICATE_COLUMN_NAME;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.DUPLICATE_PROPERTY;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.DUPLICATE_RELATION;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INDEX_ALREADY_EXISTS;
+import static io.prestosql.sql.analyzer.SemanticErrorCode.INSERT_INTO_CUBE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_FETCH_FIRST_ROW_COUNT;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_LIMIT_ROW_COUNT;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_OFFSET_ROW_COUNT;
@@ -245,6 +253,7 @@ import static io.prestosql.sql.analyzer.SemanticErrorCode.NON_NUMERIC_SAMPLE_PER
 import static io.prestosql.sql.analyzer.SemanticErrorCode.NOT_SUPPORTED;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.ORDER_BY_MUST_BE_IN_SELECT;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.TABLE_ALREADY_EXISTS;
+import static io.prestosql.sql.analyzer.SemanticErrorCode.TOO_MANY_ARGUMENTS;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.TOO_MANY_GROUPING_SETS;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.TYPE_MISMATCH;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.VIEW_ANALYSIS_ERROR;
@@ -262,6 +271,7 @@ import static java.lang.String.format;
 import static java.util.Collections.emptyList;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 
 class StatementAnalyzer
 {
@@ -273,6 +283,7 @@ class StatementAnalyzer
     private final AccessControl accessControl;
     private final WarningCollector warningCollector;
     private HeuristicIndexerManager heuristicIndexerManager;
+    private CubeManager cubeManager;
 
     public StatementAnalyzer(
             Analysis analysis,
@@ -298,10 +309,12 @@ class StatementAnalyzer
             AccessControl accessControl,
             Session session,
             WarningCollector warningCollector,
-            HeuristicIndexerManager heuristicIndexerManager)
+            HeuristicIndexerManager heuristicIndexerManager,
+            CubeManager cubeManager)
     {
         this(analysis, metadata, sqlParser, accessControl, session, warningCollector);
         this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
+        this.cubeManager = cubeManager;
     }
 
     public Scope analyze(Node node, Scope outerQueryScope)
@@ -359,6 +372,11 @@ class StatementAnalyzer
             QualifiedObjectName targetTable = createQualifiedObjectName(session, insert, insert.getTarget());
             if (metadata.getView(session, targetTable).isPresent()) {
                 throw new SemanticException(NOT_SUPPORTED, insert, "Inserting into views is not supported");
+            }
+
+            Optional<CubeMetaStore> optionalCubeMetaStore = cubeManager.getMetaStore(STAR_TREE);
+            if (optionalCubeMetaStore.isPresent() && optionalCubeMetaStore.get().getMetadataFromCubeName(targetTable.toString()).isPresent()) {
+                throw new SemanticException(INSERT_INTO_CUBE, insert, "%s is a star-tree cube, INSERT is not available", targetTable);
             }
 
             // analyze the query that creates the data
@@ -425,6 +443,38 @@ class StatementAnalyzer
             }
 
             return createAndAssignScope(insert, scope, Field.newUnqualified("rows", BIGINT));
+        }
+
+        @Override
+        protected Scope visitInsertCube(InsertCube insertCube, Optional<Scope> scope)
+        {
+            QualifiedObjectName targetCube = createQualifiedObjectName(session, insertCube, insertCube.getCubeName());            // check if target is view
+            if (metadata.getView(session, targetCube).isPresent()) {
+                throw new SemanticException(NOT_SUPPORTED, insertCube, "Inserting into view is not supported");
+            }            // check if target cube is present
+            Optional<CubeMetaStore> optionalCubeMetaStore = cubeManager.getMetaStore(STAR_TREE);
+            if (!optionalCubeMetaStore.isPresent() || !optionalCubeMetaStore.get().getMetadataFromCubeName(targetCube.toString()).isPresent()) {
+                throw new SemanticException(INSERT_INTO_CUBE, insertCube, "%s is not a star-tree cube, INSERT INTO CUBE is not applicable.", targetCube);
+            }            // check if target cube is present as a table
+            Optional<TableHandle> targetCubeHandle = metadata.getTableHandle(session, targetCube);
+            if (!targetCubeHandle.isPresent()) {
+                throw new SemanticException(MISSING_TABLE, insertCube, "Table '%s' does not exist", targetCube);
+            }            // analyze the query that creates the data
+            Scope queryScope = process(insertCube.getQuery(), scope);
+            accessControl.checkCanInsertIntoTable(session.getRequiredTransactionId(), session.getIdentity(), targetCube);
+            if (insertCube.isOverwrite()) {
+                // set the insert as insert overwrite
+                analysis.setUpdateType("INSERT OVERWRITE CUBE", targetCube);
+                analysis.setCubeOverwrite(true);
+            }
+            else {
+                analysis.setUpdateType("INSERT CUBE", targetCube);
+            }
+            Map<String, ColumnHandle> columnHandles = metadata.getColumnHandles(session, targetCubeHandle.get());
+            analysis.setCubeInsert(new Analysis.CubeInsert(
+                    targetCubeHandle.get(),
+                    insertCube.getColumns().stream().map(Identifier::getValue).map(columnHandles::get).collect(Collectors.toList())));
+            return createAndAssignScope(insertCube, scope, Field.newUnqualified("rows", BIGINT));
         }
 
         private boolean typesMatchForInsert(Iterable<Type> tableTypes, Iterable<Type> queryTypes)
@@ -640,6 +690,61 @@ class StatementAnalyzer
         }
 
         @Override
+        protected Scope visitCreateCube(CreateCube node, Optional<Scope> scope)
+        {
+            QualifiedObjectName targetCube = createQualifiedObjectName(session, node, node.getCubeName());
+            CatalogName catalogName = metadata.getCatalogHandle(session, targetCube.getCatalogName())
+                    .orElseThrow(() -> new PrestoException(NOT_FOUND, "Catalog not found: " + targetCube.getCatalogName()));
+            if (!metadata.isPreAggregationSupported(session, catalogName)) {
+                throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, String.format("Cube cannot created on catalog '%s'", catalogName.toString()));
+            }
+            Optional<CubeMetaStore> optionalCubeMetaStore = cubeManager.getMetaStore(STAR_TREE);
+            if (!optionalCubeMetaStore.isPresent()) {
+                throw new RuntimeException("HetuMetaStore is not initialized");
+            }
+
+            analysis.setUpdateType("CREATE CUBE", targetCube);
+            Set<Identifier> allIdentifiers = new HashSet<>();
+            String duplicates = node.getGroupingSet().stream()
+                    .filter(col -> !allIdentifiers.add(col))
+                    .map(Identifier::toString)
+                    .collect(joining(","));
+
+            if (duplicates.length() > 0) {
+                throw new SemanticException(DUPLICATE_COLUMN_NAME, node, "Columns %s specified more than once", duplicates);
+            }
+
+            Set<String> cubeSupportedFunctions = CubeAggregateFunction.SUPPORTED_FUNCTIONS;
+            Set<FunctionCall> aggFunctions = node.getAggregations();
+            Scope queryScope = process(new Table(node.getTableName()), scope);
+            ImmutableList.Builder<Field> outputFields = ImmutableList.builder();
+            for (FunctionCall aggFunction : aggFunctions) {
+                String argument = aggFunction.getArguments().isEmpty() || aggFunction.getArguments().get(0) instanceof LongLiteral ? null : ((Identifier) aggFunction.getArguments().get(0)).getValue();
+                String aggFunctionName = aggFunction.getName().toString().toLowerCase(ENGLISH);
+                if (!cubeSupportedFunctions.contains(aggFunctionName)) {
+                    throw new SemanticException(NOT_SUPPORTED, node, "Unsupported aggregation function '%s'. Supported functions are '%s'", aggFunctionName, String.join("'", cubeSupportedFunctions));
+                }
+                if (aggFunction.getArguments().size() > 1) {
+                    throw new SemanticException(TOO_MANY_ARGUMENTS, node, "Too many arguments for aggregate function '%s'", aggFunctionName);
+                }
+                if (aggFunction.isDistinct() && !aggFunctionName.equals(CubeAggregateFunction.COUNT.getName())) {
+                    throw new SemanticException(NOT_SUPPORTED, node, "Distinct is currently only supported for count");
+                }
+
+                if (argument != null) {
+                    ExpressionAnalysis expressionAnalysis = analyzeExpression(aggFunction, queryScope);
+                    Type expressionType = expressionAnalysis.getType(aggFunction);
+                    outputFields.add(Field.newUnqualified(aggFunctionName + "_" + argument + (aggFunction.isDistinct() ? "_distinct" : ""), expressionType));
+                }
+                else {
+                    outputFields.add(Field.newUnqualified(aggFunctionName + "_" + "all" + (aggFunction.isDistinct() ? "_distinct" : ""), BIGINT));
+                }
+            }
+
+            return createAndAssignScope(node, scope, outputFields.build());
+        }
+
+        @Override
         protected Scope visitCreateTableAsSelect(CreateTableAsSelect node, Optional<Scope> scope)
         {
             // turn this into a query that has a new table writer node on top.
@@ -801,6 +906,12 @@ class StatementAnalyzer
 
         @Override
         protected Scope visitDropTable(DropTable node, Optional<Scope> scope)
+        {
+            return createAndAssignScope(node, scope);
+        }
+
+        @Override
+        protected Scope visitDropCube(DropCube node, Optional<Scope> scope)
         {
             return createAndAssignScope(node, scope);
         }

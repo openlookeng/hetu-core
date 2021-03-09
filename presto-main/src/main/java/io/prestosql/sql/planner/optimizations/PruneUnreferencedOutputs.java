@@ -52,6 +52,7 @@ import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
@@ -753,6 +754,19 @@ public class PruneUnreferencedOutputs
                     node.getTarget(),
                     node.getAssignments(),
                     Iterables.getOnlyElement(node.getOutputSymbols()));
+        }
+
+        @Override
+        public PlanNode visitCubeFinish(CubeFinishNode node, RewriteContext<Set<Symbol>> context)
+        {
+            PlanNode source = context.rewrite(node.getSource(), ImmutableSet.copyOf(node.getSource().getOutputSymbols()));
+            return new CubeFinishNode(
+                    node.getId(),
+                    source,
+                    node.getRowCountSymbol(),
+                    node.getCubeName(),
+                    node.getDataPredicate(),
+                    node.isOverwrite());
         }
 
         @Override
