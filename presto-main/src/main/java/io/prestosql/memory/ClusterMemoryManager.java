@@ -13,6 +13,9 @@
  */
 package io.prestosql.memory;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
@@ -32,6 +35,7 @@ import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.memory.LowMemoryKiller.QueryMemoryInfo;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.InternalNodeManager;
+import io.prestosql.metadata.NodeState;
 import io.prestosql.protocol.Codec;
 import io.prestosql.protocol.SmileCodec;
 import io.prestosql.server.BasicQueryInfo;
@@ -53,7 +57,10 @@ import javax.annotation.PreDestroy;
 import javax.annotation.concurrent.GuardedBy;
 import javax.inject.Inject;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -76,6 +83,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.MoreCollectors.toOptional;
 import static com.google.common.collect.Sets.difference;
+import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.airlift.units.DataSize.succinctBytes;
 import static io.airlift.units.Duration.nanosSince;
 import static io.prestosql.ExceededMemoryLimitException.exceededGlobalTotalLimit;
@@ -130,6 +138,9 @@ public class ClusterMemoryManager
 
     @GuardedBy("this")
     private final Map<String, RemoteNodeMemory> nodes = new HashMap<>();
+
+    @GuardedBy("this")
+    private final Map<String, RemoteNodeMemory> allNodes = new HashMap<>();
 
     @GuardedBy("this")
     private final Map<MemoryPoolId, List<Consumer<MemoryPoolInfo>>> changeListeners = new HashMap<>();
@@ -533,11 +544,17 @@ public class ClusterMemoryManager
         for (InternalNode node : aliveNodes) {
             if (!nodes.containsKey(node.getNodeIdentifier()) && shouldIncludeNode(node)) {
                 nodes.put(node.getNodeIdentifier(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
+                allNodes.put(node.getNodeIdentifier(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
             }
         }
 
         // Schedule refresh
         for (RemoteNodeMemory node : nodes.values()) {
+            node.asyncRefresh(assignments);
+        }
+
+        // Schedule All refresh
+        for (RemoteNodeMemory node : allNodes.values()) {
             node.asyncRefresh(assignments);
         }
     }
@@ -589,6 +606,42 @@ public class ClusterMemoryManager
                     "Worker";
             String workerId = entry.getKey() + " [" + entry.getValue().getNode().getHost() + "] " + role;
             memoryInfo.put(workerId, entry.getValue().getInfo());
+        }
+        return memoryInfo;
+    }
+
+    public synchronized Map<String, JsonNode> getWorkerMemoryAndStateInfo()
+    {
+        Map<String, JsonNode> memoryInfo = new HashMap<>();
+        for (Entry<String, RemoteNodeMemory> entry : allNodes.entrySet()) {
+            // workerId is of the form "node_identifier [node_host] role"
+            String role = entry.getValue().getNode().isCoordinator() ? (isWorkScheduledOnCoordinator ? "Coordinator & Worker" : "Coordinator") :
+                    "Worker";
+            String workerId = entry.getKey() + " [" + entry.getValue().getNode().getHost() + "] " + role;
+            URI stateURI = uriBuilderFrom(entry.getValue().getNode().getInternalUri())
+                    .appendPath("/v1/info/state")
+                    .build();
+            String state = "\"" + NodeState.DISCONNECTION + "\"";
+            try (
+                    InputStreamReader inputStreamReader = new InputStreamReader(stateURI.toURL().openStream());
+                    BufferedReader reader = new BufferedReader(inputStreamReader)) {
+                state = reader.readLine();
+            }
+            catch (IOException e) {
+                log.info("Worker disconnect");
+            }
+            JsonNode jsonNode = null;
+            try {
+                MemoryInfo info = entry.getValue().getInfo().orElse(new MemoryInfo(0, 0, 0, new DataSize(0,
+                        DataSize.Unit.BYTE), new HashMap<>()));
+                String memoryInfoJson = new ObjectMapper().writeValueAsString(info);
+                StringBuilder memoryAndStateInfo = new StringBuilder(memoryInfoJson).insert(memoryInfoJson.length() - 1, ",\"state\":" + state);
+                jsonNode = new ObjectMapper().readTree(memoryAndStateInfo.toString());
+            }
+            catch (JsonProcessingException e) {
+                log.error("MemoryInfo parsing error:" + e.getMessage());
+            }
+            memoryInfo.put(workerId, jsonNode);
         }
         return memoryInfo;
     }

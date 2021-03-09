@@ -61,6 +61,7 @@ class NodesMain extends React.Component {
                 obj.nodeMemory = totalMemory;
                 obj.freeMemory = data.memoryData[key].pools.general.freeBytes + (data.memoryData[key].pools.reserved ? data.memoryData[key].pools.reserved.freeBytes : 0);
                 obj.usedMemory = data.memoryData[key].pools.general.reservedBytes + (data.memoryData[key].pools.reserved ? data.memoryData[key].pools.reserved.reservedBytes : 0);
+                obj.state = data.memoryData[key].state;
                 table.push(obj);
             })
         }
@@ -91,6 +92,7 @@ class NodesMain extends React.Component {
                                             <th>Usable Node Memory</th>
                                             <th>Used Memory</th>
                                             <th>Free Memory</th>
+                                            <th>State</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -103,6 +105,7 @@ class NodesMain extends React.Component {
                                                 <td>{formatDataSizeBytes(ele.nodeMemory)}</td>
                                                 <td>{formatDataSizeBytes(ele.usedMemory)}</td>
                                                 <td>{formatDataSizeBytes(ele.freeMemory)}</td>
+                                                <td>{ele.state}</td>
                                             </tr>
                                         ))}
                                     </tbody>

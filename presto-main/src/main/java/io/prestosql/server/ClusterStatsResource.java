@@ -136,7 +136,7 @@ public class ClusterStatsResource
     public Response getWorkerMemoryInfo()
     {
         return Response.ok()
-                .entity(clusterMemoryManager.getWorkerMemoryInfo())
+                .entity(clusterMemoryManager.getWorkerMemoryAndStateInfo())
                 .build();
     }
 

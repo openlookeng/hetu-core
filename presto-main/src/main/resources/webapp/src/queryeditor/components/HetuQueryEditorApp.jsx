@@ -48,10 +48,10 @@ class HetuQueryEditorApp
              </div>
           </div>
           <div className='flex flex-column right' style={{height: "100%"}}>
-              <div className='flex flex-column' style={{height: "60%"}}>
+              <div className='flex flex-column' style={{height: "40%"}}>
                   <QueryEditor />
               </div>
-              <div className='flex flex-column' style={{height: "40%"}}>
+              <div className='flex flex-column' style={{height: "60%"}}>
                   <QueryInformation />
               </div>
           </div>
