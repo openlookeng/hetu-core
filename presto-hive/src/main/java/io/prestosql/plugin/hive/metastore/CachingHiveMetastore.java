@@ -412,6 +412,7 @@ public class CachingHiveMetastore
         }
         finally {
             tableStatisticsCache.invalidate(new WithIdentity<>(identity, HiveTableName.hiveTableName(databaseName, tableName)));
+            tableCache.invalidate(new WithIdentity<>(identity, HiveTableName.hiveTableName(databaseName, tableName)));
         }
     }
 
@@ -426,6 +427,7 @@ public class CachingHiveMetastore
             partitionStatisticsCache.invalidate(new WithIdentity<>(identity, HivePartitionName.hivePartitionName(databaseName, tableName, partitionName)));
             //statistics updated for partition itself in above call.
             partitionCache.invalidate(new WithIdentity<>(identity, HivePartitionName.hivePartitionName(databaseName, tableName, partitionName)));
+            tableCache.invalidate(new WithIdentity<>(identity, HiveTableName.hiveTableName(databaseName, tableName)));
         }
     }
 
@@ -441,6 +443,7 @@ public class CachingHiveMetastore
                 //statistics updated for partition itself in above call.
                 partitionCache.invalidate(new WithIdentity<>(identity, HivePartitionName.hivePartitionName(databaseName, tableName, partitionNames.get(i))));
             }
+            tableCache.invalidate(new WithIdentity<>(identity, HiveTableName.hiveTableName(databaseName, tableName)));
         }
     }
 
