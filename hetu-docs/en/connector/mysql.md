@@ -17,6 +17,24 @@ connection-user=root
 connection-password=secret
 ```
 
+- Whether to enable the query pushdown function
+
+The pushdown function of the MySQL connector is enabled by default, and you do not need to perform any operation. You can also set the parameter as follows:
+
+``` properties
+jdbc.pushdown-enabled=true
+#true indicates that pushdown is enabled, and false indicates that pushdown is disabled.
+```
+
+- Mode for the push-down feature
+
+By default, the push-down mode of the MySQL connector is BASE_PUSHDOWN. If you want to enable all push-down, you can also set the parameter as follows:
+
+``` properties
+jdbc.pushdown-module=FULL_PUSHDOWN  
+#FULL_PUSHDOWN: All push down. BASE_PUSHDOWN: Partial push down, which indicates that filter, aggregation, limit, topN and project can be pushed down.
+```
+
 ### Multiple MySQL Servers
 
 You can have as many catalogs as you need, so if you have additional MySQL servers, simply add another properties file to `etc/catalog` with a different name (making sure it ends in `.properties`). For example, if

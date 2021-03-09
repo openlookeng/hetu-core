@@ -74,6 +74,7 @@ When the remote openLooKeng has enabled security authentication or TLS / SSL, th
 | `dc.metadata.cache.maximum.size` | Metadata Cache Maximum Size                                  | `10000`       |
 | `dc.metadata.cache.ttl`          | Metadata Cache TTL                                           | `1.00s`       |
 | `dc.query.pushdown.enabled`      | Enable sub-query push down to this data center. If this property is not set, by default sub-queries are pushed down | `true`        |
+| `dc.query.pushdown.module`      | FULL_PUSHDOWN: All push down. BASE_PUSHDOWN: Partial push down, which indicates that filter, aggregation, limit, topN and project can be pushed down. | `FULL_PUSHDOWN`        |
 | `dc.http-compression`            | Whether use zstd compress response body, default value is false | `false`       |
 
 ### Other Properties

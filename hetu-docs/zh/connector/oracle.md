@@ -33,8 +33,17 @@ Oracle JDBC驱动不在普通存储库中提供，如果您是oracle数据库的
 如果要启用oracle连接器的连接器下推功能，不需要做任何操作，oracle连接器的下推功能默认是打开的。但也可以按如下设置：
 
 ``` properties
-hetu.query.pushdown.enabled=true
+jdbc.pushdown-enabled=true
 #true表示打开下推，false表示关闭。
+```
+
+- 下推模式选择。
+
+如果要启用oracle连接器的全部下推功能，不需要做任何操作，oracle连接器的下推模式默认是全部下推的。但也可以按如下设置：
+
+``` properties
+jdbc.pushdown-module=FULL_PUSHDOWN
+#FULL_PUSHDOWN，表示全部下推；BASE_PUSHDOWN，表示部分下推，其中部分下推是指filter/aggregation/limit/topN/project这些可以下推。
 ```
 
 ### 多套Oracle数据库或服务器

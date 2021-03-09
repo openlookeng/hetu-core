@@ -13,6 +13,23 @@ connection-url=jdbc:mysql://example.net:3306
 connection-user=root
 connection-password=secret
 ```
+- 是否开启查询下推功能
+
+如果要启用mysql连接器的连接器下推功能，不需要做任何操作，mysql连接器的下推功能默认是打开的。但也可以按如下设置：
+
+``` properties
+jdbc.pushdown-enabled=true
+#true表示打开下推，false表示关闭。
+```
+
+- 下推模式选择。
+
+mysql连接器的下推模式默认是部分下推的，如果要启用mysql连接器的全部下推功能，可以按如下设置：
+
+``` properties
+jdbc.pushdown-module=FULL_PUSHDOWN
+#FULL_PUSHDOWN，表示全部下推；BASE_PUSHDOWN，表示部分下推，其中部分下推是指filter/aggregation/limit/topN/project这些可以下推。
+```
 
 ### 多个MySQL服务器
 
