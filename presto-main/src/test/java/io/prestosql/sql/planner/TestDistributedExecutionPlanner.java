@@ -58,6 +58,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static io.prestosql.SessionTestUtils.TEST_SNAPSHOT_SESSION;
@@ -403,7 +404,7 @@ public class TestDistributedExecutionPlanner
                 ImmutableList.of(symbol),
                 ImmutableMap.of(symbol, mock(ColumnHandle.class)),
                 ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
-                0,
+                new UUID(0, 0),
                 0,
                 false);
     }

@@ -20,6 +20,7 @@ import io.prestosql.Session;
 import io.prestosql.cube.CubeManager;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.sql.ExpressionFormatter;
 import io.prestosql.sql.ExpressionUtils;
 import io.prestosql.sql.parser.ParsingOptions;
@@ -33,6 +34,8 @@ import static io.hetu.core.spi.cube.CubeStatus.READY;
 import static io.prestosql.cube.CubeManager.STAR_TREE;
 import static java.util.Objects.requireNonNull;
 
+// create cube statement does not have snapshot support
+@RestorableConfig(unsupported = true)
 public class CubeFinishOperator
         implements Operator
 {
@@ -160,6 +163,12 @@ public class CubeFinishOperator
         cubeMetastore.persist(update);
         state = State.FINISHED;
         return page;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return null;
     }
 
     @Override
