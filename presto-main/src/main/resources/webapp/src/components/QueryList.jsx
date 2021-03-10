@@ -210,6 +210,8 @@ class DisplayedQueriesList extends React.Component {
     }
 }
 
+const SELECT_ALL = "all";
+
 const FILTER_TYPE = {
     QUEUED: "queued",
     WAITING_FOR_RESOURCES: "waiting_for_resources",
@@ -260,7 +262,14 @@ export class QueryList extends React.Component {
                 FILTER_TYPE.FINISHING,
                 FILTER_TYPE.FINISHED,
                 FILTER_TYPE.FAILED],
-            errorTypeFilters: [ERROR_TYPE.INTERNAL_ERROR, ERROR_TYPE.INSUFFICIENT_RESOURCES, ERROR_TYPE.EXTERNAL],
+            errorTypeFilters: [
+                ERROR_TYPE.INTERNAL_ERROR,
+                ERROR_TYPE.INSUFFICIENT_RESOURCES,
+                ERROR_TYPE.EXTERNAL,
+                ERROR_TYPE.USER_ERROR,
+            ],
+            stateSelectAll: true,
+            errorSelectAll: true,
             searchString: '',
             currentPage: 1,
             pageSize: 10,
@@ -372,20 +381,10 @@ export class QueryList extends React.Component {
     }
 
     renderFilterButton(filterType, filterText) {
-        // let checkmarkStyle = { color: '#57aac7' };
-        // let classNames = "btn btn-sm btn-info style-check";
-        // if (this.state.stateFilters.indexOf(filterType) > -1) {
-        //     classNames += " active";
-        //     checkmarkStyle = { color: '#ffffff' };
-        // }
-
-        // return (
-        //     <button type="button" className={classNames} onClick={this.handleStateFilterClick.bind(this, filterType)}>
-        //         <span className="glyphicon glyphicon-ok" style={checkmarkStyle} />&nbsp;{filterText}
-        //     </button>
-        // );
+        const { stateSelectAll } = this.state;
         let checkmarkStyle = { color: '#ffffff' };
-        if (this.state.stateFilters.indexOf(filterType) > -1) {
+        if (this.state.stateFilters.indexOf(filterType) > -1 ||
+            (filterType == SELECT_ALL && stateSelectAll)) {
             checkmarkStyle = GLYPHICON_HIGHLIGHT;
         }
         return (
@@ -398,24 +397,36 @@ export class QueryList extends React.Component {
     }
 
     handleStateFilterClick(filter) {
-        const newFilters = this.state.stateFilters.slice();
-        if (this.state.stateFilters.indexOf(filter) > -1) {
-            newFilters.splice(newFilters.indexOf(filter), 1);
-        }
-        else {
-            newFilters.push(filter);
+        let newFilters = [];
+        let { stateSelectAll } = this.state;
+        if (filter == SELECT_ALL) {
+            !stateSelectAll && _.each(FILTER_TYPE, (value, key) => {
+                newFilters.push(value);
+            })
+            stateSelectAll = !stateSelectAll;
+        } else {
+            newFilters = this.state.stateFilters.slice();
+            if (this.state.stateFilters.indexOf(filter) > -1) {
+                newFilters.splice(newFilters.indexOf(filter), 1);
+            }
+            else {
+                newFilters.push(filter);
+            }
         }
 
         this.setState({
             currentPage: 1,
+            stateSelectAll,
             stateFilters: newFilters,
         });
         _.defer(this.refreshData);
     }
 
     renderErrorTypeListItem(errorType, errorTypeText) {
+        const { errorSelectAll } = this.state;
         let checkmarkStyle = { color: '#ffffff' };
-        if (this.state.errorTypeFilters.indexOf(errorType) > -1) {
+        if (this.state.errorTypeFilters.indexOf(errorType) > -1 ||
+            (errorType == SELECT_ALL && errorSelectAll)) {
             checkmarkStyle = GLYPHICON_HIGHLIGHT;
         }
         return (
@@ -428,16 +439,26 @@ export class QueryList extends React.Component {
     }
 
     handleErrorTypeFilterClick(errorType) {
-        const newFilters = this.state.errorTypeFilters.slice();
-        if (this.state.errorTypeFilters.indexOf(errorType) > -1) {
-            newFilters.splice(newFilters.indexOf(errorType), 1);
-        }
-        else {
-            newFilters.push(errorType);
+        let newFilters = [];
+        let { errorSelectAll } = this.state;
+        if (errorType == SELECT_ALL) {
+            !errorSelectAll && _.each(ERROR_TYPE, (value, key) => {
+                newFilters.push(value);
+            })
+            errorSelectAll = !errorSelectAll;
+        } else {
+            newFilters = this.state.errorTypeFilters.slice();
+            if (this.state.errorTypeFilters.indexOf(errorType) > -1) {
+                newFilters.splice(newFilters.indexOf(errorType), 1);
+            }
+            else {
+                newFilters.push(errorType);
+            }
         }
 
         this.setState({
             currentPage: 1,
+            errorSelectAll,
             errorTypeFilters: newFilters,
         });
         _.defer(this.refreshData);
@@ -482,6 +503,7 @@ export class QueryList extends React.Component {
                                             State <span className="caret" />
                                         </button>
                                         <ul className="dropdown-menu dropdown-menu-left">
+                                            {this.renderFilterButton(SELECT_ALL, "Select All")}
                                             {this.renderFilterButton(FILTER_TYPE.QUEUED, "Queued")}
                                             {this.renderFilterButton(FILTER_TYPE.WAITING_FOR_RESOURCES, "Waiting For Resources")}
                                             {this.renderFilterButton(FILTER_TYPE.DISPATCHING, "Dispatching")}
@@ -494,13 +516,14 @@ export class QueryList extends React.Component {
                                         </ul>
                                     </div>
                                     &nbsp;
-                                    {stateFilters.indexOf(FILTER_TYPE.FAILED) > 0 &&
+                                    {stateFilters.indexOf(FILTER_TYPE.FAILED) > -1 &&
                                         <Fragment>
                                             <div className="input-group-btn">
                                                 <button type="button" className="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                                     Failed <span className="caret" />
                                                 </button>
                                                 <ul className="dropdown-menu">
+                                                    {this.renderErrorTypeListItem(SELECT_ALL, "Select All")}
                                                     {this.renderErrorTypeListItem(ERROR_TYPE.INTERNAL_ERROR, "Internal Error")}
                                                     {this.renderErrorTypeListItem(ERROR_TYPE.EXTERNAL, "External Error")}
                                                     {this.renderErrorTypeListItem(ERROR_TYPE.INSUFFICIENT_RESOURCES, "Resources Error")}
