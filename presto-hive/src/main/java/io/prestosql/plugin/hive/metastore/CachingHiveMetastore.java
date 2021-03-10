@@ -663,7 +663,7 @@ public class CachingHiveMetastore
     {
         tableStatisticsCache.asMap().keySet().stream()
                 .filter(table -> table.getKey().getDatabaseName().equals(databaseName) && table.getKey().getTableName().equals(tableName))
-                .forEach(tableCache::invalidate);
+                .forEach(tableStatisticsCache::invalidate);
     }
 
     @Override
