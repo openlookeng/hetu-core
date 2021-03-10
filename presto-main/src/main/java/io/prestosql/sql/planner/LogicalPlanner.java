@@ -34,6 +34,7 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.cube.CubeUpdateMetadata;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
@@ -51,6 +52,7 @@ import io.prestosql.spi.statistics.TableStatisticsMetadata;
 import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
+import io.prestosql.sql.ExpressionFormatter;
 import io.prestosql.sql.analyzer.Analysis;
 import io.prestosql.sql.analyzer.Field;
 import io.prestosql.sql.analyzer.RelationId;
@@ -107,6 +109,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkState;
@@ -474,15 +477,25 @@ public class LogicalPlanner
                 newTableLayout,
                 statisticsMetadata);
         Expression cubeWhere = analysis.getWhere((QuerySpecification) (insertCubeStatement.getQuery().getQueryBody()));
-        Expression rewritten = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session, namedSubPlan, uniqueIdAllocator)
-                .rewriteExpression(tableWriterPlan, cubeWhere, analysis, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator));
+        Expression rewritten = null;
+        if (cubeWhere != null) {
+            rewritten = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session, namedSubPlan, uniqueIdAllocator)
+                    .rewriteExpression(tableWriterPlan, cubeWhere, analysis, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator));
+        }
+        TableHandle sourceTableHandle = insert.getSourceTable();
+        //At this point it has been verified that source table has not been updated
+        //so insert into cube should be allowed
+        LongSupplier tableLastModifiedTimeSupplier = metadata.getTableLastModifiedTimeSupplier(session, sourceTableHandle);
+        checkState(tableLastModifiedTimeSupplier != null, "Table last modified time is null");
         CubeFinishNode cubeFinishNode = new CubeFinishNode(
                 idAllocator.getNextId(),
                 tableWriterPlan.getRoot(),
                 planSymbolAllocator.newSymbol("rows", BIGINT),
-                tableMetadata.getQualifiedName().toString(),
-                rewritten,
-                insertCubeStatement.isOverwrite());
+                new CubeUpdateMetadata(
+                        tableMetadata.getQualifiedName().toString(),
+                        tableLastModifiedTimeSupplier.getAsLong(),
+                        cubeWhere != null ? ExpressionFormatter.formatExpression(rewritten, Optional.empty()) : null,
+                        insertCubeStatement.isOverwrite()));
         return new RelationPlan(cubeFinishNode, analysis.getScope(insertCubeStatement), cubeFinishNode.getOutputSymbols());
     }
 

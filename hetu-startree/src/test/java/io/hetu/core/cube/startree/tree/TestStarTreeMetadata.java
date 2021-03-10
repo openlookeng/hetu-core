@@ -32,6 +32,7 @@ public class TestStarTreeMetadata
     private final CubeMetadata metadata = new StarTreeMetadata(
             "memory.default.cube1",
             "tpch.tiny.lineitem",
+            100,
             ImmutableList.of(
                     new DimensionColumn("suppkey", "suppkey"),
                     new DimensionColumn("returnflag", "returnflag"),
@@ -46,18 +47,23 @@ public class TestStarTreeMetadata
                     new AggregateColumn("count_discount", "count", "discount", false)),
             ImmutableList.of(ImmutableSet.of("returnflag", "linestatus")),
             null,
-            1000, CubeStatus.READY);
+            1000,
+            CubeStatus.READY);
 
     @Test
     public void testCubeMetadata()
     {
-        assertEquals(metadata.getCubeTableName(), "memory.default.cube1", "incorrect name");
-        assertEquals(metadata.getOriginalTableName(), "tpch.tiny.lineitem", "incorrect table name");
-        assertEquals(metadata.getLastUpdated(), 1000, "incorrect updating time");
+        assertEquals(metadata.getCubeName(), "memory.default.cube1", "incorrect name");
+        assertEquals(metadata.getSourceTableName(), "tpch.tiny.lineitem", "incorrect table name");
+        assertEquals(metadata.getLastUpdatedTime(), 1000, "incorrect updating time");
+        assertEquals(metadata.getAggregations(), ImmutableList.of("sum_quantity",
+                "sum_extendedprice", "count_quantity", "count_extendprice", "count_discount"));
+        assertEquals(metadata.getGroup(), ImmutableSet.of("returnflag", "linestatus"));
+        assertEquals(metadata.getDimensions(), ImmutableList.of("suppkey", "returnflag", "linestatus", "shipdate", "discount", "quantity"));
     }
 
     @Test
-    public void testMatchingValidStatement()
+    public void testMetadataMatchesCubeStatement()
     {
         CubeStatement statement = CubeStatement.newBuilder()
                 .select("returnflag", "linestatus")
@@ -69,7 +75,7 @@ public class TestStarTreeMetadata
     }
 
     @Test
-    public void testNotMatchingValidStatement1()
+    public void testMetadataNotMatchesCubeStatement()
     {
         CubeStatement statement = CubeStatement.newBuilder()
                 .select("returnflag", "linestatus")

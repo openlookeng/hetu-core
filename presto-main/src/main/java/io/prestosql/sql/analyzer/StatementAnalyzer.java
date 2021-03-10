@@ -21,6 +21,8 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import io.hetu.core.spi.cube.CubeAggregateFunction;
+import io.hetu.core.spi.cube.CubeMetadata;
+import io.hetu.core.spi.cube.CubeStatus;
 import io.hetu.core.spi.cube.io.CubeMetaStore;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
@@ -50,6 +52,7 @@ import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.security.AccessDeniedException;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.security.ViewExpression;
@@ -62,9 +65,12 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeNotFoundException;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.VarcharType;
+import io.prestosql.sql.ExpressionFormatter;
+import io.prestosql.sql.ExpressionUtils;
 import io.prestosql.sql.SqlPath;
 import io.prestosql.sql.parser.ParsingException;
 import io.prestosql.sql.parser.SqlParser;
+import io.prestosql.sql.planner.ExpressionDomainTranslator;
 import io.prestosql.sql.planner.ExpressionInterpreter;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.TypeProvider;
@@ -73,6 +79,7 @@ import io.prestosql.sql.tree.AliasedRelation;
 import io.prestosql.sql.tree.AllColumns;
 import io.prestosql.sql.tree.Analyze;
 import io.prestosql.sql.tree.AssignmentItem;
+import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Call;
 import io.prestosql.sql.tree.Comment;
 import io.prestosql.sql.tree.Commit;
@@ -182,6 +189,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Properties;
 import java.util.Set;
+import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -245,6 +253,7 @@ import static io.prestosql.sql.analyzer.SemanticErrorCode.MISMATCHED_SET_COLUMN_
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_ATTRIBUTE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_CATALOG;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_COLUMN;
+import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_CUBE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_ORDER_BY;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_SCHEMA;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_TABLE;
@@ -254,7 +263,9 @@ import static io.prestosql.sql.analyzer.SemanticErrorCode.NONDETERMINISTIC_ORDER
 import static io.prestosql.sql.analyzer.SemanticErrorCode.NON_NUMERIC_SAMPLE_PERCENTAGE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.NOT_SUPPORTED;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.ORDER_BY_MUST_BE_IN_SELECT;
+import static io.prestosql.sql.analyzer.SemanticErrorCode.PREDICATE_OVERLAP;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.TABLE_ALREADY_EXISTS;
+import static io.prestosql.sql.analyzer.SemanticErrorCode.TABLE_STATE_INCORRECT;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.TOO_MANY_ARGUMENTS;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.TOO_MANY_GROUPING_SETS;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.TYPE_MISMATCH;
@@ -446,38 +457,6 @@ class StatementAnalyzer
             return createAndAssignScope(insert, scope, Field.newUnqualified("rows", BIGINT));
         }
 
-        @Override
-        protected Scope visitInsertCube(InsertCube insertCube, Optional<Scope> scope)
-        {
-            QualifiedObjectName targetCube = createQualifiedObjectName(session, insertCube, insertCube.getCubeName());            // check if target is view
-            if (metadata.getView(session, targetCube).isPresent()) {
-                throw new SemanticException(NOT_SUPPORTED, insertCube, "Inserting into view is not supported");
-            }            // check if target cube is present
-            Optional<CubeMetaStore> optionalCubeMetaStore = cubeManager.getMetaStore(STAR_TREE);
-            if (!optionalCubeMetaStore.isPresent() || !optionalCubeMetaStore.get().getMetadataFromCubeName(targetCube.toString()).isPresent()) {
-                throw new SemanticException(INSERT_INTO_CUBE, insertCube, "%s is not a star-tree cube, INSERT INTO CUBE is not applicable.", targetCube);
-            }            // check if target cube is present as a table
-            Optional<TableHandle> targetCubeHandle = metadata.getTableHandle(session, targetCube);
-            if (!targetCubeHandle.isPresent()) {
-                throw new SemanticException(MISSING_TABLE, insertCube, "Table '%s' does not exist", targetCube);
-            }            // analyze the query that creates the data
-            Scope queryScope = process(insertCube.getQuery(), scope);
-            accessControl.checkCanInsertIntoTable(session.getRequiredTransactionId(), session.getIdentity(), targetCube);
-            if (insertCube.isOverwrite()) {
-                // set the insert as insert overwrite
-                analysis.setUpdateType("INSERT OVERWRITE CUBE", targetCube);
-                analysis.setCubeOverwrite(true);
-            }
-            else {
-                analysis.setUpdateType("INSERT CUBE", targetCube);
-            }
-            Map<String, ColumnHandle> columnHandles = metadata.getColumnHandles(session, targetCubeHandle.get());
-            analysis.setCubeInsert(new Analysis.CubeInsert(
-                    targetCubeHandle.get(),
-                    insertCube.getColumns().stream().map(Identifier::getValue).map(columnHandles::get).collect(Collectors.toList())));
-            return createAndAssignScope(insertCube, scope, Field.newUnqualified("rows", BIGINT));
-        }
-
         private boolean typesMatchForInsert(Iterable<Type> tableTypes, Iterable<Type> queryTypes)
         {
             if (Iterables.size(tableTypes) != Iterables.size(queryTypes)) {
@@ -528,6 +507,107 @@ class StatementAnalyzer
         private boolean hasBoundedCharacterType(Type type)
         {
             return type instanceof CharType || (type instanceof VarcharType && !((VarcharType) type).isUnbounded()) || hasNestedBoundedCharacterType(type);
+        }
+
+        @Override
+        protected Scope visitInsertCube(InsertCube insertCube, Optional<Scope> scope)
+        {
+            QualifiedObjectName targetCube = createQualifiedObjectName(session, insertCube, insertCube.getCubeName());
+            CubeMetaStore cubeMetaStore = cubeManager.getMetaStore(STAR_TREE).orElseThrow(() -> new RuntimeException("Hetu metastore must be initialized"));
+            CubeMetadata cubeMetadata = cubeMetaStore.getMetadataFromCubeName(targetCube.toString())
+                    .orElseThrow(() -> new SemanticException(INSERT_INTO_CUBE, insertCube, "Cube '%s' is not found, INSERT INTO CUBE is not applicable.", targetCube));
+            Optional<TableHandle> targetCubeHandle = metadata.getTableHandle(session, targetCube);
+            if (!targetCubeHandle.isPresent()) {
+                throw new SemanticException(MISSING_CUBE, insertCube, "Cube '%s' table handle does not exist", targetCube);
+            }
+
+            QualifiedObjectName tableName = QualifiedObjectName.valueOf(cubeMetadata.getSourceTableName());
+            TableHandle sourceTableHandle = metadata.getTableHandle(session, tableName)
+                    .orElseThrow(() -> new SemanticException(MISSING_TABLE, insertCube, "Source table '%s' on which cube was built is missing", tableName.toString()));
+
+            //Cube status is determined based on the last modified timestamp of the source table
+            //Without that Cube might return incorrect results if the table was updated but cube was not.
+            LongSupplier tableLastModifiedTime = metadata.getTableLastModifiedTimeSupplier(session, sourceTableHandle);
+            if (tableLastModifiedTime == null) {
+                throw new SemanticException(TABLE_STATE_INCORRECT, insertCube, "Cannot allow insert into cube. Cube might return incorrect results. Unable to identify last modified of the time source table.");
+            }
+            // If Original table was updated since Cube was built then We cannot allow any more updates on the Cube.
+            // User must create new cube from the source table and try insert overwrite cube
+            if (!insertCube.isOverwrite() && cubeMetadata.getCubeStatus() == CubeStatus.READY && tableLastModifiedTime.getAsLong() > cubeMetadata.getSourceTableLastUpdatedTime()) {
+                throw new SemanticException(TABLE_STATE_INCORRECT, insertCube, "Cannot insert into cube. Source table has been updated since Cube was last updated. Try INSERT OVERWRITE CUBE or Create new a cube");
+            }
+
+            Scope queryScope = process(insertCube.getQuery(), scope);
+            accessControl.checkCanInsertIntoTable(session.getRequiredTransactionId(), session.getIdentity(), targetCube);
+            if (insertCube.isOverwrite()) {
+                // set the insert as insert overwrite
+                analysis.setUpdateType("INSERT OVERWRITE CUBE", targetCube);
+                analysis.setCubeOverwrite(true);
+            }
+            else {
+                analysis.setUpdateType("INSERT CUBE", targetCube);
+            }
+            if (!insertCube.isOverwrite() && !insertCube.getWhere().isPresent() && cubeMetadata.getCubeStatus() != CubeStatus.INACTIVE) {
+                //Means data some data was inserted before, but trying to insert entire dataset
+                throw new SemanticException(PREDICATE_OVERLAP, insertCube, "Cannot allow insert. Inserting entire dataset but cube already has partial data");
+            }
+            else if (!insertCube.isOverwrite() && insertCube.getWhere().isPresent() && arePredicatesOverlapping(insertCube.getWhere().get(), cubeMetadata)) {
+                throw new SemanticException(PREDICATE_OVERLAP, insertCube, "Cannot allow insert. Cube already contains data for the given predicate '%s'", ExpressionFormatter.formatExpression(insertCube.getWhere().get(), Optional.empty()));
+            }
+            Map<String, ColumnHandle> columnHandles = metadata.getColumnHandles(session, targetCubeHandle.get());
+            analysis.setCubeInsert(new Analysis.CubeInsert(
+                    targetCubeHandle.get(),
+                    sourceTableHandle,
+                    insertCube.getColumns().stream().map(Identifier::getValue).map(columnHandles::get).collect(Collectors.toList())));
+            return createAndAssignScope(insertCube, scope, Field.newUnqualified("rows", BIGINT));
+        }
+
+        private boolean arePredicatesOverlapping(Expression newDataPredicate, CubeMetadata cubeMetadata)
+        {
+            ImmutableMap.Builder<Symbol, Type> typesBuilder = ImmutableMap.builder();
+            new SymbolTypeBuilderVisitor(analysis.getTypes()).process(newDataPredicate, typesBuilder);
+            TypeProvider types = TypeProvider.viewOf(typesBuilder.build());
+
+            newDataPredicate = ExpressionUtils.rewriteIdentifiersToSymbolReferences(newDataPredicate);
+            ExpressionDomainTranslator.ExtractionResult decomposedNewDataPredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, newDataPredicate, types);
+            if (!BooleanLiteral.TRUE_LITERAL.equals(decomposedNewDataPredicate.getRemainingExpression())) {
+                throw new RuntimeException(String.format("Cannot support predicate '%s'", ExpressionFormatter.formatExpression(newDataPredicate, Optional.empty())));
+            }
+            if (cubeMetadata.getCubeStatus() == CubeStatus.INACTIVE) {
+                //Inactive cubes are empty. So inserts should be allowed.
+                return false;
+            }
+
+            if (cubeMetadata.getPredicateString() == null) {
+                //Means Cube was created for entire dataset.
+                return true;
+            }
+            SqlParser sqlParser = new SqlParser();
+            Expression cubePredicateAsExpr = sqlParser.createExpression(cubeMetadata.getPredicateString(), createParsingOptions(session));
+            cubePredicateAsExpr = ExpressionUtils.rewriteIdentifiersToSymbolReferences(cubePredicateAsExpr);
+            ExpressionDomainTranslator.ExtractionResult decomposedCubePredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, cubePredicateAsExpr, types);
+            return decomposedCubePredicate.getTupleDomain().overlaps(decomposedNewDataPredicate.getTupleDomain());
+        }
+
+        private class SymbolTypeBuilderVisitor
+                extends DefaultTraversalVisitor<Void, ImmutableMap.Builder<Symbol, Type>>
+        {
+            private final Map<NodeRef<Expression>, Type> types;
+
+            private SymbolTypeBuilderVisitor(Map<NodeRef<Expression>, Type> types)
+            {
+                this.types = requireNonNull(types, "types is null");
+            }
+
+            @Override
+            protected Void visitIdentifier(Identifier identifier, ImmutableMap.Builder<Symbol, Type> builder)
+            {
+                NodeRef<Expression> expressionRef = NodeRef.of(identifier);
+                if (types.containsKey(expressionRef)) {
+                    builder.put(new Symbol(identifier.getValue()), types.get(expressionRef));
+                }
+                return null;
+            }
         }
 
         @Override
@@ -717,7 +797,7 @@ class StatementAnalyzer
 
             Set<String> cubeSupportedFunctions = CubeAggregateFunction.SUPPORTED_FUNCTIONS;
             Set<FunctionCall> aggFunctions = node.getAggregations();
-            Scope queryScope = process(new Table(node.getTableName()), scope);
+            Scope queryScope = process(new Table(node.getSourceTableName()), scope);
             ImmutableList.Builder<Field> outputFields = ImmutableList.builder();
             for (FunctionCall aggFunction : aggFunctions) {
                 String argument = aggFunction.getArguments().isEmpty() || aggFunction.getArguments().get(0) instanceof LongLiteral ? null : ((Identifier) aggFunction.getArguments().get(0)).getValue();

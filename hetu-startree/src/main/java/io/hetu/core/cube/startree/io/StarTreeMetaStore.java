@@ -17,6 +17,7 @@ package io.hetu.core.cube.startree.io;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
+import com.google.common.collect.Sets;
 import io.hetu.core.cube.startree.tree.AggregateColumn;
 import io.hetu.core.cube.startree.tree.DimensionColumn;
 import io.hetu.core.cube.startree.tree.StarTreeColumn;
@@ -34,18 +35,14 @@ import io.prestosql.spi.metastore.model.TableEntity;
 import io.prestosql.spi.metastore.model.TableEntityType;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static io.hetu.core.cube.startree.tree.StarTreeMetadata.COLUMN_DELIMITER;
-import static io.hetu.core.cube.startree.tree.StarTreeMetadata.GROUP_DELIMITER;
 import static io.hetu.core.cube.startree.util.Constants.CUBE_CATALOG;
 import static io.hetu.core.cube.startree.util.Constants.CUBE_DATABASE;
 import static java.util.Objects.requireNonNull;
@@ -53,12 +50,15 @@ import static java.util.Objects.requireNonNull;
 public class StarTreeMetaStore
         implements CubeMetaStore
 {
-    public static final String ORIGINAL_TABLE_NAME = "originalTableName";
+    public static final String SOURCE_TABLE_NAME = "sourceTableName";
     public static final String ORIGINAL_COLUMN = "originalColumn";
     public static final String STAR_TABLE_NAME = "starTableName";
     public static final String GROUPING_STRING = "groupingString";
     public static final String PREDICATE_STRING = "predicateString";
     public static final String CUBE_STATUS = "cubeStatus";
+    public static final String SOURCE_TABLE_LAST_UPDATED_TIME = "sourceLastUpdatedTime";
+    public static final String CUBE_LAST_UPDATED_TIME = "cubeLastUpdatedTime";
+
     private final HetuMetastore metastore;
     private final LoadingCache<String, List<CubeMetadata>> cubeCache;
 
@@ -77,7 +77,7 @@ public class StarTreeMetaStore
         tableEntities.forEach(table -> {
             List<ColumnEntity> cols = table.getColumns();
             StarTreeMetadataBuilder builder = new StarTreeMetadataBuilder(table.getParameters().get(STAR_TABLE_NAME),
-                    table.getParameters().get(ORIGINAL_TABLE_NAME));
+                    table.getParameters().get(SOURCE_TABLE_NAME));
             cols.forEach(col -> {
                 if (col.getType().equals("aggregate")) {
                     builder.addAggregationColumn(col.getName(), col.getParameters().get("aggregateFunction"), col.getParameters().get(ORIGINAL_COLUMN), Boolean.parseBoolean(col.getParameters().get("distinct")));
@@ -87,21 +87,12 @@ public class StarTreeMetaStore
                 }
             });
             String groupingString = table.getParameters().get(GROUPING_STRING);
-            if (groupingString != null) {
-                for (String columns : groupingString.split(GROUP_DELIMITER)) {
-                    Set<String> group;
-                    if (columns.equals("")) {
-                        group = new HashSet<>();
-                    }
-                    else {
-                        group = new HashSet<>(Arrays.asList(columns.split(COLUMN_DELIMITER)));
-                    }
-                    builder.addGroup(group);
-                }
-            }
+            builder.addGroup(Sets.newHashSet(groupingString.split(COLUMN_DELIMITER)));
             builder.withPredicate(table.getParameters().get(PREDICATE_STRING));
             builder.setCubeStatus(CubeStatus.forValue(Integer.parseInt(table.getParameters().get(CUBE_STATUS))));
-            cubeMetadataList.add(builder.build(table.getCreateTime()));
+            builder.setTableLastUpdatedTime(Long.parseLong(table.getParameters().get(SOURCE_TABLE_LAST_UPDATED_TIME)));
+            builder.setCubeLastUpdatedTime(Long.parseLong(table.getParameters().get(CUBE_LAST_UPDATED_TIME)));
+            cubeMetadataList.add(builder.build());
         });
         return cubeMetadataList;
     }
@@ -119,7 +110,7 @@ public class StarTreeMetaStore
         List<TableEntity> tables = metastore.getAllTables(CUBE_CATALOG, CUBE_DATABASE);
         List<TableEntity> matchingTables = new ArrayList<>();
         tables.forEach(table -> {
-            if (table.getParameters().get(ORIGINAL_TABLE_NAME).equals(tableName)) {
+            if (table.getParameters().get(SOURCE_TABLE_NAME).equals(tableName)) {
                 matchingTables.add(table);
             }
         });
@@ -136,8 +127,8 @@ public class StarTreeMetaStore
     @Override
     public void removeCube(CubeMetadata cubeMetadata)
     {
-        metastore.dropTable(CUBE_CATALOG, CUBE_DATABASE, cubeMetadata.getCubeTableName().replace(".", "_"));
-        cubeCache.invalidate(cubeMetadata.getOriginalTableName());
+        metastore.dropTable(CUBE_CATALOG, CUBE_DATABASE, cubeMetadata.getCubeName().replace(".", "_"));
+        cubeCache.invalidate(cubeMetadata.getSourceTableName());
     }
 
     @Override
@@ -153,7 +144,7 @@ public class StarTreeMetaStore
             metastore.createDatabase(databaseEntity);
         }
 
-        String cubeNameDelimited = cubeMetadata.getCubeTableName().replace(".", "_");
+        String cubeNameDelimited = cubeMetadata.getCubeName().replace(".", "_");
         TableEntity table = getTableEntity((StarTreeMetadata) cubeMetadata);
         if (metastore.getTable(CUBE_CATALOG, CUBE_DATABASE, cubeNameDelimited).isPresent()) {
             //update flow
@@ -163,7 +154,7 @@ public class StarTreeMetaStore
             //create flow
             metastore.createTable(table);
         }
-        cubeCache.invalidate(cubeMetadata.getOriginalTableName());
+        cubeCache.invalidate(cubeMetadata.getSourceTableName());
     }
 
     private CatalogEntity catalogEntity()
@@ -189,7 +180,7 @@ public class StarTreeMetaStore
 
     private TableEntity getTableEntity(StarTreeMetadata starTreeMetadata)
     {
-        String cubeNameDelimited = starTreeMetadata.getCubeTableName().replace(".", "_");
+        String cubeNameDelimited = starTreeMetadata.getCubeName().replace(".", "_");
         List<ColumnEntity> columns = new ArrayList<>();
         starTreeMetadata.getColumns().forEach(col -> {
             ColumnEntity newCol = new ColumnEntity();
@@ -214,11 +205,14 @@ public class StarTreeMetaStore
             columns.add(newCol);
         });
         Map<String, String> parameters = new HashMap<>();
-        parameters.put(ORIGINAL_TABLE_NAME, starTreeMetadata.getOriginalTableName());
-        parameters.put(STAR_TABLE_NAME, starTreeMetadata.getCubeTableName());
-        parameters.put(GROUPING_STRING, starTreeMetadata.getGroupString());
+        parameters.put(SOURCE_TABLE_NAME, starTreeMetadata.getSourceTableName());
+        parameters.put(STAR_TABLE_NAME, starTreeMetadata.getCubeName());
+        parameters.put(GROUPING_STRING, String.join(COLUMN_DELIMITER, starTreeMetadata.getGroup()));
         parameters.put(PREDICATE_STRING, starTreeMetadata.getPredicateString());
         parameters.put(CUBE_STATUS, String.valueOf(starTreeMetadata.getCubeStatus().getValue()));
+        parameters.put(CUBE_LAST_UPDATED_TIME, String.valueOf(starTreeMetadata.getLastUpdatedTime()));
+        parameters.put(SOURCE_TABLE_LAST_UPDATED_TIME, String.valueOf(starTreeMetadata.getSourceTableLastUpdatedTime()));
+
         return TableEntity.builder()
                 .setCatalogName(CUBE_CATALOG)
                 .setDatabaseName(CUBE_DATABASE)
@@ -226,7 +220,6 @@ public class StarTreeMetaStore
                 .setTableName(cubeNameDelimited)
                 .setColumns(columns)
                 .setParameters(parameters)
-                .setCreateTime(starTreeMetadata.getLastUpdated())
                 .build();
     }
 
@@ -237,9 +230,9 @@ public class StarTreeMetaStore
     }
 
     @Override
-    public CubeMetadataBuilder getBuilder(String cubeName, String originalTableName)
+    public CubeMetadataBuilder getBuilder(String cubeName, String sourceTableName)
     {
-        return new StarTreeMetadataBuilder(cubeName, originalTableName);
+        return new StarTreeMetadataBuilder(cubeName, sourceTableName);
     }
 
     @Override

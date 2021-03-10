@@ -29,7 +29,9 @@ public interface CubeMetadataBuilder
 
     void setCubeStatus(CubeStatus cubeStatus);
 
-    CubeMetadata build();
+    void setTableLastUpdatedTime(long tableLastUpdatedTime);
 
-    CubeMetadata build(long createdTime);
+    void setCubeLastUpdatedTime(long cubeLastUpdatedTime);
+
+    CubeMetadata build();
 }

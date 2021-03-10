@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 
 import static io.hetu.core.cube.startree.tree.StarTreeColumn.ColumnType.AGGREGATE;
 import static io.hetu.core.cube.startree.tree.StarTreeColumn.ColumnType.DIMENSION;
+import static io.hetu.core.spi.cube.CubeAggregateFunction.AVG;
 import static java.util.Objects.requireNonNull;
 
 public class StarTreeMetadata
@@ -45,7 +46,7 @@ public class StarTreeMetadata
 {
     private final String starTreeName;
 
-    private final String originalTableName;
+    private final String sourceTableName;
 
     private final List<StarTreeColumn> columns;
 
@@ -53,47 +54,50 @@ public class StarTreeMetadata
 
     private final String predicateString;
 
-    private final long lastUpdated;
+    private final long sourceTableLastUpdatedTime;
 
-    private CubeStatus cubeStatus;
+    private final long lastUpdatedTime;
+
+    private final CubeStatus cubeStatus;
 
     public static final String COLUMN_DELIMITER = ",";
-    public static final String GROUP_DELIMITER = "\t";
 
     @JsonCreator
     public StarTreeMetadata(
             @JsonProperty("starTreeName") String starTreeName,
-            @JsonProperty("originalTableName") String originalTableName,
+            @JsonProperty("sourceTableName") String sourceTableName,
+            @JsonProperty("sourceTableLastUpdatedTime") long sourceTableLastUpdatedTime,
             @JsonProperty("columns") List<StarTreeColumn> columns,
             @JsonProperty("groups") List<Set<String>> groups,
             @JsonProperty("predicateString") String predicateString,
-            @JsonProperty("lastUpdated") long lastUpdated,
+            @JsonProperty("lastUpdatedTime") long lastUpdatedTime,
             @JsonProperty("cubeStatus") CubeStatus cubeStatus)
     {
         this.starTreeName = requireNonNull(starTreeName, "starTreeName is null").toLowerCase(Locale.ENGLISH);
-        this.originalTableName = requireNonNull(originalTableName, "tableName is null").toLowerCase(Locale.ENGLISH);
+        this.sourceTableName = requireNonNull(sourceTableName, "tableName is null").toLowerCase(Locale.ENGLISH);
         this.columns = ImmutableList.copyOf(requireNonNull(columns, "columns is null"));
         this.groups = new ArrayList<>();
         requireNonNull(groups, "groups is null").forEach(group -> {
             this.groups.add(new TreeSet<>(group));
         });
         this.predicateString = predicateString;
-        this.lastUpdated = lastUpdated;
+        this.sourceTableLastUpdatedTime = sourceTableLastUpdatedTime;
+        this.lastUpdatedTime = lastUpdatedTime;
         this.cubeStatus = cubeStatus;
     }
 
     @JsonProperty
     @Override
-    public String getCubeTableName()
+    public String getCubeName()
     {
         return starTreeName;
     }
 
     @JsonProperty
     @Override
-    public String getOriginalTableName()
+    public String getSourceTableName()
     {
-        return originalTableName;
+        return sourceTableName;
     }
 
     @JsonProperty
@@ -117,9 +121,9 @@ public class StarTreeMetadata
 
     @JsonProperty
     @Override
-    public long getLastUpdated()
+    public long getLastUpdatedTime()
     {
-        return lastUpdated;
+        return lastUpdatedTime;
     }
 
     @JsonIgnore
@@ -141,17 +145,9 @@ public class StarTreeMetadata
     }
 
     @Override
-    public List<String> getAggregationsAsString()
-    {
-        return Collections.unmodifiableList(this.columns.stream()
-                .filter(column -> AGGREGATE == column.getType())
-                .map(StarTreeColumn::getUserFriendlyName).collect(Collectors.toList()));
-    }
-
-    @Override
     public boolean matches(CubeStatement statement)
     {
-        return this.originalTableName.equals(statement.getFrom()) &&
+        return this.sourceTableName.equals(statement.getFrom()) &&
                 hasDimensions(statement.getSelection()) &&
                 hasGroup(statement.getGroupBy()) &&
                 supportAggregations(statement.getAggregations()) &&
@@ -173,7 +169,7 @@ public class StarTreeMetadata
     {
         Collection<AggregationSignature> decomposedAggregations = new ArrayList<>();
         aggregations.forEach(aggregationSignature -> {
-            if (AggregationSignature.AVG_FUNCTION_NAME.equals(aggregationSignature.getFunction())) {
+            if (AVG.getName().equals(aggregationSignature.getFunction())) {
                 decomposedAggregations.add(AggregationSignature.sum(aggregationSignature.getDimension(), false));
                 decomposedAggregations.add(AggregationSignature.count(aggregationSignature.getDimension(), false));
             }
@@ -201,9 +197,11 @@ public class StarTreeMetadata
         return cubeStatus;
     }
 
-    public void setCubeStatus(CubeStatus cubeStatus)
+    @JsonProperty
+    @Override
+    public long getSourceTableLastUpdatedTime()
     {
-        this.cubeStatus = cubeStatus;
+        return sourceTableLastUpdatedTime;
     }
 
     @JsonIgnore
@@ -214,8 +212,7 @@ public class StarTreeMetadata
     }
 
     @JsonIgnore
-    @Override
-    public Optional<String> getAggregationColumn(String aggFunction, String originalColumn, boolean distinct)
+    private Optional<String> getAggregationColumn(String aggFunction, String originalColumn, boolean distinct)
     {
         return this.columns.stream()
                 .filter(column -> AGGREGATE == column.getType())
@@ -261,23 +258,6 @@ public class StarTreeMetadata
     }
 
     @Override
-    public String getGroupString()
-    {
-        StringBuilder stringBuilder = new StringBuilder();
-        groups.forEach(group -> {
-            if (!group.isEmpty()) {
-                group.forEach(column -> {
-                    stringBuilder.append(column).append(COLUMN_DELIMITER);
-                });
-                stringBuilder.deleteCharAt(stringBuilder.length() - 1);
-            }
-            stringBuilder.append(GROUP_DELIMITER);
-        });
-        stringBuilder.deleteCharAt(stringBuilder.length() - 1);
-        return stringBuilder.toString();
-    }
-
-    @Override
     public boolean equals(Object o)
     {
         if (this == o) {
@@ -287,16 +267,20 @@ public class StarTreeMetadata
             return false;
         }
         StarTreeMetadata that = (StarTreeMetadata) o;
-        return lastUpdated == that.lastUpdated &&
-                starTreeName.equals(that.starTreeName) &&
-                originalTableName.equals(that.originalTableName) &&
-                columns.equals(that.columns);
+        return sourceTableLastUpdatedTime == that.sourceTableLastUpdatedTime
+                && lastUpdatedTime == that.lastUpdatedTime
+                && starTreeName.equals(that.starTreeName)
+                && sourceTableName.equals(that.sourceTableName)
+                && columns.equals(that.columns)
+                && groups.equals(that.groups)
+                && predicateString.equals(that.predicateString)
+                && cubeStatus == that.cubeStatus;
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(starTreeName, originalTableName, columns, lastUpdated);
+        return Objects.hash(starTreeName, sourceTableName, columns, groups, predicateString, sourceTableLastUpdatedTime, lastUpdatedTime, cubeStatus);
     }
 
     @Override
@@ -304,10 +288,13 @@ public class StarTreeMetadata
     {
         return "StarTreeMetadata{" +
                 "starTreeName='" + starTreeName + '\'' +
-                ", originalTableName='" + originalTableName + '\'' +
+                ", sourceTableName='" + sourceTableName + '\'' +
                 ", columns=" + columns +
+                ", groups=" + groups +
                 ", predicateString='" + predicateString + '\'' +
-                ", lastUpdated=" + lastUpdated +
+                ", sourceTableLastUpdatedTime=" + sourceTableLastUpdatedTime +
+                ", lastUpdatedTime=" + lastUpdatedTime +
+                ", cubeStatus=" + cubeStatus +
                 '}';
     }
 }

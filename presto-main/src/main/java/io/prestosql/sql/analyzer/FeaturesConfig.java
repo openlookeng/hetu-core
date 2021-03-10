@@ -1341,7 +1341,7 @@ public class FeaturesConfig
     }
 
     @Config("cube.metadata-cache-ttl")
-    @ConfigDescription("The maximum time to live that are be loaded into cache before eviction happens")
+    @ConfigDescription("The maximum time to live for cube metadata that were loaded into cache before eviction happens")
     public FeaturesConfig setCubeMetadataCacheTtl(Duration cubeMetadataCacheTtl)
     {
         this.cubeMetadataCacheTtl = cubeMetadataCacheTtl;

@@ -275,12 +275,16 @@ public class StarTreeAggregationRule
         }
 
         LongSupplier lastModifiedTimeSupplier = metadata.getTableLastModifiedTimeSupplier(session, tableHandle);
-        if (lastModifiedTimeSupplier != null) {
-            long lastModifiedTime = lastModifiedTimeSupplier.getAsLong();
-            matchedCubeMetadataList = matchedCubeMetadataList.stream()
-                    .filter(cubeMetadata -> cubeMetadata.getLastUpdated() > lastModifiedTime)
-                    .collect(Collectors.toList());
+        if (lastModifiedTimeSupplier == null) {
+            warningCollector.add(new PrestoWarning(EXPIRED_CUBE, "Unable to identify last modified time of " + tableName + ". Ignoring star tree cubes."));
+            return Result.empty();
         }
+
+        //Filter out cubes that were created before the source table was updated
+        long lastModifiedTime = lastModifiedTimeSupplier.getAsLong();
+        matchedCubeMetadataList = matchedCubeMetadataList.stream()
+                .filter(cubeMetadata -> cubeMetadata.getSourceTableLastUpdatedTime() >= lastModifiedTime)
+                .collect(Collectors.toList());
 
         if (matchedCubeMetadataList.isEmpty()) {
             warningCollector.add(new PrestoWarning(EXPIRED_CUBE, tableName + " has been modified after creating cubes. Ignoring expired cubes."));
@@ -289,7 +293,7 @@ public class StarTreeAggregationRule
 
         //If multiple cubes are matching then lets select the recent built cube
         //so sort the cube based on the last updated time stamp
-        matchedCubeMetadataList.sort(Comparator.comparingLong(CubeMetadata::getLastUpdated).reversed());
+        matchedCubeMetadataList.sort(Comparator.comparingLong(CubeMetadata::getLastUpdatedTime).reversed());
 
         AggregationRewriteWithCube aggregationRewriteWithCube = new AggregationRewriteWithCube(metadata, session, symbolAllocator, idAllocator, symbolMapping, matchedCubeMetadataList.get(0));
         return Result.ofPlanNode(aggregationRewriteWithCube.rewrite(aggregationNode, filterNode.orElse(null)));

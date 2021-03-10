@@ -747,7 +747,7 @@ public class TestStarTreeAggregationRule
     }
 
     @Test
-    public void testDoNotUseCubeIfOriginalTableUpdatedAfterCubeCreated()
+    public void testDoNotUseCubeIfSourceTableUpdatedAfterCubeCreated()
     {
         Mockito.when(cubeManager.getCubeProvider(anyString())).then(new Returns(Optional.of(provider)));
         Mockito.when(cubeManager.getMetaStore(anyString())).then(new Returns(Optional.of(cubeMetaStore)));
@@ -764,7 +764,7 @@ public class TestStarTreeAggregationRule
         List<CubeMetadata> metadataList = ImmutableList.of(cubeMetadata);
         Mockito.when(cubeMetaStore.getMetadataList(eq("local.sf1.0.orders"))).then(new Returns(metadataList));
         Mockito.when(cubeMetadata.matches(any(CubeStatement.class))).thenReturn(true);
-        Mockito.when(cubeMetadata.getLastUpdated()).thenReturn(DateTimeUtils.parseTimestampWithoutTimeZone("2020-01-01 12:00:00"));
+        Mockito.when(cubeMetadata.getLastUpdatedTime()).thenReturn(DateTimeUtils.parseTimestampWithoutTimeZone("2020-01-01 12:00:00"));
 
         StarTreeAggregationRule starTreeAggregationRule = new StarTreeAggregationRule(cubeManager, metadata);
         tester().assertThat(starTreeAggregationRule)

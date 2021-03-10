@@ -29,6 +29,7 @@ import io.prestosql.security.AccessControl;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.sql.ExpressionFormatter;
 import io.prestosql.sql.analyzer.QueryExplainer;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.tree.AstVisitor;
@@ -101,23 +102,28 @@ public class InsertCubeRewrite
             CubeMetadata cubeMetadata = cubeMetaStore.getMetadataFromCubeName(targetCube.toString()).orElseThrow(() -> new PrestoException(StandardErrorCode.CUBE_ERROR, String.format("Cube not found '%s'", targetCube.toString())));
             Set<String> group = cubeMetadata.getGroup();
             ImmutableList.Builder<Identifier> builder = ImmutableList.builder();
-            new IdentifierBuilderVisitor().process(node.getWhere(), builder);
-            Set<String> whereColumns = builder.build()
-                    .stream()
-                    .map(Identifier::getValue)
-                    .collect(Collectors.toCollection(() -> new TreeSet<>(String.CASE_INSENSITIVE_ORDER)));
-            if (!group.containsAll(whereColumns)) {
-                throw new IllegalArgumentException("All columns in where clause must be part Cube group.");
+            if (node.getWhere().isPresent()) {
+                new IdentifierBuilderVisitor().process(node.getWhere().get(), builder);
+                Set<String> whereColumns = builder.build()
+                        .stream()
+                        .map(Identifier::getValue)
+                        .collect(Collectors.toCollection(() -> new TreeSet<>(String.CASE_INSENSITIVE_ORDER)));
+                if (whereColumns.isEmpty()) {
+                    throw new IllegalArgumentException("Invalid predicate. " + ExpressionFormatter.formatExpression(node.getWhere().get(), Optional.empty()));
+                }
+                if (!group.containsAll(whereColumns)) {
+                    throw new IllegalArgumentException("All columns in where clause must be part Cube group.");
+                }
             }
             return buildCubeInsert(cubeMetadata, node, group);
         }
 
         private InsertCube buildCubeInsert(CubeMetadata cubeMetadata, InsertCube node, Set<String> cubeGroup)
         {
-            Expression newDataPredicate = node.getWhere();
-            QualifiedObjectName originalTableName = QualifiedObjectName.valueOf(cubeMetadata.getOriginalTableName());
+            Optional<Expression> newDataPredicate = node.getWhere();
+            QualifiedObjectName sourceTableName = QualifiedObjectName.valueOf(cubeMetadata.getSourceTableName());
             List<Identifier> insertColumns = new ArrayList<>();
-            QualifiedName sourceTable = QualifiedName.of(originalTableName.getCatalogName(), originalTableName.getSchemaName(), originalTableName.getObjectName());
+            QualifiedName sourceTable = QualifiedName.of(sourceTableName.getCatalogName(), sourceTableName.getSchemaName(), sourceTableName.getObjectName());
             List<SelectItem> selectItems = new ArrayList<>();
             cubeMetadata.getAggregations().forEach(aggColumn -> {
                 AggregationSignature aggregationSignature = cubeMetadata.getAggregationSignature(aggColumn).get();
@@ -152,7 +158,7 @@ public class InsertCubeRewrite
             QuerySpecification selectQuery = new QuerySpecification(
                     new Select(false, selectItems),
                     Optional.of(new Table(sourceTable)),
-                    Optional.of(newDataPredicate),
+                    newDataPredicate,
                     Optional.of(groupBy),
                     Optional.empty(),
                     Optional.empty(),

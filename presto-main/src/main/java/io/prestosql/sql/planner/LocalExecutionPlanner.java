@@ -2907,9 +2907,7 @@ public class LocalExecutionPlanner
                     node.getId(),
                     session,
                     cubeManager,
-                    node.getCubeName(),
-                    node.getDataPredicate(),
-                    node.isOverwrite());
+                    node.getMetadata());
             Map<Symbol, Integer> layout = ImmutableMap.of(node.getOutputSymbols().get(0), 0);
             return new PhysicalOperation(operatorFactory, layout, context, source);
         }

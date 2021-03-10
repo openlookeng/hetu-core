@@ -93,7 +93,7 @@ public class DropTableTask
         if (optionalCubeMetaStore.isPresent()) {
             List<CubeMetadata> cubes = optionalCubeMetaStore.get().getMetadataList(tableName.toString());
             for (CubeMetadata cube : cubes) {
-                String[] parts = cube.getCubeTableName().split("\\.");
+                String[] parts = cube.getCubeName().split("\\.");
                 Optional<TableHandle> cubeHandle = metadata.getTableHandle(session, createQualifiedObjectName(session, null, QualifiedName.of(parts[0], parts[1], parts[2])));
                 cubeHandle.ifPresent(cubeTable -> metadata.dropTable(session, cubeTable));
                 optionalCubeMetaStore.get().removeCube(cube);

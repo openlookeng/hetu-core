@@ -26,22 +26,55 @@ import java.util.stream.Collectors;
 public interface CubeMetadata
         extends Serializable
 {
-    String getCubeTableName();
+    /**
+     * Returns name of the cube
+     */
+    String getCubeName();
 
-    String getOriginalTableName();
+    /**
+     * Returns the name of the source table
+     */
+    String getSourceTableName();
 
-    long getLastUpdated();
+    /**
+     * Returns the last updated time of the cube
+     */
+    long getLastUpdatedTime();
 
+    /**
+     * Returns the last updated time of the source table
+     */
+    long getSourceTableLastUpdatedTime();
+
+    /**
+     * Return the names of the dimension columns
+     */
     List<String> getDimensions();
 
+    /**
+     * Return the names of the aggregation columns
+     */
     List<String> getAggregations();
 
-    List<String> getAggregationsAsString();
-
+    /**
+     * Return the group by columns
+     */
     Set<String> getGroup();
 
+    /**
+     * Checks if metadata matches the CubeStatement
+     * @param statement cube statement
+     * @return true - if metadata matches CubeStatement
+     *         false - otherwise
+     */
     boolean matches(CubeStatement statement);
 
+    /**
+     * Filters all metadata that matches the cube statement
+     * @param metadataList metadata list
+     * @param statement cube statement
+     * @return all metadata that is matching the cube statement
+     */
     static List<CubeMetadata> filter(List<CubeMetadata> metadataList, CubeStatement statement)
     {
         return metadataList.stream()
@@ -49,19 +82,36 @@ public interface CubeMetadata
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Retrieves the cube column matching the given aggregation signature
+     * @return name of the aggregation column if found
+     */
     Optional<String> getColumn(AggregationSignature aggSignature);
 
-    Optional<String> getAggregationFunction(String starTableColumn);
+    /**
+     * Return the aggregation function associated with given cube column
+     * @return name of the aggregation function
+     */
+    Optional<String> getAggregationFunction(String column);
 
-    Optional<String> getAggregationColumn(String aggFunction, String originalColumn, boolean distinct);
-
+    /**
+     * Get the aggregation information of the given cube column
+     * @param column name of the cube column
+     */
     Optional<AggregationSignature> getAggregationSignature(String column);
 
+    /**
+     * Return all aggregation column information
+     */
     List<AggregationSignature> getAggregationSignatures();
 
+    /**
+     * Return cube predicate string
+     */
     String getPredicateString();
 
-    String getGroupString();
-
+    /**
+     * Return the status of the cube
+     */
     CubeStatus getCubeStatus();
 }

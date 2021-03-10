@@ -54,7 +54,6 @@ import io.prestosql.sql.tree.CurrentTime;
 import io.prestosql.sql.tree.CurrentUser;
 import io.prestosql.sql.tree.Deallocate;
 import io.prestosql.sql.tree.DecimalLiteral;
-import io.prestosql.sql.tree.DefaultExpressionTraversalVisitor;
 import io.prestosql.sql.tree.Delete;
 import io.prestosql.sql.tree.DereferenceExpression;
 import io.prestosql.sql.tree.DescribeInput;
@@ -332,14 +331,14 @@ class AstBuilder
         });
 
         QualifiedName cubeName = getQualifiedName(context.cubeName);
-        QualifiedName originalTableName = getQualifiedName(context.tableName);
+        QualifiedName sourceTableName = getQualifiedName(context.tableName);
 
         List<Property> properties = ImmutableList.of();
         if (context.cubeProperties() != null) {
             properties = visit(context.cubeProperties().property(), Property.class);
         }
 
-        return new CreateCube(getLocation(context), cubeName, originalTableName, groupingSet, decomposedAggregations, context.EXISTS() != null, properties);
+        return new CreateCube(getLocation(context), cubeName, sourceTableName, groupingSet, decomposedAggregations, context.EXISTS() != null, properties);
     }
 
     @Override
@@ -347,10 +346,7 @@ class AstBuilder
     {
         QualifiedName cubeName = getQualifiedName(context.qualifiedName());
         Optional<Expression> optionalExpression = visitIfPresent(context.expression(), Expression.class);
-        if (!optionalExpression.isPresent()) {
-            throw new IllegalArgumentException("WHERE expression is mandatory!");
-        }
-        return new InsertCube(getLocation(context), cubeName, optionalExpression.get(), null, false);
+        return new InsertCube(getLocation(context), cubeName, optionalExpression, false);
     }
 
     @Override
@@ -358,21 +354,7 @@ class AstBuilder
     {
         QualifiedName cubeName = getQualifiedName(context.qualifiedName());
         Optional<Expression> optionalExpression = visitIfPresent(context.expression(), Expression.class);
-        if (!optionalExpression.isPresent()) {
-            throw new IllegalArgumentException("WHERE expression is mandatory!");
-        }
-        return new InsertCube(getLocation(context), cubeName, optionalExpression.get(), null, true);
-    }
-
-    private static class IdentifierBuilderVisitor
-            extends DefaultExpressionTraversalVisitor<Void, ImmutableList.Builder<Identifier>>
-    {
-        @Override
-        protected Void visitIdentifier(Identifier node, ImmutableList.Builder<Identifier> builder)
-        {
-            builder.add(node);
-            return null;
-        }
+        return new InsertCube(getLocation(context), cubeName, optionalExpression, true);
     }
 
     @Override

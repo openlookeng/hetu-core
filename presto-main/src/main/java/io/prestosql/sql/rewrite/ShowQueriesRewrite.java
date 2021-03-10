@@ -271,11 +271,15 @@ final class ShowQueriesRewrite
             }
             else {
                 QualifiedObjectName qualifiedTableName = createQualifiedObjectName(session, node, node.getTableName().get());
+                Optional<TableHandle> tableHandle = metadata.getTableHandle(session, qualifiedTableName);
+                if (!tableHandle.isPresent()) {
+                    throw new SemanticException(MISSING_TABLE, node, "Table %s does not exist", qualifiedTableName.toString());
+                }
                 cubeMetadataList = cubeMetaStore.getMetadataList(qualifiedTableName.toString());
             }
             Map<String, String> cubeStatusMap = new HashMap<>();
             cubeMetadataList.forEach(cubeMetadata -> {
-                QualifiedObjectName qualifiedTableName = QualifiedObjectName.valueOf(cubeMetadata.getOriginalTableName());
+                QualifiedObjectName qualifiedTableName = QualifiedObjectName.valueOf(cubeMetadata.getSourceTableName());
                 Map<QualifiedObjectName, Long> tableLastModifiedTimeMap = new HashMap<>();
                 long tableLastModifiedTime = tableLastModifiedTimeMap.computeIfAbsent(qualifiedTableName, ignored -> {
                     TableHandle tableHandle = metadata.getTableHandle(session, qualifiedTableName).get();
@@ -284,10 +288,10 @@ final class ShowQueriesRewrite
                 });
                 CubeStatus status = cubeMetadata.getCubeStatus();
                 if (status == CubeStatus.INACTIVE) {
-                    cubeStatusMap.put(cubeMetadata.getCubeTableName(), "InActive");
+                    cubeStatusMap.put(cubeMetadata.getCubeName(), "Inactive");
                 }
                 else {
-                    cubeStatusMap.put(cubeMetadata.getCubeTableName(), tableLastModifiedTime > cubeMetadata.getLastUpdated() ? "Expired" : "Active");
+                    cubeStatusMap.put(cubeMetadata.getCubeName(), tableLastModifiedTime > cubeMetadata.getSourceTableLastUpdatedTime() ? "Expired" : "Active");
                 }
             });
             rows.add(row(
@@ -300,9 +304,9 @@ final class ShowQueriesRewrite
                     FALSE_LITERAL));
             cubeMetadataList.forEach(cubeMetadata -> {
                 rows.add(row(
-                        new StringLiteral(cubeMetadata.getCubeTableName()),
-                        new StringLiteral(cubeMetadata.getOriginalTableName()),
-                        new StringLiteral(cubeStatusMap.get(cubeMetadata.getCubeTableName())),
+                        new StringLiteral(cubeMetadata.getCubeName()),
+                        new StringLiteral(cubeMetadata.getSourceTableName()),
+                        new StringLiteral(cubeStatusMap.get(cubeMetadata.getCubeName())),
                         new StringLiteral(String.join(",", cubeMetadata.getDimensions())),
                         new StringLiteral(cubeMetadata.getAggregationSignatures().stream().map(AggregationSignature::toString).collect(Collectors.joining(","))),
                         new StringLiteral(String.join(",", cubeMetadata.getPredicateString())),
