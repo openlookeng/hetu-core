@@ -51,7 +51,9 @@
         <dep.assertj-core.version>3.8.0</dep.assertj-core.version>
         <dep.logback.version>1.2.3</dep.logback.version>
         <dep.jmxutils.version>1.21</dep.jmxutils.version>
+        <dep.junit.version>4.13.1</dep.junit.version>
         <dep.gcs.version>1.9.10</dep.gcs.version>
+        <dep.httpclient.version>4.5.13</dep.httpclient.version>
         <dep.prestosql.apache.hadoop.version>3.2.0-8</dep.prestosql.apache.hadoop.version>
         <carbon.version>2.0.1</carbon.version>
         <dep.prestosql.version>316</dep.prestosql.version>
@@ -1155,6 +1157,12 @@
             </dependency>
 
             <dependency>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <version>${dep.junit.version}</version>
+            </dependency>
+
+            <dependency>
                 <groupId>io.airlift</groupId>
                 <artifactId>testing-postgresql-server</artifactId>
                 <version>9.6.3-3</version>
@@ -1384,7 +1392,7 @@
             <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpclient</artifactId>
-                <version>4.5.11</version>
+                <version>${dep.httpclient.version}</version>
                 <exclusions>
                     <exclusion>
                         <groupId>commons-logging</groupId>

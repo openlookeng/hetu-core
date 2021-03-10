@@ -18,7 +18,6 @@
         <version.validation-api>2.0.1.Final</version.validation-api>
         <version.commons-lang3>3.10</version.commons-lang3>
         <version.mockito-all>1.10.18</version.mockito-all>
-        <version.junit>4.13</version.junit>
         <version.testing>6.10</version.testing>
         <version.hbase>2.2.3</version.hbase>
         <version.jacoco-maven-plugin>0.8.2</version.jacoco-maven-plugin>
