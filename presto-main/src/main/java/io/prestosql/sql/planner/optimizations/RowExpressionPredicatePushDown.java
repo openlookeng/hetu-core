@@ -88,6 +88,10 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Iterables.filter;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
 import static io.prestosql.spi.function.OperatorType.EQUAL;
+import static io.prestosql.spi.function.OperatorType.GREATER_THAN;
+import static io.prestosql.spi.function.OperatorType.GREATER_THAN_OR_EQUAL;
+import static io.prestosql.spi.function.OperatorType.LESS_THAN;
+import static io.prestosql.spi.function.OperatorType.LESS_THAN_OR_EQUAL;
 import static io.prestosql.spi.function.Signature.internalOperator;
 import static io.prestosql.spi.function.Signature.unmangleOperator;
 import static io.prestosql.spi.plan.JoinNode.DistributionType.PARTITIONED;
@@ -636,7 +640,7 @@ public class RowExpressionPredicatePushDown
                         if (expression instanceof CallExpression) {
                             CallExpression call = (CallExpression) expression;
                             String name = call.getSignature().getName();
-                            if (name.contains("$operator$") && unmangleOperator(name).isComparisonOperator()) {
+                            if (name.contains("$operator$") && isDynamicFilterComparisonOperator(name)) {
                                 if (call.getArguments().stream().allMatch(VariableReferenceExpression.class::isInstance)) {
                                     if (call.getArguments().get(0).getType() != BIGINT) {
                                         continue;
@@ -1519,5 +1523,14 @@ public class RowExpressionPredicatePushDown
             Signature signature = Signature.internalOperator(EQUAL, BOOLEAN, ImmutableList.of(left.getType(), right.getType()));
             return call(signature, BOOLEAN, left, right);
         }
+    }
+
+    private static boolean isDynamicFilterComparisonOperator(String name)
+    {
+        OperatorType operatorType = unmangleOperator(name);
+        return operatorType.equals(LESS_THAN) ||
+                operatorType.equals(LESS_THAN_OR_EQUAL) ||
+                operatorType.equals(GREATER_THAN) ||
+                operatorType.equals(GREATER_THAN_OR_EQUAL);
     }
 }
