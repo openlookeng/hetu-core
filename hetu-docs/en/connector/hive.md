@@ -759,10 +759,10 @@ DROP SCHEMA hive.web
 
 * ##### Parallel Metastore operations
 
-  The following parameter should be set on the user session.
+  The following parameter should be set on the hive config.
 
   ``` properties
-  SET SESSION hive.metastore-client-service-threads = 4
+  hive.metastore-client-service-threads = 4
   #Default: 4
   #Recommended: The number of running HMS service.
   ```
