@@ -113,6 +113,9 @@ Hive连接器安全需要的属性在[Hive配置属性](./hive.md#hive配置属�
 | `hive.vacuum-delta-percent-threshold`| 允许不压缩的增量目录的最大百分比。值应在0.1到1.0之间。| 0.1|
 | `hive.vacuum-cleanup-recheck-interval`| 清空清理任务重新提交的间隔。最小值为5分钟| `5 Minutes`|
 | `hive.vacuum-collector-interval`| 清空回收器任务重新提交的间隔。| `5 Minutes`|
+| `hive.max-splits-to-group`    | 可分组的最大拆分数。如果值为1，则不分组。最小值为1。     | 1   |
+| `hive.metastore-client-service-threads` | 元存储客户端与Hive元存储通信的并行线程数。 | 4 |
+| `hive.worker-metastore-cache-enabled` | 在工作节点上也开启对Hive元存储的缓存。 | `false` |
 
 ## Hive Thrift 元存储配置属性说明
 
@@ -646,6 +649,85 @@ DROP TABLE hive.web.request_logs
 ```sql
 DROP SCHEMA hive.web
 ```
+
+## 性能调优说明：
+
+#### INSERT
+
+* 可以通过配置更多数量的[写入器任务](../admin/properties.md#task.writer-count)配置来调整大量加载插入操作，如**CREATE TABLE AS**或**INSERT INTO TABLE SELECT COL1, COL2 FROM QUERY**。
+
+  ```properties
+  SET SESSION task_writer_count=<num>;
+  
+  #Note: `num' is default number of local parallel table writer jobs per worker, must be a power of 2.
+  #Recommended value: 50% of the total cpu cores available in the worker node can be given here
+  ```
+
+  每个工作节点有多个写入器会确保更高的数据消耗，但会导致每个分区生成多个文件；大量小文件对于读取操作来说是不理想的。
+
+  推荐管理员/开发人员可以使用以下方式来确保生成较少文件：\-
+
+  * **对于AArch64：**
+
+    - 使用[vacuum操作unify](../vacuum.md)合并每个分区中由多个文件写入创建的多个文件，这样在读取期间调度拆分会更快。
+
+      ```sql
+      VACUUM TABLE catalog_sales FULL UNIFY;
+      ```
+
+      **<u>Vacuum unify之前</u>**：Insert通过每个写入器为给定分区生成多个文件：
+
+      ![](../images/vaccum_full_unify_B.png)
+
+      **<u>Vacuum unify之后</u>**：**VACUUM FULL UNIFY**命令，一个给定分区的所有文件小文件统一为一个文件。
+
+      ![](../images/vaccum_full_unify_A.png)
+
+  * **对于Intel x86：**
+
+    * 以下会话参数可以通过添加一个计划节点来在工作节点间重排记录，确保每个分区只创建一个文件；这样，只有指定的工作节点才写入特定的分区。
+
+      ```properties
+      SET SESSION hive.write_partition_distribution=true
+      #Default: false
+      ```
+
+* ##### 并行元存储操作
+
+  应对用户会话设置以下参数。
+
+  ```properties
+  SET SESSION hive.metastore-client-service-threads = 4
+  #Default: 4
+  #Recommended: The number of running HMS service.
+  ```
+
+  根据许多并行HMS操作可以调用的线程池的数量，这将减少获取分区的总时间。
+
+  **说明**：另外，集群中可以添加多个Hive元存储服务，这些服务将以轮询的方式访问，从而保证更佳的Hive元存储负载。
+
+* ##### 直接删除整个分区
+
+  如果删除请求是针对分区列，那么该列将被直接删除，因此将使用元数据调用删除分区。删除增量文件将不会在该分区上创建，因为该分区的整个数据将被删除。
+
+  应在应用会话级别上设置以下参数：
+
+  ```properties
+  delete_transactional_table_direct=true
+  #Default: false
+  ```
+
+  **使用:**
+
+  ```sql
+  DELETE FROM table_test WHERE partition_column >= (SELECT max(done_paritions) FROM tracking_table);
+  ```
+
+  > 说明：
+  >
+  > a）直接删除只支持`>,>=,<,<=`运算符。
+  >
+  > b）删除整个分区时，**delete**命令的输出不能打印删除的记录数。
 
 ## 已知问题
 
