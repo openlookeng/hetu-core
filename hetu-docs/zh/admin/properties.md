@@ -414,6 +414,13 @@
 > 
 > 可能的连接顺序数随着关系数的增大而增大，因此增加此值会导致严重的性能问题。
 
+### `hetu.query-pushdown`
+
+> - **类型：** `boolean`
+> - **默认值：** `true`
+>
+> 控制jdbc connector及dc connector下推的总开关。
+
 ## 正则表达式函数属性
 
 下列属性允许调优[正则表达式函数](../functions/regexp.md)。

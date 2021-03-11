@@ -32,8 +32,17 @@ The Oracle JDBC driver is not provided in a common repository. If you are an Ora
 The pushdown function of the Oracle connector is enabled by default, and you do not need to perform any operation. You can also set the parameter as follows:
 
 ``` properties
-hetu.query.pushdown.enabled=true
+jdbc.pushdown-enabled=true
 #true indicates that pushdown is enabled, and false indicates that pushdown is disabled.
+```
+
+- Mode for the push-down feature
+
+If you want to enable the connector all push down feature for oracle connector, you do not need to do any things for oracle connector's push down feature, which is FULL_PUSHDOWN on by default. But you can also set as below:
+
+``` properties
+jdbc.pushdown-module=FULL_PUSHDOWN  
+#FULL_PUSHDOWN: All push down. BASE_PUSHDOWN: Partial push down, which indicates that filter, aggregation, limit, topN and project can be pushed down.
 ```
 
 ### Multiple Oracle Databases or Servers

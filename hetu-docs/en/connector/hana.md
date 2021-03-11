@@ -37,9 +37,17 @@ part of your SAP HANA client installation or you can download it from the SAP HA
 
 If you want to enable the connector push down feature for hana connector, you do not need to do any things for hana connector\'s push down feature is turn on by default. But you can also set as below:
 
-| hana.query.pushdown.enabled=true                    |
+| jdbc.pushdown-enabled=true                   |
 | --------------------------------------------------- |
 | # true to enable pushdown, false to disable it. |
+
+-   Mode for the push-down feature.
+
+If you want to enable the connector all push down feature for hana connector, you do not need to do any things for hana connector's push down feature, which is FULL_PUSHDOWN on by default. But you can also set as below:
+
+| jdbc.pushdown-module=FULL_PUSHDOWN                    |
+| --------------------------------------------------- |
+| # FULL_PUSHDOWN: All push down. BASE_PUSHDOWN: Partial push down, which indicates that filter, aggregation, limit, topN and project can be pushed down. |
 
 ### Multiple Hana Databases or Servers
 

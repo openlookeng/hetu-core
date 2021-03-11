@@ -73,6 +73,7 @@ connection-password=<远端openLooKeng密码>
 | `dc.metadata.cache.maximum.size` | 元数据缓存最大值，可缓存的远端openLooKeng元数据条数          | `10000` |
 | `dc.metadata.cache.ttl`          | 元数据缓存TTL，TTL到期，则需要重新从远端openLooKeng获取元数据 | `1.00s` |
 | `dc.query.pushdown.enabled`      | 启用子查询下推到远端openLooKeng                              | `true`  |
+| `dc.query.pushdown.module`       | FULL_PUSHDOWN，表示全部下推；BASE_PUSHDOWN，表示部分下推，其中部分下推是指filter/aggregation/limit/topN/project这些可以下推。| `FULL_PUSHDOWN`  |
 | `dc.http-compression`            | 启用zstd压缩数据                                             | `false` |
 
 ### 其他配置

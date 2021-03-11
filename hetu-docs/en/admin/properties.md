@@ -467,6 +467,13 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > 
 > The number of possible join orders scales factorially with the number of relations, so increasing this value can cause serious performance issues.
 
+### `hetu.query-pushdown`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `true`
+>
+> Switch for controlling the push-down feature of the JDBC connector and DC connector. 
+
 ### `optimizer.reuse-table-scan`
 
 > -   **Type:** `boolean`
