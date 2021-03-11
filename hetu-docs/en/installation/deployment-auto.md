@@ -220,12 +220,12 @@ bash /opt/openlookeng/bin/install_offline.sh --help
 If you want to add node to make the cluster bigger,execute the below command:
 
 ```shell
-bash /opt/openlookeng/bin/add_cluster_node.sh -n
+bash /opt/openlookeng/bin/add_cluster_node.sh -n <ip_address_1,……ip_address_N>
 ```
 
 or:
 ```shell
-bash /opt/openlookeng/bin/add_cluster_node.sh --node
+bash /opt/openlookeng/bin/add_cluster_node.sh --node <ip_address_1,……ip_address_N>
 ```
 
 or:
@@ -238,19 +238,19 @@ or:
 bash /opt/openlookeng/bin/add_cluster_node.sh --file <add_nodes_file_path>
 ```
 
-If there are multiple nodes, separated by commas(,).
+If there are multiple nodes, separated by commas(,). add_ nodes_ File example: ip_address_1,ip_address_2……,ip_address_N.
 
 ## Removing Node to Cluster
 
 If you want to remove node to make the cluster smaller,execute the below command:
 
 ```shell
-bash /opt/openlookeng/bin/remove_cluster_node.sh -n
+bash /opt/openlookeng/bin/remove_cluster_node.sh -n <ip_address_1,……ip_address_N>
 ```
 
 or:
 ```shell
-bash /opt/openlookeng/bin/remove_cluster_node.sh --node
+bash /opt/openlookeng/bin/remove_cluster_node.sh --node <ip_address_1,……ip_address_N>
 ```
 
 or:
@@ -263,7 +263,7 @@ or:
 bash /opt/openlookeng/bin/remove_cluster_node.sh --file <remove_nodes_file_path>
 ```
 
-If there are multiple nodes, separate them with commas(,).
+If there are multiple nodes, separate them with commas(,). add_ nodes_ File example: ip_address_1,ip_address_2……,ip_address_N.
 
 ## See Also
 

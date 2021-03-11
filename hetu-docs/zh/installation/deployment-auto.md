@@ -35,7 +35,7 @@ wget -O - https://download.openlookeng.io/install.sh|bash
 
 ## 将openLooKeng在线部署到集群
 
-执行以下命令安装openLooKeng集群：
+执行以下命令，按照提示分別输入coordinator、worker节点ip，安装openLooKeng多节点集群：
 
 ```shell
 bash <(wget -qO- https://download.openlookeng.io/install.sh) -m
@@ -188,7 +188,7 @@ bash /opt/openlookeng/bin/uninstall.sh --all
 bash /opt/openlookeng/bin/install_offline.sh
 ```
 
-执行以下命令部署多节点集群：
+执行以下命令，按照提示分别输入coordinator、worker节点IP，部署多节点集群：
 
 ```shell
 bash /opt/openlookeng/bin/install_offline.sh -m
@@ -211,13 +211,13 @@ bash /opt/openlookeng/bin/install_offline.sh --help
 如果想增加节点使集群规模更大，则执行以下命令：
 
 ```shell
-bash /opt/openlookeng/bin/add_cluster_node.sh -n
+bash /opt/openlookeng/bin/add_cluster_node.sh -n <ip_address_1,……ip_address_N>
 ```
 
 或：
 
 ```shell
-bash /opt/openlookeng/bin/add_cluster_node.sh --node
+bash /opt/openlookeng/bin/add_cluster_node.sh --node <ip_address_1,……ip_address_N>
 ```
 
 或：
@@ -232,20 +232,20 @@ bash /opt/openlookeng/bin/add_cluster_node.sh -f <add_nodes_file_path>
 bash /opt/openlookeng/bin/add_cluster_node.sh --file <add_nodes_file_path>
 ```
 
-如果有多个节点，以逗号（,）分隔。
+如果有多个节点，以逗号（,）分隔。add_nodes_file示例：ip_address_1,ip_address_2……,ip_address_N。
 
 ## 从集群移除节点
 
 如果想移除节点使集群规模更小，则执行以下命令：
 
 ```shell
-bash /opt/openlookeng/bin/remove_cluster_node.sh -n
+bash /opt/openlookeng/bin/remove_cluster_node.sh -n <ip_address_1,……ip_address_N>
 ```
 
 或：
 
 ```shell
-bash /opt/openlookeng/bin/remove_cluster_node.sh --node
+bash /opt/openlookeng/bin/remove_cluster_node.sh --node <ip_address_1,……ip_address_N>
 ```
 
 或：
@@ -260,7 +260,7 @@ bash /opt/openlookeng/bin/remove_cluster_node.sh -f <remove_nodes_file_path>
 bash /opt/openlookeng/bin/remove_cluster_node.sh --file <remove_nodes_file_path>
 ```
 
-如果有多个节点，以逗号（,）分隔。
+如果有多个节点，以逗号（,）分隔。add_nodes_file示例：ip_address_1,ip_address_2……,ip_address_N。
 
 ## 参考资料
 
