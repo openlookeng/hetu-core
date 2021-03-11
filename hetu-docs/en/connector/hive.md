@@ -754,6 +754,20 @@ DROP SCHEMA hive.web
       #Default: false
       ```
 
+  * ##### Hive Metastore timeout
+
+    The large partitioned table contains an excessive large number of partitions, causing task timeout. Large number of partitions may take more time to load and synchronize with the metastore cache, hence for better performance in higher scale storage its recommended to accordingly adjust the 'hive.metastore-timeout' parameter.
+
+    The following property should be set in the hive config file.
+
+    ```properties
+    hive.metastore-timeout=<TimeWithUnit>;
+
+    #Note: `TimeWithUnit' is the time with unit in seconds or minutes. 
+    #Default: 10s (where 's' stands for seconds)
+    #Recommended value: For operation in large partition table it can be 60s or higher. This needs to be configured according to the data volume. The values shown here are for reference only. It is recommended to adjust them according to the actual situation.
+    ```
+
 
   
 
