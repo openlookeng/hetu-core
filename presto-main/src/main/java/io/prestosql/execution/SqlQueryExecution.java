@@ -260,7 +260,7 @@ public class SqlQueryExecution
 
                 // Snapshot: query is now done, so clear its entries in the snapshot manager
                 if (SystemSessionProperties.isSnapshotEnabled(stateMachine.getSession())) {
-                    snapshotManager.doneQuery();
+                    snapshotManager.doneQuery(state);
                 }
                 SqlQueryScheduler scheduler = queryScheduler.get();
                 if (scheduler != null) {

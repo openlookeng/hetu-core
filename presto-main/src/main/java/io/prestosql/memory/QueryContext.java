@@ -24,7 +24,6 @@ import io.prestosql.execution.TaskStateMachine;
 import io.prestosql.memory.context.MemoryReservationHandler;
 import io.prestosql.memory.context.MemoryTrackingContext;
 import io.prestosql.operator.TaskContext;
-import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.snapshot.SnapshotUtils;
 import io.prestosql.snapshot.TaskSnapshotManager;
 import io.prestosql.spi.QueryId;
@@ -82,7 +81,7 @@ public class QueryContext
     private long maxTotalMemory;
 
     private final MemoryTrackingContext queryMemoryContext;
-    private final QuerySnapshotManager snapshotManager;
+    private final SnapshotUtils snapshotUtils;
 
     @GuardedBy("this")
     private MemoryPool memoryPool;
@@ -115,12 +114,7 @@ public class QueryContext
                 newRootAggregatedMemoryContext(new QueryMemoryReservationHandler(this::updateUserMemory, this::tryUpdateUserMemory), GUARANTEED_MEMORY),
                 newRootAggregatedMemoryContext(new QueryMemoryReservationHandler(this::updateRevocableMemory, this::tryReserveMemoryNotSupported), 0L),
                 newRootAggregatedMemoryContext(new QueryMemoryReservationHandler(this::updateSystemMemory, this::tryReserveMemoryNotSupported), 0L));
-        this.snapshotManager = new QuerySnapshotManager(queryId, snapshotUtils, null);
-    }
-
-    public QuerySnapshotManager getSnapshotManager()
-    {
-        return snapshotManager;
+        this.snapshotUtils = requireNonNull(snapshotUtils, "snapshotUtils is null");
     }
 
     // TODO: This method should be removed, and the correct limit set in the constructor. However, due to the way QueryContext is constructed the memory limit is not known in advance
@@ -275,7 +269,7 @@ public class QueryContext
                 totalPartitions,
                 parent.orElse(null),
                 serdeFactory,
-                new TaskSnapshotManager(taskStateMachine.getTaskId(), snapshotManager));
+                new TaskSnapshotManager(taskStateMachine.getTaskId(), snapshotUtils));
         taskContexts.put(taskStateMachine.getTaskId(), taskContext);
         return taskContext;
     }

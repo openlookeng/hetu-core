@@ -138,11 +138,11 @@ public class ExchangeOperator
         checkArgument(split.getCatalogName().equals(REMOTE_CONNECTOR_ID), "split is not a remote split");
 
         URI location = ((RemoteSplit) split.getConnectorSplit()).getLocation();
-        exchangeClient.addLocation(location);
+        boolean added = exchangeClient.addLocation(location);
 
         if (snapshotState != null) {
             // When inputChannels is not empty, then we should have received all locations
-            checkState(!inputChannels.isPresent());
+            checkState(!inputChannels.isPresent() || !added);
         }
 
         return Optional::empty;

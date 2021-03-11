@@ -193,7 +193,21 @@ public class TaskOutputOperator
                 .map(p -> serde.serialize(p).setOrigin(id))
                 .collect(toImmutableList());
 
-        outputBuffer.enqueue(serializedPages);
+        if (page instanceof MarkerPage) {
+            // Snapshot: driver/thread 1 reaches here and adds marker 1 to the output buffer.
+            // It's the first time marker 1 is received, so marker 1 will be broadcasted to all client buffers.
+            // Then driver/thread 2 adds markers 1 and 2 to the output buffer.
+            // Marker 1 was already seen, so it's not sent to client buffers, but marker 2 is seen the first time, and is sent to client buffers.
+            // Without the following synchronization, it's possible for the 2 threads to interact with client buffers at the same time.
+            // That is, marker 1 is added to client buffer #1, then thread 2 takes over, and adds marker 2 to client buffer #1 and #2.
+            // The result is that for buffer #2, it receives marker 2 before marker 1.
+            synchronized (outputBuffer) {
+                outputBuffer.enqueue(serializedPages);
+            }
+        }
+        else {
+            outputBuffer.enqueue(serializedPages);
+        }
         operatorContext.recordOutput(page.getSizeInBytes(), page.getPositionCount());
     }
 

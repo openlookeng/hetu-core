@@ -16,6 +16,7 @@ package io.prestosql.operator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+import io.airlift.log.Logger;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
@@ -34,7 +35,6 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.airlift.concurrent.MoreFutures.tryGetFutureValue;
@@ -45,6 +45,8 @@ import static java.util.Objects.requireNonNull;
 public class LookupOuterOperator
         implements Operator
 {
+    private static final Logger LOG = Logger.get(LookupOuterOperator.class);
+
     public static class LookupOuterOperatorFactory
             implements OperatorFactory
     {
@@ -304,6 +306,8 @@ public class LookupOuterOperator
         if (closed) {
             return;
         }
+
+        LOG.debug("Received marker '%s' from source driver '%d' to target '%s'", marker.toString(), driverId, operatorContext.getUniqueId());
         // See Gitee issue Checkpoint - handle LookupOuterOperator pipelines
         // https://gitee.com/open_lookeng/dashboard/issues?id=I2LMIW
         // This is for outer join with non-table-scan pipelines. Wait to receive marker from all drivers.
@@ -311,7 +315,10 @@ public class LookupOuterOperator
             if (drivers == null) {
                 drivers = new HashSet<>();
             }
-            checkArgument(drivers.add(driverId), "duplicate driver id:" + driverId);
+            if (!drivers.add(driverId)) {
+                String message = String.format("Received duplicate marker '%s' from source driver '%d' to target '%s'", marker.toString(), driverId, operatorContext.getUniqueId());
+                LOG.error(message);
+            }
             if (drivers.size() == totalDrivers) {
                 return null;
             }

@@ -21,6 +21,7 @@ import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.metadata.InternalNodeManager;
+import io.prestosql.spi.QueryId;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
@@ -37,6 +38,7 @@ import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Objects.requireNonNull;
 
@@ -54,6 +56,8 @@ public class SnapshotUtils
     // TODO-cp-I2D63N: use /tmp for now to avoid permission issues with writing to /opt
     @VisibleForTesting
     String rootPath = "/tmp/hetu/snapshot/";
+
+    private final Map<QueryId, QuerySnapshotManager> snapshotManagers = new ConcurrentHashMap<>();
 
     @Inject
     public SnapshotUtils(FileSystemClientManager fileSystemClientManager, SnapshotConfig snapshotConfig, InternalNodeManager nodeManager)
@@ -227,5 +231,20 @@ public class SnapshotUtils
         else {
             return obj;
         }
+    }
+
+    public void addQuerySnapshotManager(QueryId queryId, QuerySnapshotManager querySnapshotManager)
+    {
+        snapshotManagers.put(queryId, querySnapshotManager);
+    }
+
+    public QuerySnapshotManager getQuerySnapshotManager(QueryId queryId)
+    {
+        return snapshotManagers.get(queryId);
+    }
+
+    public void removeQuerySnapshotManager(QueryId queryId)
+    {
+        snapshotManagers.remove(queryId);
     }
 }

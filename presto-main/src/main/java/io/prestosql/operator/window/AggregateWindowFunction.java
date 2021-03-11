@@ -121,7 +121,9 @@ public class AggregateWindowFunction
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         AggregateWindowFunctionState myState = new AggregateWindowFunctionState();
-        myState.accumulator = accumulator.capture(serdeProvider);
+        if (accumulator != null) {
+            myState.accumulator = accumulator.capture(serdeProvider);
+        }
         myState.currentStart = currentStart;
         myState.currentEnd = currentEnd;
         return myState;
@@ -131,7 +133,15 @@ public class AggregateWindowFunction
     public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
     {
         AggregateWindowFunctionState myState = (AggregateWindowFunctionState) state;
-        this.accumulator.restore(myState.accumulator, serdeProvider);
+        if (myState.accumulator == null) {
+            this.accumulator = null;
+        }
+        else {
+            if (this.accumulator == null) {
+                this.accumulator = accumulatorFactory.createAccumulator();
+            }
+            this.accumulator.restore(myState.accumulator, serdeProvider);
+        }
         this.currentStart = myState.currentStart;
         this.currentEnd = myState.currentEnd;
     }

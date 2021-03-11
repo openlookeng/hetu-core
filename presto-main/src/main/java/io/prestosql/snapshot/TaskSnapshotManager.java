@@ -20,8 +20,6 @@ import io.prestosql.execution.TaskId;
 import io.prestosql.operator.Operator;
 import io.prestosql.operator.exchange.LocalMergeSourceOperator;
 
-import javax.inject.Inject;
-
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
@@ -39,7 +37,7 @@ public class TaskSnapshotManager
     private static final Logger LOG = Logger.get(TaskSnapshotManager.class);
 
     private final TaskId taskId;
-    private final QuerySnapshotManager querySnapshotManager;
+    private final SnapshotUtils snapshotUtils;
 
     private int totalComponents = -1;
     // LinkedHashMap can be used to keep ordering
@@ -48,11 +46,10 @@ public class TaskSnapshotManager
     private final Map<Long, SnapshotComponentCounter<SnapshotStateId>> restoreComponentCounters = Collections.synchronizedMap(new LinkedHashMap<>());
     private final RestoreResult restoreResult = new RestoreResult();
 
-    @Inject
-    public TaskSnapshotManager(TaskId taskId, QuerySnapshotManager querySnapshotManager)
+    public TaskSnapshotManager(TaskId taskId, SnapshotUtils snapshotUtils)
     {
         this.taskId = taskId;
-        this.querySnapshotManager = querySnapshotManager;
+        this.snapshotUtils = snapshotUtils;
     }
 
     /**
@@ -61,7 +58,7 @@ public class TaskSnapshotManager
     public void storeState(SnapshotStateId snapshotStateId, Object state)
             throws Exception
     {
-        querySnapshotManager.storeState(snapshotStateId, state);
+        snapshotUtils.storeState(snapshotStateId, state);
     }
 
     /**
@@ -72,19 +69,19 @@ public class TaskSnapshotManager
     public Optional<Object> loadState(SnapshotStateId snapshotStateId)
             throws Exception
     {
-        return querySnapshotManager.loadState(snapshotStateId);
+        return snapshotUtils.loadState(snapshotStateId);
     }
 
     public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile)
             throws Exception
     {
-        querySnapshotManager.storeFile(snapshotStateId, sourceFile);
+        snapshotUtils.storeFile(snapshotStateId, sourceFile);
     }
 
     public Boolean loadFile(SnapshotStateId snapshotStateId, Path targetFile)
             throws Exception
     {
-        return querySnapshotManager.loadFile(snapshotStateId, targetFile);
+        return snapshotUtils.loadFile(snapshotStateId, targetFile);
     }
 
     public void setTotalComponents(int totalComponents)
@@ -128,7 +125,9 @@ public class TaskSnapshotManager
             return ImmutableMap.of(-1L, SnapshotResult.SUCCESSFUL);
         }
         // Need to make a copy, otherwise there may be concurrent modification errors
-        return ImmutableMap.copyOf(captureResults);
+        synchronized (captureResults) {
+            return ImmutableMap.copyOf(captureResults);
+        }
     }
 
     public RestoreResult getSnapshotRestoreResult()
@@ -148,16 +147,18 @@ public class TaskSnapshotManager
         if (counter.updateComponent(componentId, componentState)) {
             // update capturedSnapshotResultMap
             SnapshotResult snapshotResult = counter.getSnapshotResult();
-            SnapshotResult oldResult;
             synchronized (captureResults) {
-                oldResult = captureResults.put(snapshotId, snapshotResult);
-            }
-            if (snapshotResult != oldResult && snapshotResult.isDone()) {
-                if (querySnapshotManager.isCoordinator()) {
-                    // Results on coordinator won't be reported through remote task. Send to the query side.
-                    querySnapshotManager.updateQueryCapture(taskId, captureResults);
+                SnapshotResult oldResult = captureResults.put(snapshotId, snapshotResult);
+                if (snapshotResult != oldResult && snapshotResult.isDone()) {
+                    if (snapshotUtils.isCoordinator()) {
+                        // Results on coordinator won't be reported through remote task. Send to the query side.
+                        QuerySnapshotManager querySnapshotManager = snapshotUtils.getQuerySnapshotManager(taskId.getQueryId());
+                        if (querySnapshotManager != null) {
+                            querySnapshotManager.updateQueryCapture(taskId, captureResults);
+                        }
+                    }
+                    LOG.debug("Finished capturing snapshot %d for task %s. Result is %s.", snapshotId, taskId, snapshotResult);
                 }
-                LOG.debug("Finished capturing snapshot %d for task %s. Result is %s.", snapshotId, taskId, snapshotResult);
             }
         }
     }
@@ -173,16 +174,17 @@ public class TaskSnapshotManager
 
         if (counter.updateComponent(componentId, componentState)) {
             SnapshotResult snapshotResult = counter.getSnapshotResult();
-            boolean changed;
             synchronized (restoreResult) {
-                changed = restoreResult.setSnapshotResult(snapshotId, snapshotResult);
-            }
-            if (changed && snapshotResult.isDone()) {
-                if (querySnapshotManager.isCoordinator()) {
-                    // Results on coordinator won't be reported through remote task. Send to the query side.
-                    querySnapshotManager.updateQueryRestore(taskId, Optional.of(restoreResult));
+                if (restoreResult.setSnapshotResult(snapshotId, snapshotResult) && snapshotResult.isDone()) {
+                    if (snapshotUtils.isCoordinator()) {
+                        // Results on coordinator won't be reported through remote task. Send to the query side.
+                        QuerySnapshotManager querySnapshotManager = snapshotUtils.getQuerySnapshotManager(taskId.getQueryId());
+                        if (querySnapshotManager != null) {
+                            querySnapshotManager.updateQueryRestore(taskId, Optional.of(restoreResult));
+                        }
+                    }
+                    LOG.debug("Finished restoring snapshot %d for task %s. Result is %s.", snapshotId, taskId.toString(), snapshotResult);
                 }
-                LOG.debug("Finished restoring snapshot %d for task %s. Result is %s.", snapshotId, taskId.toString(), snapshotResult);
             }
         }
     }

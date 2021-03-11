@@ -366,11 +366,12 @@ public class MergeOperator
     @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
-        return 0;
+        return operatorContext.capture(serdeProvider);
     }
 
     @Override
     public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
     {
+        operatorContext.restore(state, serdeProvider);
     }
 }

@@ -19,7 +19,6 @@ import io.prestosql.execution.TaskId;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.metadata.InMemoryNodeManager;
 import io.prestosql.operator.Operator;
-import io.prestosql.spi.QueryId;
 import io.prestosql.testing.assertions.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -32,7 +31,7 @@ public class TestTaskSnapshotManager
 {
     SnapshotConfig snapshotConfig;
     FileSystemClientManager fileSystemClientManager;
-    QuerySnapshotManager querySnapshotManager;
+    SnapshotUtils snapshotUtils;
 
     @BeforeMethod
     public void setup()
@@ -44,9 +43,8 @@ public class TestTaskSnapshotManager
         // Set up mock file system client manager
         fileSystemClientManager = mock(FileSystemClientManager.class);
 
-        SnapshotUtils snapshotUtils = new SnapshotUtils(fileSystemClientManager, snapshotConfig, new InMemoryNodeManager());
+        snapshotUtils = new SnapshotUtils(fileSystemClientManager, snapshotConfig, new InMemoryNodeManager());
         snapshotUtils.initialize();
-        this.querySnapshotManager = new QuerySnapshotManager(new QueryId("query"), snapshotUtils, null);
     }
 
     @Test
@@ -55,8 +53,8 @@ public class TestTaskSnapshotManager
     {
         TaskId taskId1 = new TaskId("query", 1, 1);
         TaskId taskId2 = new TaskId("query", 1, 2);
-        TaskSnapshotManager snapshotManager1 = new TaskSnapshotManager(taskId1, querySnapshotManager);
-        TaskSnapshotManager snapshotManager2 = new TaskSnapshotManager(taskId2, querySnapshotManager);
+        TaskSnapshotManager snapshotManager1 = new TaskSnapshotManager(taskId1, snapshotUtils);
+        TaskSnapshotManager snapshotManager2 = new TaskSnapshotManager(taskId2, snapshotUtils);
         snapshotManager1.setTotalComponents(2);
         snapshotManager2.setTotalComponents(2);
 
@@ -79,8 +77,8 @@ public class TestTaskSnapshotManager
     {
         TaskId taskId1 = new TaskId("query", 1, 1);
         TaskId taskId2 = new TaskId("query", 1, 2);
-        TaskSnapshotManager snapshotManager1 = new TaskSnapshotManager(taskId1, querySnapshotManager);
-        TaskSnapshotManager snapshotManager2 = new TaskSnapshotManager(taskId2, querySnapshotManager);
+        TaskSnapshotManager snapshotManager1 = new TaskSnapshotManager(taskId1, snapshotUtils);
+        TaskSnapshotManager snapshotManager2 = new TaskSnapshotManager(taskId2, snapshotUtils);
         snapshotManager1.setTotalComponents(2);
         snapshotManager2.setTotalComponents(3);
 
@@ -113,7 +111,7 @@ public class TestTaskSnapshotManager
     public void testUpdateFinishedQueryComponents()
     {
         TaskId taskId = new TaskId("query", 1, 1);
-        TaskSnapshotManager sm = new TaskSnapshotManager(taskId, querySnapshotManager);
+        TaskSnapshotManager sm = new TaskSnapshotManager(taskId, snapshotUtils);
         sm.setTotalComponents(2);
 
         sm.updateFinishedComponents(ImmutableList.of(mock(Operator.class)));

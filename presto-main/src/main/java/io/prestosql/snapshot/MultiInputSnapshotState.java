@@ -403,6 +403,7 @@ public class MultiInputSnapshotState
         if (!snapshot.markedChannels.add(channel)) {
             String message = String.format("Received duplicate marker '%s' from source '%s' to target '%s'", marker.toString(), channel, restorableId);
             LOG.error(message);
+            return true;
         }
 
         inputChannels = restorable.getInputChannels(marker.getTaskCount());

@@ -418,7 +418,7 @@ public class SqlTaskExecution
             return source;
         }
 
-        Set<ScheduledSplit> readySplits = getReadySplits(source);
+        List<ScheduledSplit> readySplits = getReadySplits(source);
         if (readySplits.isEmpty()) {
             // Source doesn't have any splits that are ready to be processed.
             // Add back the source removed earlier
@@ -462,12 +462,17 @@ public class SqlTaskExecution
 
     // Return all splits that are ready to be processed.
     // This includes all splits up until a marker follows a data split.
-    private Set<ScheduledSplit> getReadySplits(TaskSource source)
+    private List<ScheduledSplit> getReadySplits(TaskSource source)
     {
         Set<ScheduledSplit> inProgress = inProgressSplits.computeIfAbsent(source.getPlanNodeId(), p -> new HashSet<>());
-        Set<ScheduledSplit> readySplits = new HashSet<>();
+        List<ScheduledSplit> readySplits = new ArrayList<>();
 
-        for (ScheduledSplit split : source.getSplits()) {
+        // It's possible that order has been lost among the splits. Restore it based on sequence id
+        Set<ScheduledSplit> splits = source.getSplits();
+        List<ScheduledSplit> splitList = new ArrayList<>(splits);
+        splitList.sort((a, b) -> (int) (a.getSequenceId() - b.getSequenceId()));
+
+        for (ScheduledSplit split : splitList) {
             if (split.getSplit().getConnectorSplit() instanceof MarkerSplit) {
                 if (!inProgress.isEmpty()) {
                     // Need to wait for previous sources to finish.

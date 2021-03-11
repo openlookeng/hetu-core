@@ -19,6 +19,7 @@ import com.google.common.collect.Sets;
 import io.airlift.log.Logger;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.execution.QueryState;
 import io.prestosql.execution.TaskId;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
@@ -88,6 +89,7 @@ public class QuerySnapshotManager
             this.maxRetry = SystemSessionProperties.getSnapshotMaxRetries(session);
             this.retryTimeout = SystemSessionProperties.getSnapshotRetryTimeout(session).toMillis();
         }
+        snapshotUtils.addQuerySnapshotManager(queryId, this);
     }
 
     public void setRescheduler(Runnable rescheduler)
@@ -335,14 +337,16 @@ public class QuerySnapshotManager
         }
     }
 
-    public void doneQuery()
+    public void doneQuery(QueryState state)
     {
         LOG.debug("query will be removed with queryId = %s,%n" +
+                        "state = %s,%n" +
                         "captureComponentCounters = %s,%n" +
                         "captureResults = %s,%n" +
                         "restoreComponentCounters = %s,%n" +
                         "restoreResult = %s",
                 queryId,
+                state,
                 captureComponentCounters,
                 captureResults,
                 restoreComponentCounters,
@@ -356,9 +360,11 @@ public class QuerySnapshotManager
                 snapshotUtils.deleteAll(queryId.getId());
             }
             catch (Exception e) {
-                throw new RuntimeException(e);
+                LOG.warn(e, "Failed to delete stored snapshot states for %s, state %s", queryId, state);
             }
         }
+
+        snapshotUtils.removeQuerySnapshotManager(queryId);
     }
 
     private void resetForQuery()

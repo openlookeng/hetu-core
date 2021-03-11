@@ -206,20 +206,20 @@ public class ExchangeClient
         scheduleRequestIfNecessary();
     }
 
-    public synchronized void addLocation(URI locationUri)
+    public synchronized boolean addLocation(URI locationUri)
     {
         requireNonNull(locationUri, "locationUri is null");
 
         // Ignore new locations after close
         // NOTE: this MUST happen before checking no more locations is checked
         if (closed.get()) {
-            return;
+            return false;
         }
 
         String location = locationUri.toString();
         // ignore duplicate locations
         if (allClients.containsKey(location)) {
-            return;
+            return false;
         }
 
         checkState(!noMoreLocations, "No more locations already set");
@@ -237,6 +237,7 @@ public class ExchangeClient
         queuedClients.add(client);
 
         scheduleRequestIfNecessary();
+        return true;
     }
 
     public synchronized void noMoreLocations()
