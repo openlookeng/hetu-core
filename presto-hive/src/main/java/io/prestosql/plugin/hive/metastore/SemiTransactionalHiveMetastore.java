@@ -2325,8 +2325,8 @@ public class SemiTransactionalHiveMetastore
                 String fileName = filePath.getName();
                 boolean eligible = false;
                 // never delete presto dot files
-                if (!fileName.startsWith(".presto")) {
-                    eligible = queryIds.stream().anyMatch(id -> fileName.startsWith(id) || fileName.endsWith(id) || fileName.startsWith("bucket_") || fileName.startsWith("_orc"));
+                if (!fileName.startsWith(".presto") && !fileName.startsWith("_orc")) {
+                    eligible = queryIds.stream().anyMatch(id -> fileName.startsWith(id) || fileName.endsWith(id) || fileName.startsWith("bucket_"));
                 }
                 if (eligible) {
                     if (!deleteIfExists(fileSystem, filePath, false)) {
@@ -2457,7 +2457,7 @@ public class SemiTransactionalHiveMetastore
                 Path filePath = fileStatus.getPath();
                 String fileName = filePath.getName();
                 // never delete presto dot files
-                if (!fileName.startsWith(".presto")) {
+                if (!fileName.startsWith(".presto") && !fileName.startsWith("_orc")) {
                     boolean isSuccess = moveFileToTrash(fileSystem, filePath, hdfsEnvironment, context);
                     if (!isSuccess) {
                         allDeleted = false;
