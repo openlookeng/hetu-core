@@ -708,7 +708,7 @@ public class LogicalPlanner
         return createVacuumWriterPlan(analysis,
                 handle,
                 vacuumTable,
-                new VacuumTargetReference(handle, vacuumTable.isFull(), vacuumTable.isMerge(), vacuumTable.getPartition()),
+                new VacuumTargetReference(handle, vacuumTable.isFull(), vacuumTable.isUnify(), vacuumTable.getPartition()),
                 symbols,
                 columnNames,
                 statisticsMetadata);

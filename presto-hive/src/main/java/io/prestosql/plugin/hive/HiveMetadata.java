@@ -1742,9 +1742,9 @@ public class HiveMetadata
     }
 
     @Override
-    public ConnectorVacuumTableHandle beginVacuum(ConnectorSession session, ConnectorTableHandle tableHandle, boolean full, boolean merge, Optional<String> partition)
+    public ConnectorVacuumTableHandle beginVacuum(ConnectorSession session, ConnectorTableHandle tableHandle, boolean full, boolean unify, Optional<String> partition)
     {
-        HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, partition, merge ? HiveACIDWriteType.VACUUM_UNIFY : HiveACIDWriteType.VACUUM);
+        HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, partition, unify ? HiveACIDWriteType.VACUUM_UNIFY : HiveACIDWriteType.VACUUM);
         if ((!session.getSource().get().isEmpty()) &&
                 session.getSource().get().equals("auto-vacuum")) {
             metastore.setVacuumTableHandle((HiveTableHandle) tableHandle);
@@ -1752,7 +1752,7 @@ public class HiveMetadata
         return new HiveVacuumTableHandle(insertTableHandle.getSchemaName(), insertTableHandle.getTableName(),
                 insertTableHandle.getInputColumns(), insertTableHandle.getPageSinkMetadata(),
                 insertTableHandle.getLocationHandle(), insertTableHandle.getBucketProperty(),
-                insertTableHandle.getTableStorageFormat(), insertTableHandle.getPartitionStorageFormat(), full, merge, null);
+                insertTableHandle.getTableStorageFormat(), insertTableHandle.getPartitionStorageFormat(), full, unify, null);
     }
 
     @Override
@@ -1766,7 +1766,7 @@ public class HiveMetadata
         List<PartitionUpdate> partitionUpdates = new ArrayList<>();
         Optional<ConnectorOutputMetadata> connectorOutputMetadata =
                 finishInsertInternal(session, insertTableHandle, fragments, computedStatistics, partitionUpdates,
-                        vacuumTableHandle.isMerge() ? HiveACIDWriteType.VACUUM_UNIFY : HiveACIDWriteType.VACUUM);
+                        vacuumTableHandle.isUnifyVacuum() ? HiveACIDWriteType.VACUUM_UNIFY : HiveACIDWriteType.VACUUM);
 
         metastore.initiateVacuumCleanupTasks(vacuumTableHandle, session, partitionUpdates);
         return connectorOutputMetadata;

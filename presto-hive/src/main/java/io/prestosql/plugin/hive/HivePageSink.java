@@ -383,7 +383,7 @@ public class HivePageSink
             List<ColumnHandle> inputColumns = new ArrayList<>(HivePageSink.this.inputColumns);
             if (isInsertOnlyTable() || acidWriteType == HiveACIDWriteType.VACUUM_UNIFY) {
                 //Insert only tables Just need to merge contents together. No processing required.
-                //During vacuum merge, all buckets will be merged to one.
+                //During vacuum unify, all buckets will be merged to one.
                 //There is no need to sort again. sort_by is valid only on bucketed table,
                 //for which VACUUM_UNIFY is not valid.
                 List<HiveSplitWrapper> multiSplits = hiveSplits.stream()
@@ -511,9 +511,14 @@ public class HivePageSink
                         options.writingBase(true);
                         Range range = getOnlyElement(vacuumTableHandle.getRanges().get(partition));
                         options.minimumWriteId(range.getMin());
-                        options.maximumWriteId(range.getMax());
+                        if (vacuumTableHandle.isUnifyVacuum()) {
+                            options.maximumWriteId(vacuumTableHandle.getLocationHandle().getJsonSerializablewriteIdInfo().get().getMaxWriteId());
+                        }
+                        else {
+                            options.maximumWriteId(range.getMax());
+                        }
                         Path bucketFile = new Path(split.getPath());
-                        OptionalInt bucketNumber = vacuumTableHandle.isMerge() ? OptionalInt.of(0) : HiveUtil.getBucketNumber(bucketFile.getName());
+                        OptionalInt bucketNumber = vacuumTableHandle.isUnifyVacuum() ? OptionalInt.of(0) : HiveUtil.getBucketNumber(bucketFile.getName());
                         if (bucketNumber.isPresent()) {
                             options.bucket(bucketNumber.getAsInt());
                         }
@@ -801,7 +806,7 @@ public class HivePageSink
     private Block buildBucketBlock(Page page)
     {
         if (acidWriteType == HiveACIDWriteType.VACUUM_UNIFY) {
-            //There is no pre bucket block in case of merge
+            //There is no pre bucket block in case of unify
             return null;
         }
         if (bucketFunction == null) {
