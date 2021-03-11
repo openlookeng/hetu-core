@@ -293,8 +293,6 @@ public class TableScanOperator
     private ReuseExchangeTableScanMappingIdState reuseExchangeTableScanMappingIdState;
     private ListenableFuture<?> spillInProgress = immediateFuture(null);
 
-    private enum READSTATE {READ_MEMORY, READ_DISK}
-
     public TableScanOperator(
             OperatorContext operatorContext,
             PlanNodeId planNodeId,
@@ -443,22 +441,7 @@ public class TableScanOperator
                 reuseExchangeTableScanMappingIdState.setCurConsumerScanNodeRefCount(consumerTableScanNodeCount);
                 if (consumerTableScanNodeCount == 0) {
                     reuseExchangeTableScanMappingIdState.getPageCaches().clear();
-                    if (reuseExchangeTableScanMappingIdState.getPagesWrittenCount() != 0) {
-                        readFromDisk();
-                        LOG.debug("un spilled from disk %s sourceIdString:", sourceIdString);
-                    }
-                    else if (!reuseExchangeTableScanMappingIdState.getPagesToSpill().isEmpty()) {
-                        reuseExchangeTableScanMappingIdState.setPageCaches(reuseExchangeTableScanMappingIdState.getPagesToSpill());
-                        for (String sourceId : reuseExchangeTableScanMappingIdState.getSourceNodeModifiedIdList()) {
-                            //reinitialize indexes for all consumers in this reuseTableScanMappingId here
-                            sourceReuseTableScanMappingIdPositionIndexMap.put(sourceId, 0);
-                        }
-
-                        //restore original count so that all consumers are now active again
-                        reuseExchangeTableScanMappingIdState.setCurConsumerScanNodeRefCount(reuseExchangeTableScanMappingIdState.getTotalConsumerScanNodeCount());
-                        reuseExchangeTableScanMappingIdState.clearPagesToSpill();
-                        LOG.debug("move from Spill cache to Page cache %s sourceIdString:", sourceIdString);
-                    }
+                    unSpillData();
                 }
             }
         }
@@ -466,25 +449,47 @@ public class TableScanOperator
         return newPage;
     }
 
-    private void readFromDisk()
+    private void unSpillData()
     {
-        // no page available in memory, unspill from disk and read
-        List<Iterator<Page>> spilledPages = getSpilledPages();
-        Iterator<Page> readPages;
-        List<Page> pagesRead = new ArrayList<>();
-        if (!spilledPages.isEmpty()) {
-            for (int i = 0; i < spilledPages.size(); ++i) {
-                readPages = spilledPages.get(i);
-                readPages.forEachRemaining(pagesRead::add);
+        boolean isUnSpill = false;
+        if (reuseExchangeTableScanMappingIdState.getPagesWrittenCount() != 0) {
+            // no page available in memory, unspill from disk and read
+            List<Iterator<Page>> spilledPages = getSpilledPages();
+            Iterator<Page> readPages;
+            List<Page> pagesRead = new ArrayList<>();
+            if (!spilledPages.isEmpty()) {
+                for (int i = 0; i < spilledPages.size(); ++i) {
+                    readPages = spilledPages.get(i);
+                    readPages.forEachRemaining(pagesRead::add);
+                }
+
+                if (0 == pagesRead.size()) {
+                    cleanupInErrorCase();
+                    throw new PrestoException(GENERIC_INTERNAL_ERROR, "unSpill have no pages");
+                }
+
+                reuseExchangeTableScanMappingIdState.setPageCaches(pagesRead);
+                reuseExchangeTableScanMappingIdState.setPagesWritten(reuseExchangeTableScanMappingIdState.getPagesWrittenCount() - pagesRead.size());
+                if (reuseExchangeTableScanMappingIdState.getPagesWrittenCount() < 0) {
+                    cleanupInErrorCase();
+                    throw new ArrayIndexOutOfBoundsException("MORE PAGES READ THAN WRITTEN");
+                }
+
+                if (reuseExchangeTableScanMappingIdState.getPagesWrittenCount() == 0) {
+                    deleteSpilledFiles(reuseTableScanMappingId);
+                }
+                isUnSpill = true;
             }
+            LOG.debug("un spilled from disk %s sourceIdString:", sourceIdString);
+        }
+        if (!reuseExchangeTableScanMappingIdState.getPagesToSpill().isEmpty()) {
+            reuseExchangeTableScanMappingIdState.getPageCaches().addAll(reuseExchangeTableScanMappingIdState.getPagesToSpill());
+            reuseExchangeTableScanMappingIdState.setPagesToSpill(new ArrayList<>());
+            LOG.debug("move from Spill cache to Page cache %s sourceIdString:", sourceIdString);
+            isUnSpill = true;
+        }
 
-            if (0 == pagesRead.size()) {
-                cleanupInErrorCase();
-                throw new PrestoException(GENERIC_INTERNAL_ERROR, "unSpill have no pages");
-            }
-
-            reuseExchangeTableScanMappingIdState.setPageCaches(pagesRead);
-
+        if (isUnSpill) {
             for (String sourceId : reuseExchangeTableScanMappingIdState.getSourceNodeModifiedIdList()) {
                 //reinitialize indexes for all consumers in this reuseTableScanMappingId here
                 sourceReuseTableScanMappingIdPositionIndexMap.put(sourceId, 0);
@@ -492,19 +497,13 @@ public class TableScanOperator
 
             //restore original count so that all consumers are now active again
             reuseExchangeTableScanMappingIdState.setCurConsumerScanNodeRefCount(reuseExchangeTableScanMappingIdState.getTotalConsumerScanNodeCount());
+        }
 
-            reuseExchangeTableScanMappingIdState.setPagesWritten(reuseExchangeTableScanMappingIdState.getPagesWrittenCount() - pagesRead.size());
-
-            if (reuseExchangeTableScanMappingIdState.getPagesWrittenCount() < 0) {
-                cleanupInErrorCase();
-                throw new ArrayIndexOutOfBoundsException("MORE PAGES READ THAN WRITTEN");
-            }
-
-            if (reuseExchangeTableScanMappingIdState.getPagesWrittenCount() == 0) {
-                reuseExchangeTableScanMappingIdState.getOperatorContext().destroy();
-                deleteSpilledFiles(reuseTableScanMappingId);
-                //destroy context for producer from here.
-            }
+        if (null != reuseExchangeTableScanMappingIdState.getOperatorContext() &&
+                reuseExchangeTableScanMappingIdState.getPagesWrittenCount() == 0) {
+            //destroy context for producer from here.
+            reuseExchangeTableScanMappingIdState.getOperatorContext().destroy();
+            reuseExchangeTableScanMappingIdState.setOperatorContext(null);
         }
     }
 
@@ -562,10 +561,17 @@ public class TableScanOperator
             boolean finishStatus = reuseExchangeTableScanMappingIdState.getPageCaches().isEmpty()
                     || (sourceReuseTableScanMappingIdPositionIndexMap.get(sourceIdString) != null
                     && sourceReuseTableScanMappingIdPositionIndexMap.get(sourceIdString) >= reuseExchangeTableScanMappingIdState.getPageCaches().size()
-                    && reuseExchangeTableScanMappingIdState.getPagesWrittenCount() == 0);
+                    && reuseExchangeTableScanMappingIdState.getPagesWrittenCount() == 0
+                    && reuseExchangeTableScanMappingIdState.getPagesToSpill().size() == 0);
 
             if (finishStatus && reuseExchangeTableScanMappingIdState.getCurConsumerScanNodeRefCount() <= 0) {
                 // if it is last consumer remove ReuseExchangeTableScanMappingIdState from ConcurrentMap
+                LOG.debug("checkFinished remove %s", reuseTableScanMappingId.toString());
+
+                for (String sourceId : reuseExchangeTableScanMappingIdState.getSourceNodeModifiedIdList()) {
+                    //reinitialize indexes for all consumers in this reuseTableScanMappingId here
+                    sourceReuseTableScanMappingIdPositionIndexMap.remove(sourceId);
+                }
                 reuseExchangeTableScanMappingIdUtilsMap.remove(reuseTableScanMappingId);
             }
             return finishStatus;
@@ -763,8 +769,12 @@ public class TableScanOperator
 
     private void cleanupInErrorCase()
     {
-        reuseExchangeTableScanMappingIdState.getOperatorContext().destroy();
         deleteSpilledFiles(reuseTableScanMappingId);
+        if (null != reuseExchangeTableScanMappingIdState.getOperatorContext()) {
+            //destroy context for producer from here.
+            reuseExchangeTableScanMappingIdState.getOperatorContext().destroy();
+            reuseExchangeTableScanMappingIdState.setOperatorContext(null);
+        }
         reuseExchangeTableScanMappingIdUtilsMap.remove(reuseTableScanMappingId);
     }
 }
