@@ -50,6 +50,15 @@ public class BloomFilterDynamicFilter
         this.bloomFilterDeserialized = bloomFilterDeserialized;
     }
 
+    private BloomFilterDynamicFilter(String filterId, ColumnHandle columnHandle, BloomFilter bloomFilterDeserialized, byte[] bloomFilterSerialized, Type type)
+    {
+        this.filterId = filterId;
+        this.type = type;
+        this.columnHandle = columnHandle;
+        this.bloomFilterSerialized = bloomFilterSerialized;
+        this.bloomFilterDeserialized = bloomFilterDeserialized;
+    }
+
     public static BloomFilterDynamicFilter fromHashSetDynamicFilter(HashSetDynamicFilter hashSetDynamicFilter)
     {
         return fromHashSetDynamicFilter(hashSetDynamicFilter, DEFAULT_BLOOM_FILTER_FPP);
@@ -115,7 +124,7 @@ public class BloomFilterDynamicFilter
     @Override
     public DynamicFilter clone()
     {
-        DynamicFilter clone = new BloomFilterDynamicFilter(filterId, columnHandle, bloomFilterDeserialized, type);
+        DynamicFilter clone = new BloomFilterDynamicFilter(filterId, columnHandle, bloomFilterDeserialized, bloomFilterSerialized, type);
         clone.setMax(max);
         clone.setMax(min);
         return clone;
