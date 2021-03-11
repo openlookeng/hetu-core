@@ -104,15 +104,19 @@ public class BloomFilterDynamicFilter
     public boolean contains(Object value)
     {
         // TODO: Only support Long and Slice value for now, fix this and use original value type
+        if (value == null) {
+            return bloomFilterDeserialized.test((byte[]) null);
+        }
+
         if (value instanceof Long) {
             return bloomFilterDeserialized.test((Long) value);
         }
-        else if (value instanceof Slice) {
+
+        if (value instanceof Slice) {
             return bloomFilterDeserialized.test((Slice) value);
         }
-        else {
-            return bloomFilterDeserialized.test(((String) value).getBytes());
-        }
+
+        return bloomFilterDeserialized.test(((String) value).getBytes());
     }
 
     @Override

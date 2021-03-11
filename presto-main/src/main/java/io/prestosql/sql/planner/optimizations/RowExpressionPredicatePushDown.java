@@ -46,6 +46,7 @@ import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.sql.RowExpressionUtils;
 import io.prestosql.spi.type.TypeManager;
+import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.RowExpressionEqualityInference;
 import io.prestosql.sql.planner.RowExpressionInterpreter;
@@ -78,6 +79,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -331,8 +333,17 @@ public class RowExpressionPredicatePushDown
                     .filter(childOutputSet::contains)
                     .collect(Collectors.groupingBy(identity(), Collectors.counting()));
 
+            AtomicInteger maxOccurance = new AtomicInteger(1);
+            if (expression instanceof CallExpression) {
+                CallExpression callExpression = (CallExpression) expression;
+                if (callExpression.getSignature().getName().equals(DynamicFilters.Function.NAME)
+                        && callExpression.getFilter().isPresent()) {
+                    maxOccurance.set(3);
+                }
+            }
+
             return dependencies.entrySet().stream()
-                    .allMatch(entry -> entry.getValue() == 1 || node.getAssignments().get(toSymbol(entry.getKey())) instanceof ConstantExpression);
+                    .allMatch(entry -> entry.getValue() == maxOccurance.get() || node.getAssignments().get(toSymbol(entry.getKey())) instanceof ConstantExpression);
         }
 
         @Override

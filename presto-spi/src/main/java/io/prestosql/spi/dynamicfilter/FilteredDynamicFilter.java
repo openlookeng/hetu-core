@@ -42,7 +42,7 @@ public class FilteredDynamicFilter
             return super.contains(value);
         }
         for (Object dynamicFilterValue : valueSet) {
-            if (filter.get().test(ImmutableList.of(value, dynamicFilterValue))) {
+            if (value != null && filter.get().test(ImmutableList.of(value, dynamicFilterValue))) {
                 return true;
             }
         }
