@@ -175,7 +175,7 @@ class RelationPlanner
             Type[] types = scope.getRelationType().getAllFields().stream().map(Field::getType).toArray(Type[]::new);
             RelationPlan withCoercions = addCoercions(subPlan, types);
             if ((!isCTEReuseEnabled(session) || getExecutionPolicy(session).equals("phased"))
-                    || (getCteMaxQueueSize(session) < getTaskConcurrency(session) * 2) || !((Query) analysis.getStatement()).getWith().isPresent()) {
+                    || (getCteMaxQueueSize(session) < getTaskConcurrency(session) * 2) || !(analysis.getStatement() instanceof Query) || !((Query) analysis.getStatement()).getWith().isPresent()) {
                 if (getCteMaxQueueSize(session) < getTaskConcurrency(session) * 2) {
                     LOG.info("Main queue size " + getCteMaxQueueSize(session) + "should be more than 2 times of concurrent task " + getTaskConcurrency(session));
                 }
