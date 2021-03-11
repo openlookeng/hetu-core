@@ -150,6 +150,7 @@
         <module>hetu-common</module>
         <module>hetu-hazelcast</module>
         <module>hetu-function-namespace-managers</module>
+        <module>hetu-greenplum</module>
     </modules>
 
     <dependencyManagement>
