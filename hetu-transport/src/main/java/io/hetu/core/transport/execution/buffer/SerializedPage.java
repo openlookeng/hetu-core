@@ -40,12 +40,6 @@ public class SerializedPage
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SerializedPage.class).instanceSize();
 
-    public static SerializedPage forMarker(MarkerPage marker)
-    {
-        byte[] bytes = marker.serialize();
-        return new SerializedPage(bytes, PageCodecMarker.MARKER_PAGE.set(PageCodecMarker.none()), 1, bytes.length);
-    }
-
     private final Slice slice;
     private final int positionCount;
     private final int uncompressedSizeInBytes;
@@ -55,6 +49,12 @@ public class SerializedPage
     // origin may be null, when it is unknown or uninteresting
     // TODO-cp-I2D63E: remove origin and introduce PageInTransition to include page, origin, and target
     private String origin;
+
+    public static SerializedPage forMarker(MarkerPage marker)
+    {
+        byte[] bytes = marker.serialize();
+        return new SerializedPage(bytes, PageCodecMarker.MARKER_PAGE.set(PageCodecMarker.none()), 1, bytes.length);
+    }
 
     @JsonCreator
     public SerializedPage(

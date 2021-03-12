@@ -1030,14 +1030,6 @@ public class HivePageSink
         }
 
         // TODO-cp-I2BZ0A: ClassNotFoundException when using "State" class, because Hive classes are from a different classloader
-//        State state = new State();
-//        state.pagePartitioner = pagePartitioner.pageIndexer.capture(serdeProvider);
-//        state.writerFactory = writerFactory.capture(serdeProvider);
-//        state.writerParams = new ArrayList<>(writerParams);
-//        state.rows = rows;
-//        state.writtenBytes = writtenBytes;
-//        state.systemMemoryUsage = systemMemoryUsage;
-//        state.validationCpuNanos = validationCpuNanos;
         Map<String, Object> state = new HashMap<>();
         state.put("pagePartitioner", pagePartitioner.pageIndexer.capture(serdeProvider));
         state.put("writerFactory", writerFactory.capture(serdeProvider));
@@ -1060,15 +1052,6 @@ public class HivePageSink
     {
         checkState(writers.isEmpty());
         // TODO-cp-I2BZ0A: ClassNotFoundException when using "State" class, because Hive classes are from a different classloader
-//        State state = (State) obj;
-//        pagePartitioner.pageIndexer.restore(state.pagePartitioner, serdeProvider);
-//        writerFactory.restore(state.writerFactory, serdeProvider);
-//        writerParams.clear();
-//        writerParams.addAll(state.writerParams);
-//        rows = state.rows;
-//        writtenBytes = state.writtenBytes;
-//        systemMemoryUsage = state.systemMemoryUsage;
-//        validationCpuNanos = state.validationCpuNanos;
         Map<String, Object> state = (Map<String, Object>) obj;
         pagePartitioner.pageIndexer.restore(state.get("pagePartitioner"), serdeProvider);
         writerFactory.restore(state.get("writerFactory"), serdeProvider);
