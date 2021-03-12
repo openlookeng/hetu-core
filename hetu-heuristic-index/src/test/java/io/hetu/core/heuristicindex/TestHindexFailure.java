@@ -150,13 +150,13 @@ public class TestHindexFailure
             throws SemanticException
     {
         String tableName = getNewTableName();
-        String wrongTableName = "hive." + tableName.substring(10);
+        String wrongTableName = "hive.nonexistingschema." + tableName.substring(10);
         createEmptyTable(tableName);
 
         String indexName = getNewIndexName();
         assertContains("CREATE INDEX " + indexName + " USING " +
                         indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
-                "Schema hive does not exist");
+                "Table '" + wrongTableName + "' is invalid");
     }
 
     // Tests the case where index is trying to be created with a wrong schema name (Error case).
@@ -171,7 +171,7 @@ public class TestHindexFailure
         String indexName = getNewIndexName();
         assertContains("CREATE INDEX " + indexName + " USING " +
                         indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
-                "Schema nonexisting does not exist");
+                "Table '" + wrongTableName + "' is invalid");
     }
 
     // Tests the case where index is trying to be created without table name (Error case).
@@ -184,7 +184,7 @@ public class TestHindexFailure
         String indexName = getNewIndexName();
         assertContains("CREATE INDEX " + indexName + " USING " +
                         indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
-                "Schema hive does not exist");
+                "Table 'hive." + wrongTableName + "' is invalid");
     }
 
     // Tests the case where index is trying to be created with a wrong table name (Error case).
@@ -199,7 +199,7 @@ public class TestHindexFailure
         String indexName = getNewIndexName();
         assertContains("CREATE INDEX " + indexName + " USING " +
                         indexType + " ON " + wrongTableName + " (" + queryVariable + ")",
-                "Table " + wrongTableName + " does not exist");
+                "Table '" + wrongTableName + "' is invalid");
     }
 
     // Tests the case where index is trying to be created without column name (Error case).

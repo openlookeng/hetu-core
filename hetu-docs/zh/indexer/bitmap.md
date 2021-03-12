@@ -1,15 +1,15 @@
 
 # BitmapIndex（位图索引）
 
-BitmapIndex使用位图来进行早期行过滤，这可以帮助减少CPU和内存使用量。
+BitmapIndex使用Bitmap来进行早期行过滤，这可以帮助减少CPU和内存使用量。
 这在高并发queries中是有益的。
 
-BitmapIndex对于低基数（即独特数据不多的）的列效果很好，
-因为index的大小随着独特数量的增加而增加。
+BitmapIndex对于低基数（low cardinality, 即不同数据值的个数不多）的列效果很好，
+因为index的大小随着不同值数量的增加而增加。
 例如，`gender`之类的列将具有较小的尺寸。
-而像`id`这样的列将具有一个极高的大小（不推荐）。
+而像`id`这样的列有很多不同的值，因此不推荐使用位图索引。
 
-Bitmap是为每个独特列值而构造一个位图，可以用来记录并且在其中找到该值的行号。
+Bitmap是为每个不同的值构造一个位图，并记录包含该值的行号。
 然后，B+Tree会被用来存储值与其位图之间的映射。
 通过使用B+Tree，BitmapIndex可以支持使用运算符之类的范围query，例如
 大于（`>`），小于（`<`），`BETWEEN`等。
@@ -27,8 +27,7 @@ BitmapIndex用于过滤从ORC文件中读取的数据，且仅供worker节点使
 
 ## 选择适用的列
 
-以高并发率运行的queries，并且在具有低基数（独特值不多的）条件的列上具有过滤predicates
-可以从BitmapIndex中得到好的效果。
+以高并发数运行的queries，并且在低基数的列上过滤predicates可以从BitmapIndex中得到好的效果。
 
 例如，类似`SELECT * FROM Employees WHERE gender='M' AND type='FULLTIME' AND salary>10000`的query
 可以在`gender`和`type`列上用BitmapIndex并且得到好的效果，因为数据在两列上都被过滤，并且两者的基数都很低。
@@ -44,7 +43,9 @@ BitmapIndex用于过滤从ORC文件中读取的数据，且仅供worker节点使
     IN      IN set
     
 ## 支持的列类型
-    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"
+    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date", "decimal"
+
+**注意:** 不支持采用其它数据类型来创建index。
 
 ## 用例
 
@@ -64,7 +65,7 @@ select * from hive.hindex.users where age>20
 select * from hive.hindex.users where age<25
 select * from hive.hindex.users where age>=21
 select * from hive.hindex.users where age<=24
-select * from hive.hindex.users where age between (20, 25)
+select * from hive.hindex.users where age between 20 AND 25
 select * from hive.hindex.users where age in (22, 23)
 ```
 
@@ -74,8 +75,8 @@ select * from hive.hindex.users where age in (22, 23)
 2. 数据作为有序列表插入，数据顺序是根据在Stripe中的出现顺序。
    对于以下示例，`/hive/database.db/animals/000.orc stripe 1`的数据将如下插入：  
    `["Ant", "Crab", "Bat", "Whale", "Ant", "Monkey"]`  
-   诸如上次修改时间之类的其他信息将作为元数据存储，以确保不使用陈旧索引。
-3. 数据插入完成后，将为每个独特值创建一个Bitmap。这是一种跟踪值存在的行的紧凑方式。（请参见表）
+   诸如上次修改时间之类的其他信息将作为元数据存储并在调用时检查，以确保不使用陈旧索引。
+3. 数据插入完成后，将为每个独特值创建一个Bitmap。这是一种紧凑的跟踪值是否存在的方式。（请参见表）
 4. 一旦为独特值创建了Bitmap。该值和相应的Bitmap被压缩并存储在B+Tree中，以允许在`O(log(n))`之内的运行速度来快速查找。
 
 ![bitmap_animal_table](../images/bitmap_animal_table.png)

@@ -26,7 +26,9 @@ MinMaxIndex用于调度时的分片过滤，被coordinator节点使用。
     <=      Less than or equal
 
 ## 支持的列类型
-    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"
+    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date", "decimal"
+
+**注意:** 不支持采用其它数据类型来创建index。
 
 ## 用例
 

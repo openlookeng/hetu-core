@@ -37,17 +37,24 @@ public class FileSystemClientManager
     private static final String FS_CLIENT_TYPE = "fs.client.type";
     private static final String FS_CONFIG_DIR = "etc/filesystem/";
     private static final String DEFAULT_CONFIG_NAME = "default";
+    private static final String TEST_HDFS = "__test__hdfs__";
 
     private static final Map<String, HetuFileSystemClientFactory> fileSystemFactories = new ConcurrentHashMap<>();
     private static final Map<String, Properties> availableFileSystemConfigs = new ConcurrentHashMap<>();
 
-    private Properties defaultProfile;
-
     public FileSystemClientManager()
     {
         // Default filesystem to be a local filesystem client
-        defaultProfile = new Properties();
+        Properties defaultProfile = new Properties();
         defaultProfile.setProperty(FS_CLIENT_TYPE, "local");
+
+        Properties testHdfsProfile = new Properties();
+        testHdfsProfile.setProperty("fs.client.type", "hdfs");
+        testHdfsProfile.setProperty("hdfs.config.resources", "");
+        testHdfsProfile.setProperty("hdfs.authentication.type", "NONE");
+
+        availableFileSystemConfigs.put(DEFAULT_CONFIG_NAME, defaultProfile);
+        availableFileSystemConfigs.put(TEST_HDFS, testHdfsProfile);
     }
 
     public void addFileSystemClientFactories(HetuFileSystemClientFactory factory)
@@ -92,16 +99,9 @@ public class FileSystemClientManager
             checkState(fileSystemFactories.containsKey(configType),
                     "Factory for file system type %s not found", configType);
 
-            // If a file defines default properties, overwrite default then continue to next file
-            if (DEFAULT_CONFIG_NAME.equals(configName)) {
-                defaultProfile = properties;
-                LOG.info("default profile has been overridden by default.properties");
-            }
-            // otherwise register config file into the map
-            else {
-                availableFileSystemConfigs.put(configName, properties);
-                LOG.info(String.format("Loaded '%s' file system config '%s'", configType, configName));
-            }
+            // register profile into the map. will overwrite existing profile
+            availableFileSystemConfigs.put(configName, properties);
+            LOG.info(String.format("Loaded '%s' file system config '%s'", configType, configName));
         }
 
         LOG.info(String.format("-- Loaded file system profiles: %s --",
@@ -132,10 +132,10 @@ public class FileSystemClientManager
     public HetuFileSystemClient getFileSystemClient(String name, Path root)
             throws IOException
     {
-        if (!DEFAULT_CONFIG_NAME.equals(name) && !availableFileSystemConfigs.containsKey(name)) {
+        if (!availableFileSystemConfigs.containsKey(name)) {
             throw new IllegalArgumentException(String.format("Profile %s is not available. Please check the name provided.", name));
         }
-        Properties fsConfig = DEFAULT_CONFIG_NAME.equals(name) ? defaultProfile : availableFileSystemConfigs.get(name);
+        Properties fsConfig = availableFileSystemConfigs.get(name);
         String type = fsConfig.getProperty(FS_CLIENT_TYPE);
         HetuFileSystemClientFactory factory = fileSystemFactories.get(type);
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(factory.getClass().getClassLoader())) {
@@ -193,10 +193,10 @@ public class FileSystemClientManager
      */
     public boolean isFileSystemLocal(String name)
     {
-        if (!DEFAULT_CONFIG_NAME.equals(name) && !availableFileSystemConfigs.containsKey(name)) {
+        if (!availableFileSystemConfigs.containsKey(name)) {
             throw new IllegalArgumentException(String.format("Profile %s is not available. Please check the name provided.", name));
         }
-        Properties fsConfig = DEFAULT_CONFIG_NAME.equals(name) ? defaultProfile : availableFileSystemConfigs.get(name);
+        Properties fsConfig = availableFileSystemConfigs.get(name);
         return fsConfig.getProperty(FS_CLIENT_TYPE).equals("local");
     }
 }

@@ -44,7 +44,9 @@ BTreeIndex用于调度时的分片(Split)过滤，被coordinator节点使用。
     IN      IN set
 
 ## 支持的列类型
-    "integer", "smallint", "bigint", "tinyint", "varchar", "real", "date"
+    "integer", "smallint", "bigint", "tinyint", "varchar", "double", "real", "date", "decimal"
+
+**注意:** 不支持采用其它数据类型来创建index。
 
 ## 用例
 
@@ -65,7 +67,7 @@ select * from hive.hindex.orders where orderid>12345
 select * from hive.hindex.orders where orderid<12345
 select * from hive.hindex.orders where orderid>=12345
 select * from hive.hindex.orders where orderid<=12345
-select * from hive.hindex.orders where orderid between (10000, 20000)
+select * from hive.hindex.orders where orderid between 10000 AND 20000
 select * from hive.hindex.orders where orderid in (12345, 7890)
 ```
 

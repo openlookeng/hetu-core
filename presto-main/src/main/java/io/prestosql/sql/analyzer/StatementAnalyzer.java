@@ -2812,10 +2812,13 @@ class StatementAnalyzer
                     throw new SemanticException(MISSING_ATTRIBUTE, table, "Column '%s' cannot be resolved", column.getValue());
                 }
             }
+
+            if (partitionColumn != null && !tableHandle.get().getConnectorHandle().isPartitionColumn(partitionColumn)) {
+                throw new SemanticException(NOT_SUPPORTED, table, "Heuristic index creation is only supported for predicates on partition columns");
+            }
         }
-        if (tableHandle.isPresent() && partitionColumn != null
-                && !tableHandle.get().getConnectorHandle().isPartitionColumn(partitionColumn)) {
-            throw new SemanticException(NOT_SUPPORTED, table, "Heuristic index creation is only supported for predicates on partition columns");
+        else {
+            throw new SemanticException(MISSING_ATTRIBUTE, table, "Table '%s' is invalid", tableFullName);
         }
 
         List<Pair<String, Type>> indexColumns = new LinkedList<>();

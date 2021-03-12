@@ -3,7 +3,7 @@
 
 BloomIndex使用Bloom Filters(布隆过滤器)来在计划期间和读取数据时进行过滤。
 
-BloomIndex对于具有高基数的列以及索引大小很小的列都适用。
+BloomIndex对于具有高基数（有许多不同值）的列以及索引大小很小的列都适用。
 
 布隆过滤器是使用列值构造的。然后在查找过程中，布隆过滤器会告诉我们布隆过滤器中是否有给定值。
 
@@ -28,7 +28,9 @@ BloomIndex仅支持相等表达式，例如`name='monkey'`。
     =       Equality
 
 ## 支持的列类型
-    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date"
+    "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date", "decimal"
+
+**注意:** 不支持采用其它数据类型来创建index。
 
 ## 配置参数
 
