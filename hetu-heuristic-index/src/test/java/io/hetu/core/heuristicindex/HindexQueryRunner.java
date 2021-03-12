@@ -15,7 +15,9 @@
 package io.hetu.core.heuristicindex;
 
 import com.google.common.io.Files;
+import io.airlift.testing.mysql.TestingMySqlServer;
 import io.hetu.core.common.filesystem.TempFolder;
+import io.hetu.core.common.util.SslSocketUtil;
 import io.hetu.core.filesystem.HetuFileSystemClientPlugin;
 import io.hetu.core.metastore.HetuMetastorePlugin;
 import io.prestosql.Session;
@@ -45,14 +47,19 @@ public final class HindexQueryRunner
             throws Exception
     {
         TempFolder folder = new TempFolder();
-        Runtime.getRuntime().addShutdownHook(new Thread(folder::close));
+        TestingMySqlServer mysqlServer = new TestingMySqlServer("test", "mysql", "metastore1");
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            folder.close();
+            mysqlServer.close();
+        }));
 
-        DistributedQueryRunner queryRunner = null; // Use this to return if no exceptions
+        DistributedQueryRunner queryRunner; // Use this to return if no exceptions
 
         // Try to get a free port and start up the host
-        for (int port = 8080; port <= 65535; port++) {
-            // Use starting host at port 8080, max 2^16-1
+        for (int i = 0; i < 10; i++) {
+            int port = -1;
             try {
+                port = SslSocketUtil.getAvailablePort();
                 folder.create();
                 Map<String, String> configs = new HashMap<>();
                 configs.put("http-server.http.port", Integer.toString(port));
@@ -61,25 +68,21 @@ public final class HindexQueryRunner
                 configs.put("hetu.heuristicindex.filter.cache.loading-delay", "100ms");
                 configs.put("hetu.heuristicindex.indexstore.uri", folder.getRoot().getAbsolutePath());
                 configs.put("hetu.heuristicindex.indexstore.filesystem.profile", "__test__hdfs__");
-
-                File subFolder = folder.newFolder();
                 Map<String, String> metastoreConfig = new HashMap<>();
-                metastoreConfig.put("hetu.metastore.type", "hetufilesystem");
-                metastoreConfig.put("hetu.metastore.hetufilesystem.profile-name", "default");
-                metastoreConfig.put("hetu.metastore.hetufilesystem.path", subFolder.getAbsolutePath());
+                metastoreConfig.put("hetu.metastore.type", "jdbc");
+                metastoreConfig.put("hetu.metastore.db.url", mysqlServer.getJdbcUrl("metastore1"));
+                metastoreConfig.put("hetu.metastore.db.user", mysqlServer.getUser());
+                metastoreConfig.put("hetu.metastore.db.password", mysqlServer.getPassword());
 
                 queryRunner = createQueryRunner(configs, metastoreConfig, Collections.emptyMap());
-                break;
+                queryRunner.registerCloseable(mysqlServer);
+                return queryRunner;
             }
             catch (Exception portException) {
-                if (port >= 65535) {
-                    // No free ports
-                    throw new Exception("No more free ports for hosting server.");
-                }
-                continue;
+                System.out.printf("Failed to start testing server with port %d. Retrying.%n", port);
             }
         }
-        return queryRunner;
+        throw new Exception("Reached maximum attempt to start testing server.");
     }
 
     public static DistributedQueryRunner createQueryRunner(Map<String, String> extraProperties,
