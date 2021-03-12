@@ -49,6 +49,7 @@ import io.prestosql.testing.TestingAccessControlManager;
 import io.prestosql.transaction.TransactionManager;
 import org.intellij.lang.annotations.Language;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
@@ -180,6 +181,11 @@ public class DistributedQueryRunner
             sessionPropertyManager.addSystemSessionProperties(TEST_SYSTEM_PROPERTIES);
             sessionPropertyManager.addConnectorSessionProperties(bogusTestingCatalog.getConnectorCatalogName(), TEST_CATALOG_PROPERTIES);
         }
+    }
+
+    public void registerCloseable(Closeable closeable)
+    {
+        closer.register(closeable);
     }
 
     private static TestingPrestoServer createTestingPrestoServer(URI discoveryUri, boolean coordinator, Map<String, String> extraProperties, SqlParserOptions parserOptions, String environment, Optional<Path> baseDataDir)
