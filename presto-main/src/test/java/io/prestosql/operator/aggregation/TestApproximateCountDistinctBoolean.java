@@ -16,6 +16,7 @@ package io.prestosql.operator.aggregation;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Booleans;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.Type;
 import org.testng.annotations.DataProvider;
@@ -35,8 +36,8 @@ public class TestApproximateCountDistinctBoolean
     @Override
     protected InternalAggregationFunction getAggregationFunction()
     {
-        return metadata.getAggregateFunctionImplementation(
-                new Signature("approx_distinct", AGGREGATE, BIGINT.getTypeSignature(), BOOLEAN.getTypeSignature(), DOUBLE.getTypeSignature()));
+        return metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("approx_distinct"), AGGREGATE, BIGINT.getTypeSignature(), BOOLEAN.getTypeSignature(), DOUBLE.getTypeSignature()));
     }
 
     @Override

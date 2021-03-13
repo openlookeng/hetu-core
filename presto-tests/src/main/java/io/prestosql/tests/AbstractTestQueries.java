@@ -2551,7 +2551,7 @@ public abstract class AbstractTestQueries
     {
         MaterializedResult result = computeActual("SHOW FUNCTIONS");
         ImmutableMultimap<String, MaterializedRow> functions = Multimaps.index(result.getMaterializedRows(), input -> {
-            assertEquals(input.getFieldCount(), 6);
+            assertEquals(input.getFieldCount(), 8);
             return (String) input.getField(0);
         });
 

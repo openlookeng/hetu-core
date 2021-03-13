@@ -15,22 +15,23 @@ package io.prestosql.operator.scalar;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlOperator;
 import io.prestosql.spi.block.Block;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.analyzer.TypeSignatureProvider;
 
 import java.lang.invoke.MethodHandle;
 import java.util.List;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.OperatorType.EQUAL;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.Signature.comparableWithVariadicBound;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.type.TypeUtils.readNativeValue;
@@ -53,31 +54,30 @@ public class RowEqualOperator
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         RowType type = (RowType) boundVariables.getTypeVariable("T");
-        return new ScalarFunctionImplementation(
+        return new BuiltInScalarFunctionImplementation(
                 true,
                 ImmutableList.of(
                         valueTypeArgumentProperty(RETURN_NULL_ON_NULL),
                         valueTypeArgumentProperty(RETURN_NULL_ON_NULL)),
                 METHOD_HANDLE
                         .bindTo(type)
-                        .bindTo(resolveFieldEqualOperators(type, metadata)),
-                isDeterministic());
+                        .bindTo(resolveFieldEqualOperators(type, functionAndTypeManager)));
     }
 
-    public static List<MethodHandle> resolveFieldEqualOperators(RowType rowType, Metadata metadata)
+    public static List<MethodHandle> resolveFieldEqualOperators(RowType rowType, FunctionAndTypeManager functionAndTypeManager)
     {
         return rowType.getTypeParameters().stream()
-                .map(type -> resolveEqualOperator(type, metadata))
+                .map(type -> resolveEqualOperator(type, functionAndTypeManager))
                 .collect(toImmutableList());
     }
 
-    private static MethodHandle resolveEqualOperator(Type type, Metadata metadata)
+    private static MethodHandle resolveEqualOperator(Type type, FunctionAndTypeManager functionAndTypeManager)
     {
-        Signature operator = metadata.resolveOperator(EQUAL, ImmutableList.of(type, type));
-        ScalarFunctionImplementation implementation = metadata.getScalarFunctionImplementation(operator);
+        FunctionHandle operator = functionAndTypeManager.resolveOperatorFunctionHandle(EQUAL, TypeSignatureProvider.fromTypes(type, type));
+        BuiltInScalarFunctionImplementation implementation = functionAndTypeManager.getBuiltInScalarFunctionImplementation(operator);
         return implementation.getMethodHandle();
     }
 

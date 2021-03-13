@@ -15,17 +15,17 @@ package io.prestosql.operator.scalar;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlOperator;
 import io.prestosql.spi.annotation.UsedByGeneratedCode;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.type.Type;
 
 import java.lang.invoke.MethodHandle;
 
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.OperatorType.CAST;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.Signature.typeVariable;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.util.Reflection.methodHandle;
@@ -46,15 +46,14 @@ public final class CastFromUnknownOperator
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         Type toType = boundVariables.getTypeVariable("E");
         MethodHandle methodHandle = METHOD_HANDLE_NON_NULL.asType(METHOD_HANDLE_NON_NULL.type().changeReturnType(toType.getJavaType()));
-        return new ScalarFunctionImplementation(
+        return new BuiltInScalarFunctionImplementation(
                 false,
                 ImmutableList.of(valueTypeArgumentProperty(RETURN_NULL_ON_NULL)),
-                methodHandle,
-                isDeterministic());
+                methodHandle);
     }
 
     @UsedByGeneratedCode

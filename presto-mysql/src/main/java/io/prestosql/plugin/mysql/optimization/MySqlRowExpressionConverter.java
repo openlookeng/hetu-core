@@ -14,11 +14,18 @@
  */
 package io.prestosql.plugin.mysql.optimization;
 
+import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.optimization.BaseJdbcRowExpressionConverter;
+import io.prestosql.plugin.jdbc.optimization.JdbcConverterContext;
+import io.prestosql.plugin.mysql.MySqlConstants;
+import io.prestosql.plugin.mysql.optimization.function.MySqlApplyRemoteFunctionPushDown;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.ConstantExpression;
+import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.type.CharType;
@@ -29,39 +36,51 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarbinaryType;
 import io.prestosql.spi.type.VarcharType;
 
+import java.util.Optional;
+
 import static io.prestosql.plugin.mysql.optimization.MySqlPushDownUtils.getCastExpression;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
-import static io.prestosql.spi.function.StandardFunctionUtils.isArrayConstructor;
-import static io.prestosql.spi.function.StandardFunctionUtils.isCastFunction;
-import static io.prestosql.spi.function.StandardFunctionUtils.isSubscriptFunction;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static io.prestosql.sql.builder.functioncall.BaseFunctionUtil.isDefaultFunction;
 
 public class MySqlRowExpressionConverter
         extends BaseJdbcRowExpressionConverter
 {
-    public MySqlRowExpressionConverter(RowExpressionService rowExpressionService)
+    private final MySqlApplyRemoteFunctionPushDown mySqlApplyRemoteFunctionPushDown;
+
+    public MySqlRowExpressionConverter(DeterminismEvaluator determinismEvaluator, RowExpressionService rowExpressionService, FunctionMetadataManager functionManager, StandardFunctionResolution functionResolution, BaseJdbcConfig baseJdbcConfig)
     {
-        super(rowExpressionService);
+        super(functionManager, functionResolution, rowExpressionService, determinismEvaluator);
+        this.mySqlApplyRemoteFunctionPushDown = new MySqlApplyRemoteFunctionPushDown(baseJdbcConfig, MySqlConstants.MYSQL_CONNECTOR_NAME);
     }
 
     @Override
-    public String visitCall(CallExpression call, Void context)
+    public String visitCall(CallExpression call, JdbcConverterContext context)
     {
-        Signature signature = call.getSignature();
-        if (isArrayConstructor(signature)) {
+        // remote udf verify
+        FunctionHandle functionHandle = call.getFunctionHandle();
+        if (!isDefaultFunction(call)) {
+            Optional<String> result = mySqlApplyRemoteFunctionPushDown.rewriteRemoteFunction(call, this, context);
+            if (result.isPresent()) {
+                return result.get();
+            }
+            throw new PrestoException(NOT_SUPPORTED, String.format("MySql connector does not support remote function: %s.%s", call.getDisplayName(), call.getFunctionHandle().getFunctionNamespace()));
+        }
+
+        if (standardFunctionResolution.isArrayConstructor(functionHandle)) {
             throw new PrestoException(NOT_SUPPORTED, "MySql connector does not support array constructor");
         }
-        if (isSubscriptFunction(signature)) {
+        if (standardFunctionResolution.isSubscriptFunction(functionHandle)) {
             throw new PrestoException(NOT_SUPPORTED, "MySql connector does not support subscript expression");
         }
-        if (isCastFunction(signature)) {
+        if (standardFunctionResolution.isCastFunction(functionHandle)) {
             // deal with literal, when generic literal expression translate to rowExpression, it will be
             // translated to a 'CAST' rowExpression with a varchar type 'CONSTANT' rowExpression, in some
             // case, 'CAST' is superfluous
             RowExpression argument = call.getArguments().get(0);
             Type type = call.getType();
             if (argument instanceof ConstantExpression && argument.getType().equals(VARCHAR)) {
-                String value = argument.accept(this, null);
+                String value = argument.accept(this, context);
                 if (type instanceof VarcharType
                         || type instanceof CharType
                         || type instanceof VarbinaryType
@@ -72,10 +91,11 @@ public class MySqlRowExpressionConverter
                 }
             }
             if (call.getType().getDisplayName().equals(LIKE_PATTERN_NAME)) {
-                return call.getArguments().get(0).accept(this, null);
+                return call.getArguments().get(0).accept(this, context);
             }
-            return getCastExpression(call.getArguments().get(0).accept(this, null), call.getType());
+            return getCastExpression(call.getArguments().get(0).accept(this, context), call.getType());
         }
+
         return super.visitCall(call, context);
     }
 }

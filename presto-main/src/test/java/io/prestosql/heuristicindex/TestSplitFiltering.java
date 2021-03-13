@@ -20,6 +20,7 @@ import io.airlift.units.Duration;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.filesystem.FileSystemClientManager;
+import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.Split;
 import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.spi.HetuConstant;
@@ -37,7 +38,7 @@ import io.prestosql.spi.type.VarcharType;
 import io.prestosql.split.SplitSource;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
 import io.prestosql.sql.relational.Expressions;
-import io.prestosql.sql.relational.Signatures;
+import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.utils.MockSplit;
 import io.prestosql.utils.TestUtil;
 import org.testng.annotations.Test;
@@ -54,8 +55,10 @@ import java.util.concurrent.TimeUnit;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.heuristicindex.SplitFiltering.getAllColumns;
 import static io.prestosql.heuristicindex.SplitFiltering.rangeSearch;
+import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -63,6 +66,8 @@ import static org.testng.Assert.assertTrue;
 
 public class TestSplitFiltering
 {
+    private static final Metadata METADATA = createTestMetadataManager();
+
     /**
      * This test will not actually filter any splits since the indexes will not be found,
      * instead it's just testing the flow. The actual filtering is tested in other classes.
@@ -130,16 +135,16 @@ public class TestSplitFiltering
         testIsSplitFilterApplicableForOperator(
                 PlanBuilder.comparison(OperatorType.LESS_THAN_OR_EQUAL, new VariableReferenceExpression("a", VarcharType.VARCHAR), new ConstantExpression(utf8Slice("hello"), VarcharType.VARCHAR)),
                 true);
-
+        FunctionResolution functionResolution = new FunctionResolution(METADATA.getFunctionAndTypeManager());
         // NOT is not supported
         testIsSplitFilterApplicableForOperator(
-                Expressions.call(Signatures.notSignature(), BOOLEAN, new VariableReferenceExpression("a", VarcharType.VARCHAR)),
+                Expressions.call("NOT", functionResolution.notFunction(), BOOLEAN, new VariableReferenceExpression("a", VarcharType.VARCHAR)),
                 true);
 
         // Test multiple supported predicates
         // AND is supported
-        RowExpression castExpressionA = Expressions.call(Signatures.castSignature(BIGINT, BIGINT), BIGINT, new VariableReferenceExpression("a", BIGINT));
-        RowExpression castExpressionB = Expressions.call(Signatures.castSignature(BIGINT, BIGINT), BIGINT, new VariableReferenceExpression("b", BIGINT));
+        RowExpression castExpressionA = Expressions.call(OperatorType.CAST.name(), functionResolution.castFunction(BIGINT.getTypeSignature(), BIGINT.getTypeSignature()), BIGINT, new VariableReferenceExpression("a", BIGINT));
+        RowExpression castExpressionB = Expressions.call(OperatorType.CAST.name(), functionResolution.castFunction(fromTypes(BIGINT).get(0).getTypeSignature(), fromTypes(BIGINT).get(0).getTypeSignature()), BIGINT, new VariableReferenceExpression("b", BIGINT));
         RowExpression expr1 = PlanBuilder.comparison(OperatorType.EQUAL, new VariableReferenceExpression("a", BIGINT), castExpressionA);
         RowExpression expr2 = PlanBuilder.comparison(OperatorType.EQUAL, new VariableReferenceExpression("b", BIGINT), castExpressionB);
         RowExpression andLbExpression = new SpecialForm(SpecialForm.Form.AND, BIGINT, expr1, expr2);

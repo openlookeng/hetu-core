@@ -147,6 +147,11 @@ public abstract class AbstractTestFunctions
         functionAssertions.assertInvalidCast(projection);
     }
 
+    protected void assertInvalidCastWithSemanticErrorCode(String projection, SemanticErrorCode expectedErrorCode)
+    {
+        functionAssertions.assertInvalidCastWithSemanticErrorCode(projection, expectedErrorCode);
+    }
+
     protected void assertInvalidCast(String projection, String message)
     {
         functionAssertions.assertInvalidCast(projection, message);
@@ -171,26 +176,26 @@ public abstract class AbstractTestFunctions
 
     protected void registerScalarFunction(SqlScalarFunction sqlScalarFunction)
     {
-        functionAssertions.getMetadata().addFunctions(ImmutableList.of(sqlScalarFunction));
+        functionAssertions.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(ImmutableList.of(sqlScalarFunction));
     }
 
     protected void registerScalar(Class<?> clazz)
     {
-        functionAssertions.getMetadata().addFunctions(new FunctionListBuilder()
+        functionAssertions.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(new FunctionListBuilder()
                 .scalars(clazz)
                 .getFunctions());
     }
 
     protected void registerParametricScalar(Class<?> clazz)
     {
-        functionAssertions.getMetadata().addFunctions(new FunctionListBuilder()
+        functionAssertions.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(new FunctionListBuilder()
                 .scalar(clazz)
                 .getFunctions());
     }
 
     protected void registerFunctions(Plugin plugin)
     {
-        functionAssertions.getMetadata().addFunctions(extractFunctions(plugin.getFunctions()));
+        functionAssertions.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(extractFunctions(plugin.getFunctions()));
     }
 
     protected void registerTypes(Plugin plugin)

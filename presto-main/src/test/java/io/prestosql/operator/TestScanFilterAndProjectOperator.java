@@ -33,7 +33,9 @@ import io.prestosql.spi.block.LazyBlock;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.FixedPageSource;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.connector.RecordPageSource;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -144,8 +146,8 @@ public class TestScanFilterAndProjectOperator
                 .addSequencePage(100, 0)
                 .build();
 
-        RowExpression filter = call(
-                Signature.internalOperator(EQUAL, BOOLEAN.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature(), BIGINT.getTypeSignature())),
+        RowExpression filter = call(EQUAL.getFunctionName().toString(),
+                new BuiltInFunctionHandle(Signature.internalOperator(EQUAL, BOOLEAN.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature(), BIGINT.getTypeSignature()))),
                 BOOLEAN,
                 field(0, BIGINT),
                 constant(10L, BIGINT));
@@ -283,13 +285,13 @@ public class TestScanFilterAndProjectOperator
             }));
         }
         Metadata metadata = functionAssertions.getMetadata();
-        metadata.addFunctions(functions.build());
+        metadata.getFunctionAndTypeManager().registerBuiltInFunctions(functions.build());
 
         // match each column with a projection
         ExpressionCompiler expressionCompiler = new ExpressionCompiler(metadata, new PageFunctionCompiler(metadata, 0));
         ImmutableList.Builder<RowExpression> projections = ImmutableList.builder();
         for (int i = 0; i < totalColumns; i++) {
-            projections.add(call(internalScalarFunction("generic_long_page_col" + i, BIGINT.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature())), BIGINT, field(0, BIGINT)));
+            projections.add(call(QualifiedObjectName.valueOfDefaultFunction("generic_long_page_col" + i).toString(), new BuiltInFunctionHandle(internalScalarFunction(QualifiedObjectName.valueOfDefaultFunction("generic_long_page_col" + i), BIGINT.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature()))), BIGINT, field(0, BIGINT)));
         }
         Supplier<CursorProcessor> cursorProcessor = expressionCompiler.compileCursorProcessor(Optional.empty(), projections.build(), "key");
         Supplier<PageProcessor> pageProcessor = expressionCompiler.compilePageProcessor(Optional.empty(), projections.build(), MAX_BATCH_SIZE);
@@ -348,14 +350,14 @@ public class TestScanFilterAndProjectOperator
 
         // set up generic long function with a callback to force yield
         Metadata metadata = functionAssertions.getMetadata();
-        metadata.addFunctions(ImmutableList.of(new GenericLongFunction("record_cursor", value -> {
+        metadata.getFunctionAndTypeManager().registerBuiltInFunctions(ImmutableList.of(new GenericLongFunction("record_cursor", value -> {
             driverContext.getYieldSignal().forceYieldForTesting();
             return value;
         })));
         ExpressionCompiler expressionCompiler = new ExpressionCompiler(metadata, new PageFunctionCompiler(metadata, 0));
 
-        List<RowExpression> projections = ImmutableList.of(call(
-                internalScalarFunction("generic_long_record_cursor", BIGINT.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature())),
+        List<RowExpression> projections = ImmutableList.of(call(QualifiedObjectName.valueOfDefaultFunction("generic_long_record_cursor").toString(),
+                new BuiltInFunctionHandle(internalScalarFunction(QualifiedObjectName.valueOfDefaultFunction("generic_long_record_cursor"), BIGINT.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature()))),
                 BIGINT,
                 field(0, BIGINT)));
         Supplier<CursorProcessor> cursorProcessor = expressionCompiler.compileCursorProcessor(Optional.empty(), projections, "key");

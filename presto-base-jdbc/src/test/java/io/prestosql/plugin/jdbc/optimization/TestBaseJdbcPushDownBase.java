@@ -34,7 +34,9 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.function.FunctionKind;
+import io.prestosql.spi.function.FunctionMetadataManager;
 import io.prestosql.spi.function.OperatorType;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.Assignments;
 import io.prestosql.spi.plan.FilterNode;
@@ -44,6 +46,7 @@ import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.relation.VariableReferenceExpression;
@@ -221,7 +224,7 @@ public class TestBaseJdbcPushDownBase
                 WarningCollector.NOOP,
                 false
         ).getExpressionTypes();
-        return SqlToRowExpressionTranslator.translate(expression, FunctionKind.SCALAR, expressionTypes, ImmutableMap.of(), metadata, session, false);
+        return SqlToRowExpressionTranslator.translate(expression, FunctionKind.SCALAR, expressionTypes, ImmutableMap.of(), metadata.getFunctionAndTypeManager(), session, false);
     }
 
     protected TableScanNode tableScan(PlanBuilder planBuilder, JdbcTableHandle connectorTableHandle, JdbcColumnHandle... columnHandles)
@@ -350,10 +353,10 @@ public class TestBaseJdbcPushDownBase
         }
 
         @Override
-        public Optional<QueryGenerator<JdbcQueryGeneratorResult>> getQueryGenerator(RowExpressionService rowExpressionService)
+        public Optional<QueryGenerator<JdbcQueryGeneratorResult, JdbcConverterContext>> getQueryGenerator(DeterminismEvaluator determinismEvaluator, RowExpressionService rowExpressionService, FunctionMetadataManager functionManager, StandardFunctionResolution functionResolution)
         {
-            JdbcPushDownParameter pushDownParameter = new JdbcPushDownParameter("'", false, FULL_PUSHDOWN);
-            return Optional.of(new BaseJdbcQueryGenerator(pushDownParameter, new BaseJdbcRowExpressionConverter(rowExpressionService), new BaseJdbcSqlStatementWriter(pushDownParameter)));
+            JdbcPushDownParameter pushDownParameter = new JdbcPushDownParameter("'", false, FULL_PUSHDOWN, functionResolution);
+            return Optional.of(new BaseJdbcQueryGenerator(pushDownParameter, new BaseJdbcRowExpressionConverter(functionManager, functionResolution, rowExpressionService, determinismEvaluator), new BaseJdbcSqlStatementWriter(pushDownParameter)));
         }
     }
 

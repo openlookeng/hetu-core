@@ -15,15 +15,16 @@ package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlScalarFunction;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 
 import java.lang.invoke.MethodHandle;
 import java.util.function.LongUnaryOperator;
 
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.Signature.internalScalarFunction;
 import static io.prestosql.spi.type.StandardTypes.BIGINT;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
@@ -39,7 +40,7 @@ public final class GenericLongFunction
 
     GenericLongFunction(String suffix, LongUnaryOperator longUnaryOperator)
     {
-        super(internalScalarFunction("generic_long_" + requireNonNull(suffix, "suffix is null"), parseTypeSignature(BIGINT), parseTypeSignature(BIGINT)));
+        super(internalScalarFunction(QualifiedObjectName.valueOfDefaultFunction("generic_long_" + requireNonNull(suffix, "suffix is null")), parseTypeSignature(BIGINT), parseTypeSignature(BIGINT)));
         this.longUnaryOperator = longUnaryOperator;
     }
 
@@ -62,10 +63,10 @@ public final class GenericLongFunction
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         MethodHandle methodHandle = METHOD_HANDLE.bindTo(longUnaryOperator);
-        return new ScalarFunctionImplementation(false, ImmutableList.of(valueTypeArgumentProperty(RETURN_NULL_ON_NULL)), methodHandle, isDeterministic());
+        return new BuiltInScalarFunctionImplementation(false, ImmutableList.of(valueTypeArgumentProperty(RETURN_NULL_ON_NULL)), methodHandle);
     }
 
     public static long apply(LongUnaryOperator longUnaryOperator, long value)

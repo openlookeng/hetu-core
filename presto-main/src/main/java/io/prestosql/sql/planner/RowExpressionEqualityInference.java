@@ -26,9 +26,9 @@ import com.google.common.collect.Ordering;
 import com.google.common.collect.SetMultimap;
 import io.prestosql.expressions.RowExpressionNodeInliner;
 import io.prestosql.expressions.RowExpressionTreeRewriter;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.SpecialForm;
@@ -50,9 +50,10 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Predicates.equalTo;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.Iterables.filter;
+import static io.prestosql.expressions.LogicalRowExpressions.extractConjuncts;
 import static io.prestosql.spi.function.OperatorType.EQUAL;
-import static io.prestosql.spi.sql.RowExpressionUtils.extractConjuncts;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.relational.Expressions.call;
 import static io.prestosql.sql.relational.Expressions.uniqueSubExpressions;
 import static java.util.Objects.requireNonNull;
@@ -77,12 +78,15 @@ public class RowExpressionEqualityInference
     private final Map<RowExpression, RowExpression> canonicalMap; // Map each known RowExpression to canonical RowExpression
     private final Set<RowExpression> derivedExpressions;
     private final RowExpressionDeterminismEvaluator determinismEvaluator;
+    private final FunctionAndTypeManager functionAndTypeManager;
 
     private RowExpressionEqualityInference(
             Iterable<Set<RowExpression>> equalityGroups,
             Set<RowExpression> derivedExpressions,
-            RowExpressionDeterminismEvaluator determinismEvaluator)
+            RowExpressionDeterminismEvaluator determinismEvaluator,
+            FunctionAndTypeManager functionAndTypeManager)
     {
+        this.functionAndTypeManager = functionAndTypeManager;
         this.determinismEvaluator = determinismEvaluator;
         ImmutableSetMultimap.Builder<RowExpression, RowExpression> setBuilder = ImmutableSetMultimap.builder();
         for (Set<RowExpression> equalityGroup : equalityGroups) {
@@ -214,13 +218,13 @@ public class RowExpressionEqualityInference
             RowExpression matchingCanonical = getCanonical(scopeExpressions);
             if (scopeExpressions.size() >= 2) {
                 for (RowExpression expression : filter(scopeExpressions, not(equalTo(matchingCanonical)))) {
-                    scopeEqualities.add(buildEqualsExpression(matchingCanonical, expression));
+                    scopeEqualities.add(buildEqualsExpression(functionAndTypeManager, matchingCanonical, expression));
                 }
             }
             RowExpression complementCanonical = getCanonical(scopeComplementExpressions);
             if (scopeComplementExpressions.size() >= 2) {
                 for (RowExpression expression : filter(scopeComplementExpressions, not(equalTo(complementCanonical)))) {
-                    scopeComplementEqualities.add(buildEqualsExpression(complementCanonical, expression));
+                    scopeComplementEqualities.add(buildEqualsExpression(functionAndTypeManager, complementCanonical, expression));
                 }
             }
 
@@ -233,7 +237,7 @@ public class RowExpressionEqualityInference
             RowExpression connectingCanonical = getCanonical(connectingExpressions);
             if (connectingCanonical != null) {
                 for (RowExpression expression : filter(connectingExpressions, not(equalTo(connectingCanonical)))) {
-                    scopeStraddlingEqualities.add(buildEqualsExpression(connectingCanonical, expression));
+                    scopeStraddlingEqualities.add(buildEqualsExpression(functionAndTypeManager, connectingCanonical, expression));
                 }
             }
         }
@@ -306,16 +310,18 @@ public class RowExpressionEqualityInference
         private final Set<RowExpression> derivedExpressions = new LinkedHashSet<>();
         private final RowExpressionDeterminismEvaluator determinismEvaluator;
         private final TypeManager typeManager;
+        private final FunctionAndTypeManager functionAndTypeManager;
 
         public Builder(Metadata metadata, TypeManager typeManager)
         {
             this.determinismEvaluator = new RowExpressionDeterminismEvaluator(metadata);
             this.typeManager = typeManager;
+            this.functionAndTypeManager = metadata.getFunctionAndTypeManager();
         }
 
         public Builder(Metadata metadata)
         {
-            this(metadata, new InternalTypeManager(metadata));
+            this(metadata, new InternalTypeManager(metadata.getFunctionAndTypeManager()));
         }
 
         /**
@@ -327,7 +333,7 @@ public class RowExpressionEqualityInference
                 expression = normalizeInPredicateToEquality(expression);
                 if (isOperation(expression, EQUAL) &&
                         determinismEvaluator.isDeterministic(expression) &&
-                        !NullabilityAnalyzer.mayReturnNullOnNonNullInput(expression, typeManager)) {
+                        !NullabilityAnalyzer.mayReturnNullOnNonNullInput(expression, typeManager, functionAndTypeManager)) {
                     // We should only consider equalities that have distinct left and right components
                     return !getLeft(expression).equals(getRight(expression));
                 }
@@ -351,7 +357,7 @@ public class RowExpressionEqualityInference
                 if (size == 1) {
                     RowExpression leftValue = ((SpecialForm) expression).getArguments().get(0);
                     RowExpression rightValue = ((SpecialForm) expression).getArguments().get(1);
-                    return buildEqualsExpression(leftValue, rightValue);
+                    return buildEqualsExpression(functionAndTypeManager, leftValue, rightValue);
                 }
             }
             return expression;
@@ -444,14 +450,14 @@ public class RowExpressionEqualityInference
         public RowExpressionEqualityInference build()
         {
             generateMoreEquivalences();
-            return new RowExpressionEqualityInference(equalities.getEquivalentClasses(), derivedExpressions, determinismEvaluator);
+            return new RowExpressionEqualityInference(equalities.getEquivalentClasses(), derivedExpressions, determinismEvaluator, functionAndTypeManager);
         }
 
         private boolean isOperation(RowExpression expression, OperatorType type)
         {
             if (expression instanceof CallExpression) {
                 CallExpression call = (CallExpression) expression;
-                Optional<OperatorType> expressionOperatorType = Signature.getOperatorType(call.getSignature().getName());
+                Optional<OperatorType> expressionOperatorType = functionAndTypeManager.getFunctionMetadata(call.getFunctionHandle()).getOperatorType();
                 if (expressionOperatorType.isPresent()) {
                     return expressionOperatorType.get() == type;
                 }
@@ -480,9 +486,18 @@ public class RowExpressionEqualityInference
         return false;
     }
 
-    private static CallExpression buildEqualsExpression(RowExpression left, RowExpression right)
+    private static CallExpression buildEqualsExpression(FunctionAndTypeManager functionAndTypeManager, RowExpression left, RowExpression right)
     {
-        Signature signature = Signature.internalOperator(EQUAL, BOOLEAN, ImmutableList.of(left.getType(), right.getType()));
-        return call(signature, BOOLEAN, left, right);
+        return binaryOperation(functionAndTypeManager, EQUAL, left, right);
+    }
+
+    private static CallExpression binaryOperation(FunctionAndTypeManager functionAndTypeManager, OperatorType type, RowExpression left, RowExpression right)
+    {
+        return call(
+                type.name(),
+                functionAndTypeManager.resolveOperatorFunctionHandle(type, fromTypes(left.getType(), right.getType())),
+                BOOLEAN,
+                left,
+                right);
     }
 }

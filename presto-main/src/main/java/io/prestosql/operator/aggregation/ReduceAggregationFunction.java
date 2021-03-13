@@ -16,7 +16,7 @@ package io.prestosql.operator.aggregation;
 import com.google.common.collect.ImmutableList;
 import io.airlift.bytecode.DynamicClassLoader;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlAggregationFunction;
 import io.prestosql.operator.aggregation.AggregationMetadata.AccumulatorStateDescriptor;
 import io.prestosql.operator.aggregation.AggregationMetadata.ParameterMetadata;
@@ -78,7 +78,7 @@ public class ReduceAggregationFunction
     }
 
     @Override
-    public InternalAggregationFunction specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public InternalAggregationFunction specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         Type inputType = boundVariables.getTypeVariable("T");
         Type stateType = boundVariables.getTypeVariable("S");
@@ -129,7 +129,7 @@ public class ReduceAggregationFunction
         }
 
         AggregationMetadata metadata = new AggregationMetadata(
-                generateAggregationName(getSignature().getName(), inputType.getTypeSignature(), ImmutableList.of(inputType.getTypeSignature())),
+                generateAggregationName(getSignature().getNameSuffix(), inputType.getTypeSignature(), ImmutableList.of(inputType.getTypeSignature())),
                 createInputParameterMetadata(inputType, stateType),
                 inputMethodHandle.asType(
                         inputMethodHandle.type()
@@ -142,7 +142,7 @@ public class ReduceAggregationFunction
 
         GenericAccumulatorFactoryBinder factory = AccumulatorCompiler.generateAccumulatorFactoryBinder(metadata, classLoader);
         return new InternalAggregationFunction(
-                getSignature().getName(),
+                getSignature().getNameSuffix(),
                 ImmutableList.of(inputType),
                 ImmutableList.of(stateType),
                 stateType,

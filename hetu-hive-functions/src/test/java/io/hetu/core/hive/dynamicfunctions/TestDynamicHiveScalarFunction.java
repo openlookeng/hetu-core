@@ -95,7 +95,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithBooleanType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "booleanudf io.hetu.core.hive.dynamicfunctions.examples.udf.BooleanUDF"))));
         queryRunner.execute("drop table if exists table_boolean");
         queryRunner.execute("create table table_boolean(booleanType boolean)");
@@ -109,7 +109,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithBooleanWrapperType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "booleanwrapperudf io.hetu.core.hive.dynamicfunctions.examples.udf.BooleanWrappperUDF"))));
         queryRunner.execute("drop table if exists table_boolean_wrapper");
         queryRunner.execute("create table table_boolean_wrapper(booleanType boolean)");
@@ -123,7 +123,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithByteType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "byteudf io.hetu.core.hive.dynamicfunctions.examples.udf.ByteUDF"))));
         queryRunner.execute("drop table if exists table_byte");
         queryRunner.execute("create table table_byte(byteType tinyint)");
@@ -137,7 +137,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithByteWrapperType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "bytewrapperudf io.hetu.core.hive.dynamicfunctions.examples.udf.ByteWrapperUDF"))));
         queryRunner.execute("drop table if exists table_byte_wrapper");
         queryRunner.execute("create table table_byte_wrapper(byteType tinyint)");
@@ -151,7 +151,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithShortType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "shortudf io.hetu.core.hive.dynamicfunctions.examples.udf.ShortUDF"))));
         queryRunner.execute("drop table if exists table_short");
         queryRunner.execute("create table table_short(shortType smallint)");
@@ -165,7 +165,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithShortWrapperType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "shortwrapperudf io.hetu.core.hive.dynamicfunctions.examples.udf.ShortWrapperUDF"))));
         queryRunner.execute("drop table if exists table_short_wrapper");
         queryRunner.execute("create table table_short_wrapper(shortType smallint)");
@@ -179,7 +179,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithIntType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "intudf io.hetu.core.hive.dynamicfunctions.examples.udf.IntUDF"))));
         queryRunner.execute("drop table if exists table_int");
         queryRunner.execute("create table table_int(intType int)");
@@ -193,7 +193,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithIntWrapperType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "intwrapperudf io.hetu.core.hive.dynamicfunctions.examples.udf.IntWrapperUDF"))));
         queryRunner.execute("drop table if exists table_int_wrapper");
         queryRunner.execute("create table table_int_wrapper(intType int)");
@@ -207,7 +207,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithLongType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "longudf io.hetu.core.hive.dynamicfunctions.examples.udf.LongUDF"))));
         queryRunner.execute("drop table if exists table_long");
         queryRunner.execute("create table table_long(longType bigint)");
@@ -220,7 +220,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithLongWrapperType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "longwrapperudf io.hetu.core.hive.dynamicfunctions.examples.udf.LongWrapperUDF"))));
         queryRunner.execute("drop table if exists table_long_wrapper");
         queryRunner.execute("create table table_long_wrapper(longType bigint)");
@@ -233,7 +233,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithFloatType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "floatudf io.hetu.core.hive.dynamicfunctions.examples.udf.FloatUDF"))));
         queryRunner.execute("drop table if exists table_float");
         queryRunner.execute("create table table_float(floatType float)");
@@ -246,7 +246,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithFloatWrapperType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "floatwrapperudf io.hetu.core.hive.dynamicfunctions.examples.udf.FloatWrapperUDF"))));
         queryRunner.execute("drop table if exists table_float_wrapper");
         queryRunner.execute("create table table_float_wrapper(floatType float)");
@@ -259,7 +259,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithDoubleType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "doubleudf io.hetu.core.hive.dynamicfunctions.examples.udf.DoubleUDF"))));
         queryRunner.execute("drop table if exists table_double");
         queryRunner.execute("create table table_double(doubleType double)");
@@ -272,7 +272,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithDoubleWrapperType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "doublewrapperudf io.hetu.core.hive.dynamicfunctions.examples.udf.DoubleWrapperUDF"))));
         queryRunner.execute("drop table if exists table_double_wrapper");
         queryRunner.execute("create table table_double_wrapper(doubleType double)");
@@ -285,7 +285,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithListDoubleType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "listdoubleudf io.hetu.core.hive.dynamicfunctions.examples.udf.ListDoubleUDF"))));
         queryRunner.execute("drop table if exists table_list_double");
         queryRunner.execute("create table table_list_double(listDoubleTpye array<double>)");
@@ -298,7 +298,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithArrayListDoubleType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "arraylistdoubleudf io.hetu.core.hive.dynamicfunctions.examples.udf.ArrayListDoubleUDF"))));
         queryRunner.execute("drop table if exists table_arraylist_double");
         queryRunner.execute("create table table_arraylist_double(listDoubleTpye array<double>)");
@@ -311,7 +311,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithListIntType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "listintudf io.hetu.core.hive.dynamicfunctions.examples.udf.ListIntUDF"))));
         queryRunner.execute("drop table if exists table_list_int");
         queryRunner.execute("create table table_list_int(listIntType array<int>)");
@@ -324,7 +324,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithListStringType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "liststringudf io.hetu.core.hive.dynamicfunctions.examples.udf.ListStringUDF"))));
         queryRunner.execute("drop table if exists table_list_string");
         queryRunner.execute("create table table_list_string(listStringType array<varchar>)");
@@ -337,7 +337,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithMapDoubleType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "mapdoubleudf io.hetu.core.hive.dynamicfunctions.examples.udf.MapDoubleUDF"))));
         queryRunner.execute("drop table if exists table_map_double");
         queryRunner.execute("create table table_map_double(mapDoubleType map(double, double))");
@@ -350,7 +350,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithMapIntType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "mapintudf io.hetu.core.hive.dynamicfunctions.examples.udf.MapIntUDF"))));
         queryRunner.execute("drop table if exists table_map_int");
         queryRunner.execute("create table table_map_int(mapIntType map(int, int))");
@@ -363,7 +363,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithMapStringType()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "mapstringudf io.hetu.core.hive.dynamicfunctions.examples.udf.MapStringUDF"))));
         queryRunner.execute("drop table if exists table_map_string");
         queryRunner.execute("create table table_map_string(mapStringType map(varchar, varchar))");
@@ -376,7 +376,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithTwoParameters()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "inttwoargsudf io.hetu.core.hive.dynamicfunctions.examples.udf.IntTwoArgsUDF"))));
         queryRunner.execute("drop table if exists table_int_two_args");
         queryRunner.execute("create table table_int_two_args(int22 int,int2 int)");
@@ -389,7 +389,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithThreeParameters()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "intthreeargsudf io.hetu.core.hive.dynamicfunctions.examples.udf.IntThreeArgsUDF"))));
         queryRunner.execute("drop table if exists table_int_three_args");
         queryRunner.execute("create table table_int_three_args(int23 int,int2 int,int3 int)");
@@ -402,7 +402,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithFourParameters()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "intfourargsudf io.hetu.core.hive.dynamicfunctions.examples.udf.IntFourArgsUDF"))));
         queryRunner.execute("drop table if exists table_int_four_args");
         queryRunner.execute("create table table_int_four_args(int1 int,int2 int,int3 int,int4 int)");
@@ -415,7 +415,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithFiveParameters()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "intfiveargsudf io.hetu.core.hive.dynamicfunctions.examples.udf.IntFiveArgsUDF"))));
         queryRunner.execute("drop table if exists table_int_five_args");
         queryRunner.execute("create table table_int_five_args(int1 int,int2 int,int3 int,int4 int,int5 int)");
@@ -428,7 +428,7 @@ public class TestDynamicHiveScalarFunction
     @Test(expectedExceptions = RuntimeException.class)
     public void testDynamicHiveScalarFunctionWithSixParameters()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "intsixargsudf io.hetu.core.hive.dynamicfunctions.examples.udf.IntSixArgsUDF"))));
         queryRunner.execute("drop table if exists table_int_six_args");
         queryRunner.execute("create table table_int_six_args(int1 int,int2 int,int3 int,int4 int,int5 int,int6 int)");
@@ -481,7 +481,7 @@ public class TestDynamicHiveScalarFunction
                 return null;
             }
         };
-        queryRunner.getMetadata().addFunctions(Arrays.asList(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(
                 new DynamicHiveScalarFunction(funcMetadata, new Type[] {int.class}, int.class),
                 new DynamicHiveScalarFunction(funcMetadata, new Type[] {int.class, int.class}, int.class),
                 new DynamicHiveScalarFunction(funcMetadata, new Type[] {int.class, int.class, int.class}, int.class),
@@ -522,7 +522,7 @@ public class TestDynamicHiveScalarFunction
     @Test
     public void testDynamicHiveScalarFunctionWithEmptyParameters()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(
                 new DynamicHiveScalarFunction(new FunctionMetadata(
                         "emptyparam io.hetu.core.hive.dynamicfunctions.examples.udf.EmptyParameterUDF"),
                         new Type[] {}, int.class)));
@@ -565,7 +565,7 @@ public class TestDynamicHiveScalarFunction
     @Test(expectedExceptions = RuntimeException.class)
     public void testMaxFunctionRunningTimeLimit()
     {
-        queryRunner.getMetadata().addFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "timeout io.hetu.core.hive.dynamicfunctions.examples.udf.TimeOutUDF"), 1)));
         queryRunner.execute("select timeout(1)");
     }

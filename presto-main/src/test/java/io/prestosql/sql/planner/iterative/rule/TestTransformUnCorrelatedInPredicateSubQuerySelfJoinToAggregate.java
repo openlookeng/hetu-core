@@ -78,7 +78,7 @@ public class TestTransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
     @Test
     public void testDoesNotFire()
     {
-        tester.assertThat(new TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate())
+        tester.assertThat(new TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate(tester().getMetadata()))
                 .on(p -> p.apply(
                         Assignments.of(p.symbol("x"), OriginalExpressionUtils.castToRowExpression(new ExistsPredicate(new LongLiteral("1")))),
                         emptyList(),
@@ -90,7 +90,7 @@ public class TestTransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
     @Test
     public void testDoesFireOnInPredicate()
     {
-        tester.assertThat(new TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate())
+        tester.assertThat(new TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate(tester().getMetadata()))
                 .on(p -> {
                     Symbol o1 = p.symbol("o1", DATE);
                     Symbol t1 = p.symbol("t1", DOUBLE);

@@ -74,7 +74,7 @@ public class SplitCacheStateManager
             return;
         }
 
-        BlockEncodingSerde blockEncodingSerde = metadata.getBlockEncodingSerde();
+        BlockEncodingSerde blockEncodingSerde = metadata.getFunctionAndTypeManager().getBlockEncodingSerde();
         ObjectMapper mapper = new ObjectMapperProvider().get().registerModule(new SimpleModule()
                 .addDeserializer(Type.class, new TypeDeserializer(metadata))
                 .addSerializer(Block.class, new BlockJsonSerde.Serializer(blockEncodingSerde))

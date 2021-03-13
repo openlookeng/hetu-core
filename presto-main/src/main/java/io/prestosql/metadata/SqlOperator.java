@@ -22,22 +22,23 @@ import io.prestosql.spi.type.TypeSignature;
 
 import java.util.List;
 
-import static io.prestosql.spi.function.Signature.mangleOperatorName;
-
 public abstract class SqlOperator
         extends SqlScalarFunction
 {
+    private final OperatorType operatorType;
+
     protected SqlOperator(OperatorType operatorType, List<TypeVariableConstraint> typeVariableConstraints, List<LongVariableConstraint> longVariableConstraints, TypeSignature returnType, List<TypeSignature> argumentTypes)
     {
         // TODO This should take Signature!
         super(new Signature(
-                mangleOperatorName(operatorType),
+                operatorType.getFunctionName(),
                 FunctionKind.SCALAR,
                 typeVariableConstraints,
                 longVariableConstraints,
                 returnType,
                 argumentTypes,
                 false));
+        this.operatorType = operatorType;
     }
 
     @Override
@@ -50,6 +51,12 @@ public abstract class SqlOperator
     public final boolean isDeterministic()
     {
         return true;
+    }
+
+    @Override
+    public final boolean isCalledOnNullInput()
+    {
+        return operatorType.isCalledOnNullInput();
     }
 
     @Override

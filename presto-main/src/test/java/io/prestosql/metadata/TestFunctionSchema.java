@@ -18,8 +18,6 @@ import io.prestosql.operator.scalar.AbstractTestFunctions;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static io.prestosql.spi.type.VarcharType.VARCHAR;
-
 public class TestFunctionSchema
         extends AbstractTestFunctions
 {
@@ -31,11 +29,12 @@ public class TestFunctionSchema
     @Test
     public void testFunctionSchema()
     {
-        assertFunction("hive.bicoredata.CONCAT('hello', ' world')", VARCHAR, "hello world");
-        assertFunction("bicoredata.CONCAT('', '')", VARCHAR, "");
-        assertFunction("test123.bicoredata.CONCAT('what', '')", VARCHAR, "what");
-        assertFunction("biads.CONCAT('', 'what')", VARCHAR, "what");
-        assertFunction("mysql.bicoredata.CONCAT(CONCAT('this', ' is'), ' cool')", VARCHAR, "this is cool");
-        assertFunction("postgress.bicoredata.CONCAT('this', CONCAT(' is', ' cool'))", VARCHAR, "this is cool");
+        // todo remote udf, for we do not support other function namespace except presto.default, we comment this after we can support other function namespace
+        // assertFunction("hive.bicoredata.CONCAT('hello', ' world')", VARCHAR, "hello world");
+        // assertFunction("bicoredata.CONCAT('', '')", VARCHAR, "");
+        // assertFunction("test123.bicoredata.CONCAT('what', '')", VARCHAR, "what");
+        // assertFunction("biads.CONCAT('', 'what')", VARCHAR, "what");
+        // assertFunction("mysql.bicoredata.CONCAT(CONCAT('this', ' is'), ' cool')", VARCHAR, "this is cool");
+        // assertFunction("postgress.bicoredata.CONCAT('this', CONCAT(' is', ' cool'))", VARCHAR, "this is cool");
     }
 }

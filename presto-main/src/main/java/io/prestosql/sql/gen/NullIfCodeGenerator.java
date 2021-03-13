@@ -20,23 +20,29 @@ import io.airlift.bytecode.Scope;
 import io.airlift.bytecode.Variable;
 import io.airlift.bytecode.control.IfStatement;
 import io.airlift.bytecode.instruction.LabelNode;
-import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.metadata.CastType;
+import io.prestosql.metadata.FunctionAndTypeManager;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
+import io.prestosql.spi.function.FunctionHandle;
+import io.prestosql.spi.function.FunctionMetadata;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
+import io.prestosql.sql.analyzer.TypeSignatureProvider;
 
 import java.util.List;
+import java.util.Optional;
 
 import static io.airlift.bytecode.expression.BytecodeExpressions.constantTrue;
+import static io.prestosql.spi.function.OperatorType.CAST;
+import static io.prestosql.spi.function.OperatorType.EQUAL;
 import static io.prestosql.sql.gen.BytecodeUtils.ifWasNullPopAndGoto;
 
 public class NullIfCodeGenerator
         implements BytecodeGenerator
 {
     @Override
-    public BytecodeNode generateExpression(Signature signature, BytecodeGeneratorContext generatorContext, Type returnType, List<RowExpression> arguments)
+    public BytecodeNode generateExpression(FunctionHandle functionHandle, BytecodeGeneratorContext generatorContext, Type returnType, List<RowExpression> arguments)
     {
         Scope scope = generatorContext.getScope();
 
@@ -58,14 +64,17 @@ public class NullIfCodeGenerator
         Type secondType = second.getType();
 
         // if (equal(cast(first as <common type>), cast(second as <common type>))
-        Signature equalsSignature = generatorContext.getMetadata().resolveOperator(OperatorType.EQUAL, ImmutableList.of(firstType, secondType));
-        ScalarFunctionImplementation equalsFunction = generatorContext.getMetadata().getScalarFunctionImplementation(equalsSignature);
+        FunctionAndTypeManager functionAndTypeManager = generatorContext.getFunctionManager();
+        FunctionHandle equalFunction = functionAndTypeManager.resolveOperatorFunctionHandle(EQUAL, TypeSignatureProvider.fromTypes(firstType, secondType));
+        FunctionMetadata equalFunctionMetadata = functionAndTypeManager.getFunctionMetadata(equalFunction);
+        BuiltInScalarFunctionImplementation equalsFunction = generatorContext.getFunctionManager().getBuiltInScalarFunctionImplementation(equalFunction);
+
         BytecodeNode equalsCall = generatorContext.generateCall(
-                equalsSignature.getName(),
+                EQUAL.name(),
                 equalsFunction,
                 ImmutableList.of(
-                        cast(generatorContext, firstValue, firstType, equalsSignature.getArgumentTypes().get(0)),
-                        cast(generatorContext, generatorContext.generate(second), secondType, equalsSignature.getArgumentTypes().get(1))));
+                        cast(generatorContext, firstValue, firstType, equalFunctionMetadata.getArgumentTypes().get(0)),
+                        cast(generatorContext, generatorContext.generate(second, Optional.empty()), secondType, equalFunctionMetadata.getArgumentTypes().get(1))));
 
         BytecodeBlock conditionBlock = new BytecodeBlock()
                 .append(equalsCall)
@@ -95,12 +104,11 @@ public class NullIfCodeGenerator
         if (actualType.getTypeSignature().equals(requiredType)) {
             return argument;
         }
-
-        Signature function = generatorContext
-                .getMetadata()
-                .getCoercion(actualType.getTypeSignature(), requiredType);
+        FunctionHandle functionHandle = generatorContext
+                .getFunctionManager()
+                .lookupCast(CastType.CAST, actualType.getTypeSignature(), requiredType);
 
         // TODO: do we need a full function call? (nullability checks, etc)
-        return generatorContext.generateCall(function.getName(), generatorContext.getMetadata().getScalarFunctionImplementation(function), ImmutableList.of(argument));
+        return generatorContext.generateCall(CAST.name(), generatorContext.getFunctionManager().getBuiltInScalarFunctionImplementation(functionHandle), ImmutableList.of(argument));
     }
 }

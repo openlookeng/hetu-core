@@ -126,6 +126,7 @@ import static io.prestosql.sql.NodeUtils.getSortItemsFromOrderBy;
 import static io.prestosql.sql.planner.OrderingSchemeUtils.sortItemToSortOrder;
 import static io.prestosql.sql.planner.SymbolUtils.from;
 import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+import static io.prestosql.sql.relational.Expressions.call;
 import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static java.util.Objects.requireNonNull;
 
@@ -897,7 +898,11 @@ class QueryPlanner
 
             FunctionCall functionCall = (FunctionCall) rewritten;
             aggregationsBuilder.put(newSymbol, new Aggregation(
-                    analysis.getFunctionSignature(aggregate),
+                    call(
+                            aggregate.getName().getSuffix(),
+                            analysis.getFunctionHandle(aggregate),
+                            analysis.getType(aggregate),
+                            functionCall.getArguments().stream().map(OriginalExpressionUtils::castToRowExpression).collect(toImmutableList())),
                     functionCall.getArguments().stream().map(OriginalExpressionUtils::castToRowExpression).collect(toImmutableList()),
                     functionCall.isDistinct(),
                     functionCall.getFilter().map(SymbolUtils::from),
@@ -1139,6 +1144,7 @@ class QueryPlanner
                 continue;
             }
 
+            Type returnType = analysis.getType(windowFunction);
             Symbol newSymbol = planSymbolAllocator.newSymbol(rewritten, analysis.getType(windowFunction));
             outputTranslations.put(windowFunction, newSymbol);
 
@@ -1147,7 +1153,11 @@ class QueryPlanner
                 arguments.add(castToRowExpression(((FunctionCall) rewritten).getArguments().get(i)));
             }
             WindowNode.Function function = new WindowNode.Function(
-                    analysis.getFunctionSignature(windowFunction),
+                    call(
+                            windowFunction.getName().toString(),
+                            analysis.getFunctionHandle(windowFunction),
+                            returnType,
+                            ((FunctionCall) rewritten).getArguments().stream().map(OriginalExpressionUtils::castToRowExpression).collect(toImmutableList())),
                     arguments,
                     frame);
 

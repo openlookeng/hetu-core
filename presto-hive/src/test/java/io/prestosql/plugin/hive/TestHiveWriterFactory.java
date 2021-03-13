@@ -115,7 +115,7 @@ public class TestHiveWriterFactory
         HivePageSinkMetadata hivePageSinkMetadata = new HivePageSinkMetadata(new SchemaTableName("schema", "table"), Optional.of(table), ImmutableMap.of());
         PageSorter pageSorter = new PagesIndexPageSorter(new PagesIndex.TestingFactory(false));
         Metadata metadata = createTestMetadataManager();
-        TypeManager typeManager = new InternalTypeManager(metadata);
+        TypeManager typeManager = new InternalTypeManager(metadata.getFunctionAndTypeManager());
         HdfsConfiguration hdfsConfiguration = new HiveHdfsConfiguration(new HdfsConfigurationInitializer(hiveConfig), ImmutableSet.of());
         HdfsEnvironment hdfsEnvironment = new HdfsEnvironment(hdfsConfiguration, hiveConfig, new NoHdfsAuthentication());
         LocationService locationService = new HiveLocationService(hdfsEnvironment);

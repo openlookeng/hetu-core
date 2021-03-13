@@ -15,6 +15,7 @@ package io.prestosql.metadata;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.connector.SchemaTablePrefix;
 
 import javax.annotation.concurrent.Immutable;
@@ -65,6 +66,11 @@ public class QualifiedTablePrefix
         this.catalogName = catalogName;
         this.schemaName = schemaName;
         this.tableName = tableName;
+    }
+
+    public static QualifiedTablePrefix toQualifiedTablePrefix(QualifiedObjectName qualifiedObjectName)
+    {
+        return new QualifiedTablePrefix(qualifiedObjectName.getCatalogName(), qualifiedObjectName.getSchemaName(), qualifiedObjectName.getObjectName());
     }
 
     @JsonProperty

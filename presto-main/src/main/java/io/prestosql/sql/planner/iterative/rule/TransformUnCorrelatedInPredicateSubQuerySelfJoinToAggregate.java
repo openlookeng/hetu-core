@@ -21,8 +21,8 @@ import io.prestosql.Session;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.function.FunctionKind;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.Assignments;
 import io.prestosql.spi.plan.CTEScanNode;
@@ -32,12 +32,13 @@ import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.type.BigintType;
 import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.plan.ApplyNode;
+import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
@@ -57,10 +58,12 @@ import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.SystemSessionProperties.TRANSFORM_SELF_JOIN_TO_GROUPBY;
 import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.matching.Pattern.empty;
+import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.planner.plan.Patterns.Apply.correlation;
 import static io.prestosql.sql.planner.plan.Patterns.Apply.subQuery;
 import static io.prestosql.sql.planner.plan.Patterns.applyNode;
 import static io.prestosql.sql.planner.plan.Patterns.project;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Transforms the SelfJoin resulting in duplicate rows used for IN predicate to aggregation.
@@ -99,6 +102,13 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
     private static final Pattern<ApplyNode> PATTERN = applyNode()
             .with(empty(correlation()))
             .with(subQuery().matching(PROJECT_NODE_PATTERN));
+    private final StandardFunctionResolution functionResolution;
+
+    public TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate(Metadata metadata)
+    {
+        requireNonNull(metadata, "metadata is null");
+        this.functionResolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
+    }
 
     @Override
     public Pattern<ApplyNode> getPattern()
@@ -263,10 +273,11 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
         }
 
         AggregationNode.Aggregation aggregation = new AggregationNode.Aggregation(
-                new Signature("count",
-                        FunctionKind.AGGREGATE,
-                        BigintType.BIGINT.getTypeSignature(),
-                        BigintType.BIGINT.getTypeSignature()),
+                new CallExpression(
+                        "count",
+                        functionResolution.countFunction(),
+                        BIGINT,
+                        aggregationSymbols),
                 aggregationSymbols,
                 true, //mark DISTINCT since NOT_EQUALS predicate
                 Optional.empty(),
@@ -274,7 +285,7 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
                 Optional.empty());
 
         ImmutableMap.Builder<Symbol, AggregationNode.Aggregation> aggregationsBuilder = ImmutableMap.builder();
-        Symbol countSymbol = context.getSymbolAllocator().newSymbol(aggregation.getSignature().getName(), BigintType.BIGINT);
+        Symbol countSymbol = context.getSymbolAllocator().newSymbol(aggregation.getFunctionCall().getDisplayName(), BIGINT);
         aggregationsBuilder.put(countSymbol, aggregation);
 
         AggregationNode aggregationNode = new AggregationNode(context.getIdAllocator().getNextId(),

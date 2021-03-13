@@ -31,9 +31,9 @@ import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.RowBlockBuilder;
 import io.prestosql.spi.block.SingleRowBlock;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.function.FunctionHandle;
+import io.prestosql.spi.function.FunctionMetadata;
 import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
-import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.CharType;
@@ -49,6 +49,7 @@ import io.prestosql.sql.analyzer.ExpressionAnalyzer;
 import io.prestosql.sql.analyzer.Scope;
 import io.prestosql.sql.analyzer.SemanticErrorCode;
 import io.prestosql.sql.analyzer.SemanticException;
+import io.prestosql.sql.analyzer.TypeSignatureProvider;
 import io.prestosql.sql.planner.iterative.rule.DesugarCurrentPath;
 import io.prestosql.sql.planner.iterative.rule.DesugarCurrentUser;
 import io.prestosql.sql.tree.ArithmeticBinaryExpression;
@@ -104,6 +105,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -121,10 +123,12 @@ import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static io.prestosql.metadata.CastType.CAST;
+import static io.prestosql.metadata.FunctionAndTypeManager.qualifyObjectName;
+import static io.prestosql.metadata.LiteralFunction.estimatedSizeInBytes;
 import static io.prestosql.metadata.LiteralFunction.isSupportedLiteralType;
 import static io.prestosql.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.type.TypeUtils.readNativeValue;
 import static io.prestosql.spi.type.TypeUtils.writeNativeValue;
@@ -142,14 +146,17 @@ import static io.prestosql.type.LikeFunctions.isLikePattern;
 import static io.prestosql.type.LikeFunctions.unescapeLiteralLikePattern;
 import static io.prestosql.util.Failures.checkCondition;
 import static java.lang.Math.toIntExact;
+import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 public class ExpressionInterpreter
 {
+    private static final long MAX_SERIALIZABLE_OBJECT_SIZE = 1000;
     private final Expression expression;
     private final Metadata metadata;
     private final LiteralEncoder literalEncoder;
-    private final ConnectorSession session;
+    private final Session session;
+    private final ConnectorSession connectorSession;
     private final boolean optimize;
     private final Map<NodeRef<Expression>, Type> expressionTypes;
     private final InterpretedFunctionInvoker functionInvoker;
@@ -242,11 +249,12 @@ public class ExpressionInterpreter
         this.expression = requireNonNull(expression, "expression is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.literalEncoder = new LiteralEncoder(metadata);
-        this.session = requireNonNull(session, "session is null").toConnectorSession();
+        this.session = requireNonNull(session, "session is null");
+        this.connectorSession = session.toConnectorSession();
         this.expressionTypes = ImmutableMap.copyOf(requireNonNull(expressionTypes, "expressionTypes is null"));
         verify((expressionTypes.containsKey(NodeRef.of(expression))));
         this.optimize = optimize;
-        this.functionInvoker = new InterpretedFunctionInvoker(metadata);
+        this.functionInvoker = new InterpretedFunctionInvoker(metadata.getFunctionAndTypeManager());
         this.typeCoercion = new TypeCoercion(metadata::getType);
 
         this.visitor = new Visitor();
@@ -279,6 +287,8 @@ public class ExpressionInterpreter
     private class Visitor
             extends AstVisitor<Object, Object>
     {
+        private final Map<NodeRef<Expression>, Type> generatedExpressionTypes = new HashMap<>();
+
         @Override
         public Object visitFieldReference(FieldReference node, Object context)
         {
@@ -347,7 +357,7 @@ public class ExpressionInterpreter
         @Override
         protected Object visitLiteral(Literal node, Object context)
         {
-            return LiteralInterpreter.evaluate(metadata, session, node);
+            return LiteralInterpreter.evaluate(metadata, connectorSession, node);
         }
 
         @Override
@@ -492,7 +502,16 @@ public class ExpressionInterpreter
 
         private Type type(Expression expression)
         {
+            Type type = generatedExpressionTypes.get(NodeRef.of(expression));
+            if (type != null) {
+                return type;
+            }
             return expressionTypes.get(NodeRef.of(expression));
+        }
+
+        private void addGeneratedExpressionType(Expression exp, Type type)
+        {
+            this.generatedExpressionTypes.put(NodeRef.of(exp), type);
         }
 
         @Override
@@ -660,11 +679,11 @@ public class ExpressionInterpreter
                 case PLUS:
                     return value;
                 case MINUS:
-                    Signature operatorSignature = metadata.resolveOperator(OperatorType.NEGATION, types(node.getValue()));
-                    MethodHandle handle = metadata.getScalarFunctionImplementation(operatorSignature).getMethodHandle();
+                    FunctionHandle operatorHandle = metadata.getFunctionAndTypeManager().resolveOperatorFunctionHandle(OperatorType.NEGATION, TypeSignatureProvider.fromTypes(types(node.getValue())));
+                    MethodHandle handle = metadata.getFunctionAndTypeManager().getBuiltInScalarFunctionImplementation(operatorHandle).getMethodHandle();
 
                     if (handle.type().parameterCount() > 0 && handle.type().parameterType(0) == ConnectorSession.class) {
-                        handle = handle.bindTo(session);
+                        handle = handle.bindTo(connectorSession);
                     }
                     try {
                         return handle.invokeWithArguments(value);
@@ -793,18 +812,18 @@ public class ExpressionInterpreter
                 return new NullIfExpression(toExpression(first, firstType), toExpression(second, secondType));
             }
 
-            Type commonType = typeCoercion.getCommonSuperType(firstType, secondType).get();
+            Type commonType = metadata.getFunctionAndTypeManager().getCommonSuperType(firstType, secondType).get();
 
-            Signature firstCast = metadata.getCoercion(firstType.getTypeSignature(), commonType.getTypeSignature());
-            Signature secondCast = metadata.getCoercion(secondType.getTypeSignature(), commonType.getTypeSignature());
+            FunctionHandle firstCast = metadata.getFunctionAndTypeManager().lookupCast(CAST, firstType.getTypeSignature(), commonType.getTypeSignature());
+            FunctionHandle secondCast = metadata.getFunctionAndTypeManager().lookupCast(CAST, secondType.getTypeSignature(), commonType.getTypeSignature());
 
             // cast(first as <common type>) == cast(second as <common type>)
             boolean equal = Boolean.TRUE.equals(invokeOperator(
                     OperatorType.EQUAL,
                     ImmutableList.of(commonType, commonType),
                     ImmutableList.of(
-                            functionInvoker.invoke(firstCast, session, ImmutableList.of(first)),
-                            functionInvoker.invoke(secondCast, session, ImmutableList.of(second)))));
+                            functionInvoker.invoke(firstCast, connectorSession, ImmutableList.of(first)),
+                            functionInvoker.invoke(secondCast, connectorSession, ImmutableList.of(second)))));
 
             if (equal) {
                 return null;
@@ -898,29 +917,51 @@ public class ExpressionInterpreter
                 argumentValues.add(value);
                 argumentTypes.add(type);
             }
-            Signature functionSignature = metadata.resolveFunction(node.getName(), fromTypes(argumentTypes));
-            ScalarFunctionImplementation function = metadata.getScalarFunctionImplementation(functionSignature);
-            for (int i = 0; i < argumentValues.size(); i++) {
-                Object value = argumentValues.get(i);
-                if (value == null && function.getArgumentProperty(i).getNullConvention() == RETURN_NULL_ON_NULL) {
-                    return null;
+            FunctionHandle functionHandle = metadata.getFunctionAndTypeManager().resolveFunction(
+                    session.getTransactionId(),
+                    qualifyObjectName(node.getName()),
+                    fromTypes(argumentTypes));
+            FunctionMetadata functionMetadata = metadata.getFunctionAndTypeManager().getFunctionMetadata(functionHandle);
+            if (!functionMetadata.isCalledOnNullInput()) {
+                for (int i = 0; i < argumentValues.size(); i++) {
+                    Object value = argumentValues.get(i);
+                    if (value == null) {
+                        return null;
+                    }
                 }
             }
-
             // do not optimize non-deterministic functions
-            if (optimize && (!function.isDeterministic() || hasUnresolvedValue(argumentValues) || node.getName().equals(QualifiedName.of("fail")))) {
+            if (optimize && (!functionMetadata.isDeterministic() || hasUnresolvedValue(argumentValues) || node.getName().equals(QualifiedName.of("fail")))) {
                 verify(!node.isDistinct(), "window does not support distinct");
                 verify(!node.getOrderBy().isPresent(), "window does not support order by");
                 //DynamicFilter can have filter now.
                 verify(!node.getFilter().isPresent() || node.getName().toString().equals(DynamicFilters.Function.NAME), "window does not support filter");
-                return new FunctionCallBuilder(metadata)
-                        .setName(node.getName())
-                        .setWindow(node.getWindow())
-                        .setArguments(argumentTypes, toExpressions(argumentValues, argumentTypes))
-                        .setFilter(node.getFilter())
-                        .build();
+
+                return new FunctionCall(
+                        node.getName(),
+                        node.getWindow(),
+                        node.isDistinct(),
+                        node.isIgnoreNulls(),
+                        toExpressions(argumentValues, argumentTypes));
             }
-            return functionInvoker.invoke(functionSignature, session, argumentValues);
+
+            Object result;
+
+            switch (functionMetadata.getImplementationType()) {
+                case BUILTIN:
+                    result = functionInvoker.invoke(functionHandle, connectorSession, argumentValues);
+                    break;
+                case JDBC:
+                    // do not interpret remote functions on coordinator
+                    return new FunctionCall(node.getName(), node.getWindow(), node.isDistinct(), node.isIgnoreNulls(), toExpressions(argumentValues, argumentTypes));
+                default:
+                    throw new IllegalArgumentException(format("Unsupported function implementation type: %s", functionMetadata.getImplementationType()));
+            }
+
+            if (optimize && !isSerializable(result, type(node))) {
+                return new FunctionCall(node.getName(), node.getWindow(), node.isDistinct(), node.isIgnoreNulls(), toExpressions(argumentValues, argumentTypes));
+            }
+            return result;
         }
 
         @Override
@@ -1114,10 +1155,10 @@ public class ExpressionInterpreter
                 return null;
             }
 
-            Signature operator = metadata.getCoercion(sourceType.getTypeSignature(), targetType.getTypeSignature());
+            FunctionHandle operator = metadata.getFunctionAndTypeManager().lookupCast(CAST, sourceType.getTypeSignature(), targetType.getTypeSignature());
 
             try {
-                return functionInvoker.invoke(operator, session, ImmutableList.of(value));
+                return functionInvoker.invoke(operator, connectorSession, ImmutableList.of(value));
             }
             catch (RuntimeException e) {
                 if (node.isSafe()) {
@@ -1137,12 +1178,9 @@ public class ExpressionInterpreter
                 Object value = process(expression, context);
                 if (value instanceof Expression) {
                     checkCondition(node.getValues().size() <= 254, NOT_SUPPORTED, "Too many arguments for array constructor");
-                    return visitFunctionCall(
-                            new FunctionCallBuilder(metadata)
-                                    .setName(QualifiedName.of(ArrayConstructor.ARRAY_CONSTRUCTOR))
-                                    .setArguments(types(node.getValues()), node.getValues())
-                                    .build(),
-                            context);
+                    FunctionCall functionCall = new FunctionCall(QualifiedName.of(ArrayConstructor.ARRAY_CONSTRUCTOR), node.getValues());
+                    addGeneratedExpressionType(functionCall, type(node));
+                    return visitFunctionCall(functionCall, context);
                 }
                 writeNativeValue(elementType, arrayBlockBuilder, value);
             }
@@ -1153,7 +1191,9 @@ public class ExpressionInterpreter
         @Override
         protected Object visitCurrentUser(CurrentUser node, Object context)
         {
-            return visitFunctionCall(DesugarCurrentUser.getCall(node, metadata), context);
+            FunctionCall functionCall = DesugarCurrentUser.getCall(node, metadata);
+            addGeneratedExpressionType(functionCall, type(node));
+            return visitFunctionCall(functionCall, context);
         }
 
         @Override
@@ -1271,8 +1311,15 @@ public class ExpressionInterpreter
 
         private Object invokeOperator(OperatorType operatorType, List<? extends Type> argumentTypes, List<Object> argumentValues)
         {
-            Signature operatorSignature = metadata.resolveOperator(operatorType, argumentTypes);
-            return functionInvoker.invoke(operatorSignature, session, argumentValues);
+            FunctionHandle operatorHandle = metadata.getFunctionAndTypeManager().resolveOperatorFunctionHandle(operatorType, fromTypes(argumentTypes));
+            return functionInvoker.invoke(operatorHandle, connectorSession, argumentValues);
+        }
+
+        private boolean isSerializable(Object value, Type type)
+        {
+            requireNonNull(type, "type is null");
+            // If value is already Expression, literal values contained inside should already have been made serializable. Otherwise, we make sure the object is small and serializable.
+            return value instanceof Expression || (isSupportedLiteralType(type) && estimatedSizeInBytes(value) <= MAX_SERIALIZABLE_OBJECT_SIZE);
         }
 
         private Expression toExpression(Object base, Type type)

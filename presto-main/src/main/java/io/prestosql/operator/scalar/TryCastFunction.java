@@ -16,17 +16,21 @@ package io.prestosql.operator.scalar;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Primitives;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlScalarFunction;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.FunctionKind;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
-import io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.Type;
 
 import java.lang.invoke.MethodHandle;
 import java.util.List;
 
+import static io.prestosql.metadata.CastType.CAST;
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.spi.function.Signature.typeVariable;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static java.lang.invoke.MethodHandles.catchException;
@@ -38,11 +42,12 @@ public class TryCastFunction
         extends SqlScalarFunction
 {
     public static final TryCastFunction TRY_CAST = new TryCastFunction();
+    public static final String TRY_CAST_NAME = "TRY_CAST";
 
     public TryCastFunction()
     {
         super(new Signature(
-                "TRY_CAST",
+                QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, TRY_CAST_NAME),
                 FunctionKind.SCALAR,
                 ImmutableList.of(typeVariable("F"), typeVariable("T")),
                 ImmutableList.of(),
@@ -70,7 +75,7 @@ public class TryCastFunction
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         Type fromType = boundVariables.getTypeVariable("F");
         Type toType = boundVariables.getTypeVariable("T");
@@ -80,8 +85,8 @@ public class TryCastFunction
         MethodHandle tryCastHandle;
 
         // the resulting method needs to return a boxed type
-        Signature signature = metadata.getCoercion(fromType.getTypeSignature(), toType.getTypeSignature());
-        ScalarFunctionImplementation implementation = metadata.getScalarFunctionImplementation(signature);
+        FunctionHandle functionHandle = functionAndTypeManager.lookupCast(CAST, fromType.getTypeSignature(), toType.getTypeSignature());
+        BuiltInScalarFunctionImplementation implementation = functionAndTypeManager.getBuiltInScalarFunctionImplementation(functionHandle);
         argumentProperties = ImmutableList.of(implementation.getArgumentProperty(0));
         MethodHandle coercion = implementation.getMethodHandle();
         coercion = coercion.asType(methodType(returnType, coercion.type()));
@@ -89,6 +94,6 @@ public class TryCastFunction
         MethodHandle exceptionHandler = dropArguments(constant(returnType, null), 0, RuntimeException.class);
         tryCastHandle = catchException(coercion, RuntimeException.class, exceptionHandler);
 
-        return new ScalarFunctionImplementation(true, argumentProperties, tryCastHandle, isDeterministic());
+        return new BuiltInScalarFunctionImplementation(true, argumentProperties, tryCastHandle);
     }
 }

@@ -19,12 +19,12 @@ import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlOperator;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignatureParameter;
@@ -37,8 +37,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Throwables.throwIfUnchecked;
 import static io.prestosql.operator.scalar.JsonOperators.JSON_FACTORY;
 import static io.prestosql.spi.StandardErrorCode.INVALID_CAST_ARGUMENT;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.Signature.typeVariable;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.util.Reflection.methodHandle;
@@ -62,22 +62,21 @@ public class ArrayToJsonCast
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         checkArgument(arity == 1, "Expected arity to be 1");
         Type type = boundVariables.getTypeVariable("T");
-        Type arrayType = metadata.getParameterizedType(StandardTypes.ARRAY, ImmutableList.of(TypeSignatureParameter.of(type.getTypeSignature())));
+        Type arrayType = functionAndTypeManager.getParameterizedType(StandardTypes.ARRAY, ImmutableList.of(TypeSignatureParameter.of(type.getTypeSignature())));
         checkCondition(canCastToJson(arrayType), INVALID_CAST_ARGUMENT, "Cannot cast %s to JSON", arrayType);
 
         JsonGeneratorWriter writer = JsonGeneratorWriter.createJsonGeneratorWriter(type);
         MethodHandle methodHandle = METHOD_HANDLE.bindTo(writer);
-        return new ScalarFunctionImplementation(
+        return new BuiltInScalarFunctionImplementation(
                 false,
                 ImmutableList.of(
                         valueTypeArgumentProperty(RETURN_NULL_ON_NULL),
                         valueTypeArgumentProperty(RETURN_NULL_ON_NULL)),
-                methodHandle,
-                isDeterministic());
+                methodHandle);
     }
 
     public static Slice toJson(JsonGeneratorWriter writer, ConnectorSession session, Block block)

@@ -14,7 +14,7 @@
 package io.prestosql.operator.annotations;
 
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.spi.function.Convention;
 import io.prestosql.spi.function.FunctionDependency;
 import io.prestosql.spi.function.InvocationConvention;
@@ -41,7 +41,7 @@ import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 
 public interface ImplementationDependency
 {
-    Object resolve(BoundVariables boundVariables, Metadata metadata);
+    Object resolve(BoundVariables boundVariables, FunctionAndTypeManager functionAndTypeManager);
 
     static boolean isImplementationDependencyAnnotation(Annotation annotation)
     {
@@ -105,7 +105,6 @@ public interface ImplementationDependency
                 FunctionDependency functionDependency = (FunctionDependency) annotation;
                 return new FunctionImplementationDependency(
                         functionDependency.name(),
-                        parseTypeSignature(functionDependency.returnType(), literalParameters),
                         Arrays.stream(functionDependency.argumentTypes())
                                 .map(signature -> parseTypeSignature(signature, literalParameters))
                                 .collect(toImmutableList()),
@@ -115,7 +114,6 @@ public interface ImplementationDependency
                 OperatorDependency operatorDependency = (OperatorDependency) annotation;
                 return new OperatorImplementationDependency(
                         operatorDependency.operator(),
-                        parseTypeSignature(operatorDependency.returnType(), literalParameters),
                         Arrays.stream(operatorDependency.argumentTypes())
                                 .map(signature -> parseTypeSignature(signature, literalParameters))
                                 .collect(toImmutableList()),

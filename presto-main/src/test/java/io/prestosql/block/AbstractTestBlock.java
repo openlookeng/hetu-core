@@ -396,8 +396,8 @@ public abstract class AbstractTestBlock
     private static Block copyBlockViaBlockSerde(Block block)
     {
         DynamicSliceOutput sliceOutput = new DynamicSliceOutput(1024);
-        METADATA.getBlockEncodingSerde().writeBlock(sliceOutput, block);
-        return METADATA.getBlockEncodingSerde().readBlock(sliceOutput.slice().getInput());
+        METADATA.getFunctionAndTypeManager().getBlockEncodingSerde().writeBlock(sliceOutput, block);
+        return METADATA.getFunctionAndTypeManager().getBlockEncodingSerde().readBlock(sliceOutput.slice().getInput());
     }
 
     private static Block copyBlockViaWritePositionTo(Block block, Supplier<BlockBuilder> newBlockBuilder)

@@ -33,7 +33,7 @@ import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.testng.Assert.assertEquals;
 
-public class TestTypeRegistry
+public class TestBuiltInTypeRegistry
 {
     private final Metadata metadata = createTestMetadataManager();
 
@@ -48,18 +48,18 @@ public class TestTypeRegistry
     @Test
     public void testOperatorsImplemented()
     {
-        for (Type type : metadata.getTypes()) {
+        for (Type type : metadata.getFunctionAndTypeManager().getTypes()) {
             if (type.isComparable()) {
-                metadata.resolveOperator(EQUAL, ImmutableList.of(type, type));
-                metadata.resolveOperator(NOT_EQUAL, ImmutableList.of(type, type));
-                metadata.resolveOperator(IS_DISTINCT_FROM, ImmutableList.of(type, type));
-                metadata.resolveOperator(HASH_CODE, ImmutableList.of(type));
+                metadata.getFunctionAndTypeManager().resolveOperator(EQUAL, ImmutableList.of(type, type));
+                metadata.getFunctionAndTypeManager().resolveOperator(NOT_EQUAL, ImmutableList.of(type, type));
+                metadata.getFunctionAndTypeManager().resolveOperator(IS_DISTINCT_FROM, ImmutableList.of(type, type));
+                metadata.getFunctionAndTypeManager().resolveOperator(HASH_CODE, ImmutableList.of(type));
             }
             if (type.isOrderable()) {
-                metadata.resolveOperator(LESS_THAN, ImmutableList.of(type, type));
-                metadata.resolveOperator(LESS_THAN_OR_EQUAL, ImmutableList.of(type, type));
-                metadata.resolveOperator(GREATER_THAN_OR_EQUAL, ImmutableList.of(type, type));
-                metadata.resolveOperator(GREATER_THAN, ImmutableList.of(type, type));
+                metadata.getFunctionAndTypeManager().resolveOperator(LESS_THAN, ImmutableList.of(type, type));
+                metadata.getFunctionAndTypeManager().resolveOperator(LESS_THAN_OR_EQUAL, ImmutableList.of(type, type));
+                metadata.getFunctionAndTypeManager().resolveOperator(GREATER_THAN_OR_EQUAL, ImmutableList.of(type, type));
+                metadata.getFunctionAndTypeManager().resolveOperator(GREATER_THAN, ImmutableList.of(type, type));
             }
         }
     }

@@ -24,7 +24,6 @@ import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.block.SortOrder;
-import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.Assignments;
 import io.prestosql.spi.plan.CTEScanNode;
@@ -46,6 +45,7 @@ import io.prestosql.spi.plan.TopNNode;
 import io.prestosql.spi.plan.UnionNode;
 import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.planner.ExpressionDeterminismEvaluator;
@@ -105,6 +105,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.prestosql.spi.plan.JoinNode.Type.INNER;
 import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+import static io.prestosql.sql.relational.Expressions.call;
 import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
 import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
@@ -220,11 +221,19 @@ public class UnaliasSymbolReferences
             for (Map.Entry<Symbol, WindowNode.Function> entry : node.getWindowFunctions().entrySet()) {
                 Symbol symbol = entry.getKey();
 
-                Signature signature = entry.getValue().getSignature();
+                CallExpression callExpression = entry.getValue().getFunctionCall();
                 List<RowExpression> arguments = canonicalize(entry.getValue().getArguments());
                 WindowNode.Frame canonicalFrame = canonicalize(entry.getValue().getFrame());
 
-                functions.put(canonicalize(symbol), new WindowNode.Function(signature, arguments, canonicalFrame));
+                functions.put(canonicalize(symbol),
+                        new WindowNode.Function(
+                                call(
+                                        callExpression.getDisplayName(),
+                                        callExpression.getFunctionHandle(),
+                                        callExpression.getType(),
+                                        arguments),
+                                arguments,
+                                canonicalFrame));
             }
 
             return new WindowNode(

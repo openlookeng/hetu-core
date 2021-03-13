@@ -18,6 +18,7 @@ import io.prestosql.operator.aggregation.AbstractTestAggregationFunction;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.StandardTypes;
@@ -42,8 +43,8 @@ public class TestRealAverageAggregation
     @BeforeClass
     public void setUp()
     {
-        avgFunction = createTestMetadataManager().getAggregateFunctionImplementation(
-                new Signature("avg", FunctionKind.AGGREGATE, parseTypeSignature(StandardTypes.REAL), parseTypeSignature(StandardTypes.REAL)));
+        avgFunction = createTestMetadataManager().getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("avg"), FunctionKind.AGGREGATE, parseTypeSignature(StandardTypes.REAL), parseTypeSignature(StandardTypes.REAL)));
     }
 
     @Test

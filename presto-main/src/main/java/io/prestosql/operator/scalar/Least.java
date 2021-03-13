@@ -13,7 +13,10 @@
  */
 package io.prestosql.operator.scalar;
 
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.OperatorType;
+
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 
 public final class Least
         extends AbstractGreatestLeast
@@ -22,7 +25,7 @@ public final class Least
 
     public Least()
     {
-        super("least", OperatorType.LESS_THAN);
+        super(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "least"), OperatorType.LESS_THAN);
     }
 
     @Override

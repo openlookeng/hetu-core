@@ -257,7 +257,7 @@ public class CursorProcessorCompiler
                             innerScope,
                             callSiteBinder,
                             cachedInstanceBinder,
-                            metadata);
+                            metadata.getFunctionAndTypeManager());
                     newFilterMethod.getBody().comment("boolean wasNull = false;")
                             .putVariable(wasNullVariable1, false)
                             .comment("evaluate filter: " + subFilter)

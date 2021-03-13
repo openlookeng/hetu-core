@@ -16,13 +16,16 @@ package io.hetu.core.plugin.oracle.optimization;
 
 import io.prestosql.plugin.jdbc.optimization.BaseJdbcQueryGenerator;
 import io.prestosql.plugin.jdbc.optimization.JdbcPushDownParameter;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.StandardFunctionResolution;
+import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpressionService;
 
 public class OracleQueryGenerator
         extends BaseJdbcQueryGenerator
 {
-    public OracleQueryGenerator(RowExpressionService rowExpressionService, JdbcPushDownParameter pushDownParameter)
+    public OracleQueryGenerator(DeterminismEvaluator determinismEvaluator, RowExpressionService rowExpressionService, FunctionMetadataManager functionManager, StandardFunctionResolution functionResolution, JdbcPushDownParameter pushDownParameter)
     {
-        super(pushDownParameter, new OracleRowExpressionConverter(rowExpressionService), new OracleSqlStatementWriter(pushDownParameter));
+        super(pushDownParameter, new OracleRowExpressionConverter(determinismEvaluator, rowExpressionService, functionManager, functionResolution), new OracleSqlStatementWriter(pushDownParameter));
     }
 }

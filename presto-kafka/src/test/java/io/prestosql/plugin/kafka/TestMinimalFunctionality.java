@@ -15,10 +15,10 @@ package io.prestosql.plugin.kafka;
 
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.plugin.kafka.util.EmbeddedKafka;
 import io.prestosql.plugin.kafka.util.TestUtils;
 import io.prestosql.security.AllowAllAccessControl;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.type.BigintType;

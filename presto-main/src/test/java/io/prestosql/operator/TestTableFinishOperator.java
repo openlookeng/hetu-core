@@ -24,6 +24,7 @@ import io.prestosql.operator.aggregation.InternalAggregationFunction;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.LongArrayBlockBuilder;
 import io.prestosql.spi.connector.ConnectorOutputMetadata;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -63,8 +64,8 @@ import static org.testng.Assert.assertTrue;
 
 public class TestTableFinishOperator
 {
-    private static final InternalAggregationFunction LONG_MAX = createTestMetadataManager().getAggregateFunctionImplementation(
-            new Signature("max", AGGREGATE, BIGINT.getTypeSignature(), BIGINT.getTypeSignature()));
+    private static final InternalAggregationFunction LONG_MAX = createTestMetadataManager().getFunctionAndTypeManager().getAggregateFunctionImplementation(
+            new Signature(QualifiedObjectName.valueOfDefaultFunction("max"), AGGREGATE, BIGINT.getTypeSignature(), BIGINT.getTypeSignature()));
 
     private ScheduledExecutorService scheduledExecutor;
 

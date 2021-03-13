@@ -14,19 +14,25 @@
 package io.prestosql.sql.analyzer;
 
 import com.google.common.collect.ImmutableList;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.Location;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.sql.tree.DefaultExpressionTraversalVisitor;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.sql.tree.Node;
+import io.prestosql.sql.tree.NodeRef;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 
 import static com.google.common.base.Predicates.alwaysTrue;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static java.util.Objects.requireNonNull;
 
 public final class ExpressionTreeUtils
@@ -36,6 +42,16 @@ public final class ExpressionTreeUtils
     static List<FunctionCall> extractAggregateFunctions(Iterable<? extends Node> nodes, Metadata metadata)
     {
         return extractExpressions(nodes, FunctionCall.class, isAggregationPredicate(metadata));
+    }
+
+    static List<FunctionCall> extractAggregateFunctions(Map<NodeRef<FunctionCall>, FunctionHandle> functionHandles, Iterable<? extends Node> nodes, FunctionAndTypeManager functionAndTypeManager)
+    {
+        return extractExpressions(nodes, FunctionCall.class, isAggregationPredicate(functionHandles, functionAndTypeManager));
+    }
+
+    static List<FunctionCall> extractExternalFunctions(Map<NodeRef<FunctionCall>, FunctionHandle> functionHandles, Iterable<? extends Node> nodes, FunctionAndTypeManager functionAndTypeManager)
+    {
+        return extractExpressions(nodes, FunctionCall.class, isExternalFunctionPredicate(functionHandles, functionAndTypeManager));
     }
 
     static List<FunctionCall> extractWindowFunctions(Iterable<? extends Node> nodes)
@@ -50,11 +66,24 @@ public final class ExpressionTreeUtils
         return extractExpressions(nodes, clazz, alwaysTrue());
     }
 
+    private static Predicate<FunctionCall> isExternalFunctionPredicate(Map<NodeRef<FunctionCall>, FunctionHandle> functionHandles, FunctionAndTypeManager functionAndTypeManager)
+    {
+        return functionCall -> functionAndTypeManager.getFunctionMetadata(functionHandles.get(NodeRef.of(functionCall))).getImplementationType().isExternal();
+    }
+
     private static Predicate<FunctionCall> isAggregationPredicate(Metadata metadata)
     {
-        return ((functionCall) -> (metadata.isAggregationFunction(functionCall.getName())
-                || functionCall.getFilter().isPresent()) && !functionCall.getWindow().isPresent()
-                || functionCall.getOrderBy().isPresent());
+        return functionCall -> (metadata.getFunctionAndTypeManager().getFunctions(Optional.empty(), QualifiedObjectName.valueOfDefaultFunction(functionCall.getName().toString())).stream().anyMatch(sqlfunction -> sqlfunction.getSignature().getKind() == AGGREGATE)
+                || functionCall.getFilter().isPresent())
+                && !functionCall.getWindow().isPresent()
+                || functionCall.getOrderBy().isPresent();
+    }
+
+    private static Predicate<FunctionCall> isAggregationPredicate(Map<NodeRef<FunctionCall>, FunctionHandle> functionHandles, FunctionAndTypeManager functionAndTypeManager)
+    {
+        return functionCall -> (functionAndTypeManager.getFunctionMetadata(functionHandles.get(NodeRef.of(functionCall))).getFunctionKind() == AGGREGATE || functionCall.getFilter().isPresent())
+                && !functionCall.getWindow().isPresent()
+                || functionCall.getOrderBy().isPresent();
     }
 
     private static boolean isWindowFunction(FunctionCall functionCall)

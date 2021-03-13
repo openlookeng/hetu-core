@@ -26,6 +26,7 @@ import io.prestosql.operator.aggregation.groupby.GroupByAggregationTestUtils;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.MapType;
@@ -184,8 +185,8 @@ public class TestMultimapAggAggregation
     private static InternalAggregationFunction getInternalAggregationFunction(Type keyType, Type valueType)
     {
         MapType mapType = mapType(keyType, new ArrayType(valueType));
-        Signature signature = new Signature(NAME, AGGREGATE, mapType.getTypeSignature(), keyType.getTypeSignature(), valueType.getTypeSignature());
-        return metadata.getAggregateFunctionImplementation(signature);
+        Signature signature = new Signature(QualifiedObjectName.valueOfDefaultFunction(NAME), AGGREGATE, mapType.getTypeSignature(), keyType.getTypeSignature(), valueType.getTypeSignature());
+        return metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(signature);
     }
 
     private static <K, V> void testMultimapAgg(InternalAggregationFunction aggFunc, Type keyType, List<K> expectedKeys, Type valueType, List<V> expectedValues)

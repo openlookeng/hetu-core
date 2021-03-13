@@ -27,11 +27,11 @@ import static java.util.Objects.requireNonNull;
 final class InternalBlockEncodingSerde
         implements BlockEncodingSerde
 {
-    private final Metadata metadata;
+    private final FunctionAndTypeManager functionAndTypeManager;
 
-    public InternalBlockEncodingSerde(Metadata metadata)
+    public InternalBlockEncodingSerde(FunctionAndTypeManager metadata)
     {
-        this.metadata = requireNonNull(metadata, "metadata is null");
+        this.functionAndTypeManager = requireNonNull(metadata, "metadata is null");
     }
 
     @Override
@@ -41,7 +41,7 @@ final class InternalBlockEncodingSerde
         String encodingName = readLengthPrefixedString(input);
 
         // look up the encoding factory
-        BlockEncoding blockEncoding = metadata.getBlockEncoding(encodingName);
+        BlockEncoding blockEncoding = functionAndTypeManager.getBlockEncoding(encodingName);
 
         // load read the encoding factory from the output stream
         return blockEncoding.readBlock(this, input);
@@ -55,7 +55,7 @@ final class InternalBlockEncodingSerde
             String encodingName = block.getEncodingName();
 
             // look up the BlockEncoding
-            BlockEncoding blockEncoding = metadata.getBlockEncoding(encodingName);
+            BlockEncoding blockEncoding = functionAndTypeManager.getBlockEncoding(encodingName);
 
             // see if a replacement block should be written instead
             Optional<Block> replacementBlock = blockEncoding.replacementBlockForWrite(block);

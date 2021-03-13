@@ -15,7 +15,8 @@ package io.prestosql.sql.relational;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.metadata.FunctionAndTypeManager;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.InputReferenceExpression;
@@ -31,6 +32,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 
 public final class Expressions
 {
@@ -53,19 +57,30 @@ public final class Expressions
         return expression instanceof ConstantExpression && ((ConstantExpression) expression).isNull();
     }
 
-    public static CallExpression call(Signature signature, Type returnType, RowExpression... arguments)
+    public static CallExpression call(String displayName, FunctionHandle functionHandle, Type returnType, RowExpression... arguments)
     {
-        return new CallExpression(signature, returnType, Arrays.asList(arguments), Optional.empty());
+        return new CallExpression(displayName, functionHandle, returnType, Arrays.asList(arguments), Optional.empty());
     }
 
-    public static CallExpression call(Signature signature, Type returnType, List<RowExpression> arguments)
+    public static CallExpression call(String displayName, FunctionHandle functionHandle, Type returnType, List<RowExpression> arguments)
     {
-        return new CallExpression(signature, returnType, arguments, Optional.empty());
+        return new CallExpression(displayName, functionHandle, returnType, arguments, Optional.empty());
     }
 
-    public static CallExpression call(Signature signature, Type returnType, List<RowExpression> arguments, Optional<RowExpression> filter)
+    public static CallExpression call(String displayName, FunctionHandle functionHandle, Type returnType, List<RowExpression> arguments, Optional<RowExpression> filter)
     {
-        return new CallExpression(signature, returnType, arguments, filter);
+        return new CallExpression(displayName, functionHandle, returnType, arguments, filter);
+    }
+
+    public static CallExpression call(FunctionAndTypeManager functionAndTypeManager, String name, Type returnType, RowExpression... arguments)
+    {
+        return call(functionAndTypeManager, name, returnType, ImmutableList.copyOf(arguments), Optional.empty());
+    }
+
+    public static CallExpression call(FunctionAndTypeManager functionAndTypeManager, String name, Type returnType, List<RowExpression> arguments, Optional<RowExpression> filter)
+    {
+        FunctionHandle functionHandle = functionAndTypeManager.lookupFunction(name, fromTypes(arguments.stream().map(RowExpression::getType).collect(toImmutableList())));
+        return new CallExpression(name, functionHandle, returnType, arguments, filter);
     }
 
     public static InputReferenceExpression field(int field, Type type)

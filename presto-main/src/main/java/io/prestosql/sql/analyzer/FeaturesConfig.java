@@ -48,8 +48,6 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 @DefunctConfig({
-        "deprecated.legacy-char-to-varchar-coercion",
-        "deprecated.legacy-map-subscript",
         "deprecated.group-by-uses-equal",
         "deprecated.legacy-row-field-ordinal-access",
         "deprecated.legacy-unnest-array-rows",
@@ -95,6 +93,7 @@ public class FeaturesConfig
     private boolean pushLimitThroughOuterJoin = true;
     private boolean exchangeCompressionEnabled;
     private boolean legacyTimestamp = true;
+    private boolean legacyMapSubscript;
     private boolean optimizeMixedDistinctAggregations;
     private boolean unwrapCasts = true;
     private boolean forceSingleNodeOutput = true;
@@ -103,6 +102,8 @@ public class FeaturesConfig
     private boolean queryPushDown = true;
     private boolean pushLimitDown = true;
     private boolean implicitConversion;
+    private boolean legacyCharToVarcharCoercion;
+    private boolean legacyDateTimestampToVarcharCoercion;
 
     private boolean dictionaryAggregation;
 
@@ -161,6 +162,7 @@ public class FeaturesConfig
     private boolean cteReuseEnabled;
     private int maxQueueSize = 1024;
     private int maxPrefetchQueueSize = 512;
+    private boolean listBuiltInFunctionsOnly = true;
 
     private boolean enableStarTreeIndex;
     private long cubeMetadataCacheSize = 5;
@@ -263,6 +265,18 @@ public class FeaturesConfig
         return legacyTimestamp;
     }
 
+    @Config("deprecated.legacy-map-subscript")
+    public FeaturesConfig setLegacyMapSubscript(boolean value)
+    {
+        this.legacyMapSubscript = value;
+        return this;
+    }
+
+    public boolean isLegacyMapSubscript()
+    {
+        return legacyMapSubscript;
+    }
+
     public JoinDistributionType getJoinDistributionType()
     {
         return joinDistributionType;
@@ -326,6 +340,30 @@ public class FeaturesConfig
     public FeaturesConfig setConcurrentLifespansPerTask(int concurrentLifespansPerTask)
     {
         this.concurrentLifespansPerTask = concurrentLifespansPerTask;
+        return this;
+    }
+
+    public boolean isLegacyCharToVarcharCoercion()
+    {
+        return legacyCharToVarcharCoercion;
+    }
+
+    @Config("deprecated.legacy-char-to-varchar-coercion")
+    public FeaturesConfig setLegacyCharToVarcharCoercion(boolean value)
+    {
+        this.legacyCharToVarcharCoercion = value;
+        return this;
+    }
+
+    public boolean isLegacyDateTimestampToVarcharCoercion()
+    {
+        return legacyDateTimestampToVarcharCoercion;
+    }
+
+    @Config("deprecated.legacy-date-timestamp-to-varchar-coercion")
+    public FeaturesConfig setLegacyDateTimestampToVarcharCoercion(boolean legacyDateTimestampToVarcharCoercion)
+    {
+        this.legacyDateTimestampToVarcharCoercion = legacyDateTimestampToVarcharCoercion;
         return this;
     }
 
@@ -1307,6 +1345,18 @@ public class FeaturesConfig
     public FeaturesConfig setCubeMetadataCacheTtl(Duration cubeMetadataCacheTtl)
     {
         this.cubeMetadataCacheTtl = cubeMetadataCacheTtl;
+        return this;
+    }
+
+    public boolean isListBuiltInFunctionsOnly()
+    {
+        return listBuiltInFunctionsOnly;
+    }
+
+    @Config("list-built-in-functions-only")
+    public FeaturesConfig setListBuiltInFunctionsOnly(boolean listBuiltInFunctionsOnly)
+    {
+        this.listBuiltInFunctionsOnly = listBuiltInFunctionsOnly;
         return this;
     }
 }

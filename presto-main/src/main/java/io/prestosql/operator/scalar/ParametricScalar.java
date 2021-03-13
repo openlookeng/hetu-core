@@ -15,12 +15,12 @@ package io.prestosql.operator.scalar;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlScalarFunction;
 import io.prestosql.operator.ParametricImplementationsGroup;
 import io.prestosql.operator.scalar.annotations.ParametricScalarImplementation;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
 
 import java.util.Optional;
@@ -50,6 +50,12 @@ public class ParametricScalar
     }
 
     @Override
+    public boolean isCalledOnNullInput()
+    {
+        return details.isCalledOnNullInput();
+    }
+
+    @Override
     public boolean isHidden()
     {
         return details.isHidden();
@@ -74,19 +80,19 @@ public class ParametricScalar
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         Signature boundSignature = applyBoundVariables(getSignature(), boundVariables, arity);
         if (implementations.getExactImplementations().containsKey(boundSignature)) {
             ParametricScalarImplementation implementation = implementations.getExactImplementations().get(boundSignature);
-            Optional<ScalarFunctionImplementation> scalarFunctionImplementation = implementation.specialize(boundSignature, boundVariables, metadata, isDeterministic());
+            Optional<BuiltInScalarFunctionImplementation> scalarFunctionImplementation = implementation.specialize(boundSignature, boundVariables, functionAndTypeManager, isDeterministic());
             checkCondition(scalarFunctionImplementation.isPresent(), FUNCTION_IMPLEMENTATION_ERROR, format("Exact implementation of %s do not match expected java types.", boundSignature.getName()));
             return scalarFunctionImplementation.get();
         }
 
-        ScalarFunctionImplementation selectedImplementation = null;
+        BuiltInScalarFunctionImplementation selectedImplementation = null;
         for (ParametricScalarImplementation implementation : implementations.getSpecializedImplementations()) {
-            Optional<ScalarFunctionImplementation> scalarFunctionImplementation = implementation.specialize(boundSignature, boundVariables, metadata, isDeterministic());
+            Optional<BuiltInScalarFunctionImplementation> scalarFunctionImplementation = implementation.specialize(boundSignature, boundVariables, functionAndTypeManager, isDeterministic());
             if (scalarFunctionImplementation.isPresent()) {
                 checkCondition(selectedImplementation == null, AMBIGUOUS_FUNCTION_IMPLEMENTATION, "Ambiguous implementation for %s with bindings %s", getSignature(), boundVariables.getTypeVariables());
                 selectedImplementation = scalarFunctionImplementation.get();
@@ -96,7 +102,7 @@ public class ParametricScalar
             return selectedImplementation;
         }
         for (ParametricScalarImplementation implementation : implementations.getGenericImplementations()) {
-            Optional<ScalarFunctionImplementation> scalarFunctionImplementation = implementation.specialize(boundSignature, boundVariables, metadata, isDeterministic());
+            Optional<BuiltInScalarFunctionImplementation> scalarFunctionImplementation = implementation.specialize(boundSignature, boundVariables, functionAndTypeManager, isDeterministic());
             if (scalarFunctionImplementation.isPresent()) {
                 checkCondition(selectedImplementation == null, AMBIGUOUS_FUNCTION_IMPLEMENTATION, "Ambiguous implementation for %s with bindings %s", getSignature(), boundVariables.getTypeVariables());
                 selectedImplementation = scalarFunctionImplementation.get();

@@ -49,8 +49,8 @@ public class TestBingTileFunctions
         for (Type type : plugin.getTypes()) {
             functionAssertions.addType(type);
         }
-        functionAssertions.getMetadata().addFunctions(extractFunctions(plugin.getFunctions()));
-        functionAssertions.getMetadata().addFunctions(ImmutableList.of(APPLY_FUNCTION));
+        functionAssertions.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(extractFunctions(plugin.getFunctions()));
+        functionAssertions.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(ImmutableList.of(APPLY_FUNCTION));
     }
 
     @Test

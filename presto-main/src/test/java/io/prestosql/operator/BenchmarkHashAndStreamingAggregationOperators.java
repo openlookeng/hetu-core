@@ -22,6 +22,7 @@ import io.prestosql.operator.StreamingAggregationOperator.StreamingAggregationOp
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -82,10 +83,10 @@ public class BenchmarkHashAndStreamingAggregationOperators
 {
     private static final Metadata metadata = createTestMetadataManager();
 
-    private static final InternalAggregationFunction LONG_SUM = metadata.getAggregateFunctionImplementation(
-            new Signature("sum", AGGREGATE, BIGINT.getTypeSignature(), BIGINT.getTypeSignature()));
-    private static final InternalAggregationFunction COUNT = metadata.getAggregateFunctionImplementation(
-            new Signature("count", AGGREGATE, BIGINT.getTypeSignature()));
+    private static final InternalAggregationFunction LONG_SUM = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+            new Signature(QualifiedObjectName.valueOfDefaultFunction("sum"), AGGREGATE, BIGINT.getTypeSignature(), BIGINT.getTypeSignature()));
+    private static final InternalAggregationFunction COUNT = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+            new Signature(QualifiedObjectName.valueOfDefaultFunction("count"), AGGREGATE, BIGINT.getTypeSignature()));
 
     @State(Thread)
     public static class Context

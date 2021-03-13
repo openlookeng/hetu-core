@@ -144,7 +144,8 @@ public class PlanSymbolAllocator
             nameHint = ((VariableReferenceExpression) expression).getName();
         }
         else if (expression instanceof CallExpression) {
-            nameHint = ((CallExpression) expression).getSignature().getName();
+            String[] names = ((CallExpression) expression).getDisplayName().split("\\.");
+            nameHint = names[names.length - 1];
         }
         return newSymbol(nameHint, expression.getType(), suffix);
     }

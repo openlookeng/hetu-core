@@ -13,16 +13,16 @@
  */
 package io.prestosql.metadata;
 
-import io.prestosql.spi.function.ScalarFunctionImplementation;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
+import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.function.SqlFunction;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static java.util.Objects.requireNonNull;
 
 public abstract class SqlScalarFunction
-        implements SqlFunction
+         extends BuiltInFunction
 {
     private final Signature signature;
 
@@ -38,7 +38,12 @@ public abstract class SqlScalarFunction
         return signature;
     }
 
-    public abstract ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata);
+    public abstract BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager);
+
+    public static PolymorphicScalarFunctionBuilder builder(Class<?> clazz, OperatorType operatorType)
+    {
+        return new PolymorphicScalarFunctionBuilder(clazz, operatorType);
+    }
 
     public static PolymorphicScalarFunctionBuilder builder(Class<?> clazz)
     {

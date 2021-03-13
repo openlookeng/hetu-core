@@ -15,6 +15,7 @@ package io.prestosql.type;
 
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.type.Type;
 import org.testng.annotations.Test;
 
@@ -22,6 +23,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
+import static io.prestosql.spi.function.Signature.internalOperator;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.CharType.createCharType;
 import static io.prestosql.spi.type.DateType.DATE;
@@ -223,7 +225,7 @@ public class TestTypeCoercion
             for (Type resultType : types) {
                 if (typeCoercion.canCoerce(sourceType, resultType) && sourceType != UNKNOWN && resultType != UNKNOWN) {
                     try {
-                        metadata.getCoercion(sourceType.getTypeSignature(), resultType.getTypeSignature());
+                        internalOperator(OperatorType.CAST, sourceType.getTypeSignature(), resultType.getTypeSignature());
                     }
                     catch (Exception e) {
                         fail(format("'%s' -> '%s' coercion exists but there is no cast operator", sourceType, resultType), e);
@@ -288,7 +290,7 @@ public class TestTypeCoercion
     {
         ImmutableSet.Builder<Type> builder = ImmutableSet.builder();
         // add unparametrized types
-        builder.addAll(metadata.getTypes());
+        builder.addAll(metadata.getFunctionAndTypeManager().getTypes());
         // add corner cases for parametrized types
         builder.add(createDecimalType(1, 0));
         builder.add(createDecimalType(17, 0));

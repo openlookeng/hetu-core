@@ -16,6 +16,7 @@ package io.prestosql.testing;
 import io.prestosql.GroupByHashPageIndexerFactory;
 import io.prestosql.PagesIndexPageSorter;
 import io.prestosql.connector.ConnectorAwareNodeManager;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.InMemoryNodeManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.PagesIndex;
@@ -25,16 +26,26 @@ import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.VersionEmbedder;
 import io.prestosql.spi.connector.CatalogName;
+import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ConnectorContext;
+import io.prestosql.spi.function.ExternalFunctionHub;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.SqlInvokedFunction;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.sql.gen.JoinCompiler;
 import io.prestosql.sql.relational.ConnectorRowExpressionService;
+import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
 import io.prestosql.sql.relational.RowExpressionDomainTranslator;
 import io.prestosql.type.InternalTypeManager;
 import io.prestosql.version.EmbedVersion;
+
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiFunction;
 
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 
@@ -48,13 +59,20 @@ public class TestingConnectorContext
     private final PageIndexerFactory pageIndexerFactory;
     private final IndexClient indexClient = new NoOpIndexClient();
     private final RowExpressionService rowExpressionService;
+    private final FunctionMetadataManager functionMetadataManager;
+    public final StandardFunctionResolution standardFunctionResolution;
+    private final Optional<BiFunction<ExternalFunctionHub, CatalogSchemaName, Set<SqlInvokedFunction>>> externalFunctionParser;
 
     public TestingConnectorContext()
     {
         Metadata metadata = createTestMetadataManager();
         pageIndexerFactory = new GroupByHashPageIndexerFactory(new JoinCompiler(metadata));
-        typeManager = new InternalTypeManager(metadata);
         rowExpressionService = new ConnectorRowExpressionService(new RowExpressionDomainTranslator(metadata), new RowExpressionDeterminismEvaluator(metadata));
+        typeManager = new InternalTypeManager(metadata.getFunctionAndTypeManager());
+        FunctionAndTypeManager functionAndTypeManager = FunctionAndTypeManager.createTestFunctionAndTypeManager();
+        functionMetadataManager = functionAndTypeManager;
+        this.standardFunctionResolution = new FunctionResolution(functionAndTypeManager);
+        externalFunctionParser = Optional.empty();
     }
 
     @Override
@@ -97,5 +115,23 @@ public class TestingConnectorContext
     public RowExpressionService getRowExpressionService()
     {
         return rowExpressionService;
+    }
+
+    @Override
+    public FunctionMetadataManager getFunctionMetadataManager()
+    {
+        return functionMetadataManager;
+    }
+
+    @Override
+    public StandardFunctionResolution getStandardFunctionResolution()
+    {
+        return this.standardFunctionResolution;
+    }
+
+    @Override
+    public Optional<BiFunction<ExternalFunctionHub, CatalogSchemaName, Set<SqlInvokedFunction>>> getExternalParserFunction()
+    {
+        return externalFunctionParser;
     }
 }

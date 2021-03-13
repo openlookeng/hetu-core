@@ -15,7 +15,7 @@ package io.prestosql.cost;
 
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.BooleanType;
 import io.prestosql.spi.type.DateType;
@@ -30,6 +30,7 @@ import io.prestosql.sql.InterpretedFunctionInvoker;
 
 import java.util.OptionalDouble;
 
+import static io.prestosql.metadata.CastType.CAST;
 import static java.util.Collections.singletonList;
 
 final class StatsUtil
@@ -39,9 +40,10 @@ final class StatsUtil
     static OptionalDouble toStatsRepresentation(Metadata metadata, Session session, Type type, Object value)
     {
         if (convertibleToDoubleWithCast(type)) {
-            InterpretedFunctionInvoker functionInvoker = new InterpretedFunctionInvoker(metadata);
-            Signature castSignature = metadata.getCoercion(type.getTypeSignature(), DoubleType.DOUBLE.getTypeSignature());
-            return OptionalDouble.of((double) functionInvoker.invoke(castSignature, session.toConnectorSession(), singletonList(value)));
+            InterpretedFunctionInvoker functionInvoker = new InterpretedFunctionInvoker(metadata.getFunctionAndTypeManager());
+            FunctionHandle cast = metadata.getFunctionAndTypeManager().lookupCast(CAST, type.getTypeSignature(), DoubleType.DOUBLE.getTypeSignature());
+
+            return OptionalDouble.of((double) functionInvoker.invoke(cast, session.toConnectorSession(), singletonList(value)));
         }
 
         if (DateType.DATE.equals(type)) {

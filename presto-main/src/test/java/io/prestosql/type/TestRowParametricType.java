@@ -38,7 +38,7 @@ public class TestRowParametricType
     @Test
     public void testTypeSignatureRoundTrip()
     {
-        TypeManager typeManager = new InternalTypeManager(createTestMetadataManager());
+        TypeManager typeManager = new InternalTypeManager(createTestMetadataManager().getFunctionAndTypeManager());
         TypeSignature typeSignature = new TypeSignature(
                 ROW,
                 TypeSignatureParameter.of(new NamedTypeSignature(Optional.of(new RowFieldName("col1", false)), new TypeSignature(BIGINT))),

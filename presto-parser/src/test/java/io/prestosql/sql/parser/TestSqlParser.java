@@ -126,6 +126,7 @@ import io.prestosql.sql.tree.ShowCache;
 import io.prestosql.sql.tree.ShowCatalogs;
 import io.prestosql.sql.tree.ShowColumns;
 import io.prestosql.sql.tree.ShowCubes;
+import io.prestosql.sql.tree.ShowExternalFunction;
 import io.prestosql.sql.tree.ShowGrants;
 import io.prestosql.sql.tree.ShowRoleGrants;
 import io.prestosql.sql.tree.ShowRoles;
@@ -173,6 +174,7 @@ import static io.prestosql.sql.parser.IdentifierSymbol.AT_SIGN;
 import static io.prestosql.sql.parser.IdentifierSymbol.COLON;
 import static io.prestosql.sql.parser.ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL;
 import static io.prestosql.sql.testing.TreeAssertions.assertFormattedSql;
+import static io.prestosql.sql.tree.ArithmeticBinaryExpression.Operator.DIVIDE;
 import static io.prestosql.sql.tree.ArithmeticUnaryExpression.negative;
 import static io.prestosql.sql.tree.ArithmeticUnaryExpression.positive;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.GREATER_THAN;
@@ -676,8 +678,8 @@ public class TestSqlParser
                         new LongLiteral("2")),
                 new LongLiteral("3")));
 
-        assertExpression("1 / 2 / 3", new ArithmeticBinaryExpression(ArithmeticBinaryExpression.Operator.DIVIDE,
-                new ArithmeticBinaryExpression(ArithmeticBinaryExpression.Operator.DIVIDE,
+        assertExpression("1 / 2 / 3", new ArithmeticBinaryExpression(DIVIDE,
+                new ArithmeticBinaryExpression(DIVIDE,
                         new LongLiteral("1"),
                         new LongLiteral("2")),
                 new LongLiteral("3")));
@@ -1827,6 +1829,16 @@ public class TestSqlParser
     }
 
     @Test
+    public void testShowExternalFunction()
+    {
+        assertStatement("SHOW EXTERNAL FUNCTION x.y.z", new ShowExternalFunction(QualifiedName.of("x", "y", "z"), Optional.empty()));
+        assertStatement("SHOW EXTERNAL FUNCTION x.y.z()", new ShowExternalFunction(QualifiedName.of("x", "y", "z"), Optional.of(ImmutableList.of())));
+        assertStatement(
+                "SHOW EXTERNAL FUNCTION x.y.z(int, double)",
+                new ShowExternalFunction(QualifiedName.of("x", "y", "z"), Optional.of(ImmutableList.of("int", "double"))));
+    }
+
+    @Test
     public void testGrant()
     {
         assertStatement("GRANT INSERT, DELETE ON t TO u",
@@ -2444,7 +2456,6 @@ public class TestSqlParser
                         new QuerySpecification(
                                 selectList(
                                         new FunctionCall(
-                                                Optional.empty(),
                                                 QualifiedName.of("SUM"),
                                                 Optional.empty(),
                                                 Optional.of(new ComparisonExpression(
@@ -2494,7 +2505,6 @@ public class TestSqlParser
     {
         assertExpression("array_agg(x ORDER BY x DESC)",
                 new FunctionCall(
-                        Optional.empty(),
                         QualifiedName.of("array_agg"),
                         Optional.empty(),
                         Optional.empty(),
@@ -2507,7 +2517,6 @@ public class TestSqlParser
                         new QuerySpecification(
                                 selectList(
                                         new FunctionCall(
-                                                Optional.empty(),
                                                 QualifiedName.of("array_agg"),
                                                 Optional.empty(),
                                                 Optional.empty(),

@@ -13,11 +13,13 @@
  */
 package io.prestosql.operator.aggregation;
 
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.Type;
 
 import java.util.concurrent.ThreadLocalRandom;
 
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
@@ -28,8 +30,8 @@ public class TestApproximateCountDistinctDouble
     @Override
     protected InternalAggregationFunction getAggregationFunction()
     {
-        return metadata.getAggregateFunctionImplementation(
-                new Signature("approx_distinct", AGGREGATE, BIGINT.getTypeSignature(), DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature()));
+        return metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "approx_distinct"), AGGREGATE, BIGINT.getTypeSignature(), DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature()));
     }
 
     @Override

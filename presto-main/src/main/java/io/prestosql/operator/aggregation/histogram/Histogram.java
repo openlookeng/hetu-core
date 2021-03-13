@@ -16,7 +16,7 @@ package io.prestosql.operator.aggregation.histogram;
 import com.google.common.collect.ImmutableList;
 import io.airlift.bytecode.DynamicClassLoader;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlAggregationFunction;
 import io.prestosql.operator.aggregation.AccumulatorCompiler;
 import io.prestosql.operator.aggregation.AggregationMetadata;
@@ -72,10 +72,10 @@ public class Histogram
     }
 
     @Override
-    public InternalAggregationFunction specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public InternalAggregationFunction specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         Type keyType = boundVariables.getTypeVariable("K");
-        Type outputType = metadata.getParameterizedType(StandardTypes.MAP, ImmutableList.of(
+        Type outputType = functionAndTypeManager.getParameterizedType(StandardTypes.MAP, ImmutableList.of(
                 TypeSignatureParameter.of(keyType.getTypeSignature()),
                 TypeSignatureParameter.of(BIGINT.getTypeSignature())));
         return generateAggregation(NAME, keyType, outputType, groupMode);

@@ -18,6 +18,7 @@ import io.airlift.units.DataSize;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.relation.RowExpression;
@@ -86,16 +87,16 @@ public class TestFilterAndProjectOperator
                 .addSequencePage(100, 0, 0)
                 .build();
 
-        RowExpression filter = call(
-                Signature.internalOperator(BETWEEN, BOOLEAN.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature(), BIGINT.getTypeSignature(), BIGINT.getTypeSignature())),
+        RowExpression filter = call(BETWEEN.getFunctionName().toString(),
+                new BuiltInFunctionHandle(Signature.internalOperator(BETWEEN, BOOLEAN.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature(), BIGINT.getTypeSignature(), BIGINT.getTypeSignature()))),
                 BOOLEAN,
                 field(1, BIGINT),
                 constant(10L, BIGINT),
                 constant(19L, BIGINT));
 
         RowExpression field0 = field(0, VARCHAR);
-        RowExpression add5 = call(
-                Signature.internalOperator(ADD, BIGINT.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature(), BIGINT.getTypeSignature())),
+        RowExpression add5 = call(ADD.getFunctionName().toString(),
+                new BuiltInFunctionHandle(Signature.internalOperator(ADD, BIGINT.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature(), BIGINT.getTypeSignature()))),
                 BIGINT,
                 field(1, BIGINT),
                 constant(5L, BIGINT));
@@ -138,8 +139,8 @@ public class TestFilterAndProjectOperator
                 .addSequencePage(100, 0, 0)
                 .build();
 
-        RowExpression filter = call(
-                Signature.internalOperator(EQUAL, BOOLEAN.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature(), BIGINT.getTypeSignature())),
+        RowExpression filter = call(EQUAL.getFunctionName().toString(),
+                new BuiltInFunctionHandle(Signature.internalOperator(EQUAL, BOOLEAN.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature(), BIGINT.getTypeSignature()))),
                 BOOLEAN,
                 field(1, BIGINT),
                 constant(10L, BIGINT));

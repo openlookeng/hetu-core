@@ -24,8 +24,8 @@ import io.hetu.core.spi.cube.CubeStatement;
 import io.hetu.core.spi.cube.io.CubeMetaStore;
 import io.prestosql.Session;
 import io.prestosql.cube.CubeManager;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.TableMetadata;
 import io.prestosql.plugin.tpch.TpchColumnHandle;
 import io.prestosql.plugin.tpch.TpchTableHandle;
@@ -33,8 +33,9 @@ import io.prestosql.plugin.tpch.TpchTableLayoutHandle;
 import io.prestosql.plugin.tpch.TpchTransactionHandle;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.cube.CubeProvider;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.AggregationNode;
@@ -60,6 +61,7 @@ import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
+import io.prestosql.sql.relational.Expressions;
 import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.DoubleLiteral;
@@ -81,12 +83,13 @@ import java.util.UUID;
 
 import static io.prestosql.SystemSessionProperties.ENABLE_STAR_TREE_INDEX;
 import static io.prestosql.metadata.AbstractMockMetadata.dummyMetadata;
-import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
+import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.spi.plan.AggregationNode.Step.SINGLE;
 import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DateType.DATE;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expression;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
@@ -98,6 +101,14 @@ import static org.testng.Assert.assertTrue;
 public class TestStarTreeAggregationRule
         extends BaseRuleTest
 {
+    private static final FunctionAndTypeManager FUNCTION_MANAGER = createTestMetadataManager().getFunctionAndTypeManager();
+    private static final FunctionHandle COUNT = FUNCTION_MANAGER.lookupFunction("count", fromTypes(DOUBLE));
+    private static final FunctionHandle SUM = FUNCTION_MANAGER.lookupFunction("sum", fromTypes(DOUBLE));
+    private static final FunctionHandle AVG = FUNCTION_MANAGER.lookupFunction("avg", fromTypes(DOUBLE));
+    private static final FunctionHandle MIN = FUNCTION_MANAGER.lookupFunction("min", fromTypes(DOUBLE));
+    private static final FunctionHandle MAX = FUNCTION_MANAGER.lookupFunction("max", fromTypes(DOUBLE));
+    private static final FunctionHandle LAG = FUNCTION_MANAGER.lookupFunction("lag", fromTypes(DOUBLE));
+
     private final PlanBuilder planBuilder = new PlanBuilder(new PlanNodeIdAllocator(), dummyMetadata());
     private Symbol output;
     private Symbol columnOrderkey;
@@ -227,7 +238,8 @@ public class TestStarTreeAggregationRule
         cubeMetaStore = Mockito.mock(CubeMetaStore.class);
         cubeMetadata = Mockito.mock(CubeMetadata.class);
 
-        ordersTableHandleMatcher = new BaseMatcher<TableHandle>() {
+        ordersTableHandleMatcher = new BaseMatcher<TableHandle>()
+        {
             @Override
             public boolean matches(Object o)
             {
@@ -244,7 +256,8 @@ public class TestStarTreeAggregationRule
             }
         };
 
-        ordersCubeHandleMatcher = new BaseMatcher<TableHandle>() {
+        ordersCubeHandleMatcher = new BaseMatcher<TableHandle>()
+        {
             @Override
             public boolean matches(Object o)
             {
@@ -261,7 +274,8 @@ public class TestStarTreeAggregationRule
             }
         };
 
-        countAllColumnHandleMatcher = new BaseMatcher<ColumnHandle>() {
+        countAllColumnHandleMatcher = new BaseMatcher<ColumnHandle>()
+        {
             @Override
             public void describeTo(Description description)
             {
@@ -278,7 +292,8 @@ public class TestStarTreeAggregationRule
             }
         };
 
-        sumTotalPriceColumnHandleMatcher = new BaseMatcher<ColumnHandle>() {
+        sumTotalPriceColumnHandleMatcher = new BaseMatcher<ColumnHandle>()
+        {
             @Override
             public void describeTo(Description description)
             {
@@ -295,7 +310,8 @@ public class TestStarTreeAggregationRule
             }
         };
 
-        countOrderKeyColumnHandleMatcher = new BaseMatcher<ColumnHandle>() {
+        countOrderKeyColumnHandleMatcher = new BaseMatcher<ColumnHandle>()
+        {
             @Override
             public boolean matches(Object o)
             {
@@ -312,7 +328,8 @@ public class TestStarTreeAggregationRule
             }
         };
 
-        groupingBitSetColumnHandleMatcher = new BaseMatcher<ColumnHandle>() {
+        groupingBitSetColumnHandleMatcher = new BaseMatcher<ColumnHandle>()
+        {
             @Override
             public boolean matches(Object o)
             {
@@ -329,7 +346,8 @@ public class TestStarTreeAggregationRule
             }
         };
 
-        orderDateCubeColumnHandleMatcher = new BaseMatcher<ColumnHandle>() {
+        orderDateCubeColumnHandleMatcher = new BaseMatcher<ColumnHandle>()
+        {
             @Override
             public boolean matches(Object o)
             {
@@ -346,7 +364,8 @@ public class TestStarTreeAggregationRule
             }
         };
 
-        custKeyCubeColumnHandleMatcher = new BaseMatcher<ColumnHandle>() {
+        custKeyCubeColumnHandleMatcher = new BaseMatcher<ColumnHandle>()
+        {
             @Override
             public boolean matches(Object o)
             {
@@ -422,7 +441,11 @@ public class TestStarTreeAggregationRule
                 newId(),
                 baseTableScan,
                 ImmutableMap.of(columnOrderkey, new AggregationNode.Aggregation(
-                        new Signature("count", AGGREGATE, DOUBLE.getTypeSignature()),
+                        Expressions.call(
+                                "count",
+                                COUNT,
+                                DOUBLE,
+                                ImmutableList.of(planBuilder.variable(columnOrderkey.getName(), orderkeyHandle.getType()))),
                         ImmutableList.of(planBuilder.variable(columnOrderkey.getName(), orderkeyHandle.getType())),
                         false,
                         Optional.empty(),
@@ -439,7 +462,11 @@ public class TestStarTreeAggregationRule
                 newId(),
                 baseTableScan,
                 ImmutableMap.of(columnOrderkey, new AggregationNode.Aggregation(
-                        new Signature("count", AGGREGATE, DOUBLE.getTypeSignature()),
+                        Expressions.call(
+                                "count",
+                                COUNT,
+                                DOUBLE,
+                                ImmutableList.of(planBuilder.variable(columnOrderkey.getName(), orderkeyHandle.getType()))),
                         ImmutableList.of(planBuilder.variable(columnOrderkey.getName(), orderkeyHandle.getType())),
                         true,
                         Optional.empty(),
@@ -456,7 +483,11 @@ public class TestStarTreeAggregationRule
                 newId(),
                 baseTableScan,
                 ImmutableMap.of(columnOrderkey, new AggregationNode.Aggregation(
-                        new Signature("sum", AGGREGATE, DOUBLE.getTypeSignature()),
+                        Expressions.call(
+                                "sum",
+                                SUM,
+                                DOUBLE,
+                                ImmutableList.of(planBuilder.variable(columnOrderkey.getName(), orderkeyHandle.getType()))),
                         ImmutableList.of(planBuilder.variable(columnOrderkey.getName(), orderkeyHandle.getType())),
                         true,
                         Optional.empty(),
@@ -473,7 +504,11 @@ public class TestStarTreeAggregationRule
                 newId(),
                 baseTableScan,
                 ImmutableMap.of(columnOrderkey, new AggregationNode.Aggregation(
-                        new Signature("avg", AGGREGATE, DOUBLE.getTypeSignature()),
+                        Expressions.call(
+                                "avg",
+                                AVG,
+                                DOUBLE,
+                                ImmutableList.of(planBuilder.variable(columnOrderkey.getName(), orderkeyHandle.getType()))),
                         ImmutableList.of(planBuilder.variable(columnOrderkey.getName(), orderkeyHandle.getType())),
                         true,
                         Optional.empty(),
@@ -490,7 +525,11 @@ public class TestStarTreeAggregationRule
                 newId(),
                 baseTableScan,
                 ImmutableMap.of(columnOrderkey, new AggregationNode.Aggregation(
-                        new Signature("min", AGGREGATE, DOUBLE.getTypeSignature()),
+                        Expressions.call(
+                                "min",
+                                MIN,
+                                DOUBLE,
+                                ImmutableList.of(planBuilder.variable(columnOrderkey.getName(), orderkeyHandle.getType()))),
                         ImmutableList.of(planBuilder.variable(columnOrderkey.getName(), orderkeyHandle.getType())),
                         false,
                         Optional.empty(),
@@ -507,7 +546,11 @@ public class TestStarTreeAggregationRule
                 newId(),
                 baseTableScan,
                 ImmutableMap.of(columnOrderkey, new AggregationNode.Aggregation(
-                        new Signature("max", AGGREGATE, DOUBLE.getTypeSignature()),
+                        Expressions.call(
+                                "max",
+                                MAX,
+                                DOUBLE,
+                                ImmutableList.of(planBuilder.variable(columnOrderkey.getName(), orderkeyHandle.getType()))),
                         ImmutableList.of(planBuilder.variable(columnOrderkey.getName(), orderkeyHandle.getType())),
                         false,
                         Optional.empty(),
@@ -525,7 +568,11 @@ public class TestStarTreeAggregationRule
                 newId(),
                 baseTableScan,
                 ImmutableMap.of(columnOrderkey, new AggregationNode.Aggregation(
-                        new Signature("lag", AGGREGATE, DOUBLE.getTypeSignature()),
+                        Expressions.call(
+                                "lag",
+                                LAG,
+                                DOUBLE,
+                                ImmutableList.of(planBuilder.variable(columnOrderkey.getName(), orderkeyHandle.getType()))),
                         ImmutableList.of(planBuilder.variable(columnOrderkey.getName(), orderkeyHandle.getType())),
                         false,
                         Optional.empty(),
@@ -559,7 +606,11 @@ public class TestStarTreeAggregationRule
                 newId(),
                 projectNode1,
                 ImmutableMap.of(columnCustkey, new AggregationNode.Aggregation(
-                        new Signature("count", AGGREGATE, DOUBLE.getTypeSignature()),
+                        Expressions.call(
+                                "count",
+                                COUNT,
+                                DOUBLE,
+                                ImmutableList.of(planBuilder.variable(columnOrderkey.getName(), orderkeyHandle.getType()))),
                         ImmutableList.of(planBuilder.variable(columnCustkey.getName(), custkeyHandle.getType())),
                         true,
                         Optional.empty(),

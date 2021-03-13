@@ -26,11 +26,14 @@ import io.prestosql.plugin.jdbc.optimization.JdbcQueryGeneratorContext;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanVisitor;
 import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.sql.expression.Selection;
 import io.prestosql.spi.type.TypeManager;
@@ -49,11 +52,11 @@ public class DataCenterQueryGenerator
         extends BaseJdbcQueryGenerator
 {
     @Inject
-    public DataCenterQueryGenerator(DataCenterConfig config, RowExpressionService rowExpressionService)
+    public DataCenterQueryGenerator(DataCenterConfig config, RowExpressionService rowExpressionService, FunctionMetadataManager functionManager, StandardFunctionResolution functionResolution, DeterminismEvaluator determinismEvaluator)
     {
-        super(new JdbcPushDownParameter("\"", false, config.getQueryPushDownModule()),
-                new BaseJdbcRowExpressionConverter(rowExpressionService),
-                new BaseJdbcSqlStatementWriter(new JdbcPushDownParameter("\"", false, config.getQueryPushDownModule())));
+        super(new JdbcPushDownParameter("\"", false, config.getQueryPushDownModule(), functionResolution),
+                new BaseJdbcRowExpressionConverter(functionManager, functionResolution, rowExpressionService, determinismEvaluator),
+                new BaseJdbcSqlStatementWriter(new JdbcPushDownParameter("\"", false, config.getQueryPushDownModule(), functionResolution)));
     }
 
     @Override

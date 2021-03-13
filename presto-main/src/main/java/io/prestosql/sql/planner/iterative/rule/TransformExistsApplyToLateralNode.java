@@ -18,7 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.AggregationNode.Aggregation;
 import io.prestosql.spi.plan.Assignments;
@@ -26,11 +26,13 @@ import io.prestosql.spi.plan.LimitNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.optimizations.PlanNodeDecorrelator;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignmentUtils;
 import io.prestosql.sql.planner.plan.LateralJoinNode;
+import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.CoalesceExpression;
@@ -83,12 +85,12 @@ public class TransformExistsApplyToLateralNode
     private static final Pattern<ApplyNode> PATTERN = applyNode();
 
     private static final QualifiedName COUNT = QualifiedName.of("count");
-    private final Signature countSignature;
+    private final StandardFunctionResolution functionResolution;
 
     public TransformExistsApplyToLateralNode(Metadata metadata)
     {
         requireNonNull(metadata, "metadata is null");
-        countSignature = metadata.resolveFunction(COUNT, ImmutableList.of());
+        this.functionResolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
     }
 
     @Override
@@ -166,7 +168,12 @@ public class TransformExistsApplyToLateralNode
                                 context.getIdAllocator().getNextId(),
                                 parent.getSubquery(),
                                 ImmutableMap.of(count, new Aggregation(
-                                        countSignature,
+                                        new CallExpression(
+                                                "count",
+                                                functionResolution.countFunction(),
+                                                BIGINT,
+                                                ImmutableList.of(),
+                                                Optional.empty()),
                                         ImmutableList.of(),
                                         false,
                                         Optional.empty(),

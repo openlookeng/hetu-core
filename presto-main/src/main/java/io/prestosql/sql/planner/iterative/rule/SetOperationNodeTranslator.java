@@ -16,7 +16,8 @@ package io.prestosql.sql.planner.iterative.rule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.Assignments;
 import io.prestosql.spi.plan.PlanNode;
@@ -25,6 +26,7 @@ import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.SetOperationNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
@@ -43,11 +45,11 @@ import java.util.Optional;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.concat;
-import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
-import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.optimizations.SetOperationNodeUtils.sourceSymbolMap;
 import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
@@ -58,15 +60,17 @@ import static java.util.Objects.requireNonNull;
 public class SetOperationNodeTranslator
 {
     private static final String MARKER = "marker";
-    private static final Signature COUNT_AGGREGATION = new Signature("count", AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.BOOLEAN));
+    private static final QualifiedObjectName COUNT_AGGREGATION_NAME = QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "count");
     private static final Literal GENERIC_LITERAL = new GenericLiteral("BIGINT", "1");
     private final PlanSymbolAllocator planSymbolAllocator;
     private final PlanNodeIdAllocator idAllocator;
+    private final Metadata metadata;
 
-    public SetOperationNodeTranslator(PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator)
+    public SetOperationNodeTranslator(Metadata metadata, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator)
     {
         this.planSymbolAllocator = requireNonNull(planSymbolAllocator, "SymbolAllocator is null");
         this.idAllocator = requireNonNull(idAllocator, "PlanNodeIdAllocator is null");
+        this.metadata = requireNonNull(metadata, "metadata is null");
     }
 
     public TranslationResult makeSetContainmentPlan(SetOperationNode node)
@@ -145,7 +149,12 @@ public class SetOperationNodeTranslator
         for (int i = 0; i < markers.size(); i++) {
             Symbol output = aggregationOutputs.get(i);
             aggregations.put(output, new AggregationNode.Aggregation(
-                    COUNT_AGGREGATION,
+                    new CallExpression(
+                            COUNT_AGGREGATION_NAME.getObjectName(),
+                            metadata.getFunctionAndTypeManager().lookupFunction(COUNT_AGGREGATION_NAME.getObjectName(), fromTypes(BOOLEAN)),
+                            BIGINT,
+                            ImmutableList.of(castToRowExpression(toSymbolReference(markers.get(i)))),
+                            Optional.empty()),
                     ImmutableList.of(castToRowExpression(toSymbolReference(markers.get(i)))),
                     false,
                     Optional.empty(),

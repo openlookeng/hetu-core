@@ -17,7 +17,9 @@ import com.google.common.base.VerifyException;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.expressions.LogicalRowExpressions;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.function.FunctionMetadata;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.relation.CallExpression;
@@ -28,7 +30,6 @@ import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.RowExpressionVisitor;
 import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.VariableReferenceExpression;
-import io.prestosql.spi.sql.RowExpressionUtils;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.analyzer.ExpressionAnalyzer;
 import io.prestosql.sql.analyzer.Scope;
@@ -38,7 +39,7 @@ import io.prestosql.sql.planner.LiteralInterpreter;
 import io.prestosql.sql.planner.NoOpSymbolResolver;
 import io.prestosql.sql.planner.RowExpressionInterpreter;
 import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.relational.Signatures;
+import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.sql.tree.AstVisitor;
 import io.prestosql.sql.tree.BetweenPredicate;
 import io.prestosql.sql.tree.BooleanLiteral;
@@ -71,12 +72,12 @@ import static io.prestosql.cost.PlanNodeStatsEstimateMath.addStatsAndSumDistinct
 import static io.prestosql.cost.PlanNodeStatsEstimateMath.capStats;
 import static io.prestosql.cost.PlanNodeStatsEstimateMath.subtractSubsetStats;
 import static io.prestosql.cost.StatsUtil.toStatsRepresentation;
-import static io.prestosql.spi.function.Signature.internalOperator;
+import static io.prestosql.expressions.LogicalRowExpressions.TRUE_CONSTANT;
 import static io.prestosql.spi.relation.SpecialForm.Form.IS_NULL;
-import static io.prestosql.spi.sql.RowExpressionUtils.TRUE_CONSTANT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.sql.DynamicFilters.isDynamicFilter;
 import static io.prestosql.sql.ExpressionUtils.and;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.planner.RowExpressionInterpreter.Level.OPTIMIZED;
 import static io.prestosql.sql.planner.SymbolUtils.from;
 import static io.prestosql.sql.relational.Expressions.call;
@@ -104,6 +105,7 @@ public class FilterStatsCalculator
     private final ScalarStatsCalculator scalarStatsCalculator;
     private final StatsNormalizer normalizer;
     private final LiteralEncoder literalEncoder;
+    private final FunctionResolution functionResolution;
 
     public FilterStatsCalculator(Metadata metadata, ScalarStatsCalculator scalarStatsCalculator, StatsNormalizer normalizer)
     {
@@ -111,6 +113,7 @@ public class FilterStatsCalculator
         this.scalarStatsCalculator = requireNonNull(scalarStatsCalculator, "scalarStatsCalculator is null");
         this.normalizer = requireNonNull(normalizer, "normalizer is null");
         this.literalEncoder = new LiteralEncoder(metadata);
+        this.functionResolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
     }
 
     public PlanNodeStatsEstimate filterStats(
@@ -550,10 +553,10 @@ public class FilterStatsCalculator
         @Override
         public PlanNodeStatsEstimate visitCall(CallExpression node, Void context)
         {
+            FunctionMetadata functionMetadata = metadata.getFunctionAndTypeManager().getFunctionMetadata(node.getFunctionHandle());
             // comparison case
-            String operator = node.getSignature().getName();
-            if (operator.contains("$operator$") && node.getSignature().unmangleOperator(operator).isComparisonOperator()) {
-                OperatorType operatorType = node.getSignature().unmangleOperator(operator);
+            if (functionMetadata.getOperatorType().map(OperatorType::isComparisonOperator).orElse(false)) {
+                OperatorType operatorType = functionMetadata.getOperatorType().get();
                 RowExpression left = node.getArguments().get(0);
                 RowExpression right = node.getArguments().get(1);
 
@@ -562,21 +565,17 @@ public class FilterStatsCalculator
                 if (!(left instanceof VariableReferenceExpression) && right instanceof VariableReferenceExpression) {
                     // normalize so that variable is on the left
                     OperatorType flippedOperator = flip(operatorType);
-                    return process(call(internalOperator(flippedOperator,
-                                            node.getSignature().getReturnType(),
-                                            right.getType().getTypeSignature(),
-                                            left.getType().getTypeSignature()),
-                                        BOOLEAN, right, left));
+                    return process(call(flippedOperator.name(),
+                            metadata.getFunctionAndTypeManager().resolveOperatorFunctionHandle(flippedOperator, fromTypes(right.getType(), left.getType())),
+                            BOOLEAN, right, left));
                 }
 
                 if (left instanceof ConstantExpression) {
                     // normalize so that literal is on the right
                     OperatorType flippedOperator = flip(operatorType);
-                    return process(call(internalOperator(flippedOperator,
-                                            node.getSignature().getReturnType(),
-                                            right.getType().getTypeSignature(),
-                                            left.getType().getTypeSignature()),
-                                        BOOLEAN, right, left));
+                    return process(call(flippedOperator.name(),
+                            metadata.getFunctionAndTypeManager().resolveOperatorFunctionHandle(flippedOperator, fromTypes(right.getType(), left.getType())),
+                            BOOLEAN, right, left));
                 }
 
                 if (left instanceof VariableReferenceExpression && left.equals(right)) {
@@ -623,12 +622,12 @@ public class FilterStatsCalculator
             }
 
             //BETWEEN case
-            if (operator.contains("$operator$") && node.getSignature().unmangleOperator(operator).equals(OperatorType.BETWEEN)) {
+            if (functionResolution.isBetweenFunction(node.getFunctionHandle())) {
                 return handleBetween(node.getArguments().get(0), node.getArguments().get(1), node.getArguments().get(2));
             }
 
             // NOT case
-            if (node.getSignature().getName().equals("not")) {
+            if (functionResolution.isNotFunction(node.getFunctionHandle())) {
                 RowExpression arguemnt = node.getArguments().get(0);
                 if (arguemnt instanceof SpecialForm && ((SpecialForm) arguemnt).getForm().equals(IS_NULL)) {
                     // IS NOT NULL case
@@ -682,18 +681,14 @@ public class FilterStatsCalculator
                 valueStats = input.getSymbolStatistics(layout.get(((InputReferenceExpression) value).getField()));
             }
             RowExpression lowerBound = call(
-                    internalOperator(OperatorType.GREATER_THAN_OR_EQUAL,
-                            BOOLEAN.getTypeSignature(),
-                            value.getType().getTypeSignature(),
-                            min.getType().getTypeSignature()),
+                    OperatorType.GREATER_THAN_OR_EQUAL.name(),
+                    metadata.getFunctionAndTypeManager().resolveOperatorFunctionHandle(OperatorType.GREATER_THAN_OR_EQUAL, fromTypes(value.getType(), min.getType())),
                     BOOLEAN,
                     value,
                     min);
             RowExpression upperBound = call(
-                    internalOperator(OperatorType.LESS_THAN_OR_EQUAL,
-                            BOOLEAN.getTypeSignature(),
-                            value.getType().getTypeSignature(),
-                            max.getType().getTypeSignature()),
+                    OperatorType.LESS_THAN_OR_EQUAL.name(),
+                    metadata.getFunctionAndTypeManager().resolveOperatorFunctionHandle(OperatorType.LESS_THAN_OR_EQUAL, fromTypes(value.getType(), max.getType())),
                     BOOLEAN,
                     value,
                     max);
@@ -702,10 +697,10 @@ public class FilterStatsCalculator
             if (isInfinite(valueStats.getLowValue())) {
                 // We want to do heuristic cut (infinite range to finite range) ASAP and then do filtering on finite range.
                 // We rely on 'and()' being processed left to right
-                transformed = RowExpressionUtils.and(lowerBound, upperBound);
+                transformed = LogicalRowExpressions.and(lowerBound, upperBound);
             }
             else {
-                transformed = RowExpressionUtils.and(upperBound, lowerBound);
+                transformed = LogicalRowExpressions.and(upperBound, lowerBound);
             }
             return process(transformed);
         }
@@ -784,7 +779,8 @@ public class FilterStatsCalculator
         {
             ImmutableList<PlanNodeStatsEstimate> equalityEstimates = candidates.stream()
                     .map(inValue -> process(call(
-                            internalOperator(OperatorType.EQUAL, BOOLEAN.getTypeSignature(), value.getType().getTypeSignature(), inValue.getType().getTypeSignature()),
+                            OperatorType.EQUAL.name(),
+                            metadata.getFunctionAndTypeManager().resolveOperatorFunctionHandle(OperatorType.EQUAL, fromTypes(value.getType(), inValue.getType())),
                             BOOLEAN, value, inValue)))
                     .collect(toImmutableList());
 
@@ -864,7 +860,7 @@ public class FilterStatsCalculator
 
         private RowExpression not(RowExpression expression)
         {
-            return call(Signatures.notSignature(), expression.getType(), expression);
+            return call("not", functionResolution.notFunction(), expression.getType(), expression);
         }
 
         private ComparisonExpression.Operator getComparisonOperator(OperatorType operator)

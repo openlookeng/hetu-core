@@ -29,7 +29,10 @@ import io.prestosql.spi.connector.ConnectorPlanOptimizerProvider;
 import io.prestosql.spi.connector.ConnectorRecordSetProvider;
 import io.prestosql.spi.connector.ConnectorSplitManager;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.procedure.Procedure;
+import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.transaction.IsolationLevel;
 
 import javax.inject.Inject;
@@ -62,6 +65,9 @@ public class JdbcConnector
     private final Set<Procedure> procedures;
     private final JdbcMetadataConfig config;
     private final ConnectorPlanOptimizer planOptimizer;
+    private final FunctionMetadataManager functionManager;
+    private final StandardFunctionResolution functionResolution;
+    private final RowExpressionService rowExpressionService;
 
     private final ConcurrentMap<ConnectorTransactionHandle, JdbcMetadata> transactions = new ConcurrentHashMap<>();
 
@@ -74,6 +80,9 @@ public class JdbcConnector
             JdbcPageSinkProvider jdbcPageSinkProvider,
             Optional<ConnectorAccessControl> accessControl,
             Set<Procedure> procedures,
+            FunctionMetadataManager functionManager,
+            StandardFunctionResolution functionResolution,
+            RowExpressionService rowExpressionService,
             JdbcMetadataConfig config,
             JdbcPlanOptimizer planOptimizer)
     {
@@ -86,6 +95,9 @@ public class JdbcConnector
         this.procedures = ImmutableSet.copyOf(requireNonNull(procedures, "procedures is null"));
         this.config = config;
         this.planOptimizer = planOptimizer;
+        this.functionManager = requireNonNull(functionManager, "functionManager is null");
+        this.functionResolution = requireNonNull(functionResolution, "functionResolution is null");
+        this.rowExpressionService = requireNonNull(rowExpressionService, "rowExpressionService is null");
     }
 
     @Override

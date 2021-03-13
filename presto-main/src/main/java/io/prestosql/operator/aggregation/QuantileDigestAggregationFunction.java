@@ -17,7 +17,7 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.bytecode.DynamicClassLoader;
 import io.airlift.stats.QuantileDigest;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlAggregationFunction;
 import io.prestosql.operator.aggregation.state.QuantileDigestState;
 import io.prestosql.operator.aggregation.state.QuantileDigestStateFactory;
@@ -85,10 +85,10 @@ public final class QuantileDigestAggregationFunction
     }
 
     @Override
-    public InternalAggregationFunction specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public InternalAggregationFunction specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         Type valueType = boundVariables.getTypeVariable("V");
-        QuantileDigestType outputType = (QuantileDigestType) metadata.getParameterizedType(
+        QuantileDigestType outputType = (QuantileDigestType) functionAndTypeManager.getParameterizedType(
                 StandardTypes.QDIGEST,
                 ImmutableList.of(TypeSignatureParameter.of(valueType.getTypeSignature())));
         return generateAggregation(valueType, outputType, arity);

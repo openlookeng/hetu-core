@@ -15,18 +15,18 @@ package io.prestosql.operator.scalar;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlOperator;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.type.Type;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.Signature.typeVariable;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 
@@ -45,15 +45,14 @@ public class IdentityCast
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         checkArgument(boundVariables.getTypeVariables().size() == 1, "Expected only one type");
         Type type = boundVariables.getTypeVariable("T");
         MethodHandle identity = MethodHandles.identity(type.getJavaType());
-        return new ScalarFunctionImplementation(
+        return new BuiltInScalarFunctionImplementation(
                 false,
                 ImmutableList.of(valueTypeArgumentProperty(RETURN_NULL_ON_NULL)),
-                identity,
-                isDeterministic());
+                identity);
     }
 }

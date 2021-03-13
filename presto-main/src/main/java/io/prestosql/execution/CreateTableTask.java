@@ -20,13 +20,13 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.Session;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.TableMetadata;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeNotFoundException;
@@ -49,6 +49,7 @@ import java.util.Set;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
+import static io.prestosql.metadata.MetadataUtil.toSchemaTableName;
 import static io.prestosql.spi.StandardErrorCode.ALREADY_EXISTS;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
@@ -193,7 +194,7 @@ public class CreateTableTask
 
         Map<String, Object> finalProperties = combineProperties(sqlProperties.keySet(), properties, inheritedProperties);
 
-        ConnectorTableMetadata tableMetadata = new ConnectorTableMetadata(tableName.asSchemaTableName(), ImmutableList.copyOf(columns.values()), finalProperties, statement.getComment());
+        ConnectorTableMetadata tableMetadata = new ConnectorTableMetadata(toSchemaTableName(tableName), ImmutableList.copyOf(columns.values()), finalProperties, statement.getComment());
         try {
             metadata.createTable(session, tableName.getCatalogName(), tableMetadata, statement.isNotExists());
         }

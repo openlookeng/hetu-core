@@ -1994,6 +1994,7 @@ public class ImpalaAstBuilder
                 filter,
                 orderBy,
                 distinct,
+                false,
                 visit(context.expression(), Expression.class));
     }
 

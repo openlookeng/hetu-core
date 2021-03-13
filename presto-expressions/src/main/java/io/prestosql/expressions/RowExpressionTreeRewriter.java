@@ -102,7 +102,7 @@ public final class RowExpressionTreeRewriter<C>
             List<RowExpression> arguments = rewrite(call.getArguments(), context);
 
             if (!sameElements(call.getArguments(), arguments)) {
-                return new CallExpression(call.getSignature(), call.getType(), arguments, call.getFilter());
+                return new CallExpression(call.getDisplayName(), call.getFunctionHandle(), call.getType(), arguments, call.getFilter());
             }
             return call;
         }

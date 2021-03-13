@@ -288,7 +288,7 @@ public class PlanOptimizers
                 statsCalculator,
                 estimatedExchangesCostCalculator,
                 ImmutableSet.of(
-                        new InlineProjections(),
+                        new InlineProjections(metadata),
                         new RemoveRedundantIdentityProjections()));
 
         IterativeOptimizer projectionPushDown = new IterativeOptimizer(
@@ -374,7 +374,7 @@ public class PlanOptimizers
                                         new SingleDistinctAggregationToGroupBy(),
                                         new MultipleDistinctAggregationToMarkDistinct(),
                                         new MergeLimitWithDistinct(),
-                                        new PruneCountAggregationOverScalar(),
+                                        new PruneCountAggregationOverScalar(metadata.getFunctionAndTypeManager()),
                                         new PruneOrderByInAggregation(metadata),
                                         new RewriteSpatialPartitioningAggregation(metadata)))
                                 .build()),
@@ -384,7 +384,7 @@ public class PlanOptimizers
                         estimatedExchangesCostCalculator,
                         ImmutableSet.of(
                                 new ImplementOffset(),
-                                new ImplementLimitWithTies())),
+                                new ImplementLimitWithTies(metadata))),
                 simplifyOptimizer,
                 new UnaliasSymbolReferences(metadata),
                 new IterativeOptimizer(
@@ -397,10 +397,10 @@ public class PlanOptimizers
                         ruleStats,
                         statsCalculator,
                         estimatedExchangesCostCalculator,
-                        ImmutableList.of(new ImplementIntersectAndExceptAsUnion()),
+                        ImmutableList.of(new ImplementIntersectAndExceptAsUnion(metadata.getFunctionAndTypeManager())),
                         ImmutableSet.of(
-                                new ImplementIntersectAsUnion(),
-                                new ImplementExceptAsUnion())),
+                                new ImplementIntersectAsUnion(metadata),
+                                new ImplementExceptAsUnion(metadata))),
                 new LimitPushDown(), // Run the LimitPushDown after flattening set operators to make it easier to do the set flattening
                 new PruneUnreferencedOutputs(),
                 inlineProjections,
@@ -422,7 +422,7 @@ public class PlanOptimizers
                         ImmutableSet.of(
                                 new RemoveUnreferencedScalarLateralNodes(),
                                 new TransformUncorrelatedLateralToJoin(),
-                                new TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate(),
+                                new TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate(metadata),
                                 new TransformUncorrelatedInPredicateSubqueryToSemiJoin(),
                                 new TransformCorrelatedScalarAggregationToJoin(metadata),
                                 new TransformCorrelatedLateralJoinToJoin())),
@@ -432,7 +432,7 @@ public class PlanOptimizers
                         estimatedExchangesCostCalculator,
                         ImmutableSet.of(
                                 new RemoveUnreferencedScalarApplyNodes(),
-                                new TransformCorrelatedInPredicateToJoin(), // must be run after PruneUnreferencedOutputs
+                                new TransformCorrelatedInPredicateToJoin(metadata.getFunctionAndTypeManager()), // must be run after PruneUnreferencedOutputs
                                 new TransformCorrelatedScalarSubquery(metadata), // must be run after TransformCorrelatedScalarAggregationToJoin
                                 new TransformCorrelatedLateralJoinToJoin(),
                                 new ImplementFilteredAggregations())),
@@ -441,7 +441,7 @@ public class PlanOptimizers
                         statsCalculator,
                         estimatedExchangesCostCalculator,
                         ImmutableSet.of(
-                                new InlineProjections(),
+                                new InlineProjections(metadata),
                                 new RemoveRedundantIdentityProjections(),
                                 new TransformCorrelatedSingleRowSubqueryToProject(),
                                 new RemoveAggregationInSemiJoin())),
@@ -502,7 +502,7 @@ public class PlanOptimizers
                         ruleStats,
                         statsCalculator,
                         estimatedExchangesCostCalculator,
-                        ImmutableSet.of(new SimplifyCountOverConstant())),
+                        ImmutableSet.of(new SimplifyCountOverConstant(metadata.getFunctionAndTypeManager()))),
                 new LimitPushDown(), // Run LimitPushDown before WindowFilterPushDown
                 new WindowFilterPushDown(metadata), // This must run after PredicatePushDown and LimitPushDown so that it squashes any successive filter nodes and limits
                 new IterativeOptimizer(
@@ -590,7 +590,7 @@ public class PlanOptimizers
                 ImmutableSet.<Rule<?>>builder()
                         .add(new RemoveRedundantIdentityProjections())
                         .addAll(new ExtractSpatialJoins(metadata, splitManager, pageSourceManager, typeAnalyzer).rules())
-                        .add(new InlineProjections())
+                        .add(new InlineProjections(metadata))
                         .build()));
 
         if (!forceSingleNode) {
@@ -662,7 +662,7 @@ public class PlanOptimizers
                 ImmutableSet.<Rule<?>>builder()
                         .add(new RemoveRedundantIdentityProjections())
                         .add(new PushRemoteExchangeThroughAssignUniqueId())
-                        .add(new InlineProjections())
+                        .add(new InlineProjections(metadata))
                         .build()));
         builder.add(pushdownRule);
         builder.add(pushdownDeleteWithExchangeRule);

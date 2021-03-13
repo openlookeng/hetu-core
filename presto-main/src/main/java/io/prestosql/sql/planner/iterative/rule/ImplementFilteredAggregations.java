@@ -108,7 +108,7 @@ public class ImplementFilteredAggregations
             }
 
             aggregations.put(output, new Aggregation(
-                    aggregation.getSignature(),
+                    aggregation.getFunctionCall(),
                     aggregation.getArguments(),
                     aggregation.isDistinct(),
                     Optional.empty(),

@@ -34,6 +34,7 @@ import java.util.SortedSet;
 
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static io.prestosql.metadata.MetadataUtil.toSchemaTableName;
 
 public final class MetadataListing
 {
@@ -62,7 +63,7 @@ public final class MetadataListing
     public static Set<SchemaTableName> listTables(Session session, Metadata metadata, AccessControl accessControl, QualifiedTablePrefix prefix)
     {
         Set<SchemaTableName> tableNames = metadata.listTables(session, prefix).stream()
-                .map(QualifiedObjectName::asSchemaTableName)
+                .map(MetadataUtil::toSchemaTableName)
                 .collect(toImmutableSet());
         return accessControl.filterTables(session.getRequiredTransactionId(), session.getIdentity(), prefix.getCatalogName(), tableNames);
     }
@@ -70,7 +71,7 @@ public final class MetadataListing
     public static Set<SchemaTableName> listViews(Session session, Metadata metadata, AccessControl accessControl, QualifiedTablePrefix prefix)
     {
         Set<SchemaTableName> tableNames = metadata.listViews(session, prefix).stream()
-                .map(QualifiedObjectName::asSchemaTableName)
+                .map(MetadataUtil::toSchemaTableName)
                 .collect(toImmutableSet());
         return accessControl.filterTables(session.getRequiredTransactionId(), session.getIdentity(), prefix.getCatalogName(), tableNames);
     }
@@ -92,7 +93,7 @@ public final class MetadataListing
     public static Map<SchemaTableName, List<ColumnMetadata>> listTableColumns(Session session, Metadata metadata, AccessControl accessControl, QualifiedTablePrefix prefix)
     {
         Map<SchemaTableName, List<ColumnMetadata>> tableColumns = metadata.listTableColumns(session, prefix).entrySet().stream()
-                .collect(toImmutableMap(entry -> entry.getKey().asSchemaTableName(), Entry::getValue));
+                .collect(toImmutableMap(entry -> toSchemaTableName(entry.getKey()), Entry::getValue));
         Set<SchemaTableName> allowedTables = accessControl.filterTables(
                 session.getRequiredTransactionId(),
                 session.getIdentity(),

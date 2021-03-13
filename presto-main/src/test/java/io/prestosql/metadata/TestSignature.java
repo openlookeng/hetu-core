@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.json.JsonCodec;
 import io.airlift.json.JsonCodecFactory;
 import io.airlift.json.ObjectMapperProvider;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
@@ -39,7 +40,7 @@ public class TestSignature
         JsonCodec<Signature> codec = new JsonCodecFactory(objectMapperProvider, true).jsonCodec(Signature.class);
 
         Signature expected = new Signature(
-                "function",
+                QualifiedObjectName.valueOfDefaultFunction("function"),
                 SCALAR,
                 parseTypeSignature(StandardTypes.BIGINT),
                 ImmutableList.of(parseTypeSignature(StandardTypes.BOOLEAN), parseTypeSignature(StandardTypes.DOUBLE), parseTypeSignature(StandardTypes.VARCHAR)));

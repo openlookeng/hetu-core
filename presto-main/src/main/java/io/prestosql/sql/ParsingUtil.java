@@ -14,9 +14,12 @@
 package io.prestosql.sql;
 
 import io.prestosql.Session;
+import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.spi.PrestoWarning;
 import io.prestosql.sql.parser.ParsingOptions;
 
 import static io.prestosql.SystemSessionProperties.isParseDecimalLiteralsAsDouble;
+import static io.prestosql.spi.connector.StandardWarningCode.PARSER_WARNING;
 import static io.prestosql.sql.parser.ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL;
 import static io.prestosql.sql.parser.ParsingOptions.DecimalLiteralTreatment.AS_DOUBLE;
 
@@ -25,6 +28,14 @@ public class ParsingUtil
     public static ParsingOptions createParsingOptions(Session session)
     {
         return new ParsingOptions(isParseDecimalLiteralsAsDouble(session) ? AS_DOUBLE : AS_DECIMAL);
+    }
+
+    public static ParsingOptions createParsingOptions(Session session, WarningCollector warningCollector)
+    {
+        return ParsingOptions.builder()
+                .setDecimalLiteralTreatment(isParseDecimalLiteralsAsDouble(session) ? AS_DOUBLE : AS_DECIMAL)
+                .setWarningConsumer(warning -> warningCollector.add(new PrestoWarning(PARSER_WARNING, warning.getMessage())))
+                .build();
     }
 
     private ParsingUtil() {}

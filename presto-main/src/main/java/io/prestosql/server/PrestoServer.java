@@ -45,6 +45,7 @@ import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.jmx.HetuJmxModule;
 import io.prestosql.metadata.StaticCatalogStore;
+import io.prestosql.metadata.StaticFunctionNamespaceStore;
 import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.protocol.SmileModule;
 import io.prestosql.security.AccessControlManager;
@@ -139,6 +140,7 @@ public class PrestoServer
             fileSystemClientManager.loadFactoryConfigs();
             injector.getInstance(HetuMetaStoreManager.class).loadHetuMetastore(fileSystemClientManager);
             injector.getInstance(HeuristicIndexerManager.class).buildIndexClient();
+            injector.getInstance(StaticFunctionNamespaceStore.class).loadFunctionNamespaceManagers();
             injector.getInstance(StaticCatalogStore.class).loadCatalogs();
             injector.getInstance(DynamicCatalogStore.class).loadCatalogStores(fileSystemClientManager);
             injector.getInstance(DynamicCatalogScanner.class).start();

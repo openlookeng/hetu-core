@@ -20,8 +20,10 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
 import io.airlift.slice.Slice;
 import io.prestosql.Session;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.ConstantExpression;
@@ -33,6 +35,7 @@ import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.SpecialForm.Form;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.analyzer.TypeSignatureProvider;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.tree.Expression;
@@ -40,6 +43,7 @@ import io.prestosql.sql.tree.Expression;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -66,7 +70,7 @@ import static java.util.Objects.requireNonNull;
 public class ExpressionEquivalence
 {
     private static final Ordering<RowExpression> ROW_EXPRESSION_ORDERING = Ordering.from(new RowExpressionComparator());
-    private static final CanonicalizationVisitor CANONICALIZATION_VISITOR = new CanonicalizationVisitor();
+    private final CanonicalizationVisitor canonicalizationVisitor;
     private final Metadata metadata;
     private final TypeAnalyzer typeAnalyzer;
 
@@ -74,6 +78,7 @@ public class ExpressionEquivalence
     {
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.typeAnalyzer = requireNonNull(typeAnalyzer, "typeAnalyzer is null");
+        this.canonicalizationVisitor = new CanonicalizationVisitor(metadata.getFunctionAndTypeManager());
     }
 
     public boolean areExpressionsEquivalent(Session session, Expression leftExpression, Expression rightExpression, TypeProvider types)
@@ -87,16 +92,16 @@ public class ExpressionEquivalence
         RowExpression leftRowExpression = toRowExpression(session, leftExpression, symbolInput, types);
         RowExpression rightRowExpression = toRowExpression(session, rightExpression, symbolInput, types);
 
-        RowExpression canonicalizedLeft = leftRowExpression.accept(CANONICALIZATION_VISITOR, null);
-        RowExpression canonicalizedRight = rightRowExpression.accept(CANONICALIZATION_VISITOR, null);
+        RowExpression canonicalizedLeft = leftRowExpression.accept(canonicalizationVisitor, null);
+        RowExpression canonicalizedRight = rightRowExpression.accept(canonicalizationVisitor, null);
 
         return canonicalizedLeft.equals(canonicalizedRight);
     }
 
     public boolean areExpressionsEquivalent(RowExpression leftExpression, RowExpression rightExpression)
     {
-        RowExpression canonicalizedLeft = leftExpression.accept(CANONICALIZATION_VISITOR, null);
-        RowExpression canonicalizedRight = rightExpression.accept(CANONICALIZATION_VISITOR, null);
+        RowExpression canonicalizedLeft = leftExpression.accept(canonicalizationVisitor, null);
+        RowExpression canonicalizedRight = rightExpression.accept(canonicalizationVisitor, null);
 
         return canonicalizedLeft.equals(canonicalizedRight);
     }
@@ -108,7 +113,7 @@ public class ExpressionEquivalence
                 SCALAR,
                 typeAnalyzer.getTypes(session, types, expression),
                 symbolInput,
-                metadata,
+                metadata.getFunctionAndTypeManager(),
                 session,
                 false);
     }
@@ -116,39 +121,48 @@ public class ExpressionEquivalence
     private static class CanonicalizationVisitor
             implements RowExpressionVisitor<RowExpression, Void>
     {
+        private final FunctionAndTypeManager functionAndTypeManager;
+
+        public CanonicalizationVisitor(FunctionAndTypeManager functionAndTypeManager)
+        {
+            this.functionAndTypeManager = requireNonNull(functionAndTypeManager, "functionManager is null");
+        }
+
         @Override
         public RowExpression visitCall(CallExpression call, Void context)
         {
             call = new CallExpression(
-                    call.getSignature(),
+                    call.getDisplayName(),
+                    call.getFunctionHandle(),
                     call.getType(),
                     call.getArguments().stream()
                             .map(expression -> expression.accept(this, context))
                             .collect(toImmutableList()),
                     call.getFilter());
 
-            String callName = call.getSignature().getName();
+            QualifiedObjectName callName = functionAndTypeManager.getFunctionMetadata(call.getFunctionHandle()).getName();
 
-            if (callName.equals(mangleOperatorName(EQUAL)) || callName.equals(mangleOperatorName(NOT_EQUAL)) || callName.equals(mangleOperatorName(IS_DISTINCT_FROM))) {
+            if (callName.getObjectName().toLowerCase(Locale.ENGLISH).equals(mangleOperatorName(EQUAL).toLowerCase(Locale.ENGLISH))
+                    || callName.getObjectName().toLowerCase(Locale.ENGLISH).equals(mangleOperatorName(NOT_EQUAL).toLowerCase(Locale.ENGLISH))
+                    || callName.getObjectName().toLowerCase(Locale.ENGLISH).equals(mangleOperatorName(IS_DISTINCT_FROM).toLowerCase(Locale.ENGLISH))) {
                 // sort arguments
                 return new CallExpression(
-                        call.getSignature(),
+                        call.getDisplayName(),
+                        call.getFunctionHandle(),
                         call.getType(),
                         ROW_EXPRESSION_ORDERING.sortedCopy(call.getArguments()),
                         Optional.empty());
             }
-
-            if (callName.equals(mangleOperatorName(GREATER_THAN)) || callName.equals(mangleOperatorName(GREATER_THAN_OR_EQUAL))) {
+            if (callName.getObjectName().toLowerCase(Locale.ENGLISH).equals(mangleOperatorName(GREATER_THAN).toLowerCase(Locale.ENGLISH))
+                    || callName.getObjectName().toLowerCase(Locale.ENGLISH).equals(mangleOperatorName(GREATER_THAN_OR_EQUAL).toLowerCase(Locale.ENGLISH))) {
                 // convert greater than to less than
+
+                FunctionHandle functionHandle = functionAndTypeManager.resolveOperatorFunctionHandle(
+                        callName.equals(GREATER_THAN.getFunctionName()) ? LESS_THAN : LESS_THAN_OR_EQUAL,
+                        swapPair(TypeSignatureProvider.fromTypes(call.getArguments().stream().map(RowExpression::getType).collect(toImmutableList()))));
                 return new CallExpression(
-                        new Signature(
-                                callName.equals(mangleOperatorName(GREATER_THAN)) ? mangleOperatorName(LESS_THAN) : mangleOperatorName(LESS_THAN_OR_EQUAL),
-                                SCALAR,
-                                call.getSignature().getTypeVariableConstraints(),
-                                call.getSignature().getLongVariableConstraints(),
-                                call.getSignature().getReturnType(),
-                                swapPair(call.getSignature().getArgumentTypes()),
-                                false),
+                        call.getDisplayName(),
+                        functionHandle,
                         call.getType(),
                         swapPair(call.getArguments()),
                         Optional.empty());
@@ -245,7 +259,7 @@ public class ExpressionEquivalence
                 CallExpression leftCall = (CallExpression) left;
                 CallExpression rightCall = (CallExpression) right;
                 return ComparisonChain.start()
-                        .compare(leftCall.getSignature().toString(), rightCall.getSignature().toString())
+                        .compare(leftCall.getFunctionHandle().toString(), rightCall.getFunctionHandle().toString())
                         .compare(leftCall.getArguments(), rightCall.getArguments(), argumentComparator)
                         .result();
             }

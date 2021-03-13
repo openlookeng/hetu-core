@@ -31,7 +31,6 @@ import io.prestosql.execution.TableCacheInfo;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.SessionPropertyManager.SessionPropertyValue;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.HetuConstant;
@@ -41,15 +40,19 @@ import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.ConnectorViewDefinition;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.function.FunctionKind;
+import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.function.SqlFunction;
+import io.prestosql.spi.function.SqlInvokedFunction;
 import io.prestosql.spi.heuristicindex.IndexRecord;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.security.PrincipalType;
 import io.prestosql.spi.service.PropertyService;
 import io.prestosql.spi.session.PropertyMetadata;
+import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.sql.analyzer.QueryExplainer;
 import io.prestosql.sql.analyzer.SemanticException;
 import io.prestosql.sql.parser.ParsingException;
@@ -59,11 +62,14 @@ import io.prestosql.sql.tree.ArrayConstructor;
 import io.prestosql.sql.tree.AstVisitor;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.ColumnDefinition;
+import io.prestosql.sql.tree.CreateFunction;
 import io.prestosql.sql.tree.CreateTable;
 import io.prestosql.sql.tree.CreateView;
 import io.prestosql.sql.tree.DoubleLiteral;
 import io.prestosql.sql.tree.Explain;
 import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.ExternalBodyReference;
+import io.prestosql.sql.tree.FunctionProperty;
 import io.prestosql.sql.tree.Identifier;
 import io.prestosql.sql.tree.LikePredicate;
 import io.prestosql.sql.tree.LongLiteral;
@@ -72,11 +78,13 @@ import io.prestosql.sql.tree.Property;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.Relation;
+import io.prestosql.sql.tree.RoutineCharacteristics;
 import io.prestosql.sql.tree.ShowCache;
 import io.prestosql.sql.tree.ShowCatalogs;
 import io.prestosql.sql.tree.ShowColumns;
 import io.prestosql.sql.tree.ShowCreate;
 import io.prestosql.sql.tree.ShowCubes;
+import io.prestosql.sql.tree.ShowExternalFunction;
 import io.prestosql.sql.tree.ShowFunctions;
 import io.prestosql.sql.tree.ShowGrants;
 import io.prestosql.sql.tree.ShowIndex;
@@ -86,6 +94,7 @@ import io.prestosql.sql.tree.ShowSchemas;
 import io.prestosql.sql.tree.ShowSession;
 import io.prestosql.sql.tree.ShowTables;
 import io.prestosql.sql.tree.SortItem;
+import io.prestosql.sql.tree.SqlParameterDeclaration;
 import io.prestosql.sql.tree.Statement;
 import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.TableElement;
@@ -93,6 +102,7 @@ import io.prestosql.sql.tree.Values;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -112,19 +122,24 @@ import static io.prestosql.connector.informationschema.InformationSchemaMetadata
 import static io.prestosql.connector.informationschema.InformationSchemaMetadata.TABLE_TABLES;
 import static io.prestosql.connector.informationschema.InformationSchemaMetadata.TABLE_TABLE_PRIVILEGES;
 import static io.prestosql.cube.CubeManager.STAR_TREE;
+import static io.prestosql.metadata.FunctionAndTypeManager.qualifyObjectName;
 import static io.prestosql.metadata.MetadataListing.listCatalogs;
 import static io.prestosql.metadata.MetadataListing.listSchemas;
 import static io.prestosql.metadata.MetadataUtil.createCatalogSchemaName;
 import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
+import static io.prestosql.metadata.MetadataUtil.toCatalogSchemaTableName;
+import static io.prestosql.spi.StandardErrorCode.FUNCTION_NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_USER_ERROR;
 import static io.prestosql.spi.StandardErrorCode.INVALID_COLUMN_PROPERTY;
 import static io.prestosql.spi.StandardErrorCode.INVALID_TABLE_PROPERTY;
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
 import static io.prestosql.sql.ParsingUtil.createParsingOptions;
 import static io.prestosql.sql.QueryUtil.aliased;
 import static io.prestosql.sql.QueryUtil.aliasedName;
 import static io.prestosql.sql.QueryUtil.aliasedNullToEmpty;
 import static io.prestosql.sql.QueryUtil.ascending;
+import static io.prestosql.sql.QueryUtil.descending;
 import static io.prestosql.sql.QueryUtil.equal;
 import static io.prestosql.sql.QueryUtil.functionCall;
 import static io.prestosql.sql.QueryUtil.identifier;
@@ -151,6 +166,7 @@ import static io.prestosql.sql.tree.ShowCreate.Type.VIEW;
 import static java.lang.String.format;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
 final class ShowQueriesRewrite
@@ -171,7 +187,7 @@ final class ShowQueriesRewrite
             WarningCollector warningCollector,
             HeuristicIndexerManager heuristicIndexerManager)
     {
-        return (Statement) new Visitor(cubeManager, metadata, parser, session, parameters, accessControl, heuristicIndexerManager).process(node, null);
+        return (Statement) new Visitor(cubeManager, metadata, parser, session, parameters, accessControl, warningCollector, heuristicIndexerManager).process(node, null);
     }
 
     private static class Visitor
@@ -184,8 +200,9 @@ final class ShowQueriesRewrite
         private final List<Expression> parameters;
         private final AccessControl accessControl;
         private final HeuristicIndexerManager heuristicIndexerManager;
+        private final WarningCollector warningCollector;
 
-        public Visitor(CubeManager cubeManager, Metadata metadata, SqlParser sqlParser, Session session, List<Expression> parameters, AccessControl accessControl, HeuristicIndexerManager heuristicIndexerManager)
+        public Visitor(CubeManager cubeManager, Metadata metadata, SqlParser sqlParser, Session session, List<Expression> parameters, AccessControl accessControl, WarningCollector warningCollector, HeuristicIndexerManager heuristicIndexerManager)
         {
             //TODO: Replace with NoOpCubeManager. Here CubeManager can be null
             this.cubeManager = cubeManager;
@@ -195,6 +212,7 @@ final class ShowQueriesRewrite
             this.parameters = requireNonNull(parameters, "parameters is null");
             this.accessControl = requireNonNull(accessControl, "accessControl is null");
             this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
+            this.warningCollector = requireNonNull(warningCollector, "warningCollector is null");
         }
 
         @Override
@@ -466,7 +484,7 @@ final class ShowQueriesRewrite
                 throw new SemanticException(MISSING_TABLE, showColumns, "Table '%s' does not exist", tableName);
             }
 
-            accessControl.checkCanShowColumnsMetadata(session.getRequiredTransactionId(), session.getIdentity(), tableName.asCatalogSchemaTableName());
+            accessControl.checkCanShowColumnsMetadata(session.getRequiredTransactionId(), session.getIdentity(), toCatalogSchemaTableName(tableName));
 
             return simpleQuery(
                     selectList(
@@ -625,16 +643,20 @@ final class ShowQueriesRewrite
         @Override
         protected Node visitShowFunctions(ShowFunctions node, Void context)
         {
-            List<Expression> rows = metadata.listFunctions().stream()
-                    .filter(function -> !function.isHidden())
-                    .map(function -> row(
-                            new StringLiteral(function.getSignature().getName()),
-                            new StringLiteral(function.getSignature().getReturnType().toString()),
-                            new StringLiteral(Joiner.on(", ").join(function.getSignature().getArgumentTypes())),
-                            new StringLiteral(getFunctionType(function)),
-                            function.isDeterministic() ? TRUE_LITERAL : FALSE_LITERAL,
-                            new StringLiteral(nullToEmpty(function.getDescription()))))
-                    .collect(toImmutableList());
+            ImmutableList.Builder<Expression> rows = ImmutableList.builder();
+            for (SqlFunction function : metadata.listFunctions(Optional.of(session))) {
+                Signature signature = function.getSignature();
+                boolean builtIn = signature.getName().getCatalogSchemaName().equals(DEFAULT_NAMESPACE);
+                rows.add(row(
+                        builtIn ? new StringLiteral(signature.getNameSuffix()) : new StringLiteral(signature.getName().toString()),
+                        new StringLiteral(signature.getReturnType().toString()),
+                        new StringLiteral(Joiner.on(", ").join(signature.getArgumentTypes())),
+                        new StringLiteral(getFunctionType(function)),
+                        function.isDeterministic() ? TRUE_LITERAL : FALSE_LITERAL,
+                        new StringLiteral(nullToEmpty(function.getDescription())),
+                        signature.isVariableArity() ? TRUE_LITERAL : FALSE_LITERAL,
+                        builtIn ? TRUE_LITERAL : FALSE_LITERAL));
+            }
 
             Map<String, String> columns = ImmutableMap.<String, String>builder()
                     .put("function_name", "Function")
@@ -643,14 +665,17 @@ final class ShowQueriesRewrite
                     .put("function_type", "Function Type")
                     .put("deterministic", "Deterministic")
                     .put("description", "Description")
+                    .put("variable_arity", "Variable Arity")
+                    .put("built_in", "Built In")
                     .build();
 
             return simpleQuery(
                     selectAll(columns.entrySet().stream()
                             .map(entry -> aliasedName(entry.getKey(), entry.getValue()))
                             .collect(toImmutableList())),
-                    aliased(new Values(rows), "functions", ImmutableList.copyOf(columns.keySet())),
+                    aliased(new Values(rows.build()), "functions", ImmutableList.copyOf(columns.keySet())),
                     ordering(
+                            descending("built_in"),
                             new SortItem(
                                     functionCall("lower", identifier("function_name")),
                                     SortItem.Ordering.ASCENDING,
@@ -658,6 +683,70 @@ final class ShowQueriesRewrite
                             ascending("return_type"),
                             ascending("argument_types"),
                             ascending("function_type")));
+        }
+
+        @Override
+        protected Node visitShowExternalFunction(ShowExternalFunction node, Void context)
+        {
+            QualifiedObjectName functionName = qualifyObjectName(node.getName());
+            Collection<? extends SqlFunction> functions = metadata.getFunctionAndTypeManager().getFunctions(session.getTransactionId(), functionName);
+            if (node.getParameterTypes().isPresent()) {
+                List<TypeSignature> parameterTypes = node.getParameterTypes().get().stream()
+                        .map(TypeSignature::parseTypeSignature)
+                        .collect(toImmutableList());
+                functions = functions.stream()
+                        .filter(function -> function.getSignature().getArgumentTypes().equals(parameterTypes))
+                        .collect(toImmutableList());
+            }
+            if (functions.isEmpty()) {
+                String types = node.getParameterTypes().map(parameterTypes -> format("(%s)", Joiner.on(", ").join(parameterTypes))).orElse("");
+                throw new PrestoException(FUNCTION_NOT_FOUND, format("Function not found: %s%s", functionName, types));
+            }
+
+            ImmutableList.Builder<Expression> rows = ImmutableList.builder();
+            for (SqlFunction function : functions) {
+                if (!(function instanceof SqlInvokedFunction)) {
+                    throw new PrestoException(GENERIC_USER_ERROR, "SHOW EXTERNAL FUNCTION is only supported for SQL functions");
+                }
+
+                SqlInvokedFunction sqlFunction = (SqlInvokedFunction) function;
+                ImmutableList.Builder<FunctionProperty> functionPropertyBuilder = ImmutableList.builder();
+                Map<String, String> propertyMap = sqlFunction.getFunctionProperties();
+                for (Map.Entry<String, String> entry : propertyMap.entrySet()) {
+                    functionPropertyBuilder.add(new FunctionProperty(new Identifier(entry.getKey()), new StringLiteral(entry.getValue())));
+                }
+                CreateFunction createFunction = new CreateFunction(
+                        node.getName(),
+                        false,
+                        sqlFunction.getParameters().stream()
+                                .map(parameter -> new SqlParameterDeclaration(new Identifier(parameter.getName()), parameter.getType().toString()))
+                                .collect(toImmutableList()),
+                        sqlFunction.getSignature().getReturnType().toString(),
+                        Optional.of(sqlFunction.getDescription()),
+                        new RoutineCharacteristics(
+                                new RoutineCharacteristics.Language(sqlFunction.getRoutineCharacteristics().getLanguage().getLanguage()),
+                                RoutineCharacteristics.Determinism.valueOf(sqlFunction.getRoutineCharacteristics().getDeterminism().name()),
+                                RoutineCharacteristics.NullCallClause.valueOf(sqlFunction.getRoutineCharacteristics().getNullCallClause().name())),
+                        sqlFunction.getBody().equals("EXTERNAL") ? new ExternalBodyReference() : sqlParser.createReturn(sqlFunction.getBody(), createParsingOptions(session, warningCollector)),
+                        functionPropertyBuilder.build());
+                rows.add(row(
+                        new StringLiteral(formatSql(createFunction, Optional.empty())),
+                        new StringLiteral(function.getSignature().getArgumentTypes().stream()
+                                .map(TypeSignature::toString)
+                                .collect(joining(", ")))));
+            }
+
+            Map<String, String> columns = ImmutableMap.<String, String>builder()
+                    .put("external_function", "External Function")
+                    .put("argument_types", "Argument Types")
+                    .build();
+
+            return simpleQuery(
+                    selectAll(columns.entrySet().stream()
+                            .map(entry -> aliasedName(entry.getKey(), entry.getValue()))
+                            .collect(toImmutableList())),
+                    aliased(new Values(rows.build()), "functions", ImmutableList.copyOf(columns.keySet())),
+                    ordering(ascending("argument_types")));
         }
 
         private static String getFunctionType(SqlFunction function)
@@ -670,6 +759,8 @@ final class ShowQueriesRewrite
                     return "window";
                 case SCALAR:
                     return "scalar";
+                case EXTERNAL:
+                    return "external";
             }
             throw new IllegalArgumentException("Unsupported function kind: " + kind);
         }

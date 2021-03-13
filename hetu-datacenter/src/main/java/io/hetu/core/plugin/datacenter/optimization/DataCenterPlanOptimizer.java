@@ -25,6 +25,8 @@ import io.hetu.core.plugin.datacenter.DataCenterConfig;
 import io.hetu.core.plugin.datacenter.DataCenterTableHandle;
 import io.hetu.core.plugin.datacenter.client.DataCenterClient;
 import io.hetu.core.plugin.datacenter.client.DataCenterStatementClientFactory;
+import io.prestosql.expressions.LogicalRowExpressions;
+import io.prestosql.plugin.jdbc.optimization.JdbcConverterContext;
 import io.prestosql.plugin.jdbc.optimization.JdbcQueryGeneratorContext;
 import io.prestosql.plugin.jdbc.optimization.JdbcQueryGeneratorResult;
 import io.prestosql.spi.ConnectorPlanOptimizer;
@@ -33,8 +35,8 @@ import io.prestosql.spi.SymbolAllocator;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.Assignments;
@@ -49,9 +51,9 @@ import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
-import io.prestosql.spi.sql.RowExpressionUtils;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.UnknownType;
@@ -76,6 +78,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.plugin.jdbc.optimization.JdbcPlanOptimizerUtils.getGroupingSetColumn;
 import static io.prestosql.plugin.jdbc.optimization.JdbcPlanOptimizerUtils.replaceGroupingSetColumns;
+import static io.prestosql.spi.function.OperatorType.CAST;
 
 public class DataCenterPlanOptimizer
         implements ConnectorPlanOptimizer
@@ -89,18 +92,28 @@ public class DataCenterPlanOptimizer
     private final DataCenterConfig config;
     private final TypeManager typeManager;
     private final DataCenterQueryGenerator queryGenerator;
+    private final StandardFunctionResolution functionResolution;
+    private final LogicalRowExpressions logicalRowExpressions;
 
     @Inject
     public DataCenterPlanOptimizer(
             TypeManager typeManager,
             DataCenterConfig config,
-            DataCenterQueryGenerator query)
+            DataCenterQueryGenerator query,
+            DeterminismEvaluator determinismEvaluator,
+            FunctionMetadataManager functionManager,
+            StandardFunctionResolution functionResolution)
     {
         OkHttpClient httpClient = DataCenterStatementClientFactory.newHttpClient(config);
         this.client = new DataCenterClient(config, httpClient, typeManager);
         this.config = config;
         this.typeManager = typeManager;
         this.queryGenerator = query;
+        this.functionResolution = functionResolution;
+        this.logicalRowExpressions = new LogicalRowExpressions(
+                determinismEvaluator,
+                functionResolution,
+                functionManager);
     }
 
     @Override
@@ -166,9 +179,9 @@ public class DataCenterPlanOptimizer
             List<RowExpression> pushable = new ArrayList<>();
             List<RowExpression> nonPushable = new ArrayList<>();
 
-            for (RowExpression conjunct : RowExpressionUtils.extractConjuncts(node.getPredicate())) {
+            for (RowExpression conjunct : logicalRowExpressions.extractConjuncts(node.getPredicate())) {
                 try {
-                    conjunct.accept(queryGenerator.getConverter(), null);
+                    conjunct.accept(queryGenerator.getConverter(), new JdbcConverterContext());
                     pushable.add(conjunct);
                 }
                 catch (PrestoException pe) {
@@ -176,8 +189,8 @@ public class DataCenterPlanOptimizer
                 }
             }
             if (!pushable.isEmpty()) {
-                FilterNode pushableFilter = new FilterNode(idAllocator.getNextId(), node.getSource(), RowExpressionUtils.combineConjuncts(pushable));
-                Optional<FilterNode> nonPushableFilter = nonPushable.isEmpty() ? Optional.empty() : Optional.of(new FilterNode(idAllocator.getNextId(), pushableFilter, RowExpressionUtils.combineConjuncts(nonPushable)));
+                FilterNode pushableFilter = new FilterNode(idAllocator.getNextId(), node.getSource(), logicalRowExpressions.combineConjuncts(pushable));
+                Optional<FilterNode> nonPushableFilter = nonPushable.isEmpty() ? Optional.empty() : Optional.of(new FilterNode(idAllocator.getNextId(), pushableFilter, logicalRowExpressions.combineConjuncts(nonPushable)));
 
                 filtersSplitUp.put(pushableFilter, null);
                 if (nonPushableFilter.isPresent()) {
@@ -265,7 +278,8 @@ public class DataCenterPlanOptimizer
                     scanOutputs.add(scanSymbol);
                     columnHandles.put(scanSymbol, columns.get(aliasName));
                     assignments.put(symbol, new CallExpression(
-                            Signature.internalOperator(OperatorType.CAST, prestoType.getTypeSignature(), ImmutableList.of(dcType.getTypeSignature())),
+                            CAST.name(),
+                            functionResolution.castFunction(prestoType.getTypeSignature(), dcType.getTypeSignature()),
                             prestoType,
                             ImmutableList.of(new VariableReferenceExpression(scanSymbol.getName(), dcType)),
                             Optional.empty()));

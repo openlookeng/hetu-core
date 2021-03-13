@@ -18,15 +18,15 @@ import com.fasterxml.jackson.core.JsonToken;
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlOperator;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.annotation.UsedByGeneratedCode;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
@@ -39,8 +39,8 @@ import java.lang.invoke.MethodHandle;
 import static com.fasterxml.jackson.core.JsonToken.START_ARRAY;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.spi.StandardErrorCode.INVALID_CAST_ARGUMENT;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.Signature.typeVariable;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.util.Reflection.methodHandle;
@@ -67,20 +67,19 @@ public class JsonToArrayCast
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         checkArgument(arity == 1, "Expected arity to be 1");
         Type type = boundVariables.getTypeVariable("T");
-        ArrayType arrayType = (ArrayType) metadata.getParameterizedType(StandardTypes.ARRAY, ImmutableList.of(TypeSignatureParameter.of(type.getTypeSignature())));
+        ArrayType arrayType = (ArrayType) functionAndTypeManager.getParameterizedType(StandardTypes.ARRAY, ImmutableList.of(TypeSignatureParameter.of(type.getTypeSignature())));
         checkCondition(canCastFromJson(arrayType), INVALID_CAST_ARGUMENT, "Cannot cast JSON to %s", arrayType);
 
         BlockBuilderAppender elementAppender = BlockBuilderAppender.createBlockBuilderAppender(arrayType.getElementType());
         MethodHandle methodHandle = METHOD_HANDLE.bindTo(arrayType).bindTo(elementAppender);
-        return new ScalarFunctionImplementation(
+        return new BuiltInScalarFunctionImplementation(
                 true,
                 ImmutableList.of(valueTypeArgumentProperty(RETURN_NULL_ON_NULL)),
-                methodHandle,
-                isDeterministic());
+                methodHandle);
     }
 
     @UsedByGeneratedCode

@@ -33,6 +33,7 @@ import io.airlift.bytecode.expression.BytecodeExpression;
 import io.airlift.bytecode.instruction.LabelNode;
 import io.airlift.slice.Slice;
 import io.prestosql.Session;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.JoinHash;
 import io.prestosql.operator.JoinHashSupplier;
@@ -43,8 +44,8 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
@@ -80,6 +81,7 @@ import static io.airlift.bytecode.expression.BytecodeExpressions.constantTrue;
 import static io.airlift.bytecode.expression.BytecodeExpressions.getStatic;
 import static io.airlift.bytecode.expression.BytecodeExpressions.newInstance;
 import static io.airlift.bytecode.expression.BytecodeExpressions.notEqual;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.gen.InputReferenceCompiler.generateInputReference;
 import static io.prestosql.sql.gen.SqlTypeBytecodeExpression.constantType;
 import static io.prestosql.util.CompilerUtils.defineClass;
@@ -88,7 +90,7 @@ import static java.util.Objects.requireNonNull;
 
 public class JoinCompiler
 {
-    private final Metadata metadata;
+    private final FunctionAndTypeManager functionAndTypeManager;
 
     private final LoadingCache<CacheKey, LookupSourceSupplierFactory> lookupSourceFactories = CacheBuilder.newBuilder()
             .recordStats()
@@ -110,7 +112,7 @@ public class JoinCompiler
     @Inject
     public JoinCompiler(Metadata metadata)
     {
-        this.metadata = requireNonNull(metadata, "metadata is null");
+        this.functionAndTypeManager = requireNonNull(metadata, "metadata is null").getFunctionAndTypeManager();
     }
 
     @Managed
@@ -690,7 +692,7 @@ public class JoinCompiler
                         continue;
                 }
             }
-            ScalarFunctionImplementation operator = metadata.getScalarFunctionImplementation(metadata.resolveOperator(OperatorType.IS_DISTINCT_FROM, ImmutableList.of(type, type)));
+            BuiltInScalarFunctionImplementation operator = functionAndTypeManager.getBuiltInScalarFunctionImplementation(functionAndTypeManager.resolveOperatorFunctionHandle(OperatorType.IS_DISTINCT_FROM, fromTypes(type, type)));
             Binding binding = callSiteBinder.bind(operator.getMethodHandle());
             List<BytecodeNode> argumentsBytecode = new ArrayList<>();
             argumentsBytecode.add(generateInputReference(callSiteBinder, scope, type, leftBlock, leftBlockPosition));

@@ -24,6 +24,7 @@ import io.prestosql.metadata.LiteralFunction;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.scalar.VarbinaryFunctions;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.AbstractIntType;
@@ -33,6 +34,7 @@ import io.prestosql.spi.type.Decimals;
 import io.prestosql.spi.type.SqlDate;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.VarcharType;
 import io.prestosql.sql.tree.ArithmeticUnaryExpression;
 import io.prestosql.sql.tree.BooleanLiteral;
@@ -50,6 +52,8 @@ import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.metadata.LiteralFunction.typeForLiteralFunctionArgument;
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
+import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.DateType.DATE;
@@ -60,6 +64,7 @@ import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.SmallintType.SMALLINT;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.UnknownType.UNKNOWN;
+import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.sql.relational.Expressions.constant;
 import static io.prestosql.sql.relational.Expressions.constantNull;
@@ -69,6 +74,9 @@ import static java.util.Objects.requireNonNull;
 
 public final class LiteralEncoder
 {
+    // hack: java classes for types that can be used with magic literals
+    public static final String MAGIC_LITERAL_FUNCTION_PREFIX = "$literal$";
+
     private final Metadata metadata;
 
     public LiteralEncoder(Metadata metadata)
@@ -234,7 +242,7 @@ public final class LiteralEncoder
 
         if (object instanceof Block) {
             SliceOutput output = new DynamicSliceOutput(toIntExact(((Block) object).getSizeInBytes()));
-            BlockSerdeUtil.writeBlock(metadata.getBlockEncodingSerde(), output, (Block) object);
+            BlockSerdeUtil.writeBlock(metadata.getFunctionAndTypeManager().getBlockEncodingSerde(), output, (Block) object);
             object = output.slice();
             // This if condition will evaluate to true: object instanceof Slice && !type.equals(VARCHAR)
         }
@@ -258,8 +266,43 @@ public final class LiteralEncoder
         }
 
         return new FunctionCallBuilder(metadata)
-                .setName(QualifiedName.of(signature.getName()))
+                .setName(QualifiedName.of(signature.getNameSuffix()))
                 .addArgument(argumentType, argument)
                 .build();
+    }
+
+    public static Signature getMagicLiteralFunctionSignature(Type type)
+    {
+        TypeSignature argumentType = typeForMagicLiteral(type).getTypeSignature();
+
+        return new Signature(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, MAGIC_LITERAL_FUNCTION_PREFIX + type.getTypeSignature()),
+                SCALAR,
+                type.getTypeSignature(),
+                argumentType);
+    }
+
+    private static Type typeForMagicLiteral(Type type)
+    {
+        Class<?> clazz = type.getJavaType();
+        clazz = Primitives.unwrap(clazz);
+
+        if (clazz == long.class) {
+            return BIGINT;
+        }
+        if (clazz == double.class) {
+            return DOUBLE;
+        }
+        if (!clazz.isPrimitive()) {
+            if (type instanceof VarcharType) {
+                return type;
+            }
+            else {
+                return VARBINARY;
+            }
+        }
+        if (clazz == boolean.class) {
+            return BOOLEAN;
+        }
+        throw new IllegalArgumentException("Unhandled Java type: " + clazz.getName());
     }
 }

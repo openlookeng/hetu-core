@@ -15,13 +15,16 @@
 package io.hetu.core.plugin.hana.optimization;
 
 import io.prestosql.plugin.jdbc.optimization.BaseJdbcQueryGenerator;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.StandardFunctionResolution;
+import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpressionService;
 
 public class HanaQueryGenerator
         extends BaseJdbcQueryGenerator
 {
-    public HanaQueryGenerator(RowExpressionService rowExpressionService, HanaPushDownParameter pushDownParameter)
+    public HanaQueryGenerator(DeterminismEvaluator determinismEvaluator, RowExpressionService rowExpressionService, FunctionMetadataManager functionManager, StandardFunctionResolution functionResolution, HanaPushDownParameter pushDownParameter)
     {
-        super(pushDownParameter, new HanaRowExpressionConverter(rowExpressionService, pushDownParameter), new HanaSqlStatementWriter(pushDownParameter));
+        super(pushDownParameter, new HanaRowExpressionConverter(determinismEvaluator, rowExpressionService, functionManager, functionResolution, pushDownParameter), new HanaSqlStatementWriter(pushDownParameter));
     }
 }

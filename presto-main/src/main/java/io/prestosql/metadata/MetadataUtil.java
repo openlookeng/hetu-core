@@ -13,14 +13,17 @@
  */
 package io.prestosql.metadata;
 
+import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import io.prestosql.Session;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CatalogSchemaName;
+import io.prestosql.spi.connector.CatalogSchemaTableName;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.type.Type;
@@ -77,6 +80,21 @@ public final class MetadataUtil
         checkLowerCase(catalogName, "catalogName");
         checkLowerCase(schemaName, "schemaName");
         checkLowerCase(objectName, "objectName");
+    }
+
+    public static SchemaTableName toSchemaTableName(QualifiedObjectName qualifiedObjectName)
+    {
+        return new SchemaTableName(qualifiedObjectName.getSchemaName(), qualifiedObjectName.getObjectName());
+    }
+
+    public static CatalogSchemaTableName toCatalogSchemaTableName(QualifiedObjectName qualifiedObjectName)
+    {
+        return new CatalogSchemaTableName(qualifiedObjectName.getCatalogName(), qualifiedObjectName.getSchemaName(), qualifiedObjectName.getObjectName());
+    }
+
+    public static Function<SchemaTableName, QualifiedObjectName> convertFromSchemaTableName(String catalogName)
+    {
+        return input -> new QualifiedObjectName(catalogName, input.getSchemaName(), input.getTableName());
     }
 
     public static String checkLowerCase(String value, String name)

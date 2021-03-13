@@ -18,6 +18,7 @@ package io.hetu.core.heuristicindex.util;
 import io.airlift.slice.Slice;
 import io.hetu.core.common.util.SecurePathWhiteList;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.relation.CallExpression;
@@ -262,7 +263,14 @@ public class IndexServiceUtils
     {
         if (expression instanceof CallExpression) {
             CallExpression callExp = (CallExpression) expression;
-            Optional<OperatorType> operatorOptional = Signature.getOperatorType(((CallExpression) expression).getSignature().getName());
+            BuiltInFunctionHandle builtInFunctionHandle;
+            if (callExp.getFunctionHandle() instanceof BuiltInFunctionHandle) {
+                builtInFunctionHandle = (BuiltInFunctionHandle) callExp.getFunctionHandle();
+            }
+            else {
+                throw new UnsupportedOperationException("Unsupported function: " + callExp.getDisplayName());
+            }
+            Optional<OperatorType> operatorOptional = Signature.getOperatorType(builtInFunctionHandle.getSignature().getNameSuffix());
 
             Object value = extractValueFromRowExpression(callExp.getArguments().get(1));
 

@@ -16,6 +16,7 @@ package io.prestosql.operator.scalar;
 import com.google.common.base.Verify;
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slices;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.DriverYieldSignal;
 import io.prestosql.operator.aggregation.TypedSet;
@@ -23,9 +24,8 @@ import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
-import io.prestosql.spi.function.FunctionKind;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.ScalarFunction;
-import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.function.SqlType;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
@@ -59,6 +59,7 @@ import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggre
 import static io.prestosql.metadata.FunctionExtractor.extractFunctions;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.relational.Expressions.field;
 import static io.prestosql.testing.TestingConnectorSession.SESSION;
 
@@ -106,15 +107,18 @@ public class BenchmarkArrayDistinct
         public void setup()
         {
             Metadata metadata = createTestMetadataManager();
-            metadata.addFunctions(extractFunctions(BenchmarkArrayDistinct.class));
+            FunctionAndTypeManager functionAndTypeManager = metadata.getFunctionAndTypeManager();
+            metadata.getFunctionAndTypeManager().registerBuiltInFunctions(extractFunctions(BenchmarkArrayDistinct.class));
             ExpressionCompiler compiler = new ExpressionCompiler(metadata, new PageFunctionCompiler(metadata, 0));
             ImmutableList.Builder<RowExpression> projectionsBuilder = ImmutableList.builder();
             Block[] blocks = new Block[TYPES.size()];
             for (int i = 0; i < TYPES.size(); i++) {
                 Type elementType = TYPES.get(i);
                 ArrayType arrayType = new ArrayType(elementType);
-                Signature signature = new Signature(name, FunctionKind.SCALAR, arrayType.getTypeSignature(), arrayType.getTypeSignature());
-                projectionsBuilder.add(new CallExpression(signature, arrayType, ImmutableList.of(field(i, arrayType)), Optional.empty()));
+//                Signature signature = new Signature(QualifiedObjectName.valueOfDefaultFunction(name), FunctionKind.SCALAR, arrayType.getTypeSignature(), arrayType.getTypeSignature());
+//                projectionsBuilder.add(new CallExpression(signature.getName().toString(), new BuiltInFunctionHandle(signature), arrayType, ImmutableList.of(field(i, arrayType)), Optional.empty()));
+                FunctionHandle functionHandle = functionAndTypeManager.lookupFunction(name, fromTypes(arrayType));
+                projectionsBuilder.add(new CallExpression(name, functionHandle, arrayType, ImmutableList.of(field(i, arrayType))));
                 blocks[i] = createChannel(POSITIONS, ARRAY_SIZE, arrayType);
             }
 

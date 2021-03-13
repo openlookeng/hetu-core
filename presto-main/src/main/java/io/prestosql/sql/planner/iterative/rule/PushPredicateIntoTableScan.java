@@ -40,7 +40,6 @@ import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
-import io.prestosql.spi.sql.RowExpressionUtils;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.ExpressionDomainTranslator;
 import io.prestosql.sql.planner.ExpressionInterpreter;
@@ -53,6 +52,7 @@ import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.VariableResolver;
 import io.prestosql.sql.planner.iterative.Rule;
+import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
 import io.prestosql.sql.relational.RowExpressionDomainTranslator;
 import io.prestosql.sql.tree.Expression;
@@ -70,9 +70,9 @@ import java.util.stream.Collectors;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Sets.intersection;
+import static io.prestosql.expressions.LogicalRowExpressions.TRUE_CONSTANT;
 import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.metadata.TableLayoutResult.computeEnforced;
-import static io.prestosql.spi.sql.RowExpressionUtils.TRUE_CONSTANT;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
 import static io.prestosql.sql.ExpressionUtils.extractDisjuncts;
 import static io.prestosql.sql.ExpressionUtils.filterDeterministicConjuncts;
@@ -202,7 +202,7 @@ public class PushPredicateIntoTableScan
             boolean pushPartitionsOnly)
     {
         // don't include non-deterministic predicates
-        LogicalRowExpressions logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata));
+        LogicalRowExpressions logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata), new FunctionResolution(metadata.getFunctionAndTypeManager()), metadata.getFunctionAndTypeManager());
         RowExpression deterministicPredicate = logicalRowExpressions.filterDeterministicConjuncts(predicate);
         RowExpressionDomainTranslator.ExtractionResult<VariableReferenceExpression> decomposedPredicate =
                 domainTranslator.fromPredicate(session.toConnectorSession(), deterministicPredicate);
@@ -219,7 +219,7 @@ public class PushPredicateIntoTableScan
         List<Constraint> disjunctConstraints = ImmutableList.of();
 
         if (!pushPartitionsOnly) {
-            List<RowExpression> orSet = RowExpressionUtils.extractDisjuncts(decomposedPredicate.getRemainingExpression());
+            List<RowExpression> orSet = LogicalRowExpressions.extractDisjuncts(decomposedPredicate.getRemainingExpression());
             List<RowExpressionDomainTranslator.ExtractionResult<VariableReferenceExpression>> disjunctPredicates = orSet.stream()
                     .map(e -> domainTranslator.fromPredicate(session.toConnectorSession(), e))
                     .collect(Collectors.toList());
@@ -242,7 +242,7 @@ public class PushPredicateIntoTableScan
                     metadata,
                     session,
                     node.getAssignments(),
-                    RowExpressionUtils.combineConjuncts(
+                    logicalRowExpressions.combineConjuncts(
                             deterministicPredicate,
                             // Simplify the tuple domain to avoid creating an expression with too many nodes,
                             // which would be expensive to evaluate in the call to isCandidate below.
@@ -323,14 +323,15 @@ public class PushPredicateIntoTableScan
         // * Short of implementing the previous bullet point, the current order of non-deterministic expressions
         //   and non-TupleDomain-expressible expressions should be retained. Changing the order can lead
         //   to failures of previously successful queries.
+
         RowExpression resultingPredicate;
         if (remainingFilter.isAll() && newTable.getConnectorHandle().hasDisjunctFiltersPushdown()) {
-            resultingPredicate = RowExpressionUtils.combineConjuncts(
+            resultingPredicate = logicalRowExpressions.combineConjuncts(
                     domainTranslator.toPredicate(remainingFilter.transform(assignments::get), planSymbolAllocator.getSymbols()),
                     logicalRowExpressions.filterNonDeterministicConjuncts(predicate));
         }
         else {
-            resultingPredicate = RowExpressionUtils.combineConjuncts(
+            resultingPredicate = logicalRowExpressions.combineConjuncts(
                     domainTranslator.toPredicate(remainingFilter.transform(assignments::get), planSymbolAllocator.getSymbols()),
                     logicalRowExpressions.filterNonDeterministicConjuncts(predicate),
                     decomposedPredicate.getRemainingExpression());

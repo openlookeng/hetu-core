@@ -245,7 +245,7 @@ public class BenchmarkScanFilterAndProjectOperator
                     SCALAR,
                     TYPE_ANALYZER.getTypes(TEST_SESSION, TypeProvider.copyOf(symbolTypes), expression),
                     sourceLayout,
-                    METADATA,
+                    METADATA.getFunctionAndTypeManager(),
                     TEST_SESSION,
                     true);
         }

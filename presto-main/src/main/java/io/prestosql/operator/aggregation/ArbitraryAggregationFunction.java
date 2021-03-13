@@ -16,7 +16,7 @@ package io.prestosql.operator.aggregation;
 import com.google.common.collect.ImmutableList;
 import io.airlift.bytecode.DynamicClassLoader;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlAggregationFunction;
 import io.prestosql.operator.aggregation.AggregationMetadata.AccumulatorStateDescriptor;
 import io.prestosql.operator.aggregation.state.BlockPositionState;
@@ -81,7 +81,7 @@ public class ArbitraryAggregationFunction
     }
 
     @Override
-    public InternalAggregationFunction specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public InternalAggregationFunction specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         Type valueType = boundVariables.getTypeVariable("T");
         return generateAggregation(valueType);

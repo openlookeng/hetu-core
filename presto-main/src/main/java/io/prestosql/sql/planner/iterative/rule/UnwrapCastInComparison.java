@@ -18,7 +18,7 @@ import io.prestosql.SystemSessionProperties;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.OperatorNotFoundException;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.predicate.Utils;
 import io.prestosql.spi.type.BooleanType;
 import io.prestosql.spi.type.DecimalType;
@@ -40,6 +40,7 @@ import io.prestosql.type.TypeCoercion;
 
 import java.util.Optional;
 
+import static io.prestosql.metadata.CastType.CAST;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
@@ -127,7 +128,7 @@ public class UnwrapCastInComparison
             this.typeAnalyzer = requireNonNull(typeAnalyzer, "typeAnalyzer is null");
             this.session = requireNonNull(session, "session is null");
             this.types = requireNonNull(types, "types is null");
-            this.functionInvoker = new InterpretedFunctionInvoker(metadata);
+            this.functionInvoker = new InterpretedFunctionInvoker(metadata.getFunctionAndTypeManager());
             this.literalEncoder = new LiteralEncoder(metadata);
         }
 
@@ -178,7 +179,7 @@ public class UnwrapCastInComparison
                 return expression;
             }
 
-            Signature sourceToTarget = metadata.getCoercion(sourceType.getTypeSignature(), targetType.getTypeSignature());
+            FunctionHandle sourceToTarget = metadata.getFunctionAndTypeManager().lookupCast(CAST, sourceType.getTypeSignature(), targetType.getTypeSignature());
 
             Optional<Type.Range> sourceRange = sourceType.getRange();
             if (sourceRange.isPresent()) {
@@ -267,9 +268,9 @@ public class UnwrapCastInComparison
                 }
             }
 
-            Signature targetToSource;
+            FunctionHandle targetToSource;
             try {
-                targetToSource = metadata.getCoercion(targetType.getTypeSignature(), sourceType.getTypeSignature());
+                targetToSource = metadata.getFunctionAndTypeManager().lookupCast(CAST, targetType.getTypeSignature(), sourceType.getTypeSignature());
             }
             catch (OperatorNotFoundException e) {
                 // Without a cast between target -> source, there's nothing more we can do
@@ -375,7 +376,7 @@ public class UnwrapCastInComparison
             return new TypeCoercion(metadata::getType).canCoerce(source, target);
         }
 
-        private Object coerce(Object value, Signature coercion)
+        private Object coerce(Object value, FunctionHandle coercion)
         {
             return functionInvoker.invoke(coercion, session.toConnectorSession(), value);
         }

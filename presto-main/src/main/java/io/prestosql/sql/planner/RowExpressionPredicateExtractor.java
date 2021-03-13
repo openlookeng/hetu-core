@@ -27,7 +27,6 @@ import io.prestosql.expressions.LogicalRowExpressions;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.OperatorNotFoundException;
 import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
@@ -43,7 +42,6 @@ import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
-import io.prestosql.spi.sql.RowExpressionUtils;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
@@ -52,6 +50,7 @@ import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SortNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
+import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
 import io.prestosql.sql.relational.RowExpressionDomainTranslator;
 import io.prestosql.type.InternalTypeManager;
@@ -68,11 +67,12 @@ import java.util.function.Function;
 
 import static com.google.common.base.Predicates.in;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.expressions.LogicalRowExpressions.TRUE_CONSTANT;
+import static io.prestosql.expressions.LogicalRowExpressions.extractConjuncts;
 import static io.prestosql.spi.function.OperatorType.EQUAL;
 import static io.prestosql.spi.relation.SpecialForm.Form.IS_NULL;
-import static io.prestosql.spi.sql.RowExpressionUtils.TRUE_CONSTANT;
-import static io.prestosql.spi.sql.RowExpressionUtils.extractConjuncts;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.planner.VariableReferenceSymbolConverter.toVariableReference;
 import static io.prestosql.sql.planner.VariableReferenceSymbolConverter.toVariableReferenceMap;
 import static io.prestosql.sql.planner.VariableReferenceSymbolConverter.toVariableReferences;
@@ -87,14 +87,16 @@ public class RowExpressionPredicateExtractor
     private final Metadata metadata;
     private final PlanSymbolAllocator planSymbolAllocator;
     private final boolean useTableProperties;
+    private final LogicalRowExpressions logicalRowExpressions;
 
     public RowExpressionPredicateExtractor(RowExpressionDomainTranslator domainTranslator, Metadata metadata, PlanSymbolAllocator planSymbolAllocator, boolean useTableProperties)
     {
         this.domainTranslator = requireNonNull(domainTranslator, "domainTranslator is null");
         this.metadata = metadata;
-        this.typeManager = new InternalTypeManager(metadata);
+        this.typeManager = new InternalTypeManager(metadata.getFunctionAndTypeManager());
         this.planSymbolAllocator = planSymbolAllocator;
         this.useTableProperties = useTableProperties;
+        this.logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata), new FunctionResolution(metadata.getFunctionAndTypeManager()), metadata.getFunctionAndTypeManager());
     }
 
     public RowExpression extract(PlanNode node, Session session)
@@ -115,14 +117,14 @@ public class RowExpressionPredicateExtractor
         private final boolean useTableProperties;
 
         public Visitor(RowExpressionDomainTranslator domainTranslator, Metadata metadata, Session session, TypeManager typeManager,
-                       PlanSymbolAllocator planSymbolAllocator, boolean useTableProperties)
+                PlanSymbolAllocator planSymbolAllocator, boolean useTableProperties)
         {
             this.domainTranslator = requireNonNull(domainTranslator, "domainTranslator is null");
             this.metadata = metadata;
             this.session = session;
             this.typeManager = requireNonNull(typeManager);
             this.determinismEvaluator = new RowExpressionDeterminismEvaluator(metadata);
-            this.logicalRowExpressions = new LogicalRowExpressions(determinismEvaluator);
+            this.logicalRowExpressions = new LogicalRowExpressions(determinismEvaluator, new FunctionResolution(metadata.getFunctionAndTypeManager()), metadata.getFunctionAndTypeManager());
             this.planSymbolAllocator = planSymbolAllocator;
             this.useTableProperties = useTableProperties;
         }
@@ -160,7 +162,7 @@ public class RowExpressionPredicateExtractor
             // Remove non-deterministic conjuncts
             predicate = logicalRowExpressions.filterDeterministicConjuncts(predicate);
 
-            return RowExpressionUtils.combineConjuncts(predicate, underlyingPredicate);
+            return logicalRowExpressions.combineConjuncts(predicate, underlyingPredicate);
         }
 
         @Override
@@ -192,7 +194,7 @@ public class RowExpressionPredicateExtractor
                     .map(this::toEquality)
                     .collect(toImmutableList());
 
-            return pullExpressionThroughVariables(RowExpressionUtils.combineConjuncts(
+            return pullExpressionThroughVariables(logicalRowExpressions.combineConjuncts(
                     ImmutableList.<RowExpression>builder()
                             .addAll(projectionEqualities)
                             .add(underlyingPredicate)
@@ -290,26 +292,26 @@ public class RowExpressionPredicateExtractor
 
             switch (node.getType()) {
                 case INNER:
-                    return pullExpressionThroughVariables(RowExpressionUtils.combineConjuncts(ImmutableList.<RowExpression>builder()
+                    return pullExpressionThroughVariables(logicalRowExpressions.combineConjuncts(ImmutableList.<RowExpression>builder()
                             .add(leftPredicate)
                             .add(rightPredicate)
-                            .add(RowExpressionUtils.combineConjuncts(joinConjuncts))
+                            .add(logicalRowExpressions.combineConjuncts(joinConjuncts))
                             .add(node.getFilter().orElse(TRUE_CONSTANT))
                             .build()), nodeOutput);
                 case LEFT:
-                    return RowExpressionUtils.combineConjuncts(ImmutableList.<RowExpression>builder()
+                    return logicalRowExpressions.combineConjuncts(ImmutableList.<RowExpression>builder()
                             .add(pullExpressionThroughVariables(leftPredicate, nodeOutput))
                             .addAll(pullNullableConjunctsThroughOuterJoin(extractConjuncts(rightPredicate), nodeOutput, nodeRightOutput::contains))
                             .addAll(pullNullableConjunctsThroughOuterJoin(joinConjuncts, nodeOutput, nodeRightOutput::contains))
                             .build());
                 case RIGHT:
-                    return RowExpressionUtils.combineConjuncts(ImmutableList.<RowExpression>builder()
+                    return logicalRowExpressions.combineConjuncts(ImmutableList.<RowExpression>builder()
                             .add(pullExpressionThroughVariables(rightPredicate, nodeOutput))
                             .addAll(pullNullableConjunctsThroughOuterJoin(extractConjuncts(leftPredicate), nodeOutput, nodeLeftOutput::contains))
                             .addAll(pullNullableConjunctsThroughOuterJoin(joinConjuncts, nodeOutput, nodeLeftOutput::contains))
                             .build());
                 case FULL:
-                    return RowExpressionUtils.combineConjuncts(ImmutableList.<RowExpression>builder()
+                    return logicalRowExpressions.combineConjuncts(ImmutableList.<RowExpression>builder()
                             .addAll(pullNullableConjunctsThroughOuterJoin(extractConjuncts(leftPredicate), nodeOutput, nodeLeftOutput::contains))
                             .addAll(pullNullableConjunctsThroughOuterJoin(extractConjuncts(rightPredicate), nodeOutput, nodeRightOutput::contains))
                             .addAll(pullNullableConjunctsThroughOuterJoin(joinConjuncts, nodeOutput, nodeLeftOutput::contains, nodeRightOutput::contains))
@@ -349,10 +351,10 @@ public class RowExpressionPredicateExtractor
                         nullConjuncts.add(specialForm(IS_NULL, BOOLEAN, variable));
                     }
 
-                    resultDisjunct.add(logicalRowExpressions.and(nullConjuncts.build()));
+                    resultDisjunct.add(LogicalRowExpressions.and(nullConjuncts.build()));
                 }
 
-                return RowExpressionUtils.or(resultDisjunct.build());
+                return LogicalRowExpressions.or(resultDisjunct.build());
             };
         }
 
@@ -374,12 +376,12 @@ public class RowExpressionPredicateExtractor
 
             switch (node.getType()) {
                 case INNER:
-                    return RowExpressionUtils.combineConjuncts(ImmutableList.<RowExpression>builder()
+                    return logicalRowExpressions.combineConjuncts(ImmutableList.<RowExpression>builder()
                             .add(pullExpressionThroughVariables(leftPredicate, nodeOutput))
                             .add(pullExpressionThroughVariables(rightPredicate, nodeOutput))
                             .build());
                 case LEFT:
-                    return RowExpressionUtils.combineConjuncts(ImmutableList.<RowExpression>builder()
+                    return logicalRowExpressions.combineConjuncts(ImmutableList.<RowExpression>builder()
                             .add(pullExpressionThroughVariables(leftPredicate, nodeOutput))
                             .addAll(pullNullableConjunctsThroughOuterJoin(extractConjuncts(rightPredicate), nodeOutput, nodeRightOutput::contains))
                             .build());
@@ -392,7 +394,7 @@ public class RowExpressionPredicateExtractor
         {
             RowExpression left = toVariableReference(equiJoinClause.getLeft(), planSymbolAllocator.getTypes());
             RowExpression right = toVariableReference(equiJoinClause.getRight(), planSymbolAllocator.getTypes());
-            return buildEqualsExpression(left, right);
+            return buildEqualsExpression(metadata, left, right);
         }
 
         private RowExpression deriveCommonPredicates(PlanNode node, Function<Integer, Collection<Map.Entry<VariableReferenceExpression, VariableReferenceExpression>>> mapping)
@@ -408,7 +410,7 @@ public class RowExpressionPredicateExtractor
                         .map(this::toEquality)
                         .collect(toImmutableList());
 
-                sourceOutputConjuncts.add(ImmutableSet.copyOf(extractConjuncts(pullExpressionThroughVariables(RowExpressionUtils.combineConjuncts(
+                sourceOutputConjuncts.add(ImmutableSet.copyOf(extractConjuncts(pullExpressionThroughVariables(logicalRowExpressions.combineConjuncts(
                         ImmutableList.<RowExpression>builder()
                                 .addAll(equalities)
                                 .add(underlyingPredicate)
@@ -424,7 +426,7 @@ public class RowExpressionPredicateExtractor
                 potentialOutputConjuncts = Sets.intersection(potentialOutputConjuncts, iterator.next());
             }
 
-            return RowExpressionUtils.combineConjuncts(potentialOutputConjuncts);
+            return logicalRowExpressions.combineConjuncts(potentialOutputConjuncts);
         }
 
         private boolean notIdentityAssignment(Map.Entry<VariableReferenceExpression, ? extends RowExpression> entry)
@@ -435,7 +437,7 @@ public class RowExpressionPredicateExtractor
         private boolean canCompareEquity(Map.Entry<VariableReferenceExpression, ? extends RowExpression> entry)
         {
             try {
-                metadata.resolveOperator(EQUAL, ImmutableList.of(entry.getKey().getType(), entry.getValue().getType()));
+                metadata.getFunctionAndTypeManager().resolveOperator(EQUAL, ImmutableList.of(entry.getKey().getType(), entry.getValue().getType()));
                 return true;
             }
             catch (OperatorNotFoundException e) {
@@ -445,13 +447,12 @@ public class RowExpressionPredicateExtractor
 
         private RowExpression toEquality(Map.Entry<VariableReferenceExpression, ? extends RowExpression> entry)
         {
-            return buildEqualsExpression(entry.getKey(), entry.getValue());
+            return buildEqualsExpression(metadata, entry.getKey(), entry.getValue());
         }
 
-        private static CallExpression buildEqualsExpression(RowExpression left, RowExpression right)
+        private static CallExpression buildEqualsExpression(Metadata metadata, RowExpression left, RowExpression right)
         {
-            Signature signature = Signature.internalOperator(EQUAL, BOOLEAN, ImmutableList.of(left.getType(), right.getType()));
-            return call(signature, BOOLEAN, left, right);
+            return call(EQUAL.name(), metadata.getFunctionAndTypeManager().resolveOperatorFunctionHandle(EQUAL, fromTypes(left.getType(), right.getType())), BOOLEAN, left, right);
         }
 
         private RowExpression pullExpressionThroughVariables(RowExpression expression, Collection<VariableReferenceExpression> variables)
@@ -472,7 +473,7 @@ public class RowExpressionPredicateExtractor
 
             effectiveConjuncts.addAll(equalityInference.generateEqualitiesPartitionedBy(in(variables)).getScopeEqualities());
 
-            return RowExpressionUtils.combineConjuncts(effectiveConjuncts.build());
+            return logicalRowExpressions.combineConjuncts(effectiveConjuncts.build());
         }
     }
 }

@@ -149,6 +149,7 @@
         <module>hetu-server-rpm</module>
         <module>hetu-common</module>
         <module>hetu-hazelcast</module>
+        <module>hetu-function-namespace-managers</module>
     </modules>
 
     <dependencyManagement>

@@ -19,13 +19,14 @@ import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.Assignments;
 import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.LambdaDefinitionExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
@@ -213,15 +214,21 @@ public class PushPartialAggregationThroughExchange
         Map<Symbol, AggregationNode.Aggregation> finalAggregation = new LinkedHashMap<>();
         for (Map.Entry<Symbol, AggregationNode.Aggregation> entry : node.getAggregations().entrySet()) {
             AggregationNode.Aggregation originalAggregation = entry.getValue();
-            Signature signature = originalAggregation.getSignature();
-            InternalAggregationFunction function = metadata.getAggregateFunctionImplementation(signature);
-            Symbol intermediateSymbol = context.getSymbolAllocator().newSymbol(signature.getName(), function.getIntermediateType());
+            String functionName = metadata.getFunctionAndTypeManager().getFunctionMetadata(originalAggregation.getFunctionHandle()).getName().getObjectName();
+            FunctionHandle functionHandle = originalAggregation.getFunctionHandle();
+            InternalAggregationFunction function = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(functionHandle);
+            Symbol intermediateSymbol = context.getSymbolAllocator().newSymbol(functionName, function.getIntermediateType());
 
             checkState(!originalAggregation.getOrderingScheme().isPresent(), "Aggregate with ORDER BY does not support partial aggregation");
             intermediateAggregation.put(
                     intermediateSymbol,
                     new AggregationNode.Aggregation(
-                            signature,
+                            new CallExpression(
+                                    functionName,
+                                    functionHandle,
+                                    function.getIntermediateType(),
+                                    originalAggregation.getArguments(),
+                                    Optional.empty()),
                             originalAggregation.getArguments(),
                             originalAggregation.isDistinct(),
                             originalAggregation.getFilter(),
@@ -232,7 +239,18 @@ public class PushPartialAggregationThroughExchange
             finalAggregation.put(
                     entry.getKey(),
                     new AggregationNode.Aggregation(
-                            signature,
+                            new CallExpression(
+                                    functionName,
+                                    functionHandle,
+                                    function.getFinalType(),
+                                    ImmutableList.<RowExpression>builder()
+                                            .add(new VariableReferenceExpression(intermediateSymbol.getName(), function.getIntermediateType()))
+                                            .addAll(originalAggregation.getArguments()
+                                                    .stream()
+                                                    .filter(PushPartialAggregationThroughExchange::isLambda)
+                                                    .collect(toImmutableList()))
+                                            .build(),
+                                    Optional.empty()),
                             ImmutableList.<RowExpression>builder()
                                     .add(new VariableReferenceExpression(intermediateSymbol.getName(), function.getIntermediateType()))
                                     .addAll(originalAggregation.getArguments().stream()

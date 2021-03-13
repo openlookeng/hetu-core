@@ -17,28 +17,32 @@ import io.airlift.bytecode.BytecodeBlock;
 import io.airlift.bytecode.BytecodeNode;
 import io.airlift.bytecode.Variable;
 import io.airlift.bytecode.instruction.LabelNode;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.tree.ComparisonExpression.Operator;
+import io.prestosql.sql.analyzer.TypeSignatureProvider;
 
 import java.util.List;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static io.prestosql.spi.function.OperatorType.GREATER_THAN_OR_EQUAL;
+import static io.prestosql.spi.function.OperatorType.LESS_THAN_OR_EQUAL;
 import static io.prestosql.spi.relation.SpecialForm.Form.AND;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.sql.gen.BytecodeUtils.ifWasNullPopAndGoto;
 import static io.prestosql.sql.gen.RowExpressionCompiler.createTempVariableReferenceExpression;
 import static io.prestosql.sql.relational.Expressions.call;
-import static io.prestosql.sql.relational.Signatures.comparisonExpressionSignature;
 
 public class BetweenCodeGenerator
         implements BytecodeGenerator
 {
     @Override
-    public BytecodeNode generateExpression(Signature signature, BytecodeGeneratorContext generatorContext, Type returnType, List<RowExpression> arguments)
+    public BytecodeNode generateExpression(FunctionHandle functionHandle, BytecodeGeneratorContext generatorContext, Type returnType, List<RowExpression> arguments)
     {
+        checkArgument(functionHandle == null, "functionHandle is null here");
+
         RowExpression value = arguments.get(0);
         RowExpression min = arguments.get(1);
         RowExpression max = arguments.get(2);
@@ -50,12 +54,14 @@ public class BetweenCodeGenerator
                 AND,
                 BOOLEAN,
                 call(
-                        comparisonExpressionSignature(Operator.GREATER_THAN_OR_EQUAL, value.getType(), min.getType()),
+                        GREATER_THAN_OR_EQUAL.getFunctionName().getObjectName(),
+                        generatorContext.getFunctionManager().resolveOperatorFunctionHandle(GREATER_THAN_OR_EQUAL, TypeSignatureProvider.fromTypes(value.getType(), min.getType())),
                         BOOLEAN,
                         valueReference,
                         min),
                 call(
-                        comparisonExpressionSignature(Operator.LESS_THAN_OR_EQUAL, value.getType(), max.getType()),
+                        LESS_THAN_OR_EQUAL.getFunctionName().getObjectName(),
+                        generatorContext.getFunctionManager().resolveOperatorFunctionHandle(LESS_THAN_OR_EQUAL, TypeSignatureProvider.fromTypes(value.getType(), min.getType())),
                         BOOLEAN,
                         valueReference,
                         max));

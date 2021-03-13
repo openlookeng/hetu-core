@@ -18,8 +18,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.spi.function.FunctionKind;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.metadata.FunctionAndTypeManager;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.Assignments;
 import io.prestosql.spi.plan.FilterNode;
@@ -28,6 +28,7 @@ import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.SymbolsExtractor;
@@ -37,6 +38,7 @@ import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.AssignmentUtils;
 import io.prestosql.sql.planner.plan.InternalPlanVisitor;
+import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.ComparisonExpression;
@@ -100,6 +102,14 @@ public class TransformCorrelatedInPredicateToJoin
 {
     private static final Pattern<ApplyNode> PATTERN = applyNode()
             .with(nonEmpty(correlation()));
+
+    private final StandardFunctionResolution functionResolution;
+
+    public TransformCorrelatedInPredicateToJoin(FunctionAndTypeManager functionAndTypeManager)
+    {
+        requireNonNull(functionAndTypeManager, "functionManager is null");
+        this.functionResolution = new FunctionResolution(functionAndTypeManager);
+    }
 
     @Override
     public Pattern<ApplyNode> getPattern()
@@ -258,10 +268,15 @@ public class TransformCorrelatedInPredicateToJoin
                 ImmutableMap.of());
     }
 
-    private static AggregationNode.Aggregation countWithFilter(Symbol filter)
+    private AggregationNode.Aggregation countWithFilter(Symbol filter)
     {
         return new AggregationNode.Aggregation(
-                new Signature("count", FunctionKind.AGGREGATE, BIGINT.getTypeSignature()),
+                new CallExpression(
+                        "count",
+                        functionResolution.countFunction(),
+                        BIGINT,
+                        ImmutableList.of(),
+                        Optional.empty()),
                 ImmutableList.of(),
                 false,
                 Optional.of(filter),

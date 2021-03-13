@@ -18,15 +18,24 @@ import com.google.inject.Module;
 import io.airlift.bootstrap.Bootstrap;
 import io.prestosql.plugin.base.jmx.MBeanServerModule;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
+import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorContext;
 import io.prestosql.spi.connector.ConnectorFactory;
 import io.prestosql.spi.connector.ConnectorHandleResolver;
+import io.prestosql.spi.function.ExternalFunctionHub;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.SqlInvokedFunction;
+import io.prestosql.spi.function.StandardFunctionResolution;
+import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.type.TypeManager;
 import org.weakref.jmx.guice.MBeanModule;
 
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiFunction;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
@@ -39,13 +48,15 @@ public class JdbcConnectorFactory
     private final String name;
     private final Module module;
     private final ClassLoader classLoader;
+    private final Optional<ExternalFunctionHub> externalFunctionHubOptional;
 
-    public JdbcConnectorFactory(String name, Module module, ClassLoader classLoader)
+    public JdbcConnectorFactory(String name, Module module, ClassLoader classLoader, Optional<ExternalFunctionHub> externalFunctionHubOptional)
     {
         checkArgument(!isNullOrEmpty(name), "name is null or empty");
         this.name = name;
         this.module = requireNonNull(module, "module is null");
         this.classLoader = requireNonNull(classLoader, "classLoader is null");
+        this.externalFunctionHubOptional = requireNonNull(externalFunctionHubOptional, "externalFunctionHubOptional is null");
     }
 
     @Override
@@ -67,8 +78,13 @@ public class JdbcConnectorFactory
 
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             Bootstrap app = new Bootstrap(
-                    binder -> binder.bind(TypeManager.class).toInstance(context.getTypeManager()),
-                    binder -> binder.bind(RowExpressionService.class).toInstance(context.getRowExpressionService()),
+                    binder -> {
+                        binder.bind(FunctionMetadataManager.class).toInstance(context.getFunctionMetadataManager());
+                        binder.bind(StandardFunctionResolution.class).toInstance(context.getStandardFunctionResolution());
+                        binder.bind(TypeManager.class).toInstance(context.getTypeManager());
+                        binder.bind(RowExpressionService.class).toInstance(context.getRowExpressionService());
+                        binder.bind(DeterminismEvaluator.class).toInstance(context.getRowExpressionService().getDeterminismEvaluator());
+                    },
                     new JdbcModule(catalogName),
                     new MBeanServerModule(),
                     new MBeanModule(),
@@ -80,6 +96,16 @@ public class JdbcConnectorFactory
                     .quiet()
                     .setRequiredConfigurationProperties(requiredConfig)
                     .initialize();
+
+            FunctionMetadataManager functionMetadataManager = context.getFunctionMetadataManager();
+            BaseJdbcConfig baseJdbcConfig = injector.getInstance(BaseJdbcConfig.class);
+            Optional<CatalogSchemaName> catalogSchemaName = baseJdbcConfig.getConnectorRegistryFunctionNamespace();
+            Optional<BiFunction<ExternalFunctionHub, CatalogSchemaName, Set<SqlInvokedFunction>>> functionOptional = context.getExternalParserFunction();
+            if (functionOptional.isPresent() && externalFunctionHubOptional.isPresent() && catalogSchemaName.isPresent()) {
+                for (SqlInvokedFunction sqlInvokedFunction : functionOptional.get().apply(externalFunctionHubOptional.get(), catalogSchemaName.get())) {
+                    functionMetadataManager.createFunction(sqlInvokedFunction, true);
+                }
+            }
 
             return injector.getInstance(JdbcConnector.class);
         }

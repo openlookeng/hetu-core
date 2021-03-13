@@ -15,6 +15,7 @@ package io.prestosql.operator.scalar;
 
 import com.google.common.base.Verify;
 import com.google.common.collect.ImmutableList;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.DriverYieldSignal;
 import io.prestosql.operator.project.PageProcessor;
@@ -22,8 +23,7 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
-import io.prestosql.spi.function.FunctionKind;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.InputReferenceExpression;
@@ -62,6 +62,8 @@ import static io.prestosql.spi.function.OperatorType.GREATER_THAN;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypeSignatures;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.testing.TestingConnectorSession.SESSION;
 
 @SuppressWarnings("MethodMayBeStatic")
@@ -106,6 +108,7 @@ public class BenchmarkArrayTransform
         public void setup()
         {
             Metadata metadata = createTestMetadataManager();
+            FunctionAndTypeManager functionAndTypeManager = metadata.getFunctionAndTypeManager();
             ExpressionCompiler compiler = new ExpressionCompiler(metadata, new PageFunctionCompiler(metadata, 0));
             ImmutableList.Builder<RowExpression> projectionsBuilder = ImmutableList.builder();
             Block[] blocks = new Block[TYPES.size()];
@@ -113,15 +116,15 @@ public class BenchmarkArrayTransform
             for (int i = 0; i < TYPES.size(); i++) {
                 Type elementType = TYPES.get(i);
                 ArrayType arrayType = new ArrayType(elementType);
-                Signature signature = new Signature("transform", FunctionKind.SCALAR, returnType.getTypeSignature(), arrayType.getTypeSignature(), parseTypeSignature("function(bigint,boolean)"));
-                Signature greaterThan = new Signature("$operator$" + GREATER_THAN.name(), FunctionKind.SCALAR, BOOLEAN.getTypeSignature(), BIGINT.getTypeSignature(), BIGINT.getTypeSignature());
-                projectionsBuilder.add(new CallExpression(signature, returnType, ImmutableList.of(
+                FunctionHandle functionHandle = functionAndTypeManager.lookupFunction("transform", fromTypeSignatures(arrayType.getTypeSignature(), parseTypeSignature("function(bigint,boolean)")));
+                FunctionHandle greaterThan = functionAndTypeManager.resolveOperatorFunctionHandle(GREATER_THAN, fromTypes(BIGINT, BIGINT));
+                projectionsBuilder.add(new CallExpression("transform", functionHandle, returnType, ImmutableList.of(
                         new InputReferenceExpression(0, arrayType),
                         new LambdaDefinitionExpression(
                                 ImmutableList.of(BIGINT),
                                 ImmutableList.of("x"),
-                                new CallExpression(greaterThan, BOOLEAN, ImmutableList.of(new VariableReferenceExpression("x", BIGINT), new ConstantExpression(0L, BIGINT)), Optional.empty()))),
-                        Optional.empty()));
+                                new CallExpression(GREATER_THAN.name(), greaterThan, BOOLEAN, ImmutableList.of(new VariableReferenceExpression("x", BIGINT), new ConstantExpression(0L, BIGINT)))))));
+
                 blocks[i] = createChannel(POSITIONS, ARRAY_SIZE, arrayType);
             }
 

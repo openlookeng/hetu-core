@@ -28,41 +28,41 @@ import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 /**
  * Convert RowExpression to a formatted String used for make a sql statement in PushDown
  */
-public interface RowExpressionConverter
-        extends RowExpressionVisitor<String, Void>
+public interface RowExpressionConverter<C>
+        extends RowExpressionVisitor<String, C>
 {
     @Override
-    default String visitCall(CallExpression call, Void context)
+    default String visitCall(CallExpression call, C context)
     {
         throw new PrestoException(NOT_SUPPORTED, "Not support convert CallExpression");
     }
 
     @Override
-    default String visitSpecialForm(SpecialForm specialForm, Void context)
+    default String visitSpecialForm(SpecialForm specialForm, C context)
     {
         throw new PrestoException(NOT_SUPPORTED, "Not support convert SpecialForm");
     }
 
     @Override
-    default String visitConstant(ConstantExpression literal, Void context)
+    default String visitConstant(ConstantExpression literal, C context)
     {
         throw new PrestoException(NOT_SUPPORTED, "Not support convert ConstantExpression");
     }
 
     @Override
-    default String visitVariableReference(VariableReferenceExpression reference, Void context)
+    default String visitVariableReference(VariableReferenceExpression reference, C context)
     {
         throw new PrestoException(NOT_SUPPORTED, "Not support convert VariableReference");
     }
 
     @Override
-    default String visitInputReference(InputReferenceExpression reference, Void context)
+    default String visitInputReference(InputReferenceExpression reference, C context)
     {
         throw new PrestoException(NOT_SUPPORTED, "Not support convert InputReference");
     }
 
     @Override
-    default String visitLambda(LambdaDefinitionExpression lambda, Void context)
+    default String visitLambda(LambdaDefinitionExpression lambda, C context)
     {
         throw new PrestoException(NOT_SUPPORTED, "Not support convert Lambda");
     }

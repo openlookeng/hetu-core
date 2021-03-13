@@ -76,11 +76,13 @@ import io.prestosql.sql.tree.ExplainFormat;
 import io.prestosql.sql.tree.ExplainOption;
 import io.prestosql.sql.tree.ExplainType;
 import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.ExternalBodyReference;
 import io.prestosql.sql.tree.Extract;
 import io.prestosql.sql.tree.FetchFirst;
 import io.prestosql.sql.tree.Format;
 import io.prestosql.sql.tree.FrameBound;
 import io.prestosql.sql.tree.FunctionCall;
+import io.prestosql.sql.tree.FunctionProperty;
 import io.prestosql.sql.tree.GenericLiteral;
 import io.prestosql.sql.tree.Grant;
 import io.prestosql.sql.tree.GrantRoles;
@@ -137,10 +139,12 @@ import io.prestosql.sql.tree.RenameIndex;
 import io.prestosql.sql.tree.RenameSchema;
 import io.prestosql.sql.tree.RenameTable;
 import io.prestosql.sql.tree.ResetSession;
+import io.prestosql.sql.tree.Return;
 import io.prestosql.sql.tree.Revoke;
 import io.prestosql.sql.tree.RevokeRoles;
 import io.prestosql.sql.tree.Rollback;
 import io.prestosql.sql.tree.Rollup;
+import io.prestosql.sql.tree.RoutineCharacteristics;
 import io.prestosql.sql.tree.Row;
 import io.prestosql.sql.tree.SampledRelation;
 import io.prestosql.sql.tree.SearchedCaseExpression;
@@ -154,6 +158,7 @@ import io.prestosql.sql.tree.ShowCatalogs;
 import io.prestosql.sql.tree.ShowColumns;
 import io.prestosql.sql.tree.ShowCreate;
 import io.prestosql.sql.tree.ShowCubes;
+import io.prestosql.sql.tree.ShowExternalFunction;
 import io.prestosql.sql.tree.ShowFunctions;
 import io.prestosql.sql.tree.ShowGrants;
 import io.prestosql.sql.tree.ShowIndex;
@@ -167,6 +172,7 @@ import io.prestosql.sql.tree.SimpleCaseExpression;
 import io.prestosql.sql.tree.SimpleGroupBy;
 import io.prestosql.sql.tree.SingleColumn;
 import io.prestosql.sql.tree.SortItem;
+import io.prestosql.sql.tree.SqlParameterDeclaration;
 import io.prestosql.sql.tree.StartTransaction;
 import io.prestosql.sql.tree.Statement;
 import io.prestosql.sql.tree.StringLiteral;
@@ -207,6 +213,10 @@ import java.util.stream.Collectors;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static io.prestosql.sql.tree.RoutineCharacteristics.Determinism.DETERMINISTIC;
+import static io.prestosql.sql.tree.RoutineCharacteristics.Determinism.NOT_DETERMINISTIC;
+import static io.prestosql.sql.tree.RoutineCharacteristics.NullCallClause.CALLED_ON_NULL_INPUT;
+import static io.prestosql.sql.tree.RoutineCharacteristics.NullCallClause.RETURNS_NULL_ON_NULL_INPUT;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
@@ -238,6 +248,12 @@ class AstBuilder
     public Node visitStandalonePathSpecification(SqlBaseParser.StandalonePathSpecificationContext context)
     {
         return visit(context.pathSpecification());
+    }
+
+    @Override
+    public Node visitStandaloneRoutineBody(SqlBaseParser.StandaloneRoutineBodyContext context)
+    {
+        return visit(context.routineBody());
     }
 
     // ******************* statements **********************
@@ -689,6 +705,28 @@ class AstBuilder
     }
 
     @Override
+    public Node visitShowExternalFunction(SqlBaseParser.ShowExternalFunctionContext context)
+    {
+        Optional<List<String>> parameterTypes = context.types() == null ? Optional.empty() : Optional.of(getTypes(context.types()));
+        return new ShowExternalFunction(getLocation(context), getQualifiedName(context.qualifiedName()), parameterTypes);
+    }
+
+    @Override
+    public Node visitReturnStatement(SqlBaseParser.ReturnStatementContext context)
+    {
+        return new Return((Expression) visit(context.expression()));
+    }
+
+    @Override
+    public Node visitExternalBodyReference(SqlBaseParser.ExternalBodyReferenceContext context)
+    {
+        if (context.externalRoutineName() != null) {
+            return new ExternalBodyReference((Identifier) visit(context.externalRoutineName().identifier()));
+        }
+        return new ExternalBodyReference();
+    }
+
+    @Override
     public Node visitStartTransaction(SqlBaseParser.StartTransactionContext context)
     {
         return new StartTransaction(visit(context.transactionMode(), TransactionMode.class));
@@ -797,6 +835,12 @@ class AstBuilder
     public Node visitProperty(SqlBaseParser.PropertyContext context)
     {
         return new Property(getLocation(context), (Identifier) visit(context.identifier()), (Expression) visit(context.expression()));
+    }
+
+    @Override
+    public Node visitFunctionProperty(SqlBaseParser.FunctionPropertyContext context)
+    {
+        return new FunctionProperty(getLocation(context), (Identifier) visit(context.identifier()), (StringLiteral) visit(context.string()));
     }
 
     // ********************** query expressions ********************
@@ -1743,6 +1787,8 @@ class AstBuilder
 
         boolean distinct = isDistinct(context.setQuantifier());
 
+        boolean ignoreNulls = context.nullTreatment() != null && context.nullTreatment().IGNORE() != null;
+
         if (name.toString().equalsIgnoreCase("if")) {
             check(context.expression().size() == 2 || context.expression().size() == 3, "Invalid number of arguments for 'if' function", context);
             check(!window.isPresent(), "OVER clause not valid for 'if' function", context);
@@ -1825,6 +1871,7 @@ class AstBuilder
                 filter,
                 orderBy,
                 distinct,
+                ignoreNulls,
                 visit(context.expression(), Expression.class));
     }
 
@@ -2477,6 +2524,13 @@ class AstBuilder
         throw new IllegalArgumentException("Unsupported quantifier: " + symbol.getText());
     }
 
+    private List<String> getTypes(SqlBaseParser.TypesContext types)
+    {
+        return types.type().stream()
+                .map(this::getType)
+                .collect(toImmutableList());
+    }
+
     private String getType(SqlBaseParser.TypeContext type)
     {
         if (type.baseType() != null) {
@@ -2524,6 +2578,47 @@ class AstBuilder
         }
 
         throw new IllegalArgumentException("Unsupported type specification: " + type.getText());
+    }
+
+    private SqlParameterDeclaration getParameterDeclarations(SqlBaseParser.SqlParameterDeclarationContext context)
+    {
+        return new SqlParameterDeclaration((Identifier) visit(context.identifier()), getType(context.type()));
+    }
+
+    private RoutineCharacteristics getRoutineCharacteristics(SqlBaseParser.RoutineCharacteristicsContext context)
+    {
+        RoutineCharacteristics.Language language = null;
+        RoutineCharacteristics.Determinism determinism = null;
+        RoutineCharacteristics.NullCallClause nullCallClause = null;
+
+        for (SqlBaseParser.RoutineCharacteristicContext characteristic : context.routineCharacteristic()) {
+            if (characteristic.language() != null) {
+                if (language != null) {
+                    throw new ParsingException(format("Duplicate language clause: %s", characteristic.language().getText()), getLocation(characteristic.language()));
+                }
+                language = new RoutineCharacteristics.Language(((Identifier) visit(characteristic.language().identifier())).getValue());
+            }
+            else if (characteristic.determinism() != null) {
+                if (determinism != null) {
+                    throw new ParsingException(format("Duplicate determinism characteristics: %s", characteristic.determinism().getText()), getLocation(characteristic.determinism()));
+                }
+                determinism = characteristic.determinism().NOT() == null ? DETERMINISTIC : NOT_DETERMINISTIC;
+            }
+            else if (characteristic.nullCallClause() != null) {
+                if (nullCallClause != null) {
+                    throw new ParsingException(format("Duplicate null-call clause: %s", characteristic.nullCallClause().getText()), getLocation(characteristic.nullCallClause()));
+                }
+                nullCallClause = characteristic.nullCallClause().CALLED() != null ? CALLED_ON_NULL_INPUT : RETURNS_NULL_ON_NULL_INPUT;
+            }
+            else {
+                throw new IllegalArgumentException(format("Unsupported RoutineCharacteristic: %s", characteristic.getText()));
+            }
+        }
+
+        return new RoutineCharacteristics(
+                Optional.ofNullable(language),
+                Optional.ofNullable(determinism),
+                Optional.ofNullable(nullCallClause));
     }
 
     private String typeParameterToString(SqlBaseParser.TypeParameterContext typeParameter)

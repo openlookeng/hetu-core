@@ -29,7 +29,7 @@ import static io.prestosql.spi.type.UnknownType.UNKNOWN;
 import static io.prestosql.util.Failures.checkCondition;
 import static java.lang.Math.toIntExact;
 
-@ScalarFunction("repeat")
+@ScalarFunction(value = "repeat", calledOnNullInput = true)
 @Description("Repeat an element for a given number of times")
 public final class RepeatFunction
 {

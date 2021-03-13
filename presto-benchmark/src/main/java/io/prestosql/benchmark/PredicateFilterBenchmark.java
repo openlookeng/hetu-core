@@ -31,9 +31,9 @@ import java.util.function.Supplier;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.prestosql.benchmark.BenchmarkQueryRunner.createLocalQueryRunner;
 import static io.prestosql.spi.function.OperatorType.GREATER_THAN_OR_EQUAL;
-import static io.prestosql.spi.function.Signature.internalOperator;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.relational.Expressions.call;
 import static io.prestosql.sql.relational.Expressions.constant;
 import static io.prestosql.sql.relational.Expressions.field;
@@ -50,8 +50,8 @@ public class PredicateFilterBenchmark
     protected List<? extends OperatorFactory> createOperatorFactories()
     {
         OperatorFactory tableScanOperator = createTableScanOperator(0, new PlanNodeId("test"), "orders", "totalprice");
-        RowExpression filter = call(
-                internalOperator(GREATER_THAN_OR_EQUAL, BOOLEAN.getTypeSignature(), ImmutableList.of(DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature())),
+        RowExpression filter = call(GREATER_THAN_OR_EQUAL.name(),
+                localQueryRunner.getMetadata().getFunctionAndTypeManager().resolveOperatorFunctionHandle(GREATER_THAN_OR_EQUAL, fromTypes(DOUBLE, DOUBLE)),
                 BOOLEAN,
                 field(0, DOUBLE),
                 constant(50000.0, DOUBLE));

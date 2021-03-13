@@ -18,7 +18,7 @@ import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.window.RankingFunction;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionMetadata;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.LimitNode;
 import io.prestosql.spi.plan.PlanNode;
@@ -29,7 +29,6 @@ import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.predicate.ValueSet;
-import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.sql.ExpressionUtils;
 import io.prestosql.sql.planner.ExpressionDomainTranslator;
 import io.prestosql.sql.planner.LiteralEncoder;
@@ -52,7 +51,6 @@ import static io.prestosql.SystemSessionProperties.isOptimizeTopNRankingNumber;
 import static io.prestosql.spi.function.FunctionKind.WINDOW;
 import static io.prestosql.spi.predicate.Marker.Bound.BELOW;
 import static io.prestosql.spi.type.BigintType.BIGINT;
-import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.sql.planner.ExpressionDomainTranslator.ExtractionResult;
 import static io.prestosql.sql.planner.ExpressionDomainTranslator.fromPredicate;
 import static io.prestosql.sql.planner.plan.ChildReplacer.replaceChildren;
@@ -65,8 +63,6 @@ import static java.util.stream.Collectors.toMap;
 public class WindowFilterPushDown
         implements PlanOptimizer
 {
-    private static final Signature ROW_NUMBER_SIGNATURE = new Signature("row_number", WINDOW, parseTypeSignature(StandardTypes.BIGINT), ImmutableList.of());
-
     private final Metadata metadata;
     private final ExpressionDomainTranslator domainTranslator;
 
@@ -277,44 +273,48 @@ public class WindowFilterPushDown
                     getRankingFunction(windowNode));
         }
 
-        private static boolean canReplaceWithRowNumber(WindowNode node)
+        private boolean canReplaceWithRowNumber(WindowNode node)
         {
             if (node.getWindowFunctions().size() != 1) {
                 return false;
             }
 
             Symbol rowNumberSymbol = getOnlyElement(node.getWindowFunctions().entrySet()).getKey();
-            return node.getWindowFunctions().get(rowNumberSymbol).getSignature().equals(RankingFunction.ROW_NUMBER.getValue()) &&
-                    !node.getOrderingScheme().isPresent();
+            FunctionMetadata functionMetaData = metadata.getFunctionAndTypeManager().getFunctionMetadata(node.getWindowFunctions().get(rowNumberSymbol).getFunctionHandle());
+            return functionMetaData.getFunctionKind() == WINDOW
+                    && functionMetaData.getName().equals(RankingFunction.ROW_NUMBER.getName())
+                    && !node.getOrderingScheme().isPresent();
         }
 
-        private static boolean canOptimizeWindowFunction(WindowNode node)
+        private boolean canOptimizeWindowFunction(WindowNode node)
         {
             if (node.getWindowFunctions().size() != 1) {
                 return false;
             }
             Symbol symbol = getOnlyElement(node.getWindowFunctions().entrySet()).getKey();
-            return canOptimizeRankingFunctionSignature(node.getWindowFunctions().get(symbol).getSignature());
+            FunctionMetadata functionMetaData = metadata.getFunctionAndTypeManager().getFunctionMetadata(node.getWindowFunctions().get(symbol).getFunctionHandle());
+            return canOptimizeRankingFunctionSignature(functionMetaData);
         }
 
-        private static boolean canOptimizeRankingFunctionSignature(Signature signature)
+        private static boolean canOptimizeRankingFunctionSignature(FunctionMetadata functionMetaData)
         {
-            return signature.equals(RankingFunction.ROW_NUMBER.getValue()) ||
-                    signature.equals(RankingFunction.RANK.getValue()) ||
-                    signature.equals(RankingFunction.DENSE_RANK.getValue());
+            return functionMetaData.getFunctionKind() == WINDOW &&
+                    (functionMetaData.getName().equals(RankingFunction.ROW_NUMBER.getName()) ||
+                     functionMetaData.getName().equals(RankingFunction.RANK.getName()) ||
+                     functionMetaData.getName().equals(RankingFunction.DENSE_RANK.getName()));
         }
 
-        private static Optional<RankingFunction> getRankingFunction(WindowNode node)
+        private Optional<RankingFunction> getRankingFunction(WindowNode node)
         {
             Symbol rowNumberSymbol = getOnlyElement(node.getWindowFunctions().entrySet()).getKey();
-            Signature signature = node.getWindowFunctions().get(rowNumberSymbol).getSignature();
-            if (signature.equals(RankingFunction.ROW_NUMBER.getValue())) {
+            FunctionMetadata functionMetaData = metadata.getFunctionAndTypeManager().getFunctionMetadata(node.getWindowFunctions().get(rowNumberSymbol).getFunctionHandle());
+            if (functionMetaData.getName().equals(RankingFunction.ROW_NUMBER.getName())) {
                 return Optional.of(RankingFunction.ROW_NUMBER);
             }
-            else if (signature.equals(RankingFunction.RANK.getValue())) {
+            else if (functionMetaData.getName().equals(RankingFunction.RANK.getName())) {
                 return Optional.of(RankingFunction.RANK);
             }
-            else if (signature.equals(RankingFunction.DENSE_RANK.getValue())) {
+            else if (functionMetaData.getName().equals(RankingFunction.DENSE_RANK.getName())) {
                 return Optional.of(RankingFunction.DENSE_RANK);
             }
             else {

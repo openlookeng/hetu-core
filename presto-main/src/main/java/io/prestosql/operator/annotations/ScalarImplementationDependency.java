@@ -14,63 +14,40 @@
 package io.prestosql.operator.annotations;
 
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.InvocationConvention;
-import io.prestosql.spi.function.Signature;
 
 import java.lang.invoke.MethodHandle;
-import java.util.Objects;
 import java.util.Optional;
-
-import static io.prestosql.metadata.SignatureBinder.applyBoundVariables;
-import static java.util.Objects.requireNonNull;
 
 public abstract class ScalarImplementationDependency
         implements ImplementationDependency
 {
-    private final Signature signature;
     private final Optional<InvocationConvention> invocationConvention;
 
-    protected ScalarImplementationDependency(Signature signature, Optional<InvocationConvention> invocationConvention)
+    protected ScalarImplementationDependency(Optional<InvocationConvention> invocationConvention)
     {
-        this.signature = requireNonNull(signature, "signature is null");
         this.invocationConvention = invocationConvention;
     }
 
-    public Signature getSignature()
-    {
-        return signature;
-    }
+    protected abstract FunctionHandle getFunctionHandle(BoundVariables boundVariables, FunctionAndTypeManager functionAndTypeManager);
 
     @Override
-    public MethodHandle resolve(BoundVariables boundVariables, Metadata metadata)
+    public MethodHandle resolve(BoundVariables boundVariables, FunctionAndTypeManager functionAndTypeManager)
     {
-        Signature signature = applyBoundVariables(this.signature, boundVariables, this.signature.getArgumentTypes().size());
+        FunctionHandle functionHandle = getFunctionHandle(boundVariables, functionAndTypeManager);
         if (invocationConvention.isPresent()) {
-            return metadata.getFunctionInvokerProvider().createFunctionInvoker(signature, invocationConvention).methodHandle();
+            return functionAndTypeManager.getFunctionInvokerProvider().createFunctionInvoker(functionHandle, invocationConvention).methodHandle();
         }
         else {
-            return metadata.getScalarFunctionImplementation(signature).getMethodHandle();
+            return functionAndTypeManager.getBuiltInScalarFunctionImplementation(functionHandle).getMethodHandle();
         }
     }
 
     @Override
-    public boolean equals(Object o)
-    {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        ScalarImplementationDependency that = (ScalarImplementationDependency) o;
-        return Objects.equals(signature, that.signature) &&
-                Objects.equals(invocationConvention, that.invocationConvention);
-    }
+    public abstract boolean equals(Object o);
 
     @Override
-    public int hashCode()
-    {
-        return Objects.hash(signature, invocationConvention);
-    }
+    public abstract int hashCode();
 }

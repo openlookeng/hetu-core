@@ -56,7 +56,7 @@ import static org.testng.Assert.fail;
 
 public abstract class AbstractTestType
 {
-    private final BlockEncodingSerde blockEncodingSerde = createTestMetadataManager().getBlockEncodingSerde();
+    private final BlockEncodingSerde blockEncodingSerde = createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde();
 
     private final Class<?> objectValueType;
     private final Block testBlock;

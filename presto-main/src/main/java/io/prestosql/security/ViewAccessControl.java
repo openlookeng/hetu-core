@@ -13,7 +13,7 @@
  */
 package io.prestosql.security;
 
-import io.prestosql.metadata.QualifiedObjectName;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.security.ViewExpression;
 import io.prestosql.spi.type.Type;

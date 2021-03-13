@@ -35,7 +35,7 @@ public class TestFieldSetFilteringRecordSet
     {
         ArrayType arrayOfBigintType = new ArrayType(BIGINT);
         FieldSetFilteringRecordSet fieldSetFilteringRecordSet = new FieldSetFilteringRecordSet(
-                createTestMetadataManager(),
+                createTestMetadataManager().getFunctionAndTypeManager(),
                 new InMemoryRecordSet(
                         ImmutableList.of(BIGINT, BIGINT, TIMESTAMP_WITH_TIME_ZONE, TIMESTAMP_WITH_TIME_ZONE, arrayOfBigintType, arrayOfBigintType),
                         ImmutableList.of(
@@ -58,7 +58,7 @@ public class TestFieldSetFilteringRecordSet
     {
         ArrayType arrayOfBigintType = new ArrayType(BIGINT);
         FieldSetFilteringRecordSet fieldSetFilteringRecordSet = new FieldSetFilteringRecordSet(
-                createTestMetadataManager(),
+                createTestMetadataManager().getFunctionAndTypeManager(),
                 new InMemoryRecordSet(
                         ImmutableList.of(BIGINT, BIGINT, TIMESTAMP_WITH_TIME_ZONE, TIMESTAMP_WITH_TIME_ZONE, arrayOfBigintType, arrayOfBigintType),
                         ImmutableList.of(

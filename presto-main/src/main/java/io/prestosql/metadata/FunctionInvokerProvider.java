@@ -15,47 +15,46 @@ package io.prestosql.metadata;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ScalarImplementationChoice;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.InvocationConvention;
 import io.prestosql.spi.function.InvocationConvention.InvocationArgumentConvention;
 import io.prestosql.spi.function.InvocationConvention.InvocationReturnConvention;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
-import io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty;
-import io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention;
-import io.prestosql.spi.function.ScalarFunctionImplementation.ScalarImplementationChoice;
-import io.prestosql.spi.function.Signature;
 
 import java.util.List;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.spi.StandardErrorCode.FUNCTION_NOT_FOUND;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentType.FUNCTION_TYPE;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.BLOCK_AND_POSITION;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.USE_BOXED_TYPE;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.USE_NULL_FLAG;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentType.FUNCTION_TYPE;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.BLOCK_AND_POSITION;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.USE_BOXED_TYPE;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.USE_NULL_FLAG;
 import static java.lang.String.format;
-import static java.util.Objects.requireNonNull;
 
 public class FunctionInvokerProvider
 {
-    private final Metadata metadata;
+    private final FunctionAndTypeManager functionAndTypeManager;
 
-    public FunctionInvokerProvider(Metadata metadata)
+    public FunctionInvokerProvider(FunctionAndTypeManager functionAndTypeManager)
     {
-        this.metadata = requireNonNull(metadata, "metadata is null");
+        this.functionAndTypeManager = functionAndTypeManager;
     }
 
-    public FunctionInvoker createFunctionInvoker(Signature signature, Optional<InvocationConvention> invocationConvention)
+    public FunctionInvoker createFunctionInvoker(FunctionHandle functionHandle, Optional<InvocationConvention> invocationConvention)
     {
-        ScalarFunctionImplementation scalarFunctionImplementation = metadata.getScalarFunctionImplementation(signature);
-        for (ScalarImplementationChoice choice : scalarFunctionImplementation.getAllChoices()) {
-            if (checkChoice(choice.getArgumentProperties(), choice.isNullable(), choice.hasSession(), invocationConvention)) {
+        BuiltInScalarFunctionImplementation builtInScalarFunctionImplementation = functionAndTypeManager.getBuiltInScalarFunctionImplementation(functionHandle);
+        for (ScalarImplementationChoice choice : builtInScalarFunctionImplementation.getAllChoices()) {
+            if (checkChoice(choice.getArgumentProperties(), choice.isNullable(), choice.hasProperties(), invocationConvention)) {
                 return new FunctionInvoker(choice.getMethodHandle());
             }
         }
         checkState(invocationConvention.isPresent());
-        throw new PrestoException(FUNCTION_NOT_FOUND, format("Dependent function implementation (%s) with convention (%s) is not available", signature, invocationConvention.toString()));
+        throw new PrestoException(FUNCTION_NOT_FOUND, format("Dependent function implementation (%s) with convention (%s) is not available", functionHandle, invocationConvention.toString()));
     }
 
     @VisibleForTesting

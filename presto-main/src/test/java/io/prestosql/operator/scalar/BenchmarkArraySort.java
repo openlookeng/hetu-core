@@ -23,9 +23,8 @@ import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
-import io.prestosql.spi.function.FunctionKind;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.ScalarFunction;
-import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.function.SqlType;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
@@ -59,6 +58,7 @@ import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggre
 import static io.prestosql.metadata.FunctionExtractor.extractFunctions;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.relational.Expressions.field;
 import static io.prestosql.testing.TestingConnectorSession.SESSION;
 
@@ -106,15 +106,16 @@ public class BenchmarkArraySort
         public void setup()
         {
             Metadata metadata = createTestMetadataManager();
-            metadata.addFunctions(extractFunctions(BenchmarkArraySort.class));
+            metadata.getFunctionAndTypeManager().registerBuiltInFunctions(extractFunctions(BenchmarkArraySort.class));
             ExpressionCompiler compiler = new ExpressionCompiler(metadata, new PageFunctionCompiler(metadata, 0));
             ImmutableList.Builder<RowExpression> projectionsBuilder = ImmutableList.builder();
             Block[] blocks = new Block[TYPES.size()];
             for (int i = 0; i < TYPES.size(); i++) {
                 Type elementType = TYPES.get(i);
                 ArrayType arrayType = new ArrayType(elementType);
-                Signature signature = new Signature(name, FunctionKind.SCALAR, arrayType.getTypeSignature(), arrayType.getTypeSignature());
-                projectionsBuilder.add(new CallExpression(signature, arrayType, ImmutableList.of(field(i, arrayType)), Optional.empty()));
+
+                FunctionHandle functionHandle = metadata.getFunctionAndTypeManager().lookupFunction(name, fromTypes(arrayType));
+                projectionsBuilder.add(new CallExpression(name, functionHandle, arrayType, ImmutableList.of(field(i, arrayType))));
                 blocks[i] = createChannel(POSITIONS, ARRAY_SIZE, arrayType);
             }
 

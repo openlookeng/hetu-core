@@ -14,6 +14,8 @@
 package io.prestosql.sql.relational;
 
 import com.google.common.collect.ImmutableList;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.InputReferenceExpression;
@@ -42,12 +44,12 @@ public class TestDeterminismEvaluator
     {
         RowExpressionDeterminismEvaluator determinismEvaluator = new RowExpressionDeterminismEvaluator(createTestMetadataManager());
 
-        CallExpression random = new CallExpression(
-                new Signature(
-                        "random",
+        CallExpression random = new CallExpression(QualifiedObjectName.valueOfDefaultFunction("random").getObjectName(),
+                new BuiltInFunctionHandle(new Signature(
+                        QualifiedObjectName.valueOfDefaultFunction("random"),
                         SCALAR,
                         parseTypeSignature(StandardTypes.BIGINT),
-                        parseTypeSignature(StandardTypes.BIGINT)),
+                        parseTypeSignature(StandardTypes.BIGINT))),
                 BIGINT,
                 singletonList(constant(10L, BIGINT)),
                 Optional.empty());
@@ -56,10 +58,10 @@ public class TestDeterminismEvaluator
         InputReferenceExpression col0 = field(0, BIGINT);
         Signature lessThan = internalOperator(LESS_THAN, BOOLEAN, ImmutableList.of(BIGINT, BIGINT));
 
-        CallExpression lessThanExpression = new CallExpression(lessThan, BOOLEAN, ImmutableList.of(col0, constant(10L, BIGINT)), Optional.empty());
+        CallExpression lessThanExpression = new CallExpression(lessThan.getName().getObjectName(), new BuiltInFunctionHandle(lessThan), BOOLEAN, ImmutableList.of(col0, constant(10L, BIGINT)), Optional.empty());
         assertTrue(determinismEvaluator.isDeterministic(lessThanExpression));
 
-        CallExpression lessThanRandomExpression = new CallExpression(lessThan, BOOLEAN, ImmutableList.of(col0, random), Optional.empty());
+        CallExpression lessThanRandomExpression = new CallExpression(lessThan.getName().getObjectName(), new BuiltInFunctionHandle(lessThan), BOOLEAN, ImmutableList.of(col0, random), Optional.empty());
         assertFalse(determinismEvaluator.isDeterministic(lessThanRandomExpression));
     }
 }

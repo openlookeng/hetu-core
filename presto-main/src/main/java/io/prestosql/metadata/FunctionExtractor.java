@@ -13,16 +13,24 @@
  */
 package io.prestosql.metadata;
 
+import com.google.common.collect.ImmutableSet;
 import io.prestosql.operator.scalar.annotations.ScalarFromAnnotationsParser;
 import io.prestosql.operator.window.WindowAnnotationsParser;
+import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.function.AggregationFunction;
+import io.prestosql.spi.function.ExternalFunctionHub;
+import io.prestosql.spi.function.ExternalFunctionInfo;
+import io.prestosql.spi.function.RoutineCharacteristics;
 import io.prestosql.spi.function.ScalarFunction;
 import io.prestosql.spi.function.ScalarOperator;
 import io.prestosql.spi.function.SqlFunction;
+import io.prestosql.spi.function.SqlInvokedFunction;
 import io.prestosql.spi.function.WindowFunction;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
@@ -56,5 +64,16 @@ public final class FunctionExtractor
         }
 
         return ScalarFromAnnotationsParser.parseFunctionDefinitions(clazz);
+    }
+
+    public static Set<SqlInvokedFunction> extractExternalFunctions(ExternalFunctionHub externalFunctionHub, CatalogSchemaName catalogSchemaName)
+    {
+        RoutineCharacteristics.Language language = externalFunctionHub.getExternalFunctionLanguage();
+        ImmutableSet.Builder<SqlInvokedFunction> builder = new ImmutableSet.Builder<>();
+        for (ExternalFunctionInfo externalFunctionInfo : externalFunctionHub.getExternalFunctions()) {
+            Optional<SqlInvokedFunction> sqlInvokedFunctionOptional = ExternalFunctionsParser.parseExternalFunction(externalFunctionInfo, catalogSchemaName, language);
+            sqlInvokedFunctionOptional.ifPresent(builder::add);
+        }
+        return builder.build();
     }
 }

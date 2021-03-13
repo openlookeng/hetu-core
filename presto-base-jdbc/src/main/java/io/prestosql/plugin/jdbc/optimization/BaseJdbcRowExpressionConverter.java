@@ -17,9 +17,14 @@ package io.prestosql.plugin.jdbc.optimization;
 import com.google.common.base.Joiner;
 import io.airlift.slice.Slice;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
+import io.prestosql.spi.function.FunctionMetadata;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.OperatorType;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.ConstantExpression;
+import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.relation.SpecialForm;
@@ -45,32 +50,21 @@ import java.sql.Timestamp;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.stream.IntStream;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
-import static io.prestosql.spi.function.Signature.unmangleOperator;
-import static io.prestosql.spi.function.StandardFunctionUtils.isArithmeticFunction;
-import static io.prestosql.spi.function.StandardFunctionUtils.isArrayConstructor;
-import static io.prestosql.spi.function.StandardFunctionUtils.isCastFunction;
-import static io.prestosql.spi.function.StandardFunctionUtils.isComparisonFunction;
-import static io.prestosql.spi.function.StandardFunctionUtils.isLikeFunction;
-import static io.prestosql.spi.function.StandardFunctionUtils.isNegateFunction;
-import static io.prestosql.spi.function.StandardFunctionUtils.isNotFunction;
-import static io.prestosql.spi.function.StandardFunctionUtils.isOperator;
-import static io.prestosql.spi.function.StandardFunctionUtils.isSubscriptFunction;
-import static io.prestosql.spi.function.StandardFunctionUtils.isTryFunction;
-import static io.prestosql.spi.sql.RowExpressionUtils.isDeterministic;
 import static io.prestosql.spi.type.Decimals.decodeUnscaledValue;
+import static io.prestosql.sql.builder.functioncall.BaseFunctionUtil.isDefaultFunction;
 import static java.lang.Float.intBitsToFloat;
 import static java.lang.String.format;
-import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 public class BaseJdbcRowExpressionConverter
-        implements RowExpressionConverter
+        implements RowExpressionConverter<JdbcConverterContext>
 {
     public static final String COUNT_FUNCTION_NAME = "count";
     protected static final String LIKE_PATTERN_NAME = "LikePattern";
@@ -79,120 +73,142 @@ public class BaseJdbcRowExpressionConverter
     private static final String DYNAMIC_FILTER_FUNCTION_NAME = "$internal$dynamic_filter_function";
 
     private final Map<String, Integer> blacklistFunctions;
-    private final RowExpressionService rowExpressionService;
+    protected final FunctionMetadataManager functionMetadataManager;
+    protected final StandardFunctionResolution standardFunctionResolution;
+    protected final RowExpressionService rowExpressionService;
+    protected final DeterminismEvaluator determinismEvaluator;
 
-    public BaseJdbcRowExpressionConverter(RowExpressionService rowExpressionService)
+    public BaseJdbcRowExpressionConverter(
+            FunctionMetadataManager functionMetadataManager,
+            StandardFunctionResolution standardFunctionResolution,
+            RowExpressionService rowExpressionService,
+            DeterminismEvaluator determinismEvaluator)
     {
-        this(rowExpressionService, Collections.emptyMap());
+        this(functionMetadataManager, standardFunctionResolution, rowExpressionService, determinismEvaluator, Collections.emptyMap());
     }
 
-    public BaseJdbcRowExpressionConverter(RowExpressionService rowExpressionService, Map<String, Integer> blacklistFunctions)
+    public BaseJdbcRowExpressionConverter(
+            FunctionMetadataManager functionMetadataManager,
+            StandardFunctionResolution standardFunctionResolution,
+            RowExpressionService rowExpressionService,
+            DeterminismEvaluator determinismEvaluator,
+            Map<String, Integer> blacklistFunctions)
     {
+        this.functionMetadataManager = requireNonNull(functionMetadataManager, "function metadata manager is null");
+        this.standardFunctionResolution = requireNonNull(standardFunctionResolution, "standardFunctionResolution is null");
         this.rowExpressionService = rowExpressionService;
         requireNonNull(blacklistFunctions, "BlackListFunctions cannot be null");
         this.blacklistFunctions = blacklistFunctions;
+        this.determinismEvaluator = requireNonNull(determinismEvaluator, "determinismEvaluator is null");
     }
 
     @Override
-    public String visitCall(CallExpression call, Void context)
+    public String visitCall(CallExpression call, JdbcConverterContext context)
     {
+        // remote udf verify
+        FunctionHandle functionHandle = call.getFunctionHandle();
+        if (!isDefaultFunction(call)) {
+            throw new PrestoException(NOT_SUPPORTED, String.format("This connector do not support push down %s.%s", functionHandle.getFunctionNamespace(), call.getDisplayName()));
+        }
+
+        context.setDefaultFunctionVisited(true);
         if (!isDeterministic(rowExpressionService.getDeterminismEvaluator(), call)) {
-            throw new PrestoException(NOT_SUPPORTED, format("Unsupported not deterministic function [%s] push down.", call.getSignature().getName()));
+            throw new PrestoException(NOT_SUPPORTED, "Unsupported not deterministic function push down.");
         }
-        Signature signature = call.getSignature();
-        String functionName = call.getSignature().getName().toLowerCase(ENGLISH);
-        if (isNotFunction(signature)) {
-            return format("(NOT %s)", call.getArguments().get(0).accept(this, null));
+        if (standardFunctionResolution.isNotFunction(functionHandle)) {
+            return format("(NOT %s)", call.getArguments().get(0).accept(this, context));
         }
-        if (isTryFunction(signature)) {
-            return format("TRY(%s)", call.getArguments().get(0).accept(this, null));
+        if (standardFunctionResolution.isTryFunction(functionHandle)) {
+            return format("TRY(%s)", call.getArguments().get(0).accept(this, context));
         }
-        if (isLikeFunction(signature)) {
+        if (standardFunctionResolution.isLikeFunction(functionHandle)) {
             return format("(%s LIKE %s)",
-                    call.getArguments().get(0).accept(this, null),
-                    call.getArguments().get(1).accept(this, null));
+                    call.getArguments().get(0).accept(this, context),
+                    call.getArguments().get(1).accept(this, context));
         }
-        if (isArrayConstructor(signature)) {
-            String arguments = Joiner.on(",").join(call.getArguments().stream().map(expression -> expression.accept(this, null)).collect(toList()));
+        if (standardFunctionResolution.isArrayConstructor(functionHandle)) {
+            String arguments = Joiner.on(",").join(call.getArguments().stream().map(expression -> expression.accept(this, context)).collect(toList()));
             return format("ARRAY[%s]", arguments);
         }
-        if (isOperator(signature)) {
-            return handleOperator(call);
+        FunctionMetadata functionMetadata = functionMetadataManager.getFunctionMetadata(functionHandle);
+
+        if (standardFunctionResolution.isOperator(functionHandle)) {
+            return handleOperator(call, functionMetadata, context);
         }
-        if (functionName.equals(TIMESTAMP_LITERAL)) {
+        if (functionMetadata.getName().getObjectName().equals(TIMESTAMP_LITERAL)) {
             long time = (long) ((ConstantExpression) call.getArguments().get(0)).getValue();
             return format("TIMESTAMP '%s'", new Timestamp(time));
         }
-        return handleFunction(call);
+        return handleFunction(call, functionMetadata, context);
     }
 
     @Override
-    public String visitSpecialForm(SpecialForm specialForm, Void context)
+    public String visitSpecialForm(SpecialForm specialForm, JdbcConverterContext context)
     {
         switch (specialForm.getForm()) {
             case AND:
             case OR:
                 return format("(%s %s %s)",
-                        specialForm.getArguments().get(0).accept(this, null),
+                        specialForm.getArguments().get(0).accept(this, context),
                         specialForm.getForm().toString(),
-                        specialForm.getArguments().get(1).accept(this, null));
+                        specialForm.getArguments().get(1).accept(this, context));
             case IS_NULL:
-                return format("(%s IS NULL)", specialForm.getArguments().get(0).accept(this, null));
+                return format("(%s IS NULL)", specialForm.getArguments().get(0).accept(this, context));
             case NULL_IF:
                 return format("NULLIF(%s, %s)",
-                        specialForm.getArguments().get(0).accept(this, null),
-                        specialForm.getArguments().get(1).accept(this, null));
+                        specialForm.getArguments().get(0).accept(this, context),
+                        specialForm.getArguments().get(1).accept(this, context));
             case IN:
-                String value = specialForm.getArguments().get(0).accept(this, null);
+                String value = specialForm.getArguments().get(0).accept(this, context);
                 String valueList = Joiner.on(", ").join(IntStream.range(1, specialForm.getArguments().size())
                         .mapToObj(i -> specialForm.getArguments().get(i))
-                        .map(expression -> expression.accept(this, null))
+                        .map(expression -> expression.accept(this, context))
                         .collect(toList()));
                 return format("(%s IN (%s))", value, valueList);
             case BETWEEN:
                 return format("(%s BETWEEN %s AND %s)",
-                        specialForm.getArguments().get(0).accept(this, null),
-                        specialForm.getArguments().get(1).accept(this, null),
-                        specialForm.getArguments().get(2).accept(this, null));
+                        specialForm.getArguments().get(0).accept(this, context),
+                        specialForm.getArguments().get(1).accept(this, context),
+                        specialForm.getArguments().get(2).accept(this, context));
             case ROW_CONSTRUCTOR:
                 return format("ROW (%s)", Joiner.on(", ").join(specialForm.getArguments().stream()
-                        .map(expression -> expression.accept(this, null))
+                        .map(expression -> expression.accept(this, context))
                         .collect(toList())));
             case COALESCE:
                 String argument = Joiner.on(",")
                         .join(specialForm.getArguments().stream()
-                                .map(expression -> expression.accept(this, null))
+                                .map(expression -> expression.accept(this, context))
                                 .collect(toList()));
                 return format("COALESCE(%s)", argument);
             case IF:
                 // convert IF to [case ... when ... else] expression
                 return format("IF (%s, %s, %s)",
-                        specialForm.getArguments().get(0).accept(this, null),
-                        specialForm.getArguments().get(1).accept(this, null),
-                        specialForm.getArguments().get(2).accept(this, null));
+                        specialForm.getArguments().get(0).accept(this, context),
+                        specialForm.getArguments().get(1).accept(this, context),
+                        specialForm.getArguments().get(2).accept(this, context));
             case SWITCH:
                 int size = specialForm.getArguments().size();
                 return format("(CASE %s %s ELSE %s END)",
-                        specialForm.getArguments().get(0).accept(this, null),
+                        specialForm.getArguments().get(0).accept(this, context),
                         Joiner.on(' ').join(IntStream.range(1, size - 1)
-                                .mapToObj(i -> specialForm.getArguments().get(i).accept(this, null))
+                                .mapToObj(i -> specialForm.getArguments().get(i).accept(this, context))
                                 .collect(toList())),
-                        specialForm.getArguments().get(size - 1).accept(this, null));
+                        specialForm.getArguments().get(size - 1).accept(this, context));
             case WHEN:
                 return format("WHEN %s THEN %s",
-                        specialForm.getArguments().get(0).accept(this, null),
-                        specialForm.getArguments().get(1).accept(this, null));
+                        specialForm.getArguments().get(0).accept(this, context),
+                        specialForm.getArguments().get(1).accept(this, context));
             case DEREFERENCE:
                 return format("%s.%s",
-                        specialForm.getArguments().get(0).accept(this, null),
-                        specialForm.getArguments().get(1).accept(this, null));
+                        specialForm.getArguments().get(0).accept(this, context),
+                        specialForm.getArguments().get(1).accept(this, context));
             default:
                 throw new PrestoException(NOT_SUPPORTED, String.format("specialForm %s not supported in filter", specialForm.getForm()));
         }
     }
 
     @Override
-    public String visitConstant(ConstantExpression literal, Void context)
+    public String visitConstant(ConstantExpression literal, JdbcConverterContext context)
     {
         Type type = literal.getType();
 
@@ -234,77 +250,84 @@ public class BaseJdbcRowExpressionConverter
     }
 
     @Override
-    public String visitVariableReference(VariableReferenceExpression reference, Void context)
+    public String visitVariableReference(VariableReferenceExpression reference, JdbcConverterContext context)
     {
         return reference.getName();
     }
 
-    private String handleOperator(CallExpression call)
+    private String handleOperator(CallExpression call, FunctionMetadata functionMetadata, JdbcConverterContext context)
     {
-        Signature signature = call.getSignature();
+        FunctionHandle functionHandle = call.getFunctionHandle();
 
         List<RowExpression> arguments = call.getArguments();
-        if (isCastFunction(signature)) {
+        if (standardFunctionResolution.isCastFunction(functionHandle)) {
             if (call.getType().getDisplayName().equals(LIKE_PATTERN_NAME)) {
-                return arguments.get(0).accept(this, null);
+                return arguments.get(0).accept(this, context);
             }
-            return format("CAST(%s AS %s)", arguments.get(0).accept(this, null), call.getType().getDisplayName());
+            return format("CAST(%s AS %s)", arguments.get(0).accept(this, context), call.getType().getDisplayName());
         }
-        if (call.getArguments().size() == 1 && isNegateFunction(signature)) {
-            String value = call.getArguments().get(0).accept(this, null);
+        if (call.getArguments().size() == 1 && standardFunctionResolution.isNegateFunction(functionHandle)) {
+            String value = call.getArguments().get(0).accept(this, context);
             String separator = value.startsWith("-") ? " " : "";
             return format("-%s%s", separator, value);
         }
-        if (arguments.size() == 2 && (isComparisonFunction(signature) || isArithmeticFunction(signature))) {
+        Optional<OperatorType> operatorTypeOptional = functionMetadata.getOperatorType();
+        if (operatorTypeOptional.isPresent() && arguments.size() == 2 && (standardFunctionResolution.isComparisonFunction(functionHandle) || standardFunctionResolution.isArithmeticFunction(functionHandle))) {
             return format(
                     "(%s %s %s)",
-                    arguments.get(0).accept(this, null),
-                    unmangleOperator(signature.getName()).getOperator(),
-                    arguments.get(1).accept(this, null));
+                    arguments.get(0).accept(this, context),
+                    operatorTypeOptional.get().getOperator(),
+                    arguments.get(1).accept(this, context));
         }
-        if (isSubscriptFunction(signature)) {
-            String base = call.getArguments().get(0).accept(this, null);
-            String index = call.getArguments().get(1).accept(this, null);
+        if (standardFunctionResolution.isSubscriptFunction(functionHandle)) {
+            String base = call.getArguments().get(0).accept(this, context);
+            String index = call.getArguments().get(1).accept(this, context);
             return format("%s[%s]", base, index);
         }
-        throw new PrestoException(NOT_SUPPORTED, String.format("Unknown operator %s in push down", signature));
+        throw new PrestoException(NOT_SUPPORTED, String.format("Unknown operator %s in push down", operatorTypeOptional));
     }
 
-    private String handleFunction(CallExpression callExpression)
+    private String handleFunction(CallExpression callExpression, FunctionMetadata functionMetadata, JdbcConverterContext context)
     {
-        Signature function = callExpression.getSignature();
+        String functionName = functionMetadata.getName().getObjectName();
         List<RowExpression> arguments = callExpression.getArguments();
-        if (isBlackListFunction(function)) {
-            if (DYNAMIC_FILTER_FUNCTION_NAME.equals(function.getName())) {
+        if (isBlackListFunction(functionMetadata)) {
+            if (DYNAMIC_FILTER_FUNCTION_NAME.equals(functionName)) {
                 return "true";
             }
-            throw new PrestoException(NOT_SUPPORTED, String.format("Unsupported function in push down %s", function.getName()));
+            throw new PrestoException(NOT_SUPPORTED, String.format("Unsupported function in push down %s", functionName));
         }
-        if (function.getName().equals(COUNT_FUNCTION_NAME) && callExpression.getArguments().size() == 0) {
+        if (functionName.equals(COUNT_FUNCTION_NAME) && callExpression.getArguments().size() == 0) {
             return "count(*)";
         }
         else {
-            StringBuilder builder = new StringBuilder(function.getName());
+            StringBuilder builder = new StringBuilder(functionName);
             StringJoiner joiner = new StringJoiner(", ", "(", ")");
             for (RowExpression expression : arguments) {
-                joiner.add(expression.accept(this, null));
+                joiner.add(expression.accept(this, context));
             }
             builder.append(joiner);
             return builder.toString();
         }
     }
 
-    private boolean isBlackListFunction(Signature signature)
+    private boolean isBlackListFunction(FunctionMetadata functionMetadata)
     {
-        if (signature.getName().contains(INTERNAL_FUNCTION_PREFIX)) {
+        String functionName = functionMetadata.getName().getObjectName();
+        if (functionName.contains(INTERNAL_FUNCTION_PREFIX)) {
             return true;
         }
-        Integer args = blacklistFunctions.get(signature.getName());
-        return args != null && (args < 0 || signature.getArgumentTypes().size() == args);
+        Integer args = blacklistFunctions.get(functionName);
+        return args != null && (args < 0 || functionMetadata.getArgumentTypes().size() == args);
     }
 
     private static Number decodeDecimal(BigInteger unscaledValue, DecimalType type)
     {
         return new BigDecimal(unscaledValue, type.getScale(), new MathContext(type.getPrecision()));
+    }
+
+    protected boolean isDeterministic(DeterminismEvaluator evaluator, RowExpression call)
+    {
+        return evaluator.isDeterministic(call);
     }
 }

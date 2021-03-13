@@ -1192,7 +1192,7 @@ public class TestSignatureBinder
         private Optional<BoundVariables> bindVariables()
         {
             assertNotNull(argumentTypes);
-            SignatureBinder signatureBinder = new SignatureBinder(metadata, function, allowCoercion);
+            SignatureBinder signatureBinder = new SignatureBinder(metadata.getFunctionAndTypeManager(), function, allowCoercion);
             if (returnType == null) {
                 return signatureBinder.bindVariables(argumentTypes);
             }

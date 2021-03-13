@@ -16,21 +16,21 @@ package io.prestosql.operator.scalar;
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlOperator;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.annotation.UsedByGeneratedCode;
 import io.prestosql.spi.block.Block;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.type.Type;
 
 import java.lang.invoke.MethodHandle;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.OperatorType.SUBSCRIPT;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.Signature.typeVariable;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.util.Reflection.methodHandle;
@@ -58,7 +58,7 @@ public class ArraySubscriptOperator
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         checkArgument(boundVariables.getTypeVariables().size() == 1, "Expected one type, got %s", boundVariables.getTypeVariables());
         Type elementType = boundVariables.getTypeVariable("E");
@@ -81,13 +81,12 @@ public class ArraySubscriptOperator
         }
         methodHandle = methodHandle.bindTo(elementType);
         requireNonNull(methodHandle, "methodHandle is null");
-        return new ScalarFunctionImplementation(
+        return new BuiltInScalarFunctionImplementation(
                 true,
                 ImmutableList.of(
                         valueTypeArgumentProperty(RETURN_NULL_ON_NULL),
                         valueTypeArgumentProperty(RETURN_NULL_ON_NULL)),
-                methodHandle,
-                isDeterministic());
+                methodHandle);
     }
 
     @UsedByGeneratedCode

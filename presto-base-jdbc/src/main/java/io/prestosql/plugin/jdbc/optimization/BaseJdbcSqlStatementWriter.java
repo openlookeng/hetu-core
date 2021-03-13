@@ -18,7 +18,6 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.sql.RowExpressionConverter;
@@ -44,10 +43,12 @@ public class BaseJdbcSqlStatementWriter
 {
     private static final String COUNT_FUNCTION_NAME = "count";
     private final boolean nameCaseInsensitive;
+    private final JdbcPushDownParameter jdbcPushDownParameter;
 
     public BaseJdbcSqlStatementWriter(JdbcPushDownParameter pushDownParameter)
     {
         this.nameCaseInsensitive = pushDownParameter.getCaseInsensitiveParameter();
+        this.jdbcPushDownParameter = pushDownParameter;
     }
 
     @Override
@@ -164,8 +165,7 @@ public class BaseJdbcSqlStatementWriter
     public String castAggregationType(String aggregationExpression, RowExpressionConverter converter, Type returnType)
     {
         VariableReferenceExpression aggVariable = new VariableReferenceExpression(aggregationExpression, returnType);
-        Signature castSignature = Signature.internalOperator(OperatorType.CAST, returnType.getTypeSignature(), returnType.getTypeSignature());
-        return converter.visitCall(new CallExpression(castSignature, returnType, ImmutableList.of(aggVariable), Optional.empty()), null);
+        return converter.visitCall(new CallExpression(OperatorType.CAST.name(), jdbcPushDownParameter.getFunctionResolution().castFunction(returnType.getTypeSignature(), returnType.getTypeSignature()), returnType, ImmutableList.of(aggVariable), Optional.empty()), new JdbcConverterContext());
     }
 
     @Override

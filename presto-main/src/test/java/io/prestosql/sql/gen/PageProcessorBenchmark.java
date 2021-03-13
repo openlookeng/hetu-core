@@ -178,7 +178,7 @@ public class PageProcessorBenchmark
         Expression expression = createExpression(value, METADATA, TypeProvider.copyOf(symbolTypes));
 
         Map<NodeRef<Expression>, Type> expressionTypes = TYPE_ANALYZER.getTypes(TEST_SESSION, TypeProvider.copyOf(symbolTypes), expression);
-        return SqlToRowExpressionTranslator.translate(expression, SCALAR, expressionTypes, sourceLayout, METADATA, TEST_SESSION, true);
+        return SqlToRowExpressionTranslator.translate(expression, SCALAR, expressionTypes, sourceLayout, METADATA.getFunctionAndTypeManager(), TEST_SESSION, true);
     }
 
     private static Page createPage(List<? extends Type> types, boolean dictionary)

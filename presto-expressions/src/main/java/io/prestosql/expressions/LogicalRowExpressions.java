@@ -13,9 +13,11 @@
  */
 package io.prestosql.expressions;
 
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import io.prestosql.spi.function.FunctionMetadata;
+import io.prestosql.spi.function.FunctionMetadataManager;
 import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.DeterminismEvaluator;
@@ -25,22 +27,22 @@ import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.RowExpressionVisitor;
 import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.VariableReferenceExpression;
-import io.prestosql.spi.sql.RowExpressionUtils;
-import io.prestosql.spi.type.StandardTypes;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.function.OperatorType.EQUAL;
 import static io.prestosql.spi.function.OperatorType.GREATER_THAN;
 import static io.prestosql.spi.function.OperatorType.GREATER_THAN_OR_EQUAL;
@@ -50,16 +52,9 @@ import static io.prestosql.spi.function.OperatorType.LESS_THAN_OR_EQUAL;
 import static io.prestosql.spi.function.OperatorType.NOT_EQUAL;
 import static io.prestosql.spi.relation.SpecialForm.Form.AND;
 import static io.prestosql.spi.relation.SpecialForm.Form.OR;
-import static io.prestosql.spi.sql.RowExpressionUtils.FALSE_CONSTANT;
-import static io.prestosql.spi.sql.RowExpressionUtils.TRUE_CONSTANT;
-import static io.prestosql.spi.sql.RowExpressionUtils.combinePredicates;
-import static io.prestosql.spi.sql.RowExpressionUtils.extractPredicates;
-import static io.prestosql.spi.sql.RowExpressionUtils.filterConjuncts;
-import static io.prestosql.spi.sql.RowExpressionUtils.isConjunctionOrDisjunction;
-import static io.prestosql.spi.sql.RowExpressionUtils.or;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
-import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static java.lang.Math.min;
+import static java.lang.String.format;
 import static java.util.Arrays.asList;
 import static java.util.Arrays.stream;
 import static java.util.Collections.singletonList;
@@ -69,31 +64,58 @@ import static java.util.stream.Collectors.toList;
 
 public final class LogicalRowExpressions
 {
+    public static final ConstantExpression TRUE_CONSTANT = new ConstantExpression(true, BOOLEAN);
+    public static final ConstantExpression FALSE_CONSTANT = new ConstantExpression(false, BOOLEAN);
     // 10000 is very conservative estimation
     private static final int ELIMINATE_COMMON_SIZE_LIMIT = 10000;
     private final DeterminismEvaluator determinismEvaluator;
+    private final StandardFunctionResolution functionResolution;
+    private final FunctionMetadataManager functionMetadataManager;
 
-    public LogicalRowExpressions(DeterminismEvaluator determinismEvaluator)
+    public LogicalRowExpressions(DeterminismEvaluator determinismEvaluator, StandardFunctionResolution functionResolution, FunctionMetadataManager functionMetadataManager)
     {
         this.determinismEvaluator = determinismEvaluator;
+        this.functionResolution = requireNonNull(functionResolution, "functionResolution is null");
+        this.functionMetadataManager = requireNonNull(functionMetadataManager, "functionMetadataManager is null");
+    }
+
+    public static RowExpression or(RowExpression... expressions)
+    {
+        return or(asList(expressions));
+    }
+
+    public static RowExpression or(Collection<RowExpression> expressions)
+    {
+        return binaryExpression(OR, expressions);
+    }
+
+    public static List<RowExpression> extractPredicates(RowExpression expression)
+    {
+        if (expression instanceof SpecialForm) {
+            SpecialForm.Form form = ((SpecialForm) expression).getForm();
+            if (form == AND || form == OR) {
+                return extractPredicates(form, expression);
+            }
+        }
+        return singletonList(expression);
     }
 
     /**
      * Given a logical expression, the goal is to push negation to the leaf nodes.
      * This only applies to propositional logic and comparison. this utility cannot be applied to high-order logic.
      * Examples of non-applicable cases could be f(a AND b) > 5
-     *
+     * <p>
      * An applicable example:
-     *
-     *        NOT
-     *         |
-     *      ___OR_                          AND
-     *     /      \                      /      \
-     *    NOT     OR        ==>        AND      AND
-     *     |     /  \                 /  \     /   \
-     *    AND   c   NOT              a    b   NOT  d
-     *   /  \        |                         |
-     *  a    b       d                         c
+     * <p>
+     * NOT
+     * |
+     * ___OR_                          AND
+     * /      \                      /      \
+     * NOT     OR        ==>        AND      AND
+     * |     /  \                 /  \     /   \
+     * AND   c   NOT              a    b   NOT  d
+     * /  \        |                         |
+     * a    b       d                         c
      */
     public RowExpression pushNegationToLeaves(RowExpression expression)
     {
@@ -104,23 +126,23 @@ public final class LogicalRowExpressions
      * Given a logical expression, the goal is to convert to conjuctive normal form (CNF).
      * This requires making a call to `pushNegationToLeaves`. There is no guarantee as to
      * the balance of the resulting expression tree.
-     *
+     * <p>
      * This only applies to propositional logic. this utility cannot be applied to high-order logic.
      * Examples of non-applicable cases could be f(a AND b) > 5
-     *
+     * <p>
      * NOTE: This may exponentially increase the number of RowExpressions in the expression.
-     *
+     * <p>
      * An applicable example:
-     *
-     *        NOT
-     *         |
-     *      ___OR_                          AND
-     *     /      \                      /      \
-     *    NOT     OR        ==>        OR      AND
-     *     |     /  \                 /  \     /   \
-     *    OR   c   NOT              a    b   NOT  d
-     *   /  \        |                         |
-     *  a    b       d                         c
+     * <p>
+     * NOT
+     * |
+     * ___OR_                          AND
+     * /      \                      /      \
+     * NOT     OR        ==>        OR      AND
+     * |     /  \                 /  \     /   \
+     * OR   c   NOT              a    b   NOT  d
+     * /  \        |                         |
+     * a    b       d                         c
      */
     public RowExpression convertToConjunctiveNormalForm(RowExpression expression)
     {
@@ -130,18 +152,18 @@ public final class LogicalRowExpressions
     /**
      * Given a logical expression, the goal is to convert to disjunctive normal form (DNF).
      * The same limitations, format, and risks apply as for converting to conjunctive normal form (CNF).
-     *
+     * <p>
      * An applicable example:
-     *
-     *        NOT                                    OR
-     *         |                                 /        \
-     *      ___OR_                          AND            AND
-     *     /      \                        /    \        /     \
-     *    NOT     OR        ==>          a     AND      b     AND
-     *     |     /  \                         /   \          /   \
-     *    OR   c   NOT                       NOT  d         NOT  d
-     *   /  \        |                         |              |
-     *  a    b       d                         c              c
+     * <p>
+     * NOT                                    OR
+     * |                                 /        \
+     * ___OR_                          AND            AND
+     * /      \                        /    \        /     \
+     * NOT     OR        ==>          a     AND      b     AND
+     * |     /  \                         /   \          /   \
+     * OR   c   NOT                       NOT  d         NOT  d
+     * /  \        |                         |              |
+     * a    b       d                         c              c
      */
     public RowExpression convertToDisjunctiveNormalForm(RowExpression expression)
     {
@@ -168,6 +190,177 @@ public final class LogicalRowExpressions
     public RowExpression filterNonDeterministicConjuncts(RowExpression expression)
     {
         return filterConjuncts(expression, predicate -> !this.determinismEvaluator.isDeterministic(predicate));
+    }
+
+    public RowExpression filterConjuncts(RowExpression expression, Predicate<RowExpression> predicate)
+    {
+        List<RowExpression> conjuncts = extractConjuncts(expression).stream()
+                .filter(predicate)
+                .collect(toList());
+
+        return combineConjuncts(conjuncts);
+    }
+
+    public RowExpression combineConjuncts(RowExpression... expressions)
+    {
+        return combineConjuncts(asList(expressions));
+    }
+
+    public RowExpression combineConjuncts(Collection<RowExpression> expressions)
+    {
+        requireNonNull(expressions, "expressions is null");
+
+        List<RowExpression> conjuncts = expressions.stream()
+                .flatMap(e -> extractConjuncts(e).stream())
+                .filter(e -> !e.equals(TRUE_CONSTANT))
+                .collect(toList());
+
+        conjuncts = removeDuplicates(conjuncts);
+
+        if (conjuncts.contains(FALSE_CONSTANT)) {
+            return FALSE_CONSTANT;
+        }
+
+        return and(conjuncts);
+    }
+
+    /**
+     * Removes duplicate deterministic expressions. Preserves the relative order
+     * of the expressions in the list.
+     */
+    private List<RowExpression> removeDuplicates(List<RowExpression> expressions)
+    {
+        Set<RowExpression> seen = new HashSet<>();
+
+        List<RowExpression> result = new ArrayList<>();
+        for (RowExpression expression : expressions) {
+            if (isDeterministic(expression)) {
+                RowExpression expressionFlip = flipOperatorFunctionWithOneVarOneConstant(expression);
+                if (!seen.contains(expressionFlip)) {
+                    result.add(expressionFlip);
+                    seen.add(expressionFlip);
+                }
+            }
+            else {
+                result.add(expression);
+            }
+        }
+
+        return unmodifiableList(result);
+    }
+
+    public static boolean isDeterministic(RowExpression call)
+    {
+        if (call instanceof CallExpression) {
+            Set<String> functions = ImmutableSet.of("rand", "random", "shuffle", "uuid");
+            return !functions.contains(((CallExpression) call).getDisplayName().toLowerCase(Locale.ENGLISH));
+        }
+        return true;
+    }
+
+    public static boolean isDeterministic(DeterminismEvaluator evaluator, RowExpression call)
+    {
+        return evaluator.isDeterministic(call);
+    }
+
+    public RowExpression flipOperatorFunctionWithOneVarOneConstant(RowExpression expressions)
+    {
+        if (expressions instanceof CallExpression) {
+            CallExpression call = (CallExpression) expressions;
+            FunctionMetadata functionMetadata = functionMetadataManager.getFunctionMetadata(call.getFunctionHandle());
+            if (functionMetadata.getOperatorType().isPresent() && functionMetadata.getOperatorType().get().isComparisonOperator()) {
+                if (call.getArguments().get(1) instanceof VariableReferenceExpression &&
+                        call.getArguments().get(0) instanceof ConstantExpression) {
+                    OperatorType operator;
+                    switch (functionMetadata.getOperatorType().get()) {
+                        case LESS_THAN:
+                            operator = GREATER_THAN;
+                            break;
+                        case LESS_THAN_OR_EQUAL:
+                            operator = GREATER_THAN_OR_EQUAL;
+                            break;
+                        case GREATER_THAN:
+                            operator = LESS_THAN;
+                            break;
+                        case GREATER_THAN_OR_EQUAL:
+                            operator = LESS_THAN_OR_EQUAL;
+                            break;
+                        case IS_DISTINCT_FROM:
+                            operator = IS_DISTINCT_FROM;
+                            break;
+                        case EQUAL:
+                        case NOT_EQUAL:
+                            operator = functionMetadata.getOperatorType().get();
+                            break;
+                        default:
+                            throw new UnsupportedOperationException(format("Unsupported or is not comparison operator: %s", functionMetadata.getOperatorType().get()));
+                    }
+                    List<RowExpression> arguments = new ArrayList<>();
+                    arguments.add(call.getArguments().get(1));
+                    arguments.add(call.getArguments().get(0));
+                    return new CallExpression(operator.name(), functionResolution.comparisonFunction(operator, call.getArguments().get(1).getType(), call.getArguments().get(0).getType()), call.getType(), arguments, Optional.empty());
+                }
+            }
+        }
+        return expressions;
+    }
+
+    public static List<RowExpression> extractConjuncts(RowExpression expression)
+    {
+        return extractPredicates(AND, expression);
+    }
+
+    public static List<RowExpression> extractPredicates(SpecialForm.Form form, RowExpression expression)
+    {
+        if (expression instanceof SpecialForm && ((SpecialForm) expression).getForm() == form) {
+            SpecialForm specialFormExpression = (SpecialForm) expression;
+            if (specialFormExpression.getArguments().size() != 2) {
+                throw new IllegalStateException("logical binary expression requires exactly 2 operands");
+            }
+
+            List<RowExpression> predicates = new ArrayList<>();
+            predicates.addAll(extractPredicates(form, specialFormExpression.getArguments().get(0)));
+            predicates.addAll(extractPredicates(form, specialFormExpression.getArguments().get(1)));
+            return unmodifiableList(predicates);
+        }
+
+        return singletonList(expression);
+    }
+
+    public RowExpression combinePredicates(SpecialForm.Form form, Collection<RowExpression> expressions)
+    {
+        if (form == AND) {
+            return combineConjuncts(expressions);
+        }
+        return combineDisjuncts(expressions);
+    }
+
+    public RowExpression combineDisjuncts(Collection<RowExpression> expressions)
+    {
+        return combineDisjunctsWithDefault(expressions, FALSE_CONSTANT);
+    }
+
+    public RowExpression combineDisjunctsWithDefault(Collection<RowExpression> expressions, RowExpression emptyDefault)
+    {
+        requireNonNull(expressions, "expressions is null");
+
+        List<RowExpression> disjuncts = expressions.stream()
+                .flatMap(e -> extractDisjuncts(e).stream())
+                .filter(e -> !e.equals(FALSE_CONSTANT))
+                .collect(toList());
+
+        disjuncts = removeDuplicates(disjuncts);
+
+        if (disjuncts.contains(TRUE_CONSTANT)) {
+            return TRUE_CONSTANT;
+        }
+
+        return disjuncts.isEmpty() ? emptyDefault : or(disjuncts);
+    }
+
+    public static List<RowExpression> extractDisjuncts(RowExpression expression)
+    {
+        return extractPredicates(OR, expression);
     }
 
     private final class PushNegationVisitor
@@ -212,20 +405,13 @@ public final class LogicalRowExpressions
         {
             OperatorType newOperator = negate(getOperator(expression).orElse(null));
             if (newOperator == null) {
-                return new CallExpression(new Signature("not",
-                                                        SCALAR,
-                                                        parseTypeSignature(StandardTypes.BOOLEAN),
-                                                        ImmutableList.of(parseTypeSignature(StandardTypes.BOOLEAN))),
-                    BOOLEAN,
-                    singletonList(expression), Optional.empty());
+                return new CallExpression("not", functionResolution.notFunction(), BOOLEAN, singletonList(expression), Optional.empty());
             }
             checkArgument(expression.getArguments().size() == 2, "Comparison expression must have exactly two arguments");
             RowExpression left = expression.getArguments().get(0).accept(this, null);
             RowExpression right = expression.getArguments().get(1).accept(this, null);
-            return new CallExpression(
-                    Signature.internalOperator(newOperator, BOOLEAN, asList(left.getType(), right.getType())),
-                    BOOLEAN,
-                    asList(left, right), Optional.empty());
+            return new CallExpression(newOperator.name(),
+                    functionResolution.comparisonFunction(newOperator, left.getType(), right.getType()), BOOLEAN, asList(left, right), Optional.empty());
         }
 
         @Override
@@ -391,30 +577,23 @@ public final class LogicalRowExpressions
         }
     }
 
+    private boolean isConjunctionOrDisjunction(RowExpression expression)
+    {
+        if (expression instanceof SpecialForm) {
+            SpecialForm.Form form = ((SpecialForm) expression).getForm();
+            return form == AND || form == OR;
+        }
+        return false;
+    }
+
     private boolean isNegationExpression(RowExpression expression)
     {
-        return expression instanceof CallExpression && ((CallExpression) expression).getSignature().getName().equals("not");
+        return expression instanceof CallExpression && ((CallExpression) expression).getFunctionHandle().equals(functionResolution.notFunction());
     }
 
     private boolean isComparisonExpression(RowExpression expression)
     {
-        if (expression instanceof CallExpression) {
-            Signature signature = ((CallExpression) expression).getSignature();
-            try {
-                OperatorType operatorType = signature.unmangleOperator(signature.getName());
-                return operatorType.equals(EQUAL) ||
-                        operatorType.equals(NOT_EQUAL) ||
-                        operatorType.equals(LESS_THAN) ||
-                        operatorType.equals(LESS_THAN_OR_EQUAL) ||
-                        operatorType.equals(GREATER_THAN) ||
-                        operatorType.equals(GREATER_THAN_OR_EQUAL) ||
-                        operatorType.equals(IS_DISTINCT_FROM);
-            }
-            catch (IllegalArgumentException e) {
-                return false;
-            }
-        }
-        return false;
+        return expression instanceof CallExpression && functionResolution.isComparisonFunction(((CallExpression) expression).getFunctionHandle());
     }
 
     /**
@@ -425,7 +604,7 @@ public final class LogicalRowExpressions
     private List<List<RowExpression>> getGroupedClauses(SpecialForm expression)
     {
         return extractPredicates(expression.getForm(), expression).stream()
-                .map(RowExpressionUtils::extractPredicates)
+                .map(LogicalRowExpressions::extractPredicates)
                 .collect(toList());
     }
 
@@ -551,26 +730,15 @@ public final class LogicalRowExpressions
 
     private Optional<OperatorType> getOperator(RowExpression expression)
     {
-        try {
-            if (expression instanceof CallExpression) {
-                Signature signature = ((CallExpression) expression).getSignature();
-                return Optional.of(signature.unmangleOperator(signature.getName()));
-            }
-        }
-        catch (IllegalArgumentException e) {
-            return Optional.empty();
+        if (expression instanceof CallExpression) {
+            return functionMetadataManager.getFunctionMetadata(((CallExpression) expression).getFunctionHandle()).getOperatorType();
         }
         return Optional.empty();
     }
 
     private RowExpression notCallExpression(RowExpression argument)
     {
-        return new CallExpression(new Signature("not",
-                                        SCALAR,
-                                        parseTypeSignature(StandardTypes.BOOLEAN),
-                                        ImmutableList.of(parseTypeSignature(StandardTypes.BOOLEAN))),
-                BOOLEAN,
-                singletonList(argument), Optional.empty());
+        return new CallExpression("not", functionResolution.notFunction(), BOOLEAN, singletonList(argument), Optional.empty());
     }
 
     private static OperatorType negate(OperatorType operator)
@@ -595,7 +763,7 @@ public final class LogicalRowExpressions
     private static void checkArgument(boolean condition, String message, Object... arguments)
     {
         if (!condition) {
-            throw new IllegalArgumentException(String.format(message, arguments));
+            throw new IllegalArgumentException(format(message, arguments));
         }
     }
 

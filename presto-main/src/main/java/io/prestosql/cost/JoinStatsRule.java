@@ -15,12 +15,12 @@ package io.prestosql.cost;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.prestosql.Session;
+import io.prestosql.expressions.LogicalRowExpressions;
 import io.prestosql.matching.Pattern;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.JoinNode.EquiJoinClause;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.sql.RowExpressionUtils;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.tree.ComparisonExpression;
@@ -316,7 +316,7 @@ public class JoinStatsRule
                 numberOfFilterClauses = extractConjuncts(castToExpression(filter.get())).size();
             }
             else {
-                numberOfFilterClauses = RowExpressionUtils.extractConjuncts(filter.get()).size();
+                numberOfFilterClauses = LogicalRowExpressions.extractConjuncts(filter.get()).size();
             }
         }
         else {

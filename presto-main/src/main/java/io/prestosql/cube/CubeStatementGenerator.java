@@ -17,6 +17,7 @@ package io.prestosql.cube;
 
 import io.hetu.core.spi.cube.CubeStatement;
 import io.hetu.core.spi.cube.aggregator.AggregationSignature;
+import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.FilterNode;
@@ -45,7 +46,9 @@ public class CubeStatementGenerator
         //utility class
     }
 
-    public static CubeStatement generate(String fromTable,
+    public static CubeStatement generate(
+            Metadata metadata,
+            String fromTable,
             AggregationNode aggregationNode,
             FilterNode filterNode,
             Map<String, Object> symbolMappings)
@@ -126,7 +129,7 @@ public class CubeStatementGenerator
                 builder.where(ExpressionFormatter.formatExpression(expression, Optional.empty()));
             }
             else {
-                String predicateString = new RowExpressionFormatter().formatRowExpression(predicate);
+                String predicateString = new RowExpressionFormatter(metadata).formatRowExpression(predicate);
                 builder.where(predicateString);
             }
         }
@@ -135,7 +138,7 @@ public class CubeStatementGenerator
 
     public static Map<Symbol, AggregationSignature> createSignature(AggregationNode.Aggregation aggregation, Symbol symbol, Object argument)
     {
-        String aggregationName = aggregation.getSignature().getName();
+        String aggregationName = aggregation.getFunctionCall().getDisplayName();
         boolean distinct = aggregation.isDistinct();
         Map<Symbol, AggregationSignature> signature = Collections.emptyMap();
         if (argument instanceof ColumnHandle) {

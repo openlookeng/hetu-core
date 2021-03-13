@@ -15,6 +15,7 @@ package io.prestosql.operator.scalar.annotations;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.operator.scalar.ScalarHeader;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.ScalarFunction;
 import io.prestosql.spi.function.ScalarOperator;
@@ -28,25 +29,25 @@ import static com.google.common.base.CaseFormat.LOWER_CAMEL;
 import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.operator.annotations.FunctionsParserHelper.parseDescription;
-import static io.prestosql.spi.function.Signature.mangleOperatorName;
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static java.util.Objects.requireNonNull;
 
 public class ScalarImplementationHeader
 {
-    private final String name;
+    private final QualifiedObjectName name;
     private final Optional<OperatorType> operatorType;
     private final ScalarHeader header;
 
     private ScalarImplementationHeader(String name, ScalarHeader header)
     {
-        this.name = requireNonNull(name);
+        this.name = QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, requireNonNull(name));
         this.operatorType = Optional.empty();
         this.header = requireNonNull(header);
     }
 
     private ScalarImplementationHeader(OperatorType operatorType, ScalarHeader header)
     {
-        this.name = mangleOperatorName(operatorType);
+        this.name = operatorType.getFunctionName();
         this.operatorType = Optional.of(operatorType);
         this.header = requireNonNull(header);
     }
@@ -79,15 +80,15 @@ public class ScalarImplementationHeader
 
         if (scalarFunction != null) {
             String baseName = scalarFunction.value().isEmpty() ? camelToSnake(annotatedName(annotated)) : scalarFunction.value();
-            builder.add(new ScalarImplementationHeader(baseName, new ScalarHeader(description, scalarFunction.hidden(), scalarFunction.deterministic())));
+            builder.add(new ScalarImplementationHeader(baseName, new ScalarHeader(description, scalarFunction.hidden(), scalarFunction.deterministic(), scalarFunction.calledOnNullInput())));
 
             for (String alias : scalarFunction.alias()) {
-                builder.add(new ScalarImplementationHeader(alias, new ScalarHeader(description, scalarFunction.hidden(), scalarFunction.deterministic())));
+                builder.add(new ScalarImplementationHeader(alias, new ScalarHeader(description, scalarFunction.hidden(), scalarFunction.deterministic(), scalarFunction.calledOnNullInput())));
             }
         }
 
         if (scalarOperator != null) {
-            builder.add(new ScalarImplementationHeader(scalarOperator.value(), new ScalarHeader(description, true, true)));
+            builder.add(new ScalarImplementationHeader(scalarOperator.value(), new ScalarHeader(description, true, true, scalarOperator.value().isCalledOnNullInput())));
         }
 
         List<ScalarImplementationHeader> result = builder.build();
@@ -95,7 +96,7 @@ public class ScalarImplementationHeader
         return result;
     }
 
-    public String getName()
+    public QualifiedObjectName getName()
     {
         return name;
     }

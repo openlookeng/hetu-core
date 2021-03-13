@@ -109,6 +109,11 @@ public final class QueryUtil
         return new TableSubquery(query);
     }
 
+    public static SortItem descending(String name)
+    {
+        return new SortItem(identifier(name), SortItem.Ordering.DESCENDING, SortItem.NullOrdering.UNDEFINED);
+    }
+
     public static SortItem ascending(String name)
     {
         return new SortItem(identifier(name), SortItem.Ordering.ASCENDING, SortItem.NullOrdering.UNDEFINED);

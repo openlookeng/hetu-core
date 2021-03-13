@@ -17,11 +17,7 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 import io.prestosql.Session;
-import io.prestosql.operator.aggregation.InternalAggregationFunction;
-import io.prestosql.operator.window.WindowFunctionSupplier;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.block.BlockEncoding;
-import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -35,12 +31,12 @@ import io.prestosql.spi.connector.Constraint;
 import io.prestosql.spi.connector.ConstraintApplicationResult;
 import io.prestosql.spi.connector.LimitApplicationResult;
 import io.prestosql.spi.connector.ProjectionApplicationResult;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.connector.SampleType;
 import io.prestosql.spi.connector.SystemTable;
 import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.function.SqlFunction;
 import io.prestosql.spi.metadata.TableHandle;
@@ -52,10 +48,8 @@ import io.prestosql.spi.security.RoleGrant;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.statistics.TableStatisticsMetadata;
-import io.prestosql.spi.type.ParametricType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
-import io.prestosql.spi.type.TypeSignatureParameter;
 import io.prestosql.sql.analyzer.TypeSignatureProvider;
 import io.prestosql.sql.planner.PartitioningHandle;
 import io.prestosql.sql.tree.QualifiedName;
@@ -68,6 +62,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 
 import static io.prestosql.spi.StandardErrorCode.FUNCTION_NOT_FOUND;
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 
 public abstract class AbstractMockMetadata
@@ -80,12 +75,6 @@ public abstract class AbstractMockMetadata
 
     @Override
     public Set<ConnectorCapabilities> getConnectorCapabilities(Session session, CatalogName catalogName)
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public Type getParameterizedType(String baseTypeName, List<TypeSignatureParameter> typeParameters)
     {
         throw new UnsupportedOperationException();
     }
@@ -518,105 +507,44 @@ public abstract class AbstractMockMetadata
         throw new UnsupportedOperationException();
     }
 
-    @Override
-    public Collection<Type> getTypes()
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public Collection<ParametricType> getParametricTypes()
-    {
-        throw new UnsupportedOperationException();
-    }
-
     //
     // Functions
     //
 
     @Override
-    public void addFunctions(List<? extends SqlFunction> functions)
+    public List<SqlFunction> listFunctions(Optional<Session> session)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public List<SqlFunction> listFunctions()
+    public List<SqlFunction> listFunctionsWithoutFilterOut(Optional<Session> session)
     {
         throw new UnsupportedOperationException();
     }
 
-    @Override
-    public FunctionInvokerProvider getFunctionInvokerProvider()
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
     public Signature resolveFunction(QualifiedName name, List<TypeSignatureProvider> parameterTypes)
     {
         String nameSuffix = name.getSuffix();
         if (nameSuffix.equals("rand") && parameterTypes.isEmpty()) {
-            return new Signature(nameSuffix, FunctionKind.SCALAR, DOUBLE.getTypeSignature(), ImmutableList.of());
+            return new Signature(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, nameSuffix), FunctionKind.SCALAR, DOUBLE.getTypeSignature(), ImmutableList.of());
         }
         throw new PrestoException(FUNCTION_NOT_FOUND, name + "(" + Joiner.on(", ").join(parameterTypes) + ")");
     }
 
-    @Override
     public Signature resolveOperator(OperatorType operatorType, List<? extends Type> argumentTypes)
             throws OperatorNotFoundException
     {
         throw new UnsupportedOperationException();
     }
 
-    @Override
-    public Signature getCoercion(TypeSignature fromType, TypeSignature toType)
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean isAggregationFunction(QualifiedName name)
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public WindowFunctionSupplier getWindowFunctionImplementation(Signature signature)
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public InternalAggregationFunction getAggregateFunctionImplementation(Signature signature)
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public ScalarFunctionImplementation getScalarFunctionImplementation(Signature signature)
+    public FunctionAndTypeManager getFunctionAndTypeManager()
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
     public ProcedureRegistry getProcedureRegistry()
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    //
-    // Blocks
-    //
-
-    @Override
-    public BlockEncoding getBlockEncoding(String encodingName)
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public BlockEncodingSerde getBlockEncodingSerde()
     {
         throw new UnsupportedOperationException();
     }

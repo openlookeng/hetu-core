@@ -18,7 +18,7 @@ import com.google.common.collect.ImmutableSet;
 import io.airlift.bytecode.DynamicClassLoader;
 import io.airlift.slice.Slice;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlAggregationFunction;
 import io.prestosql.operator.aggregation.AggregationMetadata.AccumulatorStateDescriptor;
 import io.prestosql.operator.aggregation.state.LongDecimalWithOverflowState;
@@ -80,10 +80,10 @@ public class DecimalSumAggregation
     }
 
     @Override
-    public InternalAggregationFunction specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public InternalAggregationFunction specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
-        Type inputType = metadata.getType(getOnlyElement(applyBoundVariables(getSignature().getArgumentTypes(), boundVariables)));
-        Type outputType = metadata.getType(applyBoundVariables(getSignature().getReturnType(), boundVariables));
+        Type inputType = functionAndTypeManager.getType(getOnlyElement(applyBoundVariables(getSignature().getArgumentTypes(), boundVariables)));
+        Type outputType = functionAndTypeManager.getType(applyBoundVariables(getSignature().getReturnType(), boundVariables));
         return generateAggregation(inputType, outputType);
     }
 

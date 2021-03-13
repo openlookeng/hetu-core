@@ -23,7 +23,7 @@ import io.airlift.tpch.TpchTable;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
-import io.prestosql.metadata.QualifiedObjectName;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.sql.planner.Plan;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.MaterializedRow;

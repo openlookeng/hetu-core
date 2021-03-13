@@ -13,7 +13,7 @@
  */
 package io.prestosql.sql.analyzer;
 
-import io.prestosql.metadata.QualifiedObjectName;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.tree.QualifiedName;
 

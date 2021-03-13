@@ -24,6 +24,7 @@ import io.prestosql.operator.aggregation.groupby.GroupByAggregationTestUtils;
 import io.prestosql.operator.aggregation.histogram.HistogramGroupImplementation;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.MapType;
@@ -88,8 +89,8 @@ public class TestHistogram
                 createStringsBlock("a", "b", "c"));
 
         mapType = mapType(BIGINT, BIGINT);
-        aggregationFunction = getMetadata().getAggregateFunctionImplementation(
-                new Signature(NAME,
+        aggregationFunction = getMetadata().getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction(NAME),
                         AGGREGATE,
                         mapType.getTypeSignature(),
                         parseTypeSignature(StandardTypes.BIGINT)));
@@ -99,8 +100,8 @@ public class TestHistogram
                 createLongsBlock(100L, 200L, 300L));
 
         mapType = mapType(DOUBLE, BIGINT);
-        aggregationFunction = getMetadata().getAggregateFunctionImplementation(
-                new Signature(NAME,
+        aggregationFunction = getMetadata().getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction(NAME),
                         AGGREGATE,
                         mapType.getTypeSignature(),
                         parseTypeSignature(StandardTypes.DOUBLE)));
@@ -110,8 +111,8 @@ public class TestHistogram
                 createDoublesBlock(0.1, 0.3, 0.2));
 
         mapType = mapType(BOOLEAN, BIGINT);
-        aggregationFunction = getMetadata().getAggregateFunctionImplementation(
-                new Signature(NAME,
+        aggregationFunction = getMetadata().getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction(NAME),
                         AGGREGATE,
                         mapType.getTypeSignature(),
                         parseTypeSignature(StandardTypes.BOOLEAN)));
@@ -164,8 +165,8 @@ public class TestHistogram
                 createStringsBlock("a", "b", "a"));
 
         mapType = mapType(TIMESTAMP_WITH_TIME_ZONE, BIGINT);
-        aggregationFunction = getMetadata().getAggregateFunctionImplementation(
-                new Signature(NAME,
+        aggregationFunction = getMetadata().getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction(NAME),
                         AGGREGATE,
                         mapType.getTypeSignature(),
                         parseTypeSignature(StandardTypes.TIMESTAMP_WITH_TIME_ZONE)));
@@ -188,8 +189,8 @@ public class TestHistogram
                 createLongsBlock(2L, null, 1L));
 
         mapType = mapType(BIGINT, BIGINT);
-        aggregationFunction = getMetadata().getAggregateFunctionImplementation(
-                new Signature(NAME,
+        aggregationFunction = getMetadata().getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction(NAME),
                         AGGREGATE,
                         mapType.getTypeSignature(),
                         parseTypeSignature(StandardTypes.BIGINT)));
@@ -434,11 +435,11 @@ public class TestHistogram
     private static InternalAggregationFunction getAggregation(TypeSignature returnType, TypeSignature... arguments)
     {
         Metadata metadata = getMetadata(NEW);
-        Signature signature = new Signature(NAME,
+        Signature signature = new Signature(QualifiedObjectName.valueOfDefaultFunction(NAME),
                 AGGREGATE,
                 returnType,
                 Arrays.asList(arguments));
-        return metadata.getAggregateFunctionImplementation(signature);
+        return metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(signature);
     }
 
     private static Metadata getMetadata()

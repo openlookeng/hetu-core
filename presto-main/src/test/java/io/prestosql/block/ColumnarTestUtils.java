@@ -112,8 +112,8 @@ public final class ColumnarTestUtils
     private static Block copyBlock(Block block)
     {
         DynamicSliceOutput sliceOutput = new DynamicSliceOutput(1024);
-        METADATA.getBlockEncodingSerde().writeBlock(sliceOutput, block);
-        return METADATA.getBlockEncodingSerde().readBlock(sliceOutput.slice().getInput());
+        METADATA.getFunctionAndTypeManager().getBlockEncodingSerde().writeBlock(sliceOutput, block);
+        return METADATA.getFunctionAndTypeManager().getBlockEncodingSerde().readBlock(sliceOutput.slice().getInput());
     }
 
     public static DictionaryBlock createTestDictionaryBlock(Block block)

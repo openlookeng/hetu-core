@@ -19,22 +19,28 @@ import io.prestosql.Session;
 import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControl;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.rewrite.StatementRewrite;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.sql.tree.GroupingOperation;
+import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.sql.tree.Statement;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static io.prestosql.sql.analyzer.ExpressionTreeUtils.extractAggregateFunctions;
 import static io.prestosql.sql.analyzer.ExpressionTreeUtils.extractExpressions;
+import static io.prestosql.sql.analyzer.ExpressionTreeUtils.extractExternalFunctions;
 import static io.prestosql.sql.analyzer.ExpressionTreeUtils.extractWindowFunctions;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.CANNOT_HAVE_AGGREGATIONS_WINDOWS_OR_GROUPING;
+import static io.prestosql.sql.analyzer.SemanticErrorCode.NOT_SUPPORTED;
 import static java.util.Objects.requireNonNull;
 
 public class Analyzer
@@ -122,6 +128,32 @@ public class Analyzer
 
         if (!found.isEmpty()) {
             throw new SemanticException(CANNOT_HAVE_AGGREGATIONS_WINDOWS_OR_GROUPING, predicate, "%s cannot contain aggregations, window functions or grouping operations: %s", clause, found);
+        }
+    }
+
+    static void verifyNoAggregateWindowOrGroupingFunctions(Map<NodeRef<FunctionCall>, FunctionHandle> functionHandles, FunctionAndTypeManager functionAndTypeManager, Expression predicate, String clause)
+    {
+        List<FunctionCall> aggregates = extractAggregateFunctions(functionHandles, ImmutableList.of(predicate), functionAndTypeManager);
+
+        List<FunctionCall> windowExpressions = extractWindowFunctions(ImmutableList.of(predicate));
+
+        List<GroupingOperation> groupingOperations = extractExpressions(ImmutableList.of(predicate), GroupingOperation.class);
+
+        List<Expression> found = ImmutableList.copyOf(Iterables.concat(
+                aggregates,
+                windowExpressions,
+                groupingOperations));
+
+        if (!found.isEmpty()) {
+            throw new SemanticException(CANNOT_HAVE_AGGREGATIONS_WINDOWS_OR_GROUPING, predicate, "%s cannot contain aggregations, window functions or grouping operations: %s", clause, found);
+        }
+    }
+
+    static void verifyNoExternalFunctions(Map<NodeRef<FunctionCall>, FunctionHandle> functionHandles, FunctionAndTypeManager functionAndTypeManager, Expression predicate, String clause)
+    {
+        List<FunctionCall> externalFunctions = extractExternalFunctions(functionHandles, ImmutableList.of(predicate), functionAndTypeManager);
+        if (!externalFunctions.isEmpty()) {
+            throw new SemanticException(NOT_SUPPORTED, predicate, "External functions in %s is not supported: %s", clause, externalFunctions);
         }
     }
 }

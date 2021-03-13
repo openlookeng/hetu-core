@@ -81,6 +81,7 @@ import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.ColumnPropertyManager;
 import io.prestosql.metadata.DiscoveryNodeManager;
 import io.prestosql.metadata.ForNodeManager;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.HandleJsonModule;
 import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.metadata.Metadata;
@@ -89,6 +90,8 @@ import io.prestosql.metadata.SchemaPropertyManager;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.metadata.StaticCatalogStore;
 import io.prestosql.metadata.StaticCatalogStoreConfig;
+import io.prestosql.metadata.StaticFunctionNamespaceStore;
+import io.prestosql.metadata.StaticFunctionNamespaceStoreConfig;
 import io.prestosql.metadata.TablePropertyManager;
 import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.operator.ExchangeClientConfig;
@@ -110,6 +113,7 @@ import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.DomainTranslator;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spiller.FileSingleStreamSpillerFactory;
 import io.prestosql.spiller.GenericPartitioningSpillerFactory;
 import io.prestosql.spiller.GenericSpillerFactory;
@@ -230,7 +234,7 @@ public class ServerMainModule
     @Singleton
     public static BlockEncodingSerde createBlockEncodingSerde(Metadata metadata)
     {
-        return metadata.getBlockEncodingSerde();
+        return metadata.getFunctionAndTypeManager().getBlockEncodingSerde();
     }
 
     @Override
@@ -413,6 +417,8 @@ public class ServerMainModule
 
         binder.bind(StaticCatalogStore.class).in(Scopes.SINGLETON);
         configBinder(binder).bindConfig(StaticCatalogStoreConfig.class);
+
+        binder.bind(FunctionAndTypeManager.class).in(Scopes.SINGLETON);
         binder.bind(MetadataManager.class).in(Scopes.SINGLETON);
         binder.bind(Metadata.class).to(MetadataManager.class).in(Scopes.SINGLETON);
 
@@ -420,6 +426,7 @@ public class ServerMainModule
         binder.bind(DeterminismEvaluator.class).to(RowExpressionDeterminismEvaluator.class).in(Scopes.SINGLETON);
 
         // type
+        binder.bind(TypeManager.class).to(FunctionAndTypeManager.class).in(Scopes.SINGLETON);
         binder.bind(TypeAnalyzer.class).in(Scopes.SINGLETON);
         jsonBinder(binder).addDeserializerBinding(Type.class).to(TypeDeserializer.class);
         newSetBinder(binder, Type.class);
@@ -503,6 +510,9 @@ public class ServerMainModule
 
         binder.bind(CatalogManager.class).in(Scopes.SINGLETON);
         binder.bind(HetuMetaStoreManager.class).in(Scopes.SINGLETON);
+
+        binder.bind(StaticFunctionNamespaceStore.class).in(Scopes.SINGLETON);
+        configBinder(binder).bindConfig(StaticFunctionNamespaceStoreConfig.class);
 
         // block encodings
         jsonBinder(binder).addSerializerBinding(Block.class).to(BlockJsonSerde.Serializer.class);

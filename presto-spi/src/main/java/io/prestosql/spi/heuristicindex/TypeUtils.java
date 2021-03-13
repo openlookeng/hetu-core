@@ -16,7 +16,7 @@
 package io.prestosql.spi.heuristicindex;
 
 import io.airlift.slice.Slice;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.RowExpression;
@@ -38,7 +38,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
 import java.sql.Timestamp;
-import java.util.Locale;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.spi.type.Decimals.decodeUnscaledValue;
@@ -97,9 +96,7 @@ public class TypeUtils
     {
         if (rowExpression instanceof CallExpression) {
             CallExpression callExpression = (CallExpression) rowExpression;
-            Signature signature = callExpression.getSignature();
-            String name = signature.getName().toLowerCase(Locale.ENGLISH);
-
+            String name = ((BuiltInFunctionHandle) callExpression.getFunctionHandle()).getSignature().getNameSuffix();
             if (name.equals(CAST_OPERATOR)) {
                 return extractValueFromRowExpression(callExpression.getArguments().get(0));
             }

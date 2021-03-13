@@ -19,21 +19,15 @@ import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.plugin.jdbc.JdbcTableHandle;
 import io.prestosql.spi.block.SortOrder;
-import io.prestosql.spi.function.FunctionKind;
-import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.Assignments;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.OrderingScheme;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.WindowNode;
-import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.sql.expression.Types;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
-import io.prestosql.sql.relational.ConnectorRowExpressionService;
-import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
-import io.prestosql.sql.relational.RowExpressionDomainTranslator;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
@@ -42,6 +36,8 @@ import java.util.function.Function;
 
 import static io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule.FULL_PUSHDOWN;
 import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
+import static io.prestosql.sql.relational.Expressions.call;
 import static org.testng.Assert.assertEquals;
 
 public class TestBaseBaseJdbcQueryGenerator
@@ -62,9 +58,9 @@ public class TestBaseBaseJdbcQueryGenerator
             PlanNode planNode,
             String expectedJQL)
     {
-        JdbcPushDownParameter pushDownParameter = new JdbcPushDownParameter("'", false, FULL_PUSHDOWN);
-        RowExpressionService rowExpressionService = new ConnectorRowExpressionService(new RowExpressionDomainTranslator(metadata), new RowExpressionDeterminismEvaluator(metadata));
-        JdbcQueryGeneratorResult jdbcQueryGeneratorResult = (new BaseJdbcQueryGenerator(pushDownParameter, new BaseJdbcRowExpressionConverter(rowExpressionService), new BaseJdbcSqlStatementWriter(pushDownParameter))).generate(planNode, new TestTypeManager()).get();
+        TesterParameter testerParameter = TesterParameter.getTesterParameter();
+        JdbcPushDownParameter pushDownParameter = new JdbcPushDownParameter("'", false, FULL_PUSHDOWN, testerParameter.getFunctionResolution());
+        JdbcQueryGeneratorResult jdbcQueryGeneratorResult = (new BaseJdbcQueryGenerator(pushDownParameter, new BaseJdbcRowExpressionConverter(testerParameter.getMetadata().getFunctionAndTypeManager(), testerParameter.getFunctionResolution(), testerParameter.getRowExpressionService(), testerParameter.getDeterminismEvaluator()), new BaseJdbcSqlStatementWriter(pushDownParameter))).generate(planNode, new TestTypeManager()).get();
         String generatedJQL = jdbcQueryGeneratorResult.getGeneratedSql().getSql();
         assertEquals(generatedJQL, expectedJQL);
     }
@@ -155,7 +151,7 @@ public class TestBaseBaseJdbcQueryGenerator
                                 tableScan(planBuilder, jdbcTable, regionId, city, fare, amount),
                                 getRowExpression("amount > 20", defaultSessionHolder)),
                         ImmutableList.of("city", "fare"))),
-                        "SELECT city, fare FROM (SELECT regionid, city, fare, amount FROM (SELECT regionid, city, fare, amount FROM 'table') hetu_table_1 WHERE (amount > 20)) hetu_table_2 LIMIT 30");
+                "SELECT city, fare FROM (SELECT regionid, city, fare, amount FROM (SELECT regionid, city, fare, amount FROM 'table') hetu_table_1 WHERE (amount > 20)) hetu_table_2 LIMIT 30");
     }
 
     @Test
@@ -271,14 +267,10 @@ public class TestBaseBaseJdbcQueryGenerator
                 ImmutableMap.of(
                         symbol("amount_out"),
                         new WindowNode.Function(
-                                new Signature(
-                                        "min",
-                                        FunctionKind.WINDOW,
-                                        ImmutableList.of(),
-                                        ImmutableList.of(),
-                                        BIGINT.getTypeSignature(),
-                                        ImmutableList.of(BIGINT.getTypeSignature()),
-                                        false),
+                                call("min",
+                                        metadata.getFunctionAndTypeManager().lookupFunction("min", fromTypes(BIGINT)),
+                                        BIGINT,
+                                        ImmutableList.of(new VariableReferenceExpression("amount", types.get(symbol("amount"))))),
                                 ImmutableList.of(new VariableReferenceExpression("amount", types.get(symbol("amount")))),
                                 new WindowNode.Frame(
                                         Types.WindowFrameType.RANGE,
@@ -304,29 +296,25 @@ public class TestBaseBaseJdbcQueryGenerator
                         .put(symbol("amount_out"), variable("amount_out", BIGINT))
                         .build(),
                 planBuilder.window(
-                    new WindowNode.Specification(
-                            ImmutableList.of(),
-                            Optional.empty()),
-                    ImmutableMap.of(
-                            symbol("amount_out"),
-                            new WindowNode.Function(
-                                    new Signature(
-                                            "min",
-                                            FunctionKind.WINDOW,
-                                            ImmutableList.of(),
-                                            ImmutableList.of(),
-                                            BIGINT.getTypeSignature(),
-                                            ImmutableList.of(BIGINT.getTypeSignature()),
-                                            false),
-                                    ImmutableList.of(new VariableReferenceExpression("amount", types.get(symbol("amount")))),
-                                    new WindowNode.Frame(
-                                            Types.WindowFrameType.RANGE,
-                                            Types.FrameBoundType.PRECEDING,
-                                            Optional.of(startValue),
-                                            Types.FrameBoundType.FOLLOWING,
-                                            Optional.of(endValue),
-                                            Optional.of(startValue.getName()),
-                                            Optional.of(endValue.getName())))),
+                        new WindowNode.Specification(
+                                ImmutableList.of(),
+                                Optional.empty()),
+                        ImmutableMap.of(
+                                symbol("amount_out"),
+                                new WindowNode.Function(
+                                        call("min",
+                                                metadata.getFunctionAndTypeManager().lookupFunction("min", fromTypes(BIGINT)),
+                                                BIGINT,
+                                                ImmutableList.of(new VariableReferenceExpression("amount", types.get(symbol("amount"))))),
+                                        ImmutableList.of(new VariableReferenceExpression("amount", types.get(symbol("amount")))),
+                                        new WindowNode.Frame(
+                                                Types.WindowFrameType.RANGE,
+                                                Types.FrameBoundType.PRECEDING,
+                                                Optional.of(startValue),
+                                                Types.FrameBoundType.FOLLOWING,
+                                                Optional.of(endValue),
+                                                Optional.of(startValue.getName()),
+                                                Optional.of(endValue.getName())))),
                         symbol("city"),
                         scanNode)),
                 "SELECT regionid, city, amount_out FROM (SELECT regionid, city, fare, amount, startvalue, endvalue, min(amount) OVER (RANGE BETWEEN startValue PRECEDING AND endValue FOLLOWING) AS amount_out FROM (SELECT regionid, city, fare, amount, startValue, endValue FROM 'table') hetu_table_1) hetu_table_2");
@@ -345,14 +333,10 @@ public class TestBaseBaseJdbcQueryGenerator
                         ImmutableMap.of(
                                 symbol("amount_out"),
                                 new WindowNode.Function(
-                                        new Signature(
-                                                "min",
-                                                FunctionKind.WINDOW,
-                                                ImmutableList.of(),
-                                                ImmutableList.of(),
-                                                BIGINT.getTypeSignature(),
-                                                ImmutableList.of(BIGINT.getTypeSignature()),
-                                                false),
+                                        call("min",
+                                                metadata.getFunctionAndTypeManager().lookupFunction("min", fromTypes(BIGINT)),
+                                                BIGINT,
+                                                ImmutableList.of(new VariableReferenceExpression("amount", types.get(symbol("amount"))))),
                                         ImmutableList.of(new VariableReferenceExpression("amount", types.get(symbol("amount")))),
                                         new WindowNode.Frame(
                                                 Types.WindowFrameType.ROWS,

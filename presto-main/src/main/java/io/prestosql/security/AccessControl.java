@@ -14,10 +14,10 @@
 package io.prestosql.security;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.CatalogSchemaTableName;
 import io.prestosql.spi.connector.ColumnMetadata;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.security.AccessDeniedException;
 import io.prestosql.spi.security.Identity;

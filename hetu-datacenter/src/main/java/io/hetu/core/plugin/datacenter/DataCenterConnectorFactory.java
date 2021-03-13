@@ -22,6 +22,9 @@ import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorContext;
 import io.prestosql.spi.connector.ConnectorFactory;
 import io.prestosql.spi.connector.ConnectorHandleResolver;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.StandardFunctionResolution;
+import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpressionService;
 
 import java.util.Map;
@@ -56,7 +59,12 @@ public class DataCenterConnectorFactory
         try {
             // A plugin is not required to use Guice; it is just very convenient
             Bootstrap app = new Bootstrap(
-                    binder -> binder.bind(RowExpressionService.class).toInstance(context.getRowExpressionService()),
+                    binder -> {
+                        binder.bind(FunctionMetadataManager.class).toInstance(context.getFunctionMetadataManager());
+                        binder.bind(StandardFunctionResolution.class).toInstance(context.getStandardFunctionResolution());
+                        binder.bind(RowExpressionService.class).toInstance(context.getRowExpressionService());
+                        binder.bind(DeterminismEvaluator.class).toInstance(context.getRowExpressionService().getDeterminismEvaluator());
+                    },
                     new JsonModule(),
                     new DataCenterModule(context.getTypeManager()));
 

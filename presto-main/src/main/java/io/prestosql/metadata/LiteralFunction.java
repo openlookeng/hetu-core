@@ -17,8 +17,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Primitives;
 import io.airlift.slice.Slice;
+import io.hetu.core.transport.block.BlockSerdeUtil;
 import io.prestosql.spi.block.Block;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.FunctionType;
@@ -33,10 +35,10 @@ import java.lang.invoke.MethodHandles;
 import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.hetu.core.transport.block.BlockSerdeUtil.READ_BLOCK;
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
@@ -51,7 +53,7 @@ public class LiteralFunction
 
     public LiteralFunction()
     {
-        super(new Signature(LITERAL_FUNCTION_NAME, SCALAR, parseTypeSignature("R"), parseTypeSignature("T")));
+        super(new Signature(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, LITERAL_FUNCTION_NAME), SCALAR, parseTypeSignature("R"), parseTypeSignature("T")));
     }
 
     @Override
@@ -73,7 +75,7 @@ public class LiteralFunction
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         Type parameterType = boundVariables.getTypeVariable("T");
         Type type = boundVariables.getTypeVariable("R");
@@ -85,7 +87,7 @@ public class LiteralFunction
 
         if (parameterType.getJavaType() == Slice.class) {
             if (type.getJavaType() == Block.class) {
-                methodHandle = READ_BLOCK.bindTo(metadata.getBlockEncodingSerde());
+                methodHandle = BlockSerdeUtil.READ_BLOCK.bindTo(functionAndTypeManager.getBlockEncodingSerde());
             }
         }
 
@@ -95,11 +97,10 @@ public class LiteralFunction
                 parameterType.getJavaType(),
                 type.getJavaType());
 
-        return new ScalarFunctionImplementation(
+        return new BuiltInScalarFunctionImplementation(
                 false,
                 ImmutableList.of(valueTypeArgumentProperty(RETURN_NULL_ON_NULL)),
-                methodHandle,
-                isDeterministic());
+                methodHandle);
     }
 
     public static boolean isSupportedLiteralType(Type type)
@@ -153,7 +154,7 @@ public class LiteralFunction
         TypeSignature argumentType = typeForLiteralFunctionArgument(type).getTypeSignature();
 
         return new Signature(
-                LITERAL_FUNCTION_NAME + type.getTypeSignature(),
+                QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, LITERAL_FUNCTION_NAME + type.getTypeSignature()),
                 SCALAR,
                 type.getTypeSignature(),
                 argumentType);

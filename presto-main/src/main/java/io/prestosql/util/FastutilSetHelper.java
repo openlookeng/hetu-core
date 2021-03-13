@@ -13,7 +13,7 @@
  */
 package io.prestosql.util;
 
-import com.google.common.collect.ImmutableList;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.type.Type;
@@ -35,6 +35,7 @@ import static com.google.common.base.Verify.verify;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.function.OperatorType.EQUAL;
 import static io.prestosql.spi.function.OperatorType.HASH_CODE;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static java.lang.Boolean.TRUE;
 import static java.lang.Math.toIntExact;
 
@@ -50,16 +51,16 @@ public final class FastutilSetHelper
         // The performance of InCodeGenerator heavily depends on the load factor being small.
         Class<?> javaElementType = type.getJavaType();
         if (javaElementType == long.class) {
-            return new LongOpenCustomHashSet((Collection<Long>) set, 0.25f, new LongStrategy(metadata, type));
+            return new LongOpenCustomHashSet((Collection<Long>) set, 0.25f, new LongStrategy(metadata.getFunctionAndTypeManager(), type));
         }
         if (javaElementType == double.class) {
-            return new DoubleOpenCustomHashSet((Collection<Double>) set, 0.25f, new DoubleStrategy(metadata, type));
+            return new DoubleOpenCustomHashSet((Collection<Double>) set, 0.25f, new DoubleStrategy(metadata.getFunctionAndTypeManager(), type));
         }
         if (javaElementType == boolean.class) {
             return new BooleanOpenHashSet((Collection<Boolean>) set, 0.25f);
         }
         else if (!type.getJavaType().isPrimitive()) {
-            return new ObjectOpenCustomHashSet<>(set, 0.25f, new ObjectStrategy(metadata, type));
+            return new ObjectOpenCustomHashSet<>(set, 0.25f, new ObjectStrategy(metadata.getFunctionAndTypeManager(), type));
         }
         else {
             throw new UnsupportedOperationException("Unsupported native type in set: " + type.getJavaType() + " with type " + type.getTypeSignature());
@@ -92,10 +93,10 @@ public final class FastutilSetHelper
         private final MethodHandle hashCodeHandle;
         private final MethodHandle equalsHandle;
 
-        private LongStrategy(Metadata metadata, Type type)
+        private LongStrategy(FunctionAndTypeManager functionAndTypeManager, Type type)
         {
-            hashCodeHandle = metadata.getScalarFunctionImplementation(metadata.resolveOperator(HASH_CODE, ImmutableList.of(type))).getMethodHandle();
-            equalsHandle = metadata.getScalarFunctionImplementation(metadata.resolveOperator(EQUAL, ImmutableList.of(type, type))).getMethodHandle();
+            hashCodeHandle = functionAndTypeManager.getBuiltInScalarFunctionImplementation(functionAndTypeManager.resolveOperatorFunctionHandle(HASH_CODE, fromTypes(type))).getMethodHandle();
+            equalsHandle = functionAndTypeManager.getBuiltInScalarFunctionImplementation(functionAndTypeManager.resolveOperatorFunctionHandle(EQUAL, fromTypes(type, type))).getMethodHandle();
         }
 
         @Override
@@ -134,10 +135,10 @@ public final class FastutilSetHelper
         private final MethodHandle hashCodeHandle;
         private final MethodHandle equalsHandle;
 
-        private DoubleStrategy(Metadata metadata, Type type)
+        private DoubleStrategy(FunctionAndTypeManager functionAndTypeManager, Type type)
         {
-            hashCodeHandle = metadata.getScalarFunctionImplementation(metadata.resolveOperator(HASH_CODE, ImmutableList.of(type))).getMethodHandle();
-            equalsHandle = metadata.getScalarFunctionImplementation(metadata.resolveOperator(EQUAL, ImmutableList.of(type, type))).getMethodHandle();
+            hashCodeHandle = functionAndTypeManager.getBuiltInScalarFunctionImplementation(functionAndTypeManager.resolveOperatorFunctionHandle(HASH_CODE, fromTypes(type))).getMethodHandle();
+            equalsHandle = functionAndTypeManager.getBuiltInScalarFunctionImplementation(functionAndTypeManager.resolveOperatorFunctionHandle(EQUAL, fromTypes(type, type))).getMethodHandle();
         }
 
         @Override
@@ -176,14 +177,12 @@ public final class FastutilSetHelper
         private final MethodHandle hashCodeHandle;
         private final MethodHandle equalsHandle;
 
-        private ObjectStrategy(Metadata metadata, Type type)
+        private ObjectStrategy(FunctionAndTypeManager functionAndTypeManager, Type type)
         {
-            hashCodeHandle = metadata.getScalarFunctionImplementation(metadata.resolveOperator(HASH_CODE, ImmutableList.of(type)))
-                    .getMethodHandle()
-                    .asType(MethodType.methodType(long.class, Object.class));
-            equalsHandle = metadata.getScalarFunctionImplementation(metadata.resolveOperator(EQUAL, ImmutableList.of(type, type)))
-                    .getMethodHandle()
-                    .asType(MethodType.methodType(Boolean.class, Object.class, Object.class));
+            hashCodeHandle = functionAndTypeManager.getBuiltInScalarFunctionImplementation(functionAndTypeManager.resolveOperatorFunctionHandle(HASH_CODE, fromTypes(type)))
+                    .getMethodHandle().asType(MethodType.methodType(long.class, Object.class));
+            equalsHandle = functionAndTypeManager.getBuiltInScalarFunctionImplementation(functionAndTypeManager.resolveOperatorFunctionHandle(EQUAL, fromTypes(type, type)))
+                    .getMethodHandle().asType(MethodType.methodType(Boolean.class, Object.class, Object.class));
         }
 
         @Override

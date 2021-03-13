@@ -30,7 +30,6 @@ import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.OperatorNotFoundException;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.TableMetadata;
 import io.prestosql.security.AccessControl;
 import io.prestosql.security.AllowAllAccessControl;
@@ -45,6 +44,7 @@ import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorViewDefinition;
 import io.prestosql.spi.connector.ConnectorViewDefinition.ViewColumn;
 import io.prestosql.spi.connector.CreateIndexMetadata;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.heuristicindex.IndexClient;
@@ -105,6 +105,7 @@ import io.prestosql.sql.tree.FetchFirst;
 import io.prestosql.sql.tree.FieldReference;
 import io.prestosql.sql.tree.FrameBound;
 import io.prestosql.sql.tree.FunctionCall;
+import io.prestosql.sql.tree.FunctionProperty;
 import io.prestosql.sql.tree.Grant;
 import io.prestosql.sql.tree.GroupBy;
 import io.prestosql.sql.tree.GroupingElement;
@@ -233,6 +234,7 @@ import static io.prestosql.sql.analyzer.SemanticErrorCode.DUPLICATE_RELATION;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INDEX_ALREADY_EXISTS;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INSERT_INTO_CUBE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_FETCH_FIRST_ROW_COUNT;
+import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_FUNCTION_NAME;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_LIMIT_ROW_COUNT;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_OFFSET_ROW_COUNT;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_ORDINAL;
@@ -261,7 +263,6 @@ import static io.prestosql.sql.analyzer.SemanticErrorCode.VIEW_IS_RECURSIVE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.VIEW_IS_STALE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.VIEW_PARSE_ERROR;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.WILDCARD_WITHOUT_FROM;
-import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypeSignatures;
 import static io.prestosql.sql.planner.ExpressionDeterminismEvaluator.isDeterministic;
 import static io.prestosql.sql.planner.ExpressionInterpreter.expressionOptimizer;
 import static io.prestosql.sql.tree.ExplainType.Type.DISTRIBUTED;
@@ -894,6 +895,12 @@ class StatementAnalyzer
 
         @Override
         protected Scope visitCreateIndex(CreateIndex node, Optional<Scope> scope)
+        {
+            return createAndAssignScope(node, scope);
+        }
+
+        @Override
+        protected Scope visitFunctionProperty(FunctionProperty node, Optional<Scope> scope)
         {
             return createAndAssignScope(node, scope);
         }
@@ -1603,7 +1610,7 @@ class StatementAnalyzer
                     analysis.addCoercion(expression, BOOLEAN, false);
                 }
 
-                Analyzer.verifyNoAggregateWindowOrGroupingFunctions(metadata, expression, "JOIN clause");
+                verifyNoAggregateWindowOrGroupingFunctions(metadata, expression, "JOIN clause");
 
                 analysis.recordSubqueries(node, expressionAnalysis);
                 analysis.setJoinCriteria(node, expression);
@@ -1640,7 +1647,7 @@ class StatementAnalyzer
 
                 // ensure a comparison operator exists for the given types (applying coercions if necessary)
                 try {
-                    metadata.resolveOperator(OperatorType.EQUAL, ImmutableList.of(
+                    metadata.getFunctionAndTypeManager().resolveOperator(OperatorType.EQUAL, ImmutableList.of(
                             leftField.get().getType(), rightField.get().getType()));
                 }
                 catch (OperatorNotFoundException e) {
@@ -1760,6 +1767,13 @@ class StatementAnalyzer
             return createAndAssignScope(node, scope, fields);
         }
 
+        private void checkFunctionName(Statement node, QualifiedName functionName)
+        {
+            if (functionName.getParts().size() != 3) {
+                throw new SemanticException(INVALID_FUNCTION_NAME, node, format("Function name should be in the form of catalog.schema.function_name, found: %s", functionName));
+            }
+        }
+
         private void analyzeWindowFunctions(QuerySpecification node, List<Expression> outputExpressions, List<Expression> orderByExpressions)
         {
             analysis.setWindowFunctions(node, analyzeWindowFunctions(node, outputExpressions));
@@ -1771,7 +1785,7 @@ class StatementAnalyzer
         private List<FunctionCall> analyzeWindowFunctions(QuerySpecification node, List<Expression> expressions)
         {
             for (Expression expression : expressions) {
-                new WindowFunctionValidator().process(expression, analysis);
+                new WindowFunctionValidator(metadata.getFunctionAndTypeManager()).process(expression, analysis);
             }
 
             List<FunctionCall> windowFunctions = extractWindowFunctions(expressions);
@@ -1812,7 +1826,7 @@ class StatementAnalyzer
 
                 List<TypeSignature> argumentTypes = mappedCopy(windowFunction.getArguments(), expression -> analysis.getType(expression).getTypeSignature());
 
-                FunctionKind kind = metadata.resolveFunction(windowFunction.getName(), fromTypeSignatures(argumentTypes)).getKind();
+                FunctionKind kind = metadata.getFunctionAndTypeManager().getFunctionMetadata(analysis.getFunctionHandle(windowFunction)).getFunctionKind();
                 if (kind != AGGREGATE && kind != WINDOW) {
                     throw new SemanticException(MUST_BE_WINDOW_FUNCTION, node, "Not a window function: %s", windowFunction.getName());
                 }
@@ -1993,7 +2007,7 @@ class StatementAnalyzer
                                 sets.add(ImmutableList.of(ImmutableSet.of(field)));
                             }
                             else {
-                                Analyzer.verifyNoAggregateWindowOrGroupingFunctions(metadata, column, "GROUP BY clause");
+                                verifyNoAggregateWindowOrGroupingFunctions(metadata, column, "GROUP BY clause");
                                 analysis.recordSubqueries(node, analyzeExpression(column, scope));
                                 complexExpressions.add(column);
                             }
@@ -2228,7 +2242,7 @@ class StatementAnalyzer
 
         public void analyzeWhere(Node node, Scope scope, Expression predicate)
         {
-            Analyzer.verifyNoAggregateWindowOrGroupingFunctions(metadata, predicate, "WHERE clause");
+            verifyNoAggregateWindowOrGroupingFunctions(metadata, predicate, "WHERE clause");
 
             ExpressionAnalysis expressionAnalysis = analyzeExpression(predicate, scope);
             analysis.recordSubqueries(node, expressionAnalysis);

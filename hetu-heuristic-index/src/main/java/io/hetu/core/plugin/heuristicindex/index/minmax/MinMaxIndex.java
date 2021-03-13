@@ -18,6 +18,7 @@ package io.hetu.core.plugin.heuristicindex.index.minmax;
 import com.google.common.collect.ImmutableSet;
 import io.hetu.core.common.util.SecureObjectInputStream;
 import io.prestosql.spi.connector.CreateIndexMetadata;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.heuristicindex.Index;
@@ -113,7 +114,14 @@ public class MinMaxIndex
     {
         if (expression instanceof CallExpression) {
             CallExpression callExp = (CallExpression) expression;
-            Optional<OperatorType> operatorOptional = Signature.getOperatorType(((CallExpression) expression).getSignature().getName());
+            BuiltInFunctionHandle builtInFunctionHandle;
+            if (callExp.getFunctionHandle() instanceof BuiltInFunctionHandle) {
+                builtInFunctionHandle = (BuiltInFunctionHandle) callExp.getFunctionHandle();
+            }
+            else {
+                throw new UnsupportedOperationException("Unsupported function: " + callExp.getDisplayName());
+            }
+            Optional<OperatorType> operatorOptional = Signature.getOperatorType(builtInFunctionHandle.getSignature().getNameSuffix());
             if (operatorOptional.isPresent()) {
                 OperatorType operator = operatorOptional.get();
                 Comparable value = (Comparable) extractValueFromRowExpression(callExp.getArguments().get(1));

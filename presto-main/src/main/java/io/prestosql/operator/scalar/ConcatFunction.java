@@ -26,12 +26,13 @@ import io.airlift.bytecode.expression.BytecodeExpression;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlScalarFunction;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.annotation.UsedByGeneratedCode;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.function.FunctionKind;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.TypeSignature;
 
@@ -52,8 +53,9 @@ import static io.airlift.bytecode.expression.BytecodeExpressions.constantInt;
 import static io.airlift.bytecode.expression.BytecodeExpressions.invokeStatic;
 import static io.prestosql.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static io.prestosql.spi.util.Reflection.methodHandle;
@@ -76,7 +78,7 @@ public final class ConcatFunction
     private ConcatFunction(TypeSignature type, String description)
     {
         super(new Signature(
-                "concat",
+                QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "concat"),
                 FunctionKind.SCALAR,
                 ImmutableList.of(),
                 ImmutableList.of(),
@@ -105,7 +107,7 @@ public final class ConcatFunction
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         if (arity < 2) {
             throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "There must be two or more concatenation arguments");
@@ -114,11 +116,10 @@ public final class ConcatFunction
         Class<?> clazz = generateConcat(getSignature().getReturnType(), arity);
         MethodHandle methodHandle = methodHandle(clazz, "concat", nCopies(arity, Slice.class).toArray(new Class<?>[arity]));
 
-        return new ScalarFunctionImplementation(
+        return new BuiltInScalarFunctionImplementation(
                 false,
                 nCopies(arity, valueTypeArgumentProperty(RETURN_NULL_ON_NULL)),
-                methodHandle,
-                isDeterministic());
+                methodHandle);
     }
 
     private static Class<?> generateConcat(TypeSignature type, int arity)

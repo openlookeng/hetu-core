@@ -14,6 +14,9 @@
 package io.prestosql.sql.gen;
 
 import io.airlift.slice.Slices;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
+import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
@@ -24,6 +27,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DateType.DATE;
@@ -35,7 +39,6 @@ import static io.prestosql.sql.gen.InCodeGenerator.SwitchGenerationCase.HASH_SWI
 import static io.prestosql.sql.gen.InCodeGenerator.SwitchGenerationCase.SET_CONTAINS;
 import static io.prestosql.sql.gen.InCodeGenerator.checkSwitchGenerationCase;
 import static io.prestosql.sql.relational.Expressions.constant;
-import static io.prestosql.sql.relational.Signatures.CAST;
 import static org.testng.Assert.assertEquals;
 
 public class TestInCodeGenerator
@@ -51,12 +54,12 @@ public class TestInCodeGenerator
 
         values.add(constant(null, INTEGER));
         assertEquals(checkSwitchGenerationCase(INTEGER, values), DIRECT_SWITCH);
-        values.add(new CallExpression(
-                new Signature(
-                        CAST,
+        values.add(new CallExpression(OperatorType.CAST.name(),
+                new BuiltInFunctionHandle(new Signature(
+                        QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, Signature.mangleOperatorName(OperatorType.CAST)),
                         SCALAR,
                         INTEGER.getTypeSignature(),
-                        DOUBLE.getTypeSignature()),
+                        DOUBLE.getTypeSignature())),
                 INTEGER,
                 Collections.singletonList(constant(12345678901234.0, DOUBLE)),
                 Optional.empty()));
@@ -82,12 +85,12 @@ public class TestInCodeGenerator
 
         values.add(constant(null, BIGINT));
         assertEquals(checkSwitchGenerationCase(BIGINT, values), HASH_SWITCH);
-        values.add(new CallExpression(
-                new Signature(
-                        CAST,
+        values.add(new CallExpression(OperatorType.CAST.name(),
+                new BuiltInFunctionHandle(new Signature(
+                        QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, Signature.mangleOperatorName(OperatorType.CAST)),
                         SCALAR,
                         BIGINT.getTypeSignature(),
-                        DOUBLE.getTypeSignature()),
+                        DOUBLE.getTypeSignature())),
                 BIGINT,
                 Collections.singletonList(constant(12345678901234.0, DOUBLE)),
                 Optional.empty()));

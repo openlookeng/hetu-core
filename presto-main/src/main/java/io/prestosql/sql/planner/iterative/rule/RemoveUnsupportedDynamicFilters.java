@@ -21,6 +21,7 @@ import io.prestosql.cost.PlanNodeStatsEstimate;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.cost.StatsProvider;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.expressions.LogicalRowExpressions;
 import io.prestosql.expressions.RowExpressionRewriter;
 import io.prestosql.expressions.RowExpressionTreeRewriter;
 import io.prestosql.metadata.Metadata;
@@ -44,6 +45,8 @@ import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
+import io.prestosql.sql.relational.FunctionResolution;
+import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
 
 import java.util.HashSet;
 import java.util.List;
@@ -56,10 +59,8 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxSize;
 import static io.prestosql.SystemSessionProperties.isOptimizeDynamicFilterGeneration;
-import static io.prestosql.spi.sql.RowExpressionUtils.TRUE_CONSTANT;
-import static io.prestosql.spi.sql.RowExpressionUtils.combineConjuncts;
-import static io.prestosql.spi.sql.RowExpressionUtils.combinePredicates;
-import static io.prestosql.spi.sql.RowExpressionUtils.extractConjuncts;
+import static io.prestosql.expressions.LogicalRowExpressions.TRUE_CONSTANT;
+import static io.prestosql.expressions.LogicalRowExpressions.extractConjuncts;
 import static io.prestosql.sql.DynamicFilters.extractDynamicFilters;
 import static io.prestosql.sql.DynamicFilters.getDescriptor;
 import static io.prestosql.sql.DynamicFilters.isDynamicFilter;
@@ -82,11 +83,13 @@ public class RemoveUnsupportedDynamicFilters
     private final StatsCalculator statsCalculator;
     private StatsProvider statsProvider;
     private Set<String> removedDynamicFilterIds;
+    private final LogicalRowExpressions logicalRowExpressions;
 
     public RemoveUnsupportedDynamicFilters(Metadata metadata, StatsCalculator statsCalculator)
     {
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.statsCalculator = requireNonNull(statsCalculator, "statsCalculator is null");
+        this.logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata), new FunctionResolution(metadata.getFunctionAndTypeManager()), metadata.getFunctionAndTypeManager());
     }
 
     @Override
@@ -95,7 +98,7 @@ public class RemoveUnsupportedDynamicFilters
         this.removedDynamicFilterIds = new HashSet<>();
         this.statsProvider = new CachingStatsProvider(statsCalculator, session, planSymbolAllocator.getTypes());
         PlanWithConsumedDynamicFilters result = plan.accept(new RemoveUnsupportedDynamicFilters.Rewriter(session, metadata, removedDynamicFilterIds), ImmutableSet.of());
-        return SimplePlanRewriter.rewriteWith(new RemoveFilterVisitor(removedDynamicFilterIds), result.getNode(), null);
+        return SimplePlanRewriter.rewriteWith(new RemoveFilterVisitor(removedDynamicFilterIds, this.metadata), result.getNode(), null);
     }
 
     private class Rewriter
@@ -345,7 +348,7 @@ public class RemoveUnsupportedDynamicFilters
 
         private RowExpression removeDynamicFilters(RowExpression expression, Set<String> allowedDynamicFilterIds, ImmutableSet.Builder<String> consumedDynamicFilterIds)
         {
-            return combineConjuncts(extractConjuncts(expression)
+            return logicalRowExpressions.combineConjuncts(extractConjuncts(expression)
                     .stream()
                     .map(this::removeNestedDynamicFilters)
                     .filter(conjunct ->
@@ -368,7 +371,7 @@ public class RemoveUnsupportedDynamicFilters
             if (extractResult.getDynamicConjuncts().isEmpty()) {
                 return rewrittenExpression;
             }
-            return combineConjuncts(extractResult.getStaticConjuncts());
+            return logicalRowExpressions.combineConjuncts(extractResult.getStaticConjuncts());
         }
 
         private RowExpression removeNestedDynamicFilters(RowExpression expression)
@@ -403,7 +406,7 @@ public class RemoveUnsupportedDynamicFilters
                     if (!modified) {
                         return node;
                     }
-                    return combinePredicates(node.getForm(), expressionBuilder.build());
+                    return logicalRowExpressions.combinePredicates(node.getForm(), expressionBuilder.build());
                 }
             }, expression);
         }
@@ -435,10 +438,12 @@ public class RemoveUnsupportedDynamicFilters
             extends SimplePlanRewriter<Void>
     {
         private final Set<String> removedDynamicFilterIds;
+        private final LogicalRowExpressions logicalRowExpressions;
 
-        public RemoveFilterVisitor(Set<String> removedDynamicFilterIds)
+        public RemoveFilterVisitor(Set<String> removedDynamicFilterIds, Metadata metadata)
         {
             this.removedDynamicFilterIds = removedDynamicFilterIds;
+            this.logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata), new FunctionResolution(metadata.getFunctionAndTypeManager()), metadata.getFunctionAndTypeManager());
         }
 
         @Override
@@ -448,7 +453,7 @@ public class RemoveUnsupportedDynamicFilters
             RowExpression original = node.getPredicate();
             RowExpression modified;
             if (source instanceof TableScanNode) {
-                modified = combineConjuncts(extractConjuncts(original)
+                modified = logicalRowExpressions.combineConjuncts(extractConjuncts(original)
                         .stream()
                         .filter(conjunct ->
                                 getDescriptor(conjunct)

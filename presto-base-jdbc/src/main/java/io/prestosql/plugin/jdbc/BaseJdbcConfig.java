@@ -19,12 +19,19 @@ import io.airlift.configuration.ConfigSecuritySensitive;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
 import io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule;
+import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.function.Mandatory;
 
 import javax.annotation.Nullable;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
+import java.util.List;
+import java.util.Optional;
+
+import static io.prestosql.sql.builder.functioncall.BaseFunctionUtil.parserExternalFunctionCatalogSchema;
+import static io.prestosql.sql.builder.functioncall.BaseFunctionUtil.parserPushDownSupportedRemoteCatalogSchema;
+import static io.prestosql.sql.builder.functioncall.FunctionCallConstants.REMOTE_FUNCTION_CATALOG_SCHEMA;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 public class BaseJdbcConfig
@@ -58,6 +65,36 @@ public class BaseJdbcConfig
     private boolean pushDownEnable = true;
     // Hetu: JDBC push down module
     private JdbcPushDownModule pushDownModule = JdbcPushDownModule.DEFAULT;
+
+    private String pushDownExternalFunctionNamespaces;
+    private CatalogSchemaName connectorRegistryFunctionNamespace;
+
+    public Optional<CatalogSchemaName> getConnectorRegistryFunctionNamespace()
+    {
+        return Optional.ofNullable(connectorRegistryFunctionNamespace);
+    }
+
+    @Config("connector.externalfunction.namespace")
+    public BaseJdbcConfig setConnectorRegistryFunctionNamespace(String connectorRegistryFunctionNamespace)
+    {
+        this.connectorRegistryFunctionNamespace = parserExternalFunctionCatalogSchema(connectorRegistryFunctionNamespace).orElse(null);
+        return this;
+    }
+
+    @Nullable
+    public List<CatalogSchemaName> getPushDownExternalFunctionNamespace()
+    {
+        return parserPushDownSupportedRemoteCatalogSchema(this.pushDownExternalFunctionNamespaces);
+    }
+
+    @Config(REMOTE_FUNCTION_CATALOG_SCHEMA)
+    @ConfigDescription("The namespace in which remote function can push down, written in a specific catalog.schema, for example: mem.mysql," +
+            " or in multiple specific catalog.schema, for example: mem.mysql|fs.mysql|metaCache.mysql")
+    public BaseJdbcConfig setPushDownExternalFunctionNamespace(String pushDownExternalFunctionNamespaceStr)
+    {
+        this.pushDownExternalFunctionNamespaces = pushDownExternalFunctionNamespaceStr;
+        return this;
+    }
 
     public boolean isLifo()
     {

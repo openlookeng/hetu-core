@@ -19,6 +19,8 @@ import io.prestosql.metadata.CatalogMetadata;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
+import io.prestosql.spi.function.FunctionNamespaceManager;
+import io.prestosql.spi.function.FunctionNamespaceTransactionHandle;
 import io.prestosql.spi.transaction.IsolationLevel;
 
 import java.util.List;
@@ -54,6 +56,10 @@ public interface TransactionManager
     CatalogMetadata getCatalogMetadataForWrite(TransactionId transactionId, CatalogName catalogName);
 
     CatalogMetadata getCatalogMetadataForWrite(TransactionId transactionId, String catalogName);
+
+    void registerFunctionNamespaceManager(String catalogNames, FunctionNamespaceManager<?> functionNamespaceManager);
+
+    FunctionNamespaceTransactionHandle getFunctionNamespaceTransaction(TransactionId transactionId, String catalogName);
 
     ConnectorTransactionHandle getConnectorTransaction(TransactionId transactionId, CatalogName catalogName);
 

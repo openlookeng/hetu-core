@@ -15,18 +15,18 @@ package io.prestosql.operator.scalar;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.spi.block.Block;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.Type;
 
 import java.lang.invoke.MethodHandle;
 import java.util.List;
 
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.OperatorType.LESS_THAN;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.util.Reflection.methodHandle;
 
 public final class RowLessThanOperator
@@ -41,16 +41,15 @@ public final class RowLessThanOperator
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         Type type = boundVariables.getTypeVariable("T");
-        return new ScalarFunctionImplementation(
+        return new BuiltInScalarFunctionImplementation(
                 false,
                 ImmutableList.of(
                         valueTypeArgumentProperty(RETURN_NULL_ON_NULL),
                         valueTypeArgumentProperty(RETURN_NULL_ON_NULL)),
-                METHOD_HANDLE.bindTo(type).bindTo(getMethodHandles((RowType) type, metadata, LESS_THAN)),
-                isDeterministic());
+                METHOD_HANDLE.bindTo(type).bindTo(getMethodHandles((RowType) type, functionAndTypeManager, LESS_THAN)));
     }
 
     public static boolean less(

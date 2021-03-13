@@ -15,21 +15,15 @@
 package io.prestosql.plugin.jdbc.optimization;
 
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.MetadataManager;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.JdbcClient;
 import io.prestosql.plugin.jdbc.JdbcTableHandle;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.TableScanNode;
-import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
-import io.prestosql.sql.relational.ConnectorRowExpressionService;
-import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
-import io.prestosql.sql.relational.RowExpressionDomainTranslator;
 import org.testng.annotations.Test;
 
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -64,9 +58,8 @@ public class TestJdbcPlanOptimizer
     {
         BaseJdbcConfig config = new BaseJdbcConfig();
         JdbcClient client = new TestPushwonClient();
-        Metadata metadata = MetadataManager.createTestMetadataManager();
-        RowExpressionService rowExpressionService = new ConnectorRowExpressionService(new RowExpressionDomainTranslator(metadata), new RowExpressionDeterminismEvaluator(metadata));
-        JdbcPlanOptimizer optimizer = new JdbcPlanOptimizer(client, new TestTypeManager(), config, rowExpressionService);
+        TesterParameter testerParameter = TesterParameter.getTesterParameter();
+        JdbcPlanOptimizer optimizer = new JdbcPlanOptimizer(client, new TestTypeManager(), config, testerParameter.getRowExpressionService(), testerParameter.getDeterminismEvaluator(), testerParameter.getMetadata().getFunctionAndTypeManager(), testerParameter.getFunctionResolution());
         return optimizer.optimize(
                 originalPlan,
                 defaultSessionHolder.getConnectorSession(),

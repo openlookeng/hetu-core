@@ -16,14 +16,17 @@ package io.prestosql.operator.scalar;
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.CastType;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.OperatorNotFoundException;
 import io.prestosql.metadata.SqlScalarFunction;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.annotation.UsedByGeneratedCode;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Type;
@@ -39,6 +42,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.IllegalFormatException;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.BiFunction;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -46,10 +50,10 @@ import static com.google.common.collect.Streams.mapWithIndex;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
-import static io.prestosql.spi.function.Signature.internalScalarFunction;
 import static io.prestosql.spi.function.Signature.withVariadicBound;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
@@ -73,6 +77,7 @@ import static io.prestosql.spi.type.UnknownType.UNKNOWN;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.spi.type.Varchars.isVarcharType;
 import static io.prestosql.spi.util.Reflection.methodHandle;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.type.JsonType.JSON;
 import static io.prestosql.util.Failures.internalError;
 import static java.lang.Float.intBitsToFloat;
@@ -100,22 +105,21 @@ public final class FormatFunction
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         Type rowType = boundVariables.getTypeVariable("T");
 
         List<BiFunction<ConnectorSession, Block, Object>> converters = mapWithIndex(
                 rowType.getTypeParameters().stream(),
-                (type, index) -> converter(metadata, type, toIntExact(index)))
+                (type, index) -> converter(functionAndTypeManager, type, toIntExact(index)))
                 .collect(toImmutableList());
 
-        return new ScalarFunctionImplementation(
+        return new BuiltInScalarFunctionImplementation(
                 false,
                 ImmutableList.of(
                         valueTypeArgumentProperty(RETURN_NULL_ON_NULL),
                         valueTypeArgumentProperty(RETURN_NULL_ON_NULL)),
-                METHOD_HANDLE.bindTo(converters),
-                true);
+                METHOD_HANDLE.bindTo(converters));
     }
 
     @Override
@@ -136,9 +140,9 @@ public final class FormatFunction
         return "formats the input arguments using a format string";
     }
 
-    public static void validateType(Metadata metadata, Type type)
+    public static void validateType(FunctionAndTypeManager functionAndTypeManager, Type type)
     {
-        valueConverter(metadata, type, 0);
+        valueConverter(functionAndTypeManager, type, 0);
     }
 
     @UsedByGeneratedCode
@@ -163,13 +167,13 @@ public final class FormatFunction
         }
     }
 
-    private static BiFunction<ConnectorSession, Block, Object> converter(Metadata metadata, Type type, int position)
+    private static BiFunction<ConnectorSession, Block, Object> converter(FunctionAndTypeManager functionAndTypeManager, Type type, int position)
     {
-        BiFunction<ConnectorSession, Block, Object> converter = valueConverter(metadata, type, position);
+        BiFunction<ConnectorSession, Block, Object> converter = valueConverter(functionAndTypeManager, type, position);
         return (session, block) -> block.isNull(position) ? null : converter.apply(session, block);
     }
 
-    private static BiFunction<ConnectorSession, Block, Object> valueConverter(Metadata metadata, Type type, int position)
+    private static BiFunction<ConnectorSession, Block, Object> valueConverter(FunctionAndTypeManager functionAndTypeManager, Type type, int position)
     {
         if (type.equals(UNKNOWN)) {
             return (session, block) -> null;
@@ -200,8 +204,11 @@ public final class FormatFunction
         }
         // TODO: support TIME WITH TIME ZONE by making SqlTimeWithTimeZone implement TemporalAccessor
         if (type.equals(JSON)) {
-            Signature signature = internalScalarFunction("json_format", VARCHAR.getTypeSignature(), JSON.getTypeSignature());
-            MethodHandle handle = metadata.getScalarFunctionImplementation(signature).getMethodHandle();
+            FunctionHandle functionHandle = functionAndTypeManager.resolveFunction(
+                    Optional.empty(),
+                    QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "json_format"),
+                    fromTypes(JSON));
+            MethodHandle handle = functionAndTypeManager.getBuiltInScalarFunctionImplementation(functionHandle).getMethodHandle();
             return (session, block) -> convertToString(handle, type.getSlice(block, position));
         }
         if (isShortDecimal(type)) {
@@ -233,7 +240,7 @@ public final class FormatFunction
             function = (session, block) -> type.getObject(block, position);
         }
 
-        MethodHandle handle = castToVarchar(metadata, type);
+        MethodHandle handle = castToVarchar(functionAndTypeManager, type);
         if ((handle == null) || (handle.type().parameterCount() != 1)) {
             throw new PrestoException(NOT_SUPPORTED, "Type not supported for formatting: " + type.getDisplayName());
         }
@@ -241,11 +248,11 @@ public final class FormatFunction
         return (session, block) -> convertToString(handle, function.apply(session, block));
     }
 
-    private static MethodHandle castToVarchar(Metadata metadata, Type type)
+    private static MethodHandle castToVarchar(FunctionAndTypeManager functionAndTypeManager, Type type)
     {
         try {
-            Signature cast = metadata.getCoercion(type.getTypeSignature(), VARCHAR.getTypeSignature());
-            return metadata.getScalarFunctionImplementation(cast).getMethodHandle();
+            FunctionHandle cast = functionAndTypeManager.lookupCast(CastType.CAST, type.getTypeSignature(), VARCHAR.getTypeSignature());
+            return functionAndTypeManager.getBuiltInScalarFunctionImplementation(cast).getMethodHandle();
         }
         catch (OperatorNotFoundException e) {
             return null;

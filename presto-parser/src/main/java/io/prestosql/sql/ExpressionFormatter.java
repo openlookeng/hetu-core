@@ -383,6 +383,10 @@ public final class ExpressionFormatter
 
             builder.append(')');
 
+            if (node.isIgnoreNulls()) {
+                builder.append(" IGNORE NULLS");
+            }
+
             if (node.getFilter().isPresent()) {
                 builder.append(" FILTER ").append(visitFilter(node.getFilter().get(), context));
             }

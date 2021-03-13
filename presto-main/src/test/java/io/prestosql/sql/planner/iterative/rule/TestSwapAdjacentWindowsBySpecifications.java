@@ -15,9 +15,9 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.function.FunctionKind;
-import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.sql.expression.Types;
 import io.prestosql.sql.planner.assertions.ExpectedValueProvider;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
@@ -25,22 +25,26 @@ import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.sql.tree.Window;
 import org.testng.annotations.Test;
 
+import java.util.List;
 import java.util.Optional;
 
+import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.spi.sql.expression.Types.FrameBoundType.CURRENT_ROW;
 import static io.prestosql.spi.sql.expression.Types.FrameBoundType.UNBOUNDED_PRECEDING;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.functionCall;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.specification;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.window;
+import static io.prestosql.sql.relational.Expressions.call;
 
 public class TestSwapAdjacentWindowsBySpecifications
         extends BaseRuleTest
 {
     private WindowNode.Frame frame;
-    private Signature signature;
+    private FunctionHandle functionHandle;
 
     public TestSwapAdjacentWindowsBySpecifications()
     {
@@ -53,14 +57,7 @@ public class TestSwapAdjacentWindowsBySpecifications
                 Optional.empty(),
                 Optional.empty());
 
-        signature = new Signature(
-                "avg",
-                FunctionKind.WINDOW,
-                ImmutableList.of(),
-                ImmutableList.of(),
-                DOUBLE.getTypeSignature(),
-                ImmutableList.of(BIGINT.getTypeSignature()),
-                false);
+        functionHandle = createTestMetadataManager().getFunctionAndTypeManager().lookupFunction("avg", fromTypes(BIGINT));
     }
 
     @Test
@@ -79,7 +76,7 @@ public class TestSwapAdjacentWindowsBySpecifications
                                 ImmutableList.of(p.symbol("a")),
                                 Optional.empty()),
                         ImmutableMap.of(p.symbol("avg_1"),
-                                new WindowNode.Function(signature, ImmutableList.of(), frame)),
+                                new WindowNode.Function(call("avg", functionHandle, DOUBLE, ImmutableList.of()), ImmutableList.of(), frame)),
                         p.values(p.symbol("a"))))
                 .doesNotFire();
     }
@@ -101,13 +98,11 @@ public class TestSwapAdjacentWindowsBySpecifications
                         p.window(new WindowNode.Specification(
                                         ImmutableList.of(p.symbol("a")),
                                         Optional.empty()),
-                                ImmutableMap.of(p.symbol("avg_1", DOUBLE),
-                                        new WindowNode.Function(signature, ImmutableList.of(p.variable("a")), frame)),
+                                ImmutableMap.of(p.symbol("avg_1", DOUBLE), newWindowNodeFunction(ImmutableList.of(p.variable("a")))),
                                 p.window(new WindowNode.Specification(
                                                 ImmutableList.of(p.symbol("a"), p.symbol("b")),
                                                 Optional.empty()),
-                                        ImmutableMap.of(p.symbol("avg_2", DOUBLE),
-                                                new WindowNode.Function(signature, ImmutableList.of(p.variable("b")), frame)),
+                                        ImmutableMap.of(p.symbol("avg_2", DOUBLE), newWindowNodeFunction(ImmutableList.of(p.variable("b")))),
                                         p.values(p.symbol("a"), p.symbol("b")))))
                 .matches(
                         window(windowMatcherBuilder -> windowMatcherBuilder
@@ -129,14 +124,20 @@ public class TestSwapAdjacentWindowsBySpecifications
                         p.window(new WindowNode.Specification(
                                         ImmutableList.of(p.symbol("a")),
                                         Optional.empty()),
-                                ImmutableMap.of(p.symbol("avg_1"),
-                                        new WindowNode.Function(signature, ImmutableList.of(p.variable("avg_2")), frame)),
+                                ImmutableMap.of(p.symbol("avg_1"), newWindowNodeFunction(ImmutableList.of(p.variable("avg_2")))),
                                 p.window(new WindowNode.Specification(
                                                 ImmutableList.of(p.symbol("a"), p.symbol("b")),
                                                 Optional.empty()),
-                                        ImmutableMap.of(p.symbol("avg_2"),
-                                                new WindowNode.Function(signature, ImmutableList.of(p.variable("a")), frame)),
+                                        ImmutableMap.of(p.symbol("avg_2"), newWindowNodeFunction(ImmutableList.of(p.variable("a")))),
                                         p.values(p.symbol("a"), p.symbol("b")))))
                 .doesNotFire();
+    }
+
+    private WindowNode.Function newWindowNodeFunction(List<RowExpression> arguments)
+    {
+        return new WindowNode.Function(
+                call("avg", functionHandle, BIGINT, arguments),
+                arguments,
+                frame);
     }
 }

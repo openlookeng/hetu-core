@@ -66,7 +66,7 @@ import static org.testng.Assert.assertEquals;
 @SuppressWarnings("PackageVisibleField")
 public class TestSerDeUtils
 {
-    private final BlockEncodingSerde blockEncodingSerde = createTestMetadataManager().getBlockEncodingSerde();
+    private final BlockEncodingSerde blockEncodingSerde = createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde();
 
     private static class ListHolder
     {

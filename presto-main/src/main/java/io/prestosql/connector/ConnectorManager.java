@@ -31,6 +31,7 @@ import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.index.IndexManager;
 import io.prestosql.metadata.Catalog;
 import io.prestosql.metadata.CatalogManager;
+import io.prestosql.metadata.FunctionExtractor;
 import io.prestosql.metadata.HandleResolver;
 import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.metadata.MetadataManager;
@@ -65,6 +66,7 @@ import io.prestosql.split.SplitManager;
 import io.prestosql.sql.planner.ConnectorPlanOptimizerManager;
 import io.prestosql.sql.planner.NodePartitioningManager;
 import io.prestosql.sql.relational.ConnectorRowExpressionService;
+import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.transaction.TransactionManager;
 import io.prestosql.type.InternalTypeManager;
 import io.prestosql.version.EmbedVersion;
@@ -416,12 +418,15 @@ public class ConnectorManager
         ConnectorContext context = new ConnectorContextInstance(
                 new ConnectorAwareNodeManager(nodeManager, nodeInfo.getEnvironment(), catalogName),
                 versionEmbedder,
-                new InternalTypeManager(metadataManager),
+                new InternalTypeManager(metadataManager.getFunctionAndTypeManager()),
                 pageSorter,
                 pageIndexerFactory,
                 hetuMetaStoreManager.getHetuMetastore(),
                 heuristicIndexerManager.getIndexClient(),
-                new ConnectorRowExpressionService(domainTranslator, determinismEvaluator));
+                new ConnectorRowExpressionService(domainTranslator, determinismEvaluator),
+                metadataManager.getFunctionAndTypeManager(),
+                new FunctionResolution(metadataManager.getFunctionAndTypeManager()),
+                Optional.of(FunctionExtractor::extractExternalFunctions));
 
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(factory.getClass().getClassLoader())) {
             return factory.create(catalogName.getCatalogName(), properties, context);

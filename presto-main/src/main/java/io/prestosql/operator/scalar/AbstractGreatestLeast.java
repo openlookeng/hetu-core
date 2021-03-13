@@ -23,16 +23,18 @@ import io.airlift.bytecode.Scope;
 import io.airlift.bytecode.Variable;
 import io.airlift.bytecode.control.IfStatement;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlScalarFunction;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.annotation.UsedByGeneratedCode;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.analyzer.TypeSignatureProvider;
 import io.prestosql.sql.gen.CallSiteBinder;
 
 import java.lang.invoke.MethodHandle;
@@ -50,10 +52,9 @@ import static io.airlift.bytecode.Parameter.arg;
 import static io.airlift.bytecode.ParameterizedType.type;
 import static io.prestosql.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.Signature.orderableTypeParameter;
-import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.util.Reflection.methodHandle;
 import static io.prestosql.sql.gen.BytecodeUtils.invoke;
@@ -72,7 +73,7 @@ public abstract class AbstractGreatestLeast
 
     private final OperatorType operatorType;
 
-    protected AbstractGreatestLeast(String name, OperatorType operatorType)
+    protected AbstractGreatestLeast(QualifiedObjectName name, OperatorType operatorType)
     {
         super(new Signature(
                 name,
@@ -98,25 +99,24 @@ public abstract class AbstractGreatestLeast
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         Type type = boundVariables.getTypeVariable("E");
         checkArgument(type.isOrderable(), "Type must be orderable");
 
-        MethodHandle compareMethod = metadata.getScalarFunctionImplementation(Signature.internalOperator(operatorType, BOOLEAN, ImmutableList.of(type, type))).getMethodHandle();
-
+        MethodHandle compareMethod = functionAndTypeManager.getBuiltInScalarFunctionImplementation(
+                functionAndTypeManager.resolveOperatorFunctionHandle(operatorType, TypeSignatureProvider.fromTypes(type, type))).getMethodHandle();
         List<Class<?>> javaTypes = IntStream.range(0, arity)
                 .mapToObj(i -> type.getJavaType())
                 .collect(toImmutableList());
 
         Class<?> clazz = generate(javaTypes, type, compareMethod);
-        MethodHandle methodHandle = methodHandle(clazz, getSignature().getName(), javaTypes.toArray(new Class<?>[javaTypes.size()]));
+        MethodHandle methodHandle = methodHandle(clazz, getSignature().getNameSuffix(), javaTypes.toArray(new Class<?>[javaTypes.size()]));
 
-        return new ScalarFunctionImplementation(
+        return new BuiltInScalarFunctionImplementation(
                 false,
                 nCopies(javaTypes.size(), valueTypeArgumentProperty(RETURN_NULL_ON_NULL)),
-                methodHandle,
-                isDeterministic());
+                methodHandle);
     }
 
     @UsedByGeneratedCode
@@ -147,7 +147,7 @@ public abstract class AbstractGreatestLeast
 
         MethodDefinition method = definition.declareMethod(
                 a(PUBLIC, STATIC),
-                getSignature().getName(),
+                getSignature().getNameSuffix(),
                 type(javaTypes.get(0)),
                 parameters);
 
@@ -159,7 +159,7 @@ public abstract class AbstractGreatestLeast
         if (type.getTypeSignature().getBase().equals(StandardTypes.DOUBLE)) {
             for (Parameter parameter : parameters) {
                 body.append(parameter);
-                body.append(invoke(binder.bind(CHECK_NOT_NAN.bindTo(getSignature().getName())), "checkNotNaN"));
+                body.append(invoke(binder.bind(CHECK_NOT_NAN.bindTo(getSignature().getName().toString())), "checkNotNaN"));
             }
         }
 

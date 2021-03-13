@@ -617,7 +617,7 @@ public class BenchmarkDecimalOperators
                     SCALAR,
                     typeAnalyzer.getTypes(TEST_SESSION, TypeProvider.copyOf(symbolTypes), expression),
                     sourceLayout,
-                    metadata,
+                    metadata.getFunctionAndTypeManager(),
                     TEST_SESSION,
                     true);
         }

@@ -15,11 +15,7 @@ package io.prestosql.metadata;
 
 import io.airlift.slice.Slice;
 import io.prestosql.Session;
-import io.prestosql.operator.aggregation.InternalAggregationFunction;
-import io.prestosql.operator.window.WindowFunctionSupplier;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.block.BlockEncoding;
-import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -32,12 +28,10 @@ import io.prestosql.spi.connector.Constraint;
 import io.prestosql.spi.connector.ConstraintApplicationResult;
 import io.prestosql.spi.connector.LimitApplicationResult;
 import io.prestosql.spi.connector.ProjectionApplicationResult;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.connector.SampleType;
 import io.prestosql.spi.connector.SystemTable;
 import io.prestosql.spi.expression.ConnectorExpression;
-import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
-import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.function.SqlFunction;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -48,13 +42,9 @@ import io.prestosql.spi.security.RoleGrant;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.statistics.TableStatisticsMetadata;
-import io.prestosql.spi.type.ParametricType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
-import io.prestosql.spi.type.TypeSignatureParameter;
-import io.prestosql.sql.analyzer.TypeSignatureProvider;
 import io.prestosql.sql.planner.PartitioningHandle;
-import io.prestosql.sql.tree.QualifiedName;
 
 import java.util.Collection;
 import java.util.List;
@@ -212,6 +202,7 @@ public interface Metadata
 
     /**
      * For the Table UPDATE/DELETE Layouts if supported.
+     *
      * @return
      */
     default Optional<NewTableLayout> getUpdateLayout(Session session, TableHandle target)
@@ -313,6 +304,7 @@ public interface Metadata
 
     /**
      * Begin update query
+     *
      * @return
      */
     default VacuumTableHandle beginVacuum(Session session, TableHandle tableHandle, boolean full, boolean merge, Optional<String> partition)
@@ -380,10 +372,10 @@ public interface Metadata
     Optional<ConstraintApplicationResult<TableHandle>> applyFilter(Session session, TableHandle table, Constraint constraint);
 
     default Optional<ConstraintApplicationResult<TableHandle>> applyFilter(Session session, TableHandle table,
-                                                                           Constraint constraint,
-                                                                           List<Constraint> disjunctConstraints,
-                                                                           Set<ColumnHandle> allColumnHandles,
-                                                                           boolean pushPartitionsOnly)
+            Constraint constraint,
+            List<Constraint> disjunctConstraints,
+            Set<ColumnHandle> allColumnHandles,
+            boolean pushPartitionsOnly)
     {
         return applyFilter(session, table, constraint);
     }
@@ -463,60 +455,20 @@ public interface Metadata
 
     Type getType(TypeSignature signature);
 
-    default Type getParameterizedType(String baseTypeName, List<TypeSignatureParameter> typeParameters)
-    {
-        return getType(new TypeSignature(baseTypeName, typeParameters));
-    }
-
-    Collection<Type> getTypes();
-
-    Collection<ParametricType> getParametricTypes();
-
     void verifyComparableOrderableContract();
 
-    //
-    // Functions
-    //
+    List<SqlFunction> listFunctions(Optional<Session> session);
 
-    void addFunctions(List<? extends SqlFunction> functions);
-
-    List<SqlFunction> listFunctions();
-
-    FunctionInvokerProvider getFunctionInvokerProvider();
-
-    Signature resolveFunction(QualifiedName name, List<TypeSignatureProvider> parameterTypes);
-
-    Signature resolveOperator(OperatorType operatorType, List<? extends Type> argumentTypes)
-            throws OperatorNotFoundException;
-
-    Signature getCoercion(TypeSignature fromType, TypeSignature toType);
-
-    /**
-     * Is the named function an aggregation function?  This does not need type parameters
-     * because overloads between aggregation and other function types are not allowed.
-     */
-    boolean isAggregationFunction(QualifiedName name);
+    List<SqlFunction> listFunctionsWithoutFilterOut(Optional<Session> session);
 
     default LongSupplier getTableLastModifiedTimeSupplier(Session session, TableHandle tableHandle)
     {
         return null;
     }
 
-    WindowFunctionSupplier getWindowFunctionImplementation(Signature signature);
-
-    InternalAggregationFunction getAggregateFunctionImplementation(Signature signature);
-
-    ScalarFunctionImplementation getScalarFunctionImplementation(Signature signature);
+    FunctionAndTypeManager getFunctionAndTypeManager();
 
     ProcedureRegistry getProcedureRegistry();
-
-    //
-    // Blocks
-    //
-
-    BlockEncoding getBlockEncoding(String encodingName);
-
-    BlockEncodingSerde getBlockEncodingSerde();
 
     //
     // Properties
@@ -555,7 +507,7 @@ public interface Metadata
      * @param session Hetu session
      * @param catalogName catalog name
      * @return true, if underlying connector supports pre-aggregation
-     *         false, otherwise
+     * false, otherwise
      */
     boolean isPreAggregationSupported(Session session, CatalogName catalogName);
 }

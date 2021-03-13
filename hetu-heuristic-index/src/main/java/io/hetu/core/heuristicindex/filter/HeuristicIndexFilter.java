@@ -17,6 +17,7 @@ package io.hetu.core.heuristicindex.filter;
 
 import com.google.common.collect.ImmutableList;
 import io.hetu.core.common.algorithm.SequenceUtils;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.heuristicindex.IndexFilter;
@@ -61,15 +62,17 @@ public class HeuristicIndexFilter
                     Signature sigRight = Signature.internalOperator(OperatorType.LESS_THAN_OR_EQUAL,
                             specialForm.getType().getTypeSignature(),
                             specialForm.getArguments().get(2).getType().getTypeSignature());
-                    CallExpression left = new CallExpression(sigLeft, specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(1)), Optional.empty());
-                    CallExpression right = new CallExpression(sigRight, specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(2)), Optional.empty());
+                    // todo remote udf, we should get FunctionHandle from FunctionAndTypeManager
+                    CallExpression left = new CallExpression(OperatorType.GREATER_THAN_OR_EQUAL.name(), new BuiltInFunctionHandle(sigLeft), specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(1)), Optional.empty());
+                    CallExpression right = new CallExpression(OperatorType.LESS_THAN_OR_EQUAL.name(), new BuiltInFunctionHandle(sigRight), specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(2)), Optional.empty());
                     return matches(left) && matches(right);
                 case IN:
                     Signature sigEqual = Signature.internalOperator(OperatorType.EQUAL,
                             specialForm.getType().getTypeSignature(),
                             specialForm.getArguments().get(1).getType().getTypeSignature());
                     for (RowExpression exp : specialForm.getArguments().subList(1, specialForm.getArguments().size())) {
-                        if (matches(new CallExpression(sigEqual, specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), exp), Optional.empty()))) {
+                        // todo remote udf, we should get FunctionHandle from FunctionAndTypeManager
+                        if (matches(new CallExpression(OperatorType.EQUAL.name(), new BuiltInFunctionHandle(sigEqual), specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), exp), Optional.empty()))) {
                             return true;
                         }
                     }

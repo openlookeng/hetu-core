@@ -25,7 +25,6 @@ import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.ResolvedIndex;
 import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
@@ -35,7 +34,6 @@ import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.plan.WindowNode;
-import io.prestosql.spi.plan.WindowNode.Function;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
@@ -54,7 +52,6 @@ import io.prestosql.sql.planner.plan.SortNode;
 import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.HashMap;
@@ -69,6 +66,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Predicates.in;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
 import static io.prestosql.sql.planner.plan.AssignmentUtils.identityAsSymbolReferences;
 import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
@@ -363,10 +361,7 @@ public class IndexJoinOptimizer
         public PlanNode visitWindow(WindowNode node, RewriteContext<Context> context)
         {
             if (!node.getWindowFunctions().values().stream()
-                    .map(Function::getSignature)
-                    .map(Signature::getName)
-                    .map(QualifiedName::of)
-                    .allMatch(metadata::isAggregationFunction)) {
+                    .allMatch(function -> metadata.getFunctionAndTypeManager().getFunctionMetadata(function.getFunctionHandle()).getFunctionKind() == AGGREGATE)) {
                 return node;
             }
 

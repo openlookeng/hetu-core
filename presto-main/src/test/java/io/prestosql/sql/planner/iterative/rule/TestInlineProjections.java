@@ -30,7 +30,7 @@ public class TestInlineProjections
     @Test
     public void test()
     {
-        tester().assertThat(new InlineProjections())
+        tester().assertThat(new InlineProjections(getMetadata()))
                 .on(p ->
                         p.project(
                                 Assignments.builder()
@@ -70,7 +70,7 @@ public class TestInlineProjections
     @Test
     public void testIdentityProjections()
     {
-        tester().assertThat(new InlineProjections())
+        tester().assertThat(new InlineProjections(getMetadata()))
                 .on(p ->
                         p.project(
                                 Assignments.of(p.symbol("output"), castToRowExpression("value")),
@@ -83,7 +83,7 @@ public class TestInlineProjections
     @Test
     public void testSubqueryProjections()
     {
-        tester().assertThat(new InlineProjections())
+        tester().assertThat(new InlineProjections(getMetadata()))
                 .on(p ->
                         p.project(
                                 Assignments.of(p.symbol("fromOuterScope"), p.variable("fromOuterScope"), p.symbol("value"), p.variable("value")),

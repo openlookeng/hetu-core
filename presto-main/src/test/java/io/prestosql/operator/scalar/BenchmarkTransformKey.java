@@ -21,6 +21,8 @@ import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.relation.LambdaDefinitionExpression;
@@ -124,18 +126,18 @@ public class BenchmarkTransformKey
             }
             MapType mapType = mapType(elementType, elementType);
             Signature signature = new Signature(
-                    name,
+                    QualifiedObjectName.valueOfDefaultFunction(name),
                     FunctionKind.SCALAR,
                     mapType.getTypeSignature(),
                     mapType.getTypeSignature(),
                     parseTypeSignature(format("function(%s, %s, %s)", type, type, type)));
-            Signature add = new Signature("$operator$" + ADD.name(), FunctionKind.SCALAR, elementType.getTypeSignature(), elementType.getTypeSignature(), elementType.getTypeSignature());
-            projectionsBuilder.add(call(signature, mapType, ImmutableList.of(
+            Signature add = new Signature(QualifiedObjectName.valueOfDefaultFunction("$operator$" + ADD.name()), FunctionKind.SCALAR, elementType.getTypeSignature(), elementType.getTypeSignature(), elementType.getTypeSignature());
+            projectionsBuilder.add(call(signature.getName().toString(), new BuiltInFunctionHandle(signature), mapType, ImmutableList.of(
                     field(0, mapType),
                     new LambdaDefinitionExpression(
                             ImmutableList.of(elementType, elementType),
                             ImmutableList.of("x", "y"),
-                            call(add, elementType, ImmutableList.of(
+                            call(add.getName().toString(), new BuiltInFunctionHandle(add), elementType, ImmutableList.of(
                                     new VariableReferenceExpression("x", elementType),
                                     constant(increment, elementType)))))));
             Block block = createChannel(POSITIONS, mapType, elementType);

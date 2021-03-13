@@ -15,10 +15,11 @@ package io.prestosql.tests;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlScalarFunction;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.function.FunctionKind;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
 
 import java.util.Optional;
@@ -26,8 +27,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkState;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.Signature.typeVariable;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static io.prestosql.spi.util.Reflection.constructorMethodHandle;
@@ -42,7 +43,7 @@ public class StatefulSleepingSum
     private StatefulSleepingSum()
     {
         super(new Signature(
-                "stateful_sleeping_sum",
+                QualifiedObjectName.valueOfDefaultFunction("stateful_sleeping_sum"),
                 FunctionKind.SCALAR,
                 ImmutableList.of(typeVariable("bigint")),
                 ImmutableList.of(),
@@ -54,7 +55,7 @@ public class StatefulSleepingSum
     @Override
     public boolean isHidden()
     {
-        return true;
+        return false;
     }
 
     @Override
@@ -70,15 +71,14 @@ public class StatefulSleepingSum
     }
 
     @Override
-    public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+    public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
     {
         int args = 4;
-        return new ScalarFunctionImplementation(
+        return new BuiltInScalarFunctionImplementation(
                 false,
                 nCopies(args, valueTypeArgumentProperty(RETURN_NULL_ON_NULL)),
                 methodHandle(StatefulSleepingSum.class, "statefulSleepingSum", State.class, double.class, long.class, long.class, long.class),
-                Optional.of(constructorMethodHandle(State.class)),
-                true);
+                Optional.of(constructorMethodHandle(State.class)));
     }
 
     public static long statefulSleepingSum(State state, double sleepProbability, long sleepDurationMillis, long a, long b)

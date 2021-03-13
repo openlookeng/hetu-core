@@ -16,12 +16,13 @@ package io.prestosql.sql.gen;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.metadata.BoundVariables;
-import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlScalarFunction;
 import io.prestosql.operator.scalar.AbstractTestFunctions;
 import io.prestosql.spi.annotation.UsedByGeneratedCode;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.function.FunctionKind;
-import io.prestosql.spi.function.ScalarFunctionImplementation;
 import io.prestosql.spi.function.Signature;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -30,8 +31,8 @@ import java.lang.invoke.MethodHandle;
 import java.util.Optional;
 import java.util.stream.IntStream;
 
-import static io.prestosql.spi.function.ScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
-import static io.prestosql.spi.function.ScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty.valueTypeArgumentProperty;
+import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.util.Reflection.methodHandle;
 import static io.prestosql.sql.gen.TestVarArgsToArrayAdapterGenerator.TestVarArgsSum.VAR_ARGS_SUM;
@@ -76,7 +77,7 @@ public class TestVarArgsToArrayAdapterGenerator
         private TestVarArgsSum()
         {
             super(new Signature(
-                    "var_args_sum",
+                    QualifiedObjectName.valueOfDefaultFunction("var_args_sum"),
                     FunctionKind.SCALAR,
                     ImmutableList.of(),
                     ImmutableList.of(),
@@ -88,7 +89,7 @@ public class TestVarArgsToArrayAdapterGenerator
         @Override
         public boolean isHidden()
         {
-            return false;
+            return true;
         }
 
         @Override
@@ -104,7 +105,7 @@ public class TestVarArgsToArrayAdapterGenerator
         }
 
         @Override
-        public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, Metadata metadata)
+        public BuiltInScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, FunctionAndTypeManager functionAndTypeManager)
         {
             VarArgsToArrayAdapterGenerator.MethodHandleAndConstructor methodHandleAndConstructor = generateVarArgsToArrayAdapter(
                     long.class,
@@ -112,12 +113,11 @@ public class TestVarArgsToArrayAdapterGenerator
                     arity,
                     METHOD_HANDLE,
                     USER_STATE_FACTORY);
-            return new ScalarFunctionImplementation(
+            return new BuiltInScalarFunctionImplementation(
                     false,
                     nCopies(arity, valueTypeArgumentProperty(RETURN_NULL_ON_NULL)),
                     methodHandleAndConstructor.getMethodHandle(),
-                    Optional.of(methodHandleAndConstructor.getConstructor()),
-                    isDeterministic());
+                    Optional.of(methodHandleAndConstructor.getConstructor()));
         }
 
         @UsedByGeneratedCode

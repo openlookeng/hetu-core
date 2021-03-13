@@ -39,7 +39,7 @@ public class TestCountNullAggregation
     @BeforeClass
     public void setup()
     {
-        metadata.addFunctions(new FunctionListBuilder().aggregates(CountNull.class).getFunctions());
+        metadata.getFunctionAndTypeManager().registerBuiltInFunctions(new FunctionListBuilder().aggregates(CountNull.class).getFunctions());
     }
 
     @Override

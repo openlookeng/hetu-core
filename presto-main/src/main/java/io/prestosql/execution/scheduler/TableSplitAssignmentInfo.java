@@ -19,8 +19,8 @@ import com.google.common.collect.Multimap;
 import io.airlift.log.Logger;
 import io.prestosql.execution.SplitKey;
 import io.prestosql.metadata.InternalNode;
-import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.Split;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.util.Collection;

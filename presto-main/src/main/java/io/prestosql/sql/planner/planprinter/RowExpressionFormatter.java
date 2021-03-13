@@ -13,6 +13,7 @@
  */
 package io.prestosql.sql.planner.planprinter;
 
+import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
@@ -31,11 +32,17 @@ import java.util.List;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 public class RowExpressionFormatter
 {
-    public RowExpressionFormatter() {}
+    private final Metadata metadata;
+
+    public RowExpressionFormatter(Metadata metadata)
+    {
+        this.metadata = requireNonNull(metadata, "metadata is null");
+    }
 
     public String formatRowExpression(RowExpression expression)
     {
@@ -53,7 +60,7 @@ public class RowExpressionFormatter
         @Override
         public String visitCall(CallExpression node, Void context)
         {
-            String functionName = node.getSignature().getName();
+            String functionName = metadata.getFunctionAndTypeManager().getFunctionMetadata(node.getFunctionHandle()).getName().getObjectName();
             if (functionName.contains("$operator$")) {
                 OperatorType operatorType = Signature.unmangleOperator(functionName);
                 if (operatorType.isArithmeticOperator() || operatorType.isComparisonOperator()) {
@@ -74,7 +81,7 @@ public class RowExpressionFormatter
                     return format("%s BETWEEN (%s) AND (%s)", formattedExpresions.get(0), formattedExpresions.get(1), formattedExpresions.get(2));
                 }
             }
-            return node.getSignature().getName() + "(" + String.join(", ", formatRowExpressions(node.getArguments())) + ")";
+            return node.getDisplayName() + "(" + String.join(", ", formatRowExpressions(node.getArguments())) + ")";
         }
 
         @Override
