@@ -326,12 +326,12 @@ public class PartitionedOutputOperator
 
         if (page instanceof MarkerPage) {
             snapshotState.processPage(page);
+            MarkerPage marker = snapshotState.nextMarker();
 
             if (isStage0) {
                 // Do not add marker to final output.
                 return;
             }
-            MarkerPage marker = (MarkerPage) page;
             // Send out all pending pages, then broadcast the marker
             partitionFunction.flush(true);
             // Snapshot: driver/thread 1 reaches here and adds marker 1 to the output buffer.

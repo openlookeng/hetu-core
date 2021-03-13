@@ -163,6 +163,11 @@ public class TableFinishOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         if (state == State.FINISHED) {
             verify(statisticsAggregationOperator.isFinished());
             return true;

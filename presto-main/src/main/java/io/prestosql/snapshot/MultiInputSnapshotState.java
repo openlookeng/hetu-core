@@ -194,7 +194,7 @@ public class MultiInputSnapshotState
 
     private <T> T processPage(Supplier<T> pageSupplier, boolean serialized, boolean markerOnly)
     {
-        if (hasPendingPages() && markerOnly) {
+        if (markerOnly && pendingPages != null && pendingPages.hasNext()) {
             // Pending pages are not markers
             return null;
         }
@@ -462,6 +462,16 @@ public class MultiInputSnapshotState
         return false;
     }
 
+    public boolean hasPendingPages()
+    {
+        return hasPendingDataPages() || !pendingMarkers.isEmpty();
+    }
+
+    public boolean hasPendingDataPages()
+    {
+        return pendingPages != null && pendingPages.hasNext();
+    }
+
     private SerializedPage pollPendingPage()
     {
         if (pendingPages != null) {
@@ -476,11 +486,6 @@ public class MultiInputSnapshotState
             pendingPages = null;
         }
         return null;
-    }
-
-    public boolean hasPendingPages()
-    {
-        return pendingPages != null && pendingPages.hasNext();
     }
 
     public MarkerPage nextMarker()

@@ -209,6 +209,11 @@ public class LookupOuterOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && !outgoingMarkers.isEmpty()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         return closed;
     }
 

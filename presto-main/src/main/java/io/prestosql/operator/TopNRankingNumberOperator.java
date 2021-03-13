@@ -223,6 +223,11 @@ public class TopNRankingNumberOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         // has no more input, has finished flushing, and has no unfinished work
         return finishing && outputIterator != null && !outputIterator.hasNext() && unfinishedWork == null;
     }

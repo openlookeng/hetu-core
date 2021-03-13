@@ -96,6 +96,11 @@ public class LimitOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         return remainingLimit == 0 && nextPage == null;
     }
 

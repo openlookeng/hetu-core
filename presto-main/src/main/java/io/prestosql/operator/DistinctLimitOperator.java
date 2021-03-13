@@ -158,6 +158,11 @@ public class DistinctLimitOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         return !hasUnfinishedInput() && (finishing || remainingLimit == 0);
     }
 

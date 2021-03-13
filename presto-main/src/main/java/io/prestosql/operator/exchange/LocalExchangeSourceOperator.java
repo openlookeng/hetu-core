@@ -120,8 +120,13 @@ public class LocalExchangeSourceOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasPendingDataPages()) {
+            // Snapshot: there are pending restored pages. Need to send them out before finishing this operator.
+            return false;
+        }
+
         // Snapshot: must also use up all resumed pages
-        return source.isFinished() && (snapshotState == null || !snapshotState.hasPendingPages());
+        return source.isFinished();
     }
 
     @Override

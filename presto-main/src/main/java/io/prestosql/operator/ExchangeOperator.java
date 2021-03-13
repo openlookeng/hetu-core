@@ -170,7 +170,12 @@ public class ExchangeOperator
     @Override
     public boolean isFinished()
     {
-        return exchangeClient.isFinished() && (snapshotState == null || !snapshotState.hasPendingPages());
+        if (snapshotState != null && snapshotState.hasPendingDataPages()) {
+            // Snapshot: there are pending restored pages. Need to send them out before finishing this operator.
+            return false;
+        }
+
+        return exchangeClient.isFinished();
     }
 
     @Override

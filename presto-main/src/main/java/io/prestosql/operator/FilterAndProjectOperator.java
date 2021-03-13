@@ -76,6 +76,11 @@ public class FilterAndProjectOperator
     @Override
     public final boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         boolean finished = finishing && mergingOutput.isFinished();
         if (finished) {
             outputMemoryContext.setBytes(mergingOutput.getRetainedSizeInBytes());

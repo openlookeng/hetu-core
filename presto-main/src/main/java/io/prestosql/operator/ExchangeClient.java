@@ -492,6 +492,13 @@ public class ExchangeClient
                         // Only for MergeOperator
                         SerializedPage processedPage;
                         synchronized (snapshotState) {
+                            // This may look suspicious, in that if there are "pending pages" in the snapshot state, then
+                            // a) those pages were associated with specific input channels (exchange source/sink) when the state
+                            // was captured, but now they would be returned to any channel asking for the next page, and
+                            // b) when the pending page is returned, the current page (in pageReference) is discarded and lost.
+                            // But the above never happens because "merge" operators are always preceded by OrderByOperators,
+                            // which only send data pages at the end, *after* all markers. That means when snapshot is taken,
+                            // no data page has been received, so when the snapshot is restored, there won't be any pending pages.
                             processedPage = snapshotState.processSerializedPage(() -> page).orElse(null);
                         }
                         if (processedPage == null || processedPage.isMarkerPage()) {

@@ -123,6 +123,11 @@ public class AssignUniqueIdOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         return finishing && inputPage == null;
     }
 

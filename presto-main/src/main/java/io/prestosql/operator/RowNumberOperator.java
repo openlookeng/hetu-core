@@ -192,6 +192,11 @@ public class RowNumberOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         if (isSinglePartition() && maxRowsPerPartition.isPresent()) {
             if (finishing && !hasUnfinishedInput()) {
                 return true;
