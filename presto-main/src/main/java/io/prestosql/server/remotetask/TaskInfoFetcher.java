@@ -28,14 +28,10 @@ import io.prestosql.execution.TaskInfo;
 import io.prestosql.execution.TaskStatus;
 import io.prestosql.protocol.BaseResponse;
 import io.prestosql.protocol.Codec;
-import io.prestosql.snapshot.QuerySnapshotManager;
-import io.prestosql.snapshot.RestoreResult;
-import io.prestosql.snapshot.SnapshotResult;
 
 import javax.annotation.concurrent.GuardedBy;
 
 import java.net.URI;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
@@ -89,8 +85,6 @@ public class TaskInfoFetcher
     @GuardedBy("this")
     private ListenableFuture<BaseResponse<TaskInfo>> future;
 
-    private final QuerySnapshotManager snapshotManager;
-
     public TaskInfoFetcher(
             Consumer<Throwable> onFail,
             TaskInfo initialTask,
@@ -103,8 +97,7 @@ public class TaskInfoFetcher
             ScheduledExecutorService updateScheduledExecutor,
             ScheduledExecutorService errorScheduledExecutor,
             RemoteTaskStats stats,
-            boolean isBinaryEncoding,
-            QuerySnapshotManager snapshotManager)
+            boolean isBinaryEncoding)
     {
         requireNonNull(initialTask, "initialTask is null");
         requireNonNull(errorScheduledExecutor, "errorScheduledExecutor is null");
@@ -125,8 +118,6 @@ public class TaskInfoFetcher
         this.httpClient = requireNonNull(httpClient, "httpClient is null");
         this.stats = requireNonNull(stats, "stats is null");
         this.isBinaryEncoding = isBinaryEncoding;
-
-        this.snapshotManager = requireNonNull(snapshotManager, "snapshotManager is null");
     }
 
     public TaskInfo getTaskInfo()
@@ -274,7 +265,6 @@ public class TaskInfoFetcher
             updateStats(startNanos);
             errorTracker.requestSucceeded();
             updateTaskInfo(newValue);
-            updateSnapshots(newValue.getSnapshotCaptureResult(), newValue.getSnapshotRestoreResult());
         }
     }
 
@@ -316,11 +306,5 @@ public class TaskInfoFetcher
     private static boolean isDone(TaskInfo taskInfo)
     {
         return taskInfo.getTaskStatus().getState().isDone();
-    }
-
-    private void updateSnapshots(Map<Long, SnapshotResult> captureResult, Optional<RestoreResult> restoreResult)
-    {
-        snapshotManager.updateQueryCapture(taskId, captureResult);
-        snapshotManager.updateQueryRestore(taskId, restoreResult);
     }
 }

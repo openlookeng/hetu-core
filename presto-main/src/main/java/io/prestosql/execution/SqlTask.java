@@ -15,6 +15,7 @@ package io.prestosql.execution;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -265,8 +266,11 @@ public class SqlTask
         Set<Lifespan> completedDriverGroups = ImmutableSet.of();
         long fullGcCount = 0;
         Duration fullGcTime = new Duration(0, MILLISECONDS);
-        if (taskHolder.getFinalTaskInfo() != null) {
-            TaskStats taskStats = taskHolder.getFinalTaskInfo().getStats();
+        Map<Long, SnapshotResult> snapshotCaptureResult = ImmutableMap.of();
+        Optional<RestoreResult> snapshotRestoreResult = Optional.empty();
+        TaskInfo finalTaskInfo = taskHolder.getFinalTaskInfo();
+        if (finalTaskInfo != null) {
+            TaskStats taskStats = finalTaskInfo.getStats();
             queuedPartitionedDrivers = taskStats.getQueuedPartitionedDrivers();
             runningPartitionedDrivers = taskStats.getRunningPartitionedDrivers();
             physicalWrittenDataSize = taskStats.getPhysicalWrittenDataSize();
@@ -275,6 +279,12 @@ public class SqlTask
             revocableMemoryReservation = taskStats.getRevocableMemoryReservation();
             fullGcCount = taskStats.getFullGcCount();
             fullGcTime = taskStats.getFullGcTime();
+
+            if (isSnapshotEnabled) {
+                // Add snapshot result
+                snapshotCaptureResult = finalTaskInfo.getTaskStatus().getSnapshotCaptureResult();
+                snapshotRestoreResult = finalTaskInfo.getTaskStatus().getSnapshotRestoreResult();
+            }
         }
         else if (taskHolder.getTaskExecution() != null) {
             long physicalWrittenBytes = 0;
@@ -292,6 +302,13 @@ public class SqlTask
             completedDriverGroups = taskContext.getCompletedDriverGroups();
             fullGcCount = taskContext.getFullGcCount();
             fullGcTime = taskContext.getFullGcTime();
+
+            if (isSnapshotEnabled) {
+                // Add snapshot result
+                TaskSnapshotManager snapshotManager = taskHolder.taskExecution.getTaskContext().getSnapshotManager();
+                snapshotCaptureResult = snapshotManager.getSnapshotCaptureResult();
+                snapshotRestoreResult = Optional.ofNullable(snapshotManager.getSnapshotRestoreResult());
+            }
         }
 
         return new TaskStatus(taskStateMachine.getTaskId(),
@@ -310,7 +327,9 @@ public class SqlTask
                 systemMemoryReservation,
                 revocableMemoryReservation,
                 fullGcCount,
-                fullGcTime);
+                fullGcTime,
+                snapshotCaptureResult,
+                snapshotRestoreResult);
     }
 
     private TaskStats getTaskStats(TaskHolder taskHolder)
@@ -358,19 +377,13 @@ public class SqlTask
                     needsPlan.get());
         }
 
-        // Add snapshot result
-        TaskSnapshotManager snapshotManager = taskHolder.taskExecution.getTaskContext().getSnapshotManager();
-        Map<Long, SnapshotResult> snapshotCaptureResult = snapshotManager.getSnapshotCaptureResult();
-        Optional<RestoreResult> snapshotRestoreResult = Optional.ofNullable(snapshotManager.getSnapshotRestoreResult());
         return new TaskInfo(
                 taskStatus,
                 lastHeartbeat.get(),
                 outputBuffer.getInfo(),
                 noMoreSplits,
                 taskStats,
-                needsPlan.get(),
-                snapshotCaptureResult,
-                snapshotRestoreResult);
+                needsPlan.get());
     }
 
     public ListenableFuture<TaskStatus> getTaskStatus(TaskState callersCurrentState)

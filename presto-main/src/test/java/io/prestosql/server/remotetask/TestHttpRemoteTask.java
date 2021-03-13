@@ -13,6 +13,7 @@
  */
 package io.prestosql.server.remotetask;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Binder;
@@ -534,7 +535,9 @@ public class TestHttpRemoteTask
                     initialTaskStatus.getSystemMemoryReservation(),
                     initialTaskStatus.getRevocableMemoryReservation(),
                     initialTaskStatus.getFullGcCount(),
-                    initialTaskStatus.getFullGcTime());
+                    initialTaskStatus.getFullGcTime(),
+                    ImmutableMap.of(),
+                    Optional.empty());
         }
     }
 }

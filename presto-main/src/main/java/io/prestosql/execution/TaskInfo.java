@@ -19,8 +19,6 @@ import com.google.common.collect.ImmutableSet;
 import io.prestosql.execution.buffer.BufferInfo;
 import io.prestosql.execution.buffer.OutputBufferInfo;
 import io.prestosql.operator.TaskStats;
-import io.prestosql.snapshot.RestoreResult;
-import io.prestosql.snapshot.SnapshotResult;
 import io.prestosql.spi.plan.PlanNodeId;
 import org.joda.time.DateTime;
 
@@ -28,10 +26,7 @@ import javax.annotation.concurrent.Immutable;
 
 import java.net.URI;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
-import java.util.TreeMap;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static io.prestosql.execution.TaskStatus.initialTaskStatus;
@@ -48,21 +43,6 @@ public class TaskInfo
     private final TaskStats stats;
 
     private final boolean needsPlan;
-    // snapshotCaptureResult and snapshotRestoreResult are used to store result of snapshot capture and restore. They are empty when the following conditions happened:
-    // (1) Snapshot is not enabled
-    // (2) Snapshot is enabled but no data for capture/restore result
-    private final Map<Long, SnapshotResult> snapshotCaptureResult;
-    private final Optional<RestoreResult> snapshotRestoreResult;
-
-    public TaskInfo(TaskStatus taskStatus,
-                    DateTime lastHeartbeat,
-                    OutputBufferInfo outputBuffers,
-                    Set<PlanNodeId> noMoreSplits,
-                    TaskStats stats,
-                    boolean needsPlan)
-    {
-        this(taskStatus, lastHeartbeat, outputBuffers, noMoreSplits, stats, needsPlan, new TreeMap<>(), Optional.empty());
-    }
 
     @JsonCreator
     public TaskInfo(@JsonProperty("taskStatus") TaskStatus taskStatus,
@@ -70,9 +50,7 @@ public class TaskInfo
             @JsonProperty("outputBuffers") OutputBufferInfo outputBuffers,
             @JsonProperty("noMoreSplits") Set<PlanNodeId> noMoreSplits,
             @JsonProperty("stats") TaskStats stats,
-            @JsonProperty("needsPlan") boolean needsPlan,
-            @JsonProperty("snapshotCaptureResult") Map<Long, SnapshotResult> snapshotCaptureResult,
-            @JsonProperty("snapshotRestoreResult") Optional<RestoreResult> snapshotRestoreResult)
+            @JsonProperty("needsPlan") boolean needsPlan)
     {
         this.taskStatus = requireNonNull(taskStatus, "taskStatus is null");
         this.lastHeartbeat = requireNonNull(lastHeartbeat, "lastHeartbeat is null");
@@ -81,8 +59,6 @@ public class TaskInfo
         this.stats = requireNonNull(stats, "stats is null");
 
         this.needsPlan = needsPlan;
-        this.snapshotCaptureResult = snapshotCaptureResult;
-        this.snapshotRestoreResult = snapshotRestoreResult;
     }
 
     @JsonProperty
@@ -121,24 +97,12 @@ public class TaskInfo
         return needsPlan;
     }
 
-    @JsonProperty
-    public Map<Long, SnapshotResult> getSnapshotCaptureResult()
-    {
-        return snapshotCaptureResult;
-    }
-
-    @JsonProperty
-    public Optional<RestoreResult> getSnapshotRestoreResult()
-    {
-        return snapshotRestoreResult;
-    }
-
     public TaskInfo summarize()
     {
         if (taskStatus.getState().isDone()) {
-            return new TaskInfo(taskStatus, lastHeartbeat, outputBuffers.summarize(), noMoreSplits, stats.summarizeFinal(), needsPlan, snapshotCaptureResult, snapshotRestoreResult);
+            return new TaskInfo(taskStatus, lastHeartbeat, outputBuffers.summarize(), noMoreSplits, stats.summarizeFinal(), needsPlan);
         }
-        return new TaskInfo(taskStatus, lastHeartbeat, outputBuffers.summarize(), noMoreSplits, stats.summarize(), needsPlan, snapshotCaptureResult, snapshotRestoreResult);
+        return new TaskInfo(taskStatus, lastHeartbeat, outputBuffers.summarize(), noMoreSplits, stats.summarize(), needsPlan);
     }
 
     @Override
@@ -163,6 +127,6 @@ public class TaskInfo
 
     public TaskInfo withTaskStatus(TaskStatus newTaskStatus)
     {
-        return new TaskInfo(newTaskStatus, lastHeartbeat, outputBuffers, noMoreSplits, stats, needsPlan, snapshotCaptureResult, snapshotRestoreResult);
+        return new TaskInfo(newTaskStatus, lastHeartbeat, outputBuffers, noMoreSplits, stats, needsPlan);
     }
 }

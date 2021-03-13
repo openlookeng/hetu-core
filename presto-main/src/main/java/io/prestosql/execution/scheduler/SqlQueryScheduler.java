@@ -37,6 +37,7 @@ import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.execution.StageId;
 import io.prestosql.execution.StageInfo;
 import io.prestosql.execution.StageState;
+import io.prestosql.execution.TaskId;
 import io.prestosql.execution.TaskStatus;
 import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
@@ -256,6 +257,15 @@ public class SqlQueryScheduler
 
         this.stages = stages.stream()
                 .collect(toImmutableMap(SqlStageExecution::getStageId, identity()));
+
+        if (isSnapshotEnabled) {
+            // Snapshot: add minimum number of tasks to task list in query snapshot manager, so that we don't complete prematurely,
+            // e.g. 1 task is schedule and finishes right away, before other tasks are scheduled, then snapshot manager may think
+            // snapshot is complete, because all known tasks are covered.
+            for (SqlStageExecution stage : stages) {
+                snapshotManager.addNewTask(new TaskId(stage.getStageId(), 0));
+            }
+        }
 
         this.stageSchedulers = stageSchedulers.build();
         this.stageLinkages = stageLinkages.build();

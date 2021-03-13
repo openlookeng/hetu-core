@@ -15,6 +15,7 @@
 package io.prestosql.snapshot;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import io.airlift.log.Logger;
 import io.prestosql.Session;
@@ -392,7 +393,7 @@ public class QuerySnapshotManager
             if (snapshotId < 0) {
                 // Special case. Task will never receive any marker. Add it to the "finished" list
                 checkArgument(result == SnapshotResult.SUCCESSFUL);
-                updateFinishedQueryComponents(ImmutableList.of(taskId));
+                updateCapturedComponents(ImmutableList.of(taskId), false);
             }
             else if (result == SnapshotResult.FAILED) {
                 updateQueryCapture(snapshotId, taskId, SnapshotComponentCounter.ComponentState.FAILED);
@@ -489,8 +490,30 @@ public class QuerySnapshotManager
 
     public void updateFinishedQueryComponents(Collection<TaskId> finishedTasks)
     {
-        if (unfinishedTasks.removeAll(finishedTasks)) {
-            LOG.debug("Some tasks finished for query %s.%n  Remaining tasks: %s.%n  Snapshot result: %s", queryId.getId(), unfinishedTasks, captureResults);
+        updateCapturedComponents(finishedTasks, true);
+    }
+
+    public void updateCapturedComponents(Collection<TaskId> capturedTasks, boolean finished)
+    {
+        // For future snapshots
+        if (unfinishedTasks.removeAll(capturedTasks)) {
+            if (finished) {
+                LOG.debug("Some tasks finished for query %s.%n  Finished tasks: %s.%n  Remaining tasks: %s.%n  Snapshot result: %s",
+                        queryId.getId(), capturedTasks, unfinishedTasks, captureResults);
+            }
+            else {
+                LOG.debug("Some tasks are fully captured for query %s.%n  Captured tasks: %s.%n  Remaining tasks: %s.%n  Snapshot result: %s",
+                        queryId.getId(), capturedTasks, unfinishedTasks, captureResults);
+            }
+
+            synchronized (captureComponentCounters) {
+                // Update ongoing snapshots
+                for (Long snapshotId : captureComponentCounters.keySet()) {
+                    for (TaskId taskId : capturedTasks) {
+                        updateQueryCapture(taskId, ImmutableMap.of(snapshotId, SnapshotResult.SUCCESSFUL));
+                    }
+                }
+            }
         }
     }
 

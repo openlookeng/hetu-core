@@ -261,7 +261,8 @@ public final class HttpRemoteTask
                     maxErrorDuration,
                     errorScheduledExecutor,
                     stats,
-                    isBinaryEncoding);
+                    isBinaryEncoding,
+                    snapshotManager);
 
             this.taskInfoFetcher = new TaskInfoFetcher(
                     this::failTask,
@@ -275,8 +276,7 @@ public final class HttpRemoteTask
                     updateScheduledExecutor,
                     errorScheduledExecutor,
                     stats,
-                    isBinaryEncoding,
-                    snapshotManager);
+                    isBinaryEncoding);
 
             taskStatusFetcher.addStateChangeListener(newStatus -> {
                 TaskState state = newStatus.getState();
