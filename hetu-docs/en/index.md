@@ -207,3 +207,5 @@ headless: true
     - [1.0.1]({{< relref "./docs/releasenotes/releasenotes-1.0.1.md" >}})
     - [1.0.0]({{< relref "./docs/releasenotes/releasenotes-1.0.0.md" >}})
     - [0.1.0]({{< relref "./docs/releasenotes/releasenotes-0.1.0.md" >}})
+
+- [FAQ]({{< relref "./docs/faq/faq.md" >}})
