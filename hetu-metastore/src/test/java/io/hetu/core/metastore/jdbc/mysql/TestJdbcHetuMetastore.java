@@ -1127,6 +1127,45 @@ public class TestJdbcHetuMetastore
         assertEquals(newView1.get().getCreateTime(), view.getCreateTime());
     }
 
+    @Test
+    public void testAlterTableParametersParallel()
+            throws InterruptedException
+    {
+        String tableName = "table2000";
+        TableEntity tableEntity = TableEntity.builder()
+                .setCatalogName(defaultDatabase.getCatalogName())
+                .setDatabaseName(defaultDatabase.getName())
+                .setTableName(tableName)
+                .setTableType(TableEntityType.TABLE.toString())
+                .build();
+        metastore.createTable(tableEntity);
+
+        int num = 100;
+        Thread[] threads = new Thread[num];
+        for (int i = 0; i < num; i++) {
+            int finalI = i;
+            threads[i] = new Thread(() -> {
+                try {
+                    Map<String, String> parameters = new HashMap<>();
+                    parameters.put(String.valueOf(finalI), String.valueOf(finalI));
+                    metastore.alterTableParameters(defaultDatabase.getCatalogName(), defaultDatabase.getName(), tableName, parameters);
+                }
+                catch (Exception e) {
+                    testResult = false;
+                }
+            });
+            threads[i].start();
+        }
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        Map<String, String> res = metastore.getTable(defaultDatabase.getCatalogName(), defaultDatabase.getName(), tableName).get().getParameters();
+        assertEquals(num, res.size());
+
+        metastore.dropTable(defaultDatabase.getCatalogName(), defaultDatabase.getName(), tableName);
+    }
+
     private void assertCatalogEquals(CatalogEntity actual, CatalogEntity expected)
     {
         assertEquals(actual.getName(), expected.getName());

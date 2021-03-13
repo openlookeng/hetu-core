@@ -26,9 +26,9 @@ public class JdbcBasedLock
 {
     private static final Logger LOG = Logger.get(JdbcBasedLock.class);
 
-    public static final long LOCK_RETRY_COUNT = 20;
-    public static final long LOCK_TIMEOUT_COUNT = 10;
-    public static final long RETRY_INTERVAL = 500;
+    public static final long LOCK_RETRY_COUNT = 300;
+    public static final long LOCK_TIMEOUT_COUNT = 30;
+    public static final long RETRY_INTERVAL = 1000;
     private static final int UNLOCK_RETRY_COUNT = 3;
 
     private final JdbcMetadataDao dao;
@@ -51,6 +51,7 @@ public class JdbcBasedLock
             catch (PrestoException e) {
                 // retry timeout
                 if (count == LOCK_RETRY_COUNT) {
+                    LOG.warn(format("After reaching the maximum %s retries, get lock failed.", LOCK_RETRY_COUNT));
                     throw new PrestoException(HETU_METASTORE_CODE,
                             format("After reaching the maximum %s retries, get lock failed.", LOCK_RETRY_COUNT), e);
                 }
@@ -65,11 +66,14 @@ public class JdbcBasedLock
 
                 // check lock expired
                 Long id = dao.getLockId();
-                if (id != null && id > lockId) {
+                if (id == null) {
+                    lockCount = 1;
+                }
+                else if (id > lockId) {
                     lockId = id;
                     lockCount = 1;
                 }
-                if (lockCount > LOCK_TIMEOUT_COUNT) {
+                else if (lockCount > LOCK_TIMEOUT_COUNT) {
                     unlock();
                 }
             }

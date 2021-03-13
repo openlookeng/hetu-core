@@ -354,6 +354,29 @@ public class JdbcHetuMetastore
         return tables.build().stream().collect(toImmutableList());
     }
 
+    @Override
+    public void alterTableParameters(String catalogName, String databaseName, String tableName, Map<String, String> parameters)
+    {
+        runTransactionWithLock(jdbi, handle -> {
+            JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
+            List<Map.Entry<Long, TableEntity>> entries = transactionDao.getTable(catalogName, databaseName, tableName);
+            if (entries.size() != 1) {
+                throw new PrestoException(HETU_METASTORE_CODE, "Get table failed.");
+            }
+
+            // get table id and table entity
+            long tableId = entries.get(0).getKey();
+            TableEntity tableEntity = entries.get(0).getValue();
+
+            // drop table property
+            transactionDao.dropTableProperty(tableId);
+
+            tableEntity.getParameters().putAll(parameters);
+            Optional<List<PropertyEntity>> tableProps = mapToList(tableEntity.getParameters());
+            tableProps.ifPresent(props -> transactionDao.insertTableProperty(tableId, props));
+        });
+    }
+
     private synchronized void getTableColumns(List<Map.Entry<Long, TableEntity>> tableEntries,
             ImmutableList.Builder<TableEntity> tables, JdbcMetadataDao transactionDao)
     {

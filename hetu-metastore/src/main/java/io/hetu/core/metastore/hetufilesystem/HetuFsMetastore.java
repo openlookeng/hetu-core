@@ -47,6 +47,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
@@ -694,5 +695,36 @@ public class HetuFsMetastore
         catch (IOException e) {
             throw new PrestoException(HETU_METASTORE_CODE, e);
         }
+    }
+
+    @Override
+    public void alterTableParameters(String catalogName, String databaseName, String tableName, Map<String, String> parameters)
+    {
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+        checkArgument(databaseName.matches("[\\p{Alnum}_]+"), "Invalid database name");
+        checkArgument(tableName.matches("[\\p{Alnum}_]+"), "Invalid table name");
+
+        runTransaction(() -> {
+            assertCatalogExist(catalogName);
+            assertDatabaseExist(catalogName, databaseName);
+            assertTableExist(catalogName, databaseName, tableName);
+
+            try {
+                Path tablePath = getTableMetadataPath(catalogName, databaseName, tableName);
+                TableEntity tableEntity;
+                try (InputStream inputStream = client.newInputStream(tablePath)) {
+                    String tableJson = CharStreams.toString(new InputStreamReader(inputStream, UTF_8));
+                    tableEntity = TABLE_CODEC.fromJson(tableJson);
+                }
+
+                tableEntity.getParameters().putAll(parameters);
+                try (OutputStream outputStream = client.newOutputStream(tablePath)) {
+                    outputStream.write(TABLE_CODEC.toJsonBytes(tableEntity));
+                }
+            }
+            catch (IOException e) {
+                throw new PrestoException(HETU_METASTORE_CODE, e);
+            }
+        });
     }
 }
