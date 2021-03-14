@@ -228,12 +228,12 @@ public class TestHashAggregationOperator
         long memoryLimitForMergeWithMemory = 0;
         int numberOfRows = 40_000;
         Metadata metadata = createTestMetadataManager();
-        InternalAggregationFunction countVarcharColumn = metadata.getAggregateFunctionImplementation(
-                new Signature("count", AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.VARCHAR)));
-        InternalAggregationFunction countBooleanColumn = metadata.getAggregateFunctionImplementation(
-                new Signature("count", AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.BOOLEAN)));
-        InternalAggregationFunction maxVarcharColumn = metadata.getAggregateFunctionImplementation(
-                new Signature("max", AGGREGATE, parseTypeSignature(StandardTypes.VARCHAR), parseTypeSignature(StandardTypes.VARCHAR)));
+        InternalAggregationFunction countVarcharColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("count"), AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.VARCHAR)));
+        InternalAggregationFunction countBooleanColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("count"), AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.BOOLEAN)));
+        InternalAggregationFunction maxVarcharColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("max"), AGGREGATE, parseTypeSignature(StandardTypes.VARCHAR), parseTypeSignature(StandardTypes.VARCHAR)));
         List<Integer> hashChannels = Ints.asList(1);
         RowPagesBuilder rowPagesBuilder = rowPagesBuilder(false, hashChannels, VARCHAR, VARCHAR, VARCHAR, BIGINT, BOOLEAN);
         List<Page> input = rowPagesBuilder

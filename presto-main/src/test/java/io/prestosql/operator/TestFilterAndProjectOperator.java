@@ -145,7 +145,8 @@ public class TestFilterAndProjectOperator
                 .build();
 
         RowExpression filter = call(
-                Signature.internalOperator(BETWEEN, BOOLEAN.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature(), BIGINT.getTypeSignature(), BIGINT.getTypeSignature())),
+                BETWEEN.getFunctionName().toString(),
+                new BuiltInFunctionHandle(Signature.internalOperator(BETWEEN, BOOLEAN.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature(), BIGINT.getTypeSignature(), BIGINT.getTypeSignature()))),
                 BOOLEAN,
                 field(1, BIGINT),
                 constant(10L, BIGINT),
@@ -153,7 +154,8 @@ public class TestFilterAndProjectOperator
 
         RowExpression field0 = field(0, VARCHAR);
         RowExpression add5 = call(
-                Signature.internalOperator(ADD, BIGINT.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature(), BIGINT.getTypeSignature())),
+                ADD.getFunctionName().toString(),
+                new BuiltInFunctionHandle(Signature.internalOperator(ADD, BIGINT.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature(), BIGINT.getTypeSignature()))),
                 BIGINT,
                 field(1, BIGINT),
                 constant(5L, BIGINT));

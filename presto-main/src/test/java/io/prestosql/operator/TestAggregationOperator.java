@@ -133,10 +133,10 @@ public class TestAggregationOperator
     @Test
     public void testAggregationSnapshot()
     {
-        InternalAggregationFunction countVarcharColumn = metadata.getAggregateFunctionImplementation(
-                new Signature("count", AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.VARCHAR)));
-        InternalAggregationFunction maxVarcharColumn = metadata.getAggregateFunctionImplementation(
-                new Signature("max", AGGREGATE, parseTypeSignature(StandardTypes.VARCHAR), parseTypeSignature(StandardTypes.VARCHAR)));
+        InternalAggregationFunction countVarcharColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("count"), AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.VARCHAR)));
+        InternalAggregationFunction maxVarcharColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("max"), AGGREGATE, parseTypeSignature(StandardTypes.VARCHAR), parseTypeSignature(StandardTypes.VARCHAR)));
         List<Page> input = rowPagesBuilder(VARCHAR, BIGINT, VARCHAR, BIGINT, REAL, DOUBLE, VARCHAR)
                 .addSequencePage(100, 0, 0, 300, 500, 400, 500, 500)
                 .build();
