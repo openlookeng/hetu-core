@@ -15,6 +15,7 @@
 package io.hetu.core.plugin.hbase.query;
 
 import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
+import io.hetu.core.plugin.hbase.connector.HBaseConnection;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
@@ -41,11 +42,13 @@ public class HBasePageSourceProvider
         implements ConnectorPageSourceProvider
 {
     private HBaseRecordSetProvider recordSetProvider;
+    private HBaseConnection hbaseConnection;
 
     @Inject
-    public HBasePageSourceProvider(HBaseRecordSetProvider recordSetProvider)
+    public HBasePageSourceProvider(HBaseRecordSetProvider recordSetProvider, HBaseConnection hbaseConnection)
     {
         this.recordSetProvider = requireNonNull(recordSetProvider, "recordSetProvider is null");
+        this.hbaseConnection = hbaseConnection;
     }
 
     @Override
@@ -67,7 +70,7 @@ public class HBasePageSourceProvider
                                 && (table instanceof HBaseTableHandle)
                                 && ((HBaseColumnHandle) ch).getOrdinal()
                                 == ((HBaseTableHandle) table).getRowIdOrdinal())) {
-            return new HBaseUpdatablePageSource(hbaseRecordSet);
+            return new HBaseUpdatablePageSource(hbaseRecordSet, hbaseConnection);
         }
         else {
             return new RecordPageSource(recordSet);

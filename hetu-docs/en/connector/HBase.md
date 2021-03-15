@@ -159,7 +159,10 @@ Add the following configuration to the etc/catalog/hbase.properties file:
     hbase.kerberos.keytab=/opt/openlookeng/xxx/user.keytab
     hbase.kerberos.principal=lk_username@HADOOP.COM
 
-Note: Currently, the snapshot lifecycle in client side mode is not maintained. If the number of snapshots exceeds the limit of HBase, you need to manually clear the snapshots in HDFS.
+Note: 
+1. Currently, the snapshot lifecycle in client side mode is not maintained. If the number of snapshots exceeds the limit of HBase, you need to manually clear the snapshots in HDFS.
+2. Operators push down is not supported in client side mode.
+3. Snapshots cannot be created for HBase system tables (for example, the schema name is hbase).
 ```
 
 
@@ -292,3 +295,30 @@ DELETE FROM schemeName.tableName;
 ## Limitations
 
 Statement `show tables` can only display the tables that the user has established the associations with HBase data source. Because HBase does not provide an interface to retrieve metadata of tables.
+
+When a large amount of data is inserted into HBase using Openlk, the insertion success depends on the processing capability of the HBase server. If an error occurs during data insertion, advise to increase the related parameters of HBase server.
+
+vi hbase-site.xml
+```
+<!-- default is 2 -->
+  <property>
+    <name>hbase.hregion.memstore.block.multiplier</name>
+    <value>4</value>
+  </property>
+
+  <!-- default is 64MB 67108864 -->
+  <property>
+    <name>hbase.hregion.memstore.flush.size</name>
+    <value>134217728</value>
+  </property>
+  <!-- default is 7, should be at least 2x compactionThreshold -->
+  <property>
+    <name>hbase.hstore.blockingStoreFiles</name>
+    <value>200</value>
+  </property>
+  <property>
+    <name>hbase.hstore.compaction.max</name>
+    <value>20</value>
+    <description>Max number of HStoreFiles to compact per 'minor' compaction.</description>
+  </property>
+```

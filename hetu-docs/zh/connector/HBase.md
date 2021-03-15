@@ -134,7 +134,7 @@ debug=true;
 
 ## 下推
 
-HBase连接器支持下推大部分运算符，如基于RowKey的点查询、基于RowKey的范围查询等。此外，还支持这些谓词条件以进行下推：`=`、`>=`、`>`、`<`、`<=`、`!=`、`in`、`not in`、`between and`。
+HBase连接器支持下推大部分运算符，如基于RowKey的点查询、基于RowKey的范围查询等。此外，还支持这些谓词条件以进行下推：`=`、`>=`、`>`、`<`、`<=`、`!=`、`in`、`not in`、`between and`、`is null`、`is not null`。
 
 ## 性能优化配置
 ```
@@ -159,7 +159,10 @@ ClientSide的工作机制是在HDFS上创建hbase表的snapshot，记录各个�
    hbase.kerberos.keytab=/opt/openlookeng/xxx/user.keytab
    hbase.kerberos.principal=lk_username@HADOOP.COM
    
-备注：clientSide模式的snapshot生命周期目前是没有进行维护的，如果超出了hbase对快照数的限制，则需要手动清理hdfs上的快照。
+备注：
+1. clientSide模式的snapshot生命周期目前是没有进行维护的，如果超出了hbase对快照数的限制，则需要手动清理hdfs上的快照。
+2. clientSide模式下，不支持算子下推。
+3. 不允许为hbase的系统表创建快照（如schema名为hbase）
 ```
 
 ## 使用示例
@@ -276,3 +279,30 @@ DELETE FROM schemeName.tableName;
 ## 限制
 
 语句`show tables`只能显示用户已与HBase数据源建立关联的表，因为HBase没有提供接口来检索表的元数据。
+
+当使用openlk插入大量的数据到hbase中时，插入成功与否取决于hbase server的处理能力。当插入数据时出现错误时，建议增大hbase server的相关参数。
+
+vi hbase-site.xml
+```
+<!-- default is 2 -->
+  <property>
+    <name>hbase.hregion.memstore.block.multiplier</name>
+    <value>4</value>
+  </property>
+
+  <!-- default is 64MB 67108864 -->
+  <property>
+    <name>hbase.hregion.memstore.flush.size</name>
+    <value>134217728</value>
+  </property>
+  <!-- default is 7, should be at least 2x compactionThreshold -->
+  <property>
+    <name>hbase.hstore.blockingStoreFiles</name>
+    <value>200</value>
+  </property>
+  <property>
+    <name>hbase.hstore.compaction.max</name>
+    <value>20</value>
+    <description>Max number of HStoreFiles to compact per 'minor' compaction.</description>
+  </property>
+```

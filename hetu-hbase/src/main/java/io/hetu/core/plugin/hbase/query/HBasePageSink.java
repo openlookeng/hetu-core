@@ -29,7 +29,9 @@ import io.prestosql.spi.connector.ConnectorPageSink;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeUtils;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Table;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -87,18 +89,19 @@ public class HBasePageSink
         // For each position within the page
         List<Put> puts = new ArrayList<>();
 
-        try {
+        try (Connection connection = hbaseConn.createConnection();
+                Table table = connection.getTable(TableName.valueOf(tablename))) {
             for (int position = 0; position < page.getPositionCount(); ++position) {
                 // Convert Page to a Put, writing and indexing it
                 Put put = pageToPut(page, position);
                 puts.add(put);
                 if (puts.size() >= Constants.PUT_BATCH_SIZE) {
-                    hbaseConn.getConn().getTable(TableName.valueOf(tablename)).put(puts);
+                    table.put(puts);
                     puts.clear();
                 }
             }
             if (!puts.isEmpty()) {
-                hbaseConn.getConn().getTable(TableName.valueOf(tablename)).put(puts);
+                table.put(puts);
             }
         }
         catch (IOException e) {

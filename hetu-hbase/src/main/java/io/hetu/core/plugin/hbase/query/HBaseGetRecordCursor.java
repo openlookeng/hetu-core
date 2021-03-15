@@ -64,13 +64,11 @@ public class HBaseGetRecordCursor
             String[] fieldToColumnName,
             String defaultValue)
     {
-        super(columnHandles, columnTypes, serializer, rowIdName, fieldToColumnName, defaultValue);
+        super(columnHandles, columnTypes, connection, serializer, fieldToColumnName, rowIdName, defaultValue);
         startTime = System.currentTimeMillis();
         this.columnHandles = columnHandles;
-
         this.rowIdName =
                 requireNonNull(hBaseSplit.getRowKeyName(), "RowKeyName cannot be null if you want to query by RowKey");
-
         this.split = hBaseSplit;
         this.conn = connection;
         try (Table table =

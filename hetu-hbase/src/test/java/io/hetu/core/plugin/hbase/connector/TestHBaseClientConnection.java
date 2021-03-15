@@ -17,6 +17,7 @@ package io.hetu.core.plugin.hbase.connector;
 import io.hetu.core.plugin.hbase.client.TestHBaseConnection;
 import io.hetu.core.plugin.hbase.conf.HBaseConfig;
 import io.hetu.core.plugin.hbase.metadata.HBaseMetastore;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 
 import java.io.IOException;
@@ -37,12 +38,17 @@ public class TestHBaseClientConnection
     /**
      * init
      */
-    public void init()
-            throws IOException
+    public Connection createConnection()
     {
         this.conn = new TestHBaseConnection();
-        if (conn.getAdmin() instanceof HBaseAdmin) {
-            this.hbaseAdmin = (HBaseAdmin) conn.getAdmin();
+        try {
+            if (conn.getAdmin() instanceof HBaseAdmin) {
+                this.hbaseAdmin = (HBaseAdmin) conn.getAdmin();
+            }
         }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+        return conn;
     }
 }
