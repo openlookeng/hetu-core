@@ -395,12 +395,20 @@ public class QuerySnapshotManager
                 checkArgument(result == SnapshotResult.SUCCESSFUL);
                 updateCapturedComponents(ImmutableList.of(taskId), false);
             }
-            else if (result == SnapshotResult.FAILED) {
-                updateQueryCapture(snapshotId, taskId, SnapshotComponentCounter.ComponentState.FAILED);
+            else {
+                updateQueryCapture(taskId, entry.getKey(), entry.getValue());
             }
-            else if (result == SnapshotResult.SUCCESSFUL) {
-                updateQueryCapture(snapshotId, taskId, SnapshotComponentCounter.ComponentState.SUCCESSFUL);
-            }
+        }
+    }
+
+    // Update capture results based on TaskSnapshotManager running on coordinator
+    public void updateQueryCapture(TaskId taskId, long snapshotId, SnapshotResult result)
+    {
+        if (result == SnapshotResult.FAILED) {
+            updateQueryCapture(snapshotId, taskId, SnapshotComponentCounter.ComponentState.FAILED);
+        }
+        else if (result == SnapshotResult.SUCCESSFUL) {
+            updateQueryCapture(snapshotId, taskId, SnapshotComponentCounter.ComponentState.SUCCESSFUL);
         }
     }
 
@@ -448,11 +456,10 @@ public class QuerySnapshotManager
                 new SnapshotComponentCounter<>(ids -> ids.containsAll(unfinishedTasks)));
 
         if (counter.updateComponent(taskId, componentState)) {
-            LOG.debug("Finished capturing snapshot %d for task %s", snapshotId, taskId);
-
             SnapshotResult snapshotResult = counter.getSnapshotResult();
             synchronized (captureResults) {
                 if (captureResults.get(snapshotId) != SnapshotResult.NA) {
+                    LOG.debug("Finished capturing snapshot %d for task %s", snapshotId, taskId);
                     SnapshotResult oldResult = captureResults.put(snapshotId, snapshotResult);
                     if (snapshotResult != oldResult && snapshotResult.isDone()) {
                         LOG.debug("Finished capturing snapshot %d for query %s. Result is %s.", snapshotId, queryId.getId(), snapshotResult);

@@ -1723,7 +1723,9 @@ public class LocalExecutionPlanner
                 }
                 if (node.getResumeSnapshotId() != null) {
                     builder.add(MarkerPage.resumePage(node.getResumeSnapshotId()));
-                    from = 1; // Skip data page if resuming from a snapshot, because data page would have been sent
+                    if (page != null) {
+                        from = 1; // Skip data page if resuming from a snapshot, because data page would have been sent
+                    }
                 }
                 builder.add(MarkerPage.snapshotPage(node.getNextSnapshotId()));
                 pages = builder.build();

@@ -154,7 +154,7 @@ public class TaskSnapshotManager
                         // Results on coordinator won't be reported through remote task. Send to the query side.
                         QuerySnapshotManager querySnapshotManager = snapshotUtils.getQuerySnapshotManager(taskId.getQueryId());
                         if (querySnapshotManager != null) {
-                            querySnapshotManager.updateQueryCapture(taskId, captureResults);
+                            querySnapshotManager.updateQueryCapture(taskId, snapshotId, snapshotResult);
                         }
                     }
                     LOG.debug("Finished capturing snapshot %d for task %s. Result is %s.", snapshotId, taskId, snapshotResult);
