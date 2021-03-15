@@ -92,10 +92,20 @@ For a point query like `SELECT * FROM animals WHERE name='Monkey';`
 all data would normally need to be read and filtering will be applied to only return rows matching the predicate.
 In the example, all four Stripes will be read although only one of them contains the value.
 
-By using the BloomIndex, only Stripes matching the predicate can be scheduled, therefore reducing the data that is read.
-This can significantly reduce the query execution time.
+By using the BloomIndex, only Stripes matching the predicate can be scheduled, therefore reducing the data that is read. This can significantly reduce the query execution time.
 
 In this example, a lookup operation is performed on the BloomIndex for `Monkey`, which returns true for only the first Stripe.
 
-Additionally, the last modified time is stored as part of the metadata and can be used to ensure that the index is still valid.
-If the original ORC file had been modified since the index was created, then the index is invalid and should not be used for filtering.
+Additionally, the last modified time is stored as part of the metadata and can be used to ensure that the index is still valid. If the original ORC file had been modified since the
+index was created, then the index is invalid and should not be used for filtering.
+
+## Disk Usage
+
+This formula gives a rough estimate on how much disk will be used by Bloom index. A smaller fpp and a larger table will result in a bigger index:
+
+size of index = -log(fpp) * size of table * C
+
+The factor C approximately 0.04, but varies depending on the column's weight in the table. Therefore, the index for a 100GB dataset will be around 12GB when fpp is set to 0.001,
+and 16Gb when fpp is set to 0.0001.
+
+Check [hindex-statements](./hindex-statements.md) for how to change the temp folder path.

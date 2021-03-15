@@ -62,7 +62,4 @@ Therefore, the temporary directory should have sufficient space. To change the t
 -Djava.io.tmpdir=/path/to/another/dir
 ```
 
-The size of the index depends closely on the column properties such as number of unique values.
-As a rough estimate, the available temporary disk space should be table size divided by the number of columns.
-For example, e.g. for a table of 100GB with five mostly unique columns, 25GB of temporary disk space should be available.
 
