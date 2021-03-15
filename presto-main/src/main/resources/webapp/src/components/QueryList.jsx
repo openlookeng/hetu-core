@@ -29,6 +29,9 @@ import Footer from "../queryeditor/components/Footer";
 import StatusFooter from "../queryeditor/components/StatusFooter";
 import NavigationMenu from "../NavigationMenu";
 import Pagination from 'rc-pagination';
+import Select from "rc-select";
+import localeInfo from "../node_modules/rc-pagination/es/locale/en_US";
+import _ from "lodash";
 
 export class QueryListItem extends React.Component {
     static stripQueryTextWhitespace(queryText) {
@@ -281,6 +284,7 @@ export class QueryList extends React.Component {
         this.handleSortClick = this.handleSortClick.bind(this);
         this.refreshData = this.refreshData.bind(this);
         this.onPageChange = this.onPageChange.bind(this);
+        this.onPageSizeChange = this.onPageSizeChange.bind(this);
         this.debounceSearch = _.debounce(() => { _.defer(this.refreshData) }, 200)
     }
 
@@ -412,6 +416,7 @@ export class QueryList extends React.Component {
             else {
                 newFilters.push(filter);
             }
+            stateSelectAll = newFilters.length > 0 ? true : false;
         }
 
         this.setState({
@@ -454,6 +459,7 @@ export class QueryList extends React.Component {
             else {
                 newFilters.push(errorType);
             }
+            errorSelectAll = newFilters.length > 0 ? true : false;
         }
 
         this.setState({
@@ -469,8 +475,13 @@ export class QueryList extends React.Component {
         _.defer(this.refreshData);
     }
 
+    onPageSizeChange(current, pageSize) {
+        this.setState({ pageSize: pageSize });
+        _.defer(this.refreshData);
+    }
+
     render() {
-        const { allQueries, currentPage, total, stateFilters } = this.state;
+        const { allQueries, currentPage, total, stateFilters, pageSize } = this.state;
         let queryList = <DisplayedQueriesList queries={allQueries} />;
         if (allQueries.queries === null || total === 0) {
             let label = (<div className="loader">Loading...</div>);
@@ -555,9 +566,15 @@ export class QueryList extends React.Component {
                                 defaultCurrent={1}
                                 current={currentPage}
                                 total={total}
+                                defaultPageSize={10}
+                                pageSize={pageSize}
                                 onChange={this.onPageChange}
-                                showTotal={total => `Total ${total} items`}
+                                showTotal={total => `Total ${total} queries`}
                                 style={{ marginTop: 10 }}
+                                locale={localeInfo}
+                                showSizeChanger
+                                onShowSizeChange={this.onPageSizeChange}
+                                selectComponentClass={Select}
                             />
                         }
                     </div>
