@@ -26,6 +26,7 @@ import io.prestosql.spi.connector.UpdatablePageSource;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeUtils;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Table;
 
@@ -47,17 +48,17 @@ public class HBaseUpdatablePageSource
 {
     private static final Logger LOG = Logger.get(HBaseUpdatablePageSource.class);
 
-    private final HBaseConnection hBaseConnection;
+    private final HBaseConnection hbaseConnection;
 
     private final RecordPageSource inner;
 
     private final HBaseRecordSet recordSet;
 
-    public HBaseUpdatablePageSource(HBaseRecordSet recordSet)
+    public HBaseUpdatablePageSource(HBaseRecordSet recordSet, HBaseConnection hbaseConnection)
     {
         this.recordSet = recordSet;
         this.inner = new RecordPageSource(recordSet);
-        this.hBaseConnection = recordSet.getHBaseConnection();
+        this.hbaseConnection = hbaseConnection;
     }
 
     @Override
@@ -74,7 +75,8 @@ public class HBaseUpdatablePageSource
                         .findAny();
         StringRowSerializer serializer = new StringRowSerializer();
 
-        try (Table table = hBaseConnection.getConn().getTable(tableName)) {
+        try (Connection connection = hbaseConnection.createConnection();
+                Table table = connection.getTable(tableName)) {
             List<Delete> deletes = new ArrayList<>();
             Delete delete;
             for (int index = 0; index < rowIds.getPositionCount(); index++) {

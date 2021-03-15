@@ -116,7 +116,7 @@ public class HBaseConnectorMetadata
     @Override
     public void createSchema(ConnectorSession session, String schemaName, Map<String, Object> properties)
     {
-        hbaseConn.createSchema(schemaName, properties);
+        hbaseConn.createSchema(schemaName);
     }
 
     @Override

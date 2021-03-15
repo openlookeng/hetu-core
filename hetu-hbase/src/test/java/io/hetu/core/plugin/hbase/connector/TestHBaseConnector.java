@@ -92,7 +92,7 @@ public class TestHBaseConnector
         hetuMetastore = new TestingHetuMetastore();
         schemaTableName = new SchemaTableName("hbase", "test_table");
         hconn = new TestHBaseClientConnection(hCConf, hetuMetastore.getHetuMetastore());
-        hconn.getConn();
+        hconn.createConnection();
         session = new TestingConnectorSession("root");
         hcm = new HBaseConnectorMetadata(hconn);
         hConnector =
@@ -100,7 +100,7 @@ public class TestHBaseConnector
                         new HBaseConnectorMetadataFactory(hconn, hCConf),
                         new HBaseSplitManager(hconn),
                         new HBasePageSinkProvider(hconn),
-                        new HBasePageSourceProvider(new HBaseRecordSetProvider(hconn)),
+                        new HBasePageSourceProvider(new HBaseRecordSetProvider(hconn), hconn),
                         Optional.empty(),
                         new HBaseTableProperties());
     }
@@ -341,13 +341,7 @@ public class TestHBaseConnector
         hCnnConf.setRetryNumber(1);
         HBaseConnection hConn = new TestHBaseClientConnection(hCnnConf, null);
 
-        try {
-            hConn.createSchema("schema", null);
-            throw new NullPointerException("testAuthenticate : failed");
-        }
-        catch (NullPointerException e) {
-            assertEquals(e.toString(), "java.lang.NullPointerException");
-        }
+        hConn.createSchema("schema");
     }
 
     /**

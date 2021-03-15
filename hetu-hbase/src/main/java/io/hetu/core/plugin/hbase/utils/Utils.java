@@ -143,6 +143,7 @@ public class Utils
         conf.set("hbase.zookeeper.quorum", hbaseConfig.getZkQuorum());
         conf.set("hbase.zookeeper.property.clientPort", hbaseConfig.getZkClientPort());
         conf.set("hbase.cluster.distributed", "true");
+        conf.set("hbase.mob.file.cache.size", "0");
         conf.addResource(new Path(hbaseConfig.getCoreSitePath()));
         conf.addResource(new Path(hbaseConfig.getHdfsSitePath()));
         conf.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem");

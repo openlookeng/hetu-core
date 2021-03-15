@@ -81,7 +81,7 @@ public class TestQuery
         hCConf.setZkQuorum("zk1");
         hetuMetastore = new TestingHetuMetastore();
         hconn = new TestHBaseClientConnection(hCConf, hetuMetastore.getHetuMetastore());
-        hconn.getConn();
+        hconn.createConnection();
         session = new TestingConnectorSession("root");
         split =
                 new HBaseSplit(
@@ -280,7 +280,7 @@ public class TestQuery
                 .put(fieldToColumnName[4], new String(serializer.setObjectBytes(VARCHAR, expectedSlice)));
 
         HBaseRecordCursor hrc =
-                new HBaseRecordCursor(columnHandles, null, serializer, "rowkey", fieldToColumnName, "defaultValue");
+                new HBaseRecordCursor(columnHandles, null, hconn.createConnection(), serializer, fieldToColumnName, "rowkey", "defaultValue");
 
         assertEquals(flag, hrc.getBoolean(1));
         assertEquals(expectedDouble, hrc.getDouble(2));

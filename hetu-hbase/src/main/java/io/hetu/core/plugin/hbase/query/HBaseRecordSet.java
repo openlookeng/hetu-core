@@ -35,14 +35,16 @@ import io.prestosql.spi.type.VarcharType;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.CompareOperator;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.ClientSideRegionScanner;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.RegionInfo;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.client.TableDescriptor;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
-import org.apache.hadoop.hbase.filter.CompareFilter;
 import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
@@ -92,7 +94,9 @@ public class HBaseRecordSet
 
     private HBaseSplit split;
 
-    private HBaseConnection conn;
+    private Connection connection;
+
+    private HBaseConnection hBaseConnection;
 
     private HBaseTableHandle table;
 
@@ -119,7 +123,8 @@ public class HBaseRecordSet
         requireNonNull(session, "session is null");
         rowIdName = table.getRowId();
         this.split = split;
-        this.conn = hbaseConn;
+        this.hBaseConnection = hbaseConn;
+        this.connection = hbaseConn.createConnection();
         this.serializer = HBaseRowSerializer.getSerializerInstance(table.getSerializerClassName());
         this.serializer.setRowIdName(rowIdName);
         this.columnHandles = columnHandles;
@@ -159,21 +164,21 @@ public class HBaseRecordSet
     @Override
     public RecordCursor cursor()
     {
-        if (Utils.isBatchGet(
-                this.split.getTableHandle().getConstraint(), this.split.getTableHandle().getRowIdOrdinal())) {
-            return new HBaseGetRecordCursor(
-                    columnHandles,
-                    split,
-                    conn.getConn(),
-                    serializer,
-                    columnTypes,
-                    rowIdName,
-                    fieldToColumnName,
-                    this.defaultValue);
-        }
-        else if (conn.getHbaseConfig().isClientSideEnable()) {
-            try {
-                HBaseConfig hbaseConfig = conn.getHbaseConfig();
+        try (Table hTable = connection.getTable(TableName.valueOf(table.getHbaseTableName().get()))) {
+            if (Utils.isBatchGet(
+                    this.split.getTableHandle().getConstraint(), this.split.getTableHandle().getRowIdOrdinal())) {
+                return new HBaseGetRecordCursor(
+                        columnHandles,
+                        split,
+                        connection,
+                        serializer,
+                        columnTypes,
+                        rowIdName,
+                        fieldToColumnName,
+                        this.defaultValue);
+            }
+            else if (hBaseConnection.getHbaseConfig().isClientSideEnable()) {
+                HBaseConfig hbaseConfig = hBaseConnection.getHbaseConfig();
                 String hbaseRoot = hbaseConfig.getZkZnodeParent();
                 Configuration conf = Utils.generateHBaseConfig(hbaseConfig);
                 Path root = new Path(hbaseRoot);
@@ -186,37 +191,33 @@ public class HBaseRecordSet
 
                 ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
                 Thread.currentThread().setContextClassLoader(this.getClass().getClassLoader());
-                setAttributeToScan();
-                scanner = new ClientSideRegionScanner(conf, fs, root, htd, regionInfos.get(split.getRegionIndex()), scan, null);
+                setAttributeToScan(false);
+                RegionInfo regionInfo = regionInfos.get(split.getRegionIndex());
+                scan.withStartRow(regionInfo.getStartKey()).withStopRow(regionInfo.getEndKey());
+                scanner = new ClientSideRegionScanner(conf, fs, root, htd, regionInfo, scan, null);
                 Thread.currentThread().setContextClassLoader(classLoader);
+                return new HBaseRecordCursor(
+                        columnHandles, columnTypes, connection, serializer, scanner, fieldToColumnName, rowIdName, this.defaultValue);
             }
-            catch (IOException e) {
-                LOG.error("HBaseRecordSet : getClientSideScanner failed... cause by %s", e.getMessage());
+            else {
+                setAttributeToScan(true);
+                scanner = hTable.getScanner(scan);
+                return new HBaseRecordCursor(
+                        columnHandles, columnTypes, connection, serializer, scanner, fieldToColumnName, rowIdName, this.defaultValue);
             }
-            return new HBaseRecordCursor(
-                    columnHandles, columnTypes, serializer, scanner, fieldToColumnName, rowIdName, this.defaultValue);
         }
-        else {
-            try {
-                setAttributeToScan();
-                scanner = conn.getConn().getTable(TableName.valueOf(table.getHbaseTableName().get())).getScanner(scan);
+        catch (IOException e) {
+            LOG.error("HBaseRecordSet : getScanner failed... cause by %s", e.getMessage());
+            if (connection != null) {
+                try {
+                    connection.close();
+                }
+                catch (Exception ex) {
+                    LOG.error(ex.getMessage(), ex);
+                }
             }
-            catch (IOException e) {
-                LOG.error("HBaseRecordSet : setScanner failed... cause by %s", e.getMessage());
-            }
-            return new HBaseRecordCursor(
-                    columnHandles, columnTypes, serializer, scanner, fieldToColumnName, rowIdName, this.defaultValue);
+            return null;
         }
-    }
-
-    /**
-     * getHBaseConnection
-     *
-     * @return HBaseConnection
-     */
-    public HBaseConnection getHBaseConnection()
-    {
-        return this.conn;
     }
 
     /**
@@ -232,7 +233,7 @@ public class HBaseRecordSet
     /**
      * set column/filters/attributes to scan
      */
-    public void setAttributeToScan()
+    public void setAttributeToScan(boolean setFilter)
     {
         columnHandles.stream()
                 .forEach(
@@ -244,12 +245,15 @@ public class HBaseRecordSet
                                         Bytes.toBytes(columnHandle.getQualifier().get()));
                             }
                         });
-        Map<Integer, List<Range>> domainMap = this.split.getRanges();
-        FilterList filters = getFiltersFromDomains(domainMap);
 
-        if (filters.getFilters().size() != 0) {
-            scan.setFilter(filters);
+        if (setFilter) {
+            Map<Integer, List<Range>> domainMap = this.split.getRanges();
+            FilterList filters = getFiltersFromDomains(domainMap);
+            if (filters.getFilters().size() != 0) {
+                scan.setFilter(filters);
+            }
         }
+
         if (split.getStartRow() != null && !split.getStartRow().isEmpty()) {
             scan.withStartRow(Bytes.toBytes(split.getStartRow()));
         }
@@ -320,6 +324,12 @@ public class HBaseRecordSet
                                 FilterList andFilter = new FilterList(filters);
                                 andFilters.addFilter(andFilter);
                             }
+                            // operator IS NULL
+                            if (ranges.isEmpty()) {
+                                boolean isKey = (this.split.getRowKeyName().equals(columnHandle.getName()));
+                                andFilters.addFilter(
+                                        columnOrKeyFilter(columnHandle, null, CompareOperator.EQUAL, isKey));
+                            }
                         });
 
         return andFilters;
@@ -328,7 +338,7 @@ public class HBaseRecordSet
     private boolean checkPredicateType(HBaseColumnHandle columnHandle)
     {
         Type type = columnHandle.getType();
-        // type list support to pushdown
+        // type list support to push down
         if (type.equals(BOOLEAN)) {
             return true;
         }
@@ -381,7 +391,7 @@ public class HBaseRecordSet
         for (Range range : ranges) {
             if (range.isSingleValue()) {
                 String columnValue = String.valueOf(getRangeValue(range.getSingleValue()));
-                inFilters.add(columnOrKeyFilter(columnHandle, columnValue, CompareFilter.CompareOp.EQUAL, isKey));
+                inFilters.add(columnOrKeyFilter(columnHandle, columnValue, CompareOperator.EQUAL, isKey));
             }
             else {
                 String columnValueLower = null;
@@ -402,6 +412,11 @@ public class HBaseRecordSet
                                     : null;
                     addFilterByHigherBound(range.getHigh().getBound(), columnValueHigher, isKey, columnHandle, filters);
                     count++;
+                }
+                // is not null
+                if (columnValueLower == null && columnValueHigher == null) {
+                    andFilters.addFilter(
+                            columnOrKeyFilter(columnHandle, null, CompareOperator.NOT_EQUAL, isKey));
                 }
                 if (count == filterSize) {
                     Filter left = filters.remove(filters.size() - 1);
@@ -425,7 +440,7 @@ public class HBaseRecordSet
      * @return Filter
      */
     public Filter columnOrKeyFilter(
-            HBaseColumnHandle columnHandle, String columnValue, CompareFilter.CompareOp operator, boolean isKey)
+            HBaseColumnHandle columnHandle, String columnValue, CompareOperator operator, boolean isKey)
     {
         byte[] values = (columnValue != null) ? Bytes.toBytes(columnValue) : null;
 
@@ -459,13 +474,13 @@ public class HBaseRecordSet
         switch (boundEnum) {
             // >
             case ABOVE:
-                filters.add(columnOrKeyFilter(columnHandle, columnValueLower, CompareFilter.CompareOp.GREATER, isKey));
+                filters.add(columnOrKeyFilter(columnHandle, columnValueLower, CompareOperator.GREATER, isKey));
                 break;
             // >=
             case EXACTLY:
                 filters.add(
                         columnOrKeyFilter(
-                                columnHandle, columnValueLower, CompareFilter.CompareOp.GREATER_OR_EQUAL, isKey));
+                                columnHandle, columnValueLower, CompareOperator.GREATER_OR_EQUAL, isKey));
                 break;
             default:
                 throw new AssertionError("Unhandled bound: " + boundEnum);
@@ -489,13 +504,13 @@ public class HBaseRecordSet
         switch (boundEnum) {
             // <
             case BELOW:
-                filters.add(columnOrKeyFilter(columnHandle, columnValueHigher, CompareFilter.CompareOp.LESS, isKey));
+                filters.add(columnOrKeyFilter(columnHandle, columnValueHigher, CompareOperator.LESS, isKey));
                 break;
             // <=
             case EXACTLY:
                 filters.add(
                         columnOrKeyFilter(
-                                columnHandle, columnValueHigher, CompareFilter.CompareOp.LESS_OR_EQUAL, isKey));
+                                columnHandle, columnValueHigher, CompareOperator.LESS_OR_EQUAL, isKey));
                 break;
             default:
                 throw new AssertionError("Unhandled bound: " + boundEnum);

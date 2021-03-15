@@ -96,7 +96,7 @@ public class TestHBase
         table = TestUtils.createHBaseTableHandle();
         schemaTableName = new SchemaTableName("hbase", "test_table");
         hconn = new TestHBaseClientConnection(hCConf, hetuMetastore.getHetuMetastore());
-        hconn.getConn();
+        hconn.createConnection();
         session = new TestingConnectorSession("root");
         hcm = new HBaseConnectorMetadata(hconn);
         hConnector =
@@ -104,7 +104,7 @@ public class TestHBase
                         new HBaseConnectorMetadataFactory(hconn, hCConf),
                         new HBaseSplitManager(hconn),
                         new HBasePageSinkProvider(hconn),
-                        new HBasePageSourceProvider(new HBaseRecordSetProvider(hconn)),
+                        new HBasePageSourceProvider(new HBaseRecordSetProvider(hconn), hconn),
                         Optional.empty(),
                         null);
     }

@@ -52,7 +52,7 @@ public class TestHbaseSplitManager
         hCConf.setZkQuorum("zk1");
         hetuMetastore = new TestingHetuMetastore();
         hconn = new TestHBaseClientConnection(hCConf, hetuMetastore.getHetuMetastore());
-        hconn.getConn();
+        hconn.createConnection();
         hsm = new HBaseSplitManager(hconn);
     }
 
