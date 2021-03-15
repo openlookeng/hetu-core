@@ -64,6 +64,7 @@ headless: true
     - [Carbondata]({{< relref "./docs/connector/carbondata.md" >}})
     - [DataCenter]({{< relref "./docs/connector/datacenter.md" >}})
     - [Elasticsearch]({{< relref "./docs/connector/elasticsearch.md" >}})
+    - [Greenplum]({{< relref "./docs/connector/greenplum.md" >}})
     - [Hana]({{< relref "./docs/connector/hana.md" >}})
     - [HBase]({{< relref "./docs/connector/HBase.md" >}})
     - [Hive]({{< relref "./docs/connector/hive.md" >}})
