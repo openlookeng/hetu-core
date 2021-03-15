@@ -55,18 +55,14 @@ public class MarkDistinctStatsRule
     public static PlanNodeStatsEstimate groupBy(PlanNodeStatsEstimate sourceStats, Collection<Symbol> groupBySymbols)
     {
         PlanNodeStatsEstimate.Builder result = PlanNodeStatsEstimate.builder();
-        for (Symbol groupBySymbol : groupBySymbols) {
+        groupBySymbols.forEach(groupBySymbol -> {
             SymbolStatsEstimate symbolStatistics = sourceStats.getSymbolStatistics(groupBySymbol);
-            result.addSymbolStatistics(groupBySymbol, symbolStatistics.mapNullsFraction(nullsFraction -> {
-                if (nullsFraction == 0.0) {
-                    return 0.0;
-                }
-                return 1.0 / (symbolStatistics.getDistinctValuesCount() + 1);
-            }));
-        }
+            result.addSymbolStatistics(groupBySymbol, symbolStatistics.mapNullsFraction(nullsFraction ->
+                    (nullsFraction == 0.0) ? 0.0 : 1.0 / (symbolStatistics.getDistinctValuesCount() + 1)));
+        });
 
-        double rowsCount = 1;
         boolean knowStatsFound = false;
+        double rowsCount = 1;
         for (Symbol groupBySymbol : groupBySymbols) {
             SymbolStatsEstimate symbolStatistics = sourceStats.getSymbolStatistics(groupBySymbol);
             if (symbolStatistics.isUnknown()) {
