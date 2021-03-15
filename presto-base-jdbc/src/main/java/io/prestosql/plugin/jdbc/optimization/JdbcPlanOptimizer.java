@@ -126,8 +126,9 @@ public class JdbcPlanOptimizer
 
     private static PlanNode replaceChildren(PlanNode node, List<PlanNode> children)
     {
-        for (int i = 0; i < node.getSources().size(); i++) {
-            if (children.get(i) != node.getSources().get(i)) {
+        List<PlanNode> childrenNodes = node.getSources();
+        for (int i = 0; i < childrenNodes.size(); i++) {
+            if (children.get(i) != childrenNodes.get(i)) {
                 return node.replaceChildren(children);
             }
         }
