@@ -25,6 +25,7 @@ import io.prestosql.execution.DriverTaskId;
 import io.prestosql.execution.TaskId;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.OperationTimer.OperationTiming;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
@@ -32,6 +33,8 @@ import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.connector.ConnectorPageSink;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.split.PageSinkManager;
 import io.prestosql.sql.planner.plan.TableWriterNode;
@@ -39,6 +42,7 @@ import io.prestosql.sql.planner.plan.TableWriterNode.WriterTarget;
 import io.prestosql.util.AutoCloseableCloser;
 import io.prestosql.util.Mergeable;
 
+import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -61,6 +65,7 @@ import static io.prestosql.sql.planner.plan.TableWriterNode.UpdateTarget;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
+@RestorableConfig(stateClassName = "TableWriterOperatorState", uncapturedFields = {"columnChannels", "types", "blocked", "finishFuture", "snapshotState"})
 public class TableWriterOperator
         implements Operator
 {
@@ -97,7 +102,7 @@ public class TableWriterOperator
             this.columnChannels = requireNonNull(columnChannels, "columnChannels is null");
             this.pageSinkManager = requireNonNull(pageSinkManager, "pageSinkManager is null");
             checkArgument(writerTarget instanceof CreateTarget || writerTarget instanceof InsertTarget || writerTarget instanceof TableWriterNode.UpdateTarget
-                            || writerTarget instanceof TableWriterNode.DeleteAsInsertTarget, "writerTarget must be CreateTarget or InsertTarget or UpdateTarget");
+                    || writerTarget instanceof TableWriterNode.DeleteAsInsertTarget, "writerTarget must be CreateTarget or InsertTarget or UpdateTarget");
             this.target = requireNonNull(writerTarget, "writerTarget is null");
             this.session = session;
             this.taskId = taskId;
@@ -178,6 +183,8 @@ public class TableWriterOperator
     private final OperationTiming statisticsTiming = new OperationTiming();
     private final boolean statisticsCpuTimerEnabled;
 
+    private final SingleInputSnapshotState snapshotState;
+
     public TableWriterOperator(
             OperatorContext operatorContext,
             ConnectorPageSink pageSink,
@@ -194,6 +201,7 @@ public class TableWriterOperator
         this.statisticAggregationOperator = requireNonNull(statisticAggregationOperator, "statisticAggregationOperator is null");
         this.types = ImmutableList.copyOf(requireNonNull(types, "types is null"));
         this.statisticsCpuTimerEnabled = statisticsCpuTimerEnabled;
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -225,6 +233,11 @@ public class TableWriterOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         return state == State.FINISHED && blocked.isDone();
     }
 
@@ -249,6 +262,12 @@ public class TableWriterOperator
         requireNonNull(page, "page is null");
         checkState(needsInput(), "Operator does not need input");
 
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         Block[] blocks = new Block[columnChannels.size()];
         for (int outputChannel = 0; outputChannel < columnChannels.size(); outputChannel++) {
             blocks[outputChannel] = page.getBlock(columnChannels.get(outputChannel));
@@ -270,6 +289,13 @@ public class TableWriterOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (!blocked.isDone()) {
             return null;
         }
@@ -303,6 +329,12 @@ public class TableWriterOperator
 
         state = State.FINISHED;
         return new Page(positionCount, outputBlocks);
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     private Page createStatisticsPage(Page aggregationOutput)
@@ -351,11 +383,24 @@ public class TableWriterOperator
     public void close()
             throws Exception
     {
+        closeImpl(pageSink::abort);
+    }
+
+    @Override
+    public void cancelToResume()
+            throws Exception
+    {
+        closeImpl(pageSink::cancelToResume);
+    }
+
+    private void closeImpl(AutoCloseable closeAction)
+            throws Exception
+    {
         AutoCloseableCloser closer = AutoCloseableCloser.create();
         if (!closed) {
             closed = true;
             if (!committed) {
-                closer.register(pageSink::abort);
+                closer.register(closeAction);
             }
         }
         closer.register(statisticAggregationOperator);
@@ -464,5 +509,61 @@ public class TableWriterOperator
                     .add("validationCpuTime", validationCpuTime)
                     .toString();
         }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        checkState(blocked.isDone(), "Received capture request when there are pending writes");
+
+        TableWriterOperatorState myState = new TableWriterOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.pageSinkMemoryContext = pageSinkMemoryContext.getBytes();
+        myState.pageSinkPeakMemoryUsage = pageSinkPeakMemoryUsage.get();
+        myState.pageSink = pageSink.capture(serdeProvider);
+        myState.statisticAggregationOperator = statisticAggregationOperator.capture(serdeProvider);
+        myState.state = state.toString();
+        myState.rowCount = rowCount;
+        myState.committed = committed;
+        myState.closed = closed;
+        myState.writtenBytes = writtenBytes;
+        myState.statisticsTiming = statisticsTiming.capture(serdeProvider);
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        checkState(blocked.isDone(), "Received restore request when there are pending writes");
+
+        TableWriterOperatorState myState = (TableWriterOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.pageSinkMemoryContext.setBytes(myState.pageSinkMemoryContext);
+        this.pageSinkPeakMemoryUsage.set(myState.pageSinkPeakMemoryUsage);
+        this.pageSink.restore(myState.pageSink, serdeProvider);
+        this.statisticAggregationOperator.restore(myState.statisticAggregationOperator, serdeProvider);
+        this.state = State.valueOf(myState.state);
+        this.rowCount = myState.rowCount;
+        this.committed = myState.committed;
+        this.closed = myState.closed;
+        this.writtenBytes = myState.writtenBytes;
+        this.statisticsTiming.restore(myState.statisticsTiming, serdeProvider);
+        this.blocked = NOT_BLOCKED;
+    }
+
+    private static class TableWriterOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private long pageSinkMemoryContext;
+        private long pageSinkPeakMemoryUsage;
+        private Object pageSink;
+        private Object statisticAggregationOperator;
+        private String state;
+        private long rowCount;
+        private boolean committed;
+        private boolean closed;
+        private long writtenBytes;
+        private Object statisticsTiming;
     }
 }

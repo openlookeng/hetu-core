@@ -19,6 +19,7 @@ import io.prestosql.execution.NodeTaskMap.PartitionedSplitCountTracker;
 import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
+import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.planner.PlanFragment;
 
@@ -28,12 +29,14 @@ import java.util.OptionalInt;
 public interface RemoteTaskFactory
 {
     RemoteTask createRemoteTask(Session session,
-                                TaskId taskId,
-                                InternalNode node,
-                                PlanFragment fragment,
-                                Multimap<PlanNodeId, Split> initialSplits,
-                                OptionalInt totalPartitions,
-                                OutputBuffers outputBuffers,
-                                PartitionedSplitCountTracker partitionedSplitCountTracker,
-                                boolean summarizeTaskInfo, Optional<PlanNodeId> parent);
+            TaskId taskId,
+            InternalNode node,
+            PlanFragment fragment,
+            Multimap<PlanNodeId, Split> initialSplits,
+            OptionalInt totalPartitions,
+            OutputBuffers outputBuffers,
+            PartitionedSplitCountTracker partitionedSplitCountTracker,
+            boolean summarizeTaskInfo,
+            Optional<PlanNodeId> parent,
+            QuerySnapshotManager snapshotManager);
 }

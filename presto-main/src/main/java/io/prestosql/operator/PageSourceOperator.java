@@ -16,6 +16,8 @@ package io.prestosql.operator;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.connector.ConnectorPageSource;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -25,6 +27,7 @@ import java.util.concurrent.CompletableFuture;
 import static io.airlift.concurrent.MoreFutures.toListenableFuture;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(unsupported = true)
 public class PageSourceOperator
         implements Operator, Closeable
 {
@@ -104,9 +107,28 @@ public class PageSourceOperator
     }
 
     @Override
+    public Page pollMarker()
+    {
+        // TODO-cp-I38S9O: Operator currently not supported for Snapshot
+        return null;
+    }
+
+    @Override
     public void close()
             throws IOException
     {
         pageSource.close();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        // TODO-cp-I38S9O: this is used by index join (not fully implemented) and benchmark (don't need snapshotting)
+        return 0;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
     }
 }

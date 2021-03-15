@@ -17,6 +17,7 @@ import io.prestosql.array.ObjectBigArray;
 import io.prestosql.operator.aggregation.state.AbstractGroupedAccumulatorState;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
 
@@ -24,6 +25,7 @@ import static com.google.common.base.Verify.verify;
 
 // one BlockBuilder per group, which causes GC pressure and excessive cross region references.
 @Deprecated
+@RestorableConfig(unsupported = true)
 public class LegacyArrayAggregationGroupState
         extends AbstractGroupedAccumulatorState
         implements ArrayAggregationState

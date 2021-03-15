@@ -21,18 +21,25 @@ import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.function.WindowFunction;
 import io.prestosql.spi.function.WindowIndex;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"argumentChannels", "windowIndex", "accumulatorFactory"})
 public class AggregateWindowFunction
         implements WindowFunction
 {
     private final List<Integer> argumentChannels;
     private final AccumulatorFactory accumulatorFactory;
 
+    // Snapshot: all windowIndex operations revolves around pagesIndex which is passed in and captured/restored outside
+    // windowIndex fields in all window functions are reset when WindowPartition is created(see WindowPartition line 71)
+    // so it doesn't need to be captured.
     private WindowIndex windowIndex;
     private Accumulator accumulator;
     private int currentStart;
@@ -108,5 +115,42 @@ public class AggregateWindowFunction
             list.add(i);
         }
         return list.build();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        AggregateWindowFunctionState myState = new AggregateWindowFunctionState();
+        if (accumulator != null) {
+            myState.accumulator = accumulator.capture(serdeProvider);
+        }
+        myState.currentStart = currentStart;
+        myState.currentEnd = currentEnd;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        AggregateWindowFunctionState myState = (AggregateWindowFunctionState) state;
+        if (myState.accumulator == null) {
+            this.accumulator = null;
+        }
+        else {
+            if (this.accumulator == null) {
+                this.accumulator = accumulatorFactory.createAccumulator();
+            }
+            this.accumulator.restore(myState.accumulator, serdeProvider);
+        }
+        this.currentStart = myState.currentStart;
+        this.currentEnd = myState.currentEnd;
+    }
+
+    private static class AggregateWindowFunctionState
+            implements Serializable
+    {
+        private Object accumulator;
+        private int currentStart;
+        private int currentEnd;
     }
 }

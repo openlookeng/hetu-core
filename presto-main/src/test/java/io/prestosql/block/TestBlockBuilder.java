@@ -15,18 +15,23 @@ package io.prestosql.block;
 
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slices;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.Type;
+import io.prestosql.testing.TestingPagesSerdeFactory;
 import org.testng.annotations.Test;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.prestosql.block.BlockAssertions.assertBlockEquals;
+import static io.prestosql.operator.PageAssertions.assertPageEquals;
 import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
@@ -80,6 +85,59 @@ public class TestBlockBuilder
             assertEquals(newPageBuilder.getBlockBuilder(i).getPositionCount(), 0);
             assertTrue(newPageBuilder.getBlockBuilder(i).getRetainedSizeInBytes() < pageBuilder.getBlockBuilder(i).getRetainedSizeInBytes());
         }
+    }
+
+    @Test
+    public void testPageBuilderBlockBuilderSnapshot()
+    {
+        PagesSerde serde = TestingPagesSerdeFactory.testingPagesSerde();
+        List<Type> channels = ImmutableList.of(BIGINT, VARCHAR, INTEGER);
+        PageBuilder pageBuilder = new PageBuilder(channels);
+        BlockBuilder bigintBlockBuilder = pageBuilder.getBlockBuilder(0);
+        BlockBuilder varcharBlockBuilder = pageBuilder.getBlockBuilder(1);
+        BlockBuilder intBlockBuilder = pageBuilder.getBlockBuilder(2);
+
+        for (int i = 0; i < 100; i++) {
+            BIGINT.writeLong(bigintBlockBuilder, i);
+            VARCHAR.writeSlice(varcharBlockBuilder, Slices.utf8Slice("test" + i));
+            INTEGER.writeLong(intBlockBuilder, i);
+            pageBuilder.declarePosition();
+        }
+
+        Page withoutRestore = pageBuilder.build();
+        pageBuilder.reset();
+        bigintBlockBuilder = pageBuilder.getBlockBuilder(0);
+        varcharBlockBuilder = pageBuilder.getBlockBuilder(1);
+        intBlockBuilder = pageBuilder.getBlockBuilder(2);
+
+        for (int i = 0; i < 50; i++) {
+            BIGINT.writeLong(bigintBlockBuilder, i);
+            VARCHAR.writeSlice(varcharBlockBuilder, Slices.utf8Slice("test" + i));
+            INTEGER.writeLong(intBlockBuilder, i);
+            pageBuilder.declarePosition();
+        }
+
+        Object snapshot = pageBuilder.capture(serde);
+
+        for (int i = 50; i < 90; i++) {
+            BIGINT.writeLong(bigintBlockBuilder, i);
+            VARCHAR.writeSlice(varcharBlockBuilder, Slices.utf8Slice("test" + i));
+            INTEGER.writeLong(intBlockBuilder, i);
+            pageBuilder.declarePosition();
+        }
+
+        pageBuilder.restore(snapshot, serde);
+
+        for (int i = 50; i < 100; i++) {
+            BIGINT.writeLong(bigintBlockBuilder, i);
+            VARCHAR.writeSlice(varcharBlockBuilder, Slices.utf8Slice("test" + i));
+            INTEGER.writeLong(intBlockBuilder, i);
+            pageBuilder.declarePosition();
+        }
+
+        Page withRestore = pageBuilder.build();
+
+        assertPageEquals(channels, withRestore, withoutRestore);
     }
 
     @Test

@@ -87,7 +87,9 @@ import static io.prestosql.spi.connector.NotPartitionedPartitionHandle.NOT_PARTI
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.relational.SqlToRowExpressionTranslator.translate;
+import static io.prestosql.testing.TestingPagesSerdeFactory.TESTING_SERDE_FACTORY;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
+import static io.prestosql.testing.TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
@@ -175,7 +177,7 @@ public abstract class AbstractOperatorBenchmark
         List<ColumnHandle> columnHandles = columnHandlesBuilder.build();
 
         // get the split for this table
-        Split split = getLocalQuerySplit(session, tableHandle);
+        Split split = getLocalQuerySplit(session, tableHandle, planNodeId);
 
         return new OperatorFactory()
         {
@@ -200,9 +202,9 @@ public abstract class AbstractOperatorBenchmark
         };
     }
 
-    private Split getLocalQuerySplit(Session session, TableHandle handle)
+    private Split getLocalQuerySplit(Session session, TableHandle handle, PlanNodeId planNodeId)
     {
-        SplitSource splitSource = localQueryRunner.getSplitManager().getSplits(session, handle, UNGROUPED_SCHEDULING, null, Optional.empty(), Collections.emptyMap(), ImmutableSet.of(), false);
+        SplitSource splitSource = localQueryRunner.getSplitManager().getSplits(session, handle, UNGROUPED_SCHEDULING, null, Optional.empty(), Collections.emptyMap(), ImmutableSet.of(), false, planNodeId);
         List<Split> splits = new ArrayList<>();
         while (!splitSource.isFinished()) {
             splits.addAll(getNextBatch(splitSource));
@@ -295,13 +297,15 @@ public abstract class AbstractOperatorBenchmark
                 localQueryRunner.getExecutor(),
                 localQueryRunner.getScheduler(),
                 new DataSize(256, MEGABYTE),
-                spillSpaceTracker)
+                spillSpaceTracker,
+                NOOP_SNAPSHOT_UTILS)
                 .addTaskContext(new TaskStateMachine(new TaskId("query", 0, 0), localQueryRunner.getExecutor()),
                         session,
                         false,
                         false,
                         OptionalInt.empty(),
-                        Optional.empty());
+                        Optional.empty(),
+                        TESTING_SERDE_FACTORY);
 
         CpuTimer cpuTimer = new CpuTimer();
         Map<String, Long> executionStats = execute(taskContext);

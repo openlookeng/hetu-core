@@ -17,6 +17,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
 import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -26,6 +27,7 @@ import static java.lang.Math.min;
 import static java.util.Objects.requireNonNull;
 
 public final class Rectangle
+        implements Serializable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(Rectangle.class).instanceSize();
 

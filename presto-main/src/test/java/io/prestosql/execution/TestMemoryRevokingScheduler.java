@@ -59,6 +59,9 @@ import static io.prestosql.execution.SqlTask.createSqlTask;
 import static io.prestosql.execution.TaskTestUtils.createTestSplitMonitor;
 import static io.prestosql.execution.TaskTestUtils.createTestingPlanner;
 import static io.prestosql.memory.LocalMemoryManager.GENERAL_POOL;
+import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
+import static io.prestosql.testing.TestingPagesSerdeFactory.TESTING_SERDE_FACTORY;
+import static io.prestosql.testing.TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
@@ -99,7 +102,8 @@ public class TestMemoryRevokingScheduler
                 taskExecutor,
                 planner,
                 createTestSplitMonitor(),
-                new TaskManagerConfig());
+                new TaskManagerConfig(),
+                createTestMetadataManager());
 
         allOperatorContexts = null;
     }
@@ -119,7 +123,7 @@ public class TestMemoryRevokingScheduler
         SqlTask sqlTask1 = newSqlTask();
         SqlTask sqlTask2 = newSqlTask();
 
-        TaskContext taskContext1 = sqlTask1.getQueryContext().addTaskContext(new TaskStateMachine(new TaskId("q1", 1, 1), executor), session, false, false, OptionalInt.empty(), Optional.empty());
+        TaskContext taskContext1 = sqlTask1.getQueryContext().addTaskContext(new TaskStateMachine(new TaskId("q1", 1, 1), executor), session, false, false, OptionalInt.empty(), Optional.empty(), TESTING_SERDE_FACTORY);
         PipelineContext pipelineContext11 = taskContext1.addPipelineContext(0, false, false, false);
         DriverContext driverContext111 = pipelineContext11.addDriverContext();
         OperatorContext operatorContext1 = driverContext111.addOperatorContext(1, new PlanNodeId("na"), "na");
@@ -127,7 +131,7 @@ public class TestMemoryRevokingScheduler
         DriverContext driverContext112 = pipelineContext11.addDriverContext();
         OperatorContext operatorContext3 = driverContext112.addOperatorContext(3, new PlanNodeId("na"), "na");
 
-        TaskContext taskContext2 = sqlTask2.getQueryContext().addTaskContext(new TaskStateMachine(new TaskId("q2", 1, 1), executor), session, false, false, OptionalInt.empty(), Optional.empty());
+        TaskContext taskContext2 = sqlTask2.getQueryContext().addTaskContext(new TaskStateMachine(new TaskId("q2", 1, 1), executor), session, false, false, OptionalInt.empty(), Optional.empty(), TESTING_SERDE_FACTORY);
         PipelineContext pipelineContext21 = taskContext2.addPipelineContext(1, false, false, false);
         DriverContext driverContext211 = pipelineContext21.addDriverContext();
         OperatorContext operatorContext4 = driverContext211.addOperatorContext(4, new PlanNodeId("na"), "na");
@@ -249,7 +253,7 @@ public class TestMemoryRevokingScheduler
 
     private OperatorContext createContexts(SqlTask sqlTask)
     {
-        TaskContext taskContext = sqlTask.getQueryContext().addTaskContext(new TaskStateMachine(new TaskId("q", 1, 1), executor), session, false, false, OptionalInt.empty(), Optional.empty());
+        TaskContext taskContext = sqlTask.getQueryContext().addTaskContext(new TaskStateMachine(new TaskId("q", 1, 1), executor), session, false, false, OptionalInt.empty(), Optional.empty(), TESTING_SERDE_FACTORY);
         PipelineContext pipelineContext = taskContext.addPipelineContext(0, false, false, false);
         DriverContext driverContext = pipelineContext.addDriverContext();
         OperatorContext operatorContext = driverContext.addOperatorContext(1, new PlanNodeId("na"), "na");
@@ -302,12 +306,13 @@ public class TestMemoryRevokingScheduler
                         executor,
                         scheduledExecutor,
                         new DataSize(1, GIGABYTE),
-                        spillSpaceTracker),
+                        spillSpaceTracker,
+                        NOOP_SNAPSHOT_UTILS),
                 sqlTaskExecutionFactory,
                 executor,
                 Functions.identity(),
                 new DataSize(32, MEGABYTE),
                 new CounterStat(),
-                new EmptyMockMetadata());
+                createTestMetadataManager());
     }
 }

@@ -14,12 +14,14 @@
 package io.prestosql.operator;
 
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.type.Type;
 
 import java.util.List;
 
 import static io.prestosql.block.BlockAssertions.assertBlockEquals;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 public final class PageAssertions
 {
@@ -29,6 +31,15 @@ public final class PageAssertions
 
     public static void assertPageEquals(List<? extends Type> types, Page actualPage, Page expectedPage)
     {
+        if (expectedPage instanceof MarkerPage) {
+            assertTrue(expectedPage instanceof MarkerPage);
+            MarkerPage actual = (MarkerPage) actualPage;
+            MarkerPage expected = (MarkerPage) expectedPage;
+            assertEquals(actual.getSnapshotId(), expected.getSnapshotId());
+            assertEquals(actual.isResuming(), expected.isResuming());
+            return;
+        }
+
         assertEquals(types.size(), actualPage.getChannelCount());
         assertEquals(actualPage.getChannelCount(), expectedPage.getChannelCount());
         assertEquals(actualPage.getPositionCount(), expectedPage.getPositionCount());

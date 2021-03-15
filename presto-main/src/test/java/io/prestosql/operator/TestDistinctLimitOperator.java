@@ -26,7 +26,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -39,6 +41,7 @@ import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.operator.GroupByHashYieldAssertion.createPagesWithDistinctHashKeys;
 import static io.prestosql.operator.GroupByHashYieldAssertion.finishOperatorWithYieldingGroupByHash;
 import static io.prestosql.operator.OperatorAssertion.assertOperatorEquals;
+import static io.prestosql.operator.OperatorAssertion.assertOperatorEqualsWithSimpleSelfStateComparison;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.testing.MaterializedResult.resultBuilder;
@@ -105,6 +108,39 @@ public class TestDistinctLimitOperator
                 .build();
 
         assertOperatorEquals(operatorFactory, driverContext, input, expected, hashEnabled, ImmutableList.of(1));
+    }
+
+    @Test
+    public void testDistinctLimitSnapshot()
+    {
+        RowPagesBuilder rowPagesBuilder = rowPagesBuilder(true, Ints.asList(0), BIGINT);
+        List<Page> input = rowPagesBuilder
+                .addSequencePage(3, 1)
+                .addSequencePage(5, 2)
+                .build();
+
+        OperatorFactory operatorFactory = new DistinctLimitOperator.DistinctLimitOperatorFactory(0, new PlanNodeId("test"), rowPagesBuilder.getTypes(), Ints.asList(0), 5, rowPagesBuilder.getHashChannel(), joinCompiler);
+
+        MaterializedResult expected = resultBuilder(driverContext.getSession(), BIGINT)
+                .row(1L)
+                .row(2L)
+                .row(3L)
+                .row(4L)
+                .row(5L)
+                .build();
+
+        assertOperatorEqualsWithSimpleSelfStateComparison(operatorFactory, driverContext, input, expected, true, ImmutableList.of(1), createExpectedMapping());
+    }
+
+    private Map<String, Object> createExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        expectedMapping.put("operatorContext", 0);
+        expectedMapping.put("localUserMemoryContext", 33048L);
+        expectedMapping.put("remainingLimit", 2L);
+        expectedMapping.put("finishing", false);
+        expectedMapping.put("nextDistinctId", 3L);
+        return expectedMapping;
     }
 
     @Test(dataProvider = "hashEnabledValues")

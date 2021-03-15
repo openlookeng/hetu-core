@@ -24,15 +24,19 @@ import io.prestosql.operator.aggregation.builder.HashAggregationBuilder;
 import io.prestosql.operator.aggregation.builder.InMemoryHashAggregationBuilder;
 import io.prestosql.operator.aggregation.builder.SpillableHashAggregationBuilder;
 import io.prestosql.operator.scalar.CombineHashFunction;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.plan.AggregationNode.Step;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.SpillerFactory;
 import io.prestosql.sql.gen.JoinCompiler;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -45,6 +49,9 @@ import static io.prestosql.sql.planner.optimizations.HashGenerationOptimizer.INI
 import static io.prestosql.type.TypeUtils.NULL_HASH_CODE;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"snapshotState", "groupByTypes", "groupByChannels", "globalAggregationGroupIds",
+        "accumulatorFactories", "hashChannel", "groupIdChannel", "maxPartialMemory", "memoryLimitForMerge",
+        "memoryLimitForMergeWithMemory", "spillerFactory", "joinCompiler", "types", "outputPages", "unfinishedWork"})
 public class HashAggregationOperator
         implements Operator
 {
@@ -252,6 +259,7 @@ public class HashAggregationOperator
     }
 
     private final OperatorContext operatorContext;
+    private final SingleInputSnapshotState snapshotState;
     private final List<Type> groupByTypes;
     private final List<Integer> groupByChannels;
     private final List<Integer> globalAggregationGroupIds;
@@ -305,6 +313,7 @@ public class HashAggregationOperator
         requireNonNull(step, "step is null");
         requireNonNull(accumulatorFactories, "accumulatorFactories is null");
         requireNonNull(operatorContext, "operatorContext is null");
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
 
         this.groupByTypes = ImmutableList.copyOf(groupByTypes);
         this.groupByChannels = ImmutableList.copyOf(groupByChannels);
@@ -347,6 +356,11 @@ public class HashAggregationOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         return finished;
     }
 
@@ -367,50 +381,19 @@ public class HashAggregationOperator
     @Override
     public void addInput(Page page)
     {
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         checkState(unfinishedWork == null, "Operator has unfinished work");
         checkState(!finishing, "Operator is already finishing");
         requireNonNull(page, "page is null");
         inputProcessed = true;
 
         if (aggregationBuilder == null) {
-            // TODO: We ignore spillEnabled here if any aggregate has ORDER BY clause or DISTINCT because they are not yet implemented for spilling.
-            if (step.isOutputPartial() || !spillEnabled || hasOrderBy() || hasDistinct()) {
-                aggregationBuilder = new InMemoryHashAggregationBuilder(
-                        accumulatorFactories,
-                        step,
-                        expectedGroups,
-                        groupByTypes,
-                        groupByChannels,
-                        hashChannel,
-                        operatorContext,
-                        maxPartialMemory,
-                        joinCompiler,
-                        () -> {
-                            memoryContext.setBytes(((InMemoryHashAggregationBuilder) aggregationBuilder).getSizeInMemory());
-                            if (step.isOutputPartial() && maxPartialMemory.isPresent()) {
-                                // do not yield on memory for partial aggregations
-                                return true;
-                            }
-                            return operatorContext.isWaitingForMemory().isDone();
-                        });
-            }
-            else {
-                verify(!useSystemMemory, "using system memory in spillable aggregations is not supported");
-                aggregationBuilder = new SpillableHashAggregationBuilder(
-                        accumulatorFactories,
-                        step,
-                        expectedGroups,
-                        groupByTypes,
-                        groupByChannels,
-                        hashChannel,
-                        operatorContext,
-                        memoryLimitForMerge,
-                        memoryLimitForMergeWithMemory,
-                        spillerFactory,
-                        joinCompiler);
-            }
-
-            // assume initial aggregationBuilder is not full
+            createAggregationBuilder();
         }
         else {
             checkState(!aggregationBuilder.isFull(), "Aggregation buffer is full");
@@ -422,6 +405,49 @@ public class HashAggregationOperator
             unfinishedWork = null;
         }
         aggregationBuilder.updateMemory();
+    }
+
+    public void createAggregationBuilder()
+    {
+        // TODO: We ignore spillEnabled here if any aggregate has ORDER BY clause or DISTINCT because they are not yet implemented for spilling.
+        if (step.isOutputPartial() || !spillEnabled || hasOrderBy() || hasDistinct()) {
+            //TODO-cp-I39B76 snapshot support
+            aggregationBuilder = new InMemoryHashAggregationBuilder(
+                    accumulatorFactories,
+                    step,
+                    expectedGroups,
+                    groupByTypes,
+                    groupByChannels,
+                    hashChannel,
+                    operatorContext,
+                    maxPartialMemory,
+                    joinCompiler,
+                    () -> {
+                        memoryContext.setBytes(((InMemoryHashAggregationBuilder) aggregationBuilder).getSizeInMemory());
+                        if (step.isOutputPartial() && maxPartialMemory.isPresent()) {
+                            // do not yield on memory for partial aggregations
+                            return true;
+                        }
+                        return operatorContext.isWaitingForMemory().isDone();
+                    });
+        }
+        else {
+            verify(!useSystemMemory, "using system memory in spillable aggregations is not supported");
+            aggregationBuilder = new SpillableHashAggregationBuilder(
+                    accumulatorFactories,
+                    step,
+                    expectedGroups,
+                    groupByTypes,
+                    groupByChannels,
+                    hashChannel,
+                    operatorContext,
+                    memoryLimitForMerge,
+                    memoryLimitForMergeWithMemory,
+                    spillerFactory,
+                    joinCompiler);
+        }
+
+        // assume initial aggregationBuilder is not full
     }
 
     private boolean hasOrderBy()
@@ -454,6 +480,13 @@ public class HashAggregationOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (finished) {
             return null;
         }
@@ -500,6 +533,12 @@ public class HashAggregationOperator
         }
 
         return outputPages.getResult();
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     @Override
@@ -584,5 +623,54 @@ public class HashAggregationOperator
             }
         }
         return result;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        HashAggregationOperatorState myState = new HashAggregationOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.hashCollisionsCounter = hashCollisionsCounter.capture(serdeProvider);
+        if (aggregationBuilder != null) {
+            myState.aggregationBuilder = aggregationBuilder.capture(serdeProvider);
+        }
+        myState.memoryContext = memoryContext.getBytes();
+        myState.inputProcessed = inputProcessed;
+        myState.finishing = finishing;
+        myState.finished = finished;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        HashAggregationOperatorState myState = (HashAggregationOperatorState) state;
+        operatorContext.restore(myState.operatorContext, serdeProvider);
+        hashCollisionsCounter.restore(myState.hashCollisionsCounter, serdeProvider);
+        if (myState.aggregationBuilder != null) {
+            if (this.aggregationBuilder == null) {
+                createAggregationBuilder();
+            }
+            aggregationBuilder.restore(myState.aggregationBuilder, serdeProvider);
+        }
+        else {
+            aggregationBuilder = null;
+        }
+        this.memoryContext.setBytes(myState.memoryContext);
+        inputProcessed = myState.inputProcessed;
+        finishing = myState.finishing;
+        finished = myState.finished;
+    }
+
+    private static class HashAggregationOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private Object hashCollisionsCounter;
+        private Object aggregationBuilder;
+        private long memoryContext;
+        private boolean inputProcessed;
+        private boolean finishing;
+        private boolean finished;
     }
 }

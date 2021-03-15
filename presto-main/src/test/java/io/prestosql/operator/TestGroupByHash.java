@@ -21,8 +21,10 @@ import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.DictionaryBlock;
 import io.prestosql.spi.block.DictionaryId;
+import io.prestosql.spi.snapshot.SnapshotTestUtil;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
+import io.prestosql.testing.TestingPagesSerdeFactory;
 import io.prestosql.testing.TestingSession;
 import io.prestosql.type.TypeUtils;
 import org.testng.annotations.DataProvider;
@@ -30,12 +32,15 @@ import org.testng.annotations.Test;
 
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
 import static com.google.common.math.DoubleMath.log2;
+import static io.prestosql.RowPagesBuilder.rowPagesBuilder;
 import static io.prestosql.block.BlockAssertions.createLongSequenceBlock;
 import static io.prestosql.block.BlockAssertions.createLongsBlock;
 import static io.prestosql.block.BlockAssertions.createStringSequenceBlock;
@@ -90,6 +95,76 @@ public class TestGroupByHash
                 }
             }
         }
+    }
+
+    @Test
+    public void testAddPageSnapshot()
+    {
+        GroupByHash groupByHash = createGroupByHash(TEST_SESSION, ImmutableList.of(BIGINT), new int[] {0}, Optional.of(1), 100, JOIN_COMPILER);
+        Object snapshot = null;
+        boolean restored = false;
+        for (int tries = 0; tries < 2; tries++) {
+            for (int value = 0; value < MAX_GROUP_ID; value++) {
+                Block block = BlockAssertions.createLongsBlock(value);
+                Block hashBlock = TypeUtils.getHashBlock(ImmutableList.of(BIGINT), block);
+                Page page = new Page(block, hashBlock);
+                for (int addValuesTries = 0; addValuesTries < 10; addValuesTries++) {
+                    groupByHash.addPage(page).process();
+                    assertEquals(groupByHash.getGroupCount(), tries == 0 ? value + 1 : MAX_GROUP_ID);
+
+                    // add the page again using get group ids and make sure the group count didn't change
+                    Work<GroupByIdBlock> work = groupByHash.getGroupIds(page);
+                    work.process();
+                    GroupByIdBlock groupIds = work.getResult();
+                    assertEquals(groupByHash.getGroupCount(), tries == 0 ? value + 1 : MAX_GROUP_ID);
+                    assertEquals(groupIds.getGroupCount(), tries == 0 ? value + 1 : MAX_GROUP_ID);
+
+                    // verify the first position
+                    assertEquals(groupIds.getPositionCount(), 1);
+                    long groupId = groupIds.getGroupId(0);
+                    assertEquals(groupId, value);
+                }
+            }
+            if (tries == 0) {
+                snapshot = groupByHash.capture(null);
+                assertEquals(SnapshotTestUtil.toSimpleSnapshotMapping(snapshot), createBigintExpectedMapping());
+            }
+            else if (tries == 1 && !restored) {
+                //restore and go back to tries = 0
+                groupByHash.restore(snapshot, null);
+                snapshot = groupByHash.capture(null);
+                assertEquals(SnapshotTestUtil.toSimpleSnapshotMapping(snapshot), createBigintExpectedMapping());
+                tries--;
+                restored = true;
+            }
+        }
+    }
+
+    private Map<String, Object> createBigintExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        expectedMapping.put("hashCapacity", 1024);
+        expectedMapping.put("maxFill", 768);
+        expectedMapping.put("mask", 1023);
+        expectedMapping.put("nullGroupId", -1);
+        expectedMapping.put("nextGroupId", 500);
+        expectedMapping.put("hashCollisions", 21807L);
+        expectedMapping.put("expectedHashCollisions", 858.42432);
+        expectedMapping.put("preallocatedMemoryInBytes", 0L);
+        expectedMapping.put("currentPageSizeInBytes", 1072L);
+        return expectedMapping;
+    }
+
+    @Test
+    public void testNoChannelSnapshot()
+    {
+        GroupByHash groupByHash = new NoChannelGroupByHash();
+        List<Page> pages = rowPagesBuilder(BIGINT)
+                .addSequencePage(3, 1)
+                .build();
+        groupByHash.addPage(pages.get(0));
+        Object snapshot = groupByHash.capture(null);
+        assertEquals(snapshot, 1);
     }
 
     @Test
@@ -172,6 +247,77 @@ public class TestGroupByHash
         assertEquals(page.getPositionCount(), 100);
         BlockAssertions.assertBlockEquals(VARCHAR, page.getBlock(0), valuesBlock);
         BlockAssertions.assertBlockEquals(BIGINT, page.getBlock(1), hashBlock);
+    }
+
+    @Test
+    public void testAppendToSnapshot()
+    {
+        Block valuesBlock = BlockAssertions.createStringSequenceBlock(0, 100);
+        Block hashBlock = TypeUtils.getHashBlock(ImmutableList.of(VARCHAR), valuesBlock);
+        //MultiChannelGroupByHash
+        GroupByHash groupByHash = createGroupByHash(TEST_SESSION, ImmutableList.of(VARCHAR), new int[] {0}, Optional.of(1), 100, JOIN_COMPILER);
+
+        Work<GroupByIdBlock> work = groupByHash.getGroupIds(new Page(valuesBlock, hashBlock));
+        work.process();
+        GroupByIdBlock groupIds = work.getResult();
+        for (int i = 0; i < groupIds.getPositionCount(); i++) {
+            assertEquals(groupIds.getGroupId(i), i);
+        }
+        assertEquals(groupByHash.getGroupCount(), 100);
+        Object snapshot = groupByHash.capture(TestingPagesSerdeFactory.testingPagesSerde());
+        assertEquals(SnapshotTestUtil.toSimpleSnapshotMapping(snapshot), multiChannelCreateExpectedMapping());
+
+        PageBuilder pageBuilder = new PageBuilder(groupByHash.getTypes());
+        for (int i = 0; i < groupByHash.getGroupCount(); i++) {
+            pageBuilder.declarePosition();
+            groupByHash.appendValuesTo(i, pageBuilder, 0);
+        }
+        Page page = pageBuilder.build();
+        // Ensure that all blocks have the same positionCount
+        for (int i = 0; i < groupByHash.getTypes().size(); i++) {
+            assertEquals(page.getBlock(i).getPositionCount(), 100);
+        }
+        assertEquals(page.getPositionCount(), 100);
+
+        //Restore to previous state
+        groupByHash.restore(snapshot, TestingPagesSerdeFactory.testingPagesSerde());
+        snapshot = groupByHash.capture(TestingPagesSerdeFactory.testingPagesSerde());
+        assertEquals(SnapshotTestUtil.toSimpleSnapshotMapping(snapshot), multiChannelCreateExpectedMapping());
+
+        //Redo work between capture and restore, then compare result
+        pageBuilder = new PageBuilder(groupByHash.getTypes());
+        for (int i = 0; i < groupByHash.getGroupCount(); i++) {
+            pageBuilder.declarePosition();
+            groupByHash.appendValuesTo(i, pageBuilder, 0);
+        }
+        page = pageBuilder.build();
+        // Ensure that all blocks have the same positionCount
+        for (int i = 0; i < groupByHash.getTypes().size(); i++) {
+            assertEquals(page.getBlock(i).getPositionCount(), 100);
+        }
+        assertEquals(page.getPositionCount(), 100);
+        BlockAssertions.assertBlockEquals(VARCHAR, page.getBlock(0), valuesBlock);
+        BlockAssertions.assertBlockEquals(BIGINT, page.getBlock(1), hashBlock);
+    }
+
+    private Map<String, Object> multiChannelCreateExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+
+        expectedMapping.put("completedPagesMemorySize", 0L);
+        expectedMapping.put("hashCapacity", 256);
+        expectedMapping.put("maxFill", 192);
+        expectedMapping.put("mask", 255);
+        expectedMapping.put("groupAddressByHash", long[].class);
+        expectedMapping.put("groupIdsByHash", int[].class);
+        expectedMapping.put("rawHashByHashPosition", byte[].class);
+        expectedMapping.put("nextGroupId", 100);
+        expectedMapping.put("hashCollisions", 37L);
+        expectedMapping.put("expectedHashCollisions", 0.0);
+        expectedMapping.put("preallocatedMemoryInBytes", 0L);
+        expectedMapping.put("currentPageSizeInBytes", 4732L);
+
+        return expectedMapping;
     }
 
     @Test

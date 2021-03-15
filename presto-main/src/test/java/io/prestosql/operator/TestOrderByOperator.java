@@ -17,7 +17,9 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 import io.prestosql.ExceededMemoryLimitException;
+import io.prestosql.Session;
 import io.prestosql.operator.OrderByOperator.OrderByOperatorFactory;
+import io.prestosql.snapshot.SnapshotUtils;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.gen.OrderingCompiler;
@@ -28,7 +30,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -39,6 +43,7 @@ import static io.airlift.units.DataSize.succinctBytes;
 import static io.prestosql.RowPagesBuilder.rowPagesBuilder;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
 import static io.prestosql.operator.OperatorAssertion.assertOperatorEquals;
+import static io.prestosql.operator.OperatorAssertion.assertOperatorEqualsWithSimpleSelfStateComparison;
 import static io.prestosql.operator.OperatorAssertion.toMaterializedResult;
 import static io.prestosql.operator.OperatorAssertion.toPages;
 import static io.prestosql.spi.block.SortOrder.ASC_NULLS_LAST;
@@ -47,6 +52,7 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.testing.MaterializedResult.resultBuilder;
+import static io.prestosql.testing.TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS;
 import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static java.lang.String.format;
 import static java.util.concurrent.Executors.newCachedThreadPool;
@@ -60,6 +66,7 @@ public class TestOrderByOperator
     private ExecutorService executor;
     private ScheduledExecutorService scheduledExecutor;
     private DummySpillerFactory spillerFactory;
+    private final SnapshotUtils snapshotUtils = NOOP_SNAPSHOT_UTILS;
 
     @DataProvider
     public static Object[][] spillEnabled()
@@ -110,7 +117,7 @@ public class TestOrderByOperator
                 Optional.of(spillerFactory),
                 new OrderingCompiler());
 
-        DriverContext driverContext = createDriverContext(memoryLimit);
+        DriverContext driverContext = createDriverContext(memoryLimit, TEST_SESSION);
         MaterializedResult.Builder expectedBuilder = resultBuilder(driverContext.getSession(), DOUBLE);
         for (int i = 0; i < numberOfRows; ++i) {
             expectedBuilder.row((double) numberOfRows - i - 1);
@@ -150,7 +157,7 @@ public class TestOrderByOperator
                 Optional.of(spillerFactory),
                 new OrderingCompiler());
 
-        DriverContext driverContext = createDriverContext(memoryLimit);
+        DriverContext driverContext = createDriverContext(memoryLimit, TEST_SESSION);
         MaterializedResult expected = resultBuilder(driverContext.getSession(), DOUBLE)
                 .row(-0.1)
                 .row(0.1)
@@ -185,7 +192,7 @@ public class TestOrderByOperator
                 Optional.of(spillerFactory),
                 new OrderingCompiler());
 
-        DriverContext driverContext = createDriverContext(memoryLimit);
+        DriverContext driverContext = createDriverContext(memoryLimit, TEST_SESSION);
         MaterializedResult expected = resultBuilder(driverContext.getSession(), VARCHAR, BIGINT)
                 .row("a", 4L)
                 .row("a", 1L)
@@ -194,6 +201,50 @@ public class TestOrderByOperator
                 .build();
 
         assertOperatorEquals(operatorFactory, driverContext, input, expected, revokeMemoryWhenAddingPages);
+    }
+
+    @Test
+    public void testMultiFieldKeySnapshot()
+    {
+        List<Page> input = rowPagesBuilder(VARCHAR, BIGINT)
+                .row("a", 1L)
+                .row("b", 2L)
+                .pageBreak()
+                .row("b", 3L)
+                .row("a", 4L)
+                .build();
+
+        OrderByOperatorFactory operatorFactory = new OrderByOperatorFactory(
+                0,
+                new PlanNodeId("test"),
+                ImmutableList.of(VARCHAR, BIGINT),
+                ImmutableList.of(0, 1),
+                10,
+                ImmutableList.of(0, 1),
+                ImmutableList.of(ASC_NULLS_LAST, DESC_NULLS_LAST),
+                new PagesIndex.TestingFactory(false),
+                false,
+                Optional.of(spillerFactory),
+                new OrderingCompiler());
+
+        DriverContext driverContext = createDriverContext(0, TEST_SESSION);
+        MaterializedResult expected = resultBuilder(driverContext.getSession(), VARCHAR, BIGINT)
+                .row("a", 4L)
+                .row("a", 1L)
+                .row("b", 3L)
+                .row("b", 2L)
+                .build();
+
+        assertOperatorEqualsWithSimpleSelfStateComparison(operatorFactory, driverContext, input, expected, false, createExpectedMapping());
+    }
+
+    private Map<String, Object> createExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        expectedMapping.put("operatorContext", 0);
+        expectedMapping.put("revocableMemoryContext", 0L);
+        expectedMapping.put("localUserMemoryContext", 8828L);
+        return expectedMapping;
     }
 
     @Test(dataProvider = "spillEnabled")
@@ -220,7 +271,7 @@ public class TestOrderByOperator
                 Optional.of(spillerFactory),
                 new OrderingCompiler());
 
-        DriverContext driverContext = createDriverContext(memoryLimit);
+        DriverContext driverContext = createDriverContext(memoryLimit, TEST_SESSION);
         MaterializedResult expected = resultBuilder(driverContext.getSession(), BIGINT)
                 .row(4L)
                 .row(2L)
@@ -262,10 +313,11 @@ public class TestOrderByOperator
         toPages(operatorFactory, driverContext, input);
     }
 
-    private DriverContext createDriverContext(long memoryLimit)
+    private DriverContext createDriverContext(long memoryLimit, Session session)
     {
-        return TestingTaskContext.builder(executor, scheduledExecutor, TEST_SESSION)
+        return TestingTaskContext.builder(executor, scheduledExecutor, session)
                 .setMemoryPoolSize(succinctBytes(memoryLimit))
+                .setSnapshotUtils(snapshotUtils)
                 .build()
                 .addPipelineContext(0, true, true, false)
                 .addDriverContext();

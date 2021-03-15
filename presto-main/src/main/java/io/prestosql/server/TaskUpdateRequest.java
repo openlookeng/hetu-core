@@ -32,6 +32,7 @@ import static java.util.Objects.requireNonNull;
 
 public class TaskUpdateRequest
 {
+    private final String taskInstanceId;
     private final SessionRepresentation session;
     // extraCredentials is stored separately from SessionRepresentation to avoid being leaked
     private final Map<String, String> extraCredentials;
@@ -43,6 +44,7 @@ public class TaskUpdateRequest
 
     @JsonCreator
     public TaskUpdateRequest(
+            @JsonProperty("taskInstanceId") String taskInstanceId,
             @JsonProperty("session") SessionRepresentation session,
             @JsonProperty("extraCredentials") Map<String, String> extraCredentials,
             @JsonProperty("fragment") Optional<PlanFragment> fragment,
@@ -58,6 +60,7 @@ public class TaskUpdateRequest
         requireNonNull(outputIds, "outputIds is null");
         requireNonNull(totalPartitions, "totalPartitions is null");
 
+        this.taskInstanceId = taskInstanceId;
         this.session = session;
         this.extraCredentials = extraCredentials;
         this.fragment = fragment;
@@ -65,6 +68,12 @@ public class TaskUpdateRequest
         this.outputIds = outputIds;
         this.totalPartitions = totalPartitions;
         this.consumerId = consumerPlanNodeId;
+    }
+
+    @JsonProperty
+    public String getTaskInstanceId()
+    {
+        return taskInstanceId;
     }
 
     @JsonProperty
@@ -113,6 +122,7 @@ public class TaskUpdateRequest
     public String toString()
     {
         return toStringHelper(this)
+                .add("taskInstanceId", taskInstanceId)
                 .add("session", session)
                 .add("extraCredentials", extraCredentials.keySet())
                 .add("fragment", fragment)

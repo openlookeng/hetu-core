@@ -44,6 +44,7 @@ import io.prestosql.sql.gen.JoinFilterFunctionCompiler;
 import io.prestosql.sql.planner.plan.SpatialJoinNode.Type;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.TestingTaskContext;
+import io.prestosql.testing.assertions.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
@@ -63,6 +64,7 @@ import static io.prestosql.SessionTestUtils.TEST_SESSION;
 import static io.prestosql.geospatial.KdbTree.Node.newInternal;
 import static io.prestosql.geospatial.KdbTree.Node.newLeaf;
 import static io.prestosql.operator.OperatorAssertion.assertOperatorEquals;
+import static io.prestosql.operator.OperatorAssertion.toMaterializedResult;
 import static io.prestosql.operator.OperatorAssertion.toPages;
 import static io.prestosql.plugin.geospatial.GeoFunctions.stGeometryFromText;
 import static io.prestosql.plugin.geospatial.GeoFunctions.stPoint;
@@ -100,6 +102,7 @@ public class TestSpatialJoinOperator
     private static final Slice POINT_Y = stPoint(4.5, 4.5);
     private static final Slice POINT_Z = stPoint(6, 6);
     private static final Slice POINT_W = stPoint(20, 20);
+    private static final Slice POINT_R = stPoint(4.5, 4);
 
     private ExecutorService executor;
     private ScheduledExecutorService scheduledExecutor;
@@ -161,6 +164,39 @@ public class TestSpatialJoinOperator
     }
 
     @Test
+    public void testSpatialJoinSnapshot()
+    {
+        TaskContext taskContext = createTaskContext();
+        RowPagesBuilder buildPages = rowPagesBuilder(ImmutableList.of(GEOMETRY, VARCHAR))
+                .row(POLYGON_A, "A")
+                .row(null, "null")
+                .pageBreak()
+                .row(POLYGON_B, "B");
+
+        RowPagesBuilder probePages = rowPagesBuilder(ImmutableList.of(GEOMETRY, VARCHAR))
+                .row(POINT_X, "x")
+                .row(null, "null")
+                .row(POINT_Y, "y")
+                .pageBreak()
+                .row(POINT_Z, "z")
+                .pageBreak()
+                .row(POINT_W, "w")
+                .pageBreak()
+                .row(POINT_R, "r");
+
+        MaterializedResult expected = resultBuilder(taskContext.getSession(), ImmutableList.of(VARCHAR, VARCHAR))
+                .row("x", "A")
+                .row("y", "A")
+                .row("y", "B")
+                .row("z", "B")
+                .row("r", "A")
+                .row("r", "B")
+                .build();
+
+        assertSpatialJoinSnapshot(taskContext, INNER, buildPages, probePages, expected);
+    }
+
+    @Test
     public void testSpatialLeftJoin()
     {
         TaskContext taskContext = createTaskContext();
@@ -196,6 +232,59 @@ public class TestSpatialJoinOperator
         PagesSpatialIndexFactory pagesSpatialIndexFactory = buildIndex(driverContext, (build, probe, r) -> build.contains(probe), Optional.empty(), Optional.empty(), buildPages);
         OperatorFactory joinOperatorFactory = new SpatialJoinOperatorFactory(2, new PlanNodeId("test"), joinType, probePages.getTypes(), Ints.asList(1), 0, Optional.empty(), pagesSpatialIndexFactory);
         assertOperatorEquals(joinOperatorFactory, driverContext, probePages.build(), expected);
+    }
+
+    private void assertSpatialJoinSnapshot(TaskContext taskContext, Type joinType, RowPagesBuilder buildPages, RowPagesBuilder probePages, MaterializedResult expected)
+    {
+        DriverContext driverContext = taskContext.addPipelineContext(0, true, true, false).addDriverContext();
+        PagesSpatialIndexFactory pagesSpatialIndexFactory = buildIndexSnapshot(driverContext, (build, probe, r) -> build.contains(probe), Optional.empty(), Optional.empty(), buildPages);
+        OperatorFactory joinOperatorFactory = new SpatialJoinOperatorFactory(2, new PlanNodeId("test"), joinType, probePages.getTypes(), Ints.asList(1), 0, Optional.empty(), pagesSpatialIndexFactory);
+        assetResultEqualsSnapshot(joinOperatorFactory, driverContext, probePages.build(), expected);
+    }
+
+    private void assetResultEqualsSnapshot(OperatorFactory operatorFactory, DriverContext driverContext, List<Page> input, MaterializedResult expected)
+    {
+        Operator operator = operatorFactory.createOperator(driverContext);
+
+        ImmutableList.Builder<Page> outputPages = ImmutableList.builder();
+        int inputIdx = 0;
+        Object snapshot = null;
+        boolean restored = false;
+
+        for (int loopsSinceLastPage = 0; loopsSinceLastPage < 1_000; loopsSinceLastPage++) {
+            if (inputIdx < input.size() && operator.needsInput()) {
+                if (inputIdx == input.size() / 2) {
+                    snapshot = operator.capture(operator.getOperatorContext().getDriverContext().getSerde());
+                }
+                else if (inputIdx == input.size() - 1 && snapshot != null && !restored) {
+                    operator.restore(snapshot, operator.getOperatorContext().getDriverContext().getSerde());
+                    inputIdx = input.size() / 2;
+                    restored = true;
+                }
+                operator.addInput(input.get(inputIdx));
+                inputIdx++;
+                loopsSinceLastPage = 0;
+                //Operator doesn't produce output in the process, but needs getOutput call to clear for next input.
+                operator.getOutput();
+            }
+        }
+
+        for (int loopsSinceLastPage = 0; !operator.isFinished() && loopsSinceLastPage < 1_000; loopsSinceLastPage++) {
+            operator.finish();
+            Page outputPage = operator.getOutput();
+            if (outputPage != null && outputPage.getPositionCount() != 0) {
+                outputPages.add(outputPage);
+                loopsSinceLastPage = 0;
+            }
+        }
+
+        assertEquals(operator.isFinished(), true, "Operator did not finish");
+        assertEquals(operator.needsInput(), false, "Operator still wants input");
+        assertEquals(operator.isBlocked().isDone(), true, "Operator is blocked");
+
+        List<Page> output = outputPages.build();
+        MaterializedResult actual = toMaterializedResult(driverContext.getSession(), expected.getTypes(), output);
+        Assert.assertEquals(actual, expected);
     }
 
     @Test
@@ -462,6 +551,65 @@ public class TestSpatialJoinOperator
         PagesSpatialIndexFactory pagesSpatialIndexFactory = buildIndex(driverContext, (build, probe, r) -> build.intersects(probe), Optional.empty(), Optional.of(2), Optional.of(KDB_TREE_JSON), Optional.empty(), pages);
         OperatorFactory joinOperatorFactory = new SpatialJoinOperatorFactory(2, new PlanNodeId("test"), INNER, pages.getTypes(), Ints.asList(1), 0, Optional.of(2), pagesSpatialIndexFactory);
         assertOperatorEquals(joinOperatorFactory, driverContext, pages.build(), expected);
+    }
+
+    private PagesSpatialIndexFactory buildIndexSnapshot(DriverContext driverContext, SpatialPredicate spatialRelationshipTest, Optional<Integer> radiusChannel, Optional<InternalJoinFilterFunction> filterFunction, RowPagesBuilder buildPages)
+    {
+        return buildIndexSnapshot(driverContext, spatialRelationshipTest, radiusChannel, Optional.empty(), Optional.empty(), filterFunction, buildPages);
+    }
+
+    private PagesSpatialIndexFactory buildIndexSnapshot(DriverContext driverContext, SpatialPredicate spatialRelationshipTest, Optional<Integer> radiusChannel, Optional<Integer> partitionChannel, Optional<String> kdbTreeJson, Optional<InternalJoinFilterFunction> filterFunction, RowPagesBuilder buildPages)
+    {
+        Optional<JoinFilterFunctionCompiler.JoinFilterFunctionFactory> filterFunctionFactory = filterFunction
+                .map(function -> (session, addresses, pages) -> new StandardJoinFilterFunction(function, addresses, pages));
+
+        SpatialIndexBuilderOperatorFactory buildOperatorFactory = new SpatialIndexBuilderOperatorFactory(
+                1,
+                new PlanNodeId("test"),
+                buildPages.getTypes(),
+                Ints.asList(1),
+                0,
+                radiusChannel,
+                partitionChannel,
+                spatialRelationshipTest,
+                kdbTreeJson,
+                filterFunctionFactory,
+                10_000,
+                new TestingFactory(false));
+
+        Operator operator = buildOperatorFactory.createOperator(driverContext);
+        PagesSpatialIndexFactory pagesSpatialIndexFactory = buildOperatorFactory.getPagesSpatialIndexFactory();
+        ListenableFuture<PagesSpatialIndex> pagesSpatialIndex = pagesSpatialIndexFactory.createPagesSpatialIndex();
+
+        List<Page> buildSideInputs = buildPages.build();
+        int inputIndex = 0;
+        boolean restored = false;
+        Object snapshot = null;
+
+        //When build side is not done, keep looping
+        while (!pagesSpatialIndex.isDone()) {
+            if (operator.needsInput() && inputIndex < buildSideInputs.size()) {
+                operator.addInput(buildSideInputs.get(inputIndex));
+                inputIndex++;
+            }
+            //Take snapshot in the middle
+            if (inputIndex == buildSideInputs.size() / 2 && !restored) {
+                snapshot = operator.capture(operator.getOperatorContext().getDriverContext().getSerde());
+            }
+            //When input pages are used up, restore operator to snapshot and move inputIndex back to when snapshot was taken
+            if (inputIndex == buildSideInputs.size() && !restored) {
+                assertTrue(snapshot != null);
+                operator.restore(snapshot, operator.getOperatorContext().getDriverContext().getSerde());
+                restored = true;
+                inputIndex = buildSideInputs.size() / 2;
+            }
+            //Used up all provided build side inputs and have done rollback process, finish build operator, this will cause future to be done
+            if (inputIndex >= buildSideInputs.size() && restored) {
+                operator.finish();
+            }
+        }
+
+        return pagesSpatialIndexFactory;
     }
 
     private PagesSpatialIndexFactory buildIndex(DriverContext driverContext, SpatialPredicate spatialRelationshipTest, Optional<Integer> radiusChannel, Optional<InternalJoinFilterFunction> filterFunction, RowPagesBuilder buildPages)

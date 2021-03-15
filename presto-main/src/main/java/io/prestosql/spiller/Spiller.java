@@ -13,15 +13,18 @@
  */
 package io.prestosql.spiller;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.Restorable;
 
 import java.io.Closeable;
+import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.List;
 
 public interface Spiller
-        extends Closeable
+        extends Closeable, Restorable
 {
     /**
      * Initiate spilling of pages stream. Returns completed future once spilling has finished.
@@ -32,6 +35,14 @@ public interface Spiller
      * Returns list of previously spilled Pages streams.
      */
     List<Iterator<Page>> getSpills();
+
+    /**
+     * Returns spilled files paths
+     */
+    default List<Path> getSpilledFilePaths()
+    {
+        return ImmutableList.of();
+    }
 
     /**
      * Close releases/removes all underlying resources used during spilling

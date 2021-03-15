@@ -24,6 +24,7 @@ import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.TaskId;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.operator.TaskContext;
 
 import javax.annotation.concurrent.GuardedBy;
 
@@ -371,5 +372,38 @@ public class LazyOutputBuffer
                 futureResult.setException(e);
             }
         }
+    }
+
+    @Override
+    public void setTaskContext(TaskContext taskContext)
+    {
+        OutputBuffer outputBuffer;
+        synchronized (this) {
+            checkState(delegate != null, "delegate is null");
+            outputBuffer = delegate;
+        }
+        outputBuffer.setTaskContext(taskContext);
+    }
+
+    @Override
+    public void setNoMoreInputChannels()
+    {
+        OutputBuffer outputBuffer;
+        synchronized (this) {
+            checkState(delegate != null, "delegate is null");
+            outputBuffer = delegate;
+        }
+        outputBuffer.setNoMoreInputChannels();
+    }
+
+    @Override
+    public void addInputChannel(String inputId)
+    {
+        OutputBuffer outputBuffer;
+        synchronized (this) {
+            checkState(delegate != null, "delegate is null");
+            outputBuffer = delegate;
+        }
+        outputBuffer.addInputChannel(inputId);
     }
 }

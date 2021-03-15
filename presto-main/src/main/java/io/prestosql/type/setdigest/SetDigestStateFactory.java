@@ -14,10 +14,16 @@
 
 package io.prestosql.type.setdigest;
 
+import io.airlift.slice.Slices;
 import io.prestosql.array.ObjectBigArray;
 import io.prestosql.spi.function.AccumulatorStateFactory;
 import io.prestosql.spi.function.GroupedAccumulatorState;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import org.openjdk.jol.info.ClassLayout;
+
+import java.io.Serializable;
+import java.util.function.Function;
 
 public class SetDigestStateFactory
         implements AccumulatorStateFactory<SetDigestState>
@@ -50,7 +56,7 @@ public class SetDigestStateFactory
     }
 
     public static class GroupedSetDigestState
-            implements GroupedAccumulatorState, SetDigestState
+            implements GroupedAccumulatorState, SetDigestState, Restorable
     {
         private final ObjectBigArray<SetDigest> digests = new ObjectBigArray<>();
         private long groupId;
@@ -89,10 +95,39 @@ public class SetDigestStateFactory
         {
             return SIZE_OF_GROUPED + size + digests.sizeOf();
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedSetDigestStateState myState = new GroupedSetDigestStateState();
+            myState.size = size;
+            myState.groupId = groupId;
+            Function<Object, Object> digestsCapture = content -> ((SetDigest) content).serialize().getBytes();
+            myState.digests = digests.capture(digestsCapture);
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedSetDigestStateState myState = (GroupedSetDigestStateState) state;
+            this.size = myState.size;
+            this.groupId = myState.groupId;
+            Function<Object, Object> digestsRestore = content -> SetDigest.newInstance(Slices.wrappedBuffer((byte[]) content));
+            this.digests.restore(digestsRestore, myState.digests);
+        }
+
+        private static class GroupedSetDigestStateState
+                implements Serializable
+        {
+            private Object digests;
+            private long groupId;
+            private long size;
+        }
     }
 
     public static class SingleSetDigestState
-            implements SetDigestState
+            implements SetDigestState, Restorable
     {
         private SetDigest digest;
 
@@ -115,6 +150,26 @@ public class SetDigestStateFactory
                 return SIZE_OF_SINGLE;
             }
             return SIZE_OF_SINGLE + digest.estimatedInMemorySize();
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            if (this.digest != null) {
+                return digest.serialize().getBytes();
+            }
+            return null;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            if (state != null) {
+                this.digest = SetDigest.newInstance(Slices.wrappedBuffer((byte[]) state));
+            }
+            else {
+                this.digest = null;
+            }
         }
     }
 }

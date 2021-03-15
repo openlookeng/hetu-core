@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
+import com.google.common.primitives.Booleans;
 import com.google.common.primitives.Ints;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
@@ -32,12 +33,15 @@ import io.prestosql.operator.ValuesOperator.ValuesOperatorFactory;
 import io.prestosql.operator.exchange.LocalExchange.LocalExchangeFactory;
 import io.prestosql.operator.exchange.LocalExchange.LocalExchangeSinkFactoryId;
 import io.prestosql.operator.exchange.LocalExchangeSinkOperator.LocalExchangeSinkOperatorFactory;
+import io.prestosql.operator.exchange.LocalExchangeSourceOperator;
 import io.prestosql.operator.exchange.LocalExchangeSourceOperator.LocalExchangeSourceOperatorFactory;
 import io.prestosql.operator.index.PageBuffer;
 import io.prestosql.operator.index.PageBufferOperator.PageBufferOperatorFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.MarkerPage;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.GenericPartitioningSpillerFactory;
 import io.prestosql.spiller.PartitioningSpillerFactory;
@@ -45,18 +49,24 @@ import io.prestosql.spiller.SingleStreamSpiller;
 import io.prestosql.spiller.SingleStreamSpillerFactory;
 import io.prestosql.sql.gen.JoinFilterFunctionCompiler.JoinFilterFunctionFactory;
 import io.prestosql.testing.MaterializedResult;
+import io.prestosql.testing.MaterializedRow;
 import io.prestosql.testing.TestingTaskContext;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -80,7 +90,9 @@ import static io.airlift.testing.Assertions.assertEqualsIgnoreOrder;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.prestosql.RowPagesBuilder.rowPagesBuilder;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
+import static io.prestosql.SessionTestUtils.TEST_SNAPSHOT_SESSION;
 import static io.prestosql.operator.OperatorAssertion.assertOperatorEquals;
+import static io.prestosql.operator.OperatorAssertion.assertOperatorEqualsWithSimpleStateComparison;
 import static io.prestosql.operator.OperatorAssertion.dropChannel;
 import static io.prestosql.operator.OperatorAssertion.without;
 import static io.prestosql.operator.PipelineExecutionStrategy.UNGROUPED_EXECUTION;
@@ -97,6 +109,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -191,6 +204,153 @@ public class TestHashJoinOperator
                 .build();
 
         assertOperatorEquals(joinOperatorFactory, taskContext.addPipelineContext(0, true, true, false).addDriverContext(), probeInput, expected, true, getHashChannels(probePages, buildPages));
+    }
+
+    @Test
+    public void testInnerJoinSnapshot()
+    {
+        TaskContext taskContext = createTaskContext();
+
+        // build factory
+        RowPagesBuilder buildPages = rowPagesBuilder(true, Ints.asList(0), ImmutableList.of(VARCHAR, BIGINT, BIGINT))
+                .addSequencePage(10, 20, 30, 40);
+        BuildSideSetup buildSideSetup = setupBuildSide(true, taskContext, Ints.asList(0), buildPages, Optional.empty(), false, SINGLE_STREAM_SPILLER_FACTORY);
+        JoinBridgeManager<PartitionedLookupSourceFactory> lookupSourceFactory = buildSideSetup.getLookupSourceFactoryManager();
+
+        // probe factory
+        RowPagesBuilder probePages = rowPagesBuilder(true, Ints.asList(0), ImmutableList.of(VARCHAR, BIGINT, BIGINT));
+        List<Page> probeInput = probePages
+                .addSequencePage(1000, 0, 1000, 2000)
+                .build();
+        OperatorFactory joinOperatorFactory = innerJoinOperatorFactory(lookupSourceFactory, probePages, PARTITIONING_SPILLER_FACTORY);
+
+        // build drivers and operators
+        instantiateBuildDrivers(buildSideSetup, taskContext);
+        buildLookupSourceSnapshot(buildSideSetup);
+
+        // expected
+        MaterializedResult expected = MaterializedResult.resultBuilder(taskContext.getSession(), concat(probePages.getTypesWithoutHash(), buildPages.getTypesWithoutHash()))
+                .row("20", 1020L, 2020L, "20", 30L, 40L)
+                .row("21", 1021L, 2021L, "21", 31L, 41L)
+                .row("22", 1022L, 2022L, "22", 32L, 42L)
+                .row("23", 1023L, 2023L, "23", 33L, 43L)
+                .row("24", 1024L, 2024L, "24", 34L, 44L)
+                .row("25", 1025L, 2025L, "25", 35L, 45L)
+                .row("26", 1026L, 2026L, "26", 36L, 46L)
+                .row("27", 1027L, 2027L, "27", 37L, 47L)
+                .row("28", 1028L, 2028L, "28", 38L, 48L)
+                .row("29", 1029L, 2029L, "29", 39L, 49L)
+                .build();
+
+        assertOperatorEqualsWithSimpleStateComparison(joinOperatorFactory, taskContext.addPipelineContext(0, true, true, false).addDriverContext(), probeInput, expected, true, getHashChannels(probePages, buildPages), createProbeSideExpectedMapping());
+    }
+
+    private Map<String, Object> createProbeSideExpectedMapping()
+    {
+        Map<String, Object> lookupJoinOperatorMapping = new HashMap<>();
+
+        Map<String, Object> statisticsCounterMapping = new HashMap<>();
+        List<Long> logHistogramCounters = new ArrayList<>();
+        for (int i = 0; i < 16; i++) {
+            logHistogramCounters.add(0L);
+        }
+
+        lookupJoinOperatorMapping.put("operatorContext", 0);
+
+        lookupJoinOperatorMapping.put("statisticsCounter", statisticsCounterMapping);
+        statisticsCounterMapping.put("logHistogramCounters", logHistogramCounters);
+        statisticsCounterMapping.put("lookupSourcePositions", 10L);
+
+        //LookupJoinOperator.pageBuilder
+        Map<String, Object> pageBuilderMapping = new HashMap<>();
+        Map<String, Object> buildPageBuilder = new HashMap<>();
+        List<Map<String, Object>> blockBuilders = new ArrayList<>();
+        Map<String, Object> blockBuilder1 = new HashMap<>();
+        Map<String, Object> blockBuilder2 = new HashMap<>();
+        Map<String, Object> blockBuilder3 = new HashMap<>();
+        Map<String, Object> blockBuilder4 = new HashMap<>();
+
+        Map<String, Object> blockBuilder1Status = new HashMap<>();
+        Map<String, Object> blockBuilder2Status = new HashMap<>();
+        Map<String, Object> blockBuilder3Status = new HashMap<>();
+        Map<String, Object> blockBuilder4Status = new HashMap<>();
+
+        lookupJoinOperatorMapping.put("pageBuilder", pageBuilderMapping);
+        pageBuilderMapping.put("probeIndexBuilder", new ArrayList<Integer>());
+        pageBuilderMapping.put("buildPageBuilder", buildPageBuilder);
+        pageBuilderMapping.put("estimatedProbeBlockBytes", 0);
+        pageBuilderMapping.put("isSequentialProbeIndices", true);
+        buildPageBuilder.put("blockBuilders", blockBuilders);
+        buildPageBuilder.put("pageBuilderStatus", 0L);
+        buildPageBuilder.put("declaredPositions", 0);
+
+        blockBuilders.add(blockBuilder1);
+        blockBuilders.add(blockBuilder2);
+        blockBuilders.add(blockBuilder3);
+        blockBuilders.add(blockBuilder4);
+
+        List<Integer> blockBuilder1Offsets = new ArrayList<>();
+        blockBuilder1Offsets.add(0);
+
+        blockBuilder1.put("blockBuilderStatus", blockBuilder1Status);
+        blockBuilder1.put("initialized", false);
+        blockBuilder1.put("initialEntryCount", 8);
+        blockBuilder1.put("initialSliceOutputSize", 256);
+        blockBuilder1.put("sliceOutput", new ArrayList<Byte>());
+        blockBuilder1.put("hasNullValue", false);
+        blockBuilder1.put("valueIsNull", new ArrayList<Boolean>());
+        blockBuilder1.put("offsets", blockBuilder1Offsets);
+        blockBuilder1.put("positions", 0);
+        blockBuilder1.put("currentEntrySize", 0);
+        blockBuilder1.put("arraysRetainedSizeInBytes", 36L);
+        blockBuilder1Status.put("pageBuilderStatus", 0L);
+        blockBuilder1Status.put("currentSize", 0);
+
+        blockBuilder2.put("blockBuilderStatus", blockBuilder2Status);
+        blockBuilder2.put("initialized", false);
+        blockBuilder2.put("positionCount", 0);
+        blockBuilder2.put("hasNullValue", false);
+        blockBuilder2.put("hasNonNullValue", false);
+        blockBuilder2.put("valueIsNull", new ArrayList<Boolean>());
+        blockBuilder2.put("values", new ArrayList<Long>());
+        blockBuilder2.put("retainedSizeInBytes", 128L);
+        blockBuilder2Status.put("pageBuilderStatus", 0L);
+        blockBuilder2Status.put("currentSize", 0);
+
+        blockBuilder3.put("blockBuilderStatus", blockBuilder3Status);
+        blockBuilder3.put("initialized", false);
+        blockBuilder3.put("positionCount", 0);
+        blockBuilder3.put("hasNullValue", false);
+        blockBuilder3.put("hasNonNullValue", false);
+        blockBuilder3.put("valueIsNull", new ArrayList<Boolean>());
+        blockBuilder3.put("values", new ArrayList<Long>());
+        blockBuilder3.put("retainedSizeInBytes", 128L);
+        blockBuilder3Status.put("pageBuilderStatus", 0L);
+        blockBuilder3Status.put("currentSize", 0);
+
+        blockBuilder4.put("blockBuilderStatus", blockBuilder4Status);
+        blockBuilder4.put("initialized", false);
+        blockBuilder4.put("positionCount", 0);
+        blockBuilder4.put("hasNullValue", false);
+        blockBuilder4.put("hasNonNullValue", false);
+        blockBuilder4.put("valueIsNull", new ArrayList<Boolean>());
+        blockBuilder4.put("values", new ArrayList<Long>());
+        blockBuilder4.put("retainedSizeInBytes", 128L);
+        blockBuilder4Status.put("pageBuilderStatus", 0L);
+        blockBuilder4Status.put("currentSize", 0);
+
+        //Remaining primitive fields
+        lookupJoinOperatorMapping.put("inputPageSpillEpoch", 0L);
+        lookupJoinOperatorMapping.put("closed", false);
+        lookupJoinOperatorMapping.put("finishing", false);
+        lookupJoinOperatorMapping.put("finished", false);
+        lookupJoinOperatorMapping.put("joinPosition", -1L);
+        lookupJoinOperatorMapping.put("joinSourcePositions", 0);
+        lookupJoinOperatorMapping.put("currentProbePositionProducedRow", false);
+        lookupJoinOperatorMapping.put("partitionedConsumption", false);
+        lookupJoinOperatorMapping.put("lookupPartitions", false);
+
+        return lookupJoinOperatorMapping;
     }
 
     @Test
@@ -1240,6 +1400,11 @@ public class TestHashJoinOperator
         return TestingTaskContext.createTaskContext(executor, scheduledExecutor, TEST_SESSION);
     }
 
+    private TaskContext createSnapshotTaskContext()
+    {
+        return TestingTaskContext.createTaskContext(executor, scheduledExecutor, TEST_SNAPSHOT_SESSION);
+    }
+
     private static List<Integer> getHashChannels(RowPagesBuilder probe, RowPagesBuilder build)
     {
         ImmutableList.Builder<Integer> hashChannels = ImmutableList.builder();
@@ -1289,6 +1454,19 @@ public class TestHashJoinOperator
             boolean spillEnabled,
             SingleStreamSpillerFactory singleStreamSpillerFactory)
     {
+        return setupBuildSide(parallelBuild, taskContext, hashChannels, buildPages, filterFunction, spillEnabled, singleStreamSpillerFactory, false);
+    }
+
+    private BuildSideSetup setupBuildSide(
+            boolean parallelBuild,
+            TaskContext taskContext,
+            List<Integer> hashChannels,
+            RowPagesBuilder buildPages,
+            Optional<InternalJoinFilterFunction> filterFunction,
+            boolean spillEnabled,
+            SingleStreamSpillerFactory singleStreamSpillerFactory,
+            boolean outer)
+    {
         Optional<JoinFilterFunctionFactory> filterFunctionFactory = filterFunction
                 .map(function -> (session, addresses, pages) -> new StandardJoinFilterFunction(function, addresses, pages));
 
@@ -1319,8 +1497,8 @@ public class TestHashJoinOperator
         }
 
         // build side operator factories
-        LocalExchangeSourceOperatorFactory sourceOperatorFactory = new LocalExchangeSourceOperatorFactory(0, new PlanNodeId("source"), localExchangeFactory);
-        JoinBridgeManager<PartitionedLookupSourceFactory> lookupSourceFactoryManager = JoinBridgeManager.lookupAllAtOnce(new PartitionedLookupSourceFactory(
+        LocalExchangeSourceOperatorFactory sourceOperatorFactory = new LocalExchangeSourceOperatorFactory(0, new PlanNodeId("source"), localExchangeFactory, 1);
+        PartitionedLookupSourceFactory lookupSourceFactory = new PartitionedLookupSourceFactory(
                 buildPages.getTypes(),
                 rangeList(buildPages.getTypes().size()).stream()
                         .map(buildPages.getTypes()::get)
@@ -1330,7 +1508,13 @@ public class TestHashJoinOperator
                         .collect(toImmutableList()),
                 partitionCount,
                 requireNonNull(ImmutableMap.of(), "layout is null"),
-                false));
+                outer);
+        JoinBridgeManager<PartitionedLookupSourceFactory> lookupSourceFactoryManager = new JoinBridgeManager<>(
+                outer,
+                UNGROUPED_EXECUTION,
+                UNGROUPED_EXECUTION,
+                ignored -> lookupSourceFactory,
+                lookupSourceFactory.getOutputTypes());
 
         HashBuilderOperatorFactory buildOperatorFactory = new HashBuilderOperatorFactory(
                 1,
@@ -1356,11 +1540,11 @@ public class TestHashJoinOperator
         List<Driver> buildDrivers = new ArrayList<>();
         List<HashBuilderOperator> buildOperators = new ArrayList<>();
         for (int i = 0; i < buildSideSetup.getPartitionCount(); i++) {
-            DriverContext buildDriverContext = buildPipeline.addDriverContext();
+            DriverContext buildDriverContext = buildPipeline.addDriverContext(Lifespan.taskWide(), i);
             HashBuilderOperator buildOperator = buildSideSetup.getBuildOperatorFactory().createOperator(buildDriverContext);
             Driver driver = Driver.createDriver(
                     buildDriverContext,
-                    buildSideSetup.getBuildSideSourceOperatorFactory().createOperator(buildDriverContext),
+                    buildSideSetup.createBuildSideSourceOperator(buildDriverContext),
                     buildOperator);
             buildDrivers.add(driver);
             buildOperators.add(buildOperator);
@@ -1387,6 +1571,34 @@ public class TestHashJoinOperator
         for (Driver buildDriver : buildDrivers) {
             runDriverInThread(executor, buildDriver);
         }
+    }
+
+    private void buildLookupSourceSnapshot(BuildSideSetup buildSideSetup)
+    {
+        requireNonNull(buildSideSetup, "buildSideSetup is null");
+
+        LookupSourceFactory lookupSourceFactory = buildSideSetup.getLookupSourceFactoryManager().getJoinBridge(Lifespan.taskWide());
+        Future<LookupSourceProvider> lookupSourceProvider = lookupSourceFactory.createLookupSourceProvider();
+        List<HashBuilderOperator> buildOperators = buildSideSetup.getBuildOperators();
+        List<LocalExchangeSourceOperator> sourceOperators = buildSideSetup.getSourceOperators();
+        checkState(buildOperators.size() == sourceOperators.size());
+
+        while (!lookupSourceProvider.isDone()) {
+            for (int i = 0; i < buildOperators.size(); i++) {
+                if (buildOperators.get(i).needsInput()) {
+                    Page input = sourceOperators.get(i).getOutput();
+                    if (input != null && input.getPositionCount() > 0) {
+                        buildOperators.get(i).addInput(input);
+                        Object snapshot = buildOperators.get(i).capture(buildOperators.get(i).getOperatorContext().getDriverContext().getSerde());
+                        buildOperators.get(i).restore(snapshot, buildOperators.get(i).getOperatorContext().getDriverContext().getSerde());
+                    }
+                    else {
+                        buildOperators.get(i).finish();
+                    }
+                }
+            }
+        }
+        getFutureValue(lookupSourceProvider).close();
     }
 
     /**
@@ -1445,6 +1657,7 @@ public class TestHashJoinOperator
         private final int partitionCount;
         private List<Driver> buildDrivers;
         private List<HashBuilderOperator> buildOperators;
+        private final List<LocalExchangeSourceOperator> sourceOperators;
 
         BuildSideSetup(JoinBridgeManager<PartitionedLookupSourceFactory> lookupSourceFactoryManager, HashBuilderOperatorFactory buildOperatorFactory, LocalExchangeSourceOperatorFactory buildSideSourceOperatorFactory, int partitionCount)
         {
@@ -1452,6 +1665,7 @@ public class TestHashJoinOperator
             this.buildOperatorFactory = requireNonNull(buildOperatorFactory, "buildOperatorFactory is null");
             this.buildSideSourceOperatorFactory = buildSideSourceOperatorFactory;
             this.partitionCount = partitionCount;
+            this.sourceOperators = new ArrayList<>();
         }
 
         void setDriversAndOperators(List<Driver> buildDrivers, List<HashBuilderOperator> buildOperators)
@@ -1471,9 +1685,10 @@ public class TestHashJoinOperator
             return buildOperatorFactory;
         }
 
-        public LocalExchangeSourceOperatorFactory getBuildSideSourceOperatorFactory()
+        public LocalExchangeSourceOperator createBuildSideSourceOperator(DriverContext driverContext)
         {
-            return buildSideSourceOperatorFactory;
+            sourceOperators.add((LocalExchangeSourceOperator) buildSideSourceOperatorFactory.createOperator(driverContext));
+            return sourceOperators.get(sourceOperators.size() - 1);
         }
 
         public int getPartitionCount()
@@ -1491,6 +1706,11 @@ public class TestHashJoinOperator
         {
             checkState(buildOperators != null, "buildDrivers is not initialized yet");
             return buildOperators;
+        }
+
+        List<LocalExchangeSourceOperator> getSourceOperators()
+        {
+            return sourceOperators;
         }
     }
 
@@ -1537,7 +1757,10 @@ public class TestHashJoinOperator
         {
             return new SingleStreamSpiller()
             {
-                private boolean writing = true;
+                @RestorableConfig(unsupported = true)
+                private final RestorableConfig restorableConfig = null;
+
+                boolean writing = true;
                 private final List<Page> spills = new ArrayList<>();
 
                 @Override
@@ -1589,7 +1812,118 @@ public class TestHashJoinOperator
                 public void deleteFile()
                 {
                 }
+
+                @Override
+                public Path getFile()
+                {
+                    return null;
+                }
             };
         }
+    }
+
+    @Test(dataProvider = "hashJoinTestValues")
+    public void testOuterJoinSnapshot(boolean parallelBuild, boolean probeHashEnabled, boolean buildHashEnabled)
+            throws ExecutionException, InterruptedException
+    {
+        TaskContext taskContext = createSnapshotTaskContext();
+
+        // build factory
+        List<Type> buildTypes = ImmutableList.of(VARCHAR, BIGINT, BIGINT);
+        RowPagesBuilder buildPages = rowPagesBuilder(buildHashEnabled, Ints.asList(0), ImmutableList.of(VARCHAR, BIGINT, BIGINT))
+                .addSequencePage(10, 20, 30, 40);
+        BuildSideSetup buildSideSetup = setupBuildSide(parallelBuild, taskContext, Ints.asList(0), buildPages, Optional.empty(), false, SINGLE_STREAM_SPILLER_FACTORY, true);
+        JoinBridgeManager<PartitionedLookupSourceFactory> lookupSourceFactory = buildSideSetup.getLookupSourceFactoryManager();
+
+        // probe factory
+        List<Type> probeTypes = ImmutableList.of(VARCHAR, BIGINT, BIGINT);
+        RowPagesBuilder probePages = rowPagesBuilder(probeHashEnabled, Ints.asList(0), probeTypes);
+        List<Page> probeInput = probePages
+                .addSequencePage(10, 15, 1020, 2020)
+                .build();
+
+        // Add markers between pages
+        List<Page> withMarkers = new ArrayList<>();
+        long snapshotId = 1;
+        for (Page page : probeInput) {
+            withMarkers.add(page);
+            withMarkers.add(MarkerPage.snapshotPage(snapshotId++));
+        }
+        probeInput = withMarkers;
+
+        OperatorFactory joinOperatorFactory = new LookupJoinOperators().fullOuterJoin(
+                0,
+                new PlanNodeId("test"),
+                lookupSourceFactory,
+                probePages.getTypes(),
+                Ints.asList(0),
+                getHashChannelAsInt(probePages),
+                Optional.empty(),
+                OptionalInt.of(1),
+                PARTITIONING_SPILLER_FACTORY);
+
+        // build drivers and operators
+        instantiateBuildDrivers(buildSideSetup, taskContext);
+        buildLookupSource(buildSideSetup);
+
+        // Construct lookup-outer operator
+        PipelineContext buildPipeline = taskContext.addPipelineContext(2, false, true, false);
+        DriverContext outerDriverContext = buildPipeline.addDriverContext(Lifespan.taskWide(), 0);
+        Operator lookupOuter = ((LookupJoinOperatorFactory) joinOperatorFactory).createOuterOperatorFactory().get().getOuterOperatorFactory().createOperator(outerDriverContext);
+        assertFalse(lookupOuter.isBlocked().isDone());
+
+        // expected
+        MaterializedResult expected = MaterializedResult.resultBuilder(taskContext.getSession(), concat(probeTypes, buildTypes))
+                .row("15", 1020L, 2020L, null, null, null)
+                .row("16", 1021L, 2021L, null, null, null)
+                .row("17", 1022L, 2022L, null, null, null)
+                .row("18", 1023L, 2023L, null, null, null)
+                .row("19", 1024L, 2024L, null, null, null)
+                .row("20", 1025L, 2025L, "20", 30L, 40L)
+                .row("21", 1026L, 2026L, "21", 31L, 41L)
+                .row("22", 1027L, 2027L, "22", 32L, 42L)
+                .row("23", 1028L, 2028L, "23", 33L, 43L)
+                .row("24", 1029L, 2029L, "24", 34L, 44L)
+                .build();
+
+        List<Integer> hashChannels = getHashChannels(probePages, buildPages);
+        assertOperatorEquals(joinOperatorFactory, taskContext.addPipelineContext(0, true, true, false).addDriverContext(), probeInput, expected, true, hashChannels);
+
+        assertTrue(lookupOuter.isBlocked().isDone());
+        assertTrue(lookupOuter.getOutput() instanceof MarkerPage);
+        Object state = lookupOuter.capture(null);
+        lookupOuter.isBlocked().get();
+
+        Page page = lookupOuter.getOutput();
+        page = dropChannel(ImmutableList.of(page), hashChannels).get(0);
+        MaterializedResult outerExpected = MaterializedResult.resultBuilder(taskContext.getSession(), concat(probeTypes, buildTypes))
+                .row(null, null, null, "25", 35L, 45L)
+                .row(null, null, null, "26", 36L, 46L)
+                .row(null, null, null, "27", 37L, 47L)
+                .row(null, null, null, "28", 38L, 48L)
+                .row(null, null, null, "29", 39L, 49L)
+                .build();
+        List<MaterializedRow> rows = MaterializedResult.resultBuilder(taskContext.getSession(), concat(probeTypes, buildTypes))
+                .page(page)
+                .build()
+                .getMaterializedRows();
+        rows = new ArrayList<>(rows);
+        rows.sort(Comparator.comparing(a -> (String) a.getField(3)));
+        MaterializedResult outerResult = MaterializedResult.resultBuilder(taskContext.getSession(), concat(probeTypes, buildTypes))
+                .rows(rows)
+                .build();
+
+        assertEquals(outerResult, outerExpected);
+
+        long matched;
+        if (state instanceof boolean[]) {
+            boolean[] positions = (boolean[]) state;
+            matched = Booleans.asList(positions).stream().filter(e -> e).count();
+        }
+        else {
+            boolean[][] positions = (boolean[][]) state;
+            matched = Arrays.stream(positions).flatMap(array -> Booleans.asList(array).stream()).filter(e -> e).count();
+        }
+        assertEquals(matched, 5);
     }
 }

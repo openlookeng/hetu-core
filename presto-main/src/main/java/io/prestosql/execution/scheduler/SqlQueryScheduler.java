@@ -24,6 +24,7 @@ import io.airlift.concurrent.SetThreadName;
 import io.airlift.stats.TimeStat;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
+import io.prestosql.SystemSessionProperties;
 import io.prestosql.dynamicfilter.DynamicFilterService;
 import io.prestosql.execution.BasicStageStats;
 import io.prestosql.execution.LocationFactory;
@@ -36,12 +37,14 @@ import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.execution.StageId;
 import io.prestosql.execution.StageInfo;
 import io.prestosql.execution.StageState;
+import io.prestosql.execution.TaskId;
 import io.prestosql.execution.TaskStatus;
 import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.InternalNode;
+import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
@@ -70,7 +73,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -94,9 +97,11 @@ import static io.prestosql.execution.StageState.ABORTED;
 import static io.prestosql.execution.StageState.CANCELED;
 import static io.prestosql.execution.StageState.FAILED;
 import static io.prestosql.execution.StageState.FINISHED;
+import static io.prestosql.execution.StageState.RESUMABLE_FAILURE;
 import static io.prestosql.execution.StageState.RUNNING;
 import static io.prestosql.execution.StageState.SCHEDULED;
 import static io.prestosql.execution.scheduler.SourcePartitionedScheduler.newSourcePartitionedSchedulerAsStageScheduler;
+import static io.prestosql.snapshot.SnapshotConfig.MAX_NODE_ALLOCATION;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static io.prestosql.spi.connector.CatalogName.isInternalSystemConnector;
@@ -129,6 +134,9 @@ public class SqlQueryScheduler
     private final DynamicFilterService dynamicFilterService;
     private final HeuristicIndexerManager heuristicIndexerManager;
     private final Session session;
+    // Snapshot: determine when scheduler finishes scheduling.
+    // Only start to reschedule after the previous scheduler finishes
+    private final SettableFuture<?> schedulingFuture = SettableFuture.create();
 
     private final Set<PlanFragmentId> visitedPlanFrags = new HashSet<>();
 
@@ -150,7 +158,9 @@ public class SqlQueryScheduler
             ExecutionPolicy executionPolicy,
             SplitSchedulerStats schedulerStats,
             DynamicFilterService dynamicFilterService,
-            HeuristicIndexerManager heuristicIndexerManager)
+            HeuristicIndexerManager heuristicIndexerManager,
+            QuerySnapshotManager snapshotManager,
+            Map<StageId, Integer> stageTaskCounts)
     {
         SqlQueryScheduler sqlQueryScheduler = new SqlQueryScheduler(
                 queryStateMachine,
@@ -170,7 +180,9 @@ public class SqlQueryScheduler
                 executionPolicy,
                 schedulerStats,
                 dynamicFilterService,
-                heuristicIndexerManager);
+                heuristicIndexerManager,
+                snapshotManager,
+                stageTaskCounts);
         sqlQueryScheduler.initialize();
         return sqlQueryScheduler;
     }
@@ -193,7 +205,9 @@ public class SqlQueryScheduler
             ExecutionPolicy executionPolicy,
             SplitSchedulerStats schedulerStats,
             DynamicFilterService dynamicFilterService,
-            HeuristicIndexerManager heuristicIndexerManager)
+            HeuristicIndexerManager heuristicIndexerManager,
+            QuerySnapshotManager snapshotManager,
+            Map<StageId, Integer> stageTaskCounts)
     {
         this.queryStateMachine = requireNonNull(queryStateMachine, "queryStateMachine is null");
         this.executionPolicy = requireNonNull(executionPolicy, "schedulerPolicyFactory is null");
@@ -201,6 +215,10 @@ public class SqlQueryScheduler
         this.dynamicFilterService = requireNonNull(dynamicFilterService, "dynamicFilterService is null");
         this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
         this.summarizeTaskInfo = summarizeTaskInfo;
+
+        if (SystemSessionProperties.isSnapshotEnabled(session)) {
+            snapshotManager.setRescheduler(this::cancelToResume);
+        }
 
         // todo come up with a better way to build this, or eliminate this map
         ImmutableMap.Builder<StageId, StageScheduler> stageSchedulers = ImmutableMap.builder();
@@ -211,6 +229,7 @@ public class SqlQueryScheduler
 
         OutputBufferId rootBufferId = Iterables.getOnlyElement(rootOutputBuffers.getBuffers().keySet());
         visitedPlanFrags.add(plan.getFragment().getId());
+        final boolean isSnapshotEnabled = SystemSessionProperties.isSnapshotEnabled(session);
         List<SqlStageExecution> stages = createStages(
                 (fragmentId, tasks, noMoreExchangeLocations) -> updateQueryOutputLocations(queryStateMachine, rootBufferId, tasks, noMoreExchangeLocations),
                 new AtomicInteger(),
@@ -220,14 +239,17 @@ public class SqlQueryScheduler
                 remoteTaskFactory,
                 session,
                 splitBatchSize,
-                partitioningHandle -> partitioningCache.computeIfAbsent(partitioningHandle, handle -> nodePartitioningManager.getNodePartitioningMap(session, handle)),
+                (partitioningHandle, nodeCount) -> partitioningCache.computeIfAbsent(partitioningHandle, handle -> nodePartitioningManager.getNodePartitioningMap(session, handle, isSnapshotEnabled, nodeCount)),
                 nodePartitioningManager,
                 queryExecutor,
                 schedulerExecutor,
                 failureDetector,
                 nodeTaskMap,
                 stageSchedulers,
-                stageLinkages);
+                stageLinkages,
+                isSnapshotEnabled,
+                snapshotManager,
+                stageTaskCounts);
 
         SqlStageExecution rootStage = stages.get(0);
         rootStage.setOutputBuffers(rootOutputBuffers);
@@ -236,11 +258,40 @@ public class SqlQueryScheduler
         this.stages = stages.stream()
                 .collect(toImmutableMap(SqlStageExecution::getStageId, identity()));
 
+        if (isSnapshotEnabled) {
+            // Snapshot: add minimum number of tasks to task list in query snapshot manager, so that we don't complete prematurely,
+            // e.g. 1 task is schedule and finishes right away, before other tasks are scheduled, then snapshot manager may think
+            // snapshot is complete, because all known tasks are covered.
+            for (SqlStageExecution stage : stages) {
+                snapshotManager.addNewTask(new TaskId(stage.getStageId(), 0));
+            }
+        }
+
         this.stageSchedulers = stageSchedulers.build();
         this.stageLinkages = stageLinkages.build();
 
         this.executor = queryExecutor;
         this.session = session;
+    }
+
+    // Snapshot: return number of tasks for each stage from old scheduler, so new scheduler can match it.
+    public Map<StageId, Integer> getStageTaskCounts()
+    {
+        Map<StageId, Integer> ret = new HashMap<>();
+        for (SqlStageExecution stage : stages.values()) {
+            ret.put(stage.getStageId(), stage.getAllTasks().size());
+        }
+        return ret;
+    }
+
+    // Snapshot: called when we need to cancel the current query execution to prepare for a resume,
+    // either as a result of a task failure, or a failed attempt to resume the query
+    public void cancelToResume()
+    {
+        for (SqlStageExecution stageExecution : stages.values()) {
+            stageExecution.cancelToResume();
+        }
+        queryStateMachine.transitionToRescheduling();
     }
 
     // this is a separate method to ensure that the `this` reference is not leaked during construction
@@ -262,6 +313,11 @@ public class SqlQueryScheduler
         for (SqlStageExecution stage : stages.values()) {
             stage.addStateChangeListener(state -> {
                 if (queryStateMachine.isDone()) {
+                    return;
+                }
+                if (state == RESUMABLE_FAILURE) {
+                    // Snapshot: One of the stages has a resumable failure. Cancel all stages so they can be rescheduled.
+                    cancelToResume();
                     return;
                 }
                 if (state == FAILED) {
@@ -311,14 +367,17 @@ public class SqlQueryScheduler
             RemoteTaskFactory remoteTaskFactory,
             Session session,
             int splitBatchSize,
-            Function<PartitioningHandle, NodePartitionMap> partitioningCache,
+            BiFunction<PartitioningHandle, Integer, NodePartitionMap> partitioningCache,
             NodePartitioningManager nodePartitioningManager,
             ExecutorService queryExecutor,
             ScheduledExecutorService schedulerExecutor,
             FailureDetector failureDetector,
             NodeTaskMap nodeTaskMap,
             ImmutableMap.Builder<StageId, StageScheduler> stageSchedulers,
-            ImmutableMap.Builder<StageId, StageLinkage> stageLinkages)
+            ImmutableMap.Builder<StageId, StageLinkage> stageLinkages,
+            boolean isSnapshotEnabled,
+            QuerySnapshotManager snapshotManager,
+            Map<StageId, Integer> stageTaskCounts)
     {
         ImmutableList.Builder<SqlStageExecution> stages = ImmutableList.builder();
 
@@ -335,7 +394,8 @@ public class SqlQueryScheduler
                 queryExecutor,
                 failureDetector,
                 schedulerStats,
-                dynamicFilterService);
+                dynamicFilterService,
+                snapshotManager);
 
         stages.add(stage);
 
@@ -384,12 +444,31 @@ public class SqlQueryScheduler
                 if (plan.getFragment().getRemoteSourceNodes().stream().allMatch(node -> node.getExchangeType() == REPLICATE)) {
                     // no remote source
                     boolean dynamicLifespanSchedule = plan.getFragment().getStageExecutionDescriptor().isDynamicLifespanSchedule();
-                    bucketNodeMap = nodePartitioningManager.getBucketNodeMap(session, partitioningHandle, dynamicLifespanSchedule);
+                    if (isSnapshotEnabled) {
+                        NodeSelector nodeSelector = nodeScheduler.createNodeSelector(catalogName);
+                        int nodeCount;
+                        if (stageTaskCounts != null) {
+                            // Resuming: need to create same number of tasks as old stage.
+                            nodeCount = stageTaskCounts.get(stageId);
+                        }
+                        else {
+                            // Scheduling: reserve some nodes for resuming
+                            nodeCount = (int) (nodeSelector.selectableNodeCount() * MAX_NODE_ALLOCATION);
+                        }
+                        checkCondition(nodeCount > 0, NO_NODES_AVAILABLE, "Snapshot: at least 2 worker nodes are required");
+                        stageNodeList = new ArrayList<>(nodeSelector.selectRandomNodes(nodeCount));
+                        checkCondition(stageNodeList.size() == nodeCount, NO_NODES_AVAILABLE, "Snapshot: not enough worker nodes to resume expected number of tasks: " + nodeCount);
+                        // Make sure bucketNodeMap uses the same node list
+                        bucketNodeMap = nodePartitioningManager.getBucketNodeMap(session, partitioningHandle, dynamicLifespanSchedule, stageNodeList);
+                    }
+                    else {
+                        bucketNodeMap = nodePartitioningManager.getBucketNodeMap(session, partitioningHandle, dynamicLifespanSchedule);
+                        stageNodeList = new ArrayList<>(nodeScheduler.createNodeSelector(catalogName).allNodes());
+                    }
 
                     // verify execution is consistent with planner's decision on dynamic lifespan schedule
                     verify(bucketNodeMap.isDynamic() == dynamicLifespanSchedule);
 
-                    stageNodeList = new ArrayList<>(nodeScheduler.createNodeSelector(catalogName).allNodes());
                     Collections.shuffle(stageNodeList);
                     bucketToPartition = Optional.empty();
                 }
@@ -398,7 +477,8 @@ public class SqlQueryScheduler
                     verify(!plan.getFragment().getStageExecutionDescriptor().isDynamicLifespanSchedule());
 
                     // remote source requires nodePartitionMap
-                    NodePartitionMap nodePartitionMap = partitioningCache.apply(plan.getFragment().getPartitioning());
+                    NodePartitionMap nodePartitionMap = partitioningCache.apply(plan.getFragment().getPartitioning(),
+                            stageTaskCounts == null ? null : stageTaskCounts.get(stageId));
                     if (groupedExecutionForStage) {
                         checkState(connectorPartitionHandles.size() == nodePartitionMap.getBucketToPartition().length);
                     }
@@ -423,7 +503,8 @@ public class SqlQueryScheduler
             }
             else {
                 // all sources are remote
-                NodePartitionMap nodePartitionMap = partitioningCache.apply(plan.getFragment().getPartitioning());
+                NodePartitionMap nodePartitionMap = partitioningCache.apply(plan.getFragment().getPartitioning(),
+                        stageTaskCounts == null ? null : stageTaskCounts.get(stageId));
                 List<InternalNode> partitionToNode = nodePartitionMap.getPartitionToNode();
                 // todo this should asynchronously wait a standard timeout period before failing
                 checkCondition(!partitionToNode.isEmpty(), NO_NODES_AVAILABLE, "No worker nodes available");
@@ -455,7 +536,10 @@ public class SqlQueryScheduler
                     failureDetector,
                     nodeTaskMap,
                     stageSchedulers,
-                    stageLinkages);
+                    stageLinkages,
+                    isSnapshotEnabled,
+                    snapshotManager,
+                    stageTaskCounts);
             stages.addAll(subTree);
 
             SqlStageExecution childStage = subTree.get(0);
@@ -467,7 +551,8 @@ public class SqlQueryScheduler
         }
         Set<SqlStageExecution> childStages = childStagesBuilder.build();
         stage.addStateChangeListener(newState -> {
-            if (newState.isDone()) {
+            if (newState.isDone() && newState != StageState.RESCHEDULING) {
+                // Snapshot: For "rescheduling", tasks are already cancelled (for resume)
                 childStages.forEach(SqlStageExecution::cancel);
             }
         });
@@ -491,7 +576,9 @@ public class SqlQueryScheduler
                     writerTasksProvider,
                     nodeScheduler.createNodeSelector(null),
                     schedulerExecutor,
-                    getWriterMinSize(session));
+                    getWriterMinSize(session),
+                    isSnapshotEnabled,
+                    stageTaskCounts != null ? stageTaskCounts.get(stageId) : null);
             whenAllStages(childStages, StageState::isDone)
                     .addListener(scheduler::finish, directExecutor());
             stageSchedulers.put(stageId, scheduler);
@@ -663,6 +750,9 @@ public class SqlQueryScheduler
                     }
                 }
             }
+
+            // Snpashot: if resuming, notify the new scheduler so it can start scheduling new stages
+            schedulingFuture.set(null);
             if (closeError.getSuppressed().length > 0) {
                 throw closeError;
             }
@@ -676,6 +766,11 @@ public class SqlQueryScheduler
             SqlStageExecution stage = requireNonNull(sqlStageExecution, () -> format("Stage %s does not exist", stageId));
             stage.cancel();
         }
+    }
+
+    public ListenableFuture<?> doneScheduling()
+    {
+        return schedulingFuture;
     }
 
     public void abort()

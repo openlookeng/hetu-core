@@ -16,9 +16,12 @@ package io.prestosql.operator;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import io.prestosql.spi.type.Type;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 
+import java.io.Serializable;
 import java.util.List;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -33,6 +36,7 @@ import static java.util.Objects.requireNonNull;
  * TODO use dictionary blocks (probably extended kind) to avoid data copying for build side
  */
 public class LookupJoinPageBuilder
+        implements Restorable
 {
     private final IntArrayList probeIndexBuilder = new IntArrayList();
     private final PageBuilder buildPageBuilder;
@@ -181,5 +185,37 @@ public class LookupJoinPageBuilder
             // Estimate the size of the current row
             estimatedProbeBlockBytes += block.getSizeInBytes() / block.getPositionCount();
         }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        LookupJoinPageBuilderState myState = new LookupJoinPageBuilderState();
+        myState.probeIndexBuilder = probeIndexBuilder.toIntArray();
+        myState.buildPageBuilder = buildPageBuilder.capture(serdeProvider);
+        myState.estimatedProbeBlockBytes = estimatedProbeBlockBytes;
+        myState.isSequentialProbeIndices = isSequentialProbeIndices;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        LookupJoinPageBuilderState myState = (LookupJoinPageBuilderState) state;
+        this.probeIndexBuilder.clear();
+        this.probeIndexBuilder.trim();
+        this.probeIndexBuilder.addAll(0, new IntArrayList(myState.probeIndexBuilder));
+        this.buildPageBuilder.restore(myState.buildPageBuilder, serdeProvider);
+        this.estimatedProbeBlockBytes = myState.estimatedProbeBlockBytes;
+        this.isSequentialProbeIndices = myState.isSequentialProbeIndices;
+    }
+
+    private static class LookupJoinPageBuilderState
+            implements Serializable
+    {
+        private int[] probeIndexBuilder;
+        private Object buildPageBuilder;
+        private int estimatedProbeBlockBytes;
+        private boolean isSequentialProbeIndices;
     }
 }

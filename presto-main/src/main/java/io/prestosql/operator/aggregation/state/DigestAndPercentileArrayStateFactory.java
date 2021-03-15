@@ -14,12 +14,19 @@
 package io.prestosql.operator.aggregation.state;
 
 import io.airlift.slice.SizeOf;
+import io.airlift.slice.Slices;
 import io.airlift.stats.QuantileDigest;
 import io.prestosql.array.ObjectBigArray;
 import io.prestosql.spi.function.AccumulatorStateFactory;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
+import java.util.Arrays;
 import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
@@ -101,10 +108,44 @@ public class DigestAndPercentileArrayStateFactory
         {
             return INSTANCE_SIZE + size + digests.sizeOf() + percentilesArray.sizeOf();
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedDigestAndPercentileArrayStateState myState = new GroupedDigestAndPercentileArrayStateState();
+            Function<Object, Object> digestsCapture = content -> ((QuantileDigest) content).serialize().getBytes();
+            myState.digests = digests.capture(digestsCapture);
+            Function<Object, Object> percentilesArrayCapture = content -> ((List<Double>) content).stream().toArray(Double[]::new);
+            myState.percentilesArray = percentilesArray.capture(percentilesArrayCapture);
+            myState.size = size;
+            myState.baseState = super.capture(serdeProvider);
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedDigestAndPercentileArrayStateState myState = (GroupedDigestAndPercentileArrayStateState) state;
+            Function<Object, Object> digestsRestore = content -> new QuantileDigest(Slices.wrappedBuffer((byte[]) content));
+            this.digests.restore(digestsRestore, myState.digests);
+            Function<Object, Object> percentilesArrayRestore = content -> Arrays.stream((double[]) content).boxed().collect(Collectors.toList());
+            this.percentilesArray.restore(percentilesArrayRestore, myState.percentilesArray);
+            this.size = myState.size;
+            super.restore(myState.baseState, serdeProvider);
+        }
+
+        private static class GroupedDigestAndPercentileArrayStateState
+                implements Serializable
+        {
+            private Object digests;
+            private Object percentilesArray;
+            private long size;
+            private Object baseState;
+        }
     }
 
     public static class SingleDigestAndPercentileArrayState
-            implements DigestAndPercentileArrayState
+            implements DigestAndPercentileArrayState, Restorable
     {
         public static final int INSTANCE_SIZE = ClassLayout.parseClass(SingleDigestAndPercentileArrayState.class).instanceSize();
         private QuantileDigest digest;
@@ -151,6 +192,44 @@ public class DigestAndPercentileArrayStateFactory
                 estimatedSize += SizeOf.sizeOfDoubleArray(percentiles.size());
             }
             return estimatedSize;
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            SingleDigestAndPercentileArrayStateState myState = new SingleDigestAndPercentileArrayStateState();
+            if (this.digest != null) {
+                myState.digest = digest.serialize().getBytes();
+            }
+            if (this.percentiles != null) {
+                myState.percentiles = percentiles.stream().toArray(Double[]::new);
+            }
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            SingleDigestAndPercentileArrayStateState myState = (SingleDigestAndPercentileArrayStateState) state;
+            if (myState.digest != null) {
+                this.digest = new QuantileDigest(Slices.wrappedBuffer(myState.digest));
+            }
+            else {
+                this.digest = null;
+            }
+            if (myState.percentiles != null) {
+                this.percentiles = Arrays.asList(myState.percentiles);
+            }
+            else {
+                this.percentiles = null;
+            }
+        }
+
+        private static class SingleDigestAndPercentileArrayStateState
+                implements Serializable
+        {
+            private byte[] digest;
+            private Double[] percentiles;
         }
     }
 }

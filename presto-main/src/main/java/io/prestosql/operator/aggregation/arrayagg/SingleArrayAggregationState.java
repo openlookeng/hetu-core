@@ -15,14 +15,18 @@ package io.prestosql.operator.aggregation.arrayagg;
 
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
 
 import static com.google.common.base.Verify.verify;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"type"})
 public class SingleArrayAggregationState
-        implements ArrayAggregationState
+        implements ArrayAggregationState, Restorable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SingleArrayAggregationState.class).instanceSize();
     private BlockBuilder blockBuilder;
@@ -78,5 +82,28 @@ public class SingleArrayAggregationState
     public void reset()
     {
         blockBuilder = null;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        if (this.blockBuilder != null) {
+            return blockBuilder.capture(serdeProvider);
+        }
+        return null;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        if (state != null) {
+            if (this.blockBuilder == null) {
+                this.blockBuilder = type.createBlockBuilder(null, 16);
+            }
+            this.blockBuilder.restore(state, serdeProvider);
+        }
+        else {
+            this.blockBuilder = null;
+        }
     }
 }

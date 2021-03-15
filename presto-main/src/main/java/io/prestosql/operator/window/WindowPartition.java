@@ -18,8 +18,12 @@ import io.prestosql.operator.PagesHashStrategy;
 import io.prestosql.operator.PagesIndex;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.function.WindowIndex;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.sql.expression.Types.FrameBoundType;
 
+import java.io.Serializable;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkState;
@@ -32,7 +36,10 @@ import static io.prestosql.spi.sql.expression.Types.WindowFrameType.RANGE;
 import static io.prestosql.util.Failures.checkCondition;
 import static java.lang.Math.toIntExact;
 
+// Many of these fields are captured by WindowOperator
+@RestorableConfig(uncapturedFields = {"peerGroupHashStrategy", "outputChannels", "pagesIndex", "windowFunctions"})
 public final class WindowPartition
+        implements Restorable
 {
     private final PagesIndex pagesIndex;
     private final int partitionStart;
@@ -265,5 +272,43 @@ public final class WindowPartition
         long value = pagesIndex.getLong(channel, currentPosition);
         checkCondition(value >= 0, INVALID_WINDOW_FRAME, "Window frame %s offset must not be negative", value);
         return value;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        // Although partitionStart/End fields are final, they need to be captured,
+        // to be used to construct new WindowPartition objects during restore
+        WindowPartitionState myState = new WindowPartitionState();
+        myState.partitionStart = partitionStart;
+        myState.partitionEnd = partitionEnd;
+        myState.peerGroupStart = peerGroupStart;
+        myState.peerGroupEnd = peerGroupEnd;
+        myState.currentPosition = currentPosition;
+        return myState;
+    }
+
+    public static WindowPartition restoreWindowPartition(PagesIndex pagesIndex,
+            int[] outputChannels,
+            List<FramedWindowFunction> windowFunctions,
+            PagesHashStrategy peerGroupHashStrategy,
+            Object state)
+    {
+        WindowPartitionState myState = (WindowPartitionState) state;
+        WindowPartition windowPartition = new WindowPartition(pagesIndex, myState.partitionStart, myState.partitionEnd, outputChannels, windowFunctions, peerGroupHashStrategy);
+        windowPartition.peerGroupStart = myState.peerGroupStart;
+        windowPartition.peerGroupEnd = myState.peerGroupEnd;
+        windowPartition.currentPosition = myState.currentPosition;
+        return windowPartition;
+    }
+
+    private static class WindowPartitionState
+            implements Serializable
+    {
+        private int partitionStart;
+        private int partitionEnd;
+        private int peerGroupStart;
+        private int peerGroupEnd;
+        private int currentPosition;
     }
 }

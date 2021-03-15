@@ -22,12 +22,14 @@ import io.prestosql.operator.PageSourceOperator;
 import io.prestosql.operator.SourceOperator;
 import io.prestosql.operator.SourceOperatorFactory;
 import io.prestosql.operator.SplitOperatorInfo;
+import io.prestosql.snapshot.MarkerSplit;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.connector.ConnectorIndex;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.RecordSet;
 import io.prestosql.spi.connector.UpdatablePageSource;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
 import java.util.Optional;
 import java.util.function.Function;
@@ -36,6 +38,8 @@ import java.util.function.Supplier;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
+//TODO-cp-I38S9O: Operator currently not supported for Snapshot
+@RestorableConfig(unsupported = true)
 public class IndexSourceOperator
         implements SourceOperator
 {
@@ -120,6 +124,12 @@ public class IndexSourceOperator
     public Supplier<Optional<UpdatablePageSource>> addSplit(Split split)
     {
         requireNonNull(split, "split is null");
+
+        //TODO-cp-I38S9O: Operator currently not supported for Snapshot
+        if (split.getConnectorSplit() instanceof MarkerSplit) {
+            throw new UnsupportedOperationException("Operator doesn't support snapshotting.");
+        }
+
         checkState(source == null, "Index source split already set");
 
         IndexSplit indexSplit = (IndexSplit) split.getConnectorSplit();
@@ -159,24 +169,19 @@ public class IndexSourceOperator
     }
 
     @Override
-    public boolean needsInput()
-    {
-        return false;
-    }
-
-    @Override
-    public void addInput(Page page)
-    {
-        throw new UnsupportedOperationException(getClass().getName() + " can not take input");
-    }
-
-    @Override
     public Page getOutput()
     {
         if (source == null) {
             return null;
         }
         return source.getOutput();
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        //TODO-cp-I38S9O: Operator currently not supported for Snapshot
+        return null;
     }
 
     @Override

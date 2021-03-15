@@ -16,7 +16,10 @@ package io.prestosql.operator.aggregation.state;
 import io.airlift.slice.Slice;
 import io.prestosql.array.LongBigArray;
 import io.prestosql.spi.function.AccumulatorStateFactory;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import org.openjdk.jol.info.ClassLayout;
+
+import java.io.Serializable;
 
 import static io.airlift.slice.SizeOf.SIZE_OF_LONG;
 import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.UNSCALED_DECIMAL_128_SLICE_LENGTH;
@@ -79,6 +82,30 @@ public class LongDecimalWithOverflowAndLongStateFactory
         {
             return INSTANCE_SIZE + unscaledDecimals.sizeOf() + overflows.sizeOf() + numberOfElements * SingleLongDecimalWithOverflowAndLongState.SIZE;
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedLongDecimalWithOverflowAndLongStateState myState = new GroupedLongDecimalWithOverflowAndLongStateState();
+            myState.longs = longs.capture(serdeProvider);
+            myState.baseState = super.capture(serdeProvider);
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedLongDecimalWithOverflowAndLongStateState myState = (GroupedLongDecimalWithOverflowAndLongStateState) state;
+            this.longs.restore(myState.longs, serdeProvider);
+            super.restore(myState.baseState, serdeProvider);
+        }
+
+        private static class GroupedLongDecimalWithOverflowAndLongStateState
+                implements Serializable
+        {
+            private Object longs;
+            private Object baseState;
+        }
     }
 
     public static class SingleLongDecimalWithOverflowAndLongState
@@ -108,6 +135,30 @@ public class LongDecimalWithOverflowAndLongStateFactory
                 return SIZE_OF_LONG;
             }
             return SIZE;
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            SingleLongDecimalWithOverflowAndLongStateState myState = new SingleLongDecimalWithOverflowAndLongStateState();
+            myState.baseState = super.capture(serdeProvider);
+            myState.longValue = longValue;
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            SingleLongDecimalWithOverflowAndLongStateState myState = (SingleLongDecimalWithOverflowAndLongStateState) state;
+            super.restore(myState.baseState, serdeProvider);
+            this.longValue = myState.longValue;
+        }
+
+        private static class SingleLongDecimalWithOverflowAndLongStateState
+                implements Serializable
+        {
+            private Object baseState;
+            private long longValue;
         }
     }
 }

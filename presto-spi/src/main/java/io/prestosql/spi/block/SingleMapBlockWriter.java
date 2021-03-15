@@ -14,8 +14,10 @@
 package io.prestosql.spi.block;
 
 import io.airlift.slice.Slice;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
 import java.util.function.BiConsumer;
 
 import static java.lang.String.format;
@@ -239,5 +241,35 @@ public class SingleMapBlockWriter<T>
     public String toString()
     {
         return format("SingleMapBlockWriter{positionCount=%d}", getPositionCount());
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        SingleMapBlockWriterState myState = new SingleMapBlockWriterState();
+        myState.keyBlockBuilder = keyBlockBuilder.capture(serdeProvider);
+        myState.valueBlockBuilder = valueBlockBuilder.capture(serdeProvider);
+        myState.positionsWritten = positionsWritten;
+        myState.writeToValueNext = writeToValueNext;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        SingleMapBlockWriterState myState = (SingleMapBlockWriterState) state;
+        this.keyBlockBuilder.restore(myState.keyBlockBuilder, serdeProvider);
+        this.valueBlockBuilder.restore(myState.valueBlockBuilder, serdeProvider);
+        this.positionsWritten = myState.positionsWritten;
+        this.writeToValueNext = myState.writeToValueNext;
+    }
+
+    private static class SingleMapBlockWriterState
+            implements Serializable
+    {
+        private Object keyBlockBuilder;
+        private Object valueBlockBuilder;
+        private int positionsWritten;
+        private boolean writeToValueNext;
     }
 }

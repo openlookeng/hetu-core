@@ -94,6 +94,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.airlift.concurrent.MoreFutures.addTimeout;
 import static io.prestosql.SystemSessionProperties.isExchangeCompressionEnabled;
 import static io.prestosql.execution.QueryState.FAILED;
+import static io.prestosql.execution.QueryState.RESCHEDULING;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.util.Failures.toFailure;
 import static io.prestosql.util.MoreLists.mappedCopy;
@@ -181,6 +182,7 @@ public class Query
         Query result = new Query(session, slug, queryManager, exchangeClient, dataProcessorExecutor, timeoutExecutor, blockEncodingSerde);
 
         result.queryManager.addOutputInfoListener(result.getQueryId(), result::setQueryOutputInfo);
+        result.queryManager.addStateChangeListener(result.getQueryId(), result::updateQueryState);
 
         result.queryManager.addStateChangeListener(result.getQueryId(), state -> {
             if (state.isDone()) {
@@ -441,7 +443,7 @@ public class Query
             long rows = 0;
             long targetResultBytes = targetResultSize.toBytes();
             while (bytes < targetResultBytes) {
-                SerializedPage serializedPage = exchangeClient.pollPage();
+                SerializedPage serializedPage = exchangeClient.pollPage(null);
                 if (serializedPage == null) {
                     break;
                 }
@@ -583,7 +585,7 @@ public class Query
             long rows = 0;
             long targetResultBytes = targetResultSize.toBytes();
             while (bytes < targetResultBytes) {
-                SerializedPage serializedPage = exchangeClient.pollPage();
+                SerializedPage serializedPage = exchangeClient.pollPage(null);
                 if (serializedPage == null) {
                     break;
                 }
@@ -719,6 +721,14 @@ public class Query
                 (queryInfo.getState().isDone() && !queryInfo.getOutputStage().isPresent()) ||
                 queryInfo.isRunningAsync()) {
             exchangeClient.close();
+        }
+    }
+
+    private synchronized void updateQueryState(QueryState newState)
+    {
+        if (newState == RESCHEDULING) {
+            // Snapshot: remote task will be rescheduled. Need to reset exchange client so it can be connected to new task.
+            exchangeClient.resetForResume();
         }
     }
 

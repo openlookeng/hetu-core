@@ -14,10 +14,18 @@
 package io.prestosql.spi.function;
 
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
+import java.io.Serializable;
+
+@RestorableConfig(uncapturedFields = {"windowIndex"})
 public abstract class RankingWindowFunction
         implements WindowFunction
 {
+    // Snapshot: all windowIndex operations revolves around pagesIndex which is passed in and captured/restored outside
+    // windowIndex fields in all window functions are reset when WindowPartition is created(see WindowPartition line 71)
+    // so it doesn't need to be captured.
     protected WindowIndex windowIndex;
 
     private int currentPeerGroupStart;
@@ -71,4 +79,28 @@ public abstract class RankingWindowFunction
      * @param currentPosition the current position for this row
      */
     public abstract void processRow(BlockBuilder output, boolean newPeerGroup, int peerGroupCount, int currentPosition);
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        RankingWindowFunctionState myState = new RankingWindowFunctionState();
+        myState.currentPeerGroupStart = currentPeerGroupStart;
+        myState.currentPosition = currentPosition;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        RankingWindowFunctionState myState = (RankingWindowFunctionState) state;
+        this.currentPeerGroupStart = myState.currentPeerGroupStart;
+        this.currentPosition = myState.currentPosition;
+    }
+
+    private static class RankingWindowFunctionState
+            implements Serializable
+    {
+        private int currentPeerGroupStart;
+        private int currentPosition;
+    }
 }

@@ -18,6 +18,13 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.units.DataSize;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.operator.PipelineExecutionStrategy;
+import io.prestosql.operator.TaskContext;
+import io.prestosql.snapshot.MultiInputRestorable;
+import io.prestosql.snapshot.MultiInputSnapshotState;
+import io.prestosql.snapshot.SnapshotStateId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.MarkerPage;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.PartitioningHandle;
 
@@ -50,7 +57,10 @@ import static io.prestosql.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUT
 import static java.util.Objects.requireNonNull;
 
 @ThreadSafe
+@RestorableConfig(uncapturedFields = {"sources", "memoryManager", "allSourcesFinished", "noMoreSinkFactories",
+        "allSinkFactories", "openSinkFactories", "sinks", "nextSourceIndex", "snapshotState", "allInputChannels"})
 public class LocalExchange
+        implements MultiInputRestorable
 {
     private final Supplier<LocalExchanger> exchangerSupplier;
 
@@ -76,6 +86,30 @@ public class LocalExchange
     @GuardedBy("this")
     private int nextSourceIndex;
 
+    // Snapshot: distinguish between LocalExchangeSourceOperator and LocalMergeSourceOperator.
+    //
+    // For exchange, each source operator works with a single local-source.
+    // Markers received from each local-sink are broadcasted to all local-sources, so source operator's local-source
+    // receives markers from all local-sinks. Marker handling can happen entirely inside the source operator.
+    //
+    // Merge is different, in that n local-sink connects to n local-source using pass-through exchanger,
+    // and a single merge operator reads from all n local-sources.
+    // - Markers can't be broadcasted to local-sources, otherwise merge operator receives n*n markers
+    // - Merge operator only reads from a local-source if it's its "turn", so markers from certain sources can be blocked,
+    //   preventing it from being received by the operator, which in turn preventing the snapshot from being complete
+    // This requires special handling in local-exchange for merge operator, to not broadcast marker,
+    // and to process markers in local-exchange, instead of in merge operator.
+    private final boolean isForMerge;
+    // Instead of processing markers in merge operator, process them here. The snapshot state is made available to the merge operator,
+    // so its markers can be sent to downstream operators. The does not affect total expected number of components that capture their states.
+    // There is 1 less for the merge operator, but 1 more for local-exchange, so total stays the same.
+    // The local-exchange component is identified using the plan-node-id, to ensure uniqueness within the task, and consistency across capture/restore.
+    private final MultiInputSnapshotState snapshotState;
+    // Total number of local-sink/local-source (they have the same number). Used to check if all sinks have been created,
+    // which means we have the complete list of input channels for this component.
+    private final int bufferCount;
+    private Optional<Set<String>> allInputChannels = Optional.empty();
+
     public LocalExchange(
             int sinkFactoryCount,
             int bufferCount,
@@ -83,8 +117,15 @@ public class LocalExchange
             List<? extends Type> types,
             List<Integer> partitionChannels,
             Optional<Integer> partitionHashChannel,
-            DataSize maxBufferedBytes)
+            DataSize maxBufferedBytes,
+            boolean isForMerge,
+            TaskContext taskContext,
+            String id,
+            boolean snapshotEnabled)
     {
+        this.bufferCount = bufferCount;
+        this.isForMerge = isForMerge;
+        this.snapshotState = isForMerge && snapshotEnabled ? MultiInputSnapshotState.forTaskComponent(this, taskContext, snapshotId -> SnapshotStateId.forTaskComponent(snapshotId, taskContext, id)) : null;
         this.allSinkFactories = Stream.generate(() -> new LocalExchangeSinkFactory(LocalExchange.this))
                 .limit(sinkFactoryCount)
                 .collect(toImmutableList());
@@ -93,7 +134,8 @@ public class LocalExchange
 
         ImmutableList.Builder<LocalExchangeSource> sources = ImmutableList.builder();
         for (int i = 0; i < bufferCount; i++) {
-            sources.add(new LocalExchangeSource(source -> checkAllSourcesFinished()));
+            // Snapshot state is given to all local-sources, so they can process markers when they are received.
+            sources.add(new LocalExchangeSource(source -> checkAllSourcesFinished(), snapshotState));
         }
         this.sources = sources.build();
 
@@ -186,7 +228,7 @@ public class LocalExchange
         checkAllSinksComplete();
     }
 
-    private LocalExchangeSink createSink(LocalExchangeSinkFactory factory)
+    private LocalExchangeSink createSink(LocalExchangeSinkFactory factory, String sinkId)
     {
         checkNotHoldsLock(this);
 
@@ -195,12 +237,23 @@ public class LocalExchange
 
             if (allSourcesFinished) {
                 // all sources have completed so return a sink that is already finished
-                return finishedLocalExchangeSink();
+                return finishedLocalExchangeSink(isForMerge);
             }
 
             // Note: exchanger can be stateful so create a new one for each sink
             LocalExchanger exchanger = exchangerSupplier.get();
-            LocalExchangeSink sink = new LocalExchangeSink(exchanger, this::sinkFinished);
+            if (isForMerge) {
+                // Local merge always uses pass-through exchanger, so each source only needs 1 input channel
+                ((PassthroughExchanger) exchanger).getLocalExchangeSource().addInputChannel(sinkId);
+            }
+            else {
+                // Inform all LocalExchangeSourceOperator instances about this sink, so they all have a complete list of all sinks
+                for (LocalExchangeSource source : sources) {
+                    source.addInputChannel(sinkId);
+                }
+            }
+
+            LocalExchangeSink sink = new LocalExchangeSink(this, exchanger, this::sinkFinished, isForMerge);
             sinks.add(sink);
             return sink;
         }
@@ -254,6 +307,37 @@ public class LocalExchange
         checkState(!Thread.holdsLock(lock), "Can not execute this method while holding a lock");
     }
 
+    @Override
+    public Optional<Set<String>> getInputChannels(int expectedChannelCount)
+    {
+        if (allInputChannels.isPresent()) {
+            return allInputChannels;
+        }
+
+        if (sinks.size() != bufferCount) {
+            return Optional.empty();
+        }
+
+        checkState(isForMerge);
+
+        Set<String> inputChannels = new HashSet<>();
+        for (LocalExchangeSource source : sources) {
+            Set<String> channels = source.getAllInputChannels();
+            if (channels.size() != 1) {
+                checkState(channels.size() == 0, "Local exchange source for LocalMergeOperator should only have 1 input channel");
+                return Optional.empty();
+            }
+            inputChannels.addAll(channels);
+        }
+        allInputChannels = Optional.of(inputChannels);
+        return allInputChannels;
+    }
+
+    public MultiInputSnapshotState getSnapshotState()
+    {
+        return snapshotState;
+    }
+
     @ThreadSafe
     public static class LocalExchangeFactory
     {
@@ -264,6 +348,7 @@ public class LocalExchange
         private final PipelineExecutionStrategy exchangeSourcePipelineExecutionStrategy;
         private final DataSize maxBufferedBytes;
         private final int bufferCount;
+        private final boolean isForMerge;
 
         @GuardedBy("this")
         private boolean noMoreSinkFactories;
@@ -286,6 +371,19 @@ public class LocalExchange
                 PipelineExecutionStrategy exchangeSourcePipelineExecutionStrategy,
                 DataSize maxBufferedBytes)
         {
+            this(partitioning, defaultConcurrency, types, partitionChannels, partitionHashChannel, exchangeSourcePipelineExecutionStrategy, maxBufferedBytes, false);
+        }
+
+        public LocalExchangeFactory(
+                PartitioningHandle partitioning,
+                int defaultConcurrency,
+                List<Type> types,
+                List<Integer> partitionChannels,
+                Optional<Integer> partitionHashChannel,
+                PipelineExecutionStrategy exchangeSourcePipelineExecutionStrategy,
+                DataSize maxBufferedBytes,
+                boolean isForMerge)
+        {
             this.partitioning = requireNonNull(partitioning, "partitioning is null");
             this.types = requireNonNull(types, "types is null");
             this.partitionChannels = requireNonNull(partitionChannels, "partitioningChannels is null");
@@ -294,6 +392,7 @@ public class LocalExchange
             this.maxBufferedBytes = requireNonNull(maxBufferedBytes, "maxBufferedBytes is null");
 
             this.bufferCount = computeBufferCount(partitioning, defaultConcurrency, partitionChannels);
+            this.isForMerge = isForMerge;
         }
 
         public synchronized LocalExchangeSinkFactoryId newSinkFactoryId()
@@ -314,7 +413,12 @@ public class LocalExchange
             return bufferCount;
         }
 
-        public synchronized LocalExchange getLocalExchange(Lifespan lifespan)
+        public LocalExchange getLocalExchange(Lifespan lifespan)
+        {
+            return getLocalExchange(lifespan, null, null, false);
+        }
+
+        public synchronized LocalExchange getLocalExchange(Lifespan lifespan, TaskContext taskContext, String id, boolean snapshotEnabled)
         {
             if (exchangeSourcePipelineExecutionStrategy == UNGROUPED_EXECUTION) {
                 checkArgument(lifespan.isTaskWide(), "LocalExchangeFactory is declared as UNGROUPED_EXECUTION. Driver-group exchange cannot be created.");
@@ -325,7 +429,7 @@ public class LocalExchange
             return localExchangeMap.computeIfAbsent(lifespan, ignored -> {
                 checkState(noMoreSinkFactories);
                 LocalExchange localExchange =
-                        new LocalExchange(numSinkFactories, bufferCount, partitioning, types, partitionChannels, partitionHashChannel, maxBufferedBytes);
+                        new LocalExchange(numSinkFactories, bufferCount, partitioning, types, partitionChannels, partitionHashChannel, maxBufferedBytes, isForMerge, taskContext, id, snapshotEnabled);
                 for (LocalExchangeSinkFactoryId closedSinkFactoryId : closedSinkFactories) {
                     localExchange.getSinkFactory(closedSinkFactoryId).close();
                 }
@@ -395,9 +499,9 @@ public class LocalExchange
             this.exchange = requireNonNull(exchange, "exchange is null");
         }
 
-        public LocalExchangeSink createSink()
+        public LocalExchangeSink createSink(String sinkId)
         {
-            return exchange.createSink(this);
+            return exchange.createSink(this, sinkId);
         }
 
         public LocalExchangeSinkFactory duplicate()
@@ -415,5 +519,31 @@ public class LocalExchange
         {
             exchange.noMoreSinkFactories();
         }
+    }
+
+    public void broadcastMarker(MarkerPage page)
+    {
+        checkState(!isForMerge);
+
+        memoryManager.updateMemoryUsage(page.getRetainedSizeInBytes() * sources.size());
+        for (LocalExchangeSource source : sources) {
+            // Each target receives a separate copy of the marker page, to avoid potential update conflict.
+            // TODO-cp-I361XN: will likely remove the "clone" method later.
+            PageReference pageReference = new PageReference(page.clone(), 1, () -> memoryManager.updateMemoryUsage(-page.getRetainedSizeInBytes()));
+            source.addPage(pageReference);
+        }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        // No state needs to be captured
+        checkState(isForMerge);
+        return 0;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
     }
 }

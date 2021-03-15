@@ -59,6 +59,8 @@ import static io.prestosql.execution.StageState.CANCELED;
 import static io.prestosql.execution.StageState.FAILED;
 import static io.prestosql.execution.StageState.FINISHED;
 import static io.prestosql.execution.StageState.PLANNED;
+import static io.prestosql.execution.StageState.RESCHEDULING;
+import static io.prestosql.execution.StageState.RESUMABLE_FAILURE;
 import static io.prestosql.execution.StageState.RUNNING;
 import static io.prestosql.execution.StageState.SCHEDULED;
 import static io.prestosql.execution.StageState.SCHEDULING;
@@ -234,6 +236,19 @@ public class StageStateMachine
         return failed;
     }
 
+    public boolean transitionToResumableFailure()
+    {
+        log.debug("Moving stage %s to Resumable Failure state", stageId);
+        return stageState.setIf(RESUMABLE_FAILURE, currentState -> !currentState.isDone());
+    }
+
+    public boolean transitionToRescheduling()
+    {
+        log.debug("Moving stage %s to Rescheduling state", stageId);
+        // Force it, even when the stage is in FINISHED state, which was before the resume occurred
+        return stageState.forceSet(RESCHEDULING) == RESCHEDULING;
+    }
+
     /**
      * Add a listener for the final stage info.  This notification is guaranteed to be fired only once.
      * Listener is always notified asynchronously using a dedicated notification thread pool so, care should
@@ -293,7 +308,8 @@ public class StageStateMachine
         // information, the stage could finish, and the task states would
         // never be visible.
         StageState state = stageState.get();
-        boolean isScheduled = (state == RUNNING) || state.isDone();
+        // Snapshot: RESCHEDULING, although a done state for stage, should not be deemed as "scheduled".
+        boolean isScheduled = (state == RUNNING) || state.isDone() && state != RESCHEDULING;
 
         List<TaskInfo> taskInfos = ImmutableList.copyOf(taskInfosSupplier.get());
 

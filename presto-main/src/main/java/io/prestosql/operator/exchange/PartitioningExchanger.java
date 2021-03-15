@@ -91,7 +91,7 @@ class PartitioningExchanger
                     outputBlocks[i] = page.getBlock(i).copyPositions(positions.elements(), 0, positions.size());
                 }
 
-                Page pageSplit = new Page(positions.size(), outputBlocks);
+                Page pageSplit = new Page(positions.size(), outputBlocks).setOrigin(page.getOrigin().orElse(null));
                 memoryManager.updateMemoryUsage(pageSplit.getRetainedSizeInBytes());
                 buffers.get(partition).accept(new PageReference(pageSplit, 1, () -> memoryManager.updateMemoryUsage(-pageSplit.getRetainedSizeInBytes())));
             }

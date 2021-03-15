@@ -18,11 +18,15 @@ import io.prestosql.operator.DriverContext;
 import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.OperatorFactory;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.PageBuilderStatus;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.MarkerPage;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.MapType;
 import io.prestosql.spi.type.RowType;
@@ -36,6 +40,8 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"unnestTypes", "snapshotState", "replicateTypes", "replicateChannels", "unnestChannels", "finishing", "currentPage", "currentPosition",
+        "unnesters", "replicatedBlockBuilders", "ordinalityBlockBuilder"})
 public class UnnestOperator
         implements Operator
 {
@@ -112,7 +118,9 @@ public class UnnestOperator
 
     private BlockBuilder ordinalityBlockBuilder;
 
-    private int outputChannelCount;
+    private final int outputChannelCount;
+
+    private final SingleInputSnapshotState snapshotState;
 
     public UnnestOperator(OperatorContext operatorContext, List<Integer> replicateChannels, List<Type> replicateTypes, List<Integer> unnestChannels, List<Type> unnestTypes, boolean withOrdinality)
     {
@@ -136,6 +144,7 @@ public class UnnestOperator
         this.withOrdinality = withOrdinality;
 
         this.outputChannelCount = unnestOutputChannelCount + replicateTypes.size() + (withOrdinality ? 1 : 0);
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -153,6 +162,11 @@ public class UnnestOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         return finishing && currentPage == null;
     }
 
@@ -168,6 +182,12 @@ public class UnnestOperator
         checkState(!finishing, "Operator is already finishing");
         requireNonNull(page, "page is null");
         checkState(currentPage == null, "currentPage is not null");
+
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
 
         currentPage = page;
         currentPosition = 0;
@@ -191,6 +211,13 @@ public class UnnestOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (currentPage == null) {
             return null;
         }
@@ -217,6 +244,12 @@ public class UnnestOperator
         }
 
         return new Page(outputBlocks);
+    }
+
+    @Override
+    public MarkerPage pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     private int processCurrentPosition()
@@ -301,5 +334,17 @@ public class UnnestOperator
         else {
             throw new IllegalArgumentException("Cannot unnest type: " + nestedType);
         }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        return operatorContext.capture(serdeProvider);
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        this.operatorContext.restore(state, serdeProvider);
     }
 }

@@ -16,7 +16,10 @@ package io.prestosql.operator;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
+import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
+import io.airlift.slice.SliceOutput;
+import io.airlift.slice.Slices;
 import io.airlift.units.DataSize;
 import io.prestosql.Session;
 import io.prestosql.geospatial.Rectangle;
@@ -26,7 +29,11 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.block.SortOrder;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.gen.JoinCompiler;
@@ -40,6 +47,7 @@ import org.openjdk.jol.info.ClassLayout;
 
 import javax.inject.Inject;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -70,8 +78,9 @@ import static java.util.Objects.requireNonNull;
  * <li>Positional output via the {@link #appendTo} method</li>
  * </ul>
  */
+@RestorableConfig(uncapturedFields = {"orderingCompiler", "joinCompiler", "metadata", "types"})
 public class PagesIndex
-        implements Swapper
+        implements Swapper, Restorable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(PagesIndex.class).instanceSize();
     private static final Logger log = Logger.get(PagesIndex.class);
@@ -578,5 +587,64 @@ public class PagesIndex
                 return page;
             }
         };
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        BlockEncodingSerde blockSerde = serdeProvider.getBlockEncodingSerde();
+        PagesIndexState myState = new PagesIndexState();
+        myState.valueAddresses = new long[valueAddresses.size()];
+        valueAddresses.getElements(0, myState.valueAddresses, 0, valueAddresses.size());
+        myState.channels = new byte[channels.length][][];
+        for (int i = 0; i < channels.length; i++) {
+            int arraySize = channels[i].size();
+            myState.channels[i] = new byte[arraySize][];
+            Block[] blockArray = new Block[arraySize];
+            channels[i].getElements(0, blockArray, 0, arraySize);
+            for (int j = 0; j < arraySize; j++) {
+                SliceOutput sliceOutput = new DynamicSliceOutput(0);
+                blockSerde.writeBlock(sliceOutput, blockArray[j]);
+                myState.channels[i][j] = sliceOutput.getUnderlyingSlice().getBytes();
+            }
+        }
+        myState.nextBlockToCompact = nextBlockToCompact;
+        myState.positionCount = positionCount;
+        myState.pagesMemorySize = pagesMemorySize;
+        myState.estimatedSize = estimatedSize;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        BlockEncodingSerde blockSerde = serdeProvider.getBlockEncodingSerde();
+        PagesIndexState myState = (PagesIndexState) state;
+        this.valueAddresses.clear();
+        this.valueAddresses.trim();
+        this.valueAddresses.addAll(0, new LongArrayList(myState.valueAddresses));
+        for (int i = 0; i < myState.channels.length; i++) {
+            this.channels[i].clear();
+            this.channels[i].trim();
+            for (byte[] blockState : myState.channels[i]) {
+                Slice input = Slices.wrappedBuffer(blockState);
+                this.channels[i].add(blockSerde.readBlock(input.getInput()));
+            }
+        }
+        this.nextBlockToCompact = myState.nextBlockToCompact;
+        this.positionCount = myState.positionCount;
+        this.pagesMemorySize = myState.pagesMemorySize;
+        this.estimatedSize = myState.estimatedSize;
+    }
+
+    private static class PagesIndexState
+            implements Serializable
+    {
+        private long[] valueAddresses;
+        private byte[][][] channels;
+        private int nextBlockToCompact;
+        private int positionCount;
+        private long pagesMemorySize;
+        private long estimatedSize;
     }
 }

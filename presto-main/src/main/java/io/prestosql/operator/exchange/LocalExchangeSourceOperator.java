@@ -19,14 +19,22 @@ import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.OperatorFactory;
 import io.prestosql.operator.exchange.LocalExchange.LocalExchangeFactory;
+import io.prestosql.snapshot.MultiInputRestorable;
+import io.prestosql.snapshot.MultiInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
+
+import java.util.Optional;
+import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"snapshotState", "source"})
 public class LocalExchangeSourceOperator
-        implements Operator
+        implements Operator, MultiInputRestorable
 {
     public static class LocalExchangeSourceOperatorFactory
             implements OperatorFactory
@@ -34,13 +42,15 @@ public class LocalExchangeSourceOperator
         private final int operatorId;
         private final PlanNodeId planNodeId;
         private final LocalExchangeFactory localExchangeFactory;
+        private final int totalInputChannels;
         private boolean closed;
 
-        public LocalExchangeSourceOperatorFactory(int operatorId, PlanNodeId planNodeId, LocalExchangeFactory localExchangeFactory)
+        public LocalExchangeSourceOperatorFactory(int operatorId, PlanNodeId planNodeId, LocalExchangeFactory localExchangeFactory, int totalInputChannels)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.localExchangeFactory = requireNonNull(localExchangeFactory, "localExchangeFactory is null");
+            this.totalInputChannels = totalInputChannels;
         }
 
         @Override
@@ -51,7 +61,13 @@ public class LocalExchangeSourceOperator
             LocalExchange inMemoryExchange = localExchangeFactory.getLocalExchange(driverContext.getLifespan());
 
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, LocalExchangeSourceOperator.class.getSimpleName());
-            return new LocalExchangeSourceOperator(operatorContext, inMemoryExchange.getNextSource());
+            LocalExchangeSource source = inMemoryExchange.getNextSource();
+            // Snapshot: make driver ID and source/partition index the same, to ensure consistency before and after resuming.
+            // HashBuilderOperator also uses the same mechanism to ensure consistency.
+            if (operatorContext.isSnapshotEnabled()) {
+                source = inMemoryExchange.getSource(driverContext.getDriverId());
+            }
+            return new LocalExchangeSourceOperator(operatorContext, source, totalInputChannels);
         }
 
         @Override
@@ -73,12 +89,19 @@ public class LocalExchangeSourceOperator
     }
 
     private final OperatorContext operatorContext;
+    private final MultiInputSnapshotState snapshotState;
     private final LocalExchangeSource source;
+    // Snapshot: total number of local-sinks that send data to this operator
+    private final int totalInputChannels;
 
-    public LocalExchangeSourceOperator(OperatorContext operatorContext, LocalExchangeSource source)
+    public LocalExchangeSourceOperator(OperatorContext operatorContext, LocalExchangeSource source, int totalInputChannels)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
+        this.snapshotState = operatorContext.isSnapshotEnabled()
+                ? MultiInputSnapshotState.forOperator(this, operatorContext)
+                : null;
         this.source = requireNonNull(source, "source is null");
+        this.totalInputChannels = totalInputChannels;
         operatorContext.setInfoSupplier(source::getBufferInfo);
     }
 
@@ -97,6 +120,12 @@ public class LocalExchangeSourceOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasPendingDataPages()) {
+            // Snapshot: there are pending restored pages. Need to send them out before finishing this operator.
+            return false;
+        }
+
+        // Snapshot: must also use up all resumed pages
         return source.isFinished();
     }
 
@@ -121,7 +150,13 @@ public class LocalExchangeSourceOperator
     @Override
     public Page getOutput()
     {
-        Page page = source.removePage();
+        Page page;
+        if (snapshotState != null) {
+            page = snapshotState.processPage(() -> source.removePage()).orElse(null);
+        }
+        else {
+            page = source.removePage();
+        }
         if (page != null) {
             operatorContext.recordProcessedInput(page.getSizeInBytes(), page.getPositionCount());
         }
@@ -129,8 +164,33 @@ public class LocalExchangeSourceOperator
     }
 
     @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker(() -> source.removePage()).orElse(null);
+    }
+
+    @Override
+    public Optional<Set<String>> getInputChannels(int expectedChannelCount)
+    {
+        Set<String> channels = source.getAllInputChannels();
+        return totalInputChannels == channels.size() ? Optional.of(channels) : Optional.empty();
+    }
+
+    @Override
     public void close()
     {
         source.close();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        return operatorContext.capture(serdeProvider);
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        operatorContext.restore(state, serdeProvider);
     }
 }

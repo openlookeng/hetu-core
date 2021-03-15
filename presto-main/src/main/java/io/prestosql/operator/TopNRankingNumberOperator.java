@@ -18,13 +18,17 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.window.RankingFunction;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
 
+import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +40,7 @@ import static io.prestosql.operator.GroupByHash.createGroupByHash;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"outputChannels", "unfinishedWork", "outputIterator", "rankingFunction", "snapshotState"})
 public class TopNRankingNumberOperator
         implements Operator
 {
@@ -60,7 +65,7 @@ public class TopNRankingNumberOperator
         private final boolean generateRankingNumber;
         private boolean closed;
         private final JoinCompiler joinCompiler;
-        private Optional<RankingFunction> rankingFunction;
+        private final Optional<RankingFunction> rankingFunction;
 
         public TopNRankingNumberOperatorFactory(
                 int operatorId,
@@ -145,6 +150,8 @@ public class TopNRankingNumberOperator
     private Iterator<Page> outputIterator;
     private Optional<RankingFunction> rankingFunction;
 
+    private final SingleInputSnapshotState snapshotState;
+
     public TopNRankingNumberOperator(
             OperatorContext operatorContext,
             List<? extends Type> sourceTypes,
@@ -197,6 +204,8 @@ public class TopNRankingNumberOperator
                 generateRankingNumber,
                 rankingFunction,
                 groupByHash);
+
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -214,6 +223,11 @@ public class TopNRankingNumberOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         // has no more input, has finished flushing, and has no unfinished work
         return finishing && outputIterator != null && !outputIterator.hasNext() && unfinishedWork == null;
     }
@@ -232,6 +246,13 @@ public class TopNRankingNumberOperator
         checkState(unfinishedWork == null, "Cannot add input with the operator when unfinished work is not empty");
         checkState(outputIterator == null, "Cannot add input with the operator when flushing");
         requireNonNull(page, "page is null");
+
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         unfinishedWork = groupedTopNBuilder.processPage(page);
         if (unfinishedWork.process()) {
             unfinishedWork = null;
@@ -242,6 +263,13 @@ public class TopNRankingNumberOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (unfinishedWork != null) {
             boolean finished = unfinishedWork.process();
             updateMemoryReservation();
@@ -274,6 +302,12 @@ public class TopNRankingNumberOperator
         return output;
     }
 
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
+    }
+
     @VisibleForTesting
     public int getCapacity()
     {
@@ -298,5 +332,38 @@ public class TopNRankingNumberOperator
             types.add(BIGINT);
         }
         return types.build();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        TopNRankingNumberOperatorState myState = new TopNRankingNumberOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.localUserMemoryContext = localUserMemoryContext.getBytes();
+        myState.groupByHash = groupByHash.capture(serdeProvider);
+        myState.groupedTopNBuilder = groupedTopNBuilder.capture(serdeProvider);
+        myState.finishing = finishing;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        TopNRankingNumberOperatorState myState = (TopNRankingNumberOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.localUserMemoryContext.setBytes(myState.localUserMemoryContext);
+        this.groupByHash.restore(myState.groupByHash, serdeProvider);
+        this.groupedTopNBuilder.restore(myState.groupedTopNBuilder, serdeProvider);
+        this.finishing = myState.finishing;
+    }
+
+    private static class TopNRankingNumberOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private long localUserMemoryContext;
+        private Object groupByHash;
+        private Object groupedTopNBuilder;
+        private boolean finishing;
     }
 }

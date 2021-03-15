@@ -22,6 +22,8 @@ import io.airlift.slice.Slices;
 import io.hetu.core.transport.execution.buffer.PageCodecMarker.MarkerSet;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.BlockEncodingSerde;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.spiller.SpillCipher;
 
 import javax.annotation.concurrent.NotThreadSafe;
@@ -40,6 +42,7 @@ import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
 
 @NotThreadSafe
 public class PagesSerde
+        implements BlockEncodingSerdeProvider
 {
     private static final double MINIMUM_COMPRESSION_RATIO = 0.8;
 
@@ -58,6 +61,22 @@ public class PagesSerde
     }
 
     public SerializedPage serialize(Page page)
+    {
+        if (page instanceof MarkerPage) {
+            return SerializedPage.forMarker((MarkerPage) page);
+        }
+        return serializeImpl(page).setOrigin(page.getOrigin().orElse(null));
+    }
+
+    public Page deserialize(SerializedPage page)
+    {
+        if (page.isMarkerPage()) {
+            return page.toMarker();
+        }
+        return deserializeImpl(page).setOrigin(page.getOrigin().orElse(null));
+    }
+
+    private SerializedPage serializeImpl(Page page)
     {
         SliceOutput serializationBuffer = new DynamicSliceOutput(toIntExact(page.getSizeInBytes() + Integer.BYTES)); // block length is an int
         writeRawPage(page, serializationBuffer, blockEncodingSerde);
@@ -101,7 +120,7 @@ public class PagesSerde
         return new SerializedPage(slice, markers, page.getPositionCount(), uncompressedSize, page.getPageMetadata());
     }
 
-    public Page deserialize(SerializedPage serializedPage)
+    private Page deserializeImpl(SerializedPage serializedPage)
     {
         checkArgument(serializedPage != null, "serializedPage is null");
 
@@ -138,5 +157,11 @@ public class PagesSerde
         }
 
         return readRawPage(serializedPage.getPositionCount(), serializedPage.getPageMetadata(), slice.getInput(), blockEncodingSerde);
+    }
+
+    @Override
+    public BlockEncodingSerde getBlockEncodingSerde()
+    {
+        return blockEncodingSerde;
     }
 }

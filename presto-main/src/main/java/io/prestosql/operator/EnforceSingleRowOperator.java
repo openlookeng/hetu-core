@@ -13,17 +13,24 @@
  */
 package io.prestosql.operator;
 
+import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.ByteArrayBlock;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
+import java.io.Serializable;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.spi.StandardErrorCode.SUBQUERY_MULTIPLE_ROWS;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"snapshotState"})
 public class EnforceSingleRowOperator
         implements Operator
 {
@@ -67,9 +74,12 @@ public class EnforceSingleRowOperator
     private boolean finishing;
     private Page page;
 
+    private final SingleInputSnapshotState snapshotState;
+
     public EnforceSingleRowOperator(OperatorContext operatorContext)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -90,6 +100,11 @@ public class EnforceSingleRowOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         return finishing && page == null;
     }
 
@@ -104,6 +119,13 @@ public class EnforceSingleRowOperator
     {
         requireNonNull(page, "page is null");
         checkState(needsInput(), "Operator did not expect any more data");
+
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         if (page.getPositionCount() == 0) {
             return;
         }
@@ -116,6 +138,13 @@ public class EnforceSingleRowOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (!finishing) {
             return null;
         }
@@ -124,5 +153,44 @@ public class EnforceSingleRowOperator
         Page pageToReturn = page;
         page = null;
         return pageToReturn;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        EnforceSingleRowOperatorState myState = new EnforceSingleRowOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.finishing = finishing;
+        if (this.page != null) {
+            myState.page = ((PagesSerde) serdeProvider).serialize(page).capture(serdeProvider);
+        }
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        EnforceSingleRowOperatorState myState = (EnforceSingleRowOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.finishing = myState.finishing;
+        this.page = null;
+        if (myState.page != null) {
+            SerializedPage serializedPage = SerializedPage.restoreSerializedPage(myState.page);
+            this.page = ((PagesSerde) serdeProvider).deserialize(serializedPage);
+        }
+    }
+
+    private static class EnforceSingleRowOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private boolean finishing;
+        private Object page;
     }
 }

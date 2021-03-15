@@ -22,6 +22,8 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.connector.UpdatablePageSource;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.MarkerPage;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 
 import java.util.Collection;
@@ -36,6 +38,8 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static java.util.Objects.requireNonNull;
 
+//TODO-cp-I38S9Q: Operator currently not supported for Snapshot
+@RestorableConfig(unsupported = true)
 public class DeleteOperator
         implements Operator
 {
@@ -130,6 +134,11 @@ public class DeleteOperator
         requireNonNull(page, "page is null");
         checkState(state == State.RUNNING, "Operator is %s", state);
 
+        //TODO-cp-I38S9Q: Operator currently not supported for Snapshot
+        if (page instanceof MarkerPage) {
+            throw new UnsupportedOperationException("Operator doesn't support snapshotting.");
+        }
+
         Block rowIds = page.getBlock(rowIdChannel);
         pageSource().deleteRows(rowIds);
         rowCount += rowIds.getPositionCount();
@@ -173,6 +182,13 @@ public class DeleteOperator
         }
 
         return page.build();
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        //TODO-cp-I38S9Q: Operator currently not supported for Snapshot
+        return null;
     }
 
     @Override

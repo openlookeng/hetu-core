@@ -32,7 +32,7 @@ import static io.prestosql.client.PrestoHeaders.PRESTO_BUFFER_COMPLETE;
 import static io.prestosql.client.PrestoHeaders.PRESTO_PAGE_NEXT_TOKEN;
 import static io.prestosql.client.PrestoHeaders.PRESTO_PAGE_TOKEN;
 import static io.prestosql.client.PrestoHeaders.PRESTO_TASK_INSTANCE_ID;
-import static io.prestosql.execution.buffer.TestingPagesSerdeFactory.testingPagesSerde;
+import static io.prestosql.testing.TestingPagesSerdeFactory.testingPagesSerde;
 import static java.util.Objects.requireNonNull;
 import static javax.ws.rs.core.HttpHeaders.CONTENT_TYPE;
 import static org.testng.Assert.assertEquals;
@@ -73,7 +73,7 @@ public class TestingExchangeHttpClientHandler
             headers.put(PRESTO_PAGE_NEXT_TOKEN, String.valueOf(pageToken + 1));
             headers.put(PRESTO_BUFFER_COMPLETE, String.valueOf(false));
             DynamicSliceOutput output = new DynamicSliceOutput(256);
-            PagesSerdeUtil.writePages(PAGES_SERDE, output, page);
+            PagesSerdeUtil.writeSerializedPage(output, PAGES_SERDE.serialize(page));
             return new TestingResponse(HttpStatus.OK, headers.build(), output.slice().getInput());
         }
         else if (taskBuffer.isFinished()) {

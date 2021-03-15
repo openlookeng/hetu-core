@@ -75,7 +75,7 @@ public class SimpleNodeSelector
     private final int maxSplitsPerNode;
     private final int maxPendingSplitsPerTask;
     private final boolean optimizedLocalScheduling;
-    private TableSplitAssignmentInfo tableSplitAssignmentInfo;
+    private final TableSplitAssignmentInfo tableSplitAssignmentInfo;
 
     public SimpleNodeSelector(
             InternalNodeManager nodeManager,
@@ -108,6 +108,18 @@ public class SimpleNodeSelector
     public List<InternalNode> allNodes()
     {
         return ImmutableList.copyOf(nodeMap.get().get().getNodesByHostAndPort().values());
+    }
+
+    @Override
+    public int selectableNodeCount()
+    {
+        NodeMap map = nodeMap.get().get();
+        if (includeCoordinator) {
+            return map.getNodesByHostAndPort().size();
+        }
+        return (int) map.getNodesByHostAndPort().values().stream()
+                .filter(node -> !map.getCoordinatorNodeIds().contains(node.getNodeIdentifier()))
+                .count();
     }
 
     @Override
@@ -262,7 +274,7 @@ public class SimpleNodeSelector
     }
 
     private Multimap createConsumerScanNodeAssignment(QualifiedObjectName tableName, Set<Split> splits, Set<SplitKey> splitKeySet,
-                                                      HashMap<SplitKey, InternalNode> splitKeyNodeAssignment)
+            HashMap<SplitKey, InternalNode> splitKeyNodeAssignment)
     {
         Multimap<InternalNode, Split> assignment = HashMultimap.create();
         for (Split split : splits) {
@@ -315,6 +327,7 @@ public class SimpleNodeSelector
      * The method tries to make the distribution of splits more uniform. All nodes are arranged into a maxHeap and a minHeap
      * based on the number of splits that are assigned to them. Splits are redistributed, one at a time, from a maxNode to a
      * minNode until we have as uniform a distribution as possible.
+     *
      * @param assignment the node-splits multimap after the first and the second stage
      * @param assignmentStats required to obtain info regarding splits assigned to a node outside the current batch of assignment
      * @param nodeMap to get a list of all nodes to which splits can be assigned

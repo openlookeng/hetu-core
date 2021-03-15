@@ -44,6 +44,7 @@ import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.spiller.SpillerFactory;
@@ -194,6 +195,8 @@ public class ScanFilterAndProjectOperator
         }
     }
 
+    // Table scan operators do not participate in snapshotting
+    @RestorableConfig(unsupported = true)
     private class SplitToPages
             implements WorkProcessor.Transformation<Split, WorkProcessor<Page>>
     {
@@ -310,6 +313,8 @@ public class ScanFilterAndProjectOperator
         }
     }
 
+    // Table scan operators do not participate in snapshotting
+    @RestorableConfig(unsupported = true)
     private class RecordCursorToPages
             implements WorkProcessor.Process<Page>
     {
@@ -421,6 +426,8 @@ public class ScanFilterAndProjectOperator
         }
     }
 
+    // Table scan operators do not participate in snapshotting
+    @RestorableConfig(unsupported = true)
     private class ConnectorPageSourceToPages
             implements WorkProcessor.Process<Page>
     {
@@ -436,11 +443,11 @@ public class ScanFilterAndProjectOperator
         boolean isDcTable;
 
         ConnectorPageSourceToPages(LocalMemoryContext pageSourceMemoryContext,
-                                   Optional<TableScanNode> tableScanNodeOptional,
-                                   Optional<StateStoreProvider> stateStoreProviderOptional,
-                                   Optional<QueryId> queryIdOptional,
-                                   Optional<Metadata> metadataOptional,
-                                   Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional)
+                Optional<TableScanNode> tableScanNodeOptional,
+                Optional<StateStoreProvider> stateStoreProviderOptional,
+                Optional<QueryId> queryIdOptional,
+                Optional<Metadata> metadataOptional,
+                Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional)
         {
             this.pageSourceMemoryContext = pageSourceMemoryContext;
             this.stateStoreProviderOptional = stateStoreProviderOptional;
@@ -534,12 +541,12 @@ public class ScanFilterAndProjectOperator
         private Optional<QueryId> queryIdOptional = Optional.empty();
         private Optional<Metadata> metadataOptional = Optional.empty();
         private Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional = Optional.empty();
-        private ReuseExchangeOperator.STRATEGY strategy;
-        private UUID reuseTableScanMappingId;
-        private boolean spillEnabled;
+        private final ReuseExchangeOperator.STRATEGY strategy;
+        private final UUID reuseTableScanMappingId;
+        private final boolean spillEnabled;
         private final Optional<SpillerFactory> spillerFactory;
-        private Integer spillerThreshold;
-        private Integer consumerTableScanNodeCount;
+        private final Integer spillerThreshold;
+        private final Integer consumerTableScanNodeCount;
 
         public ScanFilterAndProjectOperatorFactory(
                 Session session,

@@ -43,6 +43,7 @@ import java.util.function.Consumer;
 import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.airlift.http.client.Request.Builder.prepareGet;
 import static io.airlift.units.Duration.nanosSince;
+import static io.prestosql.client.PrestoHeaders.PRESTO_TASK_INSTANCE_ID;
 import static io.prestosql.protocol.AdaptingJsonResponseHandler.createAdaptingJsonResponseHandler;
 import static io.prestosql.protocol.FullSmileResponseHandler.createFullSmileResponseHandler;
 import static io.prestosql.protocol.JsonCodecWrapper.unwrapJsonCodec;
@@ -134,7 +135,7 @@ public class TaskInfoFetcher
         scheduleUpdate();
     }
 
-    private synchronized void stop()
+    public synchronized void stop()
     {
         running = false;
         if (future != null) {
@@ -207,7 +208,7 @@ public class TaskInfoFetcher
 
         HttpUriBuilder httpUriBuilder = uriBuilderFrom(taskStatus.getSelf());
         URI uri = summarizeTaskInfo ? httpUriBuilder.addParameter("summarize").build() : httpUriBuilder.build();
-        Request request = setContentTypeHeaders(isBinaryEncoding, prepareGet())
+        Request request = addInstanceIdHeader(setContentTypeHeaders(isBinaryEncoding, prepareGet()))
                 .setUri(uri)
                 .build();
 
@@ -223,6 +224,13 @@ public class TaskInfoFetcher
         future = httpClient.executeAsync(request, responseHandler);
         currentRequestStartNanos.set(System.nanoTime());
         Futures.addCallback(future, new SimpleHttpResponseHandler<>(this, request.getUri(), stats), executor);
+    }
+
+    private Request.Builder addInstanceIdHeader(Request.Builder builder)
+    {
+        // Snapshot: Add task instance id to all task related requests,
+        // so receiver can verify if the instance id matches
+        return builder.setHeader(PRESTO_TASK_INSTANCE_ID, getTaskInfo().getTaskStatus().getTaskInstanceId());
     }
 
     synchronized void updateTaskInfo(TaskInfo newValue)

@@ -22,11 +22,14 @@ import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.type.BigintOperators;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -40,6 +43,7 @@ import static it.unimi.dsi.fastutil.HashCommon.murmurHash3;
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"updateMemory"})
 public class BigintGroupByHash
         implements GroupByHash
 {
@@ -421,5 +425,64 @@ public class BigintGroupByHash
             finished = true;
             return new GroupByIdBlock(nextGroupId, blockBuilder.build());
         }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        BigintGroupByHashState myState = new BigintGroupByHashState();
+        myState.hashCapacity = hashCapacity;
+        myState.maxFill = maxFill;
+        myState.mask = mask;
+        myState.values = values.capture(serdeProvider);
+        myState.groupIds = groupIds.capture(serdeProvider);
+        myState.nullGroupId = nullGroupId;
+        myState.valuesByGroupId = valuesByGroupId.capture(serdeProvider);
+        myState.nextGroupId = nextGroupId;
+        myState.hashCollisions = hashCollisions;
+        myState.expectedHashCollisions = expectedHashCollisions;
+        myState.preallocatedMemoryInBytes = preallocatedMemoryInBytes;
+        myState.currentPageSizeInBytes = currentPageSizeInBytes;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        BigintGroupByHashState myState = (BigintGroupByHashState) state;
+        this.hashCapacity = myState.hashCapacity;
+        this.maxFill = myState.maxFill;
+        this.mask = myState.mask;
+        this.values.restore(myState.values, serdeProvider);
+        this.groupIds.restore(myState.groupIds, serdeProvider);
+        this.nullGroupId = myState.nullGroupId;
+        this.valuesByGroupId.restore(myState.valuesByGroupId, serdeProvider);
+        this.nextGroupId = myState.nextGroupId;
+        this.hashCollisions = myState.hashCollisions;
+        this.expectedHashCollisions = myState.expectedHashCollisions;
+        this.preallocatedMemoryInBytes = myState.preallocatedMemoryInBytes;
+        this.currentPageSizeInBytes = myState.currentPageSizeInBytes;
+    }
+
+    private static class BigintGroupByHashState
+            implements Serializable
+    {
+        private int hashCapacity;
+        private int maxFill;
+        private int mask;
+
+        private Object values;
+        private Object groupIds;
+
+        private int nullGroupId;
+
+        private Object valuesByGroupId;
+
+        private int nextGroupId;
+        private long hashCollisions;
+        private double expectedHashCollisions;
+
+        private long preallocatedMemoryInBytes;
+        private long currentPageSizeInBytes;
     }
 }

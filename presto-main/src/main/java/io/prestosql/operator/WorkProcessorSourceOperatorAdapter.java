@@ -24,6 +24,7 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.UpdatablePageSource;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.Spiller;
 import io.prestosql.spiller.SpillerFactory;
@@ -50,6 +51,8 @@ import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STR
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
+// Table scan operators do not participate in snapshotting
+@RestorableConfig(unsupported = true)
 public class WorkProcessorSourceOperatorAdapter
         implements SourceOperator
 {
@@ -71,26 +74,27 @@ public class WorkProcessorSourceOperatorAdapter
     private long previousInputPositions;
     private long previousReadTimeNanos;
 
-    private ReuseExchangeOperator.STRATEGY strategy;
-    private UUID reuseTableScanMappingId;
+    private final ReuseExchangeOperator.STRATEGY strategy;
+    private final UUID reuseTableScanMappingId;
     private static ConcurrentMap<String, Integer> sourceReuseTableScanMappingIdPositionIndexMap;
     private final Optional<SpillerFactory> spillerFactory;
     private final List<Type> projectionTypes;
     private ListenableFuture<?> spillInProgress = immediateFuture(null);
-    private boolean spillEnabled;
+    private final boolean spillEnabled;
     private final long spillThreshold;
-    private static ConcurrentMap<UUID, ReuseExchangeTableScanMappingIdState> reuseExchangeTableScanMappingIdUtilsMap = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<UUID, ReuseExchangeTableScanMappingIdState> reuseExchangeTableScanMappingIdUtilsMap = new ConcurrentHashMap<>();
     private ReuseExchangeTableScanMappingIdState reuseExchangeTableScanMappingIdState;
 
-    private enum READSTATE {READ_MEMORY, READ_DISK}
+    private enum READSTATE
+    {READ_MEMORY, READ_DISK}
 
     // sourceIdString is required, as multiple reuse nodes can be there with the same reuseTableScanMappingId. It needs
     // to differentiate by concatenating SourceId and reuseTableScanMappingId.
     private String sourceIdString;
 
     public WorkProcessorSourceOperatorAdapter(OperatorContext operatorContext, WorkProcessorSourceOperatorFactory sourceOperatorFactory,
-                                              ReuseExchangeOperator.STRATEGY strategy, UUID reuseTableScanMappingId, boolean spillEnabled, List<Type> projectionTypes,
-                                              Optional<SpillerFactory> spillerFactory, Integer spillerThreshold, Integer consumerTableScanNodeCount)
+            ReuseExchangeOperator.STRATEGY strategy, UUID reuseTableScanMappingId, boolean spillEnabled, List<Type> projectionTypes,
+            Optional<SpillerFactory> spillerFactory, Integer spillerThreshold, Integer consumerTableScanNodeCount)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.sourceId = requireNonNull(sourceOperatorFactory, "sourceOperatorFactory is null").getSourceId();
@@ -193,23 +197,8 @@ public class WorkProcessorSourceOperatorAdapter
     {
         int pagesWrittenCount = reuseExchangeTableScanMappingIdState.getPagesWrittenCount();
 
-        if (pagesWrittenCount == 0) {
-            // there was no spilling of data- either spilling is not used, or not enough data to spill
-            return true;
-        }
-        return false;
-    }
-
-    @Override
-    public boolean needsInput()
-    {
-        return false;
-    }
-
-    @Override
-    public void addInput(Page page)
-    {
-        throw new UnsupportedOperationException();
+        // there was no spilling of data- either spilling is not used, or not enough data to spill
+        return pagesWrittenCount == 0;
     }
 
     @Override
@@ -233,6 +222,12 @@ public class WorkProcessorSourceOperatorAdapter
         }
 
         return page;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return null; // No marker in source pipeline
     }
 
     public static void deleteSpilledFiles(UUID reuseTableScanMappingId)
@@ -506,6 +501,8 @@ public class WorkProcessorSourceOperatorAdapter
         reuseExchangeTableScanMappingIdUtilsMap.remove(reuseTableScanMappingId);
     }
 
+    // Table scan operators do not participate in snapshotting
+    @RestorableConfig(unsupported = true)
     private class SplitBuffer
             implements WorkProcessor.Process<Split>
     {

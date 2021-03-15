@@ -54,6 +54,7 @@ import io.prestosql.security.PasswordSecurityModule;
 import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.server.security.PasswordAuthenticatorManager;
 import io.prestosql.server.security.ServerSecurityModule;
+import io.prestosql.snapshot.SnapshotUtils;
 import io.prestosql.sql.parser.SqlParserOptions;
 import io.prestosql.statestore.StateStoreLauncher;
 import io.prestosql.statestore.StateStoreProvider;
@@ -165,6 +166,9 @@ public class PrestoServer
                     injector.getInstance(DynamicFilterCacheManager.class),
                     injector.getInstance(ServerConfig.class),
                     injector.getInstance(NodeSchedulerConfig.class));
+
+            // Initialize snapshot Manager
+            injector.getInstance(SnapshotUtils.class).initialize();
 
             injector.getInstance(Announcer.class).start();
 

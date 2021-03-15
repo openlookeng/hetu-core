@@ -294,11 +294,21 @@ public final class HttpPageBufferClient
         lastUpdate = DateTime.now();
     }
 
+    private Request.Builder addInstanceIdHeader(Request.Builder builder)
+    {
+        // Snapshot: Add task instance id to all "results" related requests,
+        // so receiver can verify if the instance id matches
+        if (taskInstanceId != null) {
+            builder.setHeader(PRESTO_TASK_INSTANCE_ID, taskInstanceId);
+        }
+        return builder;
+    }
+
     private synchronized void sendGetResults()
     {
         URI uri = HttpUriBuilder.uriBuilderFrom(location).appendPath(String.valueOf(token)).build();
         HttpResponseFuture<PagesResponse> resultFuture = httpClient.executeAsync(
-                prepareGet()
+                addInstanceIdHeader(prepareGet())
                         .setHeader(PRESTO_MAX_SIZE, maxResponseSize.toString())
                         .setUri(uri).build(),
                 new PageResponseHandler());
@@ -341,7 +351,7 @@ public final class HttpPageBufferClient
                         // The next request will also make sure the token is acknowledged.
                         // This is to fast release the pages on the buffer side.
                         URI uri = HttpUriBuilder.uriBuilderFrom(location).appendPath(String.valueOf(result.getNextToken())).appendPath("acknowledge").build();
-                        httpClient.executeAsync(prepareGet().setUri(uri).build(), new ResponseHandler<Void, RuntimeException>()
+                        httpClient.executeAsync(addInstanceIdHeader(prepareGet()).setUri(uri).build(), new ResponseHandler<Void, RuntimeException>()
                         {
                             @Override
                             public Void handleException(Request request, Exception exception)
@@ -417,7 +427,7 @@ public final class HttpPageBufferClient
 
     private synchronized void sendDelete()
     {
-        HttpResponseFuture<StatusResponse> resultFuture = httpClient.executeAsync(prepareDelete().setUri(location).build(), createStatusResponseHandler());
+        HttpResponseFuture<StatusResponse> resultFuture = httpClient.executeAsync(addInstanceIdHeader(prepareDelete()).setUri(location).build(), createStatusResponseHandler());
         future = resultFuture;
         Futures.addCallback(resultFuture, new FutureCallback<StatusResponse>()
         {
@@ -582,7 +592,7 @@ public final class HttpPageBufferClient
                 }
                 if (!mediaTypeMatches(contentType, PRESTO_PAGES_TYPE)) {
                     throw new PageTransportErrorException(format("Expected %s response from server but got %s",
-                        PRESTO_PAGES_TYPE, contentType));
+                            PRESTO_PAGES_TYPE, contentType));
                 }
 
                 String taskInstanceId = getTaskInstanceId(response);

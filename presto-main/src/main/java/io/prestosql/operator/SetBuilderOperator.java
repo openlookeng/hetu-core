@@ -18,23 +18,28 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.prestosql.operator.ChannelSet.ChannelSetBuilder;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 
+import java.io.Serializable;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
 @ThreadSafe
+@RestorableConfig(uncapturedFields = {"setSupplier", "hashChannel", "unfinishedWork", "snapshotState"})
 public class SetBuilderOperator
-        implements Operator
+        implements SinkOperator
 {
     public static class SetSupplier
     {
@@ -132,6 +137,8 @@ public class SetBuilderOperator
     @Nullable
     private Work<?> unfinishedWork;  // The pending work for current page.
 
+    private final SingleInputSnapshotState snapshotState;
+
     public SetBuilderOperator(
             OperatorContext operatorContext,
             SetSupplier setSupplier,
@@ -153,6 +160,7 @@ public class SetBuilderOperator
                 expectedPositions,
                 requireNonNull(operatorContext, "operatorContext is null"),
                 requireNonNull(joinCompiler, "joinCompiler is null"));
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -195,17 +203,17 @@ public class SetBuilderOperator
         requireNonNull(page, "page is null");
         checkState(!isFinished(), "Operator is already finished");
 
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         Block sourceBlock = page.getBlock(setChannel);
         Page sourcePage = hashChannel.isPresent() ? new Page(sourceBlock, page.getBlock(hashChannel.get())) : new Page(sourceBlock);
 
         unfinishedWork = channelSetBuilder.addPage(sourcePage);
         processUnfinishedWork();
-    }
-
-    @Override
-    public Page getOutput()
-    {
-        return null;
     }
 
     private boolean processUnfinishedWork()
@@ -226,5 +234,32 @@ public class SetBuilderOperator
     public int getCapacity()
     {
         return channelSetBuilder.getCapacity();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        SetBuilderOperatorState myState = new SetBuilderOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.channelSetBuilder = channelSetBuilder.capture(serdeProvider);
+        myState.finished = finished;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        SetBuilderOperatorState myState = (SetBuilderOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.channelSetBuilder.restore(myState.channelSetBuilder, serdeProvider);
+        this.finished = myState.finished;
+    }
+
+    private static class SetBuilderOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private Object channelSetBuilder;
+        private boolean finished;
     }
 }

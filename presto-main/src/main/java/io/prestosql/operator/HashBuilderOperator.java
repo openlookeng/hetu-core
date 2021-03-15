@@ -19,8 +19,11 @@ import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spiller.SingleStreamSpiller;
 import io.prestosql.spiller.SingleStreamSpillerFactory;
 import io.prestosql.sql.gen.JoinFilterFunctionCompiler.JoinFilterFunctionFactory;
@@ -29,6 +32,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.List;
@@ -48,8 +52,12 @@ import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 @ThreadSafe
+@RestorableConfig(uncapturedFields = {"lookupSourceFactory", "lookupSourceFactoryDestroyed", "outputChannels",
+        "hashChannels", "filterFunctionFactory", "sortChannel", "searchFunctionFactories", "singleStreamSpillerFactory",
+        "lookupSourceNotNeeded", "spilledLookupSourceHandle", "spiller", "spillInProgress", "unspillInProgress", "lookupSourceSupplier", "lookupSourceChecksum",
+        "finishMemoryRevoke", "snapshotState"})
 public class HashBuilderOperator
-        implements Operator
+        implements SinkOperator
 {
     public static class HashBuilderOperatorFactory
             implements OperatorFactory
@@ -116,6 +124,11 @@ public class HashBuilderOperator
 
             PartitionedLookupSourceFactory lookupSourceFactory = this.lookupSourceFactoryManager.getJoinBridge(driverContext.getLifespan());
             int partitionIndex = getAndIncrementPartitionIndex(driverContext.getLifespan());
+            // Snapshot: make driver ID and source/partition index the same, to ensure consistency before and after resuming.
+            // LocalExchangeSourceOperator also uses the same mechanism to ensure consistency.
+            if (operatorContext.isSnapshotEnabled()) {
+                partitionIndex = driverContext.getDriverId();
+            }
             verify(partitionIndex < lookupSourceFactory.partitions());
             return new HashBuilderOperator(
                     operatorContext,
@@ -195,6 +208,7 @@ public class HashBuilderOperator
     private final OperatorContext operatorContext;
     private final LocalMemoryContext localUserMemoryContext;
     private final LocalMemoryContext localRevocableMemoryContext;
+    //TODO-cp-I2DSGR: Shared field
     private final PartitionedLookupSourceFactory lookupSourceFactory;
     private final ListenableFuture<?> lookupSourceFactoryDestroyed;
     private final int partitionIndex;
@@ -224,6 +238,8 @@ public class HashBuilderOperator
     private OptionalLong lookupSourceChecksum = OptionalLong.empty();
 
     private Optional<Runnable> finishMemoryRevoke = Optional.empty();
+
+    private final SingleInputSnapshotState snapshotState;
 
     public HashBuilderOperator(
             OperatorContext operatorContext,
@@ -263,6 +279,7 @@ public class HashBuilderOperator
 
         this.spillEnabled = spillEnabled;
         this.singleStreamSpillerFactory = requireNonNull(singleStreamSpillerFactory, "singleStreamSpillerFactory is null");
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -318,6 +335,12 @@ public class HashBuilderOperator
     public void addInput(Page page)
     {
         requireNonNull(page, "page is null");
+
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
 
         if (lookupSourceFactoryDestroyed.isDone()) {
             close();
@@ -417,12 +440,6 @@ public class HashBuilderOperator
         checkState(finishMemoryRevoke.isPresent(), "Cannot finish unknown revoking");
         finishMemoryRevoke.get().run();
         finishMemoryRevoke = Optional.empty();
-    }
-
-    @Override
-    public Page getOutput()
-    {
-        return null;
     }
 
     @Override
@@ -631,5 +648,45 @@ public class HashBuilderOperator
         catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        HashBuilderOperatorState myState = new HashBuilderOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.localUserMemoryContext = localUserMemoryContext.getBytes();
+        myState.localRevocableMemoryContext = localRevocableMemoryContext.getBytes();
+        myState.index = index.capture(serdeProvider);
+        myState.hashCollisionsCounter = hashCollisionsCounter.capture(serdeProvider);
+        myState.state = state.toString();
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        HashBuilderOperatorState myState = (HashBuilderOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.localUserMemoryContext.setBytes(myState.localUserMemoryContext);
+        this.localRevocableMemoryContext.setBytes(myState.localRevocableMemoryContext);
+
+        this.index.restore(myState.index, serdeProvider);
+
+        this.hashCollisionsCounter.restore(myState.hashCollisionsCounter, serdeProvider);
+        this.state = State.valueOf(myState.state);
+    }
+
+    private static class HashBuilderOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private long localUserMemoryContext;
+        private long localRevocableMemoryContext;
+
+        private Object index;
+
+        private Object hashCollisionsCounter;
+        private String state;
     }
 }

@@ -19,8 +19,12 @@ import io.prestosql.array.LongBigArray;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
+
+import java.io.Serializable;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.operator.aggregation.histogram.HashUtil.calculateMaxFill;
@@ -38,6 +42,7 @@ import static io.prestosql.spi.StandardErrorCode.GENERIC_INSUFFICIENT_RESOURCES;
  * Note it assumes you're storing # -> Value (Type, Block, position, or the result of the ) somewhere else
  */
 public class ValueStore
+        implements Restorable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(GroupedTypedHistogram.class).instanceSize();
     private static final float MAX_FILL_RATIO = 0.5f;
@@ -165,5 +170,44 @@ public class ValueStore
     private int nextProbe(int probe)
     {
         return nextProbeLinear(probe);
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        ValueStoreState myState = new ValueStoreState();
+        myState.values = values.capture(serdeProvider);
+        myState.rehashCount = rehashCount;
+        myState.mask = mask;
+        myState.bucketCount = bucketCount;
+        myState.buckets = buckets.capture(serdeProvider);
+        myState.valueHashes = valueHashes.capture(serdeProvider);
+        myState.maxFill = maxFill;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        ValueStoreState myState = (ValueStoreState) state;
+        this.values.restore(myState.values, serdeProvider);
+        this.rehashCount = myState.rehashCount;
+        this.mask = myState.mask;
+        this.bucketCount = myState.bucketCount;
+        this.buckets.restore(myState.buckets, serdeProvider);
+        this.valueHashes.restore(myState.valueHashes, serdeProvider);
+        this.maxFill = myState.maxFill;
+    }
+
+    private static class ValueStoreState
+            implements Serializable
+    {
+        private Object values;
+        private int rehashCount;
+        private int mask;
+        private int bucketCount;
+        private Object buckets;
+        private Object valueHashes;
+        private int maxFill;
     }
 }

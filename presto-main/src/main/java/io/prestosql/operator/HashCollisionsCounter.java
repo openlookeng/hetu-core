@@ -13,12 +13,18 @@
  */
 package io.prestosql.operator;
 
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
+
+import java.io.Serializable;
 import java.util.function.Supplier;
 
 import static io.prestosql.operator.HashCollisionsInfo.createHashCollisionsInfo;
 
+@RestorableConfig(uncapturedFields = {"operatorContext"})
 public class HashCollisionsCounter
-        implements Supplier<OperatorInfo>
+        implements Supplier<OperatorInfo>, Restorable
 {
     private final OperatorContext operatorContext;
 
@@ -40,5 +46,29 @@ public class HashCollisionsCounter
     public HashCollisionsInfo get()
     {
         return createHashCollisionsInfo(operatorContext.getInputPositions().getTotalCount(), hashCollisions, expectedHashCollisions);
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        HashCollisionsCounterState myState = new HashCollisionsCounterState();
+        myState.hashCollisions = hashCollisions;
+        myState.expectedHashCollisions = expectedHashCollisions;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        HashCollisionsCounterState myState = (HashCollisionsCounterState) state;
+        this.hashCollisions = myState.hashCollisions;
+        this.expectedHashCollisions = myState.expectedHashCollisions;
+    }
+
+    private static class HashCollisionsCounterState
+            implements Serializable
+    {
+        private long hashCollisions;
+        private double expectedHashCollisions;
     }
 }

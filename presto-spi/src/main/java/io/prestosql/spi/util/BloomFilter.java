@@ -25,6 +25,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.Serializable;
 import java.math.RoundingMode;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -54,6 +55,7 @@ import static java.lang.Double.doubleToLongBits;
  * This class was forked from {@code org.apache.orc.util.BloomFilter}.
  */
 public class BloomFilter
+        implements Serializable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(BloomFilter.class).instanceSize() + ClassLayout.parseClass(BitSet.class).instanceSize();
 
@@ -371,6 +373,7 @@ public class BloomFilter
      * for index bounds nor expand the bit set size if the specified index is greater than the size.
      */
     public static class BitSet
+            implements Serializable
     {
         private final long[] data;
         private long bitCount;

@@ -27,7 +27,9 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -36,6 +38,7 @@ import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.prestosql.RowPagesBuilder.rowPagesBuilder;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
 import static io.prestosql.operator.OperatorAssertion.assertOperatorEquals;
+import static io.prestosql.operator.OperatorAssertion.assertOperatorEqualsWithSimpleSelfStateComparison;
 import static io.prestosql.operator.ValuesOperator.ValuesOperatorFactory;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
@@ -380,6 +383,64 @@ public class TestNestedLoopJoinOperator
                 .build();
 
         assertOperatorEquals(joinOperatorFactory, taskContext.addPipelineContext(0, true, true, false).addDriverContext(), probeInput, expected);
+    }
+
+    @Test
+    public void testProbeAndBuildMultiplePagesSnapshot()
+    {
+        TaskContext taskContext = createTaskContext();
+
+        // build
+        List<Type> buildTypes = ImmutableList.of(VARCHAR);
+        RowPagesBuilder buildPages = rowPagesBuilder(buildTypes)
+                .row("A")
+                .row("B")
+                .pageBreak()
+                .row("C");
+
+        // probe
+        List<Type> probeTypes = ImmutableList.of(VARCHAR);
+        RowPagesBuilder probePages = rowPagesBuilder(probeTypes);
+        List<Page> probeInput = probePages
+                .row("a")
+                .pageBreak()
+                .row((String) null)
+                .row("b")
+                .row("c")
+                .pageBreak()
+                .row("d")
+                .build();
+        NestedLoopJoinOperatorFactory joinOperatorFactory = newJoinOperatorFactoryWithCompletedBuild(taskContext, buildPages);
+
+        // expected
+        MaterializedResult expected = resultBuilder(taskContext.getSession(), concat(probeTypes, buildPages.getTypes()))
+                .row("a", "A")
+                .row("a", "B")
+                .row("a", "C")
+                .row(null, "A")
+                .row("b", "A")
+                .row("c", "A")
+                .row(null, "B")
+                .row("b", "B")
+                .row("c", "B")
+                .row(null, "C")
+                .row("b", "C")
+                .row("c", "C")
+                .row("d", "A")
+                .row("d", "B")
+                .row("d", "C")
+                .build();
+
+        assertOperatorEqualsWithSimpleSelfStateComparison(joinOperatorFactory, taskContext.addPipelineContext(0, true, true, false).addDriverContext(), probeInput, expected, createExpectedMapping());
+    }
+
+    private Map<String, Object> createExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        expectedMapping.put("operatorContext", 0);
+        expectedMapping.put("finishing", false);
+        expectedMapping.put("closed", false);
+        return expectedMapping;
     }
 
     @Test

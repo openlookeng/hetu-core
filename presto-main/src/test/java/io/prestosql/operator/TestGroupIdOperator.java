@@ -24,7 +24,9 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -32,6 +34,7 @@ import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.prestosql.RowPagesBuilder.rowPagesBuilder;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
 import static io.prestosql.operator.OperatorAssertion.assertOperatorEqualsIgnoreOrder;
+import static io.prestosql.operator.OperatorAssertion.assertOperatorEqualsIgnoreOrderWithSimpleSelfStateComparison;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
@@ -96,5 +99,47 @@ public class TestGroupIdOperator
                 .build();
 
         assertOperatorEqualsIgnoreOrder(operatorFactory, driverContext, input, expected);
+    }
+
+    @Test
+    public void testGroupIdSnapshot()
+    {
+        RowPagesBuilder rowPagesBuilder = rowPagesBuilder(false, ImmutableList.of(), BIGINT, VARCHAR, BOOLEAN, BIGINT);
+        List<Page> input = rowPagesBuilder
+                .addSequencePage(3, 100, 400, 0, 1000)
+                .addSequencePage(3, 200, 500, 0, 1100)
+                .build();
+
+        GroupIdOperatorFactory operatorFactory =
+                new GroupIdOperatorFactory(0,
+                        new PlanNodeId("test"),
+                        ImmutableList.of(VARCHAR, BOOLEAN, BIGINT, BIGINT, BIGINT),
+                        ImmutableList.of(ImmutableMap.of(0, 1, 1, 2, 3, 0), ImmutableMap.of(2, 3, 3, 0)));
+
+        MaterializedResult expected = resultBuilder(driverContext.getSession(), VARCHAR, BOOLEAN, BIGINT, BIGINT, BIGINT)
+                .row("400", true, null, 100L, 0L)
+                .row("401", false, null, 101L, 0L)
+                .row("402", true, null, 102L, 0L)
+                .row("500", true, null, 200L, 0L)
+                .row("501", false, null, 201L, 0L)
+                .row("502", true, null, 202L, 0L)
+                .row(null, null, 1000L, 100L, 1L)
+                .row(null, null, 1001L, 101L, 1L)
+                .row(null, null, 1002L, 102L, 1L)
+                .row(null, null, 1100L, 200L, 1L)
+                .row(null, null, 1101L, 201L, 1L)
+                .row(null, null, 1102L, 202L, 1L)
+                .build();
+
+        assertOperatorEqualsIgnoreOrderWithSimpleSelfStateComparison(operatorFactory, driverContext, input, expected, createExpectedMapping());
+    }
+
+    private Map<String, Object> createExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        expectedMapping.put("operatorContext", 0);
+        expectedMapping.put("currentGroupingSet", 0);
+        expectedMapping.put("finishing", false);
+        return expectedMapping;
     }
 }

@@ -26,11 +26,16 @@ import io.prestosql.execution.TaskId;
 import io.prestosql.execution.TaskStatus;
 import io.prestosql.protocol.BaseResponse;
 import io.prestosql.protocol.Codec;
+import io.prestosql.snapshot.QuerySnapshotManager;
+import io.prestosql.snapshot.RestoreResult;
+import io.prestosql.snapshot.SnapshotResult;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.PrestoException;
 
 import javax.annotation.concurrent.GuardedBy;
 
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -45,6 +50,7 @@ import static io.airlift.http.client.Request.Builder.prepareGet;
 import static io.airlift.units.Duration.nanosSince;
 import static io.prestosql.client.PrestoHeaders.PRESTO_CURRENT_STATE;
 import static io.prestosql.client.PrestoHeaders.PRESTO_MAX_WAIT;
+import static io.prestosql.client.PrestoHeaders.PRESTO_TASK_INSTANCE_ID;
 import static io.prestosql.protocol.AdaptingJsonResponseHandler.createAdaptingJsonResponseHandler;
 import static io.prestosql.protocol.FullSmileResponseHandler.createFullSmileResponseHandler;
 import static io.prestosql.protocol.JsonCodecWrapper.unwrapJsonCodec;
@@ -78,6 +84,8 @@ class ContinuousTaskStatusFetcher
     @GuardedBy("this")
     private ListenableFuture<BaseResponse<TaskStatus>> future;
 
+    private final QuerySnapshotManager snapshotManager;
+
     public ContinuousTaskStatusFetcher(
             Consumer<Throwable> onFail,
             TaskStatus initialTaskStatus,
@@ -88,7 +96,8 @@ class ContinuousTaskStatusFetcher
             Duration maxErrorDuration,
             ScheduledExecutorService errorScheduledExecutor,
             RemoteTaskStats stats,
-            boolean isBinaryEncoding)
+            boolean isBinaryEncoding,
+            QuerySnapshotManager snapshotManager)
     {
         requireNonNull(initialTaskStatus, "initialTaskStatus is null");
 
@@ -105,6 +114,8 @@ class ContinuousTaskStatusFetcher
         this.errorTracker = new RequestErrorTracker(taskId, initialTaskStatus.getSelf(), maxErrorDuration, errorScheduledExecutor, "getting task status");
         this.stats = requireNonNull(stats, "stats is null");
         this.isBinaryEncoding = isBinaryEncoding;
+
+        this.snapshotManager = requireNonNull(snapshotManager, "snapshotManager is null");
     }
 
     public synchronized void start()
@@ -148,7 +159,7 @@ class ContinuousTaskStatusFetcher
             return;
         }
 
-        Request request = setContentTypeHeaders(isBinaryEncoding, prepareGet())
+        Request request = addInstanceIdHeader(setContentTypeHeaders(isBinaryEncoding, prepareGet()))
                 .setUri(uriBuilderFrom(taskStatus.getSelf()).appendPath("status").build())
                 .setHeader(CONTENT_TYPE, JSON_UTF_8.toString())
                 .setHeader(PRESTO_CURRENT_STATE, taskStatus.getState().toString())
@@ -167,6 +178,13 @@ class ContinuousTaskStatusFetcher
         future = httpClient.executeAsync(request, responseHandler);
         currentRequestStartNanos.set(System.nanoTime());
         Futures.addCallback(future, new SimpleHttpResponseHandler<>(this, request.getUri(), stats), executor);
+    }
+
+    private Request.Builder addInstanceIdHeader(Request.Builder builder)
+    {
+        // Add task instance id to all task related requests,
+        // so receiver can verify if the instance id matches
+        return builder.setHeader(PRESTO_TASK_INSTANCE_ID, taskStatus.get().getTaskInstanceId());
     }
 
     TaskStatus getTaskStatus()
@@ -227,7 +245,7 @@ class ContinuousTaskStatusFetcher
     {
         // change to new value if old value is not changed and new value has a newer version
         AtomicBoolean taskMismatch = new AtomicBoolean();
-        taskStatus.setIf(newValue, oldValue -> {
+        if (taskStatus.setIf(newValue, oldValue -> {
             // did the task instance id change
             if (!isNullOrEmpty(oldValue.getTaskInstanceId()) && !oldValue.getTaskInstanceId().equals(newValue.getTaskInstanceId())) {
                 taskMismatch.set(true);
@@ -238,12 +256,11 @@ class ContinuousTaskStatusFetcher
                 // never update if the task has reached a terminal state
                 return false;
             }
-            if (newValue.getVersion() < oldValue.getVersion()) {
-                // don't update to an older version (same version is ok)
-                return false;
-            }
-            return true;
-        });
+            // don't update to an older version (same version is ok)
+            return newValue.getVersion() >= oldValue.getVersion();
+        })) {
+            updateSnapshots(newValue.getSnapshotCaptureResult(), newValue.getSnapshotRestoreResult());
+        }
 
         if (taskMismatch.get()) {
             // This will also set the task status to FAILED state directly.
@@ -271,5 +288,11 @@ class ContinuousTaskStatusFetcher
     private void updateStats(long currentRequestStartNanos)
     {
         stats.statusRoundTripMillis(nanosSince(currentRequestStartNanos).toMillis());
+    }
+
+    private void updateSnapshots(Map<Long, SnapshotResult> captureResult, Optional<RestoreResult> restoreResult)
+    {
+        snapshotManager.updateQueryCapture(taskId, captureResult);
+        snapshotManager.updateQueryRestore(taskId, restoreResult);
     }
 }

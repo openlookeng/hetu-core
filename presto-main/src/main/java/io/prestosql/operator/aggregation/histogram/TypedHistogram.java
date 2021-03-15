@@ -15,9 +15,11 @@ package io.prestosql.operator.aggregation.histogram;
 
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.snapshot.Restorable;
 import io.prestosql.spi.type.Type;
 
 public interface TypedHistogram
+        extends Restorable
 {
     long getEstimatedSize();
 

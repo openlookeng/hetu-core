@@ -37,6 +37,12 @@ public class EmptySplit
     }
 
     @Override
+    public boolean isSplitEmpty()
+    {
+        return true;
+    }
+
+    @Override
     public boolean isRemotelyAccessible()
     {
         return true;

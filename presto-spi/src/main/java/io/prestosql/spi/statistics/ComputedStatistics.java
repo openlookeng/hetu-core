@@ -13,18 +13,28 @@
  */
 package io.prestosql.spi.statistics;
 
+import io.airlift.slice.DynamicSliceOutput;
+import io.airlift.slice.Slice;
+import io.airlift.slice.SliceOutput;
+import io.airlift.slice.Slices;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 
+import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.unmodifiableList;
 import static java.util.Collections.unmodifiableMap;
 import static java.util.Objects.requireNonNull;
 
 public class ComputedStatistics
+        implements Restorable
 {
     private final List<String> groupingColumns;
     private final List<Block> groupingValues;
@@ -111,5 +121,59 @@ public class ComputedStatistics
         {
             return new ComputedStatistics(groupingColumns, groupingValues, tableStatistics, columnStatistics);
         }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        ComputedStatisticsState myState = new ComputedStatisticsState();
+        myState.groupingColumns = groupingColumns;
+        myState.groupingValues = groupingValues.stream().map(block -> serializeBlock(block, serdeProvider)).toArray(byte[][]::new);
+        myState.tableStatistics = new HashMap<>();
+        for (Map.Entry<TableStatisticType, Block> entry : tableStatistics.entrySet()) {
+            myState.tableStatistics.put(entry.getKey(), serializeBlock(entry.getValue(), serdeProvider));
+        }
+        myState.columnStatistics = new HashMap<>();
+        for (Map.Entry<ColumnStatisticMetadata, Block> entry : columnStatistics.entrySet()) {
+            myState.columnStatistics.put(entry.getKey(), serializeBlock(entry.getValue(), serdeProvider));
+        }
+        return myState;
+    }
+
+    public static ComputedStatistics restoreComputedStatistics(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        ComputedStatisticsState myState = (ComputedStatisticsState) state;
+        List<Block> groupingValues = Arrays.stream(myState.groupingValues).map(array -> restoreBlock(array, serdeProvider)).collect(Collectors.toList());
+        Map<TableStatisticType, Block> tableStatistics = new HashMap<>();
+        for (Map.Entry<TableStatisticType, byte[]> entry : myState.tableStatistics.entrySet()) {
+            tableStatistics.put(entry.getKey(), restoreBlock(entry.getValue(), serdeProvider));
+        }
+        Map<ColumnStatisticMetadata, Block> columnStatistics = new HashMap<>();
+        for (Map.Entry<ColumnStatisticMetadata, byte[]> entry : myState.columnStatistics.entrySet()) {
+            columnStatistics.put(entry.getKey(), restoreBlock(entry.getValue(), serdeProvider));
+        }
+        return new ComputedStatistics(myState.groupingColumns, groupingValues, tableStatistics, columnStatistics);
+    }
+
+    private static byte[] serializeBlock(Block block, BlockEncodingSerdeProvider serdeProvider)
+    {
+        SliceOutput sliceOutput = new DynamicSliceOutput(0);
+        serdeProvider.getBlockEncodingSerde().writeBlock(sliceOutput, block);
+        return sliceOutput.getUnderlyingSlice().getBytes();
+    }
+
+    private static Block restoreBlock(byte[] array, BlockEncodingSerdeProvider serdeProvider)
+    {
+        Slice slice = Slices.wrappedBuffer(array);
+        return serdeProvider.getBlockEncodingSerde().readBlock(slice.getInput());
+    }
+
+    private static class ComputedStatisticsState
+            implements Serializable
+    {
+        private List<String> groupingColumns;
+        private byte[][] groupingValues;
+        private Map<TableStatisticType, byte[]> tableStatistics;
+        private Map<ColumnStatisticMetadata, byte[]> columnStatistics;
     }
 }

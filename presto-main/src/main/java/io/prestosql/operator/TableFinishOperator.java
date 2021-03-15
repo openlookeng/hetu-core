@@ -17,18 +17,24 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.operator.OperationTimer.OperationTiming;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ConnectorOutputMetadata;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 
+import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -43,6 +49,7 @@ import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
+@RestorableConfig(uncapturedFields = {"tableFinisher", "descriptor", "outputMetadata", "snapshotState"})
 public class TableFinishOperator
         implements Operator
 {
@@ -111,11 +118,13 @@ public class TableFinishOperator
     private State state = State.RUNNING;
     private long rowCount;
     private Optional<ConnectorOutputMetadata> outputMetadata = Optional.empty();
-    private final ImmutableList.Builder<Slice> fragmentBuilder = ImmutableList.builder();
-    private final ImmutableList.Builder<ComputedStatistics> computedStatisticsBuilder = ImmutableList.builder();
+    private final List<Slice> fragment = new ArrayList<>();
+    private final List<ComputedStatistics> computedStatistics = new ArrayList<>();
 
     private final OperationTiming statisticsTiming = new OperationTiming();
     private final boolean statisticsCpuTimerEnabled;
+
+    private final SingleInputSnapshotState snapshotState;
 
     public TableFinishOperator(
             OperatorContext operatorContext,
@@ -129,7 +138,7 @@ public class TableFinishOperator
         this.statisticsAggregationOperator = requireNonNull(statisticsAggregationOperator, "statisticsAggregationOperator is null");
         this.descriptor = requireNonNull(descriptor, "descriptor is null");
         this.statisticsCpuTimerEnabled = statisticsCpuTimerEnabled;
-
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
         operatorContext.setInfoSupplier(this::getInfo);
     }
 
@@ -154,6 +163,11 @@ public class TableFinishOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         if (state == State.FINISHED) {
             verify(statisticsAggregationOperator.isFinished());
             return true;
@@ -182,6 +196,12 @@ public class TableFinishOperator
         requireNonNull(page, "page is null");
         checkState(state == State.RUNNING, "Operator is %s", state);
 
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         Block rowCountBlock = page.getBlock(ROW_COUNT_CHANNEL);
         Block fragmentBlock = page.getBlock(FRAGMENT_CHANNEL);
         for (int position = 0; position < page.getPositionCount(); position++) {
@@ -189,7 +209,7 @@ public class TableFinishOperator
                 rowCount += BIGINT.getLong(rowCountBlock, position);
             }
             if (!fragmentBlock.isNull(position)) {
-                fragmentBuilder.add(VARBINARY.getSlice(fragmentBlock, position));
+                fragment.add(VARBINARY.getSlice(fragmentBlock, position));
             }
         }
 
@@ -269,6 +289,13 @@ public class TableFinishOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (!isBlocked().isDone()) {
             return null;
         }
@@ -284,7 +311,7 @@ public class TableFinishOperator
                 return null;
             }
             for (int position = 0; position < page.getPositionCount(); position++) {
-                computedStatisticsBuilder.add(getComputedStatistics(page, position));
+                computedStatistics.add(getComputedStatistics(page, position));
             }
             return null;
         }
@@ -294,7 +321,7 @@ public class TableFinishOperator
         }
         state = State.FINISHED;
 
-        outputMetadata = tableFinisher.finishTable(fragmentBuilder.build(), computedStatisticsBuilder.build());
+        outputMetadata = tableFinisher.finishTable(ImmutableList.copyOf(fragment), ImmutableList.copyOf(computedStatistics));
 
         // output page will only be constructed once,
         // so a new PageBuilder is constructed (instead of using PageBuilder.reset)
@@ -302,6 +329,12 @@ public class TableFinishOperator
         page.declarePosition();
         BIGINT.writeLong(page.getBlockBuilder(0), rowCount);
         return page.build();
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     private ComputedStatistics getComputedStatistics(Page page, int position)
@@ -342,5 +375,56 @@ public class TableFinishOperator
     public interface TableFinisher
     {
         Optional<ConnectorOutputMetadata> finishTable(Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics);
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        TableFinishOperatorState myState = new TableFinishOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.statisticsAggregationOperator = statisticsAggregationOperator.capture(serdeProvider);
+        myState.state = state.toString();
+        myState.rowCount = rowCount;
+        myState.fragment = new byte[fragment.size()][];
+        for (int i = 0; i < fragment.size(); i++) {
+            myState.fragment[i] = fragment.get(i).getBytes();
+        }
+        myState.computedStatistics = new Object[computedStatistics.size()];
+        for (int i = 0; i < computedStatistics.size(); i++) {
+            myState.computedStatistics[i] = computedStatistics.get(i).capture(serdeProvider);
+        }
+        myState.statisticsTiming = statisticsTiming.capture(serdeProvider);
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        TableFinishOperatorState myState = (TableFinishOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.statisticsAggregationOperator.restore(myState.statisticsAggregationOperator, serdeProvider);
+        this.state = State.valueOf(myState.state);
+        this.rowCount = myState.rowCount;
+        this.fragment.clear();
+        for (int i = 0; i < myState.fragment.length; i++) {
+            fragment.add(Slices.wrappedBuffer(myState.fragment[i]));
+        }
+        this.computedStatistics.clear();
+        for (int i = 0; i < myState.computedStatistics.length; i++) {
+            computedStatistics.add(ComputedStatistics.restoreComputedStatistics(myState.computedStatistics[i], serdeProvider));
+        }
+        this.statisticsTiming.restore(myState.statisticsTiming, serdeProvider);
+    }
+
+    private static class TableFinishOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private Object statisticsAggregationOperator;
+        private String state;
+        private long rowCount;
+        private byte[][] fragment;
+        private Object[] computedStatistics;
+        private Object statisticsTiming;
     }
 }

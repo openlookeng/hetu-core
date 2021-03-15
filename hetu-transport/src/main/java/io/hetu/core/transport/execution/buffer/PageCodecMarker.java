@@ -26,7 +26,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 public enum PageCodecMarker
 {
     COMPRESSED(1),
-    ENCRYPTED(2);
+    ENCRYPTED(2),
+    MARKER_PAGE(3);
 
     private final int mask;
 

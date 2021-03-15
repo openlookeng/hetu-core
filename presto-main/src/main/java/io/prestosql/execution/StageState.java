@@ -59,7 +59,15 @@ public enum StageState
     /**
      * Stage execution failed.
      */
-    FAILED(true, true);
+    FAILED(true, true),
+    /**
+     * Stage execution is in error. Will trigger rescheduling.
+     */
+    RESUMABLE_FAILURE(false, false),
+    /**
+     * Stage execution will be rescheduled.
+     */
+    RESCHEDULING(true, false);
 
     public static final Set<StageState> TERMINAL_STAGE_STATES = Stream.of(StageState.values()).filter(StageState::isDone).collect(toImmutableSet());
 

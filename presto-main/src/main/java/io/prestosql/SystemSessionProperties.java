@@ -19,6 +19,7 @@ import io.airlift.units.Duration;
 import io.prestosql.execution.QueryManagerConfig;
 import io.prestosql.execution.TaskManagerConfig;
 import io.prestosql.memory.MemoryManagerConfig;
+import io.prestosql.snapshot.SnapshotConfig;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.session.PropertyMetadata;
 import io.prestosql.sql.analyzer.FeaturesConfig;
@@ -42,6 +43,7 @@ import static io.prestosql.spi.session.PropertyMetadata.doubleProperty;
 import static io.prestosql.spi.session.PropertyMetadata.durationProperty;
 import static io.prestosql.spi.session.PropertyMetadata.enumProperty;
 import static io.prestosql.spi.session.PropertyMetadata.integerProperty;
+import static io.prestosql.spi.session.PropertyMetadata.longProperty;
 import static io.prestosql.spi.session.PropertyMetadata.stringProperty;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
@@ -156,12 +158,19 @@ public final class SystemSessionProperties
     public static final String CTE_MAX_PREFETCH_QUEUE_SIZE = "cte_max_prefetch_queue_size";
     public static final String DELETE_TRANSACTIONAL_TABLE_DIRECT = "delete_transactional_table_direct";
     public static final String LIST_BUILT_IN_FUNCTIONS_ONLY = "list_built_in_functions_only";
+    // Snapshot related configurations
+    public static final String SNAPSHOT_ENABLED = "snapshot_enabled";
+    public static final String SNAPSHOT_INTERVAL_TYPE = "snapshot_interval_type";
+    public static final String SNAPSHOT_TIME_INTERVAL = "snapshot_time_interval";
+    public static final String SNAPSHOT_SPLIT_COUNT_INTERVAL = "snapshot_split_count_interval";
+    public static final String SNAPSHOT_MAX_RETRIES = "snapshot_max_retries";
+    public static final String SNAPSHOT_RETRY_TIMEOUT = "snapshot_retry_timeout";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
     public SystemSessionProperties()
     {
-        this(new QueryManagerConfig(), new TaskManagerConfig(), new MemoryManagerConfig(), new FeaturesConfig(), new HetuConfig());
+        this(new QueryManagerConfig(), new TaskManagerConfig(), new MemoryManagerConfig(), new FeaturesConfig(), new HetuConfig(), new SnapshotConfig());
     }
 
     @Inject
@@ -170,7 +179,8 @@ public final class SystemSessionProperties
             TaskManagerConfig taskManagerConfig,
             MemoryManagerConfig memoryManagerConfig,
             FeaturesConfig featuresConfig,
-            HetuConfig hetuConfig)
+            HetuConfig hetuConfig,
+            SnapshotConfig snapshotConfig)
     {
         sessionProperties = ImmutableList.of(
                 stringProperty(
@@ -721,6 +731,37 @@ public final class SystemSessionProperties
                         LIST_BUILT_IN_FUNCTIONS_ONLY,
                         "Only List built-in functions in SHOW FUNCTIONS",
                         featuresConfig.isListBuiltInFunctionsOnly(),
+                        false),
+                booleanProperty(
+                        SNAPSHOT_ENABLED,
+                        "Enable query snapshoting",
+                        false,
+                        false),
+                enumProperty(
+                        SNAPSHOT_INTERVAL_TYPE,
+                        "Snapshot interval type",
+                        SnapshotConfig.IntervalType.class,
+                        snapshotConfig.getSnapshotIntervalType(),
+                        false),
+                durationProperty(
+                        SNAPSHOT_TIME_INTERVAL,
+                        "Snapshot time interval",
+                        snapshotConfig.getSnapshotTimeInterval(),
+                        false),
+                longProperty(
+                        SNAPSHOT_SPLIT_COUNT_INTERVAL,
+                        "snapshot split count interval",
+                        snapshotConfig.getSnapshotSplitCountInterval(),
+                        false),
+                longProperty(
+                        SNAPSHOT_MAX_RETRIES,
+                        "snapshot max retries",
+                        snapshotConfig.getSnapshotMaxRetries(),
+                        false),
+                durationProperty(
+                        SNAPSHOT_RETRY_TIMEOUT,
+                        "Snapshot retry timeout",
+                        snapshotConfig.getSnapshotRetryTimeout(),
                         false));
     }
 
@@ -1268,5 +1309,35 @@ public final class SystemSessionProperties
     public static boolean isListBuiltInFunctionsOnly(Session session)
     {
         return session.getSystemProperty(LIST_BUILT_IN_FUNCTIONS_ONLY, Boolean.class);
+    }
+
+    public static boolean isSnapshotEnabled(Session session)
+    {
+        return session.getSystemProperty(SNAPSHOT_ENABLED, Boolean.class);
+    }
+
+    public static SnapshotConfig.IntervalType getSnapshotIntervalType(Session session)
+    {
+        return session.getSystemProperty(SNAPSHOT_INTERVAL_TYPE, SnapshotConfig.IntervalType.class);
+    }
+
+    public static Duration getSnapshotTimeInterval(Session session)
+    {
+        return session.getSystemProperty(SNAPSHOT_TIME_INTERVAL, Duration.class);
+    }
+
+    public static long getSnapshotSplitCountInterval(Session session)
+    {
+        return session.getSystemProperty(SNAPSHOT_SPLIT_COUNT_INTERVAL, Long.class);
+    }
+
+    public static long getSnapshotMaxRetries(Session session)
+    {
+        return session.getSystemProperty(SNAPSHOT_MAX_RETRIES, Long.class);
+    }
+
+    public static Duration getSnapshotRetryTimeout(Session session)
+    {
+        return session.getSystemProperty(SNAPSHOT_RETRY_TIMEOUT, Duration.class);
     }
 }

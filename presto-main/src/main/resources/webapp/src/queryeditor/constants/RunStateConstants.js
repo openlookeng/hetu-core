@@ -15,7 +15,9 @@ const RunStateConstants = {
   FINISHED: 'FINISHED',
   QUEUED: 'QUEUED',
   FAILED: 'FAILED',
-  CANCELED: 'CANCELED'
+  CANCELED: 'CANCELED',
+  RESCHEDULING: 'RESCHEDULING',
+  RESUMING: 'RESUMING'
 };
 
 export default RunStateConstants;

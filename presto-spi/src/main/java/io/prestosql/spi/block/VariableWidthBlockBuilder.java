@@ -17,13 +17,16 @@ import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
 
+import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.slice.SizeOf.SIZE_OF_BYTE;
 import static io.airlift.slice.SizeOf.SIZE_OF_INT;
 import static io.airlift.slice.SizeOf.SIZE_OF_LONG;
@@ -47,7 +50,7 @@ public class VariableWidthBlockBuilder
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(VariableWidthBlockBuilder.class).instanceSize();
 
-    private BlockBuilderStatus blockBuilderStatus;
+    private final BlockBuilderStatus blockBuilderStatus;
 
     private boolean initialized;
     private int initialEntryCount;
@@ -365,5 +368,64 @@ public class VariableWidthBlockBuilder
         sb.append(", size=").append(sliceOutput.size());
         sb.append('}');
         return sb.toString();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        VariableWidthBlockBuilderState myState = new VariableWidthBlockBuilderState();
+        if (this.blockBuilderStatus != null) {
+            myState.blockBuilderStatus = blockBuilderStatus.capture(serdeProvider);
+        }
+        myState.initialized = initialized;
+        myState.initialEntryCount = initialEntryCount;
+        myState.initialSliceOutputSize = initialSliceOutputSize;
+        myState.sliceOutput = sliceOutput.getUnderlyingSlice().getBytes(0, sliceOutput.size());
+        myState.hasNullValue = hasNullValue;
+        myState.valueIsNull = valueIsNull.clone();
+        myState.offsets = offsets.clone();
+        myState.positions = positions;
+        myState.currentEntrySize = currentEntrySize;
+        myState.arraysRetainedSizeInBytes = arraysRetainedSizeInBytes;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        VariableWidthBlockBuilderState myState = (VariableWidthBlockBuilderState) state;
+        //BlockBuilderStatus' nullness doesn't change, so this.blockBuilderStatus and
+        //myState.blockBuilderStatus has identical nullness.
+        checkState((this.blockBuilderStatus != null) == (myState.blockBuilderStatus != null));
+        if (this.blockBuilderStatus != null) {
+            this.blockBuilderStatus.restore(myState.blockBuilderStatus, serdeProvider);
+        }
+        this.initialized = myState.initialized;
+        this.initialEntryCount = myState.initialEntryCount;
+        this.initialSliceOutputSize = myState.initialSliceOutputSize;
+        this.sliceOutput.reset();
+        this.sliceOutput.writeBytes(myState.sliceOutput);
+        this.hasNullValue = myState.hasNullValue;
+        this.valueIsNull = myState.valueIsNull;
+        this.offsets = myState.offsets;
+        this.positions = myState.positions;
+        this.currentEntrySize = myState.currentEntrySize;
+        this.arraysRetainedSizeInBytes = myState.arraysRetainedSizeInBytes;
+    }
+
+    private static class VariableWidthBlockBuilderState
+            implements Serializable
+    {
+        private Object blockBuilderStatus;
+        private boolean initialized;
+        private int initialEntryCount;
+        private int initialSliceOutputSize;
+        private byte[] sliceOutput;
+        private boolean hasNullValue;
+        private boolean[] valueIsNull;
+        private int[] offsets;
+        private int positions;
+        private int currentEntrySize;
+        private long arraysRetainedSizeInBytes;
     }
 }

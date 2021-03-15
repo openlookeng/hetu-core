@@ -16,17 +16,24 @@ package io.prestosql.operator.aggregation;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
+
+import java.io.Serializable;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static java.lang.Math.toIntExact;
 
+@RestorableConfig(uncapturedFields = {"keyComparator", "keyType", "valueType"})
 public class TypedKeyValueHeap
+        implements Restorable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(TypedKeyValueHeap.class).instanceSize();
 
@@ -52,6 +59,26 @@ public class TypedKeyValueHeap
         this.heapIndex = new int[capacity];
         this.keyBlockBuilder = keyType.createBlockBuilder(null, capacity);
         this.valueBlockBuilder = valueType.createBlockBuilder(null, capacity);
+    }
+
+    private TypedKeyValueHeap(BlockComparator keyComparator, Type keyType, Type valueType, Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        TypedKeyValueHeapState myState = (TypedKeyValueHeapState) state;
+        this.keyComparator = keyComparator;
+        this.keyType = keyType;
+        this.valueType = valueType;
+        this.capacity = myState.capacity;
+        this.heapIndex = myState.heapIndex;
+        this.positionCount = myState.positionCount;
+        this.keyBlockBuilder = keyType.createBlockBuilder(null, capacity);
+        this.keyBlockBuilder.restore(myState.keyBlockBuilder, serdeProvider);
+        this.valueBlockBuilder = valueType.createBlockBuilder(null, capacity);
+        this.valueBlockBuilder.restore(myState.valueBlockBuilder, serdeProvider);
+    }
+
+    public static TypedKeyValueHeap restoreTypedKeyValueHeap(BlockComparator keyComparator, Type keyType, Type valueType, Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        return new TypedKeyValueHeap(keyComparator, keyType, valueType, state, serdeProvider);
     }
 
     public static Type getSerializedType(Type keyType, Type valueType)
@@ -216,5 +243,27 @@ public class TypedKeyValueHeap
         }
         keyBlockBuilder = newHeapKeyBlockBuilder;
         valueBlockBuilder = newHeapValueBlockBuilder;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        TypedKeyValueHeapState myState = new TypedKeyValueHeapState();
+        myState.capacity = capacity;
+        myState.positionCount = positionCount;
+        myState.heapIndex = heapIndex.clone();
+        myState.keyBlockBuilder = keyBlockBuilder.capture(serdeProvider);
+        myState.valueBlockBuilder = valueBlockBuilder.capture(serdeProvider);
+        return myState;
+    }
+
+    private static class TypedKeyValueHeapState
+            implements Serializable
+    {
+        private int capacity;
+        private int positionCount;
+        private int[] heapIndex;
+        private Object keyBlockBuilder;
+        private Object valueBlockBuilder;
     }
 }

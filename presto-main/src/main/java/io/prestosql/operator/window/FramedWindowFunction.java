@@ -14,10 +14,15 @@
 package io.prestosql.operator.window;
 
 import io.prestosql.spi.function.WindowFunction;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"frame"})
 public final class FramedWindowFunction
+        implements Restorable
 {
     private final WindowFunction function;
     private final FrameInfo frame;
@@ -36,5 +41,17 @@ public final class FramedWindowFunction
     public FrameInfo getFrame()
     {
         return frame;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        return function.capture(serdeProvider);
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        function.restore(state, serdeProvider);
     }
 }

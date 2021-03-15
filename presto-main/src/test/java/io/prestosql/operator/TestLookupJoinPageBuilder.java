@@ -14,16 +14,21 @@
 package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.prestosql.operator.JoinProbe.JoinProbeFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.DictionaryBlock;
+import io.prestosql.spi.snapshot.SnapshotTestUtil;
 import io.prestosql.spi.type.Type;
+import io.prestosql.testing.TestingPagesSerdeFactory;
 import org.testng.annotations.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.OptionalInt;
 
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -80,6 +85,80 @@ public class TestLookupJoinPageBuilder
 
         lookupJoinPageBuilder.reset();
         assertTrue(lookupJoinPageBuilder.isEmpty());
+    }
+
+    @Test
+    public void testPageBuilderSnapshot()
+    {
+        int entries = 10_000;
+        BlockBuilder blockBuilder = BIGINT.createBlockBuilder(null, entries);
+        for (int i = 0; i < entries; i++) {
+            BIGINT.writeLong(blockBuilder, i);
+        }
+        Block block = blockBuilder.build();
+        Page page = new Page(block, block);
+
+        JoinProbeFactory joinProbeFactory = new JoinProbeFactory(new int[] {0, 1}, ImmutableList.of(0, 1), OptionalInt.empty());
+        JoinProbe probe = joinProbeFactory.createJoinProbe(page);
+        LookupSource lookupSource = new TestLookupSource(ImmutableList.of(BIGINT, BIGINT), page);
+        LookupJoinPageBuilder lookupJoinPageBuilder = new LookupJoinPageBuilder(ImmutableList.of(BIGINT, BIGINT));
+
+        PagesSerde serde = TestingPagesSerdeFactory.testingPagesSerde();
+        Object initialState = lookupJoinPageBuilder.capture(serde);
+
+        int joinPosition = 0;
+        while (!lookupJoinPageBuilder.isFull() && probe.advanceNextPosition()) {
+            lookupJoinPageBuilder.appendRow(probe, lookupSource, joinPosition++);
+            lookupJoinPageBuilder.appendNullForBuild(probe);
+        }
+        assertFalse(lookupJoinPageBuilder.isEmpty());
+
+        //Compare state
+        Object snapshot = lookupJoinPageBuilder.capture(serde);
+        assertEquals(SnapshotTestUtil.toSimpleSnapshotMapping(snapshot), createExpectedMapping());
+        //Restore to initial state and repopulate, then compare resulting page with expected output.
+        lookupJoinPageBuilder.restore(initialState, serde);
+        probe = joinProbeFactory.createJoinProbe(page);
+        joinPosition = 0;
+        while (!lookupJoinPageBuilder.isFull() && probe.advanceNextPosition()) {
+            lookupJoinPageBuilder.appendRow(probe, lookupSource, joinPosition++);
+            lookupJoinPageBuilder.appendNullForBuild(probe);
+        }
+        assertFalse(lookupJoinPageBuilder.isEmpty());
+
+        Page output = lookupJoinPageBuilder.build(probe);
+        assertEquals(output.getChannelCount(), 4);
+        assertTrue(output.getBlock(0) instanceof DictionaryBlock);
+        assertTrue(output.getBlock(1) instanceof DictionaryBlock);
+        for (int i = 0; i < output.getPositionCount(); i++) {
+            assertFalse(output.getBlock(0).isNull(i));
+            assertFalse(output.getBlock(1).isNull(i));
+            assertEquals(output.getBlock(0).getLong(i, 0), i / 2);
+            assertEquals(output.getBlock(1).getLong(i, 0), i / 2);
+            if (i % 2 == 0) {
+                assertFalse(output.getBlock(2).isNull(i));
+                assertFalse(output.getBlock(3).isNull(i));
+                assertEquals(output.getBlock(2).getLong(i, 0), i / 2);
+                assertEquals(output.getBlock(3).getLong(i, 0), i / 2);
+            }
+            else {
+                assertTrue(output.getBlock(2).isNull(i));
+                assertTrue(output.getBlock(3).isNull(i));
+            }
+        }
+        assertTrue(lookupJoinPageBuilder.toString().contains("positionCount=" + output.getPositionCount()));
+
+        lookupJoinPageBuilder.reset();
+        assertTrue(lookupJoinPageBuilder.isEmpty());
+    }
+
+    private Map<String, Object> createExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        expectedMapping.put("probeIndexBuilder", int[].class);
+        expectedMapping.put("estimatedProbeBlockBytes", 260000);
+        expectedMapping.put("isSequentialProbeIndices", false);
+        return expectedMapping;
     }
 
     @Test

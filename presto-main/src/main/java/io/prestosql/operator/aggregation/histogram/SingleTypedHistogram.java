@@ -18,9 +18,13 @@ import io.prestosql.array.LongBigArray;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.type.TypeUtils;
 import org.openjdk.jol.info.ClassLayout;
+
+import java.io.Serializable;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INSUFFICIENT_RESOURCES;
@@ -29,6 +33,7 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 import static it.unimi.dsi.fastutil.HashCommon.murmurHash3;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"type"})
 public class SingleTypedHistogram
         implements TypedHistogram
 {
@@ -220,5 +225,41 @@ public class SingleTypedHistogram
         }
         checkArgument(hashSize > maxFill, "hashSize must be larger than maxFill");
         return maxFill;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        SingleTypedHistogramState myState = new SingleTypedHistogramState();
+        myState.hashCapacity = hashCapacity;
+        myState.maxFill = maxFill;
+        myState.mask = mask;
+        myState.values = values.capture(serdeProvider);
+        myState.hashPositions = hashPositions.capture(serdeProvider);
+        myState.counts = counts.capture(serdeProvider);
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        SingleTypedHistogramState myState = (SingleTypedHistogramState) state;
+        this.hashCapacity = myState.hashCapacity;
+        this.maxFill = myState.maxFill;
+        this.mask = myState.mask;
+        this.values.restore(myState.values, serdeProvider);
+        this.hashPositions.restore(myState.hashPositions, serdeProvider);
+        this.counts.restore(myState.counts, serdeProvider);
+    }
+
+    private static class SingleTypedHistogramState
+            implements Serializable
+    {
+        private int hashCapacity;
+        private int maxFill;
+        private int mask;
+        private Object values;
+        private Object hashPositions;
+        private Object counts;
     }
 }

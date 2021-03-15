@@ -20,6 +20,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.stats.CounterStat;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.prestosql.Session;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.TaskId;
@@ -81,6 +82,8 @@ public class DriverContext
     private final List<OperatorContext> operatorContexts = new CopyOnWriteArrayList<>();
     private final Lifespan lifespan;
     private final int driverId;
+
+    private PagesSerde serde;
 
     public DriverContext(
             PipelineContext pipelineContext,
@@ -498,5 +501,15 @@ public class DriverContext
         {
             return nanosBetween(start, System.nanoTime());
         }
+    }
+
+    public PagesSerde getSerde()
+    {
+        if (serde == null) {
+            // Lazily create serde because some pipelines may not need it.
+            // Work within a driver is single-threaded, so no synchronization needed.
+            serde = pipelineContext.getTaskContext().getSerdeFactory().createPagesSerde();
+        }
+        return serde;
     }
 }

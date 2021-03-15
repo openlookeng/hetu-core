@@ -16,12 +16,16 @@ package io.prestosql.operator.project;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 
+import java.io.Serializable;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -53,7 +57,9 @@ import static java.util.Objects.requireNonNull;
  * connector, the CPU cost of memory copying (< 50kb, < 1024 rows) is supposed to be negligible.
  */
 @NotThreadSafe
+@RestorableConfig(uncapturedFields = {"types", "outputQueue", "currentInput"})
 public class MergingPageOutput
+        implements Restorable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(MergingPageOutput.class).instanceSize();
     private static final int MAX_MIN_PAGE_SIZE = 1024 * 1024;
@@ -188,5 +194,29 @@ public class MergingPageOutput
             retainedSizeInBytes += page.getRetainedSizeInBytes();
         }
         return retainedSizeInBytes;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        MergingPageOutputState myState = new MergingPageOutputState();
+        myState.pageBuilder = pageBuilder.capture(serdeProvider);
+        myState.finishing = finishing;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        MergingPageOutputState myState = (MergingPageOutputState) state;
+        this.pageBuilder.restore(myState.pageBuilder, serdeProvider);
+        this.finishing = myState.finishing;
+    }
+
+    private static class MergingPageOutputState
+            implements Serializable
+    {
+        private Object pageBuilder;
+        private boolean finishing;
     }
 }

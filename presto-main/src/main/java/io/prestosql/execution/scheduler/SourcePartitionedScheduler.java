@@ -13,6 +13,7 @@
  */
 package io.prestosql.execution.scheduler;
 
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
@@ -21,6 +22,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.prestosql.Session;
+import io.prestosql.SystemSessionProperties;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.RemoteTask;
 import io.prestosql.execution.SqlStageExecution;
@@ -29,6 +31,7 @@ import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.heuristicindex.SplitFiltering;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
+import io.prestosql.snapshot.MarkerSplit;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
 import io.prestosql.spi.heuristicindex.Pair;
@@ -303,8 +306,28 @@ public class SourcePartitionedScheduler
                 }
 
                 // calculate placements for splits
-                SplitPlacementResult splitPlacementResult = splitPlacementPolicy.computeAssignments(pendingSplits, this.stage);
+                SplitPlacementResult splitPlacementResult = splitPlacementPolicy.computeAssignments(new HashSet<>(pendingSplits), this.stage);
                 splitAssignment = splitPlacementResult.getAssignments();
+
+                if (SystemSessionProperties.isSnapshotEnabled(session)) {
+                    Split firstSplit = pendingSplits.iterator().next();
+                    if (pendingSplits.size() == 1 && firstSplit.getConnectorSplit() instanceof MarkerSplit) {
+                        // We'll create a new assignment, but still need to call computeAssignments above, and cannot modify the returned assignment map directly
+                        splitAssignment = HashMultimap.create(splitAssignment);
+                        splitAssignment.values().remove(firstSplit);
+                        //Getting all internalNodes and assigning marker splits to all of them.
+                        List<InternalNode> allNodes = splitPlacementPolicy.allNodes();
+                        for (InternalNode node : allNodes) {
+                            splitAssignment.put(node, firstSplit);
+                        }
+                        // Remember how many tasks will receive this marker
+                        ((MarkerSplit) firstSplit.getConnectorSplit()).setTaskCount(allNodes.size());
+                    }
+                    else {
+                        // MarkerSplit should be in its own batch.
+                        verify(pendingSplits.stream().noneMatch(split -> split.getConnectorSplit() instanceof MarkerSplit));
+                    }
+                }
 
                 // remove splits with successful placements
                 splitAssignment.values().forEach(pendingSplits::remove); // AbstractSet.removeAll performs terribly here.

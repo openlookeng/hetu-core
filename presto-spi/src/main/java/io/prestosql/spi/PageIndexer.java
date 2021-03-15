@@ -13,7 +13,10 @@
  */
 package io.prestosql.spi;
 
+import io.prestosql.spi.snapshot.Restorable;
+
 public interface PageIndexer
+        extends Restorable
 {
     /**
      * Returns the unique index of each position value.

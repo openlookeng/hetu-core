@@ -21,22 +21,33 @@ import com.google.common.collect.PeekingIterator;
 import com.google.common.primitives.Ints;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.WorkProcessor.ProcessState;
 import io.prestosql.operator.WorkProcessor.Transformation;
 import io.prestosql.operator.WorkProcessor.TransformationState;
 import io.prestosql.operator.window.FramedWindowFunction;
 import io.prestosql.operator.window.WindowPartition;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.Spiller;
 import io.prestosql.spiller.SpillerFactory;
 import io.prestosql.sql.gen.OrderingCompiler;
 
+import javax.annotation.Nullable;
+import javax.validation.constraints.NotNull;
+
+import java.io.Serializable;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -58,6 +69,8 @@ import static io.prestosql.util.MergeSortedPages.mergeSortedPages;
 import static java.util.Collections.nCopies;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"outputTypes", "outputChannels",
+        "driverWindowInfo", "pageBuffer", "snapshotState", "pagesIndexToWindowPartitions"})
 public class WindowOperator
         implements Operator
 {
@@ -193,6 +206,10 @@ public class WindowOperator
 
     private final WorkProcessor<Page> outputPages;
     private final PageBuffer pageBuffer = new PageBuffer();
+    private final boolean spillEnabled;
+    private final PagesIndexWithHashStrategies inMemoryPagesIndexWithHashStrategies;
+
+    private final SingleInputSnapshotState snapshotState;
 
     public WindowOperator(
             OperatorContext operatorContext,
@@ -224,6 +241,8 @@ public class WindowOperator
         checkArgument(preSortedChannelPrefix <= sortChannels.size(), "Cannot have more pre-sorted channels than specified sorted channels");
         checkArgument(preSortedChannelPrefix == 0 || ImmutableSet.copyOf(preGroupedChannels).equals(ImmutableSet.copyOf(partitionChannels)), "preSortedChannelPrefix can only be greater than zero if all partition channels are pre-grouped");
 
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
+        this.spillEnabled = spillEnabled;
         this.operatorContext = operatorContext;
         this.outputChannels = Ints.toArray(outputChannels);
         this.windowFunctions = windowFunctionDefinitions.stream()
@@ -260,7 +279,7 @@ public class WindowOperator
             ordering = unGroupedOrdering;
         }
 
-        PagesIndexWithHashStrategies inMemoryPagesIndexWithHashStrategies = new PagesIndexWithHashStrategies(
+        this.inMemoryPagesIndexWithHashStrategies = new PagesIndexWithHashStrategies(
                 pagesIndexFactory,
                 sourceTypes,
                 expectedPositions,
@@ -292,14 +311,14 @@ public class WindowOperator
 
             this.outputPages = pageBuffer.pages()
                     .flatTransform(spillablePagesToPagesIndexes.get())
-                    .flatMap(this::pagesIndexToWindowPartitions)
+                    .flatMap(pagesIndexToWindowPartitions)
                     .transform(new WindowPartitionsToOutputPages());
         }
         else {
             this.spillablePagesToPagesIndexes = Optional.empty();
             this.outputPages = pageBuffer.pages()
                     .transform(new PagesToPagesIndexes(inMemoryPagesIndexWithHashStrategies, orderChannels, ordering))
-                    .flatMap(this::pagesIndexToWindowPartitions)
+                    .flatMap(pagesIndexToWindowPartitions)
                     .transform(new WindowPartitionsToOutputPages());
         }
 
@@ -327,6 +346,11 @@ public class WindowOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         return outputPages.isFinished();
     }
 
@@ -350,12 +374,25 @@ public class WindowOperator
     @Override
     public void addInput(Page page)
     {
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         pageBuffer.add(page);
     }
 
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (!outputPages.process()) {
             return null;
         }
@@ -365,6 +402,12 @@ public class WindowOperator
         }
 
         return outputPages.getResult();
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     @Override
@@ -379,7 +422,10 @@ public class WindowOperator
         spillablePagesToPagesIndexes.get().finishRevokeMemory();
     }
 
+    @RestorableConfig(uncapturedFields = {"preGroupedPartitionHashStrategy", "unGroupedPartitionHashStrategy",
+            "preSortedPartitionHashStrategy", "peerGroupHashStrategy", "preGroupedPartitionChannels"})
     private static class PagesIndexWithHashStrategies
+            implements Restorable
     {
         final PagesIndex pagesIndex;
         final PagesHashStrategy preGroupedPartitionHashStrategy;
@@ -404,8 +450,21 @@ public class WindowOperator
             this.peerGroupHashStrategy = pagesIndex.createPagesHashStrategy(sortChannels, OptionalInt.empty());
             this.preGroupedPartitionChannels = Ints.toArray(preGroupedPartitionChannels);
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            return this.pagesIndex.capture(serdeProvider);
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            this.pagesIndex.restore(state, serdeProvider);
+        }
     }
 
+    @RestorableConfig(stateClassName = "PagesToPagesIndexesState", uncapturedFields = {"this$0", "orderChannels", "ordering", "memoryContext", "pagesIndexWithHashStrategies"})
     private class PagesToPagesIndexes
             implements Transformation<Page, PagesIndexWithHashStrategies>
     {
@@ -463,37 +522,168 @@ public class WindowOperator
         {
             memoryContext.setBytes(pagesIndexWithHashStrategies.pagesIndex.getEstimatedSize().toBytes());
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            PagesToPagesIndexesState myState = new PagesToPagesIndexesState();
+            myState.pendingInputPosition = pendingInputPosition;
+            myState.resetPagesIndex = resetPagesIndex;
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            PagesToPagesIndexesState myState = (PagesToPagesIndexesState) state;
+            this.pendingInputPosition = myState.pendingInputPosition;
+            this.resetPagesIndex = myState.resetPagesIndex;
+        }
+
+        @Override
+        public Object captureResult(PagesIndexWithHashStrategies result, BlockEncodingSerdeProvider serdeProvider)
+        {
+            checkArgument(result == inMemoryPagesIndexWithHashStrategies);
+            return 0;
+        }
+
+        @Override
+        public PagesIndexWithHashStrategies restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+        {
+            return inMemoryPagesIndexWithHashStrategies;
+        }
+
+        @Override
+        public Object captureInput(Page input, BlockEncodingSerdeProvider serdeProvider)
+        {
+            if (input != null) {
+                SerializedPage serializedPage = ((PagesSerde) serdeProvider).serialize(input);
+                return serializedPage.capture(serdeProvider);
+            }
+            return null;
+        }
+
+        @Override
+        public Page restoreInput(Object inputState, Page input, BlockEncodingSerdeProvider serdeProvider)
+        {
+            if (inputState != null) {
+                SerializedPage serializedPage = SerializedPage.restoreSerializedPage(inputState);
+                return ((PagesSerde) serdeProvider).deserialize(serializedPage);
+            }
+            return input;
+        }
     }
 
-    private WorkProcessor<WindowPartition> pagesIndexToWindowPartitions(PagesIndexWithHashStrategies pagesIndexWithHashStrategies)
+    private static class PagesToPagesIndexesState
+            implements Serializable
     {
-        PagesIndex pagesIndex = pagesIndexWithHashStrategies.pagesIndex;
+        boolean resetPagesIndex;
+        int pendingInputPosition;
+    }
 
-        // pagesIndex contains the full grouped & sorted data for one or more partitions
+    private WorkProcessor.RestorableFunction<PagesIndexWithHashStrategies, WorkProcessor<WindowPartition>> pagesIndexToWindowPartitions = new WorkProcessor.RestorableFunction<PagesIndexWithHashStrategies, WorkProcessor<WindowPartition>>()
+    {
+        @RestorableConfig(uncapturedFields = {"this$0"})
+        private final RestorableConfig restorableConfig = null;
 
-        windowInfo.addIndex(pagesIndex);
-
-        return WorkProcessor.create(new WorkProcessor.Process<WindowPartition>()
+        @Override
+        public WorkProcessor<WindowPartition> apply(PagesIndexWithHashStrategies pagesIndexWithHashStrategies)
         {
-            int partitionStart;
+            PagesIndex pagesIndex = pagesIndexWithHashStrategies.pagesIndex;
 
-            @Override
-            public ProcessState<WindowPartition> process()
+            // pagesIndex contains the full grouped & sorted data for one or more partitions
+
+            windowInfo.addIndex(pagesIndex);
+
+            return WorkProcessor.create(new WorkProcessor.Process<WindowPartition>()
             {
-                if (partitionStart == pagesIndex.getPositionCount()) {
-                    return ProcessState.finished();
+                @RestorableConfig(uncapturedFields = {"val$pagesIndex", "val$pagesIndexWithHashStrategies", "this$1"})
+                private final RestorableConfig restorableConfig = null;
+
+                int partitionStart;
+
+                @Override
+                public ProcessState<WindowPartition> process()
+                {
+                    if (partitionStart == pagesIndex.getPositionCount()) {
+                        return ProcessState.finished();
+                    }
+
+                    int partitionEnd = findGroupEnd(pagesIndex, pagesIndexWithHashStrategies.unGroupedPartitionHashStrategy, partitionStart);
+
+                    WindowPartition partition = new WindowPartition(pagesIndex, partitionStart, partitionEnd, outputChannels, windowFunctions, pagesIndexWithHashStrategies.peerGroupHashStrategy);
+                    windowInfo.addPartition(partition);
+                    partitionStart = partitionEnd;
+                    return ProcessState.ofResult(partition);
                 }
 
-                int partitionEnd = findGroupEnd(pagesIndex, pagesIndexWithHashStrategies.unGroupedPartitionHashStrategy, partitionStart);
+                @Override
+                public Object capture(BlockEncodingSerdeProvider serdeProvider)
+                {
+                    return partitionStart;
+                }
 
-                WindowPartition partition = new WindowPartition(pagesIndex, partitionStart, partitionEnd, outputChannels, windowFunctions, pagesIndexWithHashStrategies.peerGroupHashStrategy);
-                windowInfo.addPartition(partition);
-                partitionStart = partitionEnd;
-                return ProcessState.ofResult(partition);
+                @Override
+                public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+                {
+                    this.partitionStart = (int) state;
+                }
+
+                @Override
+                public Object captureResult(@NotNull WindowPartition result, BlockEncodingSerdeProvider serdeProvider)
+                {
+                    return result.capture(serdeProvider);
+                }
+
+                @Override
+                public WindowPartition restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+                {
+                    return WindowPartition.restoreWindowPartition(pagesIndex, outputChannels, windowFunctions, pagesIndexWithHashStrategies.peerGroupHashStrategy, resultState);
+                }
+            });
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            return null;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+        }
+
+        @Override
+        public Object captureResult(@Nullable WorkProcessor<WindowPartition> result, BlockEncodingSerdeProvider serdeProvider)
+        {
+            if (result != null) {
+                return result.capture(serdeProvider);
             }
-        });
-    }
+            return null;
+        }
 
+        @Override
+        public Object captureInput(@Nullable PagesIndexWithHashStrategies input, BlockEncodingSerdeProvider serdeProvider)
+        {
+            if (input == null) {
+                return null;
+            }
+            checkArgument(input == inMemoryPagesIndexWithHashStrategies);
+            return 0;
+        }
+
+        @Override
+        public PagesIndexWithHashStrategies restoreInput(Object inputState, BlockEncodingSerdeProvider serdeProvider)
+        {
+            if (inputState == null) {
+                return null;
+            }
+            return inMemoryPagesIndexWithHashStrategies;
+        }
+    };
+
+    @RestorableConfig(uncapturedFields = {"this$0"})
     private class WindowPartitionsToOutputPages
             implements Transformation<WindowPartition, Page>
     {
@@ -530,8 +720,47 @@ public class WindowOperator
             pageBuilder.reset();
             return TransformationState.ofResult(page, !partition.hasNext());
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            return pageBuilder.capture(serdeProvider);
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            pageBuilder.restore(state, serdeProvider);
+        }
+
+        @Override
+        public Object captureResult(Page result, BlockEncodingSerdeProvider serdeProvider)
+        {
+            SerializedPage serializedPage = ((PagesSerde) serdeProvider).serialize(result);
+            return serializedPage.capture(serdeProvider);
+        }
+
+        @Override
+        public Page restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+        {
+            SerializedPage serializedPage = SerializedPage.restoreSerializedPage(resultState);
+            return ((PagesSerde) serdeProvider).deserialize(serializedPage);
+        }
+
+        @Override
+        public Object captureInput(WindowPartition input, BlockEncodingSerdeProvider serdeProvider)
+        {
+            return 0;
+        }
+
+        @Override
+        public WindowPartition restoreInput(Object inputState, WindowPartition input, BlockEncodingSerdeProvider serdeProvider)
+        {
+            return input;
+        }
     }
 
+    @RestorableConfig(unsupported = true)
     private class SpillablePagesToPagesIndexes
             implements Transformation<Page, WorkProcessor<PagesIndexWithHashStrategies>>
     {
@@ -698,14 +927,97 @@ public class WindowOperator
         WorkProcessor<PagesIndexWithHashStrategies> unspill()
         {
             if (!spiller.isPresent()) {
-                return WorkProcessor.fromIterable(ImmutableList.of(inMemoryPagesIndexWithHashStrategies));
+                return WorkProcessor.fromIterator(new WorkProcessor.RestorableIterator<PagesIndexWithHashStrategies>()
+                {
+                    Iterator<PagesIndexWithHashStrategies> it = ImmutableList.of(inMemoryPagesIndexWithHashStrategies).iterator();
+
+                    @Override
+                    public boolean hasNext()
+                    {
+                        return it.hasNext();
+                    }
+
+                    @Override
+                    public PagesIndexWithHashStrategies next()
+                    {
+                        return it.next();
+                    }
+
+                    @Override
+                    public Object captureResult(@NotNull PagesIndexWithHashStrategies result, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return 0;
+                    }
+
+                    @Override
+                    public PagesIndexWithHashStrategies restoreResult(@NotNull Object resultState, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return inMemoryPagesIndexWithHashStrategies;
+                    }
+                });
             }
 
             List<WorkProcessor<Page>> sortedStreams = ImmutableList.<WorkProcessor<Page>>builder()
                     .addAll(spiller.get().getSpills().stream()
-                            .map(WorkProcessor::fromIterator)
+                            .map(pageIterator -> WorkProcessor.fromIterator(new WorkProcessor.RestorableIterator<Page>()
+                            {
+                                @Override
+                                public Object captureResult(@NotNull Page result, BlockEncodingSerdeProvider serdeProvider)
+                                {
+                                    SerializedPage serializedPage = ((PagesSerde) serdeProvider).serialize(result);
+                                    return serializedPage.capture(serdeProvider);
+                                }
+
+                                @Override
+                                public Page restoreResult(@NotNull Object resultState, BlockEncodingSerdeProvider serdeProvider)
+                                {
+                                    SerializedPage serializedPage = SerializedPage.restoreSerializedPage(resultState);
+                                    return ((PagesSerde) serdeProvider).deserialize(serializedPage);
+                                }
+
+                                @Override
+                                public boolean hasNext()
+                                {
+                                    return pageIterator.hasNext();
+                                }
+
+                                @Override
+                                public Page next()
+                                {
+                                    return pageIterator.next();
+                                }
+                            }))
                             .collect(toImmutableList()))
-                    .add(WorkProcessor.fromIterator(inMemoryPagesIndexWithHashStrategies.pagesIndex.getSortedPages()))
+                    .add(WorkProcessor.fromIterator(new WorkProcessor.RestorableIterator<Page>()
+                    {
+                        Iterator<Page> it = inMemoryPagesIndexWithHashStrategies.pagesIndex.getSortedPages();
+
+                        @Override
+                        public boolean hasNext()
+                        {
+                            return it.hasNext();
+                        }
+
+                        @Override
+                        public Page next()
+                        {
+                            return it.next();
+                        }
+
+                        @Override
+                        public Object captureResult(@NotNull Page result, BlockEncodingSerdeProvider serdeProvider)
+                        {
+                            SerializedPage serializedPage = ((PagesSerde) serdeProvider).serialize(result);
+                            return serializedPage.capture(serdeProvider);
+                        }
+
+                        @Override
+                        public Page restoreResult(@NotNull Object resultState, BlockEncodingSerdeProvider serdeProvider)
+                        {
+                            SerializedPage serializedPage = SerializedPage.restoreSerializedPage(resultState);
+                            return ((PagesSerde) serdeProvider).deserialize(serializedPage);
+                        }
+                    }))
                     .build();
 
             WorkProcessor<Page> mergedPages = mergeSortedPages(
@@ -730,6 +1042,51 @@ public class WindowOperator
                 localRevocableMemoryContext.setBytes(0L);
                 localUserMemoryContext.setBytes(pagesIndexBytes);
             }
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            return 0;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+        }
+
+        @Override
+        public Object captureResult(WorkProcessor<PagesIndexWithHashStrategies> result, BlockEncodingSerdeProvider serdeProvider)
+        {
+            return result.capture(serdeProvider);
+        }
+
+        @Override
+        public WorkProcessor<PagesIndexWithHashStrategies> restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+        {
+            WorkProcessor<PagesIndexWithHashStrategies> processor = unspill();
+            processor.restore(resultState, serdeProvider);
+            return processor;
+        }
+
+        @Override
+        public Object captureInput(Page input, BlockEncodingSerdeProvider serdeProvider)
+        {
+            if (input != null) {
+                SerializedPage serializedPage = ((PagesSerde) serdeProvider).serialize(input);
+                return serializedPage.capture(serdeProvider);
+            }
+            return null;
+        }
+
+        @Override
+        public Page restoreInput(Object inputState, Page input, BlockEncodingSerdeProvider serdeProvider)
+        {
+            if (inputState != null) {
+                SerializedPage serializedPage = SerializedPage.restoreSerializedPage(inputState);
+                return ((PagesSerde) serdeProvider).deserialize(serializedPage);
+            }
+            return input;
         }
     }
 
@@ -843,5 +1200,45 @@ public class WindowOperator
     {
         driverWindowInfo.set(Optional.of(windowInfo.build()));
         spillablePagesToPagesIndexes.ifPresent(SpillablePagesToPagesIndexes::closeSpiller);
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        WindowOperatorState myState = new WindowOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.windowInfo = windowInfo.capture(serdeProvider);
+        myState.inMemoryPagesIndexWithHashStrategies = inMemoryPagesIndexWithHashStrategies.capture(serdeProvider);
+        myState.outputPages = outputPages.capture(serdeProvider);
+        myState.windowFunctions = new Object[windowFunctions.size()];
+        for (int i = 0; i < windowFunctions.size(); i++) {
+            myState.windowFunctions[i] = windowFunctions.get(i).capture(serdeProvider);
+        }
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        WindowOperator.WindowOperatorState myState = (WindowOperator.WindowOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.windowInfo.restore(myState.windowInfo, serdeProvider);
+        this.inMemoryPagesIndexWithHashStrategies.restore(myState.inMemoryPagesIndexWithHashStrategies, serdeProvider);
+        this.outputPages.restore(myState.outputPages, serdeProvider);
+        checkArgument(myState.windowFunctions.length == windowFunctions.size());
+        for (int i = 0; i < myState.windowFunctions.length; i++) {
+            this.windowFunctions.get(i).restore(myState.windowFunctions[i], serdeProvider);
+        }
+    }
+
+    private static class WindowOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private Object outputPages;
+        private Object spillablePagesToPagesIndexes;
+        private Object windowInfo;
+        private Object inMemoryPagesIndexWithHashStrategies;
+        private Object[] windowFunctions;
     }
 }

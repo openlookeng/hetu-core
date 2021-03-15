@@ -18,19 +18,24 @@ import io.prestosql.execution.Lifespan;
 import io.prestosql.operator.NestedLoopBuildOperator.NestedLoopBuildOperatorFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.SnapshotTestUtil;
 import io.prestosql.spi.type.Type;
 import io.prestosql.testing.TestingTaskContext;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
 import static io.prestosql.block.BlockAssertions.createLongSequenceBlock;
+import static io.prestosql.operator.PageAssertions.assertPageEquals;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
@@ -93,6 +98,78 @@ public class TestNestedLoopBuildOperator
         assertEquals(buildPages.get(0), buildPage1);
         assertEquals(buildPages.get(1), buildPage2);
         assertEquals(buildPages.size(), 2);
+    }
+
+    @Test
+    public void testNestedLoopBuildSnapshot()
+            throws Exception
+    {
+        TaskContext taskContext = createTaskContext();
+        List<Type> buildTypes = ImmutableList.of(BIGINT);
+        JoinBridgeManager<NestedLoopJoinBridge> nestedLoopJoinBridgeManager = new JoinBridgeManager<>(
+                false,
+                PipelineExecutionStrategy.UNGROUPED_EXECUTION,
+                PipelineExecutionStrategy.UNGROUPED_EXECUTION,
+                lifespan -> new NestedLoopJoinPagesSupplier(),
+                buildTypes);
+        NestedLoopBuildOperatorFactory nestedLoopBuildOperatorFactory = new NestedLoopBuildOperatorFactory(3, new PlanNodeId("test"), nestedLoopJoinBridgeManager);
+        DriverContext driverContext = taskContext.addPipelineContext(0, true, true, false).addDriverContext();
+        NestedLoopBuildOperator nestedLoopBuildOperator = (NestedLoopBuildOperator) nestedLoopBuildOperatorFactory.createOperator(driverContext);
+        NestedLoopJoinBridge nestedLoopJoinBridge = nestedLoopJoinBridgeManager.getJoinBridge(Lifespan.taskWide());
+
+        assertFalse(nestedLoopJoinBridge.getPagesFuture().isDone());
+
+        // build pages
+        Page buildPage1 = new Page(3, createLongSequenceBlock(11, 14));
+        Page buildPageEmpty = new Page(0);
+        Page buildPage2 = new Page(3000, createLongSequenceBlock(4000, 7000));
+
+        nestedLoopBuildOperator.addInput(buildPage1);
+        nestedLoopBuildOperator.addInput(buildPageEmpty);
+
+        Object snapshot = nestedLoopBuildOperator.capture(driverContext.getSerde());
+        assertEquals(SnapshotTestUtil.toFullSnapshotMapping(snapshot), createExpectedMapping());
+
+        nestedLoopBuildOperator.addInput(buildPage2);
+
+        nestedLoopBuildOperator.restore(snapshot, driverContext.getSerde());
+        snapshot = nestedLoopBuildOperator.capture(driverContext.getSerde());
+        assertEquals(SnapshotTestUtil.toFullSnapshotMapping(snapshot), createExpectedMapping());
+
+        nestedLoopBuildOperator.addInput(buildPage2);
+        nestedLoopBuildOperator.finish();
+
+        assertTrue(nestedLoopJoinBridge.getPagesFuture().isDone());
+        List<Page> buildPages = nestedLoopJoinBridge.getPagesFuture().get().getPages();
+
+        assertPageEquals(buildTypes, buildPages.get(0), buildPage1);
+        assertEquals(buildPages.get(1), buildPage2);
+        assertEquals(buildPages.size(), 2);
+    }
+
+    private Map<String, Object> createExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        Map<String, Object> nestedLoopJoinPagesBuilderMapping = new HashMap<>();
+        List<Map<String, Object>> pagesMapping = new ArrayList<>();
+        Map<String, Object> serializedPageMapping = new HashMap<>();
+
+        expectedMapping.put("operatorContext", 0);
+        expectedMapping.put("nestedLoopJoinPagesBuilder", nestedLoopJoinPagesBuilderMapping);
+        expectedMapping.put("localUserMemoryContext", 220L);
+
+        nestedLoopJoinPagesBuilderMapping.put("pages", pagesMapping);
+        nestedLoopJoinPagesBuilderMapping.put("finished", false);
+        nestedLoopJoinPagesBuilderMapping.put("estimatedSize", 220L);
+
+        pagesMapping.add(serializedPageMapping);
+
+        serializedPageMapping.put("slice", byte[].class);
+        serializedPageMapping.put("positionCount", 3);
+        serializedPageMapping.put("uncompressedSizeInBytes", 47);
+        serializedPageMapping.put("origin", null);
+        serializedPageMapping.put("pageCodecMarkers", (byte) 0);
+        return expectedMapping;
     }
 
     @Test

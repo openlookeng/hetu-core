@@ -22,7 +22,9 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -77,6 +79,70 @@ public class TestLimitOperator
                 .build();
 
         OperatorAssertion.assertOperatorEquals(operatorFactory, driverContext, input, expected);
+    }
+
+    @Test
+    public void testLimitSnapshotSimple()
+    {
+        List<Page> input = rowPagesBuilder(BIGINT)
+                .addSequencePage(3, 1)
+                .addSequencePage(1, 4)
+                .addSequencePage(1, 5)
+                .addSequencePage(1, 6)
+                .addSequencePage(3, 7)
+                .build();
+
+        OperatorFactory operatorFactory = new LimitOperatorFactory(0, new PlanNodeId("test"), 7);
+
+        MaterializedResult expected = resultBuilder(driverContext.getSession(), BIGINT)
+                .page(createSequencePage(ImmutableList.of(BIGINT), 3, 1))
+                .page(createSequencePage(ImmutableList.of(BIGINT), 1, 4))
+                .page(createSequencePage(ImmutableList.of(BIGINT), 1, 5))
+                .page(createSequencePage(ImmutableList.of(BIGINT), 1, 6))
+                .page(createSequencePage(ImmutableList.of(BIGINT), 1, 7))
+                .build();
+
+        OperatorAssertion.assertOperatorEqualsWithSimpleStateComparison(operatorFactory, driverContext, input, expected, createExpectedMappingSimple());
+    }
+
+    private Map<String, Object> createExpectedMappingSimple()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        expectedMapping.put("operatorContext", 0);
+        expectedMapping.put("remainingLimit", 2L);
+        return expectedMapping;
+    }
+
+    @Test
+    public void testLimitSnapshotWithRestore()
+    {
+        List<Page> input = rowPagesBuilder(BIGINT)
+                .addSequencePage(3, 1)
+                .addSequencePage(1, 4)
+                .addSequencePage(1, 5)
+                .addSequencePage(1, 6)
+                .addSequencePage(3, 7)
+                .build();
+
+        OperatorFactory operatorFactory = new LimitOperatorFactory(0, new PlanNodeId("test"), 7);
+
+        MaterializedResult expected = resultBuilder(driverContext.getSession(), BIGINT)
+                .page(createSequencePage(ImmutableList.of(BIGINT), 3, 1))
+                .page(createSequencePage(ImmutableList.of(BIGINT), 1, 4))
+                .page(createSequencePage(ImmutableList.of(BIGINT), 1, 5))
+                .page(createSequencePage(ImmutableList.of(BIGINT), 1, 6))
+                .page(createSequencePage(ImmutableList.of(BIGINT), 1, 7))
+                .build();
+
+        OperatorAssertion.assertOperatorEqualsWithStateComparison(operatorFactory, driverContext, input, expected, createExpectedMappingRestore());
+    }
+
+    private Map<String, Object> createExpectedMappingRestore()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        expectedMapping.put("operatorContext", 0);
+        expectedMapping.put("remainingLimit", 3L);
+        return expectedMapping;
     }
 
     @Test

@@ -15,8 +15,14 @@ package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
 import io.airlift.units.DataSize;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,7 +31,9 @@ import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"operatorContext"})
 public class NestedLoopJoinPagesBuilder
+        implements Restorable
 {
     private final OperatorContext operatorContext;
     private List<Page> pages;
@@ -84,5 +92,42 @@ public class NestedLoopJoinPagesBuilder
                 .add("estimatedSize", estimatedSize)
                 .add("pageCount", pages.size())
                 .toString();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        NestedLoopJoinPagesBuilderState myState = new NestedLoopJoinPagesBuilderState();
+        myState.pages = new Object[pages.size()];
+        PagesSerde serde = (PagesSerde) serdeProvider;
+        for (int i = 0; i < pages.size(); i++) {
+            SerializedPage sp = serde.serialize(pages.get(i));
+            myState.pages[i] = sp.capture(serdeProvider);
+        }
+        myState.finished = finished;
+        myState.estimatedSize = estimatedSize;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        NestedLoopJoinPagesBuilderState myState = (NestedLoopJoinPagesBuilderState) state;
+        this.pages.clear();
+        PagesSerde serde = (PagesSerde) serdeProvider;
+        for (Object obj : myState.pages) {
+            SerializedPage sp = SerializedPage.restoreSerializedPage(obj);
+            this.pages.add(serde.deserialize(sp));
+        }
+        this.finished = myState.finished;
+        this.estimatedSize = myState.estimatedSize;
+    }
+
+    private static class NestedLoopJoinPagesBuilderState
+            implements Serializable
+    {
+        private Object[] pages;
+        private boolean finished;
+        private long estimatedSize;
     }
 }

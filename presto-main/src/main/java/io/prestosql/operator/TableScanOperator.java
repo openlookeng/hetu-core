@@ -37,6 +37,7 @@ import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.spiller.Spiller;
@@ -73,6 +74,8 @@ import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STR
 import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
 import static java.util.Objects.requireNonNull;
 
+// Table scan operators do not participate in snapshotting
+@RestorableConfig(unsupported = true)
 public class TableScanOperator
         implements SourceOperator, Closeable
 {
@@ -93,12 +96,12 @@ public class TableScanOperator
         private Optional<QueryId> queryIdOptional = Optional.empty();
         private Optional<Metadata> metadataOptional = Optional.empty();
         private Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional = Optional.empty();
-        private ReuseExchangeOperator.STRATEGY strategy;
-        private UUID reuseTableScanMappingId;
-        private boolean spillEnabled;
+        private final ReuseExchangeOperator.STRATEGY strategy;
+        private final UUID reuseTableScanMappingId;
+        private final boolean spillEnabled;
         private final Optional<SpillerFactory> spillerFactory;
-        private Integer spillerThreshold;
-        private Integer consumerTableScanNodeCount;
+        private final Integer spillerThreshold;
+        private final Integer consumerTableScanNodeCount;
 
         public TableScanOperatorFactory(
                 Session session,
@@ -281,15 +284,15 @@ public class TableScanOperator
     boolean existsCrossFilter;
     boolean isDcTable;
 
-    private ReuseExchangeOperator.STRATEGY strategy;
-    private UUID reuseTableScanMappingId;
+    private final ReuseExchangeOperator.STRATEGY strategy;
+    private final UUID reuseTableScanMappingId;
     private static ConcurrentMap<String, Integer> sourceReuseTableScanMappingIdPositionIndexMap;
     private String sourceIdString;
     private final Optional<SpillerFactory> spillerFactory;
     private final List<Type> types;
-    private boolean spillEnabled;
+    private final boolean spillEnabled;
     private final long spillThreshold;
-    private static ConcurrentMap<UUID, ReuseExchangeTableScanMappingIdState> reuseExchangeTableScanMappingIdUtilsMap = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<UUID, ReuseExchangeTableScanMappingIdState> reuseExchangeTableScanMappingIdUtilsMap = new ConcurrentHashMap<>();
     private ReuseExchangeTableScanMappingIdState reuseExchangeTableScanMappingIdState;
     private ListenableFuture<?> spillInProgress = immediateFuture(null);
 
@@ -384,12 +387,8 @@ public class TableScanOperator
     {
         int pagesWrittenCount = reuseExchangeTableScanMappingIdState.getPagesWrittenCount();
 
-        if (pagesWrittenCount == 0) {
-            // there was no spilling of data- either spilling is not used, or not enough data to spill
-            return true;
-        }
-
-        return false;
+        // there was no spilling of data- either spilling is not used, or not enough data to spill
+        return pagesWrittenCount == 0;
     }
 
     public static void deleteSpilledFiles(UUID reuseTableScanMappingId)
@@ -690,18 +689,6 @@ public class TableScanOperator
     }
 
     @Override
-    public boolean needsInput()
-    {
-        return false;
-    }
-
-    @Override
-    public void addInput(Page page)
-    {
-        throw new UnsupportedOperationException(getClass().getName() + " can not take input");
-    }
-
-    @Override
     public Page getOutput()
     {
         if (strategy.equals(REUSE_STRATEGY_CONSUMER)) {
@@ -755,6 +742,12 @@ public class TableScanOperator
         }
 
         return page;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return null; // No marker in source pipeline
     }
 
     private Page filter(Page page)

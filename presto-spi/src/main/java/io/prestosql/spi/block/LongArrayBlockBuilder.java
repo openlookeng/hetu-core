@@ -13,13 +13,16 @@
  */
 package io.prestosql.spi.block;
 
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
 
+import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.spi.block.BlockUtil.calculateBlockResetSize;
 import static io.prestosql.spi.block.BlockUtil.checkArrayRange;
@@ -35,9 +38,9 @@ public class LongArrayBlockBuilder
     private static final Block NULL_VALUE_BLOCK = new LongArrayBlock(0, 1, new boolean[] {true}, new long[1]);
 
     @Nullable
-    private BlockBuilderStatus blockBuilderStatus;
+    private final BlockBuilderStatus blockBuilderStatus;
     private boolean initialized;
-    private int initialEntryCount;
+    private final int initialEntryCount;
 
     private int positionCount;
     private boolean hasNullValue;
@@ -339,5 +342,52 @@ public class LongArrayBlockBuilder
         if (position < 0 || position >= getPositionCount()) {
             throw new IllegalArgumentException("position is not valid");
         }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        LongArrayBlockBuilderState myState = new LongArrayBlockBuilderState();
+        if (blockBuilderStatus != null) {
+            myState.blockBuilderStatus = blockBuilderStatus.capture(serdeProvider);
+        }
+        myState.initialized = initialized;
+        myState.positionCount = positionCount;
+        myState.hasNullValue = hasNullValue;
+        myState.hasNonNullValue = hasNonNullValue;
+        myState.valueIsNull = valueIsNull.clone();
+        myState.values = values.clone();
+        myState.retainedSizeInBytes = retainedSizeInBytes;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        LongArrayBlockBuilderState myState = (LongArrayBlockBuilderState) state;
+        checkState((this.blockBuilderStatus != null) == (myState.blockBuilderStatus != null));
+        if (this.blockBuilderStatus != null) {
+            this.blockBuilderStatus.restore(myState.blockBuilderStatus, serdeProvider);
+        }
+        this.initialized = myState.initialized;
+        this.positionCount = myState.positionCount;
+        this.hasNullValue = myState.hasNullValue;
+        this.hasNonNullValue = myState.hasNonNullValue;
+        this.valueIsNull = myState.valueIsNull;
+        this.values = myState.values;
+        this.retainedSizeInBytes = myState.retainedSizeInBytes;
+    }
+
+    private static class LongArrayBlockBuilderState
+            implements Serializable
+    {
+        private Object blockBuilderStatus;
+        private boolean initialized;
+        private int positionCount;
+        private boolean hasNullValue;
+        private boolean hasNonNullValue;
+        private boolean[] valueIsNull;
+        private long[] values;
+        private long retainedSizeInBytes;
     }
 }

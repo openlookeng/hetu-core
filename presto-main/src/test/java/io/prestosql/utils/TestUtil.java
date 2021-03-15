@@ -29,6 +29,7 @@ import io.prestosql.execution.scheduler.SplitSchedulerStats;
 import io.prestosql.failuredetector.NoOpFailureDetector;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.seedstore.SeedStoreManager;
+import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -52,6 +53,7 @@ import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
 import io.prestosql.sql.planner.plan.PlanFragmentId;
 import io.prestosql.statestore.LocalStateStoreProvider;
 import io.prestosql.testing.TestingMetadata;
+import io.prestosql.testing.TestingSnapshotUtils;
 import io.prestosql.testing.TestingTransactionHandle;
 import io.prestosql.util.FinalizerService;
 
@@ -77,9 +79,9 @@ import static java.util.concurrent.Executors.newScheduledThreadPool;
 
 public class TestUtil
 {
-    private static NodeTaskMap nodeTaskMap = new NodeTaskMap(new FinalizerService());
-    private static ExecutorService executor = newCachedThreadPool(daemonThreadsNamed("test-executor-%s"));
-    private static ScheduledExecutorService scheduledExecutor = newScheduledThreadPool(2, daemonThreadsNamed("test-scheduledExecutor-%s"));
+    private static final NodeTaskMap nodeTaskMap = new NodeTaskMap(new FinalizerService());
+    private static final ExecutorService executor = newCachedThreadPool(daemonThreadsNamed("test-executor-%s"));
+    private static final ScheduledExecutorService scheduledExecutor = newScheduledThreadPool(2, daemonThreadsNamed("test-scheduledExecutor-%s"));
 
     private TestUtil()
     {
@@ -102,7 +104,8 @@ public class TestUtil
                 new NoOpFailureDetector(),
                 new SplitSchedulerStats(),
                 new DynamicFilterService(new LocalStateStoreProvider(
-                        new SeedStoreManager(new FileSystemClientManager()))));
+                        new SeedStoreManager(new FileSystemClientManager()))),
+                new QuerySnapshotManager(stageId.getQueryId(), TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS, TEST_SESSION));
         stage.setOutputBuffers(createInitialEmptyOutputBuffers(ARBITRARY));
 
         return stage;

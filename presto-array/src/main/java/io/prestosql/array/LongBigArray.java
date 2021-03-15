@@ -14,8 +14,11 @@
 package io.prestosql.array;
 
 import io.airlift.slice.SizeOf;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
 import java.util.Arrays;
 
 import static io.airlift.slice.SizeOf.sizeOfLongArray;
@@ -23,6 +26,7 @@ import static io.airlift.slice.SizeOf.sizeOfLongArray;
 // Note: this code was forked from fastutil (http://fastutil.di.unimi.it/)
 // Copyright (C) 2010-2013 Sebastiano Vigna
 public final class LongBigArray
+        implements Restorable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(LongBigArray.class).instanceSize();
     private static final long SIZE_OF_SEGMENT = sizeOfLongArray(BigArrays.SEGMENT_SIZE);
@@ -139,5 +143,38 @@ public final class LongBigArray
         array[segments] = newSegment;
         capacity += BigArrays.SEGMENT_SIZE;
         segments++;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        LongBigArrayState myState = new LongBigArrayState();
+        long[][] capturedArray = new long[this.array.length][];
+        for (int i = 0; i < this.array.length; i++) {
+            if (this.array[i] != null) {
+                capturedArray[i] = this.array[i].clone();
+            }
+        }
+        myState.array = capturedArray;
+        myState.capacity = this.capacity;
+        myState.segments = this.segments;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        LongBigArrayState myState = (LongBigArrayState) state;
+        this.array = myState.array;
+        this.capacity = myState.capacity;
+        this.segments = myState.segments;
+    }
+
+    private static class LongBigArrayState
+            implements Serializable
+    {
+        private long[][] array;
+        private int capacity;
+        private int segments;
     }
 }

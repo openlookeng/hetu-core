@@ -15,6 +15,7 @@ package io.prestosql.metadata;
 
 import io.prestosql.connector.informationschema.InformationSchemaHandleResolver;
 import io.prestosql.connector.system.SystemHandleResolver;
+import io.prestosql.snapshot.MarkerSplitHandleResolver;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorDeleteAsInsertTableHandle;
 import io.prestosql.spi.connector.ConnectorHandleResolver;
@@ -60,6 +61,7 @@ public class HandleResolver
         handleResolvers.put("$system", new MaterializedHandleResolver(new SystemHandleResolver()));
         handleResolvers.put("$info_schema", new MaterializedHandleResolver(new InformationSchemaHandleResolver()));
         handleResolvers.put("$empty", new MaterializedHandleResolver(new EmptySplitHandleResolver()));
+        handleResolvers.put("$marker", new MaterializedHandleResolver(new MarkerSplitHandleResolver()));
 
         functionHandleResolvers.put("$static", new MaterializedFunctionHandleResolver(new BuiltInFunctionNamespaceHandleResolver()));
     }

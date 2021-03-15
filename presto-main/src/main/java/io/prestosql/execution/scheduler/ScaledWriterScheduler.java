@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 import static io.prestosql.execution.scheduler.ScheduleResult.BlockedReason.WRITER_SCALING;
+import static io.prestosql.snapshot.SnapshotConfig.MAX_NODE_ALLOCATION;
 import static io.prestosql.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static io.prestosql.util.Failures.checkCondition;
 import static java.util.Objects.requireNonNull;
@@ -49,6 +50,9 @@ public class ScaledWriterScheduler
     private final Set<InternalNode> scheduledNodes = new HashSet<>();
     private final AtomicBoolean done = new AtomicBoolean();
     private volatile SettableFuture<?> future = SettableFuture.create();
+    private final boolean isSnapshotEnabled;
+    // Snapshot: when rescheduling, the number of tasks previously scheduled
+    private final int initialTaskCount;
 
     public ScaledWriterScheduler(
             SqlStageExecution stage,
@@ -56,7 +60,9 @@ public class ScaledWriterScheduler
             Supplier<Collection<TaskStatus>> writerTasksProvider,
             NodeSelector nodeSelector,
             ScheduledExecutorService executor,
-            DataSize writerMinSize)
+            DataSize writerMinSize,
+            boolean isSnapshotEnabled,
+            Integer initialTaskCount)
     {
         this.stage = requireNonNull(stage, "stage is null");
         this.sourceTasksProvider = requireNonNull(sourceTasksProvider, "sourceTasksProvider is null");
@@ -64,6 +70,8 @@ public class ScaledWriterScheduler
         this.nodeSelector = requireNonNull(nodeSelector, "nodeSelector is null");
         this.executor = requireNonNull(executor, "executor is null");
         this.writerMinSizeBytes = requireNonNull(writerMinSize, "minWriterSize is null").toBytes();
+        this.isSnapshotEnabled = isSnapshotEnabled;
+        this.initialTaskCount = initialTaskCount == null ? 1 : initialTaskCount;
     }
 
     public void finish()
@@ -87,7 +95,14 @@ public class ScaledWriterScheduler
     private int getNewTaskCount()
     {
         if (scheduledNodes.isEmpty()) {
-            return 1;
+            return initialTaskCount;
+        }
+
+        if (isSnapshotEnabled) {
+            // Don't exceed max allocation limit
+            if (scheduledNodes.size() + 1 > nodeSelector.selectableNodeCount() * MAX_NODE_ALLOCATION) {
+                return 0;
+            }
         }
 
         double fullTasks = sourceTasksProvider.get().stream()
@@ -115,8 +130,12 @@ public class ScaledWriterScheduler
         }
 
         List<InternalNode> nodes = nodeSelector.selectRandomNodes(count, scheduledNodes);
-
-        checkCondition(!scheduledNodes.isEmpty() || !nodes.isEmpty(), NO_NODES_AVAILABLE, "No nodes available to run query");
+        if (scheduledNodes.isEmpty() && nodes.size() != initialTaskCount) {
+            String message = initialTaskCount > 1 ?
+                    "Snapshot: not enough worker nodes available to resume expected number of writer tasks: " + initialTaskCount :
+                    "No nodes available to run query";
+            checkCondition(false, NO_NODES_AVAILABLE, message);
+        }
 
         ImmutableList.Builder<RemoteTask> tasks = ImmutableList.builder();
         for (InternalNode node : nodes) {

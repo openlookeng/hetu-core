@@ -16,12 +16,16 @@ package io.prestosql.operator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.operator.SetBuilderOperator.SetSupplier;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,6 +36,7 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"channelSetFuture", "probeHashChannel", "channelSet", "outputPage", "snapshotState"})
 public class HashSemiJoinOperator
         implements Operator
 {
@@ -88,6 +93,8 @@ public class HashSemiJoinOperator
     private Page outputPage;
     private boolean finishing;
 
+    private final SingleInputSnapshotState snapshotState;
+
     public HashSemiJoinOperator(OperatorContext operatorContext, SetSupplier channelSetFuture, int probeJoinChannel, Optional<Integer> probeHashChannel)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
@@ -99,6 +106,7 @@ public class HashSemiJoinOperator
         this.channelSetFuture = channelSetFuture.getChannelSet();
         this.probeJoinChannel = probeJoinChannel;
         this.probeHashChannel = probeHashChannel;
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -116,19 +124,29 @@ public class HashSemiJoinOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         return finishing && outputPage == null;
     }
 
     @Override
     public ListenableFuture<?> isBlocked()
     {
+        if (snapshotState != null && allowMarker()) {
+            // TODO-cp-I3AJIP: this may unblock too often
+            return NOT_BLOCKED;
+        }
+
         return channelSetFuture;
     }
 
     @Override
     public boolean needsInput()
     {
-        if (finishing || outputPage != null) {
+        if (!allowMarker()) {
             return false;
         }
 
@@ -139,10 +157,23 @@ public class HashSemiJoinOperator
     }
 
     @Override
+    public boolean allowMarker()
+    {
+        return !finishing && outputPage == null;
+    }
+
+    @Override
     public void addInput(Page page)
     {
         requireNonNull(page, "page is null");
         checkState(!finishing, "Operator is finishing");
+
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         checkState(channelSet != null, "Set has not been built yet");
         checkState(outputPage == null, "Operator still has pending output");
 
@@ -188,8 +219,45 @@ public class HashSemiJoinOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         Page result = outputPage;
         outputPage = null;
         return result;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        HashSemiJoinOperatorState myState = new HashSemiJoinOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.finishing = finishing;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        HashSemiJoinOperatorState myState = (HashSemiJoinOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.finishing = myState.finishing;
+    }
+
+    private static class HashSemiJoinOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private boolean finishing;
     }
 }

@@ -21,13 +21,13 @@ import io.airlift.http.client.HttpClient;
 import io.airlift.http.client.testing.TestingHttpClient;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
-import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
+import io.prestosql.Session;
 import io.prestosql.execution.Lifespan;
-import io.prestosql.execution.buffer.TestingPagesSerdeFactory;
 import io.prestosql.metadata.Split;
 import io.prestosql.operator.ExchangeOperator.ExchangeOperatorFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.type.Type;
 import io.prestosql.split.RemoteSplit;
 import org.testng.annotations.AfterClass;
@@ -38,6 +38,8 @@ import org.testng.annotations.Test;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -46,6 +48,7 @@ import java.util.concurrent.TimeUnit;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
+import static io.prestosql.SessionTestUtils.TEST_SNAPSHOT_SESSION;
 import static io.prestosql.operator.ExchangeOperator.REMOTE_CONNECTOR_ID;
 import static io.prestosql.operator.PageAssertions.assertPageEquals;
 import static io.prestosql.operator.TestingTaskBuffer.PAGE;
@@ -53,6 +56,7 @@ import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -60,7 +64,6 @@ import static org.testng.Assert.assertTrue;
 public class TestExchangeOperator
 {
     private static final List<Type> TYPES = ImmutableList.of(VARCHAR);
-    private static final PagesSerdeFactory SERDE_FACTORY = new TestingPagesSerdeFactory();
 
     private static final String TASK_1_ID = "task1";
     private static final String TASK_2_ID = "task2";
@@ -135,6 +138,63 @@ public class TestExchangeOperator
 
         // read the pages
         waitForPages(operator, 30);
+
+        // wait for finished
+        waitForFinished(operator);
+    }
+
+    //TODO-cp-I2DSGR: currently only has operator context so it's not tested.
+
+    @Test
+    public void testGetInputChannels()
+    {
+        ExchangeOperator operator = (ExchangeOperator) createExchangeOperator();
+
+        // Not enough channels are known
+        assertFalse(operator.getInputChannels(1).isPresent());
+
+        operator.addSplit(newRemoteSplit(TASK_1_ID));
+        // Not all channels are known
+        assertFalse(operator.getInputChannels(0).isPresent());
+        // Not enough channels are known
+        assertFalse(operator.getInputChannels(2).isPresent());
+
+        operator.addSplit(newRemoteSplit(TASK_2_ID));
+        // Not all channels are known
+        assertFalse(operator.getInputChannels(0).isPresent());
+        // At least expected channels are known
+        assertTrue(operator.getInputChannels(2).isPresent());
+
+        operator.noMoreSplits();
+        Optional<Set<String>> channels = operator.getInputChannels(0);
+        assertTrue(channels.isPresent());
+        assertEquals(channels.get().size(), 2);
+
+        Optional<Set<String>> channels1 = operator.getInputChannels(0);
+        assertTrue(channels == channels1);
+    }
+
+    @Test
+    public void testMarkers()
+            throws Exception
+    {
+        SourceOperator operator = createExchangeOperator(TEST_SNAPSHOT_SESSION);
+
+        operator.addSplit(newRemoteSplit(TASK_1_ID));
+        operator.addSplit(newRemoteSplit(TASK_2_ID));
+        operator.noMoreSplits();
+
+        MarkerPage marker = MarkerPage.snapshotPage(1);
+        taskBuffers.getUnchecked(TASK_1_ID).addPages(3, false);
+        taskBuffers.getUnchecked(TASK_2_ID).addPages(3, false);
+        taskBuffers.getUnchecked(TASK_1_ID).addPage(marker, false);
+        taskBuffers.getUnchecked(TASK_2_ID).addPages(3, false);
+        taskBuffers.getUnchecked(TASK_2_ID).addPage(marker, false);
+        taskBuffers.getUnchecked(TASK_2_ID).addPages(3, true);
+        taskBuffers.getUnchecked(TASK_1_ID).addPages(3, true);
+
+        // read the pages
+        waitForPages(operator, 16);
 
         // wait for finished
         waitForFinished(operator);
@@ -247,13 +307,19 @@ public class TestExchangeOperator
 
     private SourceOperator createExchangeOperator()
     {
-        ExchangeOperatorFactory operatorFactory = new ExchangeOperatorFactory(0, new PlanNodeId("test"), exchangeClientSupplier, SERDE_FACTORY);
+        return createExchangeOperator(TEST_SESSION);
+    }
 
-        DriverContext driverContext = createTaskContext(scheduler, scheduledExecutor, TEST_SESSION)
+    private SourceOperator createExchangeOperator(Session session)
+    {
+        ExchangeOperatorFactory operatorFactory = new ExchangeOperatorFactory(0, new PlanNodeId("test"), exchangeClientSupplier);
+
+        DriverContext driverContext = createTaskContext(scheduler, scheduledExecutor, session)
                 .addPipelineContext(0, true, true, false)
                 .addDriverContext();
 
         SourceOperator operator = operatorFactory.createOperator(driverContext);
+        operatorFactory.noMoreOperators();
         assertEquals(operator.getOperatorContext().getOperatorStats().getSystemMemoryReservation().toBytes(), 0);
         return operator;
     }
@@ -306,7 +372,9 @@ public class TestExchangeOperator
         // verify pages
         assertEquals(outputPages.size(), expectedPageCount);
         for (Page page : outputPages) {
-            assertPageEquals(TYPES, page, PAGE);
+            if (!(page instanceof MarkerPage)) {
+                assertPageEquals(TYPES, page, PAGE);
+            }
         }
 
         assertEquals(operator.getOperatorContext().getOperatorStats().getSystemMemoryReservation().toBytes(), 0);

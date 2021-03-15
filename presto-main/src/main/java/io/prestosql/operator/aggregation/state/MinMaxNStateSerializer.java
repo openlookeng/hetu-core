@@ -19,9 +19,13 @@ import io.prestosql.operator.aggregation.TypedHeap;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.function.AccumulatorStateSerializer;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.Type;
+
+import java.io.Serializable;
+import java.util.function.Function;
 
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static java.lang.Math.toIntExact;
@@ -75,5 +79,56 @@ public class MinMaxNStateSerializer
         TypedHeap heap = new TypedHeap(blockComparator, elementType, capacity);
         heap.addAll(heapBlock);
         state.setTypedHeap(heap);
+    }
+
+    @Override
+    public Object serializeCapture(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        MinMaxNState minMaxNState = (MinMaxNState) state;
+        boolean grouped = minMaxNState instanceof MinMaxNStateFactory.GroupedMinMaxNState;
+        if (!grouped) {
+            if (minMaxNState.getTypedHeap() != null) {
+                return minMaxNState.getTypedHeap().capture(serdeProvider);
+            }
+            return null;
+        }
+        GroupedMinMaxNStateState myState = new GroupedMinMaxNStateState();
+        MinMaxNStateFactory.GroupedMinMaxNState groupedState = (MinMaxNStateFactory.GroupedMinMaxNState) minMaxNState;
+        myState.size = groupedState.getSize();
+        myState.groupId = groupedState.getStateGroupId();
+        Function<Object, Object> heapsCapture = content -> ((TypedHeap) content).capture(serdeProvider);
+        myState.heaps = groupedState.getHeaps().capture(heapsCapture);
+        return myState;
+    }
+
+    @Override
+    public void deserializeRestore(Object snapshot, Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        MinMaxNState minMaxNState = (MinMaxNState) state;
+        boolean grouped = minMaxNState instanceof MinMaxNStateFactory.GroupedMinMaxNState;
+        if (!grouped) {
+            if (snapshot != null) {
+                minMaxNState.setTypedHeap(TypedHeap.restoreTypedHeap(blockComparator, elementType, snapshot, serdeProvider));
+            }
+            else {
+                minMaxNState.setTypedHeap(null);
+            }
+        }
+        else {
+            GroupedMinMaxNStateState myState = (GroupedMinMaxNStateState) snapshot;
+            MinMaxNStateFactory.GroupedMinMaxNState groupedState = (MinMaxNStateFactory.GroupedMinMaxNState) minMaxNState;
+            groupedState.setSize(myState.size);
+            groupedState.setStateGroupId(myState.groupId);
+            Function<Object, Object> heapsRestore = content -> TypedHeap.restoreTypedHeap(blockComparator, elementType, content, serdeProvider);
+            groupedState.getHeaps().restore(heapsRestore, myState.heaps);
+        }
+    }
+
+    private static class GroupedMinMaxNStateState
+            implements Serializable
+    {
+        private Object heaps;
+        private long size;
+        private long groupId;
     }
 }

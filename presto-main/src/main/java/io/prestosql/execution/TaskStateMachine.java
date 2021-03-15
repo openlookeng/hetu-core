@@ -92,14 +92,9 @@ public class TaskStateMachine
         transitionToDoneState(TaskState.FINISHED);
     }
 
-    public void cancel()
+    public void cancel(TaskState targetState)
     {
-        transitionToDoneState(TaskState.CANCELED);
-    }
-
-    public void abort()
-    {
-        transitionToDoneState(TaskState.ABORTED);
+        transitionToDoneState(targetState);
     }
 
     public void failed(Throwable cause)

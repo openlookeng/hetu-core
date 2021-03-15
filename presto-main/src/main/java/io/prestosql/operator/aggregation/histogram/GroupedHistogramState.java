@@ -16,8 +16,11 @@ package io.prestosql.operator.aggregation.histogram;
 
 import io.prestosql.operator.aggregation.state.AbstractGroupedAccumulatorState;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
+
+import java.io.Serializable;
 
 /**
  * state object that uses a single histogram for all groups. See {@link GroupedTypedHistogram}
@@ -63,5 +66,32 @@ public class GroupedHistogramState
     public long getEstimatedSize()
     {
         return INSTANCE_SIZE + size + typedHistogram.getEstimatedSize();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        GroupedHistogramStateState myState = new GroupedHistogramStateState();
+        myState.baseState = super.capture(serdeProvider);
+        myState.typedHistogram = typedHistogram.capture(serdeProvider);
+        myState.size = size;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        GroupedHistogramStateState myState = (GroupedHistogramStateState) state;
+        super.restore(myState.baseState, serdeProvider);
+        this.typedHistogram.restore(myState.typedHistogram, serdeProvider);
+        this.size = myState.size;
+    }
+
+    private static class GroupedHistogramStateState
+            implements Serializable
+    {
+        private Object baseState;
+        private Object typedHistogram;
+        private long size;
     }
 }

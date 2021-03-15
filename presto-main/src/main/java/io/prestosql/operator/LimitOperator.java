@@ -13,14 +13,20 @@
  */
 package io.prestosql.operator;
 
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
+
+import java.io.Serializable;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"nextPage", "snapshotState"})
 public class LimitOperator
         implements Operator
 {
@@ -64,12 +70,15 @@ public class LimitOperator
     private Page nextPage;
     private long remainingLimit;
 
+    private final SingleInputSnapshotState snapshotState;
+
     public LimitOperator(OperatorContext operatorContext, long limit)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
 
         checkArgument(limit >= 0, "limit must be at least zero");
         this.remainingLimit = limit;
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -87,6 +96,11 @@ public class LimitOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         return remainingLimit == 0 && nextPage == null;
     }
 
@@ -100,6 +114,12 @@ public class LimitOperator
     public void addInput(Page page)
     {
         checkState(needsInput());
+
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
 
         if (page.getPositionCount() <= remainingLimit) {
             remainingLimit -= page.getPositionCount();
@@ -119,8 +139,45 @@ public class LimitOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         Page page = nextPage;
         nextPage = null;
         return page;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        LimitOperatorState myState = new LimitOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.remainingLimit = remainingLimit;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        LimitOperatorState myState = (LimitOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.remainingLimit = myState.remainingLimit;
+    }
+
+    private static class LimitOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private long remainingLimit;
     }
 }

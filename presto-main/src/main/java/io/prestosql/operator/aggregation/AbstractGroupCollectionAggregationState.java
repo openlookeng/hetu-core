@@ -18,10 +18,13 @@ import io.prestosql.array.ShortBigArray;
 import io.prestosql.operator.aggregation.state.AbstractGroupedAccumulatorState;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongList;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,6 +33,7 @@ import static com.google.common.base.Verify.verify;
 /**
  * Instances of this state use a single PageBuilder for all groups.
  */
+@RestorableConfig(uncapturedFields = {"currentPageBuilder"})
 public abstract class AbstractGroupCollectionAggregationState<T>
         extends AbstractGroupedAccumulatorState
 {
@@ -182,4 +186,70 @@ public abstract class AbstractGroupCollectionAggregationState<T>
     }
 
     protected abstract void accept(T consumer, PageBuilder pageBuilder, int currentPosition);
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        AbstractGroupCollectionAggregationStateState myState = new AbstractGroupCollectionAggregationStateState();
+        myState.headBlockIndex = headBlockIndex.capture(serdeProvider);
+        myState.headPosition = headPosition.capture(serdeProvider);
+        myState.nextBlockIndex = nextBlockIndex.capture(serdeProvider);
+        myState.nextPosition = nextPosition.capture(serdeProvider);
+        myState.tailBlockIndex = tailBlockIndex.capture(serdeProvider);
+        myState.tailPosition = tailPosition.capture(serdeProvider);
+        myState.values = new Object[values.size()];
+        for (int i = 0; i < values.size(); i++) {
+            myState.values[i] = values.get(i).capture(serdeProvider);
+        }
+        myState.sumPositions = sumPositions;
+        myState.groupEntryCount = groupEntryCount.capture(serdeProvider);
+        myState.valueBlocksRetainedSizeInBytes = valueBlocksRetainedSizeInBytes;
+        myState.totalPositions = totalPositions;
+        myState.capacity = capacity;
+        myState.baseState = super.capture(serdeProvider);
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        AbstractGroupCollectionAggregationStateState myState = (AbstractGroupCollectionAggregationStateState) state;
+        this.headBlockIndex.restore(myState.headBlockIndex, serdeProvider);
+        this.headPosition.restore(myState.headPosition, serdeProvider);
+        this.nextBlockIndex.restore(myState.nextBlockIndex, serdeProvider);
+        this.nextPosition.restore(myState.nextPosition, serdeProvider);
+        this.tailBlockIndex.restore(myState.tailBlockIndex, serdeProvider);
+        this.tailPosition.restore(myState.tailPosition, serdeProvider);
+        this.values.clear();
+        for (int i = 0; i < myState.values.length; i++) {
+            values.add(currentPageBuilder.newPageBuilderLike());
+            values.get(i).restore(myState.values[i], serdeProvider);
+        }
+        this.currentPageBuilder = values.get(values.size() - 1);
+        this.sumPositions.clear();
+        this.sumPositions.addAll(myState.sumPositions);
+        this.groupEntryCount.restore(myState.groupEntryCount, serdeProvider);
+        this.valueBlocksRetainedSizeInBytes = myState.valueBlocksRetainedSizeInBytes;
+        this.totalPositions = myState.totalPositions;
+        this.capacity = myState.capacity;
+        super.restore(myState.baseState, serdeProvider);
+    }
+
+    private static class AbstractGroupCollectionAggregationStateState
+            implements Serializable
+    {
+        private Object headBlockIndex;
+        private Object headPosition;
+        private Object nextBlockIndex;
+        private Object nextPosition;
+        private Object tailBlockIndex;
+        private Object tailPosition;
+        private Object[] values;
+        private LongList sumPositions;
+        private Object groupEntryCount;
+        private long valueBlocksRetainedSizeInBytes;
+        private long totalPositions;
+        private long capacity;
+        private Object baseState;
+    }
 }

@@ -14,6 +14,7 @@
 package io.prestosql.operator;
 
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 
 import static java.util.Objects.requireNonNull;
 
@@ -60,5 +61,23 @@ public class FinishedOperator
     public Page getOutput()
     {
         return null;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return null;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        return operatorContext.capture(serdeProvider);
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        operatorContext.restore(state, serdeProvider);
     }
 }

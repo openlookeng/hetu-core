@@ -19,20 +19,26 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.operator.SpillContext;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 
 import javax.annotation.concurrent.NotThreadSafe;
 
 import java.io.IOException;
+import java.io.Serializable;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 @NotThreadSafe
+@RestorableConfig(uncapturedFields = {"types", "spillContext", "aggregatedMemoryContext", "singleStreamSpillerFactory", "closer", "previousSpill"})
 public class GenericSpiller
         implements Spiller
 {
@@ -99,6 +105,40 @@ public class GenericSpiller
 
     public void deleteAllStreams()
     {
-        singleStreamSpillers.stream().forEach(x -> x.deleteFile());
+        singleStreamSpillers.stream().forEach(SingleStreamSpiller::deleteFile);
+    }
+
+    @Override
+    public List<Path> getSpilledFilePaths()
+    {
+        return singleStreamSpillers.stream().map(s -> s.getFile()).collect(Collectors.toList());
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        GenericSpillerState myState = new GenericSpillerState();
+        for (SingleStreamSpiller s : singleStreamSpillers) {
+            myState.singleStreamSpillers.add(s.capture(serdeProvider));
+        }
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        GenericSpillerState myState = (GenericSpillerState) state;
+        for (Object s : myState.singleStreamSpillers) {
+            SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, spillContext, aggregatedMemoryContext.newLocalMemoryContext(GenericSpiller.class.getSimpleName()));
+            singleStreamSpiller.restore(s, serdeProvider);
+            this.singleStreamSpillers.add(singleStreamSpiller);
+            this.closer.register(singleStreamSpiller);
+        }
+    }
+
+    private static class GenericSpillerState
+            implements Serializable
+    {
+        List<Object> singleStreamSpillers = new ArrayList<>();
     }
 }

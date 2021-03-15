@@ -23,6 +23,10 @@ public interface TrackingLookupSourceSupplier
 
     OuterPositionIterator getOuterPositionIterator();
 
+    Object captureJoinPositions();
+
+    void restoreJoinPositions(Object state);
+
     static TrackingLookupSourceSupplier nonTracking(Supplier<LookupSource> lookupSourceSupplier)
     {
         requireNonNull(lookupSourceSupplier, "lookupSourceSupplier is null");
@@ -36,6 +40,18 @@ public interface TrackingLookupSourceSupplier
 
             @Override
             public OuterPositionIterator getOuterPositionIterator()
+            {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Object captureJoinPositions()
+            {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void restoreJoinPositions(Object state)
             {
                 throw new UnsupportedOperationException();
             }

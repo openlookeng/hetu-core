@@ -17,12 +17,15 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.stats.GcMonitor;
 import io.airlift.units.DataSize;
+import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.Session;
 import io.prestosql.execution.TaskId;
 import io.prestosql.execution.TaskStateMachine;
 import io.prestosql.memory.context.MemoryReservationHandler;
 import io.prestosql.memory.context.MemoryTrackingContext;
 import io.prestosql.operator.TaskContext;
+import io.prestosql.snapshot.SnapshotUtils;
+import io.prestosql.snapshot.TaskSnapshotManager;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spiller.SpillSpaceTracker;
@@ -78,6 +81,7 @@ public class QueryContext
     private long maxTotalMemory;
 
     private final MemoryTrackingContext queryMemoryContext;
+    private final SnapshotUtils snapshotUtils;
 
     @GuardedBy("this")
     private MemoryPool memoryPool;
@@ -94,7 +98,8 @@ public class QueryContext
             Executor notificationExecutor,
             ScheduledExecutorService yieldExecutor,
             DataSize maxSpill,
-            SpillSpaceTracker spillSpaceTracker)
+            SpillSpaceTracker spillSpaceTracker,
+            SnapshotUtils snapshotUtils)
     {
         this.queryId = requireNonNull(queryId, "queryId is null");
         this.maxUserMemory = requireNonNull(maxUserMemory, "maxUserMemory is null").toBytes();
@@ -109,6 +114,7 @@ public class QueryContext
                 newRootAggregatedMemoryContext(new QueryMemoryReservationHandler(this::updateUserMemory, this::tryUpdateUserMemory), GUARANTEED_MEMORY),
                 newRootAggregatedMemoryContext(new QueryMemoryReservationHandler(this::updateRevocableMemory, this::tryReserveMemoryNotSupported), 0L),
                 newRootAggregatedMemoryContext(new QueryMemoryReservationHandler(this::updateSystemMemory, this::tryReserveMemoryNotSupported), 0L));
+        this.snapshotUtils = requireNonNull(snapshotUtils, "snapshotUtils is null");
     }
 
     // TODO: This method should be removed, and the correct limit set in the constructor. However, due to the way QueryContext is constructed the memory limit is not known in advance
@@ -248,7 +254,7 @@ public class QueryContext
         return memoryPool;
     }
 
-    public TaskContext addTaskContext(TaskStateMachine taskStateMachine, Session session, boolean perOperatorCpuTimerEnabled, boolean cpuTimerEnabled, OptionalInt totalPartitions, Optional<PlanNodeId> parent)
+    public TaskContext addTaskContext(TaskStateMachine taskStateMachine, Session session, boolean perOperatorCpuTimerEnabled, boolean cpuTimerEnabled, OptionalInt totalPartitions, Optional<PlanNodeId> parent, PagesSerdeFactory serdeFactory)
     {
         TaskContext taskContext = TaskContext.createTaskContext(
                 this,
@@ -261,9 +267,16 @@ public class QueryContext
                 perOperatorCpuTimerEnabled,
                 cpuTimerEnabled,
                 totalPartitions,
-                parent.orElse(null));
+                parent.orElse(null),
+                serdeFactory,
+                new TaskSnapshotManager(taskStateMachine.getTaskId(), snapshotUtils));
         taskContexts.put(taskStateMachine.getTaskId(), taskContext);
         return taskContext;
+    }
+
+    public void removeTaskContext(TaskId taskId)
+    {
+        taskContexts.remove(taskId);
     }
 
     public <C, R> R accept(QueryContextVisitor<C, R> visitor, C context)

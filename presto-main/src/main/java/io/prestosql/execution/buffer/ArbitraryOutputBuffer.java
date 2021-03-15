@@ -20,20 +20,32 @@ import com.google.common.collect.Sets.SetView;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.SystemSessionProperties;
 import io.prestosql.execution.StateMachine;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.ClientBuffer.PagesSupplier;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.operator.TaskContext;
+import io.prestosql.snapshot.MultiInputRestorable;
+import io.prestosql.snapshot.MultiInputSnapshotState;
+import io.prestosql.snapshot.SnapshotStateId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
@@ -58,10 +70,17 @@ import static java.util.Objects.requireNonNull;
 /**
  * A buffer that assigns pages to queues based on a first come, first served basis.
  */
+@RestorableConfig(uncapturedFields = {"memoryManager", "taskContext", "inputChannels", "snapshotState", "outputBuffers",
+        "masterBuffer", "buffers", "markersForNewBuffers", "state", "noMoreInputChannels"})
 public class ArbitraryOutputBuffer
-        implements OutputBuffer
+        implements OutputBuffer, MultiInputRestorable
 {
     private final OutputBufferMemoryManager memoryManager;
+    // Snapshot: Output buffers can receive markers from multiple drivers
+    private TaskContext taskContext;
+    private boolean noMoreInputChannels;
+    private final Set<String> inputChannels = Sets.newConcurrentHashSet();
+    private MultiInputSnapshotState snapshotState;
 
     @GuardedBy("this")
     private OutputBuffers outputBuffers = createInitialEmptyOutputBuffers(ARBITRARY);
@@ -70,6 +89,10 @@ public class ArbitraryOutputBuffer
 
     @GuardedBy("this")
     private final ConcurrentMap<OutputBufferId, ClientBuffer> buffers = new ConcurrentHashMap<>();
+
+    // When not all remote clients are ready (canAddBuffers is true), need to remember markers, to send to newly added clients
+    @GuardedBy("this")
+    private final List<SerializedPageReference> markersForNewBuffers = new ArrayList<>();
 
     private final StateMachine<BufferState> state;
     private final String taskInstanceId;
@@ -211,6 +234,18 @@ public class ArbitraryOutputBuffer
             return;
         }
 
+        Collection<ClientBuffer> targetClients = null;
+        if (snapshotState != null) {
+            // All marker related processing is handled by this utility method
+            synchronized (this) {
+                pages = snapshotState.processSerializedPages(pages);
+            }
+            if (pages.size() == 1 && pages.get(0).isMarkerPage()) {
+                // Broadcast marker to all clients
+                targetClients = safeGetBuffersSnapshot();
+            }
+        }
+
         // reserve memory
         long bytesAdded = pages.stream().mapToLong(SerializedPage::getRetainedSizeInBytes).sum();
         memoryManager.updateMemoryUsage(bytesAdded);
@@ -225,8 +260,8 @@ public class ArbitraryOutputBuffer
                 .map(pageSplit -> new SerializedPageReference(pageSplit, 1, () -> memoryManager.updateMemoryUsage(-pageSplit.getRetainedSizeInBytes())))
                 .collect(toImmutableList());
 
-        // add pages to the buffer (this will increase the reference count by one)
-        masterBuffer.addPages(serializedPageReferences);
+        // add pages to the buffer
+        masterBuffer.addPages(serializedPageReferences, targetClients);
 
         // process any pending reads from the client buffers
         for (ClientBuffer clientBuffer : safeGetBuffersSnapshot()) {
@@ -234,6 +269,15 @@ public class ArbitraryOutputBuffer
                 break;
             }
             clientBuffer.loadPagesIfNecessary(masterBuffer);
+        }
+
+        if (targetClients != null && state.get().canAddBuffers()) {
+            // targetClients != null means current page is a marker page
+            // Record the marker so when new buffers are added, the marker is sent to those new buffers
+            serializedPageReferences.forEach(SerializedPageReference::addReference);
+            synchronized (this) {
+                markersForNewBuffers.addAll(serializedPageReferences);
+            }
         }
     }
 
@@ -343,15 +387,25 @@ public class ArbitraryOutputBuffer
         // NOTE: buffers are allowed to be created in the FINISHED state because destroy() can move to the finished state
         // without a clean "no-more-buffers" message from the scheduler.  This happens with limit queries and is ok because
         // the buffer will be immediately destroyed.
-        checkState(state.get().canAddBuffers() || !outputBuffers.isNoMoreBufferIds(), "No more buffers already set");
+        BufferState state = this.state.get();
+        checkState(state.canAddBuffers() || !outputBuffers.isNoMoreBufferIds(), "No more buffers already set");
 
         // NOTE: buffers are allowed to be created before they are explicitly declared by setOutputBuffers
         // When no-more-buffers is set, we verify that all created buffers have been declared
         buffer = new ClientBuffer(taskInstanceId, id);
 
-        // buffer may have finished immediately before calling this method
-        if (state.get() == FINISHED) {
-            buffer.destroy();
+        // do not setup the new buffer if we are already failed
+        if (state != FAILED) {
+            // add pending markers
+            if (!markersForNewBuffers.isEmpty()) {
+                markersForNewBuffers.forEach(SerializedPageReference::addReference);
+                masterBuffer.insertMarkers(markersForNewBuffers, buffer);
+            }
+
+            // buffer may have finished immediately before calling this method
+            if (state == FINISHED) {
+                buffer.destroy();
+            }
         }
 
         buffers.put(id, buffer);
@@ -363,12 +417,26 @@ public class ArbitraryOutputBuffer
         return ImmutableList.copyOf(this.buffers.values());
     }
 
-    private synchronized void noMoreBuffers()
+    private void noMoreBuffers()
     {
-        if (outputBuffers.isNoMoreBufferIds()) {
-            // verify all created buffers have been declared
-            SetView<OutputBufferId> undeclaredCreatedBuffers = Sets.difference(buffers.keySet(), outputBuffers.getBuffers().keySet());
-            checkState(undeclaredCreatedBuffers.isEmpty(), "Final output buffers does not contain all created buffer ids: %s", undeclaredCreatedBuffers);
+        checkState(!Thread.holdsLock(this), "Can not set no more buffers while holding a lock on this");
+        List<SerializedPageReference> pages = null;
+        synchronized (this) {
+            if (!markersForNewBuffers.isEmpty()) {
+                pages = ImmutableList.copyOf(markersForNewBuffers);
+                markersForNewBuffers.clear();
+            }
+
+            if (outputBuffers.isNoMoreBufferIds()) {
+                // verify all created buffers have been declared
+                SetView<OutputBufferId> undeclaredCreatedBuffers = Sets.difference(buffers.keySet(), outputBuffers.getBuffers().keySet());
+                checkState(undeclaredCreatedBuffers.isEmpty(), "Final output buffers does not contain all created buffer ids: %s", undeclaredCreatedBuffers);
+            }
+        }
+
+        if (pages != null) {
+            // dereference outside of synchronized to avoid making a callback while holding a lock
+            pages.forEach(SerializedPageReference::dereferencePage);
         }
     }
 
@@ -387,20 +455,62 @@ public class ArbitraryOutputBuffer
     }
 
     @ThreadSafe
-    private static class MasterBuffer
+    private class MasterBuffer
             implements PagesSupplier
     {
         @GuardedBy("this")
         private final LinkedList<SerializedPageReference> masterBuffer = new LinkedList<>();
+        // Snapshot: pararrel array to masterBuffer, about which clients need to receive this page. "null" indicates any one client.
+        @GuardedBy("this")
+        private final LinkedList<Set<ClientBuffer>> targetClients = new LinkedList<>();
 
         @GuardedBy("this")
         private boolean noMorePages;
 
         private final AtomicInteger bufferedPages = new AtomicInteger();
 
-        public synchronized void addPages(List<SerializedPageReference> pages)
+        public synchronized void addPages(List<SerializedPageReference> pages, Collection<ClientBuffer> clients)
         {
             masterBuffer.addAll(pages);
+            if (snapshotState != null) {
+                for (SerializedPageReference page : pages) {
+                    if (clients == null) {
+                        targetClients.add(null);
+                    }
+                    else {
+                        targetClients.add(new HashSet<>(clients));
+                        // This page will be returned multiple times. Make sure reference count is accurate.
+                        for (int i = 0; i < clients.size() - 1; i++) {
+                            page.addReference();
+                        }
+                    }
+                }
+                checkState(masterBuffer.size() == targetClients.size(), "Lists have different sizes");
+            }
+            bufferedPages.set(masterBuffer.size());
+        }
+
+        public void insertMarkers(List<SerializedPageReference> markers, ClientBuffer buffer)
+        {
+            // Markers are potentially inserted at the beginning of the queue. Process them reversely to maintain marker order.
+            for (int i = markers.size() - 1; i >= 0; i--) {
+                SerializedPageReference page = markers.get(i);
+                // If this marker still exists in the queue, then add target to its target list;
+                // otherwise add the page to the front of the queue, so it's the first page retrieved by the new target.
+                Iterator<SerializedPageReference> pageIterator = masterBuffer.iterator();
+                Iterator<Set<ClientBuffer>> targetIterator = targetClients.iterator();
+                while (pageIterator.hasNext() && pageIterator.next() != page) {
+                    targetIterator.next();
+                }
+                if (targetIterator.hasNext()) {
+                    targetIterator.next().add(buffer);
+                }
+                else {
+                    masterBuffer.addFirst(page);
+                    targetClients.addFirst(Sets.newHashSet(buffer));
+                }
+                page.addReference();
+            }
             bufferedPages.set(masterBuffer.size());
         }
 
@@ -421,25 +531,54 @@ public class ArbitraryOutputBuffer
         }
 
         @Override
-        public synchronized List<SerializedPageReference> getPages(DataSize maxSize)
+        public synchronized List<SerializedPageReference> getPages(ClientBuffer client, DataSize maxSize)
         {
             long maxBytes = maxSize.toBytes();
             List<SerializedPageReference> pages = new ArrayList<>();
             long bytesRemoved = 0;
 
-            while (true) {
-                SerializedPageReference page = masterBuffer.peek();
-                if (page == null) {
-                    break;
+            if (snapshotState == null) {
+                while (true) {
+                    SerializedPageReference page = masterBuffer.peek();
+                    if (page == null) {
+                        break;
+                    }
+                    bytesRemoved += page.getRetainedSizeInBytes();
+                    // break (and don't add) if this page would exceed the limit
+                    if (!pages.isEmpty() && bytesRemoved > maxBytes) {
+                        break;
+                    }
+                    // this should not happen since we have a lock
+                    checkState(masterBuffer.poll() == page, "Master buffer corrupted");
+                    pages.add(page);
                 }
-                bytesRemoved += page.getRetainedSizeInBytes();
-                // break (and don't add) if this page would exceed the limit
-                if (!pages.isEmpty() && bytesRemoved > maxBytes) {
-                    break;
+            }
+            else {
+                for (int i = 0; i < masterBuffer.size(); i++) {
+                    Set<ClientBuffer> clients = targetClients.get(i);
+                    if (clients != null && !clients.contains(client)) {
+                        // Current page is not for this client. Check later pages.
+                        continue;
+                    }
+
+                    SerializedPageReference page = masterBuffer.get(i);
+                    bytesRemoved += page.getRetainedSizeInBytes();
+                    // break (and don't add) if this page would exceed the limit
+                    if (!pages.isEmpty() && bytesRemoved > maxBytes) {
+                        break;
+                    }
+                    pages.add(page);
+
+                    if (clients != null) {
+                        clients.remove(client);
+                    }
+                    if (clients == null || clients.isEmpty()) {
+                        // this should not happen since we have a lock
+                        checkState(masterBuffer.remove(i) == page, "Master buffer corrupted");
+                        checkState(targetClients.remove(i) == clients, "Target client list corrupted");
+                        i--;
+                    }
                 }
-                // this should not happen since we have a lock
-                checkState(masterBuffer.poll() == page, "Master buffer corrupted");
-                pages.add(page);
             }
 
             bufferedPages.set(masterBuffer.size());
@@ -479,5 +618,63 @@ public class ArbitraryOutputBuffer
     OutputBufferMemoryManager getMemoryManager()
     {
         return memoryManager;
+    }
+
+    @Override
+    public void setTaskContext(TaskContext taskContext)
+    {
+        checkArgument(taskContext != null, "taskContext is null");
+        checkState(this.taskContext == null, "setTaskContext is called multiple times");
+        this.taskContext = taskContext;
+        this.snapshotState = SystemSessionProperties.isSnapshotEnabled(taskContext.getSession())
+                ? MultiInputSnapshotState.forTaskComponent(this, taskContext, snapshotId -> SnapshotStateId.forTaskComponent(snapshotId, taskContext, "OutputBuffer"))
+                : null;
+    }
+
+    @Override
+    public void setNoMoreInputChannels()
+    {
+        checkState(!noMoreInputChannels, "setNoMoreInputChannels is called multiple times");
+        this.noMoreInputChannels = true;
+    }
+
+    @Override
+    public void addInputChannel(String inputId)
+    {
+        checkState(!noMoreInputChannels, "addInputChannel is called after setNoMoreInputChannels");
+        inputChannels.add(inputId);
+    }
+
+    @Override
+    public Optional<Set<String>> getInputChannels(int expectedChannelCount)
+    {
+        return noMoreInputChannels ? Optional.of(Collections.unmodifiableSet(inputChannels)) : Optional.empty();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        ArbitraryOutputBufferState myState = new ArbitraryOutputBufferState();
+        myState.totalPagesAdded = totalPagesAdded.get();
+        myState.totalRowsAdded = totalRowsAdded.get();
+        // TODO-cp-I2DSGR: other fields worth capturing?
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        ArbitraryOutputBufferState myState = (ArbitraryOutputBufferState) state;
+        totalPagesAdded.set(myState.totalPagesAdded);
+        totalRowsAdded.set(myState.totalRowsAdded);
+    }
+
+    private static class ArbitraryOutputBufferState
+            implements Serializable
+    {
+        // Do not need to capture markersForNewBuffers, because pages stored there
+        // will be sent out before markers are sent to their targets.
+        private long totalPagesAdded;
+        private long totalRowsAdded;
     }
 }

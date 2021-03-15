@@ -16,6 +16,7 @@ package io.prestosql.operator.aggregation.state;
 import io.prestosql.array.ObjectBigArray;
 import io.prestosql.operator.aggregation.TypedHeap;
 import io.prestosql.spi.function.AccumulatorStateFactory;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import org.openjdk.jol.info.ClassLayout;
 
 public class MinMaxNStateFactory
@@ -45,6 +46,8 @@ public class MinMaxNStateFactory
         return GroupedMinMaxNState.class;
     }
 
+    // captured/restored by MinMaxNStateSerializer
+    @RestorableConfig(unsupported = true)
     public static class GroupedMinMaxNState
             extends AbstractGroupedAccumulatorState
             implements MinMaxNState
@@ -86,6 +89,31 @@ public class MinMaxNStateFactory
         public void addMemoryUsage(long memory)
         {
             size += memory;
+        }
+
+        public ObjectBigArray<TypedHeap> getHeaps()
+        {
+            return heaps;
+        }
+
+        public long getSize()
+        {
+            return size;
+        }
+
+        public void setSize(long size)
+        {
+            this.size = size;
+        }
+
+        public long getStateGroupId()
+        {
+            return getGroupId();
+        }
+
+        public void setStateGroupId(long groupId)
+        {
+            setGroupId(groupId);
         }
     }
 

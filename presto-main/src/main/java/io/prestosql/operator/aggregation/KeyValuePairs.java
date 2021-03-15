@@ -16,9 +16,13 @@ package io.prestosql.operator.aggregation;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -30,7 +34,9 @@ import static io.prestosql.type.TypeUtils.positionEqualsPosition;
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"keyType", "valueType"})
 public class KeyValuePairs
+        implements Restorable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(KeyValuePairs.class).instanceSize();
     private static final int EXPECTED_ENTRIES = 10;
@@ -185,5 +191,41 @@ public class KeyValuePairs
     private int getMaskedHash(long rawHash)
     {
         return (int) (rawHash & hashMask);
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        KeyValuePairsState myState = new KeyValuePairsState();
+        myState.keyBlockBuilder = keyBlockBuilder.capture(serdeProvider);
+        myState.valueBlockBuilder = valueBlockBuilder.capture(serdeProvider);
+        myState.keyPositionByHash = keyPositionByHash.clone();
+        myState.hashCapacity = hashCapacity;
+        myState.maxFill = maxFill;
+        myState.hashMask = hashMask;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        KeyValuePairsState myState = (KeyValuePairsState) state;
+        this.keyBlockBuilder.restore(myState.keyBlockBuilder, serdeProvider);
+        this.valueBlockBuilder.restore(myState.valueBlockBuilder, serdeProvider);
+        this.keyPositionByHash = myState.keyPositionByHash;
+        this.hashCapacity = myState.hashCapacity;
+        this.maxFill = myState.maxFill;
+        this.hashMask = myState.hashMask;
+    }
+
+    private static class KeyValuePairsState
+            implements Serializable
+    {
+        private Object keyBlockBuilder;
+        private Object valueBlockBuilder;
+        private int[] keyPositionByHash;
+        private int hashCapacity;
+        private int maxFill;
+        private int hashMask;
     }
 }

@@ -327,7 +327,13 @@ public class QueryInfo
     @JsonProperty
     public boolean isFinalQueryInfo()
     {
-        return state.isDone() && getAllStages(outputStage).stream().allMatch(StageInfo::isFinalStageInfo);
+        return state.isDone() && areAllStagesDone();
+    }
+
+    public boolean areAllStagesDone()
+    {
+        // Snapshot: also used during resume, to determine if all old stages have finished
+        return getAllStages(outputStage).stream().allMatch(StageInfo::isFinalStageInfo);
     }
 
     @JsonProperty

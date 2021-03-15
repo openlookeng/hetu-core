@@ -41,6 +41,7 @@ import static io.prestosql.RowPagesBuilder.rowPagesBuilder;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
 import static io.prestosql.operator.OperatorAssertion.finishOperator;
 import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.testing.TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS;
 import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static io.prestosql.testing.assertions.Assert.assertEquals;
 import static java.util.Objects.requireNonNull;
@@ -88,7 +89,8 @@ public final class GroupByHashYieldAssertion
                 EXECUTOR,
                 SCHEDULED_EXECUTOR,
                 new DataSize(512, MEGABYTE),
-                new SpillSpaceTracker(new DataSize(512, MEGABYTE)));
+                new SpillSpaceTracker(new DataSize(512, MEGABYTE)),
+                NOOP_SNAPSHOT_UTILS);
 
         DriverContext driverContext = createTaskContext(queryContext, EXECUTOR, TEST_SESSION)
                 .addPipelineContext(0, true, true, false)

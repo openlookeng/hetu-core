@@ -17,12 +17,16 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
 import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Optional;
 
@@ -34,6 +38,8 @@ import static io.prestosql.SystemSessionProperties.isDictionaryAggregationEnable
 import static io.prestosql.operator.GroupByHash.createGroupByHash;
 import static java.util.Objects.requireNonNull;
 
+// When a marker is received (needsInput returns true), inputPage and unfinishedWork must be null
+@RestorableConfig(uncapturedFields = {"inputPage", "outputChannels", "unfinishedWork", "snapshotState"})
 public class DistinctLimitOperator
         implements Operator
 {
@@ -109,6 +115,8 @@ public class DistinctLimitOperator
     private GroupByIdBlock groupByIds;
     private Work<GroupByIdBlock> unfinishedWork;
 
+    private final SingleInputSnapshotState snapshotState;
+
     public DistinctLimitOperator(OperatorContext operatorContext, List<Integer> distinctChannels, List<Type> distinctTypes, long limit, Optional<Integer> hashChannel, JoinCompiler joinCompiler)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
@@ -131,6 +139,8 @@ public class DistinctLimitOperator
                 joinCompiler,
                 this::updateMemoryReservation);
         remainingLimit = limit;
+
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -148,6 +158,11 @@ public class DistinctLimitOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         return !hasUnfinishedInput() && (finishing || remainingLimit == 0);
     }
 
@@ -162,6 +177,12 @@ public class DistinctLimitOperator
     {
         checkState(needsInput());
 
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         inputPage = page;
         unfinishedWork = groupByHash.getGroupIds(page);
         processUnfinishedWork();
@@ -171,6 +192,13 @@ public class DistinctLimitOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (unfinishedWork != null && !processUnfinishedWork()) {
             return null;
         }
@@ -201,6 +229,12 @@ public class DistinctLimitOperator
 
         updateMemoryReservation();
         return result;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     private Page maskToDistinctOutputPositions(int distinctCount, int[] distinctPositions)
@@ -253,5 +287,46 @@ public class DistinctLimitOperator
     public int getCapacity()
     {
         return groupByHash.getCapacity();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        DistinctLimitOperatorState myState = new DistinctLimitOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.localUserMemoryContext = localUserMemoryContext.getBytes();
+        myState.remainingLimit = remainingLimit;
+        myState.finishing = finishing;
+        myState.groupByHash = groupByHash.capture(serdeProvider);
+        myState.nextDistinctId = nextDistinctId;
+        if (groupByIds != null) {
+            myState.groupByIds = groupByIds.capture(serdeProvider);
+        }
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        DistinctLimitOperatorState myState = (DistinctLimitOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.localUserMemoryContext.setBytes(myState.localUserMemoryContext);
+        this.remainingLimit = myState.remainingLimit;
+        this.finishing = myState.finishing;
+        this.groupByHash.restore(myState.groupByHash, serdeProvider);
+        this.nextDistinctId = myState.nextDistinctId;
+        this.groupByIds = myState.groupByIds == null ? null : GroupByIdBlock.restoreGroupedIdBlock(myState.groupByIds, serdeProvider.getBlockEncodingSerde());
+    }
+
+    private static class DistinctLimitOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private long localUserMemoryContext;
+        private long remainingLimit;
+        private boolean finishing;
+        private Object groupByHash;
+        private long nextDistinctId;
+        private Object groupByIds;
     }
 }

@@ -178,4 +178,10 @@ public class FullConnectorSession
     {
         session.setPageMetadataEnabled(pageMetadataEnabled);
     }
+
+    @Override
+    public boolean isSnapshotEnabled()
+    {
+        return SystemSessionProperties.isSnapshotEnabled(session);
+    }
 }

@@ -17,18 +17,26 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.MarkerPage;
+import io.prestosql.spi.snapshot.Restorable;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
+import java.util.Optional;
 import java.util.Properties;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static io.hetu.core.transport.execution.buffer.PageCodecMarker.COMPRESSED;
 import static io.hetu.core.transport.execution.buffer.PageCodecMarker.ENCRYPTED;
+import static io.hetu.core.transport.execution.buffer.PageCodecMarker.MARKER_PAGE;
 import static io.hetu.core.transport.execution.buffer.PageCodecMarker.MarkerSet.fromByteValue;
 import static java.util.Objects.requireNonNull;
 
 public class SerializedPage
+        implements Restorable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SerializedPage.class).instanceSize();
 
@@ -37,6 +45,16 @@ public class SerializedPage
     private final int uncompressedSizeInBytes;
     private final byte pageCodecMarkers;
     private Properties pageMetadata = new Properties();
+
+    // origin may be null, when it is unknown or uninteresting
+    // TODO-cp-I2D63E: remove origin and introduce PageInTransition to include page, origin, and target
+    private String origin;
+
+    public static SerializedPage forMarker(MarkerPage marker)
+    {
+        byte[] bytes = marker.serialize();
+        return new SerializedPage(bytes, PageCodecMarker.MARKER_PAGE.set(PageCodecMarker.none()), 1, bytes.length);
+    }
 
     @JsonCreator
     public SerializedPage(
@@ -136,10 +154,32 @@ public class SerializedPage
         return ENCRYPTED.isSet(pageCodecMarkers);
     }
 
+    public boolean isMarkerPage()
+    {
+        return MARKER_PAGE.isSet(pageCodecMarkers);
+    }
+
+    public MarkerPage toMarker()
+    {
+        checkState(isMarkerPage());
+        return MarkerPage.deserialize(getSliceArray());
+    }
+
     @JsonProperty
     public Properties getPageMetadata()
     {
         return pageMetadata;
+    }
+
+    public Optional<String> getOrigin()
+    {
+        return Optional.ofNullable(origin);
+    }
+
+    public SerializedPage setOrigin(String origin)
+    {
+        this.origin = origin;
+        return this;
     }
 
     @Override
@@ -152,5 +192,38 @@ public class SerializedPage
                 .add("uncompressedSizeInBytes", uncompressedSizeInBytes)
                 .add("pageMetadata", pageMetadata)
                 .toString();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        SerializedPageState state = new SerializedPageState();
+        state.slice = getSliceArray();
+        state.positionCount = getPositionCount();
+        state.uncompressedSizeInBytes = getUncompressedSizeInBytes();
+        state.pageCodecMarkers = getPageCodecMarkers();
+        state.origin = origin;
+        return state;
+    }
+
+    public static SerializedPage restoreSerializedPage(Object state)
+    {
+        SerializedPageState serializedPageState = (SerializedPageState) state;
+        return new SerializedPage(
+                serializedPageState.slice,
+                serializedPageState.pageCodecMarkers,
+                serializedPageState.positionCount,
+                serializedPageState.uncompressedSizeInBytes)
+                .setOrigin(serializedPageState.origin);
+    }
+
+    private static class SerializedPageState
+            implements Serializable
+    {
+        private byte[] slice;
+        private int positionCount;
+        private int uncompressedSizeInBytes;
+        private byte pageCodecMarkers;
+        private String origin;
     }
 }

@@ -28,7 +28,9 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -39,6 +41,7 @@ import static io.prestosql.RowPagesBuilder.rowPagesBuilder;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.operator.OperatorAssertion.assertOperatorEquals;
+import static io.prestosql.operator.OperatorAssertion.assertOperatorEqualsWithSimpleSelfStateComparison;
 import static io.prestosql.operator.OperatorAssertion.toPages;
 import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -125,6 +128,55 @@ public class TestAggregationOperator
         assertOperatorEquals(operatorFactory, driverContext, input, expected);
         assertEquals(driverContext.getSystemMemoryUsage(), 0);
         assertEquals(driverContext.getMemoryUsage(), 0);
+    }
+
+    @Test
+    public void testAggregationSnapshot()
+    {
+        InternalAggregationFunction countVarcharColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("count"), AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.VARCHAR)));
+        InternalAggregationFunction maxVarcharColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("max"), AGGREGATE, parseTypeSignature(StandardTypes.VARCHAR), parseTypeSignature(StandardTypes.VARCHAR)));
+        List<Page> input = rowPagesBuilder(VARCHAR, BIGINT, VARCHAR, BIGINT, REAL, DOUBLE, VARCHAR)
+                .addSequencePage(100, 0, 0, 300, 500, 400, 500, 500)
+                .build();
+
+        OperatorFactory operatorFactory = new AggregationOperatorFactory(
+                0,
+                new PlanNodeId("test"),
+                Step.SINGLE,
+                ImmutableList.of(COUNT.bind(ImmutableList.of(0), Optional.empty()),
+                        LONG_SUM.bind(ImmutableList.of(1), Optional.empty()),
+                        LONG_AVERAGE.bind(ImmutableList.of(1), Optional.empty()),
+                        maxVarcharColumn.bind(ImmutableList.of(2), Optional.empty()),
+                        countVarcharColumn.bind(ImmutableList.of(0), Optional.empty()),
+                        LONG_SUM.bind(ImmutableList.of(3), Optional.empty()),
+                        REAL_SUM.bind(ImmutableList.of(4), Optional.empty()),
+                        DOUBLE_SUM.bind(ImmutableList.of(5), Optional.empty()),
+                        maxVarcharColumn.bind(ImmutableList.of(6), Optional.empty())),
+                false);
+
+        DriverContext driverContext = createTaskContext(executor, scheduledExecutor, TEST_SESSION)
+                .addPipelineContext(0, true, true, false)
+                .addDriverContext();
+
+        MaterializedResult expected = resultBuilder(driverContext.getSession(), BIGINT, BIGINT, DOUBLE, VARCHAR, BIGINT, BIGINT, REAL, DOUBLE, VARCHAR)
+                .row(100L, 4950L, 49.5, "399", 100L, 54950L, 44950.0f, 54950.0, "599")
+                .build();
+
+        assertOperatorEqualsWithSimpleSelfStateComparison(operatorFactory, driverContext, input, expected, createExpectedMapping());
+        assertEquals(driverContext.getSystemMemoryUsage(), 0);
+        assertEquals(driverContext.getMemoryUsage(), 0);
+    }
+
+    private Map<String, Object> createExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        expectedMapping.put("operatorContext", 0);
+        expectedMapping.put("systemMemoryContext", 0L);
+        expectedMapping.put("userMemoryContext", 224L);
+        expectedMapping.put("state", "NEEDS_INPUT");
+        return expectedMapping;
     }
 
     @Test

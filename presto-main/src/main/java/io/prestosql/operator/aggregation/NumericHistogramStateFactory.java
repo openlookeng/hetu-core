@@ -16,6 +16,11 @@ package io.prestosql.operator.aggregation;
 import io.prestosql.array.ObjectBigArray;
 import io.prestosql.operator.aggregation.state.AbstractGroupedAccumulatorState;
 import io.prestosql.spi.function.AccumulatorStateFactory;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+
+import java.io.Serializable;
+import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
 
@@ -84,10 +89,39 @@ public class NumericHistogramStateFactory
         {
             return size + histograms.sizeOf();
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedStateState myState = new GroupedStateState();
+            myState.size = size;
+            myState.baseState = super.capture(serdeProvider);
+            Function<Object, Object> histogramsCapture = content -> content;
+            myState.histograms = histograms.capture(histogramsCapture);
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            GroupedStateState myState = (GroupedStateState) state;
+            this.size = myState.size;
+            super.restore(myState.baseState, serdeProvider);
+            Function<Object, Object> histogramsRestore = content -> content;
+            this.histograms.restore(histogramsRestore, myState.histograms);
+        }
+
+        private static class GroupedStateState
+                implements Serializable
+        {
+            private long size;
+            private Object baseState;
+            private Object histograms;
+        }
     }
 
     public static class SingleState
-            implements DoubleHistogramAggregation.State
+            implements DoubleHistogramAggregation.State, Restorable
     {
         private NumericHistogram histogram;
 
@@ -110,6 +144,26 @@ public class NumericHistogramStateFactory
                 return 0;
             }
             return histogram.estimatedInMemorySize();
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            if (histogram != null) {
+                return histogram;
+            }
+            return null;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            if (state != null) {
+                this.histogram = (NumericHistogram) state;
+            }
+            else {
+                this.histogram = null;
+            }
         }
     }
 }

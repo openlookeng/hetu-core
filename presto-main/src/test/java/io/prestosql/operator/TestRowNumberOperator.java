@@ -30,7 +30,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -46,6 +48,7 @@ import static io.prestosql.operator.GroupByHashYieldAssertion.createPagesWithDis
 import static io.prestosql.operator.GroupByHashYieldAssertion.finishOperatorWithYieldingGroupByHash;
 import static io.prestosql.operator.OperatorAssertion.toMaterializedResult;
 import static io.prestosql.operator.OperatorAssertion.toPages;
+import static io.prestosql.operator.OperatorAssertion.toPagesCompareSelfStateSimple;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
@@ -147,6 +150,68 @@ public class TestRowNumberOperator
         pages = stripRowNumberColumn(pages);
         MaterializedResult actual = toMaterializedResult(driverContext.getSession(), ImmutableList.of(DOUBLE, BIGINT), pages);
         assertEqualsIgnoreOrder(actual.getMaterializedRows(), expectedResult.getMaterializedRows());
+    }
+
+    @Test
+    public void testRowNumberUnpartitionedSnapshot()
+    {
+        DriverContext driverContext = getDriverContext();
+        List<Page> input = rowPagesBuilder(BIGINT, DOUBLE)
+                .row(1L, 0.3)
+                .row(2L, 0.2)
+                .row(3L, 0.1)
+                .row(3L, 0.19)
+                .pageBreak()
+                .row(1L, 0.4)
+                .pageBreak()
+                .row(1L, 0.5)
+                .row(1L, 0.6)
+                .row(2L, 0.7)
+                .row(2L, 0.8)
+                .row(2L, 0.9)
+                .build();
+
+        RowNumberOperator.RowNumberOperatorFactory operatorFactory = new RowNumberOperator.RowNumberOperatorFactory(
+                0,
+                new PlanNodeId("test"),
+                ImmutableList.of(BIGINT, DOUBLE),
+                Ints.asList(1, 0),
+                Ints.asList(),
+                ImmutableList.of(),
+                Optional.empty(),
+                Optional.empty(),
+                10,
+                joinCompiler);
+
+        MaterializedResult expectedResult = resultBuilder(driverContext.getSession(), DOUBLE, BIGINT)
+                .row(0.3, 1L)
+                .row(0.4, 1L)
+                .row(0.5, 1L)
+                .row(0.6, 1L)
+                .row(0.2, 2L)
+                .row(0.7, 2L)
+                .row(0.8, 2L)
+                .row(0.9, 2L)
+                .row(0.1, 3L)
+                .row(0.19, 3L)
+                .build();
+
+        List<Page> pages = toPagesCompareSelfStateSimple(operatorFactory, driverContext, input, true, createExpectedMapping());
+        Block rowNumberColumn = getRowNumberColumn(pages);
+        assertEquals(rowNumberColumn.getPositionCount(), 10);
+
+        pages = stripRowNumberColumn(pages);
+        MaterializedResult actual = toMaterializedResult(driverContext.getSession(), ImmutableList.of(DOUBLE, BIGINT), pages);
+        assertEqualsIgnoreOrder(actual.getMaterializedRows(), expectedResult.getMaterializedRows());
+    }
+
+    private Map<String, Object> createExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        expectedMapping.put("operatorContext", 0);
+        expectedMapping.put("localUserMemoryContext", 12352L);
+        expectedMapping.put("finishing", false);
+        return expectedMapping;
     }
 
     @Test(dataProvider = "dataType")

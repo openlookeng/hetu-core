@@ -23,6 +23,7 @@ import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.OperatorFactory;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
@@ -30,9 +31,11 @@ import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.AggregationNode.Step;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.type.Type;
 import io.prestosql.testing.LocalQueryRunner;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Optional;
 
@@ -132,8 +135,11 @@ public class HandTpchQuery1
         return ImmutableList.of(tableScanOperator, tpchQuery1Operator, aggregationOperator);
     }
 
+    // TODO: DO NOT use import for the following reference to Operator.
+    // There is a compiler bug (still exists in Java 8). Using "import" will fail to build.
+    @io.prestosql.spi.snapshot.RestorableConfig(uncapturedFields = {"finishing", "snapshotState"})
     public static class TpchQuery1Operator
-            implements io.prestosql.operator.Operator // TODO: use import when Java 7 compiler bug is fixed
+            implements io.prestosql.operator.Operator
     {
         private static final ImmutableList<Type> TYPES = ImmutableList.of(
                 VARCHAR,
@@ -177,10 +183,13 @@ public class HandTpchQuery1
         private final PageBuilder pageBuilder;
         private boolean finishing;
 
+        private final SingleInputSnapshotState snapshotState;
+
         public TpchQuery1Operator(OperatorContext operatorContext)
         {
             this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
             this.pageBuilder = new PageBuilder(TYPES);
+            this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
         }
 
         @Override
@@ -198,6 +207,11 @@ public class HandTpchQuery1
         @Override
         public boolean isFinished()
         {
+            if (snapshotState != null && snapshotState.hasMarker()) {
+                // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+                return false;
+            }
+
             return finishing && pageBuilder.isEmpty();
         }
 
@@ -214,6 +228,12 @@ public class HandTpchQuery1
             checkState(!pageBuilder.isFull(), "Output buffer is full");
             checkState(!finishing, "Operator is finished");
 
+            if (snapshotState != null) {
+                if (snapshotState.processPage(page)) {
+                    return;
+                }
+            }
+
             filterAndProjectRowOriented(pageBuilder,
                     page.getBlock(0),
                     page.getBlock(1),
@@ -227,6 +247,13 @@ public class HandTpchQuery1
         @Override
         public Page getOutput()
         {
+            if (snapshotState != null) {
+                Page marker = snapshotState.nextMarker();
+                if (marker != null) {
+                    return marker;
+                }
+            }
+
             // only return a page if the page buffer isFull or we are finishing and the page buffer has data
             if (pageBuilder.isFull() || (finishing && !pageBuilder.isEmpty())) {
                 Page page = pageBuilder.build();
@@ -234,6 +261,12 @@ public class HandTpchQuery1
                 return page;
             }
             return null;
+        }
+
+        @Override
+        public Page pollMarker()
+        {
+            return snapshotState.nextMarker();
         }
 
         private static final int MAX_SHIP_DATE = parseDate("1998-09-02");
@@ -326,6 +359,30 @@ public class HandTpchQuery1
                     }
                 }
             }
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            TpchQuery1OperatorState myState = new TpchQuery1OperatorState();
+            myState.operatorContext = operatorContext.capture(serdeProvider);
+            myState.pageBuilder = pageBuilder.capture(serdeProvider);
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            TpchQuery1OperatorState myState = (TpchQuery1OperatorState) state;
+            this.operatorContext.restore(myState.operatorContext, serdeProvider);
+            this.pageBuilder.restore(myState.pageBuilder, serdeProvider);
+        }
+
+        private static class TpchQuery1OperatorState
+                implements Serializable
+        {
+            private Object operatorContext;
+            private Object pageBuilder;
         }
     }
 

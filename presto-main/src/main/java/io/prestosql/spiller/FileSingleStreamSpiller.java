@@ -30,6 +30,8 @@ import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.SpillContext;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.spiller.SpillCipher;
 
 import javax.annotation.concurrent.NotThreadSafe;
@@ -37,9 +39,12 @@ import javax.annotation.concurrent.NotThreadSafe;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -53,13 +58,16 @@ import static java.nio.file.StandardOpenOption.APPEND;
 import static java.util.Objects.requireNonNull;
 
 @NotThreadSafe
+
+@RestorableConfig(uncapturedFields = {"closer", "serde",
+        "spillerStats", "localSpillContext", "memoryContext", "executor", "spillInProgress"})
 public class FileSingleStreamSpiller
         implements SingleStreamSpiller
 {
     @VisibleForTesting
     static final int BUFFER_SIZE = 4 * 1024;
 
-    private final FileHolder targetFile;
+    private FileHolder targetFile;
     private final Closer closer = Closer.create();
     private final PagesSerde serde;
     private final SpillerStats spillerStats;
@@ -71,6 +79,9 @@ public class FileSingleStreamSpiller
     private boolean writable = true;
     private long spilledPagesInMemorySize;
     private ListenableFuture<?> spillInProgress = Futures.immediateFuture(null);
+
+    // Snapshot: capture page sizes that are used to update localSpillContext and spillerStats during resume
+    private List<Long> pageSizeList = new ArrayList<>();
 
     public FileSingleStreamSpiller(
             PagesSerde serde,
@@ -147,6 +158,7 @@ public class FileSingleStreamSpiller
                 long pageSize = serializedPage.getSizeInBytes();
                 localSpillContext.updateBytes(pageSize);
                 spillerStats.addToTotalSpilledBytes(pageSize);
+                pageSizeList.add(pageSize);
                 writeSerializedPage(output, serializedPage);
             }
         }
@@ -216,5 +228,54 @@ public class FileSingleStreamSpiller
     public void deleteFile()
     {
         targetFile.close();
+    }
+
+    @Override
+    public Path getFile()
+    {
+        return targetFile.getFilePath();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        FileSingleStreamSpillerState state = new FileSingleStreamSpillerState();
+        state.writable = this.writable;
+        state.spilledPagesInMemorySize = spilledPagesInMemorySize;
+        state.pageSizeList = this.pageSizeList;
+        state.targetFile = this.targetFile.getFilePath().toAbsolutePath().toString();
+        return state;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        try {
+            FileSingleStreamSpillerState myState = (FileSingleStreamSpillerState) state;
+            this.writable = myState.writable;
+            this.spilledPagesInMemorySize = myState.spilledPagesInMemorySize;
+            this.pageSizeList = myState.pageSizeList;
+            this.targetFile.close();
+            Path path = Paths.get(myState.targetFile);
+            Files.deleteIfExists(path);
+            this.targetFile = closer.register(new FileHolder(Files.createFile(path)));
+            for (Long pageSize : pageSizeList) {
+                // restore localSpillContext and spillerStats
+                this.localSpillContext.updateBytes(pageSize);
+                this.spillerStats.addToTotalSpilledBytes(pageSize);
+            }
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static class FileSingleStreamSpillerState
+            implements Serializable
+    {
+        private boolean writable;
+        private long spilledPagesInMemorySize;
+        private List<Long> pageSizeList;
+        private String targetFile;
     }
 }

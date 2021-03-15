@@ -14,8 +14,16 @@
 package io.prestosql;
 
 import io.prestosql.client.ClientCapabilities;
+import io.prestosql.execution.QueryManagerConfig;
+import io.prestosql.execution.TaskManagerConfig;
+import io.prestosql.memory.MemoryManagerConfig;
+import io.prestosql.metadata.SessionPropertyManager;
+import io.prestosql.snapshot.SnapshotConfig;
+import io.prestosql.sql.analyzer.FeaturesConfig;
+import io.prestosql.utils.HetuConfig;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static io.prestosql.SystemSessionProperties.SNAPSHOT_ENABLED;
 import static io.prestosql.plugin.tpch.TpchMetadata.TINY_SCHEMA_NAME;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static java.util.Arrays.stream;
@@ -29,6 +37,29 @@ public final class SessionTestUtils
                     .map(ClientCapabilities::toString)
                     .collect(toImmutableSet()))
             .build();
+
+    public static final Session TEST_SNAPSHOT_SESSION;
+
+    static
+    {
+        // Use a session object that enables snapshot
+        SnapshotConfig snapshotConfig = new SnapshotConfig();
+        SystemSessionProperties properties = new SystemSessionProperties(
+                new QueryManagerConfig(),
+                new TaskManagerConfig(),
+                new MemoryManagerConfig(),
+                new FeaturesConfig(),
+                new HetuConfig(),
+                snapshotConfig);
+        TEST_SNAPSHOT_SESSION = testSessionBuilder(new SessionPropertyManager(properties))
+                .setCatalog("tpch")
+                .setSchema(TINY_SCHEMA_NAME)
+                .setClientCapabilities(stream(ClientCapabilities.values())
+                        .map(ClientCapabilities::toString)
+                        .collect(toImmutableSet()))
+                .setSystemProperty(SNAPSHOT_ENABLED, "true")
+                .build();
+    }
 
     private SessionTestUtils()
     {

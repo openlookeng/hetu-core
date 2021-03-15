@@ -25,6 +25,8 @@ import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexWriter;
 import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.MarkerPage;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeUtils;
 
@@ -46,6 +48,8 @@ import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.spi.heuristicindex.TypeUtils.getActualValue;
 import static java.util.Objects.requireNonNull;
 
+//TODO-cp-I38S9O: Operator currently not supported for Snapshot
+@RestorableConfig(unsupported = true)
 public class CreateIndexOperator
         implements Operator
 {
@@ -180,6 +184,11 @@ public class CreateIndexOperator
         checkState(needsInput(), "Operator is already finishing");
         requireNonNull(page, "page is null");
 
+        //TODO-cp-I38S9O: Operator currently not supported for Snapshot
+        if (page instanceof MarkerPage) {
+            throw new UnsupportedOperationException("Operator doesn't support snapshotting.");
+        }
+
         // if operator is still receiving input, it's not finished
         finished.putIfAbsent(this, false);
 
@@ -266,6 +275,13 @@ public class CreateIndexOperator
         }
 
         state = State.FINISHED;
+        return null;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        //TODO-cp-I38S9O: Operator currently not supported for Snapshot
         return null;
     }
 

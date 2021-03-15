@@ -18,9 +18,10 @@ import io.prestosql.operator.HashCollisionsCounter;
 import io.prestosql.operator.Work;
 import io.prestosql.operator.WorkProcessor;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.Restorable;
 
 public interface HashAggregationBuilder
-        extends AutoCloseable
+        extends AutoCloseable, Restorable
 {
     Work<?> processPage(Page page);
 

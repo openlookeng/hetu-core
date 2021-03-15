@@ -37,6 +37,7 @@ import io.prestosql.protocol.Codec;
 import io.prestosql.protocol.SmileCodec;
 import io.prestosql.server.remotetask.HttpRemoteTask;
 import io.prestosql.server.remotetask.RemoteTaskStats;
+import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.planner.PlanFragment;
 import org.weakref.jmx.Managed;
@@ -135,14 +136,16 @@ public class HttpRemoteTaskFactory
 
     @Override
     public RemoteTask createRemoteTask(Session session,
-                                       TaskId taskId,
-                                       InternalNode node,
-                                       PlanFragment fragment,
-                                       Multimap<PlanNodeId, Split> initialSplits,
-                                       OptionalInt totalPartitions,
-                                       OutputBuffers outputBuffers,
-                                       PartitionedSplitCountTracker partitionedSplitCountTracker,
-                                       boolean summarizeTaskInfo, Optional<PlanNodeId> parent)
+            TaskId taskId,
+            InternalNode node,
+            PlanFragment fragment,
+            Multimap<PlanNodeId, Split> initialSplits,
+            OptionalInt totalPartitions,
+            OutputBuffers outputBuffers,
+            PartitionedSplitCountTracker partitionedSplitCountTracker,
+            boolean summarizeTaskInfo,
+            Optional<PlanNodeId> parent,
+            QuerySnapshotManager snapshotManager)
     {
         return new HttpRemoteTask(session,
                 taskId,
@@ -166,6 +169,7 @@ public class HttpRemoteTaskFactory
                 partitionedSplitCountTracker,
                 stats,
                 isBinaryEncoding,
-                parent);
+                parent,
+                snapshotManager);
     }
 }

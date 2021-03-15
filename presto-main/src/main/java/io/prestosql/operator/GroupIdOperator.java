@@ -14,13 +14,22 @@
 package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
+import io.airlift.slice.DynamicSliceOutput;
+import io.airlift.slice.Slice;
+import io.airlift.slice.SliceOutput;
+import io.airlift.slice.Slices;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +38,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"types", "groupingSetInputs", "currentPage", "snapshotState"})
 public class GroupIdOperator
         implements Operator
 {
@@ -114,6 +124,8 @@ public class GroupIdOperator
     private int currentGroupingSet;
     private boolean finishing;
 
+    private final SingleInputSnapshotState snapshotState;
+
     public GroupIdOperator(
             OperatorContext operatorContext,
             List<Type> types,
@@ -126,6 +138,7 @@ public class GroupIdOperator
         this.groupingSetInputs = requireNonNull(groupingSetInputs, "groupingSetInputs is null");
         this.nullBlocks = requireNonNull(nullBlocks, "nullBlocks is null");
         this.groupIdBlocks = requireNonNull(groupIdBlocks, "groupIdBlocks is null");
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
     }
 
     @Override
@@ -143,6 +156,11 @@ public class GroupIdOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
         return finishing && currentPage == null;
     }
 
@@ -158,17 +176,36 @@ public class GroupIdOperator
         checkState(!finishing, "Operator is already finishing");
         checkState(currentPage == null, "currentPage must be null to add a new page");
 
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
         currentPage = requireNonNull(page, "page is null");
     }
 
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         if (currentPage == null) {
             return null;
         }
 
         return generateNextPage();
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
     }
 
     private Page generateNextPage()
@@ -194,5 +231,65 @@ public class GroupIdOperator
         }
 
         return outputPage;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        GroupIdOperatorState myState = new GroupIdOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        BlockEncodingSerde blockSerde = serdeProvider.getBlockEncodingSerde();
+        myState.nullBlocks = new byte[nullBlocks.length][];
+        for (int i = 0; i < nullBlocks.length; i++) {
+            myState.nullBlocks[i] = serializeBlock(nullBlocks[i], blockSerde);
+        }
+        myState.groupIdBlocks = new byte[groupIdBlocks.length][];
+        for (int i = 0; i < groupIdBlocks.length; i++) {
+            myState.groupIdBlocks[i] = serializeBlock(groupIdBlocks[i], blockSerde);
+        }
+        myState.currentGroupingSet = currentGroupingSet;
+        myState.finishing = finishing;
+        return myState;
+    }
+
+    private byte[] serializeBlock(Block block, BlockEncodingSerde serde)
+    {
+        SliceOutput output = new DynamicSliceOutput(0);
+        serde.writeBlock(output, block);
+        return output.getUnderlyingSlice().getBytes();
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        GroupIdOperatorState myState = (GroupIdOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        BlockEncodingSerde blockSerde = serdeProvider.getBlockEncodingSerde();
+        for (int i = 0; i < nullBlocks.length; i++) {
+            this.nullBlocks[i] = deserializeBlock(myState.nullBlocks[i], blockSerde);
+        }
+        for (int i = 0; i < groupIdBlocks.length; i++) {
+            this.groupIdBlocks[i] = deserializeBlock(myState.groupIdBlocks[i], blockSerde);
+        }
+        this.currentGroupingSet = myState.currentGroupingSet;
+        this.finishing = myState.finishing;
+    }
+
+    private Block deserializeBlock(byte[] array, BlockEncodingSerde serde)
+    {
+        Slice input = Slices.wrappedBuffer(array);
+        return serde.readBlock(input.getInput());
+    }
+
+    private static class GroupIdOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+
+        private byte[][] nullBlocks;
+        private byte[][] groupIdBlocks;
+
+        private int currentGroupingSet;
+        private boolean finishing;
     }
 }

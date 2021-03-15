@@ -18,9 +18,13 @@ import io.prestosql.array.LongBigArray;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.type.TypeUtils;
 import org.openjdk.jol.info.ClassLayout;
+
+import java.io.Serializable;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -51,6 +55,7 @@ import static java.util.Objects.requireNonNull;
  * </pre>
  */
 
+@RestorableConfig(uncapturedFields = {"bucketNodeFactory", "type", "valuePositions"})
 public class GroupedTypedHistogram
         implements TypedHistogram
 {
@@ -512,5 +517,68 @@ public class GroupedTypedHistogram
     private interface NodeReader
     {
         void read(int nodePointer);
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        GroupedTypedHistogramState myState = new GroupedTypedHistogramState();
+        myState.values = values.capture(serdeProvider);
+        myState.counts = counts.capture(serdeProvider);
+        myState.groupIds = groupIds.capture(serdeProvider);
+        myState.nextPointers = nextPointers.capture(serdeProvider);
+        myState.valuesPositions = valuePositions.capture(serdeProvider);
+        myState.valueAndGroupHashes = valueAndGroupHashes.capture(serdeProvider);
+        myState.headPointers = headPointers.capture(serdeProvider);
+        myState.buckets = buckets.capture(serdeProvider);
+        myState.nextNodePointer = nextNodePointer;
+        myState.mask = mask;
+        myState.bucketCount = bucketCount;
+        myState.maxFill = maxFill;
+        myState.currentGroupId = currentGroupId;
+        myState.numberOfGroups = numberOfGroups;
+        myState.valueStore = valueStore.capture(serdeProvider);
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        GroupedTypedHistogramState myState = (GroupedTypedHistogramState) state;
+        this.values.restore(myState.values, serdeProvider);
+        this.counts.restore(myState.counts, serdeProvider);
+        this.groupIds.restore(myState.groupIds, serdeProvider);
+        this.nextPointers.restore(myState.nextPointers, serdeProvider);
+        this.valuePositions.restore(myState.valuesPositions, serdeProvider);
+        this.valueAndGroupHashes.restore(myState.valueAndGroupHashes, serdeProvider);
+        this.headPointers.restore(myState.headPointers, serdeProvider);
+        this.buckets.restore(myState.buckets, serdeProvider);
+        this.nextNodePointer = myState.nextNodePointer;
+        this.mask = myState.mask;
+        this.bucketCount = myState.bucketCount;
+        this.maxFill = myState.maxFill;
+        this.currentGroupId = myState.currentGroupId;
+        this.numberOfGroups = myState.numberOfGroups;
+        this.valueStore.restore(myState.valueStore, serdeProvider);
+    }
+
+    private static class GroupedTypedHistogramState
+            implements Serializable
+    {
+        private Object values;
+        private Object counts;
+        private Object groupIds;
+        private Object nextPointers;
+        private Object valuesPositions;
+        private Object valueAndGroupHashes;
+        private Object headPointers;
+        private Object buckets;
+        private int nextNodePointer;
+        private int mask;
+        private int bucketCount;
+        private int maxFill;
+        private int currentGroupId;
+        private long numberOfGroups;
+        private Object valueStore;
     }
 }

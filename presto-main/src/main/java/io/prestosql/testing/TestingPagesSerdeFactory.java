@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.execution.buffer;
+package io.prestosql.testing;
 
 import io.airlift.compress.Compressor;
 import io.airlift.compress.Decompressor;
@@ -31,6 +31,8 @@ import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 public class TestingPagesSerdeFactory
         extends PagesSerdeFactory
 {
+    public static final PagesSerdeFactory TESTING_SERDE_FACTORY = new TestingPagesSerdeFactory();
+
     public TestingPagesSerdeFactory()
     {
         // compression should be enabled in as many tests as possible

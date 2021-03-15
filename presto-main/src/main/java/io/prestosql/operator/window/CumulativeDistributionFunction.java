@@ -16,6 +16,9 @@ package io.prestosql.operator.window;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.function.RankingWindowFunction;
 import io.prestosql.spi.function.WindowFunctionSignature;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+
+import java.io.Serializable;
 
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 
@@ -40,5 +43,32 @@ public class CumulativeDistributionFunction
             count += peerGroupCount;
         }
         DOUBLE.writeDouble(output, ((double) count) / totalCount);
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        CumulativeDistributionFunctionState myState = new CumulativeDistributionFunctionState();
+        myState.totalCount = totalCount;
+        myState.count = count;
+        myState.baseState = super.capture(serdeProvider);
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        CumulativeDistributionFunctionState myState = (CumulativeDistributionFunctionState) state;
+        this.totalCount = myState.totalCount;
+        this.count = myState.count;
+        super.restore(myState.baseState, serdeProvider);
+    }
+
+    private static class CumulativeDistributionFunctionState
+            implements Serializable
+    {
+        private long totalCount;
+        private long count;
+        private Object baseState;
     }
 }

@@ -13,7 +13,9 @@
  */
 package io.prestosql.operator;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
@@ -25,6 +27,8 @@ import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.HttpPageBufferClient.ClientCallback;
 import io.prestosql.operator.WorkProcessor.ProcessState;
+import io.prestosql.snapshot.MultiInputSnapshotState;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
@@ -33,7 +37,10 @@ import javax.annotation.concurrent.ThreadSafe;
 import java.io.Closeable;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -68,13 +75,22 @@ public class ExchangeClient
     @GuardedBy("this")
     private boolean noMoreLocations;
 
-    private final ConcurrentMap<URI, HttpPageBufferClient> allClients = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, HttpPageBufferClient> allClients = new ConcurrentHashMap<>();
+
+    private boolean snapshotEnabled;
+    // Snapshot: whether momre target (exchange operators) can be added, and all known targets. Markers are sent to all of them.
+    private boolean noMoreTargets;
+    private final Set<String> allTargets = new HashSet<>();
+    // Markers received before all targets are known. These markers will be sent to all new targets.
+    private final List<SerializedPage> pendingMarkers = Collections.synchronizedList(new ArrayList<>());
 
     @GuardedBy("this")
     private final Deque<HttpPageBufferClient> queuedClients = new LinkedList<>();
 
     private final Set<HttpPageBufferClient> completedClients = newConcurrentHashSet();
     private final LinkedBlockingDeque<SerializedPage> pageBuffer = new LinkedBlockingDeque<>();
+    // Snapshot: pararrel array to pageBuffer, about which targets need to receive this page. "null" indicates any one target.
+    private final LinkedBlockingDeque<Set<String>> targetBuffer = new LinkedBlockingDeque<>();
 
     @GuardedBy("this")
     private final List<SettableFuture<?>> blockedCallers = new ArrayList<>();
@@ -93,6 +109,9 @@ public class ExchangeClient
 
     private final LocalMemoryContext systemMemoryContext;
     private final Executor pageBufferClientCallbackExecutor;
+
+    // Only set for MergeOperator, to capture marker pages
+    private MultiInputSnapshotState snapshotState;
 
     // ExchangeClientStatus.mergeWith assumes all clients have the same bufferCapacity.
     // Please change that method accordingly when this assumption becomes not true.
@@ -119,6 +138,23 @@ public class ExchangeClient
         this.pageBufferClientCallbackExecutor = requireNonNull(pageBufferClientCallbackExecutor, "pageBufferClientCallbackExecutor is null");
     }
 
+    Set<String> getAllClients()
+    {
+        // Snapshot: Called by exchange operator, to get all their input channels, i.e. remote tasks
+        return Collections.unmodifiableSet(allClients.keySet());
+    }
+
+    public void setSnapshotEnabled()
+    {
+        snapshotEnabled = true;
+    }
+
+    void setSnapshotState(MultiInputSnapshotState snapshotState)
+    {
+        // Only used by MergeOperator
+        this.snapshotState = requireNonNull(snapshotState);
+    }
+
     public ExchangeClientStatus getStatus()
     {
         // The stats created by this method is only for diagnostics.
@@ -138,19 +174,52 @@ public class ExchangeClient
         }
     }
 
-    public synchronized void addLocation(URI location)
+    public synchronized void addTarget(String target)
     {
-        requireNonNull(location, "location is null");
+        allTargets.add(target);
+
+        // Markers are potentially inserted at the beginning of the queue. Process them reversely to maintain marker order.
+        for (int i = pendingMarkers.size() - 1; i >= 0; i--) {
+            SerializedPage page = pendingMarkers.get(i);
+            // If this marker still exists in the queue, then add target to its target list;
+            // otherwise add the page to the front of the queue, so it's the first page retrieved by the new target.
+            Iterator<SerializedPage> pageIterator = pageBuffer.iterator();
+            Iterator<Set<String>> targetIterator = targetBuffer.iterator();
+            while (pageIterator.hasNext() && pageIterator.next() != page) {
+                targetIterator.next();
+            }
+            if (targetIterator.hasNext()) {
+                targetIterator.next().add(target);
+            }
+            else {
+                pageBuffer.addFirst(page);
+                targetBuffer.addFirst(Sets.newHashSet(target));
+            }
+            bufferRetainedSizeInBytes += page.getRetainedSizeInBytes();
+        }
+    }
+
+    public void noMoreTargets()
+    {
+        noMoreTargets = true;
+        pendingMarkers.clear();
+        scheduleRequestIfNecessary();
+    }
+
+    public synchronized boolean addLocation(URI locationUri)
+    {
+        requireNonNull(locationUri, "locationUri is null");
 
         // Ignore new locations after close
         // NOTE: this MUST happen before checking no more locations is checked
         if (closed.get()) {
-            return;
+            return false;
         }
 
+        String location = locationUri.toString();
         // ignore duplicate locations
         if (allClients.containsKey(location)) {
-            return;
+            return false;
         }
 
         checkState(!noMoreLocations, "No more locations already set");
@@ -160,14 +229,15 @@ public class ExchangeClient
                 maxResponseSize,
                 maxErrorDuration,
                 acknowledgePages,
-                location,
-                new ExchangeClientCallback(),
+                locationUri,
+                new ExchangeClientCallback(location),
                 scheduler,
                 pageBufferClientCallbackExecutor);
         allClients.put(location, client);
         queuedClients.add(client);
 
         scheduleRequestIfNecessary();
+        return true;
     }
 
     public synchronized void noMoreLocations()
@@ -176,29 +246,59 @@ public class ExchangeClient
         scheduleRequestIfNecessary();
     }
 
-    public WorkProcessor<SerializedPage> pages()
+    public WorkProcessor<SerializedPage> pages(String target)
     {
-        return WorkProcessor.create(() -> {
-            SerializedPage page = pollPage();
-            if (page == null) {
-                if (isFinished()) {
-                    return ProcessState.finished();
-                }
+        return WorkProcessor.create(
+                new WorkProcessor.Process<SerializedPage>()
+                {
+                    @Override
+                    public ProcessState<SerializedPage> process()
+                    {
+                        SerializedPage page = pollPage(target);
 
-                ListenableFuture<?> blocked = isBlocked();
-                if (!blocked.isDone()) {
-                    return ProcessState.blocked(blocked);
-                }
+                        if (page == null) {
+                            if (isFinished()) {
+                                return ProcessState.finished();
+                            }
 
-                return ProcessState.yield();
-            }
+                            ListenableFuture<?> blocked = isBlocked();
+                            if (!blocked.isDone()) {
+                                return ProcessState.blocked(blocked);
+                            }
 
-            return ProcessState.ofResult(page);
-        });
+                            return ProcessState.yield();
+                        }
+
+                        return ProcessState.ofResult(page);
+                    }
+
+                    @Override
+                    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return 0;
+                    }
+
+                    @Override
+                    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                    }
+
+                    @Override
+                    public Object captureResult(SerializedPage result, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return result.capture(serdeProvider);
+                    }
+
+                    @Override
+                    public SerializedPage restoreResult(Object resultState, BlockEncodingSerdeProvider serdeProvider)
+                    {
+                        return SerializedPage.restoreSerializedPage(resultState);
+                    }
+                });
     }
 
     @Nullable
-    public SerializedPage pollPage()
+    public SerializedPage pollPage(String target)
     {
         checkState(!Thread.holdsLock(this), "Can not get next page while holding a lock on this");
 
@@ -208,8 +308,41 @@ public class ExchangeClient
             return null;
         }
 
+        if (!snapshotEnabled) {
+            return postProcessPage(pageBuffer.poll());
+        }
+
+        return postProcessPage(pollPageImpl(target));
+    }
+
+    private synchronized SerializedPage pollPageImpl(String target)
+    {
         SerializedPage page = pageBuffer.poll();
-        return postProcessPage(page);
+        Set<String> targets = targetBuffer.poll();
+        if (page != null && page.isMarkerPage()) {
+            if (targets.contains(target)) {
+                targets.remove(target);
+                if (!targets.isEmpty()) {
+                    // Put unfinished marker back at top of queue for other targets to retrieve.
+                    pageBuffer.addFirst(page);
+                    targetBuffer.addFirst(targets);
+                }
+            }
+            else {
+                SerializedPage marker = page;
+                // Already sent marker to this target. Poll other pages.
+                page = pollPageImpl(target);
+                if (page == NO_MORE_PAGES) {
+                    // Can't grab the no-more-pages marker when there are pending marker pages
+                    pageBuffer.addFirst(NO_MORE_PAGES);
+                    page = null;
+                }
+                // Put unfinished marker back at top of queue for other targets to retrieve.
+                pageBuffer.addFirst(marker);
+                targetBuffer.addFirst(targets);
+            }
+        }
+        return page;
     }
 
     private SerializedPage postProcessPage(SerializedPage page)
@@ -255,6 +388,16 @@ public class ExchangeClient
         return closed.get();
     }
 
+    public synchronized void resetForResume()
+    {
+        cleanup();
+        allClients.clear();
+        queuedClients.clear();
+        completedClients.clear();
+        noMoreLocations = false;
+        closed.set(false);
+    }
+
     @Override
     public synchronized void close()
     {
@@ -262,26 +405,34 @@ public class ExchangeClient
             return;
         }
 
-        for (HttpPageBufferClient client : allClients.values()) {
-            closeQuietly(client);
-        }
-        pageBuffer.clear();
-        systemMemoryContext.setBytes(0);
-        bufferRetainedSizeInBytes = 0;
+        cleanup();
         if (pageBuffer.peekLast() != NO_MORE_PAGES) {
             checkState(pageBuffer.add(NO_MORE_PAGES), "Could not add no more pages marker");
         }
         notifyBlockedCallers();
     }
 
-    public synchronized void scheduleRequestIfNecessary()
+    private void cleanup()
+    {
+        for (HttpPageBufferClient client : allClients.values()) {
+            closeQuietly(client);
+        }
+        pageBuffer.clear();
+        targetBuffer.clear();
+        pendingMarkers.clear();
+        systemMemoryContext.setBytes(0);
+        bufferRetainedSizeInBytes = 0;
+    }
+
+    @VisibleForTesting
+    synchronized void scheduleRequestIfNecessary()
     {
         if (isFinished() || isFailed()) {
             return;
         }
 
         // if finished, add the end marker
-        if (noMoreLocations && completedClients.size() == allClients.size()) {
+        if (noMoreLocations && completedClients.size() == allClients.size() && pendingMarkers.isEmpty()) {
             if (pageBuffer.peekLast() != NO_MORE_PAGES) {
                 checkState(pageBuffer.add(NO_MORE_PAGES), "Could not add no more pages marker");
             }
@@ -323,15 +474,53 @@ public class ExchangeClient
         return future;
     }
 
-    private synchronized boolean addPages(List<SerializedPage> pages)
+    private synchronized boolean addPages(List<SerializedPage> pages, String location)
     {
         if (isClosed() || isFailed()) {
             return false;
         }
 
-        pageBuffer.addAll(pages);
-
+        long sizeAdjustment = 0;
         if (!pages.isEmpty()) {
+            if (!snapshotEnabled) {
+                pageBuffer.addAll(pages);
+            }
+            else {
+                for (SerializedPage page : pages) {
+                    page.setOrigin(location);
+                    if (snapshotState != null) {
+                        // Only for MergeOperator
+                        SerializedPage processedPage;
+                        synchronized (snapshotState) {
+                            // This may look suspicious, in that if there are "pending pages" in the snapshot state, then
+                            // a) those pages were associated with specific input channels (exchange source/sink) when the state
+                            // was captured, but now they would be returned to any channel asking for the next page, and
+                            // b) when the pending page is returned, the current page (in pageReference) is discarded and lost.
+                            // But the above never happens because "merge" operators are always preceded by OrderByOperators,
+                            // which only send data pages at the end, *after* all markers. That means when snapshot is taken,
+                            // no data page has been received, so when the snapshot is restored, there won't be any pending pages.
+                            processedPage = snapshotState.processSerializedPage(() -> page).orElse(null);
+                        }
+                        if (processedPage == null || processedPage.isMarkerPage()) {
+                            // Don't add markers to the buffer, otherwise it may affect the order in which these buffers are accessed.
+                            // Instead, markers are stored in and returned by the snapshot state.
+                            continue;
+                        }
+                    }
+                    pageBuffer.add(page);
+                    if (page.isMarkerPage()) {
+                        if (!noMoreTargets) {
+                            pendingMarkers.add(page);
+                        }
+                        targetBuffer.add(new HashSet<>(allTargets));
+                        // This page will be sent out multiple times. Adjust total size.
+                        sizeAdjustment += page.getRetainedSizeInBytes() * (allTargets.size() - 1);
+                    }
+                    else {
+                        targetBuffer.add(Collections.emptySet());
+                    }
+                }
+            }
             // notify all blocked callers
             notifyBlockedCallers();
         }
@@ -340,7 +529,7 @@ public class ExchangeClient
                 .mapToLong(SerializedPage::getRetainedSizeInBytes)
                 .sum();
 
-        bufferRetainedSizeInBytes += pagesRetainedSizeInBytes;
+        bufferRetainedSizeInBytes += pagesRetainedSizeInBytes + sizeAdjustment;
         maxBufferRetainedSizeInBytes = Math.max(maxBufferRetainedSizeInBytes, bufferRetainedSizeInBytes);
         systemMemoryContext.setBytes(bufferRetainedSizeInBytes);
         successfulRequests++;
@@ -367,7 +556,11 @@ public class ExchangeClient
     private synchronized void requestComplete(HttpPageBufferClient client)
     {
         if (!queuedClients.contains(client)) {
-            queuedClients.add(client);
+            // Snapshot: Client may have been removed as a result of rescheduling, then don't queue it.
+            // Use object identity, instead of .equals, for comparison.
+            if (!snapshotEnabled || allClients.values().stream().anyMatch(c -> c == client)) {
+                queuedClients.add(client);
+            }
         }
         scheduleRequestIfNecessary();
     }
@@ -375,7 +568,11 @@ public class ExchangeClient
     private synchronized void clientFinished(HttpPageBufferClient client)
     {
         requireNonNull(client, "client is null");
-        completedClients.add(client);
+        // Snapshot: Client may have been removed as a result of rescheduling, then don't add it.
+        // Use object identity, instead of .equals, for comparison.
+        if (!snapshotEnabled || allClients.values().stream().anyMatch(c -> c == client)) {
+            completedClients.add(client);
+        }
         scheduleRequestIfNecessary();
     }
 
@@ -406,12 +603,19 @@ public class ExchangeClient
     private class ExchangeClientCallback
             implements ClientCallback
     {
+        private final String location;
+
+        private ExchangeClientCallback(String location)
+        {
+            this.location = location;
+        }
+
         @Override
         public boolean addPages(HttpPageBufferClient client, List<SerializedPage> pages)
         {
             requireNonNull(client, "client is null");
             requireNonNull(pages, "pages is null");
-            return ExchangeClient.this.addPages(pages);
+            return ExchangeClient.this.addPages(pages, location);
         }
 
         @Override

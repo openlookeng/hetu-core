@@ -27,7 +27,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -103,6 +105,35 @@ public class TestMarkDistinctOperator
         }
 
         OperatorAssertion.assertOperatorEqualsIgnoreOrder(operatorFactory, driverContext, input, expected.build(), hashEnabled, Optional.of(1));
+    }
+
+    @Test
+    public void testMarkDistinctSnapshot()
+    {
+        RowPagesBuilder rowPagesBuilder = rowPagesBuilder(true, Ints.asList(0), BIGINT);
+        List<Page> input = rowPagesBuilder
+                .addSequencePage(100, 0)
+                .addSequencePage(100, 0)
+                .build();
+
+        OperatorFactory operatorFactory = new MarkDistinctOperatorFactory(0, new PlanNodeId("test"), rowPagesBuilder.getTypes(), ImmutableList.of(0), rowPagesBuilder.getHashChannel(), joinCompiler);
+
+        MaterializedResult.Builder expected = resultBuilder(driverContext.getSession(), BIGINT, BOOLEAN);
+        for (long i = 0; i < 100; i++) {
+            expected.row(i, true);
+            expected.row(i, false);
+        }
+
+        OperatorAssertion.assertOperatorEqualsIgnoreOrderWithSimpleSelfStateComparison(operatorFactory, driverContext, input, expected.build(), true, Optional.of(1), createExpectedMapping());
+    }
+
+    private Map<String, Object> createExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        expectedMapping.put("operatorContext", 0);
+        expectedMapping.put("localUserMemoryContext", 361496L);
+        expectedMapping.put("finishing", false);
+        return expectedMapping;
     }
 
     @Test(dataProvider = "dataType")

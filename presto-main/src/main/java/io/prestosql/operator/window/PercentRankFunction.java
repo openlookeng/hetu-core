@@ -16,6 +16,9 @@ package io.prestosql.operator.window;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.function.RankingWindowFunction;
 import io.prestosql.spi.function.WindowFunctionSignature;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+
+import java.io.Serializable;
 
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 
@@ -52,5 +55,35 @@ public class PercentRankFunction
         }
 
         DOUBLE.writeDouble(output, ((double) (rank - 1)) / (totalCount - 1));
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        PercentRankFunctionState myState = new PercentRankFunctionState();
+        myState.totalCount = totalCount;
+        myState.rank = rank;
+        myState.count = count;
+        myState.baseState = super.capture(serdeProvider);
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        PercentRankFunctionState myState = (PercentRankFunctionState) state;
+        this.totalCount = myState.totalCount;
+        this.rank = myState.rank;
+        this.count = myState.count;
+        super.restore(myState.baseState, serdeProvider);
+    }
+
+    private static class PercentRankFunctionState
+            implements Serializable
+    {
+        private long totalCount;
+        private long rank;
+        private long count;
+        private Object baseState;
     }
 }

@@ -15,14 +15,20 @@ package io.prestosql.operator.aggregation.multimapagg;
 
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
+
+import java.io.Serializable;
 
 import static io.prestosql.type.TypeUtils.expectedValueSize;
 import static java.util.Objects.requireNonNull;
 
+@RestorableConfig(uncapturedFields = {"keyType", "valueType"})
 public class SingleMultimapAggregationState
-        implements MultimapAggregationState
+        implements MultimapAggregationState, Restorable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SingleMultimapAggregationState.class).instanceSize();
     private static final int EXPECTED_ENTRIES = 10;
@@ -80,5 +86,30 @@ public class SingleMultimapAggregationState
         // Thus reset() will be called for each group (via MultimapAggregationStateSerializer#deserialize)
         keyBlockBuilder = keyBlockBuilder.newBlockBuilderLike(null);
         valueBlockBuilder = valueBlockBuilder.newBlockBuilderLike(null);
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        SingleMultimapAggregationStateState myState = new SingleMultimapAggregationStateState();
+        myState.keyBlockBuilder = keyBlockBuilder.capture(serdeProvider);
+        myState.valueBlockBuilder = valueBlockBuilder.capture(serdeProvider);
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        SingleMultimapAggregationStateState myState = (SingleMultimapAggregationStateState) state;
+        reset();
+        this.keyBlockBuilder.restore(myState.keyBlockBuilder, serdeProvider);
+        this.valueBlockBuilder.restore(myState.valueBlockBuilder, serdeProvider);
+    }
+
+    private static class SingleMultimapAggregationStateState
+            implements Serializable
+    {
+        private Object keyBlockBuilder;
+        private Object valueBlockBuilder;
     }
 }

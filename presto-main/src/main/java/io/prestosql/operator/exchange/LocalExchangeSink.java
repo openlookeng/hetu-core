@@ -15,34 +15,45 @@ package io.prestosql.operator.exchange;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.MarkerPage;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.operator.Operator.NOT_BLOCKED;
 import static io.prestosql.operator.exchange.LocalExchanger.FINISHED;
 import static java.util.Objects.requireNonNull;
 
 public class LocalExchangeSink
 {
-    public static LocalExchangeSink finishedLocalExchangeSink()
+    public static LocalExchangeSink finishedLocalExchangeSink(boolean isForMerge)
     {
-        LocalExchangeSink finishedSink = new LocalExchangeSink(FINISHED, sink -> {});
+        LocalExchangeSink finishedSink = new LocalExchangeSink(null, FINISHED, sink -> {}, isForMerge);
         finishedSink.finish();
         return finishedSink;
     }
 
+    // Snapshot: Local-exchange is used to broadcast markers, because it has all the local-sources
+    private final LocalExchange exchange;
     private final LocalExchanger exchanger;
     private final Consumer<LocalExchangeSink> onFinish;
 
     private final AtomicBoolean finished = new AtomicBoolean();
 
+    // Snapshot: broadcast markers for local-exchange operator, and pass-through for local-merge operator
+    private final boolean isForMerge;
+
     public LocalExchangeSink(
+            LocalExchange exchange,
             LocalExchanger exchanger,
-            Consumer<LocalExchangeSink> onFinish)
+            Consumer<LocalExchangeSink> onFinish,
+            boolean isForMerge)
     {
+        this.exchange = exchange;
         this.exchanger = requireNonNull(exchanger, "exchanger is null");
         this.onFinish = requireNonNull(onFinish, "onFinish is null");
+        this.isForMerge = isForMerge;
     }
 
     public void finish()
@@ -71,7 +82,17 @@ public class LocalExchangeSink
 
         // there can be a race where finished is set between the check above and here
         // it is expected that the exchanger ignores pages after finish
-        exchanger.accept(page);
+        if (!isForMerge && page instanceof MarkerPage) {
+            // Bypass exchanger, and ask exchange to broadcast the marker to all targets.
+            checkState(exchange != null);
+            exchange.broadcastMarker((MarkerPage) page);
+            // For merges, exchanger is always pass-through, and all sources are merged by a single operator instance,
+            // so there is no need to "broadcast". Use pass-through exchanger to send markers
+            // (so sink->source is considered a single pipeline).
+        }
+        else {
+            exchanger.accept(page);
+        }
     }
 
     public ListenableFuture<?> waitForWriting()

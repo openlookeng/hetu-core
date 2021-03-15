@@ -22,6 +22,8 @@ import io.prestosql.operator.WorkProcessorOperatorAdapter.AdapterWorkProcessorOp
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 
 import java.util.List;
@@ -33,6 +35,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * Returns the top N rows from the source sorted according to the specified ordering in the keyChannelIndex channel.
  */
+@RestorableConfig(uncapturedFields = {"pages", "pageBuffer"})
 public class TopNOperator
         implements AdapterWorkProcessorOperator
 {
@@ -194,6 +197,8 @@ public class TopNOperator
         topNProcessor.addInput(page);
     }
 
+    // TopNOperator doesn't capture TopNPages
+    @RestorableConfig(unsupported = true)
     private class TopNPages
             implements WorkProcessor.Transformation<Page, Page>
     {
@@ -217,5 +222,17 @@ public class TopNOperator
 
             return TransformationState.finished();
         }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        return topNProcessor.capture(serdeProvider);
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        topNProcessor.restore(state, serdeProvider);
     }
 }

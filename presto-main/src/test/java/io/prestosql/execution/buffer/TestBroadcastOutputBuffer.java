@@ -23,20 +23,25 @@ import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.memory.context.MemoryReservationHandler;
 import io.prestosql.memory.context.SimpleLocalMemoryContext;
+import io.prestosql.operator.TaskContext;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.type.BigintType;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.stream.Collectors;
 
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.units.DataSize.Unit.BYTE;
+import static io.prestosql.SessionTestUtils.TEST_SNAPSHOT_SESSION;
 import static io.prestosql.execution.buffer.BufferResult.emptyResults;
 import static io.prestosql.execution.buffer.BufferState.OPEN;
 import static io.prestosql.execution.buffer.BufferState.TERMINAL_BUFFER_STATES;
@@ -58,10 +63,11 @@ import static io.prestosql.execution.buffer.BufferTestUtils.sizeOfPages;
 import static io.prestosql.execution.buffer.OutputBuffers.BROADCAST_PARTITION_ID;
 import static io.prestosql.execution.buffer.OutputBuffers.BufferType.BROADCAST;
 import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
-import static io.prestosql.execution.buffer.TestingPagesSerdeFactory.testingPagesSerde;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newRootAggregatedMemoryContext;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.testing.TestingPagesSerdeFactory.testingPagesSerde;
+import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static org.testng.Assert.assertEquals;
@@ -256,6 +262,55 @@ public class TestBroadcastOutputBuffer
 
         assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 14, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 14, true));
         assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 14, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 14, true));
+    }
+
+    @Test
+    public void testMarkers()
+    {
+        OutputBuffers outputBuffers = createInitialEmptyOutputBuffers(BROADCAST)
+                .withBuffer(FIRST, BROADCAST_PARTITION_ID)
+                .withBuffer(SECOND, BROADCAST_PARTITION_ID)
+                .withNoMoreBufferIds();
+        BroadcastOutputBuffer buffer = createBroadcastBuffer(outputBuffers, sizeOfPages(10));
+
+        ScheduledExecutorService scheduler = newScheduledThreadPool(4, daemonThreadsNamed("test-%s"));
+        ScheduledExecutorService scheduledExecutor = newScheduledThreadPool(2, daemonThreadsNamed("test-scheduledExecutor-%s"));
+        TaskContext taskContext = createTaskContext(scheduler, scheduledExecutor, TEST_SNAPSHOT_SESSION);
+        buffer.setTaskContext(taskContext);
+        buffer.addInputChannel("id");
+        buffer.setNoMoreInputChannels();
+
+        MarkerPage marker1 = MarkerPage.snapshotPage(1);
+        MarkerPage marker2 = MarkerPage.snapshotPage(2);
+
+        // add one item
+        addPage(buffer, createPage(0));
+        // broadcast 2 pages
+        addPage(buffer, marker1, true);
+        addPage(buffer, marker2, true);
+
+        // first client gets 2 elements
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(3), NO_WAIT),
+                bufferResult(0, createPage(0), marker1, marker2));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 0, sizeOfPages(3), NO_WAIT),
+                bufferResult(0, createPage(0), marker1, marker2));
+        assertEquals(buffer.getInfo().getBuffers().stream().map(BufferInfo::getBufferedPages).collect(Collectors.toList()), Arrays.asList(3, 3));
+        assertEquals(buffer.getInfo().getBuffers().stream().map(BufferInfo::getPagesSent).collect(Collectors.toList()), Arrays.asList(0L, 0L));
+        // acknowledge
+        buffer.get(FIRST, 3, sizeOfPages(1)).cancel(true);
+        assertQueueState(buffer, FIRST, 0, 3);
+        buffer.get(SECOND, 3, sizeOfPages(1)).cancel(true);
+        assertQueueState(buffer, SECOND, 0, 3);
+        assertEquals(buffer.getInfo().getBuffers().stream().map(BufferInfo::getBufferedPages).collect(Collectors.toList()), Arrays.asList(0, 0));
+        assertEquals(buffer.getInfo().getBuffers().stream().map(BufferInfo::getPagesSent).collect(Collectors.toList()), Arrays.asList(3L, 3L));
+
+        // finish
+        buffer.setNoMorePages();
+        buffer.abort(FIRST);
+        buffer.abort(SECOND);
+        assertQueueClosed(buffer, FIRST, 3);
+        assertQueueClosed(buffer, SECOND, 3);
+        assertFinished(buffer);
     }
 
     // TODO: remove this after PR is landed: https://github.com/prestodb/presto/pull/7987

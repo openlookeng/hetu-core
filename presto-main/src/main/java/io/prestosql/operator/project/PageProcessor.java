@@ -27,6 +27,7 @@ import io.prestosql.spi.block.DictionaryBlock;
 import io.prestosql.spi.block.DictionaryId;
 import io.prestosql.spi.block.LazyBlock;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.sql.gen.ExpressionProfiler;
 
 import javax.annotation.concurrent.NotThreadSafe;
@@ -130,6 +131,8 @@ public class PageProcessor
         return WorkProcessor.create(new ProjectSelectedPositions(session, yieldSignal, memoryContext, page, positionsRange(0, page.getPositionCount())));
     }
 
+    // This is only used by table scan operators, so don't need to participate in snapshotting
+    @RestorableConfig(unsupported = true)
     private class ProjectSelectedPositions
             implements WorkProcessor.Process<Page>
     {
@@ -138,7 +141,7 @@ public class PageProcessor
         private final LocalMemoryContext memoryContext;
 
         private Page page;
-        private Block[] previouslyComputedResults;
+        private final Block[] previouslyComputedResults;
         private SelectedPositions selectedPositions;
         private long retainedSizeInBytes;
 

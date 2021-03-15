@@ -13,13 +13,16 @@
  */
 package io.prestosql.spi.block;
 
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
 
+import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.spi.block.BlockUtil.calculateBlockResetSize;
 import static io.prestosql.spi.block.BlockUtil.checkArrayRange;
@@ -34,7 +37,7 @@ public class ByteArrayBlockBuilder<T>
     private static final Block NULL_VALUE_BLOCK = new ByteArrayBlock(0, 1, new boolean[] {true}, new byte[1]);
 
     @Nullable
-    private BlockBuilderStatus blockBuilderStatus;
+    private final BlockBuilderStatus blockBuilderStatus;
     private boolean initialized;
     private int initialEntryCount;
 
@@ -292,5 +295,55 @@ public class ByteArrayBlockBuilder<T>
         if (position < 0 || position >= getPositionCount()) {
             throw new IllegalArgumentException("position is not valid");
         }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        ByteArrayBlockBuilderState myState = new ByteArrayBlockBuilderState();
+        if (this.blockBuilderStatus != null) {
+            myState.blockBuilderStatus = blockBuilderStatus.capture(serdeProvider);
+        }
+        myState.initialized = initialized;
+        myState.initialEntryCount = initialEntryCount;
+        myState.positionCount = positionCount;
+        myState.hasNullValue = hasNullValue;
+        myState.hasNonNullValue = hasNonNullValue;
+        myState.valueIsNull = valueIsNull;
+        myState.values = values;
+        myState.retainedSizeInBytes = retainedSizeInBytes;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        ByteArrayBlockBuilderState myState = (ByteArrayBlockBuilderState) state;
+        checkState((this.blockBuilderStatus != null) == (myState.blockBuilderStatus != null));
+        if (this.blockBuilderStatus != null) {
+            this.blockBuilderStatus.restore(myState.blockBuilderStatus, serdeProvider);
+        }
+        this.initialized = myState.initialized;
+        this.initialEntryCount = myState.initialEntryCount;
+        this.positionCount = myState.positionCount;
+        this.hasNullValue = myState.hasNullValue;
+        this.hasNonNullValue = myState.hasNonNullValue;
+        this.valueIsNull = myState.valueIsNull;
+        this.values = myState.values;
+        this.retainedSizeInBytes = myState.retainedSizeInBytes;
+    }
+
+    private static class ByteArrayBlockBuilderState
+            implements Serializable
+    {
+        private Object blockBuilderStatus;
+        private boolean initialized;
+        private int initialEntryCount;
+        private int positionCount;
+        private boolean hasNullValue;
+        private boolean hasNonNullValue;
+        private boolean[] valueIsNull;
+        private byte[] values;
+        private long retainedSizeInBytes;
     }
 }

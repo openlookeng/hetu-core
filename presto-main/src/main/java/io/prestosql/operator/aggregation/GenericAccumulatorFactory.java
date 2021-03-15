@@ -27,11 +27,14 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.function.WindowIndex;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
 
 import javax.annotation.Nullable;
 
+import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
@@ -223,6 +226,7 @@ public class GenericAccumulatorFactory
         }
     }
 
+    @RestorableConfig(uncapturedFields = {"maskChannel"})
     private static class DistinctingAccumulator
             implements Accumulator
     {
@@ -306,6 +310,30 @@ public class GenericAccumulatorFactory
         {
             accumulator.evaluateFinal(blockBuilder);
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            DistinctingAccumulatorState myState = new DistinctingAccumulatorState();
+            myState.accumulator = accumulator.capture(serdeProvider);
+            myState.hash = hash.capture(serdeProvider);
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            DistinctingAccumulatorState myState = (DistinctingAccumulatorState) state;
+            this.accumulator.restore(myState.accumulator, serdeProvider);
+            this.hash.restore(myState.hash, serdeProvider);
+        }
+
+        private static class DistinctingAccumulatorState
+                implements Serializable
+        {
+            private Object accumulator;
+            private Object hash;
+        }
     }
 
     private static Page filter(Page page, Block mask)
@@ -321,6 +349,7 @@ public class GenericAccumulatorFactory
         return page.getPositions(ids, 0, next);
     }
 
+    @RestorableConfig(uncapturedFields = {"maskChannel"})
     private static class DistinctingGroupedAccumulator
             implements GroupedAccumulator
     {
@@ -421,8 +450,33 @@ public class GenericAccumulatorFactory
         public void prepareFinal()
         {
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            DistinctingGroupedAccumulatorState myState = new DistinctingGroupedAccumulatorState();
+            myState.accumulator = accumulator.capture(serdeProvider);
+            myState.hash = hash.capture(serdeProvider);
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            DistinctingGroupedAccumulatorState myState = (DistinctingGroupedAccumulatorState) state;
+            this.accumulator.restore(myState.accumulator, serdeProvider);
+            this.hash.restore(myState.hash, serdeProvider);
+        }
+
+        private static class DistinctingGroupedAccumulatorState
+                implements Serializable
+        {
+            private Object accumulator;
+            private Object hash;
+        }
     }
 
+    @RestorableConfig(uncapturedFields = {"orderings", "orderByChannels"})
     private static class OrderingAccumulator
             implements Accumulator
     {
@@ -494,8 +548,33 @@ public class GenericAccumulatorFactory
             pagesIterator.forEachRemaining(accumulator::addInput);
             accumulator.evaluateFinal(blockBuilder);
         }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            OrderingAccumulatorState myState = new OrderingAccumulatorState();
+            myState.accumulator = accumulator.capture(serdeProvider);
+            myState.pagesIndex = pagesIndex.capture(serdeProvider);
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            OrderingAccumulatorState myState = (OrderingAccumulatorState) state;
+            this.accumulator.restore(myState.accumulator, serdeProvider);
+            this.pagesIndex.restore(myState.pagesIndex, serdeProvider);
+        }
+
+        private static class OrderingAccumulatorState
+                implements Serializable
+        {
+            private Object accumulator;
+            private Object pagesIndex;
+        }
     }
 
+    @RestorableConfig(uncapturedFields = {"orderByChannels", "orderings"})
     private static class OrderingGroupedAccumulator
             implements GroupedAccumulator
     {
@@ -584,6 +663,33 @@ public class GenericAccumulatorFactory
                 // to use. Since we did not change the order of original input channels, passing the group id is safe.
                 accumulator.addInput(groupIds, page);
             });
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            OrderingGroupedAccumulatorState myState = new OrderingGroupedAccumulatorState();
+            myState.accumulator = accumulator.capture(serdeProvider);
+            myState.pagesIndex = pagesIndex.capture(serdeProvider);
+            myState.groupCount = groupCount;
+            return myState;
+        }
+
+        @Override
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            OrderingGroupedAccumulatorState myState = (OrderingGroupedAccumulatorState) state;
+            this.accumulator.restore(myState.accumulator, serdeProvider);
+            this.pagesIndex.restore(myState.pagesIndex, serdeProvider);
+            this.groupCount = myState.groupCount;
+        }
+
+        private static class OrderingGroupedAccumulatorState
+                implements Serializable
+        {
+            private Object accumulator;
+            private Object pagesIndex;
+            private long groupCount;
         }
     }
 }

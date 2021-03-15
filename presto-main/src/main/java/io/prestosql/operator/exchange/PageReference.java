@@ -51,4 +51,9 @@ class PageReference
         }
         return page;
     }
+
+    public Page peekPage()
+    {
+        return page;
+    }
 }

@@ -14,12 +14,18 @@
 package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.SnapshotTestUtil;
 import io.prestosql.spi.type.Type;
+import io.prestosql.testing.TestingPagesSerdeFactory;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static io.prestosql.SequencePageBuilder.createSequencePage;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -31,19 +37,24 @@ import static org.testng.Assert.assertTrue;
 public class TestPagesIndex
 {
     @Test
-    public void testEstimatedSize()
+    public void testEstimatedSizeSnapshot()
     {
         List<Type> types = ImmutableList.of(BIGINT, VARCHAR);
+        PagesSerde serde = TestingPagesSerdeFactory.testingPagesSerde();
+        Page input = somePage(types);
 
         PagesIndex pagesIndex = newPagesIndex(types, 30, false);
         long initialEstimatedSize = pagesIndex.getEstimatedSize().toBytes();
         assertTrue(initialEstimatedSize > 0, format("Initial estimated size must be positive, got %s", initialEstimatedSize));
 
-        pagesIndex.addPage(somePage(types));
+        pagesIndex.addPage(input);
         long estimatedSizeWithOnePage = pagesIndex.getEstimatedSize().toBytes();
         assertTrue(estimatedSizeWithOnePage > initialEstimatedSize, "Estimated size should grow after adding a page");
 
-        pagesIndex.addPage(somePage(types));
+        Object snapshot = pagesIndex.capture(serde);
+        assertEquals(SnapshotTestUtil.toSimpleSnapshotMapping(snapshot), createExpectedMapping());
+
+        pagesIndex.addPage(input);
         long estimatedSizeWithTwoPages = pagesIndex.getEstimatedSize().toBytes();
         assertEquals(
                 estimatedSizeWithTwoPages,
@@ -57,6 +68,21 @@ public class TestPagesIndex
                 "Compact should reduce (or retain) size, but changed from %s to %s",
                 estimatedSizeWithTwoPages,
                 estimatedSizeAfterCompact));
+    }
+
+    private Map<String, Object> createExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        List<Long> valueAddresses = new ArrayList<>();
+        for (int i = 0; i < 7; i++) {
+            valueAddresses.add((long) i);
+        }
+        expectedMapping.put("valueAddresses", valueAddresses);
+        expectedMapping.put("nextBlockToCompact", 0);
+        expectedMapping.put("positionCount", 7);
+        expectedMapping.put("pagesMemorySize", 3852L);
+        expectedMapping.put("estimatedSize", 12396L);
+        return expectedMapping;
     }
 
     @Test

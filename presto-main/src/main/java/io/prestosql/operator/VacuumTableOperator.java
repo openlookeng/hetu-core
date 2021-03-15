@@ -26,6 +26,7 @@ import io.prestosql.execution.DriverTaskId;
 import io.prestosql.execution.TaskId;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.metadata.Split;
+import io.prestosql.snapshot.MarkerSplit;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
@@ -38,6 +39,7 @@ import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.UpdatablePageSource;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.split.EmptySplit;
 import io.prestosql.split.PageSinkManager;
@@ -66,6 +68,8 @@ import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
+//TODO-cp-I38S9D: used for SQL statement that is not covered by the scope
+@RestorableConfig(unsupported = true)
 public class VacuumTableOperator
         implements SourceOperator
 {
@@ -89,15 +93,15 @@ public class VacuumTableOperator
         private boolean closed;
 
         public VacuumTableOperatorFactory(int operatorId,
-                                          PlanNodeId planNodeId,
-                                          PageSourceProvider pageSourceProvider,
-                                          PageSinkManager pageSinkManager,
-                                          TableWriterNode.WriterTarget writerTarget,
-                                          TableHandle table,
-                                          Session session,
-                                          OperatorFactory statisticsAggregationOperatorFactory,
-                                          List<Type> types,
-                                          Optional<TaskId> taskId)
+                PlanNodeId planNodeId,
+                PageSourceProvider pageSourceProvider,
+                PageSinkManager pageSinkManager,
+                TableWriterNode.WriterTarget writerTarget,
+                TableHandle table,
+                Session session,
+                OperatorFactory statisticsAggregationOperatorFactory,
+                List<Type> types,
+                Optional<TaskId> taskId)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -165,12 +169,12 @@ public class VacuumTableOperator
     }
 
     public VacuumTableOperator(OperatorContext context,
-                               PlanNodeId planNodeId,
-                               ConnectorPageSink pageSink,
-                               ConnectorPageSourceProvider connectorPageSourceProvider,
-                               TableHandle table,
-                               Operator statisticsAggregationOperator,
-                               boolean statisticsCpuTimerEnabled, List<Type> types)
+            PlanNodeId planNodeId,
+            ConnectorPageSink pageSink,
+            ConnectorPageSourceProvider connectorPageSourceProvider,
+            TableHandle table,
+            Operator statisticsAggregationOperator,
+            boolean statisticsCpuTimerEnabled, List<Type> types)
     {
         this.operatorContext = requireNonNull(context, "operatorContext is null");
         this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -198,7 +202,7 @@ public class VacuumTableOperator
     private final ConnectorPageSourceProvider connectorPageSourceProvider;
     private final List<Type> types;
 
-    private List<ConnectorSplit> splits = new ArrayList<>();
+    private final List<ConnectorSplit> splits = new ArrayList<>();
     private boolean finished;
 
     private final SettableFuture<?> splitBlocked = SettableFuture.create();
@@ -223,6 +227,12 @@ public class VacuumTableOperator
     public Supplier<Optional<UpdatablePageSource>> addSplit(Split split)
     {
         requireNonNull(split, "split is null");
+
+        //TODO-cp-I38S9D: used for SQL statement that is not covered by the scope
+        if (split.getConnectorSplit() instanceof MarkerSplit) {
+            throw new UnsupportedOperationException("Operator doesn't support snapshotting.");
+        }
+
         if (finished) {
             return Optional::empty;
         }
@@ -259,18 +269,6 @@ public class VacuumTableOperator
     public ListenableFuture<?> isBlocked()
     {
         return blocked;
-    }
-
-    @Override
-    public boolean needsInput()
-    {
-        return false;
-    }
-
-    @Override
-    public void addInput(Page page)
-    {
-        throw new UnsupportedOperationException(getClass().getName() + " can not take input");
     }
 
     @Override
@@ -328,6 +326,14 @@ public class VacuumTableOperator
 
         state = State.FINISHED;
         return new Page(positionCount, outputBlocks);
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        //TODO-cp-I38S9D: used for SQL statement that is not covered by the scope
+//        return snapshotState.nextMarker();
+        return null;
     }
 
     private Page createStatisticsPage(Page aggregationOutput)

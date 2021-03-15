@@ -14,9 +14,18 @@
 package io.prestosql.array;
 
 import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.io.Serializable;
+import java.util.function.Function;
+
+@RestorableConfig(uncapturedFields = {"trackedSlices"})
 public final class SliceBigArray
+        implements Restorable
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SliceBigArray.class).instanceSize();
     private static final int SLICE_INSTANCE_SIZE = ClassLayout.parseClass(Slice.class).instanceSize();
@@ -100,5 +109,31 @@ public final class SliceBigArray
                 sizeOfSlices += SLICE_INSTANCE_SIZE;
             }
         }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        SliceBigArrayState myState = new SliceBigArrayState();
+        Function<Object, Object> captureFunction = arrayContent -> ((Slice) arrayContent).getBytes();
+        myState.array = array.capture(captureFunction);
+        myState.sizeOfSlices = sizeOfSlices;
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        SliceBigArrayState myState = (SliceBigArrayState) state;
+        Function<Object, Object> restoreFunction = arrayState -> Slices.wrappedBuffer((byte[]) arrayState);
+        this.array.restore(restoreFunction, myState.array);
+        this.sizeOfSlices = myState.sizeOfSlices;
+    }
+
+    private static class SliceBigArrayState
+            implements Serializable
+    {
+        private Object array;
+        private long sizeOfSlices;
     }
 }

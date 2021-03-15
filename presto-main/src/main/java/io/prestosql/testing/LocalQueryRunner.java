@@ -112,6 +112,7 @@ import io.prestosql.server.PluginManagerConfig;
 import io.prestosql.server.ServerConfig;
 import io.prestosql.server.SessionPropertyDefaults;
 import io.prestosql.server.security.PasswordAuthenticatorManager;
+import io.prestosql.snapshot.SnapshotConfig;
 import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.Plugin;
@@ -334,7 +335,7 @@ public class LocalQueryRunner
                 new FunctionAndTypeManager(transactionManager, featuresConfig, new HandleResolver(), ImmutableSet.of()),
                 featuresConfig,
                 // new HetuConfig object passed, if split filtering is needed in the runner, a modified HetuConfig object with filter settings manually set must be used.
-                new SessionPropertyManager(new SystemSessionProperties(new QueryManagerConfig(), taskManagerConfig, new MemoryManagerConfig(), featuresConfig, new HetuConfig())),
+                new SessionPropertyManager(new SystemSessionProperties(new QueryManagerConfig(), taskManagerConfig, new MemoryManagerConfig(), featuresConfig, new HetuConfig(), new SnapshotConfig())),
                 new SchemaPropertyManager(),
                 new TablePropertyManager(),
                 new ColumnPropertyManager(),
@@ -761,7 +762,8 @@ public class LocalQueryRunner
 
         NodeInfo nodeInfo = new NodeInfo("test");
 
-        SeedStoreManager seedStoreManager = new SeedStoreManager(new FileSystemClientManager());
+        FileSystemClientManager fileSystemClientManager = new FileSystemClientManager();
+        SeedStoreManager seedStoreManager = new SeedStoreManager(fileSystemClientManager);
         StateStoreProvider stateStoreProvider = new LocalStateStoreProvider(seedStoreManager);
         LocalExecutionPlanner executionPlanner = new LocalExecutionPlanner(
                 metadata,
@@ -817,7 +819,8 @@ public class LocalQueryRunner
                     stageExecutionDescriptor.isScanGroupedExecution(tableScan.getId()) ? GROUPED_SCHEDULING : UNGROUPED_SCHEDULING,
                     null,
                     Optional.empty(), Collections.emptyMap(), ImmutableSet.of(),
-                    tableScan.getStrategy() != ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT);
+                    tableScan.getStrategy() != ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                    tableScan.getId());
 
             ImmutableSet.Builder<ScheduledSplit> scheduledSplits = ImmutableSet.builder();
             while (!splitSource.isFinished()) {
