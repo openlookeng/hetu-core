@@ -75,6 +75,7 @@ public interface Index
      * @param pairs an ordered list of KeyValues to add to index, sorted ascending on Keys
      */
     default void addKeyValues(List<Pair<String, List<Pair<Comparable<? extends Comparable<?>>, String>>>> pairs)
+            throws IOException
     {
         throw new UnsupportedOperationException("This index does not support adding Key-Value pairs.");
     }

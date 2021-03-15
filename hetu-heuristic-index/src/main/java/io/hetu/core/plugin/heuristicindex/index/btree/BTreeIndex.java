@@ -31,6 +31,7 @@ import io.prestosql.spi.relation.SpecialForm;
 import org.apache.commons.compress.utils.IOUtils;
 import org.mapdb.BTreeMap;
 import org.mapdb.DB;
+import org.mapdb.DBException;
 import org.mapdb.DBMaker;
 import org.mapdb.Serializer;
 import org.xerial.snappy.SnappyInputStream;
@@ -94,21 +95,30 @@ public class BTreeIndex
     }
 
     private synchronized void setupDB()
+            throws IOException
     {
         if (!isDBCreated.get()) {
-            db = DBMaker
-                    .fileDB(dataFile)
-                    .fileMmapEnableIfSupported()
-                    .cleanerHackEnable()
-                    .make();
-            properties = db.treeMap("propertiesMap")
-                    .keySerializer(Serializer.STRING)
-                    .valueSerializer(Serializer.STRING)
-                    .createOrOpen();
-            if (properties.containsKey(KEY_TYPE)) {
-                createDBMap(properties.get(KEY_TYPE), properties.get(VALUE_TYPE));
+            try {
+                db = DBMaker
+                        .fileDB(dataFile)
+                        .fileMmapEnableIfSupported()
+                        .cleanerHackEnable()
+                        .make();
+                properties = db.treeMap("propertiesMap")
+                        .keySerializer(Serializer.STRING)
+                        .valueSerializer(Serializer.STRING)
+                        .createOrOpen();
+                if (properties.containsKey(KEY_TYPE)) {
+                    createDBMap(properties.get(KEY_TYPE), properties.get(VALUE_TYPE));
+                }
+                isDBCreated.compareAndSet(false, true);
             }
-            isDBCreated.compareAndSet(false, true);
+            catch (DBException dbe) {
+                // rethrow IOException from DB
+                if (dbe.getCause() instanceof IOException) {
+                    throw (IOException) dbe.getCause();
+                }
+            }
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
                     close();
@@ -164,6 +174,7 @@ public class BTreeIndex
 
     @Override
     public void addKeyValues(List<Pair<String, List<Pair<Comparable<? extends Comparable<?>>, String>>>> input)
+            throws IOException
     {
         if (!isDBCreated.get()) {
             setupDB();

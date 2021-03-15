@@ -63,7 +63,7 @@ public class HeuristicIndexFactory
             return getIndexObjFromID(indexType).getClass().getConstructor().newInstance();
         }
         catch (NoSuchMethodException | InvocationTargetException | InstantiationException | IllegalAccessException e) {
-            throw new RuntimeException("Error creating new instance of class: " + indexType);
+            throw new RuntimeException(String.format("Error creating new instance of class: %s. Check server log for details.", indexType), e);
         }
     }
 
