@@ -164,6 +164,7 @@ headless: true
     - [SHOW CREATE TABLE]({{< relref "./docs/sql/show-create-table.md" >}})
     - [SHOW CREATE VIEW]({{< relref "./docs/sql/show-create-view.md" >}})
     - [SHOW FUNCTIONS]({{< relref "./docs/sql/show-functions.md" >}})
+    - [SHOW EXTERNAL FUNCTION]({{< relref "./docs/sql/show-external-function.md" >}})
     - [SHOW GRANTS]({{< relref "./docs/sql/show-grants.md" >}})
     - [SHOW ROLE GRANTS]({{< relref "./docs/sql/show-role-grants.md" >}})
     - [SHOW ROLES]({{< relref "./docs/sql/show-roles.md" >}})
