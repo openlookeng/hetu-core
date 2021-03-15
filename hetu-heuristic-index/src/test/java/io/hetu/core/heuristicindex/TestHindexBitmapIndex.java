@@ -39,7 +39,7 @@ public class TestHindexBitmapIndex
         MaterializedResult baseQueryResult = computeActual(baseQuery);
         long baseQueryInputRows = getInputRowsOfLastQueryExecution(baseQuery);
 
-        safeCreateIndex("CREATE INDEX " + indexName + " USING bitmap ON " + tableName + " (key)");
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING bitmap ON " + tableName + " (key)");
 
         MaterializedResult predicateQueryResultLoadingIndex = computeActual(predicateQuery);
 

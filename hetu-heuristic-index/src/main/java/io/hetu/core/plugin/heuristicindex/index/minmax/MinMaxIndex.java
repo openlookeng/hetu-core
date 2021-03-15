@@ -127,16 +127,15 @@ public class MinMaxIndex
                 Comparable value = (Comparable) extractValueFromRowExpression(callExp.getArguments().get(1));
                 switch (operator) {
                     case EQUAL:
-                        return (value.compareTo(min) > 0 || value.compareTo(min) == 0)
-                                && (value.compareTo(max) < 0 || value.compareTo(max) == 0);
+                        return (value.compareTo(min) >= 0) && (value.compareTo(max) <= 0);
                     case LESS_THAN:
                         return value.compareTo(min) > 0;
                     case LESS_THAN_OR_EQUAL:
-                        return value.compareTo(min) > 0 || value.compareTo(min) == 0;
+                        return value.compareTo(min) >= 0;
                     case GREATER_THAN:
                         return value.compareTo(max) < 0;
                     case GREATER_THAN_OR_EQUAL:
-                        return value.compareTo(max) < 0 || value.compareTo(max) == 0;
+                        return value.compareTo(max) <= 0;
                     default:
                         throw new UnsupportedOperationException("Unsupported operator " + operator);
                 }
