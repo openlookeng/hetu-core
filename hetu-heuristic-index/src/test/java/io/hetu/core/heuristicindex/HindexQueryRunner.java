@@ -14,7 +14,6 @@
  */
 package io.hetu.core.heuristicindex;
 
-import com.google.common.io.Files;
 import io.airlift.testing.mysql.TestingMySqlServer;
 import io.hetu.core.common.filesystem.TempFolder;
 import io.hetu.core.common.util.SslSocketUtil;
@@ -30,6 +29,7 @@ import io.prestosql.spi.security.PrincipalType;
 import io.prestosql.tests.DistributedQueryRunner;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -103,7 +103,7 @@ public final class HindexQueryRunner
                 .build();
 
         try {
-            File tempDir = Files.createTempDir();
+            File tempDir = Files.createTempDirectory("test-hive").toFile();
             File hiveDir = new File(tempDir, "hive_data");
             HiveMetastore metastore = createTestingFileHiveMetastore(hiveDir);
             HiveIdentity identity = new HiveIdentity(SESSION);

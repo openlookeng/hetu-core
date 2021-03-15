@@ -15,7 +15,7 @@
 package io.hetu.core.plugin.heuristicindex.index.btree;
 
 import com.google.common.collect.Sets;
-import com.google.common.io.Files;
+import io.hetu.core.common.filesystem.TempFolder;
 import io.hetu.core.heuristicindex.PartitionIndexWriter;
 import io.hetu.core.heuristicindex.util.IndexServiceUtils;
 import io.prestosql.spi.connector.CreateIndexMetadata;
@@ -42,7 +42,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.Paths;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -75,21 +75,29 @@ public class BTreeIndex
     protected AtomicBoolean isDBCreated = new AtomicBoolean(false);
     protected BTreeMap<String, String> properties;
     protected DB db;
-    protected File file;
+    protected TempFolder dataDir;
+    protected File dataFile;
     protected Set<kotlin.Pair<? extends Comparable<?>, String>> source;
     protected String keyType;
     protected String valueType;
 
     public BTreeIndex()
     {
-        file = new File(Files.createTempDir() + "/btree-" + UUID.randomUUID().toString());
+        dataDir = new TempFolder();
+        try {
+            dataDir.create();
+            dataFile = dataDir.getRoot().toPath().resolve("btree-" + UUID.randomUUID().toString()).toFile();
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException("Failed to create temp directory for BTREE data", e);
+        }
     }
 
     private synchronized void setupDB()
     {
         if (!isDBCreated.get()) {
             db = DBMaker
-                    .fileDB(file)
+                    .fileDB(dataFile)
                     .fileMmapEnableIfSupported()
                     .cleanerHackEnable()
                     .make();
@@ -292,7 +300,7 @@ public class BTreeIndex
             db.close();
         }
 
-        try (InputStream inputStream = new FileInputStream(file); SnappyOutputStream sout = new SnappyOutputStream(out)) {
+        try (InputStream inputStream = new FileInputStream(dataFile); SnappyOutputStream sout = new SnappyOutputStream(out)) {
             IOUtils.copy(inputStream, sout);
         }
     }
@@ -301,7 +309,7 @@ public class BTreeIndex
     public Index deserialize(InputStream in)
             throws IOException
     {
-        try (OutputStream out = new FileOutputStream(file)) {
+        try (OutputStream out = new FileOutputStream(dataFile)) {
             IOUtils.copy(new SnappyInputStream(in), out);
         }
         setupDB();
@@ -320,9 +328,7 @@ public class BTreeIndex
             db.close();
         }
 
-        String parentDir = file.getParent();
-        file.delete();
-        java.nio.file.Files.deleteIfExists(Paths.get(parentDir));
+        dataDir.close();
     }
 
     private List<String> translateSymbols(String dataMapLookUpRes)
