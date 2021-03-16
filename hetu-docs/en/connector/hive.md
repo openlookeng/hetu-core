@@ -769,7 +769,7 @@ DROP SCHEMA hive.web
     ```
 
 
-  
+
 
 * ##### Parallel Metastore operations
 
