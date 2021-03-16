@@ -26,7 +26,6 @@ import javax.inject.Inject;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
@@ -261,10 +260,10 @@ public class HetuMetastoreCache
     }
 
     @Override
-    public void alterTableParameters(String catalogName, String databaseName, String tableName, Map<String, String> parameters)
+    public void alterTableParameter(String catalogName, String databaseName, String tableName, String key, String value)
     {
         try {
-            delegate.alterTableParameters(catalogName, databaseName, tableName, parameters);
+            delegate.alterTableParameter(catalogName, databaseName, tableName, key, value);
         }
         finally {
             String databaseKey = catalogName + '.' + databaseName;

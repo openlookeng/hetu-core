@@ -110,8 +110,16 @@ In this example, a lookup operation is performed on the BTreeIndex for `Ant`, wh
 "/hive/database.db/animals/000.orc+1024+2044+12345"
 "/hive/database.db/animals/001.orc+3+1023+12348"
 ```
+
 The file name and offsets can be used to filter out Splits which do not match the predicate.
 
-Additionally, the last modified time can be used to ensure that the index is still valid.
-If the original ORC file had been modified since the index was created,
-then the index is invalid and should not be used for filtering.
+Additionally, the last modified time can be used to ensure that the index is still valid. If the original ORC file had been modified since the index was created, then the index is
+invalid and should not be used for filtering.
+
+## Disk usage
+
+BTree index uses disk to serialize its internal tree structure. Therefore, sufficient space in the system's temporary directory is required for both creation and filtering.
+
+For a big table/column, the size of BTree index could be very big (up to the same size as the column in the dataset).
+
+Check [hindex-statements](./hindex-statements.md) for how to change the temp folder path.

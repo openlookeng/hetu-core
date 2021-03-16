@@ -110,8 +110,15 @@ select * from hive.hindex.orders where orderid in (12345, 7890)
 “ /hive/database.db/animals/000.orc+1024+2044+12345”
 “ /hive/database.db/animals/001.orc+3+1023+12348”
 ```
+
 文件名和偏移量可用于筛选出与predicates不匹配的分片。
 
-此外，上次修改的时间可以用来确保索引仍然有效。
-如果自创建索引以来已修改原始ORC文件，
-则索引无效，不应将其用于过滤。
+此外，上次修改的时间可以用来确保索引仍然有效。 如果自创建索引以来已修改原始ORC文件， 则索引无效，不应将其用于过滤。
+
+## 磁盘使用
+
+BTree索引使用磁盘来序列化数据结构。因此，无论是创建BTree索引还是在执行语句时使用BTree索引，都需要本地临时磁盘空间。
+
+对于比较大的表和列，BTree使用的空间可能非常庞大（与列的数据大小相当）。
+
+参见 [hindex-statements](./hindex-statements.md)中的“磁盘使用”章节来指定使用的临时路径。

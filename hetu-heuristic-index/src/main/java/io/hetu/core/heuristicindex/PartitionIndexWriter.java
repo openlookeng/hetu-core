@@ -189,7 +189,9 @@ public class PartitionIndexWriter
             }
         }
         finally {
-            partitionIndex.close();
+            if (partitionIndex != null) {
+                partitionIndex.close();
+            }
             persistLock.unlock();
         }
     }

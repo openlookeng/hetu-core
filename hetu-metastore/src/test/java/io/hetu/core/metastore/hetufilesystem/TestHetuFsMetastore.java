@@ -45,7 +45,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -1215,9 +1214,7 @@ public class TestHetuFsMetastore
             int finalI = i;
             threads[i] = new Thread(() -> {
                 try {
-                    Map<String, String> parameters = new HashMap<>();
-                    parameters.put(String.valueOf(finalI), String.valueOf(finalI));
-                    metastore.alterTableParameters(defaultDatabase.getCatalogName(), defaultDatabase.getName(), tableName, parameters);
+                    metastore.alterTableParameter(defaultDatabase.getCatalogName(), defaultDatabase.getName(), tableName, String.valueOf(finalI), String.valueOf(finalI));
                 }
                 catch (Exception e) {
                     testResult = false;

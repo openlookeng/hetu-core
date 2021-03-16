@@ -129,7 +129,7 @@ public class CreateIndexOperator
             }
         }
         catch (IOException e) {
-            throw new UncheckedIOException("Persisting index failed: ", e);
+            throw new UncheckedIOException("Persisting index failed: " + e.getMessage(), e);
         }
 
         synchronized (levelWriter) {

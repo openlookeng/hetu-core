@@ -70,7 +70,7 @@ public class JdbcHetuMetastore
     }
 
     @Override
-    public synchronized void createCatalog(CatalogEntity catalog)
+    public void createCatalog(CatalogEntity catalog)
     {
         runTransactionWithLock(jdbi, handle -> {
             JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
@@ -81,7 +81,7 @@ public class JdbcHetuMetastore
     }
 
     @Override
-    public synchronized void createCatalogIfNotExist(CatalogEntity catalog)
+    public void createCatalogIfNotExist(CatalogEntity catalog)
     {
         try {
             createCatalog(catalog);
@@ -95,7 +95,7 @@ public class JdbcHetuMetastore
     }
 
     @Override
-    public synchronized void alterCatalog(String catalogName, CatalogEntity newCatalog)
+    public void alterCatalog(String catalogName, CatalogEntity newCatalog)
     {
         if (!catalogName.equals(newCatalog.getName())) {
             throw new PrestoException(HETU_METASTORE_CODE, "Cannot alter a catalog's name");
@@ -116,7 +116,7 @@ public class JdbcHetuMetastore
     }
 
     @Override
-    public synchronized void dropCatalog(String catalogName)
+    public void dropCatalog(String catalogName)
     {
         runTransactionWithLock(jdbi, handle -> {
             JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
@@ -127,7 +127,7 @@ public class JdbcHetuMetastore
         });
     }
 
-    private synchronized Long getCatalogId(JdbcMetadataDao metadataDao, String catalogName)
+    private Long getCatalogId(JdbcMetadataDao metadataDao, String catalogName)
     {
         Long catalogId = metadataDao.getCatalogId(catalogName);
         if (catalogId == null) {
@@ -137,25 +137,25 @@ public class JdbcHetuMetastore
         return catalogId;
     }
 
-    private synchronized void checkCatalogExists(JdbcMetadataDao metadataDao, String catalogName)
+    private void checkCatalogExists(JdbcMetadataDao metadataDao, String catalogName)
     {
         getCatalogId(metadataDao, catalogName);
     }
 
     @Override
-    public synchronized Optional<CatalogEntity> getCatalog(String catalogName)
+    public Optional<CatalogEntity> getCatalog(String catalogName)
     {
         return dao.getCatalog(catalogName);
     }
 
     @Override
-    public synchronized List<CatalogEntity> getCatalogs()
+    public List<CatalogEntity> getCatalogs()
     {
         return dao.getAllCatalogs();
     }
 
     @Override
-    public synchronized void createDatabase(DatabaseEntity database)
+    public void createDatabase(DatabaseEntity database)
     {
         runTransactionWithLock(jdbi, handle -> {
             JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
@@ -167,7 +167,7 @@ public class JdbcHetuMetastore
     }
 
     @Override
-    public synchronized void createDatabaseIfNotExist(DatabaseEntity database)
+    public void createDatabaseIfNotExist(DatabaseEntity database)
     {
         try {
             createDatabase(database);
@@ -181,7 +181,7 @@ public class JdbcHetuMetastore
     }
 
     @Override
-    public synchronized void alterDatabase(String catalogName, String databaseName, DatabaseEntity newDatabase)
+    public void alterDatabase(String catalogName, String databaseName, DatabaseEntity newDatabase)
     {
         if (!catalogName.equals(newDatabase.getCatalogName())) {
             throw new PrestoException(HETU_METASTORE_CODE,
@@ -202,7 +202,7 @@ public class JdbcHetuMetastore
     }
 
     @Override
-    public synchronized void dropDatabase(String catalogName, String databaseName)
+    public void dropDatabase(String catalogName, String databaseName)
     {
         runTransactionWithLock(jdbi, handle -> {
             JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
@@ -213,20 +213,20 @@ public class JdbcHetuMetastore
     }
 
     @Override
-    public synchronized Optional<DatabaseEntity> getDatabase(String catalogName, String databaseName)
+    public Optional<DatabaseEntity> getDatabase(String catalogName, String databaseName)
     {
         requireNonNull(databaseName, "database name is null");
         return dao.getDatabase(catalogName, databaseName);
     }
 
     @Override
-    public synchronized List<DatabaseEntity> getAllDatabases(String catalogName)
+    public List<DatabaseEntity> getAllDatabases(String catalogName)
     {
         return dao.getAllDatabases(catalogName);
     }
 
     @Override
-    public synchronized void createTable(TableEntity table)
+    public void createTable(TableEntity table)
     {
         runTransactionWithLock(jdbi, handle -> {
             JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
@@ -242,7 +242,7 @@ public class JdbcHetuMetastore
     }
 
     @Override
-    public synchronized void createTableIfNotExist(TableEntity table)
+    public void createTableIfNotExist(TableEntity table)
     {
         try {
             createTable(table);
@@ -256,7 +256,7 @@ public class JdbcHetuMetastore
     }
 
     @Override
-    public synchronized void dropTable(String catalogName, String databaseName, String tableName)
+    public void dropTable(String catalogName, String databaseName, String tableName)
     {
         runTransactionWithLock(jdbi, handle -> {
             JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
@@ -278,7 +278,7 @@ public class JdbcHetuMetastore
     }
 
     @Override
-    public synchronized void alterTable(String catalogName, String databaseName, String oldTableName, TableEntity newTable)
+    public void alterTable(String catalogName, String databaseName, String oldTableName, TableEntity newTable)
     {
         runTransactionWithLock(jdbi, handle -> {
             JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
@@ -303,7 +303,7 @@ public class JdbcHetuMetastore
         });
     }
 
-    private synchronized void insertColumnInfo(JdbcMetadataDao metadataDao, long tableId, List<ColumnEntity> columns)
+    private void insertColumnInfo(JdbcMetadataDao metadataDao, long tableId, List<ColumnEntity> columns)
     {
         if (columns == null) {
             return;
@@ -316,7 +316,7 @@ public class JdbcHetuMetastore
         });
     }
 
-    private synchronized Long getTableId(JdbcMetadataDao metadataDao, String catalogName, String databaseName, String tableName)
+    private Long getTableId(JdbcMetadataDao metadataDao, String catalogName, String databaseName, String tableName)
     {
         Long tableId = metadataDao.getTableId(catalogName, databaseName, tableName);
         if (tableId == null) {
@@ -326,7 +326,7 @@ public class JdbcHetuMetastore
     }
 
     @Override
-    public synchronized Optional<TableEntity> getTable(String catalogName, String databaseName, String tableName)
+    public Optional<TableEntity> getTable(String catalogName, String databaseName, String tableName)
     {
         requireNonNull(tableName, "table name is null");
         ImmutableList.Builder<TableEntity> tables = ImmutableList.builder();
@@ -343,7 +343,7 @@ public class JdbcHetuMetastore
     }
 
     @Override
-    public synchronized List<TableEntity> getAllTables(String catalogName, String databaseName)
+    public List<TableEntity> getAllTables(String catalogName, String databaseName)
     {
         ImmutableList.Builder<TableEntity> tables = ImmutableList.builder();
         runTransaction(jdbi, handle -> {
@@ -355,7 +355,7 @@ public class JdbcHetuMetastore
     }
 
     @Override
-    public void alterTableParameters(String catalogName, String databaseName, String tableName, Map<String, String> parameters)
+    public void alterTableParameter(String catalogName, String databaseName, String tableName, String key, String value)
     {
         runTransactionWithLock(jdbi, handle -> {
             JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
@@ -371,13 +371,18 @@ public class JdbcHetuMetastore
             // drop table property
             transactionDao.dropTableProperty(tableId);
 
-            tableEntity.getParameters().putAll(parameters);
+            if (value == null) {
+                tableEntity.getParameters().remove(key);
+            }
+            else {
+                tableEntity.getParameters().put(key, value);
+            }
             Optional<List<PropertyEntity>> tableProps = mapToList(tableEntity.getParameters());
             tableProps.ifPresent(props -> transactionDao.insertTableProperty(tableId, props));
         });
     }
 
-    private synchronized void getTableColumns(List<Map.Entry<Long, TableEntity>> tableEntries,
+    private void getTableColumns(List<Map.Entry<Long, TableEntity>> tableEntries,
             ImmutableList.Builder<TableEntity> tables, JdbcMetadataDao transactionDao)
     {
         tableEntries.forEach(entry -> {
@@ -388,7 +393,7 @@ public class JdbcHetuMetastore
         });
     }
 
-    private synchronized Optional<List<PropertyEntity>> mapToList(Map<String, String> map)
+    private Optional<List<PropertyEntity>> mapToList(Map<String, String> map)
     {
         if (map == null || map.isEmpty()) {
             return Optional.empty();
@@ -398,7 +403,7 @@ public class JdbcHetuMetastore
         return Optional.of(propBuilder.build());
     }
 
-    private synchronized Long getDatabaseId(String catalogName, String databaseName, JdbcMetadataDao metadataDao)
+    private Long getDatabaseId(String catalogName, String databaseName, JdbcMetadataDao metadataDao)
     {
         Long databaseId = metadataDao.getDatabaseId(catalogName, databaseName);
         if (databaseId == null) {

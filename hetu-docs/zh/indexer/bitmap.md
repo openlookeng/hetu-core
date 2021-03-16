@@ -107,12 +107,15 @@ Monkey, LAND
 通过使用BitmapIndex，我们可以改进此过程。而不是读取Stripe中的所有行。
 BitmapIndex可以返回应读取的匹配行的列表。这样既可以减少内存消耗，又可以缩短查询执行时间。
 
-如果我们在`type`列上创建BitmapIndex，则在从Stripe读取数据之前，
-将为Stripe的BitmapIndex查询`LAND`，并将返回具有以下值的迭代器：
+如果我们在`type`列上创建BitmapIndex，则在从Stripe读取数据之前， 将为Stripe的BitmapIndex查询`LAND`，并将返回具有以下值的迭代器：
 `[1, 5, 6]`
 
 这些对应于与值匹配的行号（即仅应将这些行读入内存），其余的可以跳过。
 
-对于具有多个值的queries，例如`SELECT * FROM animes WHERE type=LAND OR type=AERIAL;`，
-BitmapIndex将执行两次查找。将对两个Bitmaps执行联合以得到最终结果
-（例如，`[001000] UNION [100011] = [101011]`），因此返回的迭代器将为`[1、3、5、6]`。
+对于具有多个值的queries，例如`SELECT * FROM animes WHERE type=LAND OR type=AERIAL;`， BitmapIndex将执行两次查找。将对两个Bitmaps执行联合以得到最终结果 （例如，`[001000] UNION [100011] = [101011]`），因此返回的迭代器将为`[1、3、5、6]`。
+
+## 磁盘使用
+
+Bitmap索引内部使用btree数据来序列化。因此，无论是创建还是在执行语句时使用索引，都需要本地临时磁盘空间。
+
+参见 [hindex-statements](./hindex-statements.md)中的“磁盘使用”章节来指定使用的临时路径。

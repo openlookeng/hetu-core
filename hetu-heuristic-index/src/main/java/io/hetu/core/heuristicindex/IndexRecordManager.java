@@ -115,15 +115,11 @@ public class IndexRecordManager
             metastore.createTableIfNotExist(newTable);
         }
 
-        Optional<TableEntity> tableEntity = metastore.getTable(record.catalog, record.schema, record.table);
-        if (tableEntity.isPresent()) {
-            TableEntity newTable = tableEntity.get();
-            newTable.getParameters().put(record.serializeKey(), record.serializeValue());
-            metastore.alterTable(record.catalog, record.schema, record.table, newTable);
-        }
-        else {
-            throw new IllegalStateException("Failed to create table entity in hetu metastore");
-        }
+        metastore.alterTableParameter(record.catalog,
+                record.schema,
+                record.table,
+                record.serializeKey(),
+                record.serializeValue());
     }
 
     public synchronized void deleteIndexRecord(String name, List<String> partitionsToRemove)
@@ -131,19 +127,24 @@ public class IndexRecordManager
     {
         getNewIndexStream().filter(record -> record.name.equals(name))
                 .forEach(record -> {
-                    Optional<TableEntity> tableEntity = metastore.getTable(record.catalog, record.schema, record.table);
-                    if (tableEntity.isPresent()) {
-                        TableEntity newTable = tableEntity.get();
-                        if (partitionsToRemove.isEmpty()) {
-                            tableEntity.get().getParameters().remove(record.serializeKey());
-                        }
-                        else {
-                            record.partitions.removeAll(partitionsToRemove);
-                            IndexRecord newRecord = new IndexRecord(record.name, record.user, record.qualifiedTable, record.columns,
-                                    record.indexType, record.properties, record.partitions);
-                            tableEntity.get().getParameters().put(newRecord.serializeKey(), newRecord.serializeValue());
-                        }
-                        metastore.alterTable(record.catalog, record.schema, record.table, newTable);
+                    if (partitionsToRemove.isEmpty()) {
+                        metastore.alterTableParameter(
+                                record.catalog,
+                                record.schema,
+                                record.table,
+                                record.serializeKey(),
+                                null);
+                    }
+                    else {
+                        record.partitions.removeAll(partitionsToRemove);
+                        IndexRecord newRecord = new IndexRecord(record.name, record.user, record.qualifiedTable, record.columns,
+                                record.indexType, record.properties, record.partitions);
+                        metastore.alterTableParameter(
+                                record.catalog,
+                                record.schema,
+                                record.table,
+                                newRecord.serializeKey(),
+                                newRecord.serializeValue());
                     }
                 });
     }
