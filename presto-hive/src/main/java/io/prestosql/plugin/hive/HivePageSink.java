@@ -55,6 +55,7 @@ import org.apache.hadoop.hive.ql.io.AcidOutputFormat.Options;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.io.AcidUtils.ParsedDelta;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
@@ -397,8 +398,11 @@ public class HivePageSink
                 // Remove all sub files
                 writerFactory.removeAllSubFiles(writerParams.stream().map(param -> param.filePath).collect(toList()));
             }
+            catch (FileNotFoundException e) {
+                // Ignore. Containing staging folder may have been deleted.
+            }
             catch (IOException e) {
-                log.warn("exception '%s' while aborting subfile", e);
+                log.debug("exception '%s' while aborting subfile", e);
                 rollbackException = Optional.of(e);
             }
         }

@@ -326,7 +326,7 @@ public class MultiInputSnapshotState
                     snapshotManager.failedToRestore(componentId, true);
                     LOG.warn("Can't locate saved state for snapshot %d, component %s", snapshotId, restorableId);
                 }
-                else if (storedState.get() == QuerySnapshotManager.NO_STATE) {
+                else if (storedState.get() == TaskSnapshotManager.NO_STATE) {
                     snapshotManager.failedToRestore(componentId, true);
                     LOG.error("BUG! State of component %s has never been stored successfully before snapshot %d", restorableId, snapshotId);
                 }

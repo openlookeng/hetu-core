@@ -20,19 +20,15 @@ import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
-import io.prestosql.execution.StageId;
 import io.prestosql.execution.TaskId;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.metadata.InMemoryNodeManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
-import io.prestosql.testing.assertions.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import java.io.FileWriter;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -48,7 +44,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -83,123 +78,7 @@ public class TestQuerySnapshotManager
             throws Exception
     {
         // Cleanup files
-        snapshotUtils.deleteAll(queryId.getId());
-    }
-
-    @Test
-    public void TestStoreAndLoad()
-            throws Exception
-    {
-        queryId = new QueryId("saveandload");
-        QuerySnapshotManager snapshotManager = new QuerySnapshotManager(queryId, snapshotUtils, TEST_SNAPSHOT_SESSION);
-
-        // Test operator state
-        MockState operatorState = new MockState("operator-state");
-        TaskId taskId1 = new TaskId(queryId.getId(), 1, 2);
-        SnapshotStateId operatorStateId = SnapshotStateId.forOperator(1L, taskId1, 3, 4, 5);
-        snapshotManager.storeState(operatorStateId, operatorState);
-        MockState newOperatorState = (MockState) snapshotManager.loadState(operatorStateId).get();
-        Assert.assertEquals(operatorState.getState(), newOperatorState.getState());
-
-        // Test task state
-        MockState taskState = new MockState("task-state");
-        TaskId taskId2 = new TaskId(queryId.getId(), 3, 4);
-        SnapshotStateId taskStateId = SnapshotStateId.forOperator(3L, taskId2, 5, 6, 7);
-        snapshotManager.storeState(taskStateId, taskState);
-        MockState newTaskState = (MockState) snapshotManager.loadState(taskStateId).get();
-        Assert.assertEquals(taskState.getState(), newTaskState.getState());
-    }
-
-    @Test
-    public void TestLoadBacktrack()
-            throws Exception
-    {
-        queryId = new QueryId("loadbacktrack");
-        QuerySnapshotManager snapshotManager = new QuerySnapshotManager(queryId, snapshotUtils, TEST_SNAPSHOT_SESSION);
-
-        StageId stageId = new StageId(queryId, 0);
-        TaskId taskId = new TaskId(stageId, 0);
-
-        // Save operator state
-        MockState state = new MockState("state");
-        SnapshotStateId stateId = SnapshotStateId.forOperator(1L, taskId, 3, 4, 5);
-        snapshotManager.storeState(stateId, state);
-
-        // Make snapshot manager think that snapshot #1 is complete
-        snapshotManager.addNewTask(taskId);
-        snapshotManager.updateQueryCapture(taskId, Collections.singletonMap(1L, SnapshotResult.SUCCESSFUL));
-
-        SnapshotStateId newStateId = stateId.withSnapshotId(2);
-        Optional<Object> loadedState = snapshotManager.loadState(newStateId);
-        // Should return state saved for snapshot #1
-        assertTrue(loadedState.isPresent());
-        Assert.assertEquals(((MockState) loadedState.get()).getState(), state.getState());
-    }
-
-    @Test
-    public void testStoreAndLoadFile()
-            throws Exception
-    {
-        queryId = new QueryId("file");
-        QuerySnapshotManager snapshotManager = new QuerySnapshotManager(queryId, snapshotUtils, TEST_SNAPSHOT_SESSION);
-
-        // Create a file
-        Path sourcePath = Paths.get(SNAPSHOT_FILE_SYSTEM_DIR + "/source/spill-test.txt");
-        sourcePath.getParent().toFile().mkdirs();
-
-        String fileContent = "Spill Contents";
-        FileWriter fileWriter = new FileWriter(SNAPSHOT_FILE_SYSTEM_DIR + "/source/spill-test.txt");
-        fileWriter.write(fileContent);
-        fileWriter.close();
-
-        TaskId taskId1 = new TaskId(queryId.getId(), 1, 5);
-        SnapshotStateId snapshotStateId = new SnapshotStateId(1, taskId1, "component1");
-        snapshotManager.storeFile(snapshotStateId, sourcePath);
-
-        Path targetPath = Paths.get(SNAPSHOT_FILE_SYSTEM_DIR + "/target/spill-test.txt");
-        assertTrue(snapshotManager.loadFile(snapshotStateId, targetPath));
-
-        String output = Files.readAllLines(targetPath).get(0);
-        Assert.assertEquals(output, fileContent);
-    }
-
-    @Test
-    public void testStoreAndLoadFileBacktrack()
-            throws Exception
-    {
-        queryId = new QueryId("filebacktrack");
-        QuerySnapshotManager snapshotManager = new QuerySnapshotManager(queryId, snapshotUtils, TEST_SNAPSHOT_SESSION);
-
-        // Create a file
-        Path sourcePath = Paths.get(SNAPSHOT_FILE_SYSTEM_DIR + "/source/spill-test.txt");
-        sourcePath.getParent().toFile().mkdirs();
-
-        String fileContent = "Spill Contents";
-        FileWriter fileWriter = new FileWriter(SNAPSHOT_FILE_SYSTEM_DIR + "/source/spill-test.txt");
-        fileWriter.write(fileContent);
-        fileWriter.close();
-
-        TaskId taskId1 = new TaskId(queryId.getId(), 2, 3);
-        snapshotManager.addNewTask(taskId1);
-        SnapshotStateId id4save = new SnapshotStateId(2, taskId1, "component1");
-        snapshotManager.storeFile(id4save, sourcePath);
-
-        SnapshotStateId id4load = new SnapshotStateId(3, taskId1, "component1");
-        Path targetPath = Paths.get(SNAPSHOT_FILE_SYSTEM_DIR + "/target/spill-test.txt");
-
-        // Try1: Previous snapshot ids not setup, so load fails
-        assertNull(snapshotManager.loadFile(id4load, targetPath));
-
-        // Try2: Previous snapshots are setup, so load should be successful
-        snapshotManager.updateQueryCapture(taskId1, Collections.singletonMap(2L, SnapshotResult.SUCCESSFUL));
-        assertTrue(snapshotManager.loadFile(id4load, targetPath));
-
-        String output = Files.readAllLines(targetPath).get(0);
-        Assert.assertEquals(output, fileContent);
-
-        // Try3: Previous snapshot failed
-        snapshotManager.updateQueryCapture(taskId1, Collections.singletonMap(2L, SnapshotResult.FAILED));
-        assertFalse(snapshotManager.loadFile(id4load, targetPath));
+        snapshotUtils.removeQuerySnapshotManager(queryId);
     }
 
     @Test
