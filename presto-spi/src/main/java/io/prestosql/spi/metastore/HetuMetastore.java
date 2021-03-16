@@ -19,6 +19,7 @@ import io.prestosql.spi.metastore.model.DatabaseEntity;
 import io.prestosql.spi.metastore.model.TableEntity;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -175,4 +176,14 @@ public interface HetuMetastore
      * @return tables
      */
     List<TableEntity> getAllTables(String catalogName, String databaseName);
+
+    /**
+     * alter table parameters in hetu metastore,
+     *
+     * @param catalogName  catalog name
+     * @param databaseName database name
+     * @param tableName table name
+     * @param parameters  table parameters
+     */
+    void alterTableParameters(String catalogName, String databaseName, String tableName, Map<String, String> parameters);
 }
