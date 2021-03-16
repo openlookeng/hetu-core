@@ -28,6 +28,7 @@ public class MysqlExternalFunctionHub
         return ImmutableSet.<ExternalFunctionInfo>builder()
                 .addAll(MysqlExternalMathFunctions.getFunctionsInfo())
                 .addAll(MysqlExternalStringFunctions.getFunctionsInfo())
+                .addAll(MysqlExternalDateTimeFunctions.getFunctionsInfo())
                 .build();
     }
 }
