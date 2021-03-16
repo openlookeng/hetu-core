@@ -33,7 +33,7 @@ public class TestHindexBTreeIndex
         createBtreeTable1(tableName);
 
         String indexName = getNewIndexName();
-        safeCreateIndex("CREATE INDEX " + indexName + " USING btree ON " + tableName +
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
                 " (key2) WHERE key2 = 11");
         assertQuerySucceeds("DROP INDEX " + indexName);
     }
@@ -46,7 +46,7 @@ public class TestHindexBTreeIndex
         createBtreeTable1(tableName);
 
         String indexName = getNewIndexName();
-        safeCreateIndex("CREATE INDEX " + indexName + " USING btree ON " + tableName +
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
                 " (key1) WHERE key2 = 11");
         assertQuerySucceeds("DROP INDEX " + indexName);
     }
@@ -59,7 +59,7 @@ public class TestHindexBTreeIndex
         createBtreeTable1(tableName);
 
         String indexName = getNewIndexName();
-        safeCreateIndex("CREATE INDEX " + indexName + " USING btree ON " + tableName +
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
                 " (key1) WHERE key2 = 11");
         assertQuerySucceeds("DROP INDEX " + indexName + " WHERE key2 = 11");
     }
@@ -72,7 +72,7 @@ public class TestHindexBTreeIndex
         createBtreeTable1(tableName);
 
         String indexName = getNewIndexName();
-        safeCreateIndex("CREATE INDEX " + indexName + " USING btree ON " + tableName +
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
                 " (key1) WHERE key2 = 11");
         try {
             assertQuerySucceeds("DROP INDEX " + indexName + " WHERE key2 = 10");
@@ -92,7 +92,7 @@ public class TestHindexBTreeIndex
         createBtreeTable1(tableName);
 
         String indexName = getNewIndexName();
-        safeCreateIndex("CREATE INDEX " + indexName + " USING btree ON " + tableName +
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
                 " (key2) WHERE key2 = 11");
 
         String testerQuery = "SELECT * FROM " + tableName + " WHERE key2 = 11";
@@ -132,7 +132,7 @@ public class TestHindexBTreeIndex
         createBtreeTableTransact1(tableName);
 
         String indexName = getNewIndexName();
-        safeCreateIndex("CREATE INDEX " + indexName + " USING btree ON " + tableName +
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING btree ON " + tableName +
                 " (key2) WHERE key2 = 12");
 
         String testerQuery = "SELECT * FROM " + tableName + " WHERE key2 = 12";
@@ -193,7 +193,7 @@ public class TestHindexBTreeIndex
         createBtreeTableMultiPart1(tableName);
 
         String indexName1 = getNewIndexName();
-        safeCreateIndex("CREATE INDEX " + indexName1 + " USING btree ON " + tableName +
+        assertQuerySucceeds("CREATE INDEX " + indexName1 + " USING btree ON " + tableName +
                 " (key1) WHERE key3 = 222");
 
         String testerQuery1 = "SELECT * FROM " + tableName + " WHERE key1 = 2";
@@ -215,7 +215,7 @@ public class TestHindexBTreeIndex
         // Create second index and do query again on different keys
 
         String indexName2 = getNewIndexName();
-        safeCreateIndex("CREATE INDEX " + indexName2 + " USING btree ON " + tableName +
+        assertQuerySucceeds("CREATE INDEX " + indexName2 + " USING btree ON " + tableName +
                 " (key2) WHERE key5 = 22222");
 
         String testerQuery2 = "SELECT * FROM " + tableName + " WHERE key2 = 22";

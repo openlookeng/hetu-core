@@ -34,7 +34,7 @@ public class TestHindexFailure
         createTable1(tableName);
 
         // Create index
-        safeCreateIndex("CREATE INDEX " + indexName + " USING " +
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
                 indexType + " ON " + tableName + " (id)");
 
         assertContains("DROP INDEX hive", "Index 'hive' does not exist");
@@ -59,7 +59,7 @@ public class TestHindexFailure
         createTable1(tableName);
 
         // Create index
-        safeCreateIndex("CREATE INDEX " + indexName + " USING " +
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
                 indexType + " ON " + tableName + " (id)");
 
         assertQuerySucceeds("DROP INDEX " + indexName);
@@ -76,7 +76,7 @@ public class TestHindexFailure
         createTable1(tableName);
 
         String indexName1 = getNewIndexName();
-        safeCreateIndex("CREATE INDEX " + indexName1 + " USING " +
+        assertQuerySucceeds("CREATE INDEX " + indexName1 + " USING " +
                 indexType + " ON " + tableName + " (" + queryVariable + ")");
 
         String indexName2 = getNewIndexName();

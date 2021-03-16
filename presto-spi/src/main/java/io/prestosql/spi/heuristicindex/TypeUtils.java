@@ -38,6 +38,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.util.Locale;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.spi.type.Decimals.decodeUnscaledValue;
@@ -98,7 +100,19 @@ public class TypeUtils
             CallExpression callExpression = (CallExpression) rowExpression;
             String name = ((BuiltInFunctionHandle) callExpression.getFunctionHandle()).getSignature().getNameSuffix();
             if (name.equals(CAST_OPERATOR)) {
-                return extractValueFromRowExpression(callExpression.getArguments().get(0));
+                Object valueExtracted = extractValueFromRowExpression(callExpression.getArguments().get(0));
+                String valueTypeName = valueExtracted.getClass().getTypeName().toLowerCase(Locale.ROOT);
+                String expectedTypeName = rowExpression.getType().getDisplayName().toLowerCase(Locale.ROOT);
+                if (!valueTypeName.contains(expectedTypeName) && expectedTypeName.equals("real")) {
+                    // A cast is necessary for Real type, so use Float casting
+                    return Float.parseFloat(valueExtracted.toString());
+                }
+                else if (!valueTypeName.contains(expectedTypeName) && expectedTypeName.equals("date")) {
+                    // A cast is necessary for Date type, so use Long casting
+                    LocalDate dateGiven = LocalDate.parse(valueExtracted.toString());
+                    return dateGiven.toEpochDay();
+                }
+                return valueExtracted;
             }
         }
         else if (rowExpression instanceof ConstantExpression) {
