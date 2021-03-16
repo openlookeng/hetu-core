@@ -31,6 +31,29 @@ jdbc.pushdown-module=FULL_PUSHDOWN
 #FULL_PUSHDOWN，表示全部下推；BASE_PUSHDOWN，表示部分下推，其中部分下推是指filter/aggregation/limit/topN/project这些可以下推。
 ```
 
+### 外部函数注册
+MySQL连接器支持注册外部函数。
+
+配置支持下推的外部函数注册命名空间`catalog.schema`。
+例如在`etc/catalog/mysql.properties`中配置：
+```Properties
+jdbc.pushdown.remotenamespace=example.default
+```
+
+### 外部函数下推
+和将外部函数下推到MySQL数据源执行。
+
+配置支持下推的外部函数注册命名空间`catalog.schema`。
+例如在`etc/catalog/mysql.properties`中配置：
+```Properties
+jdbc.pushdown.remotenamespace=example.default
+```
+可以声明自己支持多个函数命名空间中的函数，在`jdbc.pushdown.remotenamespace`配置项中使用'|'分割既可。例如：
+```Properties
+jdbc.pushdown.remotenamespace=example1.default|example2.default|example3.default|
+#表示当前Connector实例同时支持example1.default、example2.default、example3.default三个函数命名空间最终的函数下推到当前连接的数据源中执行。
+```
+
 ### 多个MySQL服务器
 
 可以根据需要创建任意多的目录，因此，如果有额外的MySQL服务器，只需添加另一个不同的名称的属性文件到`etc/catalog`中（确保它以`.properties`结尾）。例如，如果将属性文件命名为`sales.properties`，openLooKeng将使用配置的连接器创建一个名为`sales`的目录。

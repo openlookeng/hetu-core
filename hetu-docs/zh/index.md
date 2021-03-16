@@ -36,6 +36,7 @@ headless: true
     - [溢出到磁盘]({{< relref "./docs/admin/spill.md" >}})
     - [资源组]({{< relref "./docs/admin/resource-groups.md" >}})
     - [会话属性管理器]({{< relref "./docs/admin/session-property-managers.md" >}})
+    - [函数命令空间管理]({{< relref "./docs/admin/function-namespace-managers.md" >}})
     - [分布式排序]({{< relref "./docs/admin/dist-sort.md" >}})
     - [动态目录]({{< relref "./docs/admin/dynamic-catalog.md" >}})
     - [水平伸缩]({{< relref "./docs/admin/horizontal-scaling.md" >}})
@@ -196,6 +197,7 @@ headless: true
     - [文件系统访问实用程序]({{< relref "./docs/develop/filesystem.md" >}})
     - [启发式索引]({{< relref "./docs/develop/indexer.md" >}})
     - [Hive ORC Cache]({{< relref "./docs/develop/hive-orc-cache.md" >}})
+    - [外部函数注册和下推]({{< relref "./docs/develop/externalfunction-registration-pushdown.md" >}})
 
 - [openLooKeng REST接口说明]({{< relref "./docs/rest/_index.md" >}})
     - [节点资源]({{< relref "./docs/rest/node.md" >}})

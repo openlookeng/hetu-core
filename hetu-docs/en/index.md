@@ -36,6 +36,7 @@ headless: true
     - [Spill to Disk]({{< relref "./docs/admin/spill.md" >}})
     - [Resource Groups]({{< relref "./docs/admin/resource-groups.md" >}})
     - [Session Property Managers]({{< relref "./docs/admin/session-property-managers.md" >}})
+    - [Function Namespace Managers]({{< relref "./docs/admin/function-namespace-managers.md" >}})
     - [Distributed Sort]({{< relref "./docs/admin/dist-sort.md" >}})
     - [Dynamic Catalog]({{< relref "./docs/admin/dynamic-catalog.md" >}})
     - [Horizontal Scaling]({{< relref "./docs/admin/horizontal-scaling.md" >}})
@@ -196,6 +197,7 @@ headless: true
     - [Filesystem Access Utilities]({{< relref "./docs/develop/filesystem.md" >}})
     - [Heuristic indexer]({{< relref "./docs/develop/indexer.md" >}})
     - [Hive ORC Cache]({{< relref "./docs/develop/hive-orc-cache.md" >}})
+    - [External Function Registration and Push Down]({{< relref "./docs/develop/externalfunction-registration-pushdown.md" >}})
 
 - [openLooKeng REST API]({{< relref "./docs/rest/_index.md" >}})
     - [Node Resource]({{< relref "./docs/rest/node.md" >}})
