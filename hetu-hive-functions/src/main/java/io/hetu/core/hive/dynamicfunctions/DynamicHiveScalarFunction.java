@@ -283,7 +283,7 @@ public class DynamicHiveScalarFunction
     @Override
     public boolean isCalledOnNullInput()
     {
-        return false;
+        return true;
     }
 
     @Override

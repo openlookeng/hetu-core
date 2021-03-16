@@ -72,7 +72,8 @@ public class TestDynamicHiveScalarFunction
                 "io.hetu.core.hive.dynamicfunctions.examples.udf.ShortWrapperUDF",
                 "io.hetu.core.hive.dynamicfunctions.examples.udf.ByteUDF",
                 "io.hetu.core.hive.dynamicfunctions.examples.udf.DoubleWrapperUDF",
-                "io.hetu.core.hive.dynamicfunctions.examples.udf.FloatUDF");
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.FloatUDF",
+                "io.hetu.core.hive.dynamicfunctions.examples.udf.NullInputUDF");
         try {
             queryRunner = DistributedQueryRunner.builder(
                     testSessionBuilder().setCatalog("memory").setSchema("default").build())
@@ -568,5 +569,24 @@ public class TestDynamicHiveScalarFunction
         queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
                 "timeout io.hetu.core.hive.dynamicfunctions.examples.udf.TimeOutUDF"), 1)));
         queryRunner.execute("select timeout(1)");
+    }
+
+    @Test
+    public void testNullInputUDF()
+    {
+        queryRunner.getMetadata().getFunctionAndTypeManager().registerBuiltInFunctions(Arrays.asList(new DynamicHiveScalarFunction(new FunctionMetadata(
+                "evaluateNullInputUDF io.hetu.core.hive.dynamicfunctions.examples.udf.NullInputUDF"), 1)));
+        assertEquals(
+                queryRunner.execute("select evaluateNullInputUDF('we are ', 1)"),
+                queryRunner.execute("select 7"));
+        assertEquals(
+                queryRunner.execute("select evaluateNullInputUDF('we are ', 2)"),
+                queryRunner.execute("select 6"));
+        assertEquals(
+                queryRunner.execute("select evaluateNullInputUDF(' we are ', 2)"),
+                queryRunner.execute("select 6"));
+        assertEquals(
+                queryRunner.execute("select evaluateNullInputUDF('', null)"),
+                queryRunner.execute("select -1"));
     }
 }
