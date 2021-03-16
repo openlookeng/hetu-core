@@ -118,6 +118,9 @@ public class BTreeIndex
                 if (dbe.getCause() instanceof IOException) {
                     throw (IOException) dbe.getCause();
                 }
+                else {
+                    throw new IOException("Error setting up local mapdb: ", dbe);
+                }
             }
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {

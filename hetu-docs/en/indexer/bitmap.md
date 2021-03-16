@@ -121,6 +121,13 @@ the BitmapIndex for the Stripe will be queried for `"LAND"` and will return an i
 These correspond to the row numbers which match the value
 (i.e. only these rows should be read into memory), the rest can be skipped.
 
-For queries with multiple values like `SELECT * FROM animals WHERE type=LAND or type=AERIAL;`,
-BitmapIndex will perform two lookups. A union will be performed on the two Bitmaps to get the final result
+For queries with multiple values like `SELECT * FROM animals WHERE type=LAND or type=AERIAL;`, BitmapIndex will perform two lookups. A union will be performed on the two Bitmaps to
+get the final result
 (i.e. `[001000] UNION [100011] = [101011]`), therefore the returned iterator will be `[1, 3, 5, 6]`.
+
+## Disk usage
+
+Bitmap index internally has a btree structure which uses disk to serialize. Therefore, sufficient space in the system's temporary directory is required for both creation and
+filtering.
+
+Check [hindex-statements](./hindex-statements.md) for how to change the temp folder path.

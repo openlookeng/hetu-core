@@ -116,7 +116,7 @@ The file name and offsets can be used to filter out Splits which do not match th
 Additionally, the last modified time can be used to ensure that the index is still valid. If the original ORC file had been modified since the index was created, then the index is
 invalid and should not be used for filtering.
 
-## 磁盘使用
+## Disk usage
 
 BTree index uses disk to serialize its internal tree structure. Therefore, sufficient space in the system's temporary directory is required for both creation and filtering.
 
