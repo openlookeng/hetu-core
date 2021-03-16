@@ -1146,9 +1146,7 @@ public class TestJdbcHetuMetastore
             int finalI = i;
             threads[i] = new Thread(() -> {
                 try {
-                    Map<String, String> parameters = new HashMap<>();
-                    parameters.put(String.valueOf(finalI), String.valueOf(finalI));
-                    metastore.alterTableParameters(defaultDatabase.getCatalogName(), defaultDatabase.getName(), tableName, parameters);
+                    metastore.alterTableParameter(defaultDatabase.getCatalogName(), defaultDatabase.getName(), tableName, String.valueOf(finalI), String.valueOf(finalI));
                 }
                 catch (Exception e) {
                     testResult = false;

@@ -37,7 +37,6 @@ import org.testng.annotations.Test;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 
@@ -286,6 +285,6 @@ public class TestStarTreeMetaStore
         }
 
         @Override
-        public void alterTableParameters(String catalogName, String databaseName, String tableName, Map<String, String> parameters) {}
+        public void alterTableParameter(String catalogName, String databaseName, String tableName, String key, String value) {}
     }
 }
