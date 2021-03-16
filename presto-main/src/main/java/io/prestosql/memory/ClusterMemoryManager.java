@@ -65,6 +65,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -621,15 +622,16 @@ public class ClusterMemoryManager
             URI stateURI = uriBuilderFrom(entry.getValue().getNode().getInternalUri())
                     .appendPath("/v1/info/state")
                     .build();
-            String state = "\"" + NodeState.DISCONNECTION + "\"";
+            String stateTemp = "\"" + NodeState.DISCONNECTION + "\"";
             try (
                     InputStreamReader inputStreamReader = new InputStreamReader(stateURI.toURL().openStream());
                     BufferedReader reader = new BufferedReader(inputStreamReader)) {
-                state = reader.readLine();
+                stateTemp = reader.readLine();
             }
             catch (IOException e) {
                 log.info("Worker disconnect");
             }
+            String state = stateTemp.substring(0, 2).toUpperCase(Locale.ENGLISH) + stateTemp.substring(2).toLowerCase(Locale.ENGLISH);
             JsonNode jsonNode = null;
             try {
                 MemoryInfo info = entry.getValue().getInfo().orElse(new MemoryInfo(0, 0, 0, new DataSize(0,
