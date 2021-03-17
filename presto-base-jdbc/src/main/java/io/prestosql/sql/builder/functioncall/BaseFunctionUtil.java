@@ -26,9 +26,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.sql.builder.functioncall.FunctionCallConstants.CATALOG_SCHEMA_LENGTH_COUNT;
-import static io.prestosql.sql.builder.functioncall.FunctionCallConstants.DEFAULT_FUNCTION_CATALOG;
-import static io.prestosql.sql.builder.functioncall.FunctionCallConstants.DEFAULT_FUNCTION_SCHEMA;
 import static io.prestosql.sql.builder.functioncall.FunctionCallConstants.DOT_SPLITTER;
 import static io.prestosql.sql.builder.functioncall.FunctionCallConstants.REMOTE_CATALOGSCHEMAS_CONFIG_SPLITTER;
 import static java.util.stream.Collectors.joining;
@@ -82,7 +81,7 @@ public class BaseFunctionUtil
     public static boolean isDefaultFunction(CallExpression callExpression)
     {
         CatalogSchemaName catalogSchemaName = callExpression.getFunctionHandle().getFunctionNamespace();
-        return DEFAULT_FUNCTION_CATALOG.equalsIgnoreCase(catalogSchemaName.getCatalogName()) && DEFAULT_FUNCTION_SCHEMA.equalsIgnoreCase(catalogSchemaName.getSchemaName());
+        return DEFAULT_NAMESPACE.equals(catalogSchemaName);
     }
 
     /**

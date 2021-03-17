@@ -14,17 +14,8 @@
  */
 package io.prestosql.plugin.mysql.optimization.function;
 
-import com.google.common.base.Joiner;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
-import io.prestosql.plugin.jdbc.optimization.BaseJdbcRowExpressionConverter;
-import io.prestosql.plugin.jdbc.optimization.JdbcConverterContext;
-import io.prestosql.spi.function.SqlFunctionHandle;
-import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.sql.builder.functioncall.ApplyRemoteFunctionPushDown;
-
-import java.util.Optional;
-
-import static java.util.stream.Collectors.toList;
 
 public class MySqlApplyRemoteFunctionPushDown
         extends ApplyRemoteFunctionPushDown
@@ -32,17 +23,5 @@ public class MySqlApplyRemoteFunctionPushDown
     public MySqlApplyRemoteFunctionPushDown(BaseJdbcConfig baseJdbcConfig, String connectorName)
     {
         super(baseJdbcConfig, connectorName);
-    }
-
-    @Override
-    public Optional<String> rewriteRemoteFunction(CallExpression callExpression, BaseJdbcRowExpressionConverter rowExpressionConverter, JdbcConverterContext jdbcConverterContext)
-    {
-        if (!isConnectorSupportedRemoteFunction(callExpression)) {
-            return Optional.empty();
-        }
-        jdbcConverterContext.setRemoteUdfVisited(true);
-        String displayName = ((SqlFunctionHandle) callExpression.getFunctionHandle()).getFunctionId().getFunctionName().getObjectName();
-        String args = Joiner.on(",").join(callExpression.getArguments().stream().map(expression -> expression.accept(rowExpressionConverter, jdbcConverterContext)).collect(toList()));
-        return Optional.of(String.format("%s(%s)", displayName, args));
     }
 }
