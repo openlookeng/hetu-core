@@ -16,7 +16,7 @@
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
 
         <dep.kafka.version>0.10.2.2</dep.kafka.version>
-        <dep.scala.version>2.10.6</dep.scala.version>
+        <dep.scala.version>2.10.7</dep.scala.version>
     </properties>
 
     <dependencies>
@@ -80,6 +80,10 @@
                 <exclusion>
                     <artifactId>netty</artifactId>
                     <groupId>io.netty</groupId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.scala-lang</groupId>
+                    <artifactId>scala-library</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>

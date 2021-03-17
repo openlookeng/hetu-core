@@ -15,7 +15,7 @@
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
         <hazelcast.version>4.0.3</hazelcast.version>
         <aspectjweaver.version>1.9.4</aspectjweaver.version>
-        <spring-context.version>5.2.5.RELEASE</spring-context.version>
+        <spring-context.version>5.2.9.RELEASE</spring-context.version>
         <cache-api.version>1.1.1</cache-api.version>
         <jmockit.version>1.38</jmockit.version>
     </properties>
