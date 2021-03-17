@@ -101,7 +101,7 @@ public interface Index
      * {@code null} if the index does not support lookUp operation
      */
     default <T extends Comparable<T>> Iterator<T> lookUp(Object expression)
-            throws UnsupportedOperationException
+            throws UnsupportedOperationException, IndexLookUpException
     {
         return null;
     }

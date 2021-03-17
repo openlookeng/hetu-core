@@ -28,11 +28,11 @@ import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class HeuristicIndexFilter
         implements IndexFilter
@@ -172,6 +172,7 @@ public class HeuristicIndexFilter
     }
 
     private <T extends Comparable<T>> Iterator<T> lookUpAll(RowExpression expression)
+            throws IndexLookUpException
     {
         RowExpression varRef = null;
 
@@ -194,12 +195,25 @@ public class HeuristicIndexFilter
             return null;
         }
 
-        List<Iterator<T>> iterators = new ArrayList<>(selectedIndex.size());
+        try {
+            List<Iterator<T>> iterators = selectedIndex.parallelStream()
+                    .map(indexMetadata -> {
+                        try {
+                            return (Iterator<T>) indexMetadata.getIndex().lookUp(expression);
+                        }
+                        catch (IndexLookUpException e) {
+                            throw new RuntimeException(e);
+                        }
+                    })
+                    .collect(Collectors.toList());
 
-        for (IndexMetadata indexMetadata : selectedIndex) {
-            iterators.add((indexMetadata.getIndex()).lookUp(expression));
+            return SequenceUtils.union(iterators);
         }
-
-        return SequenceUtils.union(iterators);
+        catch (RuntimeException re) {
+            if (re.getCause() instanceof IndexLookUpException) {
+                throw (IndexLookUpException) re.getCause();
+            }
+            throw re;
+        }
     }
 }

@@ -21,4 +21,15 @@ public class IndexLookUpException
     public IndexLookUpException()
     {
     }
+
+    public IndexLookUpException(String message)
+    {
+        super(message);
+    }
+
+    @Override
+    public String getMessage()
+    {
+        return super.getMessage();
+    }
 }

@@ -16,6 +16,7 @@ package io.hetu.core.plugin.heuristicindex.index.btree;
 
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.heuristicindex.Index;
+import io.prestosql.spi.heuristicindex.IndexLookUpException;
 import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.RowExpression;
@@ -86,7 +87,7 @@ public class TestBTreeIndex
 
     @Test
     public void testLookup()
-            throws IOException
+            throws IOException, IndexLookUpException
     {
         BTreeIndex index = new BTreeIndex();
         for (int i = 0; i < 100; i++) {
@@ -111,7 +112,7 @@ public class TestBTreeIndex
 
     @Test
     public void testBetween()
-            throws IOException
+            throws IOException, IndexLookUpException
     {
         BTreeIndex index = new BTreeIndex();
         for (int i = 0; i < 20; i++) {
@@ -142,7 +143,7 @@ public class TestBTreeIndex
 
     @Test
     public void testIn()
-            throws IOException
+            throws IOException, IndexLookUpException
     {
         BTreeIndex index = new BTreeIndex();
         for (int i = 0; i < 20; i++) {
@@ -175,7 +176,7 @@ public class TestBTreeIndex
 
     @Test
     public void testGreaterThan()
-            throws IOException
+            throws IOException, IndexLookUpException
     {
         BTreeIndex index = new BTreeIndex();
         for (int i = 0; i < 25; i++) {
@@ -204,7 +205,7 @@ public class TestBTreeIndex
 
     @Test
     public void testGreaterThanEqualTo()
-            throws IOException
+            throws IOException, IndexLookUpException
     {
         BTreeIndex index = new BTreeIndex();
         for (int i = 0; i < 100; i++) {
@@ -232,7 +233,7 @@ public class TestBTreeIndex
 
     @Test
     public void testLessThan()
-            throws IOException
+            throws IOException, IndexLookUpException
     {
         BTreeIndex index = new BTreeIndex();
         for (int i = 0; i < 100; i++) {
@@ -262,7 +263,7 @@ public class TestBTreeIndex
 
     @Test
     public void testLessThanEqualTo()
-            throws IOException
+            throws IOException, IndexLookUpException
     {
         BTreeIndex index = new BTreeIndex();
         for (int i = 0; i < 100; i++) {
@@ -311,7 +312,7 @@ public class TestBTreeIndex
 
     @Test
     public void testDeserialize()
-            throws IOException
+            throws IOException, IndexLookUpException
     {
         BTreeIndex index = new BTreeIndex();
         String value = "foo bar";
