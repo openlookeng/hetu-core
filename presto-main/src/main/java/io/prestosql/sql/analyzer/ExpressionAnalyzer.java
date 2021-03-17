@@ -29,6 +29,7 @@ import io.prestosql.security.AccessControl;
 import io.prestosql.security.DenyAllAccessControl;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.StandardErrorCode;
+import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.FunctionMetadata;
@@ -43,6 +44,7 @@ import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeNotFoundException;
+import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.TypeSignatureParameter;
 import io.prestosql.spi.type.VarcharType;
 import io.prestosql.sql.parser.SqlParser;
@@ -120,6 +122,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
@@ -127,6 +130,8 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.metadata.CastType.CAST;
 import static io.prestosql.metadata.FunctionAndTypeManager.qualifyObjectName;
+import static io.prestosql.spi.StandardErrorCode.FUNCTION_NOT_FOUND;
+import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.spi.function.OperatorType.SUBSCRIPT;
 import static io.prestosql.spi.type.ArrayParametricType.ARRAY;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -1007,6 +1012,15 @@ public class ExpressionAnalyzer
                 }
                 else {
                     Type actualType = typeManager.getType(argumentTypes.get(i).getTypeSignature());
+                    CatalogSchemaName catalogSchemaName = functionMetadata.getName().getCatalogSchemaName();
+                    if (!DEFAULT_NAMESPACE.equals(catalogSchemaName) && !expectedType.equals(actualType)) {
+                        throw new PrestoException(FUNCTION_NOT_FOUND, format(
+                                "Unexpected parameters %s for external function %s. Expected: %s(%s)",
+                                actualType.getDisplayName(),
+                                functionMetadata.getName().toString(),
+                                functionMetadata.getName().toString(),
+                                functionMetadata.getArgumentTypes().stream().map(TypeSignature::toString).collect(Collectors.joining(", "))));
+                    }
                     coerceType(expression, actualType, expectedType, format("Function %s argument %d", function, i));
                 }
             }
