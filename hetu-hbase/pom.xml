@@ -68,7 +68,6 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
-            <version>2.10.0</version>
             <scope>provided</scope>
         </dependency>
 
@@ -215,6 +214,10 @@
                 <exclusion>
                     <groupId>org.apache.hadoop</groupId>
                     <artifactId>hadoop-distcp</artifactId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>jetty-util-ajax</artifactId>
+                    <groupId>org.eclipse.jetty</groupId>
                 </exclusion>
             </exclusions>
         </dependency>

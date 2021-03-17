@@ -15,7 +15,6 @@
 package io.prestosql.sql.planner;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.io.Files;
 import io.prestosql.Session;
 import io.prestosql.plugin.hive.HiveConnector;
 import io.prestosql.plugin.hive.HiveConnectorFactory;
@@ -41,6 +40,7 @@ import static io.prestosql.plugin.hive.metastore.file.FileHiveMetastore.createTe
 import static io.prestosql.testing.TestingConnectorSession.SESSION;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static java.lang.String.format;
+import static java.nio.file.Files.createTempDirectory;
 
 /**
  * This class tests cost-based optimization rules related to joins. It contains unmodified TPCDS queries.
@@ -72,7 +72,7 @@ public class TestTpcdsCostBasedPlanPushdown
             queryRunner.createCatalog("tpcds", new TpcdsConnectorFactory(1), ImmutableMap.of());
 
             // add hive
-            File hiveDir = new File(Files.createTempDir(), "hive_data");
+            File hiveDir = new File(createTempDirectory("TestTpcdsCostBasedPlanPushdown").toFile(), "hive_data");
             HiveMetastore metastore = createTestingFileHiveMetastore(hiveDir);
             metastore.createDatabase(
                     new HiveIdentity(SESSION),

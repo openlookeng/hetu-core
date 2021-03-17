@@ -26,10 +26,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static com.google.common.io.Files.createTempDir;
 import static com.google.common.io.Resources.toByteArray;
 import static io.prestosql.plugin.atop.AtopErrorCode.ATOP_READ_TIMEOUT;
 import static io.prestosql.plugin.atop.LocalAtopQueryRunner.createQueryRunner;
+import static java.nio.file.Files.createTempDirectory;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
@@ -41,7 +41,7 @@ public class TestAtopHang
     public void setUp()
             throws Exception
     {
-        File tempPath = createTempDir();
+        File tempPath = createTempDirectory(getClass().getName()).toFile();
         copyExecutable("hanging_atop.sh", tempPath);
         queryRunner = createQueryRunner(ImmutableMap.of("atop.executable-path", tempPath + "/hanging_atop.sh", "atop.executable-read-timeout", "1s"), AtopProcessFactory.class);
     }

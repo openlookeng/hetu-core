@@ -15,7 +15,6 @@ package io.prestosql.spiller;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
-import com.google.common.io.Files;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import io.airlift.slice.InputStreamSliceInput;
 import io.hetu.core.transport.execution.buffer.PageCodecMarker;
@@ -30,6 +29,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
 import java.util.List;
@@ -44,6 +44,7 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static java.lang.Double.doubleToLongBits;
+import static java.nio.file.Files.createTempDirectory;
 import static java.nio.file.Files.newInputStream;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static org.testng.Assert.assertEquals;
@@ -55,7 +56,11 @@ public class TestFileSingleStreamSpiller
     private static final List<Type> TYPES = ImmutableList.of(BIGINT, DOUBLE, VARBINARY);
 
     private final ListeningExecutorService executor = listeningDecorator(newCachedThreadPool());
-    private final File spillPath = Files.createTempDir();
+    private final File spillPath = createTempDirectory(getClass().getName()).toFile();
+
+    public TestFileSingleStreamSpiller()
+            throws IOException
+    {}
 
     @AfterClass(alwaysRun = true)
     public void tearDown()

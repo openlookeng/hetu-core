@@ -16,7 +16,6 @@ package io.prestosql.plugin.hive;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.io.Files;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import io.airlift.json.JsonCodec;
 import io.airlift.slice.Slices;
@@ -84,6 +83,7 @@ import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static io.prestosql.testing.assertions.Assert.assertEquals;
 import static java.lang.Math.round;
 import static java.lang.String.format;
+import static java.nio.file.Files.createTempDirectory;
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.FILE_INPUT_FORMAT;
 import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
@@ -106,7 +106,7 @@ public class TestHivePageSink
             throws Exception
     {
         HiveConfig config = new HiveConfig();
-        File tempDir = Files.createTempDir();
+        File tempDir = createTempDirectory(getClass().getName()).toFile();
         try {
             HiveMetastore metastore = createTestingFileHiveMetastore(new File(tempDir, "metastore"));
             for (HiveStorageFormat format : HiveStorageFormat.values()) {

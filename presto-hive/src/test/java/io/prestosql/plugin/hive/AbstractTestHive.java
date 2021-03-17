@@ -153,7 +153,6 @@ import static com.google.common.collect.Maps.uniqueIndex;
 import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.collect.Sets.difference;
 import static com.google.common.hash.Hashing.sha256;
-import static com.google.common.io.Files.createTempDir;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
@@ -251,6 +250,7 @@ import static java.lang.Float.floatToRawIntBits;
 import static java.lang.Math.toIntExact;
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.nio.file.Files.createTempDirectory;
 import static java.util.Collections.emptyMap;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
@@ -2566,9 +2566,9 @@ public abstract class AbstractTestHive
     }
 
     @Test
-    public void testCreateManagedTableWithLocation()
+    public void testCreateManagedTableWithLocation() throws IOException
     {
-        String location = createTempDir().toString();
+        String location = createTempDirectory(getClass().getName()).toString();
         Map<String, Object> tableProperty;
         Transaction transaction = newTransaction();
         ConnectorSession session = newSession();
@@ -2615,9 +2615,9 @@ public abstract class AbstractTestHive
     }
 
     @Test
-    public void testCreateExternalTableWithLocation()
+    public void testCreateExternalTableWithLocation() throws IOException
     {
-        String location = createTempDir().toString();
+        String location = createTempDirectory(getClass().getName()).toString();
         Map<String, Object> tableProperty;
         Transaction transaction = newTransaction();
         ConnectorSession session = newSession();

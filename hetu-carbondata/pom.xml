@@ -683,6 +683,10 @@
           <artifactId>parquet-hadoop-bundle</artifactId>
           <groupId>org.apache.parquet</groupId>
         </exclusion>
+        <exclusion>
+          <artifactId>groovy-all</artifactId>
+          <groupId>org.codehaus.groovy</groupId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>

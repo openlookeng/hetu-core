@@ -14,7 +14,6 @@
 package io.prestosql.plugin.hive;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.io.Files;
 import io.prestosql.Session;
 import io.prestosql.benchmark.BenchmarkSuite;
 import io.prestosql.plugin.hive.authentication.HiveIdentity;
@@ -34,6 +33,7 @@ import static com.google.common.io.RecursiveDeleteOption.ALLOW_INSECURE;
 import static io.prestosql.plugin.hive.metastore.file.FileHiveMetastore.createTestingFileHiveMetastore;
 import static io.prestosql.testing.TestingConnectorSession.SESSION;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
+import static java.nio.file.Files.createTempDirectory;
 import static java.util.Objects.requireNonNull;
 
 public final class HiveBenchmarkQueryRunner
@@ -46,7 +46,7 @@ public final class HiveBenchmarkQueryRunner
             throws IOException
     {
         String outputDirectory = requireNonNull(System.getProperty("outputDirectory"), "Must specify -DoutputDirectory=...");
-        File tempDir = Files.createTempDir();
+        File tempDir = createTempDirectory("HiveBenchmarkQueryRunner").toFile();
         try (LocalQueryRunner localQueryRunner = createLocalQueryRunner(tempDir)) {
             new BenchmarkSuite(localQueryRunner, outputDirectory).runAllBenchmarks();
         }

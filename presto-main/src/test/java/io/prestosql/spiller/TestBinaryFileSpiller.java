@@ -14,7 +14,6 @@
 package io.prestosql.spiller;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.io.Files;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.RowPagesBuilder;
@@ -29,6 +28,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -43,6 +43,7 @@ import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.lang.Double.doubleToLongBits;
+import static java.nio.file.Files.createTempDirectory;
 import static org.testng.Assert.assertEquals;
 
 @Test(singleThreaded = true)
@@ -50,12 +51,16 @@ public class TestBinaryFileSpiller
 {
     private static final List<Type> TYPES = ImmutableList.of(BIGINT, VARCHAR, DOUBLE, BIGINT);
 
-    private final File spillPath = Files.createTempDir();
+    private final File spillPath = createTempDirectory(getClass().getName()).toFile();
     private SpillerStats spillerStats;
     private FileSingleStreamSpillerFactory singleStreamSpillerFactory;
     private SpillerFactory factory;
     private PagesSerde pagesSerde;
     private AggregatedMemoryContext memoryContext;
+
+    public TestBinaryFileSpiller()
+            throws IOException
+    {}
 
     @BeforeMethod
     public void setUp()

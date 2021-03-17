@@ -15,7 +15,6 @@ package io.prestosql.spiller;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
-import com.google.common.io.Files;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import io.prestosql.spi.Page;
@@ -27,6 +26,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +41,7 @@ import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spiller.FileSingleStreamSpillerFactory.SPILL_FILE_PREFIX;
 import static io.prestosql.spiller.FileSingleStreamSpillerFactory.SPILL_FILE_SUFFIX;
+import static java.nio.file.Files.createTempDirectory;
 import static java.util.Collections.emptyList;
 import static org.testng.Assert.assertEquals;
 
@@ -54,14 +55,14 @@ public class TestFileSingleStreamSpillerFactory
     private File spillPath2;
 
     @BeforeMethod
-    public void setUp()
+    public void setUp() throws IOException
     {
         closer = Closer.create();
         executor = MoreExecutors.listeningDecorator(Executors.newCachedThreadPool());
         closer.register(() -> executor.shutdownNow());
-        spillPath1 = Files.createTempDir();
+        spillPath1 = createTempDirectory(getClass().getName()).toFile();
         closer.register(() -> deleteRecursively(spillPath1.toPath(), ALLOW_INSECURE));
-        spillPath2 = Files.createTempDir();
+        spillPath2 = createTempDirectory(getClass().getName()).toFile();
         closer.register(() -> deleteRecursively(spillPath2.toPath(), ALLOW_INSECURE));
     }
 

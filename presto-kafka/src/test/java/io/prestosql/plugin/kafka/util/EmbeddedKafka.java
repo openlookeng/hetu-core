@@ -15,7 +15,6 @@ package io.prestosql.plugin.kafka.util;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import com.google.common.io.Files;
 import kafka.admin.AdminUtils;
 import kafka.admin.RackAwareMode;
 import kafka.javaapi.producer.Producer;
@@ -43,6 +42,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.io.MoreFiles.deleteRecursively;
 import static com.google.common.io.RecursiveDeleteOption.ALLOW_INSECURE;
 import static io.prestosql.plugin.kafka.util.TestUtils.toProperties;
+import static java.nio.file.Files.createTempDirectory;
 import static java.util.Objects.requireNonNull;
 
 public class EmbeddedKafka
@@ -68,11 +68,12 @@ public class EmbeddedKafka
     }
 
     EmbeddedKafka(EmbeddedZookeeper zookeeper, Properties overrideProperties)
+            throws IOException
     {
         this.zookeeper = requireNonNull(zookeeper, "zookeeper is null");
         requireNonNull(overrideProperties, "overrideProperties is null");
 
-        this.kafkaDataDir = Files.createTempDir();
+        this.kafkaDataDir = createTempDirectory(getClass().getName()).toFile();
 
         Map<String, String> properties = ImmutableMap.<String, String>builder()
                 .put("broker.id", "0")
