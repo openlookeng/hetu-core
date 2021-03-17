@@ -15,14 +15,35 @@
 package io.prestosql.plugin.mysql.optimization.function;
 
 import com.google.common.collect.ImmutableSet;
-import io.prestosql.plugin.jdbc.JdbcExternalFunctionHub;
+import io.prestosql.plugin.jdbc.BaseJdbcConfig;
+import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.function.ExternalFunctionInfo;
+import io.prestosql.sql.builder.functioncall.JdbcExternalFunctionHub;
 
+import javax.inject.Inject;
+
+import java.util.Optional;
 import java.util.Set;
+
+import static java.util.Objects.requireNonNull;
 
 public class MysqlExternalFunctionHub
         extends JdbcExternalFunctionHub
 {
+    private final BaseJdbcConfig jdbcConfig;
+
+    @Inject
+    public MysqlExternalFunctionHub(BaseJdbcConfig jdbcConfig)
+    {
+        this.jdbcConfig = requireNonNull(jdbcConfig, "jdbcConfig is null");
+    }
+
+    @Override
+    public Optional<CatalogSchemaName> getExternalFunctionCatalogSchemaName()
+    {
+        return jdbcConfig.getConnectorRegistryFunctionNamespace();
+    }
+
     public Set<ExternalFunctionInfo> getExternalFunctions()
     {
         return ImmutableSet.<ExternalFunctionInfo>builder()

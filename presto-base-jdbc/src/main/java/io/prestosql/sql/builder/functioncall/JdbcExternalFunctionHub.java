@@ -12,19 +12,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.jdbc;
+package io.prestosql.sql.builder.functioncall;
 
+import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.function.ExternalFunctionHub;
 import io.prestosql.spi.function.ExternalFunctionInfo;
 import io.prestosql.spi.function.RoutineCharacteristics;
 
+import java.util.Optional;
 import java.util.Set;
 
 import static java.util.Collections.emptySet;
 
-public abstract class JdbcExternalFunctionHub
+public class JdbcExternalFunctionHub
         implements ExternalFunctionHub
 {
+    @Override
     public Set<ExternalFunctionInfo> getExternalFunctions()
     {
         return emptySet();
@@ -34,5 +37,11 @@ public abstract class JdbcExternalFunctionHub
     public final RoutineCharacteristics.Language getExternalFunctionLanguage()
     {
         return RoutineCharacteristics.Language.JDBC;
+    }
+
+    @Override
+    public Optional<CatalogSchemaName> getExternalFunctionCatalogSchemaName()
+    {
+        return Optional.empty();
     }
 }

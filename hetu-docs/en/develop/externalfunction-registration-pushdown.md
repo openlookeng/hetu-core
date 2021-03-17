@@ -3,36 +3,35 @@ External Function Registration and Push Down
 
 Introduction
 ------------
-The Jdbc connector extends from `presto-base-jdbc` can register `external function` to openLooKeng,
-and push them down to data source which support to execute those functions.
+The connector can register `external function` to openLooKeng. In Jdbc connector, openLookeng can push them down to data source which support to execute those functions.
 
-Function Registration in the Jdbc Connector
----------------------------
-The user can find the example code about how to register `external function` through Jdbc Connector in the `presto-mysql/src/main/java/io.prestosql/plugin/mysql/optimization/function`.
-The only one thing that developer need to do is to extends the abstract class 'JdbcExternalFunctionHub' and implement the `getExternalFunctions` method:
+Function Registration in Connector
+----------------------------------
+The connector can register `external function` to openLooKeng.
+
+The user can find the example code about how to register `external function` through connector in the `presto-mysql/src/main/java/io.prestosql/plugin/mysql/optimization/function`.
+There are two steps to register external functions through connector.
+1. Developer need to extend the interface 'ExternalFunctionHub' and implement the related method:
 ```JAVA
-public abstract class JdbcExternalFunctionHub
-        implements ExternalFunctionHub
+public interface ExternalFunctionHub
 {
-    public Set<ExternalFunctionInfo> getExternalFunctions()
-    {
-        return emptySet();
-    }
+    Set<ExternalFunctionInfo> getExternalFunctions();
 
-    @Override
-    public final RoutineCharacteristics.Language getExternalFunctionLanguage()
-    {
-        return RoutineCharacteristics.Language.JDBC;
-    }
+    RoutineCharacteristics.Language getExternalFunctionLanguage();
+
+    CatalogSchemaName getExternalFunctionCatalogSchemaName();
 }
 ```
-The `getExternalFunctions` method return the external function set which the connector want to register to the `function-namespace-manager`.
-About how to implement the method, we supply example code in the `MysqlExternalFunctionHub.java`. We build `ExternalFunctionInfo` static instances and register them to return set.
-Of course you can build you own code to load the set of `ExternalFunctionInfo` instances, for example, load an external file and format it to `ExternalFunctionInfo` instances，
+
+The `getExternalFunctions` method return the external function set 
+About how to implement it, we supply example code in the `MysqlExternalFunctionHub.java`.
+For example, about implementation of `ExternalFunctionHub#getExternalFunctions`, 
+we build `ExternalFunctionInfo` static instances and register them to return set.
+Of course you can build you own code to load the set of `ExternalFunctionInfo` instances, for example, load an external file and format it to `ExternalFunctionInfo` instances.
 In the example, we only supply a general-purpose framework.
 
-After you implement the `getExternalFunctions` method,
-you only need to register `JdbcExternalFunctionHub` instance in the JdbcPlugin(for example, `MySqlPlugin.java`) to the `JdbcConnectionFactory`.
+2. After you implement the `ExternalFunctionHub` interface,
+you only need to register `ExternalFunctionHub` instance into the Connector. You can find example code in `MySqlClientModule.java` and `MysqlJdbcClient.java`.
 
 
 Configuration of External Function Namespace

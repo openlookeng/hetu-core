@@ -30,12 +30,14 @@ import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.FixedSplitSource;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.TableNotFoundException;
+import io.prestosql.spi.function.ExternalFunctionHub;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
+import io.prestosql.sql.builder.functioncall.JdbcExternalFunctionHub;
 
 import javax.annotation.PreDestroy;
 
@@ -122,6 +124,7 @@ public class BaseJdbcClient
     protected final Cache<RemoteTableNameCacheKey, Map<String, String>> remoteTableNames;
     // Hetu: JDBC fetch size configuration
     protected final int fetchSize;
+    private final ExternalFunctionHub externalFunctionHub;
 
     public BaseJdbcClient(BaseJdbcConfig config, String identifierQuote, ConnectionFactory connectionFactory)
     {
@@ -130,7 +133,19 @@ public class BaseJdbcClient
                 connectionFactory,
                 requireNonNull(config, "config is null").isCaseInsensitiveNameMatching(),
                 config.getCaseInsensitiveNameMatchingCacheTtl(),
-                config.getFetchSize()); // Hetu: Read JDBC fetch size configuration
+                config.getFetchSize(), // Hetu: Read JDBC fetch size configuration
+                new JdbcExternalFunctionHub());
+    }
+
+    public BaseJdbcClient(BaseJdbcConfig config, String identifierQuote, ConnectionFactory connectionFactory, ExternalFunctionHub externalFunctionHub)
+    {
+        this(
+                identifierQuote,
+                connectionFactory,
+                requireNonNull(config, "config is null").isCaseInsensitiveNameMatching(),
+                config.getCaseInsensitiveNameMatchingCacheTtl(),
+                config.getFetchSize(), // Hetu: Read JDBC fetch size configuration
+                externalFunctionHub);
     }
 
     public BaseJdbcClient(
@@ -139,7 +154,7 @@ public class BaseJdbcClient
             boolean caseInsensitiveNameMatching,
             Duration caseInsensitiveNameMatchingCacheTtl)
     {
-        this(identifierQuote, connectionFactory, caseInsensitiveNameMatching, caseInsensitiveNameMatchingCacheTtl, -1);
+        this(identifierQuote, connectionFactory, caseInsensitiveNameMatching, caseInsensitiveNameMatchingCacheTtl, -1, new JdbcExternalFunctionHub());
     }
 
     /**
@@ -156,7 +171,8 @@ public class BaseJdbcClient
             ConnectionFactory connectionFactory,
             boolean caseInsensitiveNameMatching,
             Duration caseInsensitiveNameMatchingCacheTtl,
-            int fetchSize)
+            int fetchSize,
+            ExternalFunctionHub externalFunctionHub)
     {
         this.identifierQuote = requireNonNull(identifierQuote, "identifierQuote is null");
         this.connectionFactory = requireNonNull(connectionFactory, "connectionFactory is null");
@@ -168,6 +184,7 @@ public class BaseJdbcClient
         this.remoteSchemaNames = remoteNamesCacheBuilder.build();
         this.remoteTableNames = remoteNamesCacheBuilder.build();
         this.fetchSize = fetchSize;
+        this.externalFunctionHub = requireNonNull(externalFunctionHub, "externalFunctionHub is null");
     }
 
     @PreDestroy
@@ -615,6 +632,12 @@ public class BaseJdbcClient
             preparedStatement.setFetchSize(fetchSize);
         }
         return preparedStatement;
+    }
+
+    @Override
+    public Optional<ExternalFunctionHub> getExternalFunctionHub()
+    {
+        return Optional.of(this.externalFunctionHub);
     }
 
     protected ResultSet getTables(Connection connection, Optional<String> schemaName, Optional<String> tableName)

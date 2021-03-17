@@ -16,8 +16,6 @@ package io.prestosql.plugin.jdbc;
 import io.prestosql.testing.TestingConnectorContext;
 import org.testng.annotations.Test;
 
-import java.util.Optional;
-
 public class TestJdbcConnectorFactory
 {
     @Test
@@ -26,8 +24,7 @@ public class TestJdbcConnectorFactory
         JdbcConnectorFactory connectorFactory = new JdbcConnectorFactory(
                 "test",
                 new TestingH2JdbcModule(),
-                getClass().getClassLoader(),
-                Optional.empty());
+                getClass().getClassLoader());
 
         connectorFactory.create("test", TestingH2JdbcModule.createProperties(), new TestingConnectorContext());
     }

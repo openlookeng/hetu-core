@@ -15,7 +15,6 @@ package io.prestosql.plugin.mysql;
 
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.JdbcPlugin;
-import io.prestosql.plugin.mysql.optimization.function.MysqlExternalFunctionHub;
 import io.prestosql.spi.function.ConnectorConfig;
 import io.prestosql.spi.queryeditorui.ConnectorUtil;
 import io.prestosql.spi.queryeditorui.ConnectorWithProperties;
@@ -32,7 +31,7 @@ public class MySqlPlugin
 {
     public MySqlPlugin()
     {
-        super("mysql", new MySqlClientModule(), new MysqlExternalFunctionHub());
+        super("mysql", new MySqlClientModule());
     }
 
     @Override

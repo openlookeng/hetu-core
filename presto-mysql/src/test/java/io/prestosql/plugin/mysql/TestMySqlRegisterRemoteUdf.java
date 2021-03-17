@@ -13,6 +13,7 @@
  */
 package io.prestosql.plugin.mysql;
 
+import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.mysql.optimization.function.MysqlExternalFunctionHub;
 import io.prestosql.spi.function.ExternalFunctionInfo;
 import io.prestosql.spi.type.StandardTypes;
@@ -31,7 +32,7 @@ public class TestMySqlRegisterRemoteUdf
     @Test
     public void testDefaults()
     {
-        MysqlExternalFunctionHub externalFunctionHub = new MysqlExternalFunctionHub();
+        MysqlExternalFunctionHub externalFunctionHub = new MysqlExternalFunctionHub(new BaseJdbcConfig());
         Set<ExternalFunctionInfo> externalFunctionInfo = externalFunctionHub.getExternalFunctions();
         assertTrue(externalFunctionInfo.size() > 0);
 
@@ -51,7 +52,7 @@ public class TestMySqlRegisterRemoteUdf
     @Test
     public void testOverloadFunctions()
     {
-        MysqlExternalFunctionHub externalFunctionHub = new MysqlExternalFunctionHub();
+        MysqlExternalFunctionHub externalFunctionHub = new MysqlExternalFunctionHub(new BaseJdbcConfig());
         Set<ExternalFunctionInfo> externalFunctionInfo = externalFunctionHub.getExternalFunctions();
         assertTrue(externalFunctionInfo.size() > 0);
 
@@ -74,7 +75,7 @@ public class TestMySqlRegisterRemoteUdf
     @Test
     public void testMultiParamsFunctions()
     {
-        MysqlExternalFunctionHub externalFunctionHub = new MysqlExternalFunctionHub();
+        MysqlExternalFunctionHub externalFunctionHub = new MysqlExternalFunctionHub(new BaseJdbcConfig());
         Set<ExternalFunctionInfo> externalFunctionInfo = externalFunctionHub.getExternalFunctions();
         assertTrue(externalFunctionInfo.size() > 0);
 

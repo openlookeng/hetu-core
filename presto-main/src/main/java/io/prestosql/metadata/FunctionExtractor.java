@@ -28,6 +28,7 @@ import io.prestosql.spi.function.SqlInvokedFunction;
 import io.prestosql.spi.function.WindowFunction;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -66,12 +67,16 @@ public final class FunctionExtractor
         return ScalarFromAnnotationsParser.parseFunctionDefinitions(clazz);
     }
 
-    public static Set<SqlInvokedFunction> extractExternalFunctions(ExternalFunctionHub externalFunctionHub, CatalogSchemaName catalogSchemaName)
+    public static Set<SqlInvokedFunction> extractExternalFunctions(ExternalFunctionHub externalFunctionHub)
     {
         RoutineCharacteristics.Language language = externalFunctionHub.getExternalFunctionLanguage();
+        Optional<CatalogSchemaName> catalogSchemaName = externalFunctionHub.getExternalFunctionCatalogSchemaName();
+        if (!catalogSchemaName.isPresent()) {
+            return Collections.emptySet();
+        }
         ImmutableSet.Builder<SqlInvokedFunction> builder = new ImmutableSet.Builder<>();
         for (ExternalFunctionInfo externalFunctionInfo : externalFunctionHub.getExternalFunctions()) {
-            Optional<SqlInvokedFunction> sqlInvokedFunctionOptional = ExternalFunctionsParser.parseExternalFunction(externalFunctionInfo, catalogSchemaName, language);
+            Optional<SqlInvokedFunction> sqlInvokedFunctionOptional = ExternalFunctionsParser.parseExternalFunction(externalFunctionInfo, catalogSchemaName.get(), language);
             sqlInvokedFunctionOptional.ifPresent(builder::add);
         }
         return builder.build();

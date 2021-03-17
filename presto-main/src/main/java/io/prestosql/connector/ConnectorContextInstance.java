@@ -17,20 +17,13 @@ import io.prestosql.spi.NodeManager;
 import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.VersionEmbedder;
-import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ConnectorContext;
-import io.prestosql.spi.function.ExternalFunctionHub;
 import io.prestosql.spi.function.FunctionMetadataManager;
-import io.prestosql.spi.function.SqlInvokedFunction;
 import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.metastore.HetuMetastore;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.type.TypeManager;
-
-import java.util.Optional;
-import java.util.Set;
-import java.util.function.BiFunction;
 
 import static java.util.Objects.requireNonNull;
 
@@ -48,7 +41,6 @@ public class ConnectorContextInstance
     private final RowExpressionService rowExpressionService;
     private final FunctionMetadataManager functionMetadataManager;
     private final StandardFunctionResolution functionResolution;
-    private final Optional<BiFunction<ExternalFunctionHub, CatalogSchemaName, Set<SqlInvokedFunction>>> externalFunctionParser;
 
     public ConnectorContextInstance(
             NodeManager nodeManager,
@@ -60,8 +52,7 @@ public class ConnectorContextInstance
             IndexClient indexClient,
             RowExpressionService rowExpressionService,
             FunctionMetadataManager functionMetadataManager,
-            StandardFunctionResolution functionResolution,
-            Optional<BiFunction<ExternalFunctionHub, CatalogSchemaName, Set<SqlInvokedFunction>>> functionParser)
+            StandardFunctionResolution functionResolution)
     {
         this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
         this.versionEmbedder = requireNonNull(versionEmbedder, "versionEmbedder is null");
@@ -73,7 +64,6 @@ public class ConnectorContextInstance
         this.rowExpressionService = rowExpressionService;
         this.functionMetadataManager = requireNonNull(functionMetadataManager, "functionMetadataManager is null");
         this.functionResolution = requireNonNull(functionResolution, "functionResolution is null");
-        this.externalFunctionParser = requireNonNull(functionParser, "functionParser is null");
     }
 
     @Override
@@ -134,11 +124,5 @@ public class ConnectorContextInstance
     public StandardFunctionResolution getStandardFunctionResolution()
     {
         return functionResolution;
-    }
-
-    @Override
-    public Optional<BiFunction<ExternalFunctionHub, CatalogSchemaName, Set<SqlInvokedFunction>>> getExternalParserFunction()
-    {
-        return externalFunctionParser;
     }
 }

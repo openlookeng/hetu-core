@@ -23,6 +23,8 @@ import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.ConnectionFactory;
 import io.prestosql.plugin.jdbc.DriverConnectionFactory;
 import io.prestosql.plugin.jdbc.JdbcClient;
+import io.prestosql.plugin.mysql.optimization.function.MysqlExternalFunctionHub;
+import io.prestosql.spi.function.ExternalFunctionHub;
 
 import java.sql.SQLException;
 import java.util.Optional;
@@ -39,6 +41,7 @@ public class MySqlClientModule
     protected void setup(Binder binder)
     {
         binder.bind(JdbcClient.class).to(MySqlClient.class).in(Scopes.SINGLETON);
+        binder.bind(ExternalFunctionHub.class).to(MysqlExternalFunctionHub.class).in(Scopes.SINGLETON);
         ensureCatalogIsEmpty(buildConfigObject(BaseJdbcConfig.class).getConnectionUrl());
         configBinder(binder).bindConfig(MySqlConfig.class);
     }
