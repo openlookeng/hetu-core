@@ -47,7 +47,7 @@ public class IndexRecordManager
 
         ImmutableList.Builder<IndexRecord> records = ImmutableList.builder();
         getNewIndexStream().forEach(records::add);
-        LOG.debug("{}ms spent on index record scan from hetu metastore", System.currentTimeMillis() - startTime);
+        LOG.debug("%dms spent on index record scan from hetu metastore", System.currentTimeMillis() - startTime);
 
         return records.build();
     }
@@ -86,6 +86,10 @@ public class IndexRecordManager
             throws IOException
     {
         IndexRecord record = new IndexRecord(name, user, table, columns, indexType, indexProperties, partitions);
+        IndexRecord old = lookUpIndexRecord(name);
+        if (old != null) {
+            record.partitions.addAll(0, old.partitions);
+        }
 
         Optional<CatalogEntity> oldCatalog = metastore.getCatalog(record.catalog);
         if (!oldCatalog.isPresent()) {
@@ -144,7 +148,7 @@ public class IndexRecordManager
                                 record.schema,
                                 record.table,
                                 newRecord.serializeKey(),
-                                newRecord.serializeValue());
+                                newRecord.partitions.isEmpty() ? null : newRecord.serializeValue()); // if the last partition of the index has been dropped, remove the record
                     }
                 });
     }

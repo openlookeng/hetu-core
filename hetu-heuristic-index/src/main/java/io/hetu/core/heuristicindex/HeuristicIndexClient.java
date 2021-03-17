@@ -278,6 +278,11 @@ public class HeuristicIndexClient
                 for (Path path : toDeletePartitions) {
                     fs.deleteRecursively(path);
                 }
+
+                // if all partitions have been deleted, remove index path
+                if (fs.walk(indexLevelPath).allMatch(fs::isDirectory)) {
+                    fs.deleteRecursively(indexLevelPath);
+                }
             }
 
             try {

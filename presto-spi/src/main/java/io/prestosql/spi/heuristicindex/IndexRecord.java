@@ -60,7 +60,7 @@ public class IndexRecord
         this.catalog = qualifiedNames[0];
         this.schema = qualifiedNames[1];
         this.table = qualifiedNames[2];
-        this.columns = columns;
+        this.columns = Arrays.stream(columns).map(String::toLowerCase).toArray(String[]::new);
         this.indexType = indexType.toUpperCase(Locale.ENGLISH);
         this.properties = properties;
         this.partitions = partitions;

@@ -47,7 +47,7 @@ public class TestHeuristicIndexClient
             folder.create();
             File tableFolder = new File(folder.getRoot().getPath(), tableName);
             assertTrue(tableFolder.mkdir());
-            File columnFolder = new File(tableFolder, "testColumn");
+            File columnFolder = new File(tableFolder, "test_column");
             assertTrue(columnFolder.mkdirs());
             File indexTypeFolder = new File(columnFolder, "BLOOM");
             assertTrue(indexTypeFolder.mkdirs());
@@ -60,7 +60,7 @@ public class TestHeuristicIndexClient
             client.addIndexRecord(new CreateIndexMetadata("idx1",
                     tableName,
                     "BLOOM",
-                    Collections.singletonList(new Pair<>("testColumn", VARCHAR)),
+                    Collections.singletonList(new Pair<>("test_column", VARCHAR)),
                     Collections.emptyList(),
                     new Properties(),
                     "user",

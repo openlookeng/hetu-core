@@ -215,8 +215,8 @@ public class TestHindexBTreeIndex
         // Create second index and do query again on different keys
 
         String indexName2 = getNewIndexName();
-        assertQuerySucceeds("CREATE INDEX " + indexName2 + " USING btree ON " + tableName +
-                " (key2) WHERE key5 = 22222");
+        assertQueryFails("CREATE INDEX " + indexName2 + " USING btree ON " + tableName +
+                " (key2) WHERE key5 = 22222", "Creating index on key5 is not supported as it's not first-level partition");
 
         String testerQuery2 = "SELECT * FROM " + tableName + " WHERE key2 = 22";
 

@@ -19,15 +19,19 @@ WHERE predicate;
 - `"level"='STRIPE'` 如缺省，默认创建级别是STRIPE
 
 如果表是分区的，可以用一个等于表达式来指定一个创建的分区，或使用IN来指定多个。
+
 ```roomsql
 CREATE INDEX index_name USING bloom ON hive.schema.table (column1);
 CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.fpp"="0.01") WHERE p=part1;
 CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WHERE p in (part1, part2, part3);
 ```
 
+**注意:** 如果表使用多重分区（例如被colA和colB）两列分区，则索引创建仅支持使用**第一级**分区值。
+
 ## SHOW
 
 显示所有索引或只根据名字显示一个索引：
+
 ```roomsql
 SHOW INDEX;
 SHOW INDEX index_name;
