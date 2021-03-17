@@ -141,7 +141,16 @@
 > 
 > 此配置属性可由`spill_window_operator`会话属性重写。
 
-### `experimental.spiller-spill-path`
+### `experimental.spill-reuse-tablescan`
+
+> - **类型**：`boolean`
+> - **默认值**：`false`
+>
+> 尝试将内存溢出到磁盘，以避免在运行Reuse Exchange时超出查询的内存限制。此属性必须与`experimental.spill-enabled`属性一起使用。
+>
+> 此配置属性可由`spill_reuse_tablescan`会话属性重写。
+
+### experimental.spiller-spill-path`
 
 > - **类型：** `string`
 > - **无默认值。** 启用溢出时必须设置。
@@ -185,7 +194,14 @@
 > 
 > 取消溢出单个聚合运算符实例所使用的内存限制。
 
-### `experimental.spill-compression-enabled`
+### `experimental.spill-threshold-reuse-tablescan`
+
+> - **类型**：`int`
+> - **默认值**：`10（单位MB）`
+>
+> 用于在Reuse Exchange中缓存页面的内存限制。
+
+### experimental.spill-compression-enabled`
 
 > - **类型：** `boolean`
 > - **默认值：** `false`
@@ -421,6 +437,20 @@
 >
 > 控制jdbc connector及dc connector下推的总开关。
 
+### `optimizer.reuse-table-scan`
+
+> - **类型**：`boolean`
+> - **默认值**：`false`
+>
+> 如果查询包含的表或公用表表达式（CTE）出现多次且具有相同的投影和过滤器，则使用Reuse Exchange来将数据缓存在内存中。启用此功能将通过将数据缓存在内存中并避免多次从磁盘读取来减少执行查询所需的时间。也可以使用`reuse_table_scan`会话属性在每个查询基础上指定。
+
+### `optimizer.cte-reuse-enabled`
+
+> - **类型：** `boolean`
+> - **默认值：** `false`
+>
+> 启用此标志后，无论主查询中使用同一CTE多少次，都仅执行一次公用表表达式（CTE）。当多次使用同一个CTE时，这将有助于提高查询执行性能。也可以使用 cte_reuse_enabled 会话属性对每个查询指定。
+
 ## 正则表达式函数属性
 
 下列属性允许调优[正则表达式函数](../functions/regexp.md)。
@@ -461,14 +491,14 @@
 > 此属性启用启发式索引。还有一个会话属性`heuristicindex_filter_enabled`，可按会话设置。注意：当配置文件中将此全局属性设置为`true`时，会话属性仅用于临时打开和关闭索引筛选。当未全局启用索引筛选器时，无法使用该会话属性来打开。
 
 ### `hetu.heuristicindex.filter.cache.max-memory`
- 
+
 > -   **类型：** `data size`
 > -   **默认值：** `10GB`
 >
 > 由于索引文件很少被改动，将索引缓存可以提升性能，减少从文件系统读取索引所需时间。这一属性控制索引缓存允许使用的内存大小，当缓存已满，最旧的缓存将被移除，由新的缓存替代（LRU缓存）。
 
 ### `hetu.heuristicindex.filter.cache.soft-reference`
- 
+
 > -   **类型:** `boolean`
 > -   **默认值：** `true`
 >
@@ -593,3 +623,21 @@
 > 用于自动清空功能的线程数。最小值为1，最大值为16。
 >
 > **注意：** 此属性只能在协调节点中配置。
+
+## **CTE属性**
+
+### `cte.cte-max-queue-size`
+
+> - **类型：** `int`
+> - **默认值：** `1024`
+>
+> 每个处理队列的最大页数。处理队列的数量等于主查询中的CTE引用的数量。也可以使用 cte_max_queue_size 会话属性对每个查询指定。
+
+### `cte.cte-max-prefetch-queue-size`
+
+> - **类型：** `int`
+> - **默认值：** `512`
+>
+> 处理队列已满时，预取队列可以容纳的最大页数。预取队列用于急切读取数据，从而无需等待I/O执行查询。也可以使用 cte_max_prefetch_queue_size会话属性对每个查询指定。
+>
+> **说明：** 应在所有工作节点上配置该属性。
