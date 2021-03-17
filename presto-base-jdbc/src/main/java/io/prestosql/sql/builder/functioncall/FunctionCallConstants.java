@@ -44,14 +44,4 @@ public class FunctionCallConstants
      * function catalog, schema and functio name length
      */
     public static final int CATALOG_SCHEMA_NAME_LENGTH = 3;
-
-    /**
-     * default function namespace catalog
-     */
-    public static final String DEFAULT_FUNCTION_CATALOG = "presto";
-
-    /**
-     * default function namespace schema
-     */
-    public static final String DEFAULT_FUNCTION_SCHEMA = "default";
 }

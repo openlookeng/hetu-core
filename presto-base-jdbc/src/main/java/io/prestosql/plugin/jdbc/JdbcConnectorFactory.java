@@ -25,7 +25,6 @@ import io.prestosql.spi.connector.ConnectorFactory;
 import io.prestosql.spi.connector.ConnectorHandleResolver;
 import io.prestosql.spi.function.ExternalFunctionHub;
 import io.prestosql.spi.function.FunctionMetadataManager;
-import io.prestosql.spi.function.SqlInvokedFunction;
 import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpressionService;
@@ -34,8 +33,6 @@ import org.weakref.jmx.guice.MBeanModule;
 
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.function.BiFunction;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
@@ -97,16 +94,11 @@ public class JdbcConnectorFactory
                     .setRequiredConfigurationProperties(requiredConfig)
                     .initialize();
 
-            FunctionMetadataManager functionMetadataManager = context.getFunctionMetadataManager();
             BaseJdbcConfig baseJdbcConfig = injector.getInstance(BaseJdbcConfig.class);
             Optional<CatalogSchemaName> catalogSchemaName = baseJdbcConfig.getConnectorRegistryFunctionNamespace();
-            Optional<BiFunction<ExternalFunctionHub, CatalogSchemaName, Set<SqlInvokedFunction>>> functionOptional = context.getExternalParserFunction();
-            if (functionOptional.isPresent() && externalFunctionHubOptional.isPresent() && catalogSchemaName.isPresent()) {
-                for (SqlInvokedFunction sqlInvokedFunction : functionOptional.get().apply(externalFunctionHubOptional.get(), catalogSchemaName.get())) {
-                    functionMetadataManager.createFunction(sqlInvokedFunction, true);
-                }
+            if (this.externalFunctionHubOptional.isPresent() && catalogSchemaName.isPresent()) {
+                externalFunctionHubOptional.get().registerExternalFunctions(catalogSchemaName.get(), externalFunctionHubOptional.get(), context);
             }
-
             return injector.getInstance(JdbcConnector.class);
         }
         catch (Exception e) {

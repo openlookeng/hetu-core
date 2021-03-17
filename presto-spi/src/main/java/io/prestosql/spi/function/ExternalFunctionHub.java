@@ -14,11 +14,32 @@
  */
 package io.prestosql.spi.function;
 
+import io.prestosql.spi.connector.CatalogSchemaName;
+import io.prestosql.spi.connector.ConnectorContext;
+
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiFunction;
+
+import static java.util.Objects.requireNonNull;
 
 public interface ExternalFunctionHub
 {
     Set<ExternalFunctionInfo> getExternalFunctions();
 
     RoutineCharacteristics.Language getExternalFunctionLanguage();
+
+    default void registerExternalFunctions(CatalogSchemaName catalogSchemaName, ExternalFunctionHub externalFunctionHub, ConnectorContext context)
+    {
+        requireNonNull(catalogSchemaName);
+        requireNonNull(externalFunctionHub);
+        requireNonNull(context);
+        FunctionMetadataManager functionMetadataManager = context.getFunctionMetadataManager();
+        Optional<BiFunction<ExternalFunctionHub, CatalogSchemaName, Set<SqlInvokedFunction>>> functionOptional = context.getExternalParserFunction();
+        if (functionOptional.isPresent()) {
+            for (SqlInvokedFunction sqlInvokedFunction : functionOptional.get().apply(externalFunctionHub, catalogSchemaName)) {
+                functionMetadataManager.createFunction(sqlInvokedFunction, true);
+            }
+        }
+    }
 }

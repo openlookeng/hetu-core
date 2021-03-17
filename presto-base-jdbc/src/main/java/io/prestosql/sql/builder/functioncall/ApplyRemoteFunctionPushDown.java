@@ -14,16 +14,19 @@
  */
 package io.prestosql.sql.builder.functioncall;
 
+import com.google.common.base.Joiner;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.optimization.BaseJdbcRowExpressionConverter;
 import io.prestosql.plugin.jdbc.optimization.JdbcConverterContext;
 import io.prestosql.spi.connector.CatalogSchemaName;
+import io.prestosql.spi.function.SqlFunctionHandle;
 import io.prestosql.spi.relation.CallExpression;
 
 import java.util.List;
 import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 
 public abstract class ApplyRemoteFunctionPushDown
 {
@@ -41,7 +44,16 @@ public abstract class ApplyRemoteFunctionPushDown
     /**
      * rewrite the remote function to a executable function in the data source.
      */
-    public abstract Optional<String> rewriteRemoteFunction(CallExpression callExpression, BaseJdbcRowExpressionConverter rowExpressionConverter, JdbcConverterContext jdbcConverterContext);
+    public Optional<String> rewriteRemoteFunction(CallExpression callExpression, BaseJdbcRowExpressionConverter rowExpressionConverter, JdbcConverterContext jdbcConverterContext)
+    {
+        if (!isConnectorSupportedRemoteFunction(callExpression)) {
+            return Optional.empty();
+        }
+        jdbcConverterContext.setRemoteUdfVisited(true);
+        String displayName = ((SqlFunctionHandle) callExpression.getFunctionHandle()).getFunctionId().getFunctionName().getObjectName();
+        String args = Joiner.on(",").join(callExpression.getArguments().stream().map(expression -> expression.accept(rowExpressionConverter, jdbcConverterContext)).collect(toList()));
+        return Optional.of(String.format("%s(%s)", displayName, args));
+    }
 
     /**
      * if a function is a remote function and supported by the connector, return true, else return false
