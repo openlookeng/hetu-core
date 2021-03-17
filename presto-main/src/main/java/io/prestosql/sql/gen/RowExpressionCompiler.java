@@ -113,7 +113,7 @@ public class RowExpressionCompiler
                             functionAndTypeManager);
                     return (new FunctionCallCodeGenerator()).generateExpression(call.getFunctionHandle(), generatorContext, call.getType(), call.getArguments());
                 default:
-                    throw new IllegalArgumentException(format("Unsupported function implementation type in RowExpressionCompiler: %s", functionMetadata.getImplementationType()));
+                    throw new IllegalArgumentException(format("Unsupported function implementation type in RowExpressionCompiler: %s. For the external function, we will support to execute them in the future release.", functionMetadata.getImplementationType()));
             }
         }
 

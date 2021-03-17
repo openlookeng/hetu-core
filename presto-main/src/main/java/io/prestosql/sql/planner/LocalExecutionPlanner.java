@@ -1604,7 +1604,7 @@ public class LocalExecutionPlanner
                 }
             }
             catch (RuntimeException e) {
-                throw new PrestoException(COMPILER_ERROR, "Compiler failed", e);
+                throw new PrestoException(COMPILER_ERROR, "Execution Compiler failed.", e);
             }
         }
 
