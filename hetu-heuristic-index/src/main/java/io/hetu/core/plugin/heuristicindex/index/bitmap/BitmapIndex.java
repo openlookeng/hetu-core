@@ -224,7 +224,7 @@ public class BitmapIndex
 
                         if (highBoundless && !lowBoundless) {
                             // >= or >
-                            Object low = range.getLow().getValue();
+                            Object low = getActualValue(predicate.getType(), range.getLow().getValue());
                             Object high = btree.lastKey();
                             boolean fromInclusive = range.getLow().getBound().equals(Marker.Bound.EXACTLY);
                             if (btree.comparator().compare(low, high) > 0) {
@@ -237,7 +237,7 @@ public class BitmapIndex
                         else if (!highBoundless && lowBoundless) {
                             // <= or <
                             Object low = btree.firstKey();
-                            Object high = range.getHigh().getValue();
+                            Object high = getActualValue(predicate.getType(), range.getHigh().getValue());
                             boolean toInclusive = range.getHigh().getBound().equals(Marker.Bound.EXACTLY);
                             if (btree.comparator().compare(low, high) > 0) {
                                 Object temp = low;
@@ -248,8 +248,8 @@ public class BitmapIndex
                         }
                         else if (!highBoundless && !lowBoundless) {
                             // BETWEEN
-                            Object low = range.getHigh().getValue();
-                            Object high = range.getLow().getValue();
+                            Object low = getActualValue(predicate.getType(), range.getLow().getValue());
+                            Object high = getActualValue(predicate.getType(), range.getHigh().getValue());
                             if (btree.comparator().compare(low, high) > 0) {
                                 Object temp = low;
                                 low = high;
@@ -263,7 +263,7 @@ public class BitmapIndex
                         }
 
                         for (Object i : concurrentNavigableMap.keySet()) {
-                            RoaringBitmap bitmap = lookUpSingle(getActualValue(predicate.getType(), i));
+                            RoaringBitmap bitmap = lookUpSingle(i);
                             allMatches.add(bitmap);
                         }
                     }

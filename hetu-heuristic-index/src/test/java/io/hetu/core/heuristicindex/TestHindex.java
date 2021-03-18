@@ -29,6 +29,7 @@ public class TestHindex
         extends TestIndexResources
 {
     // Tests the supported data types with the different index types while queries utilize the BETWEEN operator.
+    // Tests omit BitmapIndex because BitmapIndex's row filtering should have combined inserts, it is tested separately
     @Test(dataProvider = "supportedDataTypesBetweenValues")
     public void testDataTypesBetweenValues(String indexType, String column, String queryCondition)
             throws Exception
@@ -36,12 +37,6 @@ public class TestHindex
         String tableName = getNewTableName();
         createTableSupportedDataTypes(tableName);
         String testerQuery = "SELECT * FROM " + tableName + " WHERE " + column + " " + queryCondition;
-
-        String baseQuery = "SELECT * FROM " + tableName;
-
-        // Get splits and result
-        assertQuerySucceeds(baseQuery);
-        long inputRowsBaseQuery = getInputRowsOfLastQueryExecution(baseQuery);
 
         // Create index
         String indexName = getNewIndexName();
@@ -51,7 +46,6 @@ public class TestHindex
         Pair<Integer, MaterializedResult> resultPairLoadingIndex = getSplitAndMaterializedResult(testerQuery);
         int splitsLoadingIndex = resultPairLoadingIndex.getFirst();
         MaterializedResult resultLoadingIndex = resultPairLoadingIndex.getSecond();
-        long inputRowsLoadingIndex = getInputRowsOfLastQueryExecution(testerQuery);
 
         // Wait before continuing
         Thread.sleep(1000);
@@ -60,28 +54,19 @@ public class TestHindex
         Pair<Integer, MaterializedResult> resultPairIndexLoaded = getSplitAndMaterializedResult(testerQuery);
         int splitsIndexLoaded = resultPairIndexLoaded.getFirst();
         MaterializedResult resultIndexLoaded = resultPairIndexLoaded.getSecond();
-        long inputRowsIndexLoaded = getInputRowsOfLastQueryExecution(testerQuery);
 
         assertTrue(verifyEqualResults(resultLoadingIndex, resultIndexLoaded), "The results should be equal for" +
                 " index type: " + indexType + ", condition: " + queryCondition);
-        if (indexType.toLowerCase(Locale.ROOT).equals("bitmap")) {
-            assertTrue(inputRowsBaseQuery > inputRowsLoadingIndex,
-                    "The numbers of input rows for base query should be the largest:" +
-                            " index type: " + indexType + " condition: " + queryCondition +
-                            " inputRowsBaseQuery: " + inputRowsBaseQuery +
-                            " inputRowsLoadingIndex: " + inputRowsLoadingIndex +
-                            " inputRowsIndexLoaded: " + inputRowsIndexLoaded);
-        }
-        else {
-            assertTrue(splitsLoadingIndex > splitsIndexLoaded,
-                    "The splits with index loaded should be lower than splits before index:" +
-                            " index type: " + indexType + " condition: " + queryCondition +
-                            " splitsLoadingIndex: " + splitsLoadingIndex +
-                            " splitsIndexLoaded: " + splitsIndexLoaded);
-        }
+        assertTrue(splitsLoadingIndex > splitsIndexLoaded,
+                "The splits with index loaded should be lower than splits before index:" +
+                        " index type: " + indexType + " condition: " + queryCondition +
+                        " splitsLoadingIndex: " + splitsLoadingIndex +
+                        " splitsIndexLoaded: " + splitsIndexLoaded);
     }
 
     // Tests to see the difference in number of splits used without and with the usage of index with specified data.
+    // This test case is a basic test case for BitmapIndex, since the table is not insertion combined, this test
+    // only compares BitmapIndex's input row counts with base query. Separate tests are implemented to further test BitmapIndex.
     @Test(dataProvider = "splitsWithIndexAndData")
     public void testSplitsWithIndexAndData(String indexType, String dataType)
             throws Exception
@@ -117,8 +102,8 @@ public class TestHindex
         assertTrue(verifyEqualResults(resultLoadingIndex, resultIndexLoaded), "The results should be equal for" +
                 " index type: " + indexType + ", data type: " + dataType);
         if (indexType.toLowerCase(Locale.ROOT).equals("bitmap")) {
-            assertTrue(inputRowsBaseQuery > inputRowsLoadingIndex,
-                    "The numbers of input rows for base query should be the largest:" +
+            assertTrue(inputRowsBaseQuery > inputRowsIndexLoaded,
+                    "The numbers of input rows should decrease after index loaded:" +
                             " index type: " + indexType + " data type: " + dataType +
                             " inputRowsBaseQuery: " + inputRowsBaseQuery +
                             " inputRowsLoadingIndex: " + inputRowsLoadingIndex +

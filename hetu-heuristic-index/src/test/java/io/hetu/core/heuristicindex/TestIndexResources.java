@@ -92,16 +92,12 @@ public class TestIndexResources
     public Object[][] bitmapOperatorInputRowsTest()
     {
         return new Object[][] {
-                {"key = 5", ""}, {"key IN (1, 2)", ""}, {"key BETWEEN 3 AND 7", " WHERE key BETWEEN 2 AND 8"},
-                {"key < 5", " WHERE key <= 5"}, {"key <= 5", " WHERE key <= 8"},
-                {"key >= 5", " WHERE key >= 3"}, {"key > 5", " WHERE key >= 5"},
-                {"key < 0", " WHERE key > -1"}, {"key <= -1", " WHERE key >= 0"},
-                {"key >= 100", " WHERE key >= 3"}, {"key > 99", " WHERE key >= 5"},
-                {"key <> 5", ""}, {"key NOT IN (1, 2)", ""}, {"key BETWEEN 7 AND 3", " WHERE key BETWEEN 2 AND 8"},
-                {"key > 5 AND key < 5", ""}, {"key > 5 OR key < 5", ""}, {"key < 5 AND key > 5", ""}, {"key < 5 OR key > 5", ""},
-                {"key = 5 AND key IN (5)", ""}, {"key <> 5 AND key IN (5)", ""}, {"key <> 5 OR key NOT IN (5)", ""},
-                {"key <> 5 AND key NOT IN (5)", ""}, {"key = 5 AND key NOT IN (5)", ""}, {"key = 5 OR key IN (5)", ""},
-                {"key BETWEEN 3 AND 5 OR key = 6", ""}, {"key BETWEEN 3 AND 5 AND key = 4", ""}};
+                {"p1 = 5"}, {"p1 IN (1, 2)"}, {"p1 BETWEEN 3 AND 7"}, {"p1 < 5"}, {"p1 <= 5"}, {"p1 >= 5"}, {"p1 > 5"},
+                {"p1 < 0"}, {"p1 <= -1"}, {"p1 >= 100"}, {"p1 > 99"}, {"p1 <> 5"}, {"p1 NOT IN (8)"}, {"p1 BETWEEN 7 AND 3"},
+                {"p1 > 5 AND p1 < 5"}, {"p1 > 5 OR p1 < 5"}, {"p1 < 5 AND p1 > 5"}, {"p1 < 5 OR p1 > 5"},
+                {"p1 = 5 AND p1 IN (5)"}, {"p1 <> 5 AND p1 IN (5)"}, {"p1 <> 5 OR p1 NOT IN (5)"},
+                {"p1 <> 5 AND p1 NOT IN (5)"}, {"p1 = 5 AND p1 NOT IN (5)"}, {"p1 = 5 OR p1 IN (5)"},
+                {"p1 BETWEEN 3 AND 5 OR p1 = 6"}, {"p1 BETWEEN 3 AND 5 AND p1 = 4"}};
     }
 
     @DataProvider(name = "queryOperatorTest")
@@ -199,34 +195,88 @@ public class TestIndexResources
                 " (6, 66, 666, 6666, 66666), (7, 77, 777, 7777, 77777), (2, 22, 222, 2222, 22222), (2, 22, 222, 2222, 22222)");
     }
 
+    @DataProvider(name = "bitmapSupportedDataTypesRangedValues")
+    public Object[][] bitmapSupportedDataTypesRangedValues()
+    {
+        return new Object[][] {
+                {"p1", "> 1"}, {"p1", "< 2"}, {"p1", "<= 2"}, {"p1", ">= 2"},
+                {"p2", "> SMALLINT '1'"}, {"p2", "< SMALLINT '2'"}, {"p2", "<= SMALLINT '2'"}, {"p2", ">= SMALLINT '2'"},
+                {"p3", "> BIGINT '1'"}, {"p3", "< BIGINT '2'"}, {"p3", "<= BIGINT '2'"}, {"p3", ">= BIGINT '2'"},
+                {"p4", "> TINYINT '1'"}, {"p4", "< TINYINT '2'"}, {"p4", "<= TINYINT '2'"}, {"p4", ">= TINYINT '2'"},
+                {"p5", "> 'a'"}, {"p5", "< 'b'"}, {"p5", "<= 'b'"}, {"p5", ">= 'b'"},
+                {"p6", "> CHAR 'a'"}, {"p6", "< CHAR 'b'"}, {"p6", "<= CHAR 'b'"}, {"p6", ">= CHAR 'b'"},
+                {"p8", "> DOUBLE '1'"}, {"p8", "< DOUBLE '2'"}, {"p8", "<= DOUBLE '2'"}, {"p8", ">= DOUBLE '2'"},
+                {"p9", "> REAL '1'"}, {"p9", "< REAL '2'"}, {"p9", "<= REAL '2'"}, {"p9", ">= REAL '2'"},
+                {"p10", "> DATE '2021-01-11'"}, {"p10", "< DATE '2021-01-12'"}, {"p10", "<= DATE '2021-01-12'"}, {"p10", ">= DATE '2021-01-12'"},
+                {"p11", "> DECIMAL '11.11'"}, {"p11", "< DECIMAL '22.22'"}, {"p11", "<= DECIMAL '22.22'"}, {"p11", ">= DECIMAL '22.22'"}};
+    }
+
+    void createTableSupportedRangedTypes(String tableName)
+    {
+        assertQuerySucceeds("CREATE TABLE " + tableName + " (p1 INT, p2 SMALLINT, p3 BIGINT, p4 TINYINT, p5 VARCHAR, p6 CHAR, p7 BOOLEAN, p8 DOUBLE, p9 REAL, p10 DATE, p11 DECIMAL(4,2))");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(1, SMALLINT '1', BIGINT '1', TINYINT '1', 'a', CHAR 'a', BOOLEAN 'true', DOUBLE '1', REAL '1', DATE '2021-01-11', DECIMAL '11.11'), " +
+                "(1, SMALLINT '1', BIGINT '1', TINYINT '1', 'a', CHAR 'a', BOOLEAN 'true', DOUBLE '1', REAL '1', DATE '2021-01-11', DECIMAL '11.11'), " +
+                "(1, SMALLINT '1', BIGINT '1', TINYINT '1', 'a', CHAR 'a', BOOLEAN 'false', DOUBLE '1', REAL '1', DATE '2021-01-11', DECIMAL '11.11'), " +
+                "(1, SMALLINT '1', BIGINT '1', TINYINT '1', 'a', CHAR 'a', BOOLEAN 'true', DOUBLE '1', REAL '1', DATE '2021-01-11', DECIMAL '11.11'), " +
+                "(2, SMALLINT '2', BIGINT '2', TINYINT '2', 'b', CHAR 'b', BOOLEAN 'true', DOUBLE '2', REAL '2', DATE '2021-01-12', DECIMAL '22.22'), " +
+                "(2, SMALLINT '2', BIGINT '2', TINYINT '2', 'b', CHAR 'b', BOOLEAN 'true', DOUBLE '2', REAL '2', DATE '2021-01-12', DECIMAL '22.22'), " +
+                "(2, SMALLINT '2', BIGINT '2', TINYINT '2', 'b', CHAR 'b', BOOLEAN 'false', DOUBLE '2', REAL '2', DATE '2021-01-12', DECIMAL '22.22'), " +
+                "(2, SMALLINT '2', BIGINT '2', TINYINT '2', 'b', CHAR 'b', BOOLEAN 'false', DOUBLE '2', REAL '2', DATE '2021-01-12', DECIMAL '22.22'), " +
+                "(3, SMALLINT '3', BIGINT '3', TINYINT '3', 'c', CHAR 'c', BOOLEAN 'false', DOUBLE '3', REAL '3', DATE '2021-01-13', DECIMAL '33.33')");
+    }
+
+    @DataProvider(name = "bitmapSupportedDataTypesBetweenValues")
+    public Object[][] bitmapSupportedDataTypesBetweenValues()
+    {
+        return new Object[][] {
+                {"p1", "BETWEEN 3 AND 5"}, {"p2", "BETWEEN SMALLINT '3' AND SMALLINT '5'"}, {"p3", "BETWEEN BIGINT '3' AND BIGINT '5'"},
+                {"p4", "BETWEEN TINYINT '3' AND TINYINT '5'"}, {"p5", "BETWEEN 'c' AND 'e'"}, {"p6", "BETWEEN CHAR 'c' AND CHAR 'e'"},
+                {"p8", "BETWEEN DOUBLE '3' AND DOUBLE '5'"}, {"p9", "BETWEEN REAL '3' AND REAL '5'"}, {"p10", "BETWEEN DATE '2021-01-13' AND DATE '2021-01-15'"},
+                {"p11", "BETWEEN DECIMAL '33.33' AND DECIMAL '55.55'"}};
+    }
+
     @DataProvider(name = "supportedDataTypesBetweenValues")
     public Object[][] supportedDataTypesBetweenValues()
     {
         return new Object[][] {
-                {"bitmap", "p1", "BETWEEN 3 AND 5"}, {"minmax", "p1", "BETWEEN 3 AND 5"}, {"btree", "p1", "BETWEEN 3 AND 5"},
-                {"bitmap", "p2", "BETWEEN SMALLINT '3' AND SMALLINT '5'"}, {"minmax", "p2", "BETWEEN SMALLINT '3' AND SMALLINT '5'"}, {"btree", "p2", "BETWEEN SMALLINT '3' AND SMALLINT '5'"},
-                {"bitmap", "p3", "BETWEEN BIGINT '3' AND BIGINT '5'"}, {"minmax", "p3", "BETWEEN BIGINT '3' AND BIGINT '5'"}, {"btree", "p3", "BETWEEN BIGINT '3' AND BIGINT '5'"},
-                {"bitmap", "p4", "BETWEEN TINYINT '3' AND TINYINT '5'"}, {"minmax", "p4", "BETWEEN TINYINT '3' AND TINYINT '5'"}, {"btree", "p4", "BETWEEN TINYINT '3' AND TINYINT '5'"},
-                {"bitmap", "p5", "BETWEEN 'c' AND 'e'"}, {"minmax", "p5", "BETWEEN 'c' AND 'e'"}, {"btree", "p5", "BETWEEN 'c' AND 'e'"},
-                {"bitmap", "p6", "BETWEEN CHAR 'c' AND CHAR 'e'"}, {"minmax", "p6", "BETWEEN CHAR 'c' AND CHAR 'e'"},
-                {"bitmap", "p8", "BETWEEN DOUBLE '3' AND DOUBLE '5'"}, {"minmax", "p8", "BETWEEN DOUBLE '3' AND DOUBLE '5'"}, {"btree", "p8", "BETWEEN DOUBLE '3' AND DOUBLE '5'"},
-                {"bitmap", "p9", "BETWEEN REAL '3' AND REAL '5'"}, {"minmax", "p9", "BETWEEN REAL '3' AND REAL '5'"}, {"btree", "p9", "BETWEEN REAL '3' AND REAL '5'"},
-                {"bitmap", "p10", "BETWEEN DATE '2021-01-13' AND DATE '2021-01-15'"}, {"minmax", "p10", "BETWEEN DATE '2021-01-13' AND DATE '2021-01-15'"}, {"btree", "p10", "BETWEEN DATE '2021-01-13' AND DATE '2021-01-15'"},
-                {"bitmap", "p11", "BETWEEN DECIMAL '33.33' AND DECIMAL '55.55'"}, {"minmax", "p11", "BETWEEN DECIMAL '33.33' AND DECIMAL '55.55'"}, {"btree", "p11", "BETWEEN DECIMAL '33.33' AND DECIMAL '55.55'"}};
+                {"minmax", "p1", "BETWEEN 3 AND 5"}, {"btree", "p1", "BETWEEN 3 AND 5"},
+                {"minmax", "p2", "BETWEEN SMALLINT '3' AND SMALLINT '5'"}, {"btree", "p2", "BETWEEN SMALLINT '3' AND SMALLINT '5'"},
+                {"minmax", "p3", "BETWEEN BIGINT '3' AND BIGINT '5'"}, {"btree", "p3", "BETWEEN BIGINT '3' AND BIGINT '5'"},
+                {"minmax", "p4", "BETWEEN TINYINT '3' AND TINYINT '5'"}, {"btree", "p4", "BETWEEN TINYINT '3' AND TINYINT '5'"},
+                {"minmax", "p5", "BETWEEN 'c' AND 'e'"}, {"btree", "p5", "BETWEEN 'c' AND 'e'"},
+                {"minmax", "p6", "BETWEEN CHAR 'c' AND CHAR 'e'"},
+                {"minmax", "p8", "BETWEEN DOUBLE '3' AND DOUBLE '5'"}, {"btree", "p8", "BETWEEN DOUBLE '3' AND DOUBLE '5'"},
+                {"minmax", "p9", "BETWEEN REAL '3' AND REAL '5'"}, {"btree", "p9", "BETWEEN REAL '3' AND REAL '5'"},
+                {"minmax", "p10", "BETWEEN DATE '2021-01-13' AND DATE '2021-01-15'"}, {"btree", "p10", "BETWEEN DATE '2021-01-13' AND DATE '2021-01-15'"},
+                {"minmax", "p11", "BETWEEN DECIMAL '33.33' AND DECIMAL '55.55'"}, {"btree", "p11", "BETWEEN DECIMAL '33.33' AND DECIMAL '55.55'"}};
+    }
+
+    void createTableBitmapSupportedDataTypes(String tableName)
+    {
+        assertQuerySucceeds("CREATE TABLE " + tableName + " (p1 INT, p2 SMALLINT, p3 BIGINT, p4 TINYINT, p5 VARCHAR, p6 CHAR, p7 BOOLEAN, p8 DOUBLE, p9 REAL, p10 DATE, p11 DECIMAL(4,2))");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(1, SMALLINT '1', BIGINT '1', TINYINT '1', 'a', CHAR 'a', BOOLEAN 'true', DOUBLE '1', REAL '1', DATE '2021-01-11', DECIMAL '11.11'), " +
+                "(2, SMALLINT '2', BIGINT '2', TINYINT '2', 'b', CHAR 'b', BOOLEAN 'true', DOUBLE '2', REAL '2', DATE '2021-01-12', DECIMAL '22.22'), " +
+                "(3, SMALLINT '3', BIGINT '3', TINYINT '3', 'c', CHAR 'c', BOOLEAN 'false', DOUBLE '3', REAL '3', DATE '2021-01-13', DECIMAL '33.33'), " +
+                "(4, SMALLINT '4', BIGINT '4', TINYINT '4', 'd', CHAR 'd', BOOLEAN 'false', DOUBLE '4', REAL '4', DATE '2021-01-14', DECIMAL '44.44'), " +
+                "(5, SMALLINT '5', BIGINT '5', TINYINT '5', 'e', CHAR 'e', BOOLEAN 'true', DOUBLE '5', REAL '5', DATE '2021-01-15', DECIMAL '55.55'), " +
+                "(6, SMALLINT '6', BIGINT '6', TINYINT '6', 'f', CHAR 'f', BOOLEAN 'true', DOUBLE '6', REAL '6', DATE '2021-01-16', DECIMAL '66.66'), " +
+                "(7, SMALLINT '7', BIGINT '7', TINYINT '7', 'g', CHAR 'g', BOOLEAN 'false', DOUBLE '7', REAL '7', DATE '2021-01-17', DECIMAL '77.77'), " +
+                "(8, SMALLINT '8', BIGINT '8', TINYINT '8', 'h', CHAR 'h', BOOLEAN 'false', DOUBLE '8', REAL '8', DATE '2021-01-18', DECIMAL '88.88'), " +
+                "(9, SMALLINT '9', BIGINT '9', TINYINT '9', 'i', CHAR 'i', BOOLEAN 'true', DOUBLE '9', REAL '9', DATE '2021-01-19', DECIMAL '99.99')");
     }
 
     void createTableSupportedDataTypes(String tableName)
     {
         assertQuerySucceeds("CREATE TABLE " + tableName + " (p1 INT, p2 SMALLINT, p3 BIGINT, p4 TINYINT, p5 VARCHAR, p6 CHAR, p7 BOOLEAN, p8 DOUBLE, p9 REAL, p10 DATE, p11 DECIMAL(4,2))");
-        assertQuerySucceeds("INSERT INTO " + tableName + " values(1, SMALLINT '1', BIGINT '1', TINYINT '1', 'a', CHAR 'a', BOOLEAN 'true', DOUBLE '1', REAL '1', DATE '2021-01-11', DECIMAL '11.11')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " values(2, SMALLINT '2', BIGINT '2', TINYINT '2', 'b', CHAR 'b', BOOLEAN 'true', DOUBLE '2', REAL '2', DATE '2021-01-12', DECIMAL '22.22')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " values(3, SMALLINT '3', BIGINT '3', TINYINT '3', 'c', CHAR 'c', BOOLEAN 'false', DOUBLE '3', REAL '3', DATE '2021-01-13', DECIMAL '33.33')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " values(4, SMALLINT '4', BIGINT '4', TINYINT '4', 'd', CHAR 'd', BOOLEAN 'false', DOUBLE '4', REAL '4', DATE '2021-01-14', DECIMAL '44.44')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " values(5, SMALLINT '5', BIGINT '5', TINYINT '5', 'e', CHAR 'e', BOOLEAN 'true', DOUBLE '5', REAL '5', DATE '2021-01-15', DECIMAL '55.55')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " values(6, SMALLINT '6', BIGINT '6', TINYINT '6', 'f', CHAR 'f', BOOLEAN 'true', DOUBLE '6', REAL '6', DATE '2021-01-16', DECIMAL '66.66')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " values(7, SMALLINT '7', BIGINT '7', TINYINT '7', 'g', CHAR 'g', BOOLEAN 'false', DOUBLE '7', REAL '7', DATE '2021-01-17', DECIMAL '77.77')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " values(8, SMALLINT '8', BIGINT '8', TINYINT '8', 'h', CHAR 'h', BOOLEAN 'false', DOUBLE '8', REAL '8', DATE '2021-01-18', DECIMAL '88.88')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " values(9, SMALLINT '9', BIGINT '9', TINYINT '9', 'i', CHAR 'i', BOOLEAN 'true', DOUBLE '9', REAL '9', DATE '2021-01-19', DECIMAL '99.99')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(1, SMALLINT '1', BIGINT '1', TINYINT '1', 'a', CHAR 'a', BOOLEAN 'true', DOUBLE '1', REAL '1', DATE '2021-01-11', DECIMAL '11.11')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(2, SMALLINT '2', BIGINT '2', TINYINT '2', 'b', CHAR 'b', BOOLEAN 'true', DOUBLE '2', REAL '2', DATE '2021-01-12', DECIMAL '22.22')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(3, SMALLINT '3', BIGINT '3', TINYINT '3', 'c', CHAR 'c', BOOLEAN 'false', DOUBLE '3', REAL '3', DATE '2021-01-13', DECIMAL '33.33')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(4, SMALLINT '4', BIGINT '4', TINYINT '4', 'd', CHAR 'd', BOOLEAN 'false', DOUBLE '4', REAL '4', DATE '2021-01-14', DECIMAL '44.44')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(5, SMALLINT '5', BIGINT '5', TINYINT '5', 'e', CHAR 'e', BOOLEAN 'true', DOUBLE '5', REAL '5', DATE '2021-01-15', DECIMAL '55.55')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(6, SMALLINT '6', BIGINT '6', TINYINT '6', 'f', CHAR 'f', BOOLEAN 'true', DOUBLE '6', REAL '6', DATE '2021-01-16', DECIMAL '66.66')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(7, SMALLINT '7', BIGINT '7', TINYINT '7', 'g', CHAR 'g', BOOLEAN 'false', DOUBLE '7', REAL '7', DATE '2021-01-17', DECIMAL '77.77')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(8, SMALLINT '8', BIGINT '8', TINYINT '8', 'h', CHAR 'h', BOOLEAN 'false', DOUBLE '8', REAL '8', DATE '2021-01-18', DECIMAL '88.88')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(9, SMALLINT '9', BIGINT '9', TINYINT '9', 'i', CHAR 'i', BOOLEAN 'true', DOUBLE '9', REAL '9', DATE '2021-01-19', DECIMAL '99.99')");
     }
 
     @DataProvider(name = "splitsWithIndexAndData")
