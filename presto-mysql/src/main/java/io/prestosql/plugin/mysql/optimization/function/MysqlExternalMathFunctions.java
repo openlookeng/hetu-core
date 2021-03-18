@@ -26,6 +26,8 @@ public final class MysqlExternalMathFunctions
     {
         return ImmutableSet.<ExternalFunctionInfo>builder()
                 .add(MYSQL_TRUNCATE_FUNCTION_INFO)
+                .add(MYSQL_ABS_FUNCTION_INFO)
+                .add(MYSQL_BIG_INT_ABS_FUNCTION_INFO)
                 .build();
     }
 
@@ -37,6 +39,26 @@ public final class MysqlExternalMathFunctions
                     .deterministic(true)
                     .calledOnNullInput(false)
                     .description("return the value x that is reserved to y decimal places")
+                    .build();
+
+    private static final ExternalFunctionInfo MYSQL_ABS_FUNCTION_INFO =
+            ExternalFunctionInfo.builder()
+                    .functionName("abs")
+                    .inputArgs(StandardTypes.INTEGER)
+                    .returnType(StandardTypes.INTEGER)
+                    .deterministic(true)
+                    .calledOnNullInput(false)
+                    .description("return the absolute value of x")
+                    .build();
+
+    private static final ExternalFunctionInfo MYSQL_BIG_INT_ABS_FUNCTION_INFO =
+            ExternalFunctionInfo.builder()
+                    .functionName("abs")
+                    .inputArgs(StandardTypes.BIGINT)
+                    .returnType(StandardTypes.BIGINT)
+                    .deterministic(true)
+                    .calledOnNullInput(false)
+                    .description("return the absolute value of x")
                     .build();
 
     private MysqlExternalMathFunctions()

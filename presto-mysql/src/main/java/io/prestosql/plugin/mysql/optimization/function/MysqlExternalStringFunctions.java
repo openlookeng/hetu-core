@@ -26,6 +26,8 @@ public final class MysqlExternalStringFunctions
     {
         return ImmutableSet.<ExternalFunctionInfo>builder()
                 .add(MYSQL_FORMAT_FUNCTION_INFO)
+                .add(MYSQL_FORMAT_DECIMAL_FUNCTION_INFO)
+                .add(MYSQL_LOWER_FUNCTION_INFO)
                 .build();
     }
 
@@ -38,6 +40,27 @@ public final class MysqlExternalStringFunctions
                     .calledOnNullInput(false)
                     .description("format the number 'num' to a format like'#,###,###.##', " +
                             "rounded to 'lo' decimal places, and returns the result as a string")
+                    .build();
+
+    private static final ExternalFunctionInfo MYSQL_FORMAT_DECIMAL_FUNCTION_INFO =
+            ExternalFunctionInfo.builder()
+                    .functionName("format")
+                    .inputArgs(StandardTypes.DECIMAL, StandardTypes.INTEGER)
+                    .returnType(StandardTypes.VARCHAR)
+                    .deterministic(true)
+                    .calledOnNullInput(false)
+                    .description("format the number 'num' to a format like'#,###,###.##', " +
+                            "rounded to 'lo' decimal places, and returns the result as a string")
+                    .build();
+
+    private static final ExternalFunctionInfo MYSQL_LOWER_FUNCTION_INFO =
+            ExternalFunctionInfo.builder()
+                    .functionName("lower")
+                    .inputArgs(StandardTypes.VARCHAR)
+                    .returnType(StandardTypes.VARCHAR)
+                    .deterministic(true)
+                    .calledOnNullInput(false)
+                    .description("returns the string str with all characters changed to lowercase")
                     .build();
 
     private MysqlExternalStringFunctions()
