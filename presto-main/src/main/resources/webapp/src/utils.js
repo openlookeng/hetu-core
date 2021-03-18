@@ -235,6 +235,7 @@ export function getChildren(nodeInfo: any)
         case 'TableDeleteNode':
         case 'TableFinishNode':
         case 'GroupIdNode':
+        case 'CTEScanNode':
         case 'UnnestNode':
         case 'EnforceSingleRowNode':
             return [nodeInfo.source];
