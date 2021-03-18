@@ -18,6 +18,8 @@ import ResultsPreviewStore from '../stores/ResultsPreviewStore';
 import ResultsPreviewActions from '../actions/ResultsPreviewActions';
 import QueryActions from '../actions/QueryActions';
 import Pagination from 'rc-pagination';
+import Select from "rc-select";
+import localeInfo from "../../node_modules/rc-pagination/es/locale/en_US";
 
 let isColumnResizing = false;
 
@@ -60,7 +62,8 @@ class ResultsTable
       total: 0,
       query: "",
       table: [],
-      fileName: ""
+      fileName: "",
+      pageSize: 10
     };
     this._onChange = this._onChange.bind(this);
     this._enhancedData = this._enhancedData.bind(this);
@@ -98,6 +101,7 @@ class ResultsTable
     let table = this.state.table;
     let currentPage = this.state.currentPage;
     let total = this.state.table.total;
+    let pageSize = this.state.pageSize;
     if (table === null || total === 0) {
         this._renderEmptyMessage();
       }
@@ -115,10 +119,10 @@ class ResultsTable
           </div>
           <Table
               headerHeight={25}
-              rowHeight={30}
+              rowHeight={35}
               rowsCount={this.state.table.data.length}
               width={this.props.tableWidth}
-              maxHeight={this.props.tableHeight - 130}
+              maxHeight={this.props.tableHeight - 90}
               isResizable={isColumnResizing}
               onColumnResizeEndCallback={this._onColumnResizeEndCallback}
               {... this.props}>
@@ -129,9 +133,15 @@ class ResultsTable
               defaultCurrent={1}
               current={currentPage}
               total={total}
+              defaultPageSize={10}
+              pageSize={pageSize}
               onChange={this.onPageChange}
-              showTotal={total => `Total ${total} items`}
+              showTotal={total => `Total ${total} results`}
               style={{ marginTop: 10 }}
+              locale={localeInfo}
+              showSizeChanger
+              onShowSizeChange={this.onPageChange}
+              selectComponentClass={Select}
             />
         </div>
         </div>
@@ -164,9 +174,9 @@ class ResultsTable
     this.setState(getStateFromStore());
   }
 
-  onPageChange(current) {
+  onPageChange(current, pageSize) {
     let fileName = "../api/files/" + ResultsPreviewStore.getResultsPreview().fileName;
-    ResultsPreviewActions.loadResultsPreview(fileName, current);
+    ResultsPreviewActions.loadResultsPreview(fileName, current, pageSize);
     let page = ResultsPreviewStore.getResultsPreview();
     let query = ResultsPreviewStore.getPreviewQuery();
     this.setState({
@@ -175,6 +185,7 @@ class ResultsTable
       table: page,
       total: page.total,
       fileName: page.fileName,
+      pageSize: pageSize
     });
   }
 
