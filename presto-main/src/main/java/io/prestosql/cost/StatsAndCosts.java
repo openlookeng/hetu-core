@@ -112,22 +112,27 @@ public class StatsAndCosts
     {
         ImmutableMap.Builder<PlanNodeId, PlanNodeStatsEstimate> planNodeStats = ImmutableMap.builder();
         ImmutableMap.Builder<PlanNodeId, PlanCostEstimate> planNodeCosts = ImmutableMap.builder();
-        reconstructStatsAndCosts(stageInfo, planNodeStats, planNodeCosts);
+        Set<PlanNodeId> visitedPlanNodeId = new HashSet<>();
+        reconstructStatsAndCosts(stageInfo, planNodeStats, planNodeCosts, visitedPlanNodeId);
         return new StatsAndCosts(planNodeStats.build(), planNodeCosts.build());
     }
 
     private static void reconstructStatsAndCosts(
             StageInfo stage,
             ImmutableMap.Builder<PlanNodeId, PlanNodeStatsEstimate> planNodeStats,
-            ImmutableMap.Builder<PlanNodeId, PlanCostEstimate> planNodeCosts)
+            ImmutableMap.Builder<PlanNodeId, PlanCostEstimate> planNodeCosts,
+            Set<PlanNodeId> visitedPlanNodeId)
     {
         PlanFragment planFragment = stage.getPlan();
         if (planFragment != null) {
-            planNodeStats.putAll(planFragment.getStatsAndCosts().getStats());
-            planNodeCosts.putAll(planFragment.getStatsAndCosts().getCosts());
+            if (!visitedPlanNodeId.contains(planFragment.getRoot().getId())) {
+                visitedPlanNodeId.add(planFragment.getRoot().getId());
+                planNodeStats.putAll(planFragment.getStatsAndCosts().getStats());
+                planNodeCosts.putAll(planFragment.getStatsAndCosts().getCosts());
+            }
         }
         for (StageInfo subStage : stage.getSubStages()) {
-            reconstructStatsAndCosts(subStage, planNodeStats, planNodeCosts);
+            reconstructStatsAndCosts(subStage, planNodeStats, planNodeCosts, visitedPlanNodeId);
         }
     }
 }
