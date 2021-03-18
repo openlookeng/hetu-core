@@ -177,6 +177,16 @@ public class QuerySnapshotManager
         return result;
     }
 
+    public void invalidateAllSnapshots()
+    {
+        synchronized (captureResults) {
+            for (Long snapshotId : captureResults.keySet()) {
+                captureResults.put(snapshotId, SnapshotResult.NA);
+            }
+            saveQuerySnapshotResult();
+        }
+    }
+
     private void queryRestoreComplete(RestoreResult restoreResult)
     {
         if (!retryTimer.isPresent()) {

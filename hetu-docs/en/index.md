@@ -44,6 +44,7 @@ headless: true
     - [State store]({{< relref "./docs/admin/state-store.md" >}})
     - [Meta Store]({{< relref "./docs/admin/meta-store.md" >}})
     - [Audit Log]({{< relref "./docs/admin/audit-log.md" >}})
+    - [Reliable Execution]({{< relref "./docs/admin/reliable-execution.md" >}})
 
 - [Query Optimizer]("#")
     - [Table Statistics]({{< relref "./docs/optimizer/statistics.md" >}})
@@ -152,7 +153,7 @@ headless: true
     - [GRANT ROLES]({{< relref "./docs/sql/grant-roles.md" >}})
     - [INSERT]({{< relref "./docs/sql/insert.md" >}})
     - [INSERT OVERWRITE]({{< relref "./docs/sql/insert-overwrite.md" >}})
-    - [INSERT CUBE]({{< relref "./docs/sql/insert-cube.md" >}}) 
+    - [INSERT CUBE]({{< relref "./docs/sql/insert-cube.md" >}})
     - [INSERT OVERWRITE CUBE]({{< relref "./docs/sql/insert-overwrite-cube.md" >}})
     - [JMX]({{< relref "./docs/sql/jmx.md" >}})
     - [PREPARE]({{< relref "./docs/sql/prepare.md" >}})
@@ -188,7 +189,7 @@ headless: true
     - [Migrating From Hive]({{< relref "./docs/migration/from-hive.md" >}})
     - [SQL Migration Tool]({{< relref "./docs/migration/sql-migration-tool.md" >}})
     - [Support Hive Functions]({{< relref "./docs/migration/hetu-hive-functions.md" >}})
-  
+
 - [Developer Guide]({{< relref "./docs/develop/_index.md" >}})
     - [Getting Started]({{< relref "./docs/develop/getting-started.md" >}})
     - [SPI Overview]({{< relref "./docs/develop/spi-overview.md" >}})

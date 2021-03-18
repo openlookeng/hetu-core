@@ -339,7 +339,7 @@ public class MultiInputSnapshotState
                 }
             }
             catch (Exception e) {
-                LOG.warn(e, "Failed to restore snapshot " + snapshotId + " for " + restorableId);
+                LOG.warn(e, "Failed to restore snapshot state for %s: %s", componentId, e.getMessage());
                 snapshotManager.failedToRestore(componentId, false);
             }
 

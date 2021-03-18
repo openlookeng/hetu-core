@@ -763,4 +763,22 @@ public class ClassLoaderSafeConnectorMetadata
             return delegate.isPreAggregationSupported(session);
         }
     }
+
+    @Override
+    public boolean isSnapshotSupportedAsInput(ConnectorSession session, ConnectorTableHandle table)
+    {
+        return delegate.isSnapshotSupportedAsInput(session, table);
+    }
+
+    @Override
+    public boolean isSnapshotSupportedAsOutput(ConnectorSession session, ConnectorTableHandle table)
+    {
+        return delegate.isSnapshotSupportedAsOutput(session, table);
+    }
+
+    @Override
+    public boolean isSnapshotSupportedAsNewTable(ConnectorSession session, Map<String, Object> tableProperties)
+    {
+        return delegate.isSnapshotSupportedAsNewTable(session, tableProperties);
+    }
 }

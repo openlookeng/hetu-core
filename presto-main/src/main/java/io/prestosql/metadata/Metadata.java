@@ -502,6 +502,31 @@ public interface Metadata
     boolean isHeuristicIndexSupported(Session session, QualifiedObjectName tableName);
 
     /**
+     * Whether this table can be used as input for snapshot-enabled query executions
+     *
+     * @param session Presto session
+     * @param table Connector specific table handle
+     */
+    boolean isSnapshotSupportedAsInput(Session session, TableHandle table);
+
+    /**
+     * Whether this table can be used as output for snapshot-enabled query executions
+     *
+     * @param session Presto session
+     * @param table Connector specific table handle
+     */
+    boolean isSnapshotSupportedAsOutput(Session session, TableHandle table);
+
+    /**
+     * Whether new table with specified format can be used as output for snapshot-enabled
+     *
+     * @param session Presto session
+     * @param catalogName Catalog name
+     * @param tableProperties Table properties
+     */
+    boolean isSnapshotSupportedAsNewTable(Session session, CatalogName catalogName, Map<String, Object> tableProperties);
+
+    /**
      * Cube pre-aggregation is applicable only for supported connectors.
      *
      * @param session Hetu session

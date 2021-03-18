@@ -619,4 +619,47 @@ public abstract class AbstractMockMetadata
     {
         return true;
     }
+
+    /**
+     * Whether this table can be used as input for snapshot-enabled query executions.
+     * This method overrides {@link ConnectorMetadata} returns true to indicate
+     * snapshot feature is enabled for testing connectors.
+     *
+     * @param session Presto session
+     * @param table Connector specific table handle
+     */
+    @Override
+    public boolean isSnapshotSupportedAsInput(Session session, TableHandle table)
+    {
+        return true;
+    }
+
+    /**
+     * Whether this table can be used as output for snapshot-enabled query executions.
+     * This method overrides {@link ConnectorMetadata} returns true to indicate
+     * snapshot feature is enabled for testing connectors.
+     *
+     * @param session Presto session
+     * @param table Connector specific table handle
+     */
+    @Override
+    public boolean isSnapshotSupportedAsOutput(Session session, TableHandle table)
+    {
+        return true;
+    }
+
+    /**
+     * Whether new table with specified format can be used as output for snapshot-enabled.
+     * This method overrides {@link ConnectorMetadata} returns true to indicate
+     * snapshot feature is enabled for testing connectors.
+     *
+     * @param session Presto session
+     * @param catalogName Catalog name
+     * @param tableProperties Table properties
+     */
+    @Override
+    public boolean isSnapshotSupportedAsNewTable(Session session, CatalogName catalogName, Map<String, Object> tableProperties)
+    {
+        return true;
+    }
 }

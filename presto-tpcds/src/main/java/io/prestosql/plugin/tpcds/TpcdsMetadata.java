@@ -184,7 +184,7 @@ public class TpcdsMetadata
     public ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle)
     {
         ConnectorTableMetadata tableMetadata = getTableMetadata(session, tableHandle);
-        String columnName = ((TpcdsColumnHandle) columnHandle).getColumnName();
+        String columnName = columnHandle.getColumnName();
 
         for (ColumnMetadata column : tableMetadata.getColumns()) {
             if (column.getName().equals(columnName)) {
@@ -286,6 +286,12 @@ public class TpcdsMetadata
      */
     @Override
     public boolean isExecutionPlanCacheSupported(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return true;
+    }
+
+    @Override
+    public boolean isSnapshotSupportedAsInput(ConnectorSession session, ConnectorTableHandle handle)
     {
         return true;
     }

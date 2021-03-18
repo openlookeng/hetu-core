@@ -50,8 +50,10 @@ import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.snapshot.SnapshotUtils;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.PrestoWarning;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.CatalogName;
+import io.prestosql.spi.connector.StandardWarningCode;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
@@ -83,7 +85,10 @@ import io.prestosql.sql.planner.SubPlan;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.planner.plan.OutputNode;
+import io.prestosql.sql.tree.CreateTableAsSelect;
 import io.prestosql.sql.tree.Explain;
+import io.prestosql.sql.tree.Insert;
+import io.prestosql.sql.tree.Statement;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.utils.HetuConfig;
 import org.joda.time.DateTime;
@@ -91,6 +96,7 @@ import org.joda.time.DateTime;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -159,6 +165,7 @@ public class SqlQueryExecution
     private final HeuristicIndexerManager heuristicIndexerManager;
     private final StateStoreProvider stateStoreProvider;
     private final QuerySnapshotManager snapshotManager;
+    private final WarningCollector warningCollector;
 
     public SqlQueryExecution(
             PreparedQuery preparedQuery,
@@ -212,6 +219,7 @@ public class SqlQueryExecution
             this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
             this.dynamicFilterService = requireNonNull(dynamicFilterService, "dynamicFilterService is null");
             this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
+            this.warningCollector = requireNonNull(warningCollector);
 
             this.snapshotManager = new QuerySnapshotManager(
                     stateMachine.getQueryId(),
@@ -580,7 +588,9 @@ public class SqlQueryExecution
             }
             catch (PrestoException e) {
                 if (snapshotId.isPresent() && e.getErrorCode().equals(NO_NODES_AVAILABLE.toErrorCode())) {
-                    // Not enough worker to resume all tasks. Try an ealier snapshot.
+                    // Not enough worker to resume all tasks. Retrying from any saves snapshot likely wont' work either.
+                    // Clear ongoing and existing snapshots and restart.
+                    snapshotManager.invalidateAllSnapshots();
                     continue;
                 }
                 // Failure is not due to task count. Can't recover from it.
@@ -643,6 +653,11 @@ public class SqlQueryExecution
         stateMachine.endAnalysis();
 
         boolean explainAnalyze = analysis.getStatement() instanceof Explain && ((Explain) analysis.getStatement()).isAnalyze();
+
+        if (SystemSessionProperties.isSnapshotEnabled(getSession())) {
+            checkSnapshotSupport(getSession());
+        }
+
         return new PlanRoot(fragmentedPlan, !explainAnalyze, extractConnectors(analysis));
     }
 
@@ -660,6 +675,67 @@ public class SqlQueryExecution
     {
         LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector);
         return logicalPlanner.plan(analysis);
+    }
+
+    // Check if snapshot feature conflict with other aspects of the query.
+    // If any requirement is not met, then proceed as if snapshot was not enabled,
+    // i.e. session.isSnapshotEnabled() and SystemSessionProperties.isSnapshotEnabled(session) return false
+    private void checkSnapshotSupport(Session session)
+    {
+        List<String> reasons = new ArrayList<>();
+
+        // Only support create-table-as-select and insert statements
+        Statement statement = analysis.getStatement();
+        if (statement instanceof CreateTableAsSelect) {
+            // Ask catalog if new table supports snapshot
+            Map<String, Object> tableProperties = analysis.getCreateTableMetadata().getProperties();
+            if (!metadata.isSnapshotSupportedAsNewTable(session, analysis.getTarget().get().getCatalogName(), tableProperties)) {
+                reasons.add("Only support creating tables in Hive with ORC format");
+            }
+        }
+        else if (statement instanceof Insert) {
+            // Ask catalog if target table supports snapshot
+            if (!metadata.isSnapshotSupportedAsOutput(session, analysis.getInsert().get().getTarget())) {
+                reasons.add("Only support inserting into tables in Hive with ORC format");
+            }
+        }
+        else {
+            reasons.add("Only support CTAS (create table as select) and INSERT statements");
+        }
+
+        // Doesn't work with the following features
+        if (SystemSessionProperties.isReuseTableScanEnabled(session)
+                || SystemSessionProperties.isCTEReuseEnabled(session)
+                || SystemSessionProperties.isSpillEnabled(session)) {
+            reasons.add("No support along with reuse_table_scan or cte_reuse_enabled or spill_enabled features");
+        }
+
+        // All input tables must support snapshotting
+        for (TableHandle tableHandle : analysis.getTables()) {
+            if (!metadata.isSnapshotSupportedAsInput(session, tableHandle)) {
+                reasons.add("Only support reading from Hive, TPCDS, and TPCH source tables");
+                break;
+            }
+        }
+
+        // Must have more than 1 worker
+        if (nodeScheduler.createNodeSelector(null).selectableNodeCount() == 1) {
+            reasons.add("Requires more than 1 worker nodes");
+        }
+
+        if (!reasons.isEmpty()) {
+            // Disable snapshot support in the session. If this value has been used before this point,
+            // then we may need to remedy those places to disable snapshot as well. Fortunately,
+            // most accesses occur before this point, except for classes like ExecutingStatementResource,
+            // where the "snapshot enabled" info is retrieved and set in ExchangeClient. This is harmless.
+            // The ExchangeClient may still have snapshotEnabled=true while it's disabled in the session.
+            // This does not alter ExchangeClient's behavior, because this instance (in coordinator)
+            // will never receive any marker.
+            session.disableSnapshot();
+            reasons.forEach(reason -> {
+                warningCollector.add(new PrestoWarning(StandardWarningCode.SNAPSHOT_NOT_SUPPORTED, reason));
+            });
+        }
     }
 
     private static Set<CatalogName> extractConnectors(Analysis analysis)

@@ -128,7 +128,7 @@ public class SingleInputSnapshotState
                 markers.clear();
             }
             catch (Exception e) {
-                LOG.warn(e, "Failed to restore snapshot state");
+                LOG.warn(e, "Failed to restore snapshot state for %s: %s", componentId, e.getMessage());
                 snapshotManager.failedToRestore(componentId, false);
             }
         }

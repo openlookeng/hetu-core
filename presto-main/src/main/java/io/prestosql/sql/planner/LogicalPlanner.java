@@ -343,6 +343,7 @@ public class LogicalPlanner
                 analysis.getCreateTableProperties(),
                 analysis.getParameters(),
                 analysis.getCreateTableComment());
+        analysis.setCreateTableMetadata(tableMetadata);
         Optional<NewTableLayout> newTableLayout = metadata.getNewTableLayout(session, destination.getCatalogName(), tableMetadata);
 
         List<String> columnNames = tableMetadata.getColumns().stream()

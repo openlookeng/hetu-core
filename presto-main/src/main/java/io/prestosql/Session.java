@@ -48,6 +48,7 @@ import java.util.stream.Collectors;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static io.prestosql.SystemSessionProperties.SNAPSHOT_ENABLED;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.connector.CatalogName.createInformationSchemaCatalogName;
 import static io.prestosql.spi.connector.CatalogName.createSystemTablesCatalogName;
@@ -125,7 +126,14 @@ public final class Session
         this.clientCapabilities = ImmutableSet.copyOf(requireNonNull(clientCapabilities, "clientCapabilities is null"));
         this.resourceEstimates = requireNonNull(resourceEstimates, "resourceEstimates is null");
         this.startTime = startTime;
-        this.systemProperties = ImmutableMap.copyOf(requireNonNull(systemProperties, "systemProperties is null"));
+        requireNonNull(systemProperties, "systemProperties is null");
+        if (Boolean.parseBoolean(systemProperties.get(SNAPSHOT_ENABLED))) {
+            // Snapshot: it's possible to disable snapshot at a later point, so systemProperties can't be immutable
+            this.systemProperties = new HashMap<>(systemProperties);
+        }
+        else {
+            this.systemProperties = ImmutableMap.copyOf(systemProperties);
+        }
         this.sessionPropertyManager = requireNonNull(sessionPropertyManager, "sessionPropertyManager is null");
         this.preparedStatements = requireNonNull(preparedStatements, "preparedStatements is null");
         this.pageMetadataEnabled = pageMetadataEnabled;
@@ -298,6 +306,13 @@ public final class Session
     public void setPageMetadataEnabled(boolean pageMetadataEnabled)
     {
         this.pageMetadataEnabled = pageMetadataEnabled;
+    }
+
+    public void disableSnapshot()
+    {
+        // This can only be called if snapshot is currently enabled
+        checkState(Boolean.parseBoolean(systemProperties.get(SNAPSHOT_ENABLED)));
+        systemProperties.put(SNAPSHOT_ENABLED, "false");
     }
 
     public Session beginTransactionId(TransactionId transactionId, TransactionManager transactionManager, AccessControl accessControl)

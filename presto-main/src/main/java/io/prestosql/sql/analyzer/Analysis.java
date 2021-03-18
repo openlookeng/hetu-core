@@ -24,6 +24,7 @@ import io.prestosql.execution.Output;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.metadata.TableHandle;
@@ -142,6 +143,7 @@ public class Analysis
     // for create table
     private Optional<QualifiedObjectName> createTableDestination = Optional.empty();
     private Map<String, Expression> createTableProperties = ImmutableMap.of();
+    private ConnectorTableMetadata tableMetadata;
     private boolean createTableAsSelectWithData = true;
     private boolean createTableAsSelectNoOp;
     private Optional<List<Identifier>> createTableColumnAliases = Optional.empty();
@@ -637,6 +639,16 @@ public class Analysis
     public Map<String, Expression> getCreateTableProperties()
     {
         return createTableProperties;
+    }
+
+    public void setCreateTableMetadata(ConnectorTableMetadata tableMetadata)
+    {
+        this.tableMetadata = tableMetadata;
+    }
+
+    public ConnectorTableMetadata getCreateTableMetadata()
+    {
+        return tableMetadata;
     }
 
     public Optional<List<Identifier>> getColumnAliases()
