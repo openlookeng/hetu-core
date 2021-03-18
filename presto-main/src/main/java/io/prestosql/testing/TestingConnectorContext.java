@@ -26,11 +26,8 @@ import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.VersionEmbedder;
 import io.prestosql.spi.connector.CatalogName;
-import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ConnectorContext;
-import io.prestosql.spi.function.ExternalFunctionHub;
 import io.prestosql.spi.function.FunctionMetadataManager;
-import io.prestosql.spi.function.SqlInvokedFunction;
 import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.relation.RowExpressionService;
@@ -42,10 +39,6 @@ import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
 import io.prestosql.sql.relational.RowExpressionDomainTranslator;
 import io.prestosql.type.InternalTypeManager;
 import io.prestosql.version.EmbedVersion;
-
-import java.util.Optional;
-import java.util.Set;
-import java.util.function.BiFunction;
 
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 
@@ -61,7 +54,6 @@ public class TestingConnectorContext
     private final RowExpressionService rowExpressionService;
     private final FunctionMetadataManager functionMetadataManager;
     public final StandardFunctionResolution standardFunctionResolution;
-    private final Optional<BiFunction<ExternalFunctionHub, CatalogSchemaName, Set<SqlInvokedFunction>>> externalFunctionParser;
 
     public TestingConnectorContext()
     {
@@ -72,7 +64,6 @@ public class TestingConnectorContext
         FunctionAndTypeManager functionAndTypeManager = FunctionAndTypeManager.createTestFunctionAndTypeManager();
         functionMetadataManager = functionAndTypeManager;
         this.standardFunctionResolution = new FunctionResolution(functionAndTypeManager);
-        externalFunctionParser = Optional.empty();
     }
 
     @Override
@@ -127,11 +118,5 @@ public class TestingConnectorContext
     public StandardFunctionResolution getStandardFunctionResolution()
     {
         return this.standardFunctionResolution;
-    }
-
-    @Override
-    public Optional<BiFunction<ExternalFunctionHub, CatalogSchemaName, Set<SqlInvokedFunction>>> getExternalParserFunction()
-    {
-        return externalFunctionParser;
     }
 }

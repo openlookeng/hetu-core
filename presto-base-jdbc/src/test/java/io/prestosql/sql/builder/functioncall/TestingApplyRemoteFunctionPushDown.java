@@ -12,18 +12,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.spi.function;
+package io.prestosql.sql.builder.functioncall;
 
-import io.prestosql.spi.connector.CatalogSchemaName;
+import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 
-import java.util.Optional;
-import java.util.Set;
-
-public interface ExternalFunctionHub
+public class TestingApplyRemoteFunctionPushDown
+        extends ApplyRemoteFunctionPushDown
 {
-    Set<ExternalFunctionInfo> getExternalFunctions();
-
-    RoutineCharacteristics.Language getExternalFunctionLanguage();
-
-    Optional<CatalogSchemaName> getExternalFunctionCatalogSchemaName();
+    public TestingApplyRemoteFunctionPushDown(BaseJdbcConfig baseJdbcConfig, String connectorName)
+    {
+        super(baseJdbcConfig, connectorName);
+    }
 }

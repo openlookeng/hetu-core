@@ -12,44 +12,41 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.mysql.optimization.function;
+package io.prestosql.sql.builder.functioncall;
 
 import com.google.common.collect.ImmutableSet;
-import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.function.ExternalFunctionInfo;
-import io.prestosql.sql.builder.functioncall.JdbcExternalFunctionHub;
-
-import javax.inject.Inject;
+import io.prestosql.spi.type.StandardTypes;
 
 import java.util.Optional;
 import java.util.Set;
 
-import static java.util.Objects.requireNonNull;
-
-public class MysqlExternalFunctionHub
+public class TestingJdbcExternalFunctionHub
         extends JdbcExternalFunctionHub
 {
-    private final BaseJdbcConfig jdbcConfig;
+    private CatalogSchemaName catalogSchemaName = new CatalogSchemaName("jdbc", "foo");
 
-    @Inject
-    public MysqlExternalFunctionHub(BaseJdbcConfig jdbcConfig)
+    public Set<ExternalFunctionInfo> getExternalFunctions()
     {
-        this.jdbcConfig = requireNonNull(jdbcConfig, "jdbcConfig is null");
+        return ImmutableSet.<ExternalFunctionInfo>builder().add(EXTERNAL_FUNCTION_INFO).build();
     }
 
     @Override
     public Optional<CatalogSchemaName> getExternalFunctionCatalogSchemaName()
     {
-        return jdbcConfig.getConnectorRegistryFunctionNamespace();
+        return Optional.of(catalogSchemaName);
     }
 
-    public Set<ExternalFunctionInfo> getExternalFunctions()
-    {
-        return ImmutableSet.<ExternalFunctionInfo>builder()
-                .addAll(MysqlExternalMathFunctions.getFunctionsInfo())
-                .addAll(MysqlExternalStringFunctions.getFunctionsInfo())
-                .addAll(MysqlExternalDateTimeFunctions.getFunctionsInfo())
-                .build();
-    }
+    protected static final ExternalFunctionInfo EXTERNAL_FUNCTION_INFO =
+            ExternalFunctionInfo
+                    .builder()
+                    .functionName("foo")
+                    .calledOnNullInput(true)
+                    .description("foo-fun")
+                    .deterministic(true)
+                    .inputArgs(StandardTypes.DOUBLE)
+                    .isHidden(false)
+                    .returnType(StandardTypes.DOUBLE)
+                    .build();
 }

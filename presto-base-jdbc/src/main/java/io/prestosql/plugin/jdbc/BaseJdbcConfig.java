@@ -67,17 +67,17 @@ public class BaseJdbcConfig
     private JdbcPushDownModule pushDownModule = JdbcPushDownModule.DEFAULT;
 
     private String pushDownExternalFunctionNamespaces;
-    private CatalogSchemaName connectorRegistryFunctionNamespace;
+    private String connectorRegistryFunctionNamespace;
 
     public Optional<CatalogSchemaName> getConnectorRegistryFunctionNamespace()
     {
-        return Optional.ofNullable(connectorRegistryFunctionNamespace);
+        return parserExternalFunctionCatalogSchema(connectorRegistryFunctionNamespace);
     }
 
     @Config("connector.externalfunction.namespace")
     public BaseJdbcConfig setConnectorRegistryFunctionNamespace(String connectorRegistryFunctionNamespace)
     {
-        this.connectorRegistryFunctionNamespace = parserExternalFunctionCatalogSchema(connectorRegistryFunctionNamespace).orElse(null);
+        this.connectorRegistryFunctionNamespace = connectorRegistryFunctionNamespace;
         return this;
     }
 

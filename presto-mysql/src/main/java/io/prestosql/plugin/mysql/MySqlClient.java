@@ -43,6 +43,7 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.function.ExternalFunctionHub;
 import io.prestosql.spi.function.FunctionMetadataManager;
 import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.relation.DeterminismEvaluator;
@@ -114,9 +115,9 @@ public class MySqlClient
     private final BaseJdbcConfig config;
 
     @Inject
-    public MySqlClient(BaseJdbcConfig config, @StatsCollecting ConnectionFactory connectionFactory, TypeManager typeManager)
+    public MySqlClient(BaseJdbcConfig config, @StatsCollecting ConnectionFactory connectionFactory, TypeManager typeManager, ExternalFunctionHub externalFunctionHub)
     {
-        super(config, "`", connectionFactory);
+        super(config, "`", connectionFactory, externalFunctionHub);
         this.pushDownModule = config.getPushDownModule();
         this.jsonType = typeManager.getType(new TypeSignature(StandardTypes.JSON));
         this.config = config;

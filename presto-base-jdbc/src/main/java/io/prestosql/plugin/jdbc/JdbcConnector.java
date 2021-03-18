@@ -29,6 +29,7 @@ import io.prestosql.spi.connector.ConnectorPlanOptimizerProvider;
 import io.prestosql.spi.connector.ConnectorRecordSetProvider;
 import io.prestosql.spi.connector.ConnectorSplitManager;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
+import io.prestosql.spi.function.ExternalFunctionHub;
 import io.prestosql.spi.function.FunctionMetadataManager;
 import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.procedure.Procedure;
@@ -70,6 +71,7 @@ public class JdbcConnector
     private final RowExpressionService rowExpressionService;
 
     private final ConcurrentMap<ConnectorTransactionHandle, JdbcMetadata> transactions = new ConcurrentHashMap<>();
+    private final JdbcClient jdbcClient;
 
     @Inject
     public JdbcConnector(
@@ -84,7 +86,8 @@ public class JdbcConnector
             StandardFunctionResolution functionResolution,
             RowExpressionService rowExpressionService,
             JdbcMetadataConfig config,
-            JdbcPlanOptimizer planOptimizer)
+            JdbcPlanOptimizer planOptimizer,
+            JdbcClient jdbcClient)
     {
         this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
         this.jdbcMetadataFactory = requireNonNull(jdbcMetadataFactory, "jdbcMetadataFactory is null");
@@ -98,6 +101,13 @@ public class JdbcConnector
         this.functionManager = requireNonNull(functionManager, "functionManager is null");
         this.functionResolution = requireNonNull(functionResolution, "functionResolution is null");
         this.rowExpressionService = requireNonNull(rowExpressionService, "rowExpressionService is null");
+        this.jdbcClient = requireNonNull(jdbcClient, "jdbcClient is null");
+    }
+
+    @Override
+    public Optional<ExternalFunctionHub> getExternalFunctionHub()
+    {
+        return this.jdbcClient.getExternalFunctionHub();
     }
 
     @Override

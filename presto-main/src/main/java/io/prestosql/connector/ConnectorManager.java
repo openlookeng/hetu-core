@@ -31,7 +31,7 @@ import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.index.IndexManager;
 import io.prestosql.metadata.Catalog;
 import io.prestosql.metadata.CatalogManager;
-import io.prestosql.metadata.FunctionExtractor;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.HandleResolver;
 import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.metadata.MetadataManager;
@@ -55,6 +55,8 @@ import io.prestosql.spi.connector.ConnectorPlanOptimizerProvider;
 import io.prestosql.spi.connector.ConnectorRecordSetProvider;
 import io.prestosql.spi.connector.ConnectorSplitManager;
 import io.prestosql.spi.connector.SystemTable;
+import io.prestosql.spi.function.ExternalFunctionHub;
+import io.prestosql.spi.function.SqlInvokedFunction;
 import io.prestosql.spi.procedure.Procedure;
 import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.DomainTranslator;
@@ -90,6 +92,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
+import static io.prestosql.metadata.FunctionExtractor.extractExternalFunctions;
 import static io.prestosql.spi.HetuConstant.DATA_CENTER_CONNECTOR_NAME;
 import static io.prestosql.spi.connector.CatalogName.createInformationSchemaCatalogName;
 import static io.prestosql.spi.connector.CatalogName.createSystemTablesCatalogName;
@@ -425,11 +428,22 @@ public class ConnectorManager
                 heuristicIndexerManager.getIndexClient(),
                 new ConnectorRowExpressionService(domainTranslator, determinismEvaluator),
                 metadataManager.getFunctionAndTypeManager(),
-                new FunctionResolution(metadataManager.getFunctionAndTypeManager()),
-                Optional.of(FunctionExtractor::extractExternalFunctions));
+                new FunctionResolution(metadataManager.getFunctionAndTypeManager()));
 
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(factory.getClass().getClassLoader())) {
-            return factory.create(catalogName.getCatalogName(), properties, context);
+            Connector connector = factory.create(catalogName.getCatalogName(), properties, context);
+            registerExternalFunctions(connector.getExternalFunctionHub(), metadataManager.getFunctionAndTypeManager());
+            return connector;
+        }
+    }
+
+    private static void registerExternalFunctions(Optional<ExternalFunctionHub> externalFunctionHub, FunctionAndTypeManager functionAndTypeManager)
+    {
+        if (externalFunctionHub.isPresent()) {
+            Set<SqlInvokedFunction> sqlInvokedFunctions = extractExternalFunctions(externalFunctionHub.get());
+            for (SqlInvokedFunction sqlInvokedFunction : sqlInvokedFunctions) {
+                functionAndTypeManager.createFunction(sqlInvokedFunction, true);
+            }
         }
     }
 

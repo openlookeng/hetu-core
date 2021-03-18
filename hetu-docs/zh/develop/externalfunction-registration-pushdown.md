@@ -3,34 +3,32 @@
 
 ## 介绍
 
-openLooKeng系统可以在Jdbc Connector中注册外部函数到`function-namespace-manager`中，并且可以通过Jdbc Connector下推到数据源执行。
+openLooKeng系统可以在Connector中注册外部函数到`function-namespace-manager`中。 并且在Jdbc Connector中还支持下推到数据源执行。
 
-## 在Jdbc Connector中注册外部函数
+## 在Connector中注册外部函数
+openLooKeng可以通过Connector向系统注册外部函数。我们在Jdbc Connector实现了一个例子，下面我们通过例子来讲解。
 
 用户可以在`presto-mysql/src/main/java/io.prestosql/plugin/mysql/optimization/function`中找到如何在Jdbc Connector向`function-namespace-manager`注册外部函数的代码。
-用户只要扩展实现下面这个抽象函数类中的 `getExternalFunctions` 方法(例如`MysqlExternalFunctionHub.java`)：
+在Connector中注册外部函数需要以下两个步骤。
+1. 扩展实现下面这个抽象函数类(例如`MysqlExternalFunctionHub.java`)：
 ```JAVA
-public abstract class JdbcExternalFunctionHub
-        implements ExternalFunctionHub
+public interface ExternalFunctionHub
 {
-    public Set<ExternalFunctionInfo> getExternalFunctions()
-    {
-        return emptySet();
-    }
+    Set<ExternalFunctionInfo> getExternalFunctions();
 
-    @Override
-    public final RoutineCharacteristics.Language getExternalFunctionLanguage()
-    {
-        return RoutineCharacteristics.Language.JDBC;
-    }
+    RoutineCharacteristics.Language getExternalFunctionLanguage();
+
+    CatalogSchemaName getExternalFunctionCatalogSchemaName();
 }
 ```
-此方法返回Connector需要向`function-namespace-manager`注册的函数信息。
-关于如何实现`JdbcExternalFunctionHub#getExternalFunctions`，我们在`MysqlExternalFunctionHub.java`中提供了一个简单明了的例子，
+这些方法返回Connector需要向`function-namespace-manager`注册的函数信息。
+关于如何实现`ExternalFunctionHub`，我们在`MysqlExternalFunctionHub.java`中提供了一个简单明了的例子。
+例如对于`ExternalFunctionHub#getExternalFunctions`方法，
 我们通过静态类实例注册的形式来实现`ExternalFunctionInfo`的实例集合的构造。当然你也可以自己定制代码，通过从外部读取文件等形式来构造`ExternalFunctionInfo`的实例集合，
-也就是你只需要注册和返回一个`ExternalFunctionInfo`的实例集合即可。在这里我们仅提供基本的通用框架。
+也就是你只需要注册和返回一个`ExternalFunctionInfo`的实例集合即可。
+在这里我们仅提供基本的通用框架。
 
-实现JdbcExternalFunctionHub之后，你只需要将其通过Jdbc Connector的plugin实现类(例如`MySqlPlugin.java`)注册到JdbcConnectionFactory中。
+2. 实现`ExternalFunctionHub`接口之后，你只需要将其通过实例注入的方式(参考`MySqlClientModule.java`)，注入到`JdbcClient`(参考`MysqlJdbcClient.java`)。
 
 ## 配置外部函数注册的命名空间
 

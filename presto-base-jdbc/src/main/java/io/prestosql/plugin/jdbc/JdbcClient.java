@@ -21,6 +21,7 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplitSource;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.function.ExternalFunctionHub;
 import io.prestosql.spi.function.FunctionMetadataManager;
 import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -157,5 +158,13 @@ public interface JdbcClient
     default boolean isExecutionPlanCacheSupported()
     {
         return true;
+    }
+
+    /**
+     * return external function hub
+     */
+    default Optional<ExternalFunctionHub> getExternalFunctionHub()
+    {
+        return Optional.empty();
     }
 }

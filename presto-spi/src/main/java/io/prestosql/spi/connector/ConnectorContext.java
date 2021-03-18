@@ -17,18 +17,12 @@ import io.prestosql.spi.NodeManager;
 import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.VersionEmbedder;
-import io.prestosql.spi.function.ExternalFunctionHub;
 import io.prestosql.spi.function.FunctionMetadataManager;
-import io.prestosql.spi.function.SqlInvokedFunction;
 import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.metastore.HetuMetastore;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.type.TypeManager;
-
-import java.util.Optional;
-import java.util.Set;
-import java.util.function.BiFunction;
 
 public interface ConnectorContext
 {
@@ -78,11 +72,6 @@ public interface ConnectorContext
     }
 
     default StandardFunctionResolution getStandardFunctionResolution()
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    default Optional<BiFunction<ExternalFunctionHub, CatalogSchemaName, Set<SqlInvokedFunction>>> getExternalParserFunction()
     {
         throw new UnsupportedOperationException();
     }

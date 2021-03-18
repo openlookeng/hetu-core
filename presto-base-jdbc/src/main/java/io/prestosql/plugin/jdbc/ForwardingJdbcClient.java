@@ -22,6 +22,7 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplitSource;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.function.ExternalFunctionHub;
 import io.prestosql.spi.function.FunctionMetadataManager;
 import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -269,5 +270,14 @@ public abstract class ForwardingJdbcClient
     public Optional<QueryGenerator<JdbcQueryGeneratorResult, JdbcConverterContext>> getQueryGenerator(DeterminismEvaluator determinismEvaluator, RowExpressionService rowExpressionService, FunctionMetadataManager functionManager, StandardFunctionResolution functionResolution)
     {
         return getDelegate().getQueryGenerator(determinismEvaluator, rowExpressionService, functionManager, functionResolution);
+    }
+
+    /**
+     * return external function hub
+     */
+    @Override
+    public Optional<ExternalFunctionHub> getExternalFunctionHub()
+    {
+        return Optional.empty();
     }
 }
