@@ -35,6 +35,7 @@ import org.intellij.lang.annotations.Language;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -84,6 +85,7 @@ public class BasePlanTest
 
     @BeforeClass
     public final void initPlanTest()
+            throws IOException
     {
         queryRunner = queryRunnerSupplier.get();
     }
@@ -241,7 +243,8 @@ public class BasePlanTest
 
     public interface LocalQueryRunnerSupplier
     {
-        LocalQueryRunner get();
+        LocalQueryRunner get()
+                throws IOException;
     }
 
     protected Metadata getMetadata()

@@ -120,7 +120,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import static com.google.common.base.Functions.constant;
 import static com.google.common.collect.Iterables.transform;
 import static com.google.common.collect.Iterators.advance;
-import static com.google.common.io.Files.createTempDir;
 import static com.google.common.io.MoreFiles.deleteRecursively;
 import static com.google.common.io.RecursiveDeleteOption.ALLOW_INSECURE;
 import static io.airlift.slice.SizeOf.SIZE_OF_INT;
@@ -155,6 +154,7 @@ import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.testing.TestingConnectorSession.SESSION;
 import static java.lang.Math.toIntExact;
+import static java.nio.file.Files.createTempDirectory;
 import static java.util.Collections.nCopies;
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.META_TABLE_COLUMNS;
@@ -1114,9 +1114,9 @@ public class RcFileTester
         private final File tempDir;
         private final File file;
 
-        private TempFile()
+        private TempFile() throws IOException
         {
-            tempDir = createTempDir();
+            tempDir = createTempDirectory(getClass().getName()).toFile();
             file = new File(tempDir, "data.rcfile");
         }
 

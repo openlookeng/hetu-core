@@ -51,7 +51,6 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
-import static com.google.common.io.Files.createTempDir;
 import static com.google.common.io.MoreFiles.deleteRecursively;
 import static com.google.common.io.RecursiveDeleteOption.ALLOW_INSECURE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
@@ -72,6 +71,7 @@ import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.lang.Math.toIntExact;
+import static java.nio.file.Files.createTempDirectory;
 import static java.util.UUID.randomUUID;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.joda.time.DateTimeZone.UTC;
@@ -340,7 +340,7 @@ public class BenchmarkColumnReaders
                 throws Exception
         {
             this.type = type;
-            temporaryDirectory = createTempDir();
+            temporaryDirectory = createTempDirectory(getClass().getName()).toFile();
             orcFile = new File(temporaryDirectory, randomUUID().toString());
             writeOrcColumnPresto(orcFile, NONE, type, createValues(), new OrcWriterStats());
 

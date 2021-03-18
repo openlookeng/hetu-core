@@ -13,7 +13,6 @@
  */
 package io.prestosql.plugin.hive;
 
-import com.google.common.io.Files;
 import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.plugin.hive.metastore.Database;
 import io.prestosql.plugin.hive.metastore.HiveMetastore;
@@ -31,6 +30,7 @@ import java.io.IOException;
 import static com.google.common.io.MoreFiles.deleteRecursively;
 import static com.google.common.io.RecursiveDeleteOption.ALLOW_INSECURE;
 import static io.prestosql.testing.TestingConnectorSession.SESSION;
+import static java.nio.file.Files.createTempDirectory;
 import static java.util.Objects.requireNonNull;
 
 public abstract class AbstractTestHiveLocal
@@ -55,9 +55,9 @@ public abstract class AbstractTestHiveLocal
     protected abstract HiveMetastore createMetastore(File tempDir);
 
     @BeforeClass
-    public void initialize()
+    public void initialize() throws IOException
     {
-        tempDir = Files.createTempDir();
+        tempDir = createTempDirectory(getClass().getName()).toFile();
 
         HiveMetastore metastore = createMetastore(tempDir);
 

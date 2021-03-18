@@ -87,7 +87,6 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.io.Files.asCharSink;
-import static com.google.common.io.Files.createTempDir;
 import static com.google.common.io.MoreFiles.deleteRecursively;
 import static com.google.common.io.RecursiveDeleteOption.ALLOW_INSECURE;
 import static io.airlift.json.JsonCodec.jsonCodec;
@@ -135,6 +134,7 @@ import static io.prestosql.tests.QueryAssertions.assertEqualsIgnoreOrder;
 import static io.prestosql.transaction.TransactionBuilder.transaction;
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.nio.file.Files.createTempDirectory;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -2595,7 +2595,7 @@ public class TestHiveIntegrationSmokeTest
     public void testCreateExternalTable()
             throws Exception
     {
-        File tempDir = createTempDir();
+        File tempDir = createTempDirectory(getClass().getName()).toFile();
         File dataFile = new File(tempDir, "test.txt");
         asCharSink(dataFile, UTF_8).write("hello\nworld\n");
 

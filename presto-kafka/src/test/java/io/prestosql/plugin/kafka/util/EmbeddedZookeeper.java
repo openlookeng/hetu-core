@@ -13,7 +13,6 @@
  */
 package io.prestosql.plugin.kafka.util;
 
-import com.google.common.io.Files;
 import org.apache.zookeeper.server.NIOServerCnxnFactory;
 import org.apache.zookeeper.server.ServerCnxnFactory;
 import org.apache.zookeeper.server.ZooKeeperServer;
@@ -26,6 +25,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.google.common.io.MoreFiles.deleteRecursively;
 import static com.google.common.io.RecursiveDeleteOption.ALLOW_INSECURE;
+import static java.nio.file.Files.createTempDirectory;
 
 public class EmbeddedZookeeper
         implements Closeable
@@ -40,7 +40,7 @@ public class EmbeddedZookeeper
     public EmbeddedZookeeper()
             throws IOException
     {
-        zkDataDir = Files.createTempDir();
+        zkDataDir = createTempDirectory(getClass().getName()).toFile();
         zkServer = new ZooKeeperServer();
 
         FileTxnSnapLog ftxn = new FileTxnSnapLog(zkDataDir, zkDataDir);
