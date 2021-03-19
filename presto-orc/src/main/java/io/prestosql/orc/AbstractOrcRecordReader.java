@@ -44,6 +44,7 @@ import io.prestosql.orc.stream.StreamSourceMeta;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.heuristicindex.Index;
+import io.prestosql.spi.heuristicindex.IndexLookUpException;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.type.FixedWidthType;
@@ -351,7 +352,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
                         return true;
                     }
                 }
-                catch (UnsupportedOperationException uoe2) {
+                catch (UnsupportedOperationException | IndexLookUpException uoe2) {
                     return false;
                 }
             }
@@ -376,7 +377,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
                         return false;
                     }
                 }
-                catch (UnsupportedOperationException uoe2) {
+                catch (UnsupportedOperationException | IndexLookUpException uoe2) {
                     return false;
                 }
             }

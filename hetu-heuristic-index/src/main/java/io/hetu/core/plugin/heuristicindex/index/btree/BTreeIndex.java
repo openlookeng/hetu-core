@@ -23,6 +23,7 @@ import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.heuristicindex.Index;
+import io.prestosql.spi.heuristicindex.IndexLookUpException;
 import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.heuristicindex.SerializationUtils;
 import io.prestosql.spi.relation.CallExpression;
@@ -45,9 +46,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -56,9 +58,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static io.hetu.core.heuristicindex.util.IndexServiceUtils.getSerializer;
 import static io.prestosql.spi.heuristicindex.TypeUtils.extractValueFromRowExpression;
@@ -70,6 +70,11 @@ public class BTreeIndex
     public static final String FILE_NAME = "index.bt";
     private static final String KEY_TYPE = "__hetu__keytype";
     private static final String VALUE_TYPE = "__hetu__valuetype";
+
+    // when the lookup result is larger than this, processing lookUp result will take too long time and is not worthy
+    private static final long TERMINATE_LOOKUP_SIZE_THRESHOLD = 10000L;
+    // when the lookup result's weight in dataMap is larger than this, not much values can be filtered so filtering is not worth
+    private static final double TERMINATE_LOOKUP_WEIGHT_THRESHOLD = 0.1;
 
     protected Map<String, String> symbolTable;
     protected BTreeMap<Object, String> dataMap;
@@ -225,13 +230,19 @@ public class BTreeIndex
     @Override
     public boolean matches(Object expression)
     {
-        return lookUp(expression).hasNext();
+        try {
+            return lookUp(expression).hasNext();
+        }
+        catch (IndexLookUpException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
     public Iterator<String> lookUp(Object expression)
+            throws IndexLookUpException
     {
-        List<String> result = new ArrayList<>();
+        Collection<String> lookUpResults = Collections.emptyList();
 
         if (expression instanceof CallExpression) {
             CallExpression callExp = (CallExpression) expression;
@@ -249,24 +260,20 @@ public class BTreeIndex
                 switch (operator) {
                     case EQUAL:
                         if (dataMap.containsKey(key)) {
-                            result.addAll(translateSymbols(dataMap.get(key)));
+                            lookUpResults = Collections.singleton(dataMap.get(key));
                         }
                         break;
                     case LESS_THAN:
-                        ConcurrentNavigableMap<Object, String> concurrentNavigableMap = dataMap.subMap(dataMap.firstKey(), true, key, false);
-                        result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
+                        lookUpResults = rangeLookUp(dataMap.firstKey(), true, key, false);
                         break;
                     case LESS_THAN_OR_EQUAL:
-                        concurrentNavigableMap = dataMap.subMap(dataMap.firstKey(), true, key, true);
-                        result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
+                        lookUpResults = rangeLookUp(dataMap.firstKey(), true, key, true);
                         break;
                     case GREATER_THAN:
-                        concurrentNavigableMap = dataMap.subMap(key, false, dataMap.lastKey(), true);
-                        result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
+                        lookUpResults = rangeLookUp(key, false, dataMap.lastKey(), true);
                         break;
                     case GREATER_THAN_OR_EQUAL:
-                        concurrentNavigableMap = dataMap.subMap(key, true, dataMap.lastKey(), true);
-                        result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
+                        lookUpResults = rangeLookUp(key, true, dataMap.lastKey(), true);
                         break;
                     default:
                         throw new UnsupportedOperationException("Expression not supported");
@@ -279,14 +286,14 @@ public class BTreeIndex
                 case BETWEEN:
                     Object left = extractValueFromRowExpression(specialForm.getArguments().get(1));
                     Object right = extractValueFromRowExpression(specialForm.getArguments().get(2));
-                    ConcurrentNavigableMap<Object, String> concurrentNavigableMap = dataMap.subMap(left, true, right, true);
-                    result.addAll(concurrentNavigableMap.values().stream().map(this::translateSymbols).flatMap(Collection::stream).collect(Collectors.toList()));
+                    lookUpResults = rangeLookUp(left, true, right, true);
                     break;
                 case IN:
+                    lookUpResults = new ArrayList<>();
                     for (RowExpression exp : specialForm.getArguments().subList(1, specialForm.getArguments().size())) {
                         Object key = extractValueFromRowExpression(exp);
                         if (dataMap.containsKey(key)) {
-                            result.addAll(translateSymbols(dataMap.get(key)));
+                            lookUpResults.add(dataMap.get(key));
                         }
                     }
                     break;
@@ -298,8 +305,19 @@ public class BTreeIndex
             throw new UnsupportedOperationException("Expression not supported");
         }
 
-        result.sort(String::compareTo);
-        return result.iterator();
+        Set<String> symbolSet = new HashSet<>();
+        // break lookUp results to symbols and keep in a set. e.g. ["1,2,2,4","2,3"] -> set{"1", "2", "3", "4"}
+        for (String res : lookUpResults) {
+            Collections.addAll(symbolSet, res.split(","));
+        }
+
+        // translate the symbols to actual data values
+        List<String> translated = new ArrayList<>(symbolSet.size());
+        for (String sym : symbolSet) {
+            translated.add(symbolTable != null ? symbolTable.get(sym) : sym);
+        }
+        translated.sort(String::compareTo);
+        return translated.iterator();
     }
 
     @Override
@@ -345,8 +363,19 @@ public class BTreeIndex
         dataDir.close();
     }
 
-    private List<String> translateSymbols(String dataMapLookUpRes)
+    private Collection<String> rangeLookUp(Object from, boolean fromInclusive, Object to, boolean toInclusive)
+            throws IndexLookUpException
     {
-        return Arrays.stream(dataMapLookUpRes.split(",")).map(res -> symbolTable != null ? symbolTable.get(res) : res).collect(Collectors.toList());
+        if (dataMap.getComparator().compare(from, to) > 0) {
+            return Collections.emptyList();
+        }
+
+        Collection<String> values = dataMap.subMap(from, fromInclusive, to, toInclusive).values();
+        if (values.size() > TERMINATE_LOOKUP_SIZE_THRESHOLD &&
+                (double) values.size() / dataMap.size() >= TERMINATE_LOOKUP_WEIGHT_THRESHOLD) {
+            throw new IndexLookUpException("Look-up returned too many matching values. Filtering will not be effective. Skipping.");
+        }
+
+        return values;
     }
 }
