@@ -105,6 +105,9 @@ public class TestBitmapIndex
                     Domain.create(ValueSet.ofRanges(equal(IntegerType.INTEGER, 3L)), false))),
                     ImmutableList.of(0, 3));
             assertEquals(iteratorToList(bitmapIndexRead.lookUp(
+                    Domain.create(ValueSet.ofRanges(equal(IntegerType.INTEGER, 3L)), false))),
+                    ImmutableList.of(0, 3));
+            assertEquals(iteratorToList(bitmapIndexRead.lookUp(
                     Domain.create(ValueSet.ofRanges(equal(IntegerType.INTEGER, 2048L)), false))),
                     ImmutableList.of(4));
             assertEquals(iteratorToList(bitmapIndexRead.lookUp(
