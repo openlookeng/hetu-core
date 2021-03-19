@@ -225,7 +225,7 @@ public class HBaseSplitManager
         }
 
         // get regions from snapshot
-        List<RegionInfo> regionInfos = Utils.getRegionInfos(snapshotName, hbaseConnection.getHbaseConfig());
+        List<RegionInfo> regionInfos = Utils.getRegionInfos(snapshotName, hbaseConnection);
         List<HostAddress> hostAddresses = new ArrayList<>();
         // create splits
         for (int index = 0; index < regionInfos.size(); index++) {

@@ -48,8 +48,6 @@ public class HBaseGetRecordCursor
 {
     private static final Logger LOG = Logger.get(HBaseGetRecordCursor.class);
 
-    private Connection conn;
-
     private Result[] results;
 
     private int currentRecordIndex;
@@ -64,13 +62,12 @@ public class HBaseGetRecordCursor
             String[] fieldToColumnName,
             String defaultValue)
     {
-        super(columnHandles, columnTypes, connection, serializer, fieldToColumnName, rowIdName, defaultValue);
+        super(columnHandles, columnTypes, serializer, fieldToColumnName, rowIdName, defaultValue);
         startTime = System.currentTimeMillis();
         this.columnHandles = columnHandles;
         this.rowIdName =
                 requireNonNull(hBaseSplit.getRowKeyName(), "RowKeyName cannot be null if you want to query by RowKey");
         this.split = hBaseSplit;
-        this.conn = connection;
         try (Table table =
                 connection.getTable(TableName.valueOf(hBaseSplit.getTableHandle().getHbaseTableName().get()))) {
             List<String> rowKeys = new ArrayList<>();
@@ -152,13 +149,5 @@ public class HBaseGetRecordCursor
     @Override
     public void close()
     {
-        try (Connection connection = this.conn) {
-            if (connection != null) {
-                connection.close();
-            }
-        }
-        catch (IOException e) {
-            // ignore exception from close
-        }
     }
 }
