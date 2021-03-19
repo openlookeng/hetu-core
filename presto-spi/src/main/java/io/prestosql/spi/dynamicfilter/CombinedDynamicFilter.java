@@ -14,7 +14,10 @@
  */
 package io.prestosql.spi.dynamicfilter;
 
+import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.connector.ColumnHandle;
+
+import java.util.List;
 
 import static com.google.common.base.Verify.verify;
 
@@ -60,5 +63,26 @@ public class CombinedDynamicFilter
     public boolean isEmpty()
     {
         return filter1.isEmpty() && filter2.isEmpty();
+    }
+
+    public List<DynamicFilter> getFilters()
+    {
+        ImmutableList.Builder<DynamicFilter> builder = ImmutableList.builder();
+
+        if (filter1 instanceof CombinedDynamicFilter) {
+            builder.addAll(((CombinedDynamicFilter) filter1).getFilters());
+        }
+        else {
+            builder.add(filter1);
+        }
+
+        if (filter2 instanceof CombinedDynamicFilter) {
+            builder.addAll(((CombinedDynamicFilter) filter2).getFilters());
+        }
+        else {
+            builder.add(filter2);
+        }
+
+        return builder.build();
     }
 }
