@@ -23,6 +23,7 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
+import io.prestosql.spi.dynamicfilter.CombinedDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.dynamicfilter.HashSetDynamicFilter;
@@ -131,8 +132,17 @@ public class DataCenterPageSource
                     BloomFilterDynamicFilter bloomFilterDynamicFilter = BloomFilterDynamicFilter.fromHashSetDynamicFilter((HashSetDynamicFilter) df);
                     builder.put(columnName, bloomFilterDynamicFilter.createSerializedBloomFilter());
                 }
-                else {
+                else if (df instanceof CombinedDynamicFilter) {
+                    BloomFilterDynamicFilter bloomFilterDynamicFilter = BloomFilterDynamicFilter.fromCombinedDynamicFilter((CombinedDynamicFilter) df);
+                    if (bloomFilterDynamicFilter != null) {
+                        builder.put(columnName, bloomFilterDynamicFilter.createSerializedBloomFilter());
+                    }
+                }
+                else if (df instanceof BloomFilterDynamicFilter) {
                     builder.put(columnName, ((BloomFilterDynamicFilter) df).getBloomFilterSerialized());
+                }
+                else {
+                    LOGGER.info("Dynamic Filter (type: " + df.getClass().getSimpleName() + ") skipped for DC connector");
                 }
             }
         }

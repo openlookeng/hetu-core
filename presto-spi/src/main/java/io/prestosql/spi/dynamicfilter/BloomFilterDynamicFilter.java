@@ -22,7 +22,9 @@ import io.prestosql.spi.util.BloomFilter;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class BloomFilterDynamicFilter
         extends DynamicFilter
@@ -98,6 +100,27 @@ public class BloomFilterDynamicFilter
             log.error("could not  finish filter, Exception happened:" + e.getMessage());
         }
         return finalOutput;
+    }
+
+    public static BloomFilterDynamicFilter fromCombinedDynamicFilter(CombinedDynamicFilter df)
+    {
+        List<DynamicFilter> filters = df.getFilters();
+
+        List<BloomFilterDynamicFilter> bloomFilter = filters.stream().filter(f -> f instanceof BloomFilterDynamicFilter)
+                .map(BloomFilterDynamicFilter.class::cast)
+                .collect(Collectors.toList());
+        if (bloomFilter.size() > 0) {
+            return bloomFilter.get(0);
+        }
+
+        List<HashSetDynamicFilter> hashSetDynamicFilters = filters.stream().filter(f -> f instanceof HashSetDynamicFilter)
+                .map(HashSetDynamicFilter.class::cast)
+                .collect(Collectors.toList());
+        if (hashSetDynamicFilters.size() > 0) {
+            return fromHashSetDynamicFilter(hashSetDynamicFilters.get(0));
+        }
+
+        return null;
     }
 
     @Override
