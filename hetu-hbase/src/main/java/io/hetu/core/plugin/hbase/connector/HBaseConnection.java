@@ -36,6 +36,7 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
@@ -92,6 +93,8 @@ public class HBaseConnection
     // if zookeeper.sasl.client.config not set，then ZOOKEEPER_DEFAULT_LOGIN_CONTEXT_NAME is Client_new，
     // otherwise the kerberos on zookeeper will fail
     private static final String ZOOKEEPER_DEFAULT_LOGIN_CONTEXT_NAME = "Client_new";
+    private static final String KRB5_CONF_KEY = "java.security.krb5.conf";
+
     /**
      * hbase config
      */
@@ -108,6 +111,10 @@ public class HBaseConnection
      * Configuration
      */
     protected Configuration cfg;
+    /**
+     * FileSystem
+     */
+    protected FileSystem fs;
 
     private UserGroupInformation ugi;
     private HBaseMetastore hbaseMetastore;
@@ -163,11 +170,28 @@ public class HBaseConnection
     private void authenticate()
     {
         cfg = HBaseConfiguration.create();
+        cfg.set("hbase.zookeeper.quorum", hbaseConfig.getZkQuorum());
+        cfg.set("hbase.zookeeper.property.clientPort", hbaseConfig.getZkClientPort());
+        cfg.set("zookeeper.znode.parent", hbaseConfig.getZkZnodeParent());
         cfg.set("hbase.client.retries.number", hbaseConfig.getRetryNumber() + "");
         cfg.set("hbase.client.pause", hbaseConfig.getPauseTime() + "");
 
-        if (Constants.HDFS_AUTHENTICATION_KERBEROS.equals(hbaseConfig.getKerberos())) {
-            try {
+        try {
+            if (hbaseConfig.isClientSideEnable()) {
+                cfg.set("hbase.cluster.distributed", "true");
+                cfg.set("hbase.mob.file.cache.size", "0");
+                if (!Utils.isFileExist(hbaseConfig.getCoreSitePath())) {
+                    throw new FileNotFoundException(hbaseConfig.getCoreSitePath());
+                }
+                cfg.addResource(new Path(hbaseConfig.getCoreSitePath()));
+                if (!Utils.isFileExist(hbaseConfig.getHdfsSitePath())) {
+                    throw new FileNotFoundException(hbaseConfig.getHdfsSitePath());
+                }
+                cfg.addResource(new Path(hbaseConfig.getHdfsSitePath()));
+                cfg.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem");
+            }
+
+            if (Constants.HDFS_AUTHENTICATION_KERBEROS.equals(hbaseConfig.getKerberos())) {
                 if (!Utils.isFileExist(hbaseConfig.getHbaseSitePath())) {
                     throw new FileNotFoundException(hbaseConfig.getHbaseSitePath());
                 }
@@ -193,10 +217,40 @@ public class HBaseConnection
                 HBaseKerberosAuthentication.setJaasConf(ZOOKEEPER_DEFAULT_LOGIN_CONTEXT_NAME, userName, userKeytabFile);
                 ugi = HBaseKerberosAuthentication.authenticateAndReturnUGI(userName, userKeytabFile, krb5File, cfg);
             }
-            catch (IOException e) {
-                LOG.error("auth failed...cause by %s", e);
-            }
         }
+        catch (IOException e) {
+            LOG.error("auth failed...cause by %s", e);
+        }
+    }
+
+    /**
+     * getConfiguration
+     *
+     * @return Configuration
+     */
+    public Configuration getConfiguration()
+    {
+        return cfg;
+    }
+
+    /**
+     * getFileSystem
+     *
+     * @return FileSystem
+     */
+    public FileSystem getFileSystem() throws IOException
+    {
+        return (fs == null) ? FileSystem.get(cfg) : fs;
+    }
+
+    /**
+     * getConnection
+     *
+     * @return Connection
+     */
+    public Connection getConn()
+    {
+        return (conn == null) ? createConnection() : conn;
     }
 
     /**
@@ -206,10 +260,6 @@ public class HBaseConnection
      */
     public Connection createConnection()
     {
-        cfg.set("hbase.zookeeper.quorum", hbaseConfig.getZkQuorum());
-        cfg.set("hbase.zookeeper.property.clientPort", hbaseConfig.getZkClientPort());
-        cfg.set("zookeeper.znode.parent", hbaseConfig.getZkZnodeParent());
-
         final Connection[] connection = new Connection[1];
         if (Constants.HDFS_AUTHENTICATION_KERBEROS.equals(hbaseConfig.getKerberos())) {
             ugi.doAs(
@@ -251,11 +301,7 @@ public class HBaseConnection
     public HBaseAdmin getHbaseAdmin()
     {
         try {
-            if (conn == null) {
-                conn = createConnection();
-            }
-
-            Admin admin = this.conn.getAdmin();
+            Admin admin = this.getConn().getAdmin();
             if (admin instanceof HBaseAdmin) {
                 hbaseAdmin = (HBaseAdmin) admin;
             }

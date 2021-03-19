@@ -23,11 +23,10 @@ import io.hetu.core.plugin.hbase.utils.serializers.HBaseRowSerializer;
 import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.type.Type;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ClientSideRegionScanner;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 
-import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 
@@ -53,8 +52,6 @@ public class HBaseRecordCursor
         implements RecordCursor
 {
     private static final Logger LOG = Logger.get(HBaseRecordCursor.class);
-
-    private Connection connection;
 
     /**
      * columnHandles list
@@ -116,7 +113,6 @@ public class HBaseRecordCursor
      *
      * @param columnHandles columnHandles
      * @param columnTypes columnTypes
-     * @param connection connection
      * @param serializer serializer
      * @param rowIdName rowIdName
      * @param fieldToColumnName fieldToColumnName
@@ -125,7 +121,6 @@ public class HBaseRecordCursor
     public HBaseRecordCursor(
             List<HBaseColumnHandle> columnHandles,
             List<Type> columnTypes,
-            Connection connection,
             HBaseRowSerializer serializer,
             String[] fieldToColumnName,
             String rowIdName,
@@ -134,7 +129,6 @@ public class HBaseRecordCursor
         this.serializer = serializer;
         this.columnHandles = columnHandles;
         this.columnTypes = columnTypes;
-        this.connection = connection;
         this.fieldToColumnName = fieldToColumnName;
         this.rowIdName = rowIdName;
         this.serializer.setColumnHandleList(columnHandles);
@@ -147,7 +141,6 @@ public class HBaseRecordCursor
      *
      * @param columnHandles columnHandles
      * @param columnTypes columnTypes
-     * @param connection connection
      * @param serializer serializer
      * @param scanner scanner
      * @param rowIdName rowIdName
@@ -157,7 +150,6 @@ public class HBaseRecordCursor
     public HBaseRecordCursor(
             List<HBaseColumnHandle> columnHandles,
             List<Type> columnTypes,
-            Connection connection,
             HBaseRowSerializer serializer,
             ResultScanner scanner,
             String[] fieldToColumnName,
@@ -166,7 +158,6 @@ public class HBaseRecordCursor
     {
         this.columnHandles = columnHandles;
         this.columnTypes = columnTypes;
-        this.connection = connection;
         this.serializer = serializer;
         this.serializer.setColumnHandleList(columnHandles);
         this.scanner = scanner;
@@ -267,7 +258,6 @@ public class HBaseRecordCursor
                 return;
             }
         }
-
         LOG.error(
                 format(
                         "checkFieldType: Expected field %s to be a type of %s but is %s",
@@ -281,13 +271,8 @@ public class HBaseRecordCursor
     @Override
     public void close()
     {
-        try (Connection connection = this.connection) {
-            if (connection != null) {
-                connection.close();
-            }
-        }
-        catch (IOException e) {
-            // ignore exception from close
+        if (this.scanner != null && !(this.scanner instanceof ClientSideRegionScanner)) {
+            this.scanner.close();
         }
     }
 }

@@ -124,7 +124,7 @@ public class HBaseRecordSet
         rowIdName = table.getRowId();
         this.split = split;
         this.hBaseConnection = hbaseConn;
-        this.connection = hbaseConn.createConnection();
+        this.connection = hbaseConn.getConn();
         this.serializer = HBaseRowSerializer.getSerializerInstance(table.getSerializerClassName());
         this.serializer.setRowIdName(rowIdName);
         this.columnHandles = columnHandles;
@@ -180,9 +180,9 @@ public class HBaseRecordSet
             else if (hBaseConnection.getHbaseConfig().isClientSideEnable()) {
                 HBaseConfig hbaseConfig = hBaseConnection.getHbaseConfig();
                 String hbaseRoot = hbaseConfig.getZkZnodeParent();
-                Configuration conf = Utils.generateHBaseConfig(hbaseConfig);
+                Configuration conf = hBaseConnection.getConfiguration();
                 Path root = new Path(hbaseRoot);
-                FileSystem fs = FileSystem.get(conf);
+                FileSystem fs = hBaseConnection.getFileSystem();
                 Path snapshotDir = SnapshotDescriptionUtils.getCompletedSnapshotDir(split.getSnapshotName(), root);
                 SnapshotProtos.SnapshotDescription snapshotDesc = SnapshotDescriptionUtils.readSnapshotInfo(fs, snapshotDir);
                 SnapshotManifest manifest = SnapshotManifest.open(conf, fs, snapshotDir, snapshotDesc);
@@ -197,13 +197,13 @@ public class HBaseRecordSet
                 scanner = new ClientSideRegionScanner(conf, fs, root, htd, regionInfo, scan, null);
                 Thread.currentThread().setContextClassLoader(classLoader);
                 return new HBaseRecordCursor(
-                        columnHandles, columnTypes, connection, serializer, scanner, fieldToColumnName, rowIdName, this.defaultValue);
+                        columnHandles, columnTypes, serializer, scanner, fieldToColumnName, rowIdName, this.defaultValue);
             }
             else {
                 setAttributeToScan(true);
                 scanner = hTable.getScanner(scan);
                 return new HBaseRecordCursor(
-                        columnHandles, columnTypes, connection, serializer, scanner, fieldToColumnName, rowIdName, this.defaultValue);
+                        columnHandles, columnTypes, serializer, scanner, fieldToColumnName, rowIdName, this.defaultValue);
             }
         }
         catch (IOException e) {

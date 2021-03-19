@@ -280,7 +280,7 @@ public class TestQuery
                 .put(fieldToColumnName[4], new String(serializer.setObjectBytes(VARCHAR, expectedSlice)));
 
         HBaseRecordCursor hrc =
-                new HBaseRecordCursor(columnHandles, null, hconn.createConnection(), serializer, fieldToColumnName, "rowkey", "defaultValue");
+                new HBaseRecordCursor(columnHandles, null, serializer, fieldToColumnName, "rowkey", "defaultValue");
 
         assertEquals(flag, hrc.getBoolean(1));
         assertEquals(expectedDouble, hrc.getDouble(2));
