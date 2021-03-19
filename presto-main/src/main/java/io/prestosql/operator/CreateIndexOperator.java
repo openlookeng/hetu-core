@@ -235,6 +235,15 @@ public class CreateIndexOperator
                     if (partition == null) {
                         throw new IllegalStateException("Partition level is not supported for non partitioned table.");
                     }
+                    if (!createIndexMetadata.getPartitions().isEmpty()) {
+                        for (String userPart : createIndexMetadata.getPartitions()) {
+                            String userPartCol = userPart.split("=")[0];
+                            String actualPartCol = partition.split("=")[0];
+                            if (!userPartCol.equals(actualPartCol)) {
+                                throw new IllegalArgumentException(String.format("Creating index on %s is not supported as it's not first-level partition", userPartCol));
+                            }
+                        }
+                    }
                     levelWriter.putIfAbsent(partition, heuristicIndexerManager.getIndexWriter(createIndexMetadata, connectorMetadata));
                     persistBy.putIfAbsent(levelWriter.get(partition), this);
                     levelWriter.get(partition).addData(values, connectorMetadata);
@@ -347,6 +356,7 @@ public class CreateIndexOperator
 
     /**
      * This is a hacky way to tell if the table is partitioned and get the partition of table
+     * by returning the first path segment containing "="
      * <p>
      * Should be replaced if a better solution is available
      *

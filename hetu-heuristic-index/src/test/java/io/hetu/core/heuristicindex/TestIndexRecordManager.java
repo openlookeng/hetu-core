@@ -205,13 +205,13 @@ public class TestIndexRecordManager
             throws IOException
     {
         testIndexRecordAddLookUpHelper("testName", "testUser", "testCatalog.testSchema.testTable", new String[] {
-                "testColumn"}, "A", Collections.emptyList(), Collections.emptyList());
-        testIndexRecordAddLookUpHelper("testName", "testUser", "testCatalog.testSchema.testTable", new String[] {"testColumn",
-                "testColumn2"}, "B", Collections.emptyList(), Collections.emptyList());
+                "test_column"}, "A", Collections.emptyList(), Collections.emptyList());
+        testIndexRecordAddLookUpHelper("testName", "testUser", "testCatalog.testSchema.testTable", new String[] {"test_column",
+                "test_column2"}, "B", Collections.emptyList(), Collections.emptyList());
         testIndexRecordAddLookUpHelper("testName", "testUser", "testCatalog.testSchema.testTable", new String[] {
-                "testColumn"}, "C", Collections.emptyList(), ImmutableList.of("12"));
+                "test_column"}, "C", Collections.emptyList(), ImmutableList.of("12"));
         testIndexRecordAddLookUpHelper("testName", "testUser", "testCatalog.testSchema.testTable", new String[] {
-                "testColumn"}, "D", Collections.emptyList(), ImmutableList.of("12", "123"));
+                "test_column"}, "D", Collections.emptyList(), ImmutableList.of("12", "123"));
     }
 
     @AfterClass
