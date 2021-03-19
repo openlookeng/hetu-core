@@ -72,7 +72,7 @@ public class TestHindexBitmapIndex
         // Wait before continuing
         Thread.sleep(1000);
 
-        MaterializedResult resultIndexLoaded = getSplitAndMaterializedResult(testerQuery).getSecond();
+        MaterializedResult resultIndexLoaded = runTwiceGetSplitAndMaterializedResult(testerQuery).getSecond();
         long inputRowsIndexLoaded = getInputRowsOfLastQueryExecution(testerQuery);
 
         assertTrue(verifyEqualResults(resultLoadingIndex, resultIndexLoaded), "The results should be equal for" +
@@ -104,7 +104,7 @@ public class TestHindexBitmapIndex
         // Wait before continuing
         Thread.sleep(1000);
 
-        MaterializedResult resultIndexLoaded = getSplitAndMaterializedResult(testerQuery).getSecond();
+        MaterializedResult resultIndexLoaded = runTwiceGetSplitAndMaterializedResult(testerQuery).getSecond();
         long inputRowsIndexLoaded = getInputRowsOfLastQueryExecution(testerQuery);
 
         assertTrue(verifyEqualResults(resultLoadingIndex, resultIndexLoaded), "The results should be equal for" +

@@ -104,7 +104,7 @@ public class TestHindexBTreeIndex
         // Wait before continuing
         Thread.sleep(1000);
 
-        Pair<Integer, MaterializedResult> resultPairIndexLoaded = getSplitAndMaterializedResult(testerQuery);
+        Pair<Integer, MaterializedResult> resultPairIndexLoaded = runTwiceGetSplitAndMaterializedResult(testerQuery);
         int splitsIndexLoaded = resultPairIndexLoaded.getFirst();
         MaterializedResult resultIndexLoaded = resultPairIndexLoaded.getSecond();
 
@@ -144,7 +144,7 @@ public class TestHindexBTreeIndex
         // Wait before continuing
         Thread.sleep(1000);
 
-        Pair<Integer, MaterializedResult> resultPairIndexLoaded = getSplitAndMaterializedResult(testerQuery);
+        Pair<Integer, MaterializedResult> resultPairIndexLoaded = runTwiceGetSplitAndMaterializedResult(testerQuery);
         int splitsIndexLoaded = resultPairIndexLoaded.getFirst();
         MaterializedResult resultIndexLoaded = resultPairIndexLoaded.getSecond();
 
@@ -205,7 +205,7 @@ public class TestHindexBTreeIndex
         // Wait before continuing
         Thread.sleep(1000);
 
-        Pair<Integer, MaterializedResult> resultPairIndexLoaded1 = getSplitAndMaterializedResult(testerQuery1);
+        Pair<Integer, MaterializedResult> resultPairIndexLoaded1 = runTwiceGetSplitAndMaterializedResult(testerQuery1);
         int splitsIndexLoaded1 = resultPairIndexLoaded1.getFirst();
         MaterializedResult resultIndexLoaded1 = resultPairIndexLoaded1.getSecond();
 
@@ -227,7 +227,7 @@ public class TestHindexBTreeIndex
         // Wait before continuing
         Thread.sleep(1000);
 
-        Pair<Integer, MaterializedResult> resultPairIndexLoaded2 = getSplitAndMaterializedResult(testerQuery2);
+        Pair<Integer, MaterializedResult> resultPairIndexLoaded2 = runTwiceGetSplitAndMaterializedResult(testerQuery2);
         int splitsIndexLoaded2 = resultPairIndexLoaded2.getFirst();
         MaterializedResult resultIndexLoaded2 = resultPairIndexLoaded2.getSecond();
 

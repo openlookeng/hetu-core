@@ -51,26 +51,26 @@ public class TestIndexResources
     @DataProvider(name = "tableData1")
     public Object[][] tableData1()
     {
-        return new Object[][] {{"bitmap", "id", "2"}, {"bloom", "id", "2"}, {"minmax", "id", "2"}, {"btree", "id", "2"}};
+        return new Object[][]{{"bitmap", "id", "2"}, {"bloom", "id", "2"}, {"minmax", "id", "2"}, {"btree", "id", "2"}};
     }
 
     @DataProvider(name = "tableData2")
     public Object[][] tableData2()
     {
-        return new Object[][] {{"bitmap", "key", "2"}, {"bloom", "key", "2"}, {"minmax", "key", "2"}, {"btree", "key", "2"}};
+        return new Object[][]{{"bitmap", "key", "2"}, {"bloom", "key", "2"}, {"minmax", "key", "2"}, {"btree", "key", "2"}};
     }
 
     @DataProvider(name = "btreeTable1Operators")
     public Object[][] btreeTable1Operators()
     {
-        return new Object[][] {{"key2 = 11"}, {"key2 > 12"}, {"key2 >= 12"}, {"key2 < 15"}, {"key2 <= 12"},
+        return new Object[][]{{"key2 = 11"}, {"key2 > 12"}, {"key2 >= 12"}, {"key2 < 15"}, {"key2 <= 12"},
                 {"key2 BETWEEN 12 AND 15"}, {"key2 IN (11, 12)"}, {"key2 = 11 or 12"}};
     }
 
     @DataProvider(name = "nullDataHandling")
     public Object[][] nullDataHandling()
     {
-        return new Object[][] {{"bitmap", "col1", "111"}, {"bitmap", "col2", "222"}, {"bitmap", "col3", "33"},
+        return new Object[][]{{"bitmap", "col1", "111"}, {"bitmap", "col2", "222"}, {"bitmap", "col3", "33"},
                 {"bloom", "col1", "111"}, {"bloom", "col2", "222"}, {"bloom", "col3", "33"},
                 {"minmax", "col1", "111"}, {"minmax", "col2", "222"}, {"minmax", "col3", "33"},
                 {"btree", "col1", "111"}, {"btree", "col2", "222"}, {"btree", "col3", "33"}};
@@ -79,19 +79,19 @@ public class TestIndexResources
     @DataProvider(name = "tableData3")
     public Object[][] tableData3()
     {
-        return new Object[][] {{"bitmap", "id"}, {"bloom", "id"}, {"minmax", "id"}, {"btree", "id"}};
+        return new Object[][]{{"bitmap", "id"}, {"bloom", "id"}, {"minmax", "id"}, {"btree", "id"}};
     }
 
     @DataProvider(name = "indexTypes")
     public Object[][] indexTypes()
     {
-        return new Object[][] {{"BITMAP"}, {"BLOOM"}, {"MINMAX"}, {"BTREE"}};
+        return new Object[][]{{"BITMAP"}, {"BLOOM"}, {"MINMAX"}, {"BTREE"}};
     }
 
     @DataProvider(name = "bitmapOperatorInputRowsTest")
     public Object[][] bitmapOperatorInputRowsTest()
     {
-        return new Object[][] {
+        return new Object[][]{
                 {"p1 = 5"}, {"p1 IN (1, 2)"}, {"p1 BETWEEN 3 AND 7"}, {"p1 < 5"}, {"p1 <= 5"}, {"p1 >= 5"}, {"p1 > 5"},
                 {"p1 < 0"}, {"p1 <= -1"}, {"p1 >= 100"}, {"p1 > 99"}, {"p1 <> 5"}, {"p1 NOT IN (8)"}, {"p1 BETWEEN 7 AND 3"},
                 {"p1 > 5 AND p1 < 5"}, {"p1 > 5 OR p1 < 5"}, {"p1 < 5 AND p1 > 5"}, {"p1 < 5 OR p1 > 5"},
@@ -103,7 +103,7 @@ public class TestIndexResources
     @DataProvider(name = "queryOperatorTest")
     public Object[][] queryOperatorTest()
     {
-        return new Object[][] {
+        return new Object[][]{
                 {"id = 3", "bitmap"}, {"id = 3", "bloom"}, {"id = 3", "btree"}, {"id = 3", "minmax"},
                 {"id <> 3", "bitmap"}, {"id <> 3", "bloom"}, {"id <> 3", "btree"}, {"id <> 3", "minmax"},
                 {"id < 3", "bitmap"}, {"id < 3", "bloom"}, {"id < 3", "btree"}, {"id < 3", "minmax"},
@@ -198,7 +198,7 @@ public class TestIndexResources
     @DataProvider(name = "bitmapSupportedDataTypesRangedValues")
     public Object[][] bitmapSupportedDataTypesRangedValues()
     {
-        return new Object[][] {
+        return new Object[][]{
                 {"p1", "> 1"}, {"p1", "< 2"}, {"p1", "<= 2"}, {"p1", ">= 2"},
                 {"p2", "> SMALLINT '1'"}, {"p2", "< SMALLINT '2'"}, {"p2", "<= SMALLINT '2'"}, {"p2", ">= SMALLINT '2'"},
                 {"p3", "> BIGINT '1'"}, {"p3", "< BIGINT '2'"}, {"p3", "<= BIGINT '2'"}, {"p3", ">= BIGINT '2'"},
@@ -228,7 +228,7 @@ public class TestIndexResources
     @DataProvider(name = "bitmapSupportedDataTypesBetweenValues")
     public Object[][] bitmapSupportedDataTypesBetweenValues()
     {
-        return new Object[][] {
+        return new Object[][]{
                 {"p1", "BETWEEN 3 AND 5"}, {"p2", "BETWEEN SMALLINT '3' AND SMALLINT '5'"}, {"p3", "BETWEEN BIGINT '3' AND BIGINT '5'"},
                 {"p4", "BETWEEN TINYINT '3' AND TINYINT '5'"}, {"p5", "BETWEEN 'c' AND 'e'"}, {"p6", "BETWEEN CHAR 'c' AND CHAR 'e'"},
                 {"p8", "BETWEEN DOUBLE '3' AND DOUBLE '5'"}, {"p9", "BETWEEN REAL '3' AND REAL '5'"}, {"p10", "BETWEEN DATE '2021-01-13' AND DATE '2021-01-15'"},
@@ -238,7 +238,7 @@ public class TestIndexResources
     @DataProvider(name = "supportedDataTypesBetweenValues")
     public Object[][] supportedDataTypesBetweenValues()
     {
-        return new Object[][] {
+        return new Object[][]{
                 {"minmax", "p1", "BETWEEN 3 AND 5"}, {"btree", "p1", "BETWEEN 3 AND 5"},
                 {"minmax", "p2", "BETWEEN SMALLINT '3' AND SMALLINT '5'"}, {"btree", "p2", "BETWEEN SMALLINT '3' AND SMALLINT '5'"},
                 {"minmax", "p3", "BETWEEN BIGINT '3' AND BIGINT '5'"}, {"btree", "p3", "BETWEEN BIGINT '3' AND BIGINT '5'"},
@@ -282,7 +282,7 @@ public class TestIndexResources
     @DataProvider(name = "splitsWithIndexAndData")
     public Object[][] splitsWithIndexAndData()
     {
-        return new Object[][] {
+        return new Object[][]{
                 {"bitmap", "bigint"}, {"bloom", "bigint"}, {"minmax", "bigint"}, {"btree", "bigint"},
                 {"bitmap", "boolean"}, {"bloom", "boolean"}, {"minmax", "boolean"},
                 {"bitmap", "char"}, {"bloom", "char"}, {"minmax", "char"},
@@ -484,6 +484,12 @@ public class TestIndexResources
     String getNewIndexName()
     {
         return "idx" + Integer.valueOf(count.getAndIncrement()).toString();
+    }
+
+    Pair<Integer, MaterializedResult> runTwiceGetSplitAndMaterializedResult(String testerQuery)
+    {
+        getSplitAndMaterializedResult(testerQuery);
+        return getSplitAndMaterializedResult(testerQuery);
     }
 
     // Get the split count and MaterializedResult in one pair to return.
