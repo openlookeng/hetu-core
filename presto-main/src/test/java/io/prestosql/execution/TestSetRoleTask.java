@@ -15,6 +15,7 @@ package io.prestosql.execution;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.execution.resourcegroups.NoOpResourceGroupManager;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
@@ -100,6 +101,7 @@ public class TestSetRoleTask
                         .build(),
                 URI.create("fake://uri"),
                 new ResourceGroupId("test"),
+                new NoOpResourceGroupManager(),
                 false,
                 transactionManager,
                 accessControl,

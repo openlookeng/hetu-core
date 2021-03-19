@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.Session.SessionBuilder;
+import io.prestosql.execution.resourcegroups.NoOpResourceGroupManager;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
@@ -261,6 +262,7 @@ public class TestStartTransactionTask
                 session,
                 URI.create("fake://uri"),
                 new ResourceGroupId("test"),
+                new NoOpResourceGroupManager(),
                 true,
                 transactionManager,
                 new AccessControlManager(transactionManager),

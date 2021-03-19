@@ -129,6 +129,7 @@ public final class SqlStageExecution
     private PlanNodeId parentId;
 
     private final QuerySnapshotManager snapshotManager;
+    private boolean throttledSchedule;
 
     public static SqlStageExecution createSqlStageExecution(
             StageId stageId,
@@ -205,6 +206,8 @@ public final class SqlStageExecution
                 }
             });
         }
+
+        this.throttledSchedule = false;
     }
 
     private void traverseNodesForDynamicFiltering(List<PlanNode> nodes)
@@ -775,5 +778,15 @@ public final class SqlStageExecution
     public void setParentId(PlanNodeId parentId)
     {
         this.parentId = parentId;
+    }
+
+    public boolean isThrottledSchedule()
+    {
+        return throttledSchedule;
+    }
+
+    public void setThrottledSchedule(boolean throttledSchedule)
+    {
+        this.throttledSchedule = throttledSchedule;
     }
 }

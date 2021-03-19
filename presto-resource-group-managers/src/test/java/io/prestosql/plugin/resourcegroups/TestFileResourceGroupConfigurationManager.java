@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableSet;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.spi.memory.MemoryPoolInfo;
+import io.prestosql.spi.resourcegroups.KillPolicy;
 import io.prestosql.spi.resourcegroups.ResourceGroup;
 import io.prestosql.spi.resourcegroups.ResourceGroupId;
 import io.prestosql.spi.resourcegroups.SelectionContext;
@@ -57,6 +58,7 @@ public class TestFileResourceGroupConfigurationManager
         assertFails("resource_groups_config_bad_extract_variable.json", "Invalid resource group name.*");
         assertFails("resource_groups_config_bad_query_type.json", "Selector specifies an invalid query type: invalid_query_type");
         assertFails("resource_groups_config_bad_selector.json", "Selector refers to nonexistent group: a.b.c.X");
+        assertFails("resource_groups_config_invalid_kill_policy.json", "No enum constant io.prestosql.spi.resourcegroups.KillPolicy.INVALID");
     }
 
     @Test
@@ -88,6 +90,7 @@ public class TestFileResourceGroupConfigurationManager
         assertEquals(global.getSchedulingPolicy(), WEIGHTED);
         assertEquals(global.getSchedulingWeight(), 0);
         assertTrue(global.getJmxExport());
+        assertEquals(global.getKillPolicy(), KillPolicy.NO_KILL);
 
         ResourceGroupId subId = new ResourceGroupId(globalId, "sub");
         ResourceGroup sub = new TestingResourceGroup(subId);
@@ -98,6 +101,7 @@ public class TestFileResourceGroupConfigurationManager
         assertNull(sub.getSchedulingPolicy());
         assertEquals(sub.getSchedulingWeight(), 5);
         assertFalse(sub.getJmxExport());
+        assertEquals(sub.getKillPolicy(), KillPolicy.HIGH_MEMORY_QUERIES);
     }
 
     @Test

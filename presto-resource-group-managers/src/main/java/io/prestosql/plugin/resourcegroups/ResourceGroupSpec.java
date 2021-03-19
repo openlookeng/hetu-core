@@ -18,6 +18,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
+import io.prestosql.spi.resourcegroups.KillPolicy;
 import io.prestosql.spi.resourcegroups.SchedulingPolicy;
 
 import java.util.HashSet;
@@ -52,6 +53,8 @@ public class ResourceGroupSpec
     private final Optional<Duration> softCpuLimit;
     private final Optional<Duration> hardCpuLimit;
 
+    private final Optional<KillPolicy> killPolicy;
+
     // Hetu: add new parameters: softReservedMemory and hardReservedConcurrency
     @JsonCreator
     public ResourceGroupSpec(
@@ -68,7 +71,8 @@ public class ResourceGroupSpec
             @JsonProperty("subGroups") Optional<List<ResourceGroupSpec>> subGroups,
             @JsonProperty("jmxExport") Optional<Boolean> jmxExport,
             @JsonProperty("softCpuLimit") Optional<Duration> softCpuLimit,
-            @JsonProperty("hardCpuLimit") Optional<Duration> hardCpuLimit)
+            @JsonProperty("hardCpuLimit") Optional<Duration> hardCpuLimit,
+            @JsonProperty("killPolicy") Optional<String> killPolicy)
     {
         this.softCpuLimit = requireNonNull(softCpuLimit, "softCpuLimit is null");
         this.hardCpuLimit = requireNonNull(hardCpuLimit, "hardCpuLimit is null");
@@ -131,6 +135,8 @@ public class ResourceGroupSpec
             checkArgument(!names.contains(subGroup.getName()), "Duplicated sub group: %s", subGroup.getName());
             names.add(subGroup.getName());
         }
+
+        this.killPolicy = requireNonNull(killPolicy, "killPolicy is null").map(value -> KillPolicy.valueOf(value.toUpperCase()));
     }
 
     public Optional<DataSize> getSoftMemoryLimit()
@@ -208,6 +214,11 @@ public class ResourceGroupSpec
         return hardCpuLimit;
     }
 
+    public Optional<KillPolicy> getKillPolicy()
+    {
+        return killPolicy;
+    }
+
     @Override
     public boolean equals(Object other)
     {
@@ -230,7 +241,8 @@ public class ResourceGroupSpec
                 subGroups.equals(that.subGroups) &&
                 jmxExport.equals(that.jmxExport) &&
                 softCpuLimit.equals(that.softCpuLimit) &&
-                hardCpuLimit.equals(that.hardCpuLimit));
+                hardCpuLimit.equals(that.hardCpuLimit) &&
+                killPolicy.equals(that.killPolicy));
     }
 
     // Subgroups not included, used to determine whether a group needs to be reconfigured
@@ -250,7 +262,8 @@ public class ResourceGroupSpec
                 schedulingWeight.equals(other.schedulingWeight) &&
                 jmxExport.equals(other.jmxExport) &&
                 softCpuLimit.equals(other.softCpuLimit) &&
-                hardCpuLimit.equals(other.hardCpuLimit));
+                hardCpuLimit.equals(other.hardCpuLimit) &&
+                killPolicy.equals(other.killPolicy));
     }
 
     @Override
@@ -269,7 +282,8 @@ public class ResourceGroupSpec
                 subGroups,
                 jmxExport,
                 softCpuLimit,
-                hardCpuLimit);
+                hardCpuLimit,
+                killPolicy);
     }
 
     @Override
@@ -288,6 +302,7 @@ public class ResourceGroupSpec
                 .add("jmxExport", jmxExport)
                 .add("softCpuLimit", softCpuLimit)
                 .add("hardCpuLimit", hardCpuLimit)
+                .add("killPolicy", killPolicy)
                 .toString();
     }
 }

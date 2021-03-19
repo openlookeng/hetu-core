@@ -75,6 +75,8 @@ public final class InternalResourceGroupManager<C>
     private static final Logger log = Logger.get(InternalResourceGroupManager.class);
     private static final File RESOURCE_GROUPS_CONFIGURATION = new File("etc/resource-groups.properties");
     private static final String CONFIGURATION_MANAGER_PROPERTY_NAME = "resource-groups.configuration-manager";
+    private static final String RESOURCE_GROUP_MEMORY_MARGIN_PERCENT = "resource-groups.memory-margin-percent";
+    private static final String RESOURCE_GROUP_QUERY_PROGRESS_MARGIN_PERCENT = "resource-groups.query-progress-margin-percent";
     // default status refresh interval
     private static final long DEFAULT_STATUS_REFRESH_INTERVAL = 1L;
 
@@ -92,6 +94,8 @@ public final class InternalResourceGroupManager<C>
     private final long statusRefreshInterval;
     private final boolean isMultiCoordinatorEnabled;
     private final StateStoreProvider stateStoreProvider;
+    private int memoryMarginPercent;
+    private int queryProgressMarginPercent;
 
     @Inject
     public InternalResourceGroupManager(LegacyResourceGroupConfigurationManager legacyManager,
@@ -109,6 +113,8 @@ public final class InternalResourceGroupManager<C>
         this.statusRefreshInterval = getStatusRefreshInterval(hetuConfig);
         this.isMultiCoordinatorEnabled = hetuConfig.isMultipleCoordinatorEnabled();
         this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
+        this.memoryMarginPercent = 10;
+        this.queryProgressMarginPercent = 5;
     }
 
     @Override
@@ -163,6 +169,10 @@ public final class InternalResourceGroupManager<C>
             checkArgument(!isNullOrEmpty(configurationManagerName),
                     "Resource groups configuration %s does not contain %s", RESOURCE_GROUPS_CONFIGURATION.getAbsoluteFile(), CONFIGURATION_MANAGER_PROPERTY_NAME);
 
+            memoryMarginPercent = Integer.valueOf(properties.getOrDefault(RESOURCE_GROUP_MEMORY_MARGIN_PERCENT, "10"));
+            properties.remove(RESOURCE_GROUP_MEMORY_MARGIN_PERCENT);
+            queryProgressMarginPercent = Integer.valueOf(properties.getOrDefault(RESOURCE_GROUP_QUERY_PROGRESS_MARGIN_PERCENT, "5"));
+            properties.remove(RESOURCE_GROUP_QUERY_PROGRESS_MARGIN_PERCENT);
             setConfigurationManager(configurationManagerName, properties);
         }
     }
@@ -287,6 +297,8 @@ public final class InternalResourceGroupManager<C>
             }
             else {
                 BaseResourceGroup root = createNewRootGroup(id.getSegments().get(0), executor);
+                root.setMemoryMarginPercent(memoryMarginPercent);
+                root.setQueryProgressMarginPercent(queryProgressMarginPercent);
                 group = root;
                 rootGroups.add(root);
             }
@@ -375,5 +387,11 @@ public final class InternalResourceGroupManager<C>
         else {
             return new InternalResourceGroup(Optional.empty(), name, this::exportGroup, executor);
         }
+    }
+
+    @Override
+    public long getCachedMemoryUsage(ResourceGroupId resourceGroupId)
+    {
+        return groups.get(resourceGroupId).getCachedMemoryUsageBytes();
     }
 }

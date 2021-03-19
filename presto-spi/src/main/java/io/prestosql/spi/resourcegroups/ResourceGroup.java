@@ -132,4 +132,11 @@ public interface ResourceGroup
      * @return number of running queries
      */
     int getRunningQueries();
+
+    /**
+     * kill policy of this group in its parent group.
+     */
+    void setKillPolicy(KillPolicy killPolicy);
+
+    KillPolicy getKillPolicy();
 }

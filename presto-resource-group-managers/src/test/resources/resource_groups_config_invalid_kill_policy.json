@@ -16,7 +16,7 @@
           "hardConcurrencyLimit": 3,
           "maxQueued": 4,
           "schedulingWeight": 5,
-          "killPolicy": "HIGH_MEMORY_QUERIES"
+          "killPolicy": "invalid"
         }
       ]
     }

@@ -159,13 +159,13 @@ class H2TestUtil
     {
         // Hetu: add parameters softReservedMemory and hardReservedConcurrency
         dao.insertResourceGroupsGlobalProperties("cpu_quota_period", "1h");
-        dao.insertResourceGroup(1, "global", "1MB", "10%", 100, 1000, 1000, 50, null, null, null, null, null, null, TEST_ENVIRONMENT);
-        dao.insertResourceGroup(2, "bi-${USER}", "1MB", "10%", 3, 2, 2, 1, null, null, null, null, null, 1L, TEST_ENVIRONMENT);
-        dao.insertResourceGroup(3, "user-${USER}", "1MB", "10%", 3, 3, 3, 1, null, null, null, null, null, 1L, TEST_ENVIRONMENT);
-        dao.insertResourceGroup(4, "adhoc-${USER}", "1MB", "10%", 3, 3, 3, 1, null, null, null, null, null, 3L, TEST_ENVIRONMENT);
-        dao.insertResourceGroup(5, "dashboard-${USER}", "1MB", "10%", 1, 1, 1, 1, null, null, null, null, null, 3L, TEST_ENVIRONMENT);
-        dao.insertResourceGroup(6, "no-queueing", "1MB", "10%", 0, 1, 1, 1, null, null, null, null, null, null, TEST_ENVIRONMENT_2);
-        dao.insertResourceGroup(7, "explain", "1MB", "10%", 0, 1, 1, 1, null, null, null, null, null, null, TEST_ENVIRONMENT);
+        dao.insertResourceGroup(1, "global", "1MB", "10%", 100, 1000, 1000, 50, null, null, null, null, null, "RECENT_QUERIES", null, TEST_ENVIRONMENT);
+        dao.insertResourceGroup(2, "bi-${USER}", "1MB", "10%", 3, 2, 2, 1, null, null, null, null, null, "RECENT_QUERIES", 1L, TEST_ENVIRONMENT);
+        dao.insertResourceGroup(3, "user-${USER}", "1MB", "10%", 3, 3, 3, 1, null, null, null, null, null, "RECENT_QUERIES", 1L, TEST_ENVIRONMENT);
+        dao.insertResourceGroup(4, "adhoc-${USER}", "1MB", "10%", 3, 3, 3, 1, null, null, null, null, null, "RECENT_QUERIES", 3L, TEST_ENVIRONMENT);
+        dao.insertResourceGroup(5, "dashboard-${USER}", "1MB", "10%", 1, 1, 1, 1, null, null, null, null, null, "RECENT_QUERIES", 3L, TEST_ENVIRONMENT);
+        dao.insertResourceGroup(6, "no-queueing", "1MB", "10%", 0, 1, 1, 1, null, null, null, null, null, "RECENT_QUERIES", null, TEST_ENVIRONMENT_2);
+        dao.insertResourceGroup(7, "explain", "1MB", "10%", 0, 1, 1, 1, null, null, null, null, null, "RECENT_QUERIES", null, TEST_ENVIRONMENT);
         dao.insertSelector(2, 10_000, "user.*", "test", null, null, null);
         dao.insertSelector(4, 1_000, "user.*", "(?i).*adhoc.*", null, null, null);
         dao.insertSelector(5, 100, "user.*", "(?i).*dashboard.*", null, null, null);

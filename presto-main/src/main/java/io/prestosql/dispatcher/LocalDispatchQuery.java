@@ -29,9 +29,11 @@ import io.prestosql.server.BasicQueryInfo;
 import io.prestosql.spi.ErrorCode;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.resourcegroups.ResourceGroupId;
 import org.joda.time.DateTime;
 
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
@@ -118,6 +120,12 @@ public class LocalDispatchQuery
     }
 
     @Override
+    public long getCurrentUserMemory()
+    {
+        return stateMachine.getCurrentUserMemory();
+    }
+
+    @Override
     public void recordHeartbeat()
     {
         stateMachine.recordHeartbeat();
@@ -159,6 +167,11 @@ public class LocalDispatchQuery
         return stateMachine.getQueryId();
     }
 
+    public ResourceGroupId getResourceGroup()
+    {
+        return stateMachine.getResourceGroup();
+    }
+
     @Override
     public boolean isDone()
     {
@@ -175,6 +188,18 @@ public class LocalDispatchQuery
     public Optional<DateTime> getExecutionStartTime()
     {
         return stateMachine.getExecutionStartTime();
+    }
+
+    @Override
+    public Optional<DateTime> getQueryExecutionStartTime()
+    {
+        return stateMachine.getExecutionStartTime();
+    }
+
+    @Override
+    public OptionalDouble getQueryProgress()
+    {
+        return getBasicQueryInfo().getQueryStats().getProgressPercentage();
     }
 
     @Override

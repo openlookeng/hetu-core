@@ -22,6 +22,8 @@ import io.airlift.units.Duration;
 import io.prestosql.execution.ManagedQueryExecution;
 import io.prestosql.execution.QueryState;
 import io.prestosql.server.QueryStateInfo;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.resourcegroups.KillPolicy;
 import io.prestosql.spi.resourcegroups.ResourceGroupId;
 import io.prestosql.spi.resourcegroups.SchedulingPolicy;
 import io.prestosql.spi.statestore.StateStore;
@@ -36,6 +38,7 @@ import org.weakref.jmx.Managed;
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -56,6 +59,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.server.QueryStateInfo.createQueryStateInfo;
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INSUFFICIENT_RESOURCES;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -257,6 +261,14 @@ public class DistributedResourceGroup
     }
 
     @Override
+    public void setKillPolicy(KillPolicy killPolicy)
+    {
+        synchronized (root) {
+            this.killPolicy = killPolicy;
+        }
+    }
+
+    @Override
     public DistributedResourceGroup getOrCreateSubGroup(String name)
     {
         requireNonNull(name, "name is null");
@@ -266,6 +278,8 @@ public class DistributedResourceGroup
                 return (DistributedResourceGroup) subGroups.get(name);
             }
             DistributedResourceGroup subGroup = new DistributedResourceGroup(Optional.of(this), name, jmxExportListener, executor, stateStore);
+            subGroup.setMemoryMarginPercent(memoryMarginPercent);
+            subGroup.setQueryProgressMarginPercent(queryProgressMarginPercent);
             subGroups.put(name, subGroup);
             return subGroup;
         }
@@ -385,6 +399,110 @@ public class DistributedResourceGroup
                 cpuUsageMillis = tempCpuUsageMillis;
             }
             lastUpdateTime = new DateTime();
+        }
+    }
+
+    public void internalCancelQuery()
+    {
+        checkState(Thread.holdsLock(root), "Must hold lock to check cancel query");
+        synchronized (root) {
+            if (!subGroups.isEmpty()) {
+                for (BaseResourceGroup group : subGroups()) {
+                    ((DistributedResourceGroup) group).internalCancelQuery();
+                }
+
+                return;
+            }
+
+            if (cachedMemoryUsageBytes <= softMemoryLimitBytes) {
+                return;
+            }
+
+            Optional<SharedResourceGroupState> resourceGroupState = getSharedResourceGroupState();
+            if (!resourceGroupState.isPresent()) {
+                return;
+            }
+
+            Set<SharedQueryState> globalRunningQueries = resourceGroupState.get().getRunningQueries();
+            List<SharedQueryState> sortedQueryList;
+
+            Lock lock = stateStore.getLock(id.toString());
+            boolean locked = false;
+            try {
+                // If lock is not free, then we return immediately, so no need to refresh after taking lock.
+                // Before next call of this function, refresh will already happen.
+                locked = lock.tryLock();
+                if (locked) {
+                    switch (killPolicy) {
+                        case HIGH_MEMORY_QUERIES:
+                            double absMemoryMargin = 1 - (double) memoryMarginPercent / 100;
+                            double absQueryProgressMargin = 1 - (double) queryProgressMarginPercent / 100;
+
+                            sortedQueryList = globalRunningQueries.stream().sorted((o1, o2) -> {
+                                if (o1.getUserMemoryReservation().toBytes() < o2.getUserMemoryReservation().toBytes() * absMemoryMargin
+                                        || o2.getUserMemoryReservation().toBytes() < o1.getUserMemoryReservation().toBytes() * absMemoryMargin) {
+                                    return ((Long) o2.getUserMemoryReservation().toBytes()).compareTo(o1.getUserMemoryReservation().toBytes());
+                                }
+
+                                // if memory usage within 10%, then sort based on % of query completion.
+                                // if query progress difference is within 5%, then order will be decided based on memory itself.
+                                if (o1.getQueryProgress().orElse(0) < o2.getQueryProgress().orElse(0) * absQueryProgressMargin
+                                        || o2.getQueryProgress().orElse(0) < o1.getQueryProgress().orElse(0) * absQueryProgressMargin) {
+                                    return ((Double) o1.getQueryProgress().orElse(0)).compareTo((o2.getQueryProgress().orElse(0)));
+                                }
+
+                                return ((Long) o2.getUserMemoryReservation().toBytes()).compareTo(o1.getUserMemoryReservation().toBytes());
+                            }).collect(Collectors.toList());
+                            break;
+                        case OLDEST_QUERIES:
+                            sortedQueryList = globalRunningQueries.stream().sorted(Comparator.comparing(o -> (o.getExecutionStartTime().get()))).collect(Collectors.toList());
+                            break;
+                        case RECENT_QUERIES:
+                            sortedQueryList = globalRunningQueries.stream().sorted(Comparator.comparing(o -> (o.getExecutionStartTime().get()), Comparator.reverseOrder())).collect(Collectors.toList());
+                            break;
+                        case FINISH_PERCENTAGE_QUERIES:
+                            sortedQueryList = globalRunningQueries.stream().sorted(Comparator.comparing(o -> (o.getQueryProgress().orElse(0)))).collect(Collectors.toList());
+                            break;
+                        case NO_KILL:
+                            //fall through
+                        default:
+                            sortedQueryList = new ArrayList<>();
+                    }
+
+                    long tempCachedMemoryUsage = cachedMemoryUsageBytes;
+
+                    // As per the kill policy, top queries are selected across all coordinators but we kill only local queries
+                    // till memory reaches with-in required limit.
+                    // E.g. Suppose Kill policy is HIGH_MEMORY_QUERIES and queries are ordered as below
+                    //      Q1, Q10, Q7, Q20, Q25
+                    //              where only Q1 and Q7 are local queries and only combined memory of Q1 and Q10 brings memory within the desired limit.
+                    //              So in this case only Q1 will be killed from local coordinator.
+                    for (SharedQueryState query : sortedQueryList) {
+                        for (ManagedQueryExecution localQuery : runningQueries) {
+                            if (query.getBasicQueryInfo().getQueryId().equals(localQuery.getBasicQueryInfo().getQueryId())) {
+                                LOG.info("Query " + localQuery.getBasicQueryInfo().getQueryId() + " is getting killed for resource group " + this + " query will be killed with policy " + killPolicy);
+                                localQuery.fail(new PrestoException(GENERIC_INSUFFICIENT_RESOURCES, "Memory consumption " + cachedMemoryUsageBytes + " exceed the limit " + softMemoryLimitBytes + "for resource group " + this));
+                                queryFinished(localQuery);
+                                cachedMemoryUsageBytes -= query.getUserMemoryReservation().toBytes();
+                                break;
+                            }
+                        }
+
+                        tempCachedMemoryUsage -= query.getUserMemoryReservation().toBytes();
+                        if (tempCachedMemoryUsage <= softMemoryLimitBytes) {
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (RuntimeException e) {
+                return;
+            }
+            finally {
+                if (locked) {
+                    lock.unlock();
+                }
+            }
         }
     }
 
@@ -603,6 +721,7 @@ public class DistributedResourceGroup
     public synchronized void processQueuedQueries()
     {
         internalRefreshStats();
+        internalCancelQuery();
         while (internalStartNext()) {
             // start all the queries we can
         }
@@ -612,5 +731,11 @@ public class DistributedResourceGroup
     public void generateCpuQuota(long elapsedSeconds)
     {
         return;
+    }
+
+    @Override
+    public long getCachedMemoryUsageBytes()
+    {
+        return cachedMemoryUsageBytes;
     }
 }

@@ -13,6 +13,14 @@ resource-groups.config-file=etc/resource-groups.json
 
 Change the value of `resource-groups.config-file` to point to a JSON config file, which can be an absolute path, or a path relative to the openLooKeng data directory.
 
+### Additional Configuration
+
+In addition to above properties in `etc/resource-groups.properties`, below two properties can be configured, which gets used along with kill policy (details of same as part of killPolicy)
+
+`resource-groups.memory-margin-percent` (optional)- This is the allowed percentage of memory variation between two queries considered to be same. In this case queries does not get ordered based on memory usage instead they get ordered based on query execution progress provided query progress difference is more than configured. Default value is 10%.
+
+`resource-groups.query-progress-margin-percent`(optional)- This is the allowed percentage of query execution progress between two queries considered to be same. In this query does not get ordered based on query execution progress. Default value is 5%.
+
 ## Resource Group Properties
 
 
@@ -30,6 +38,14 @@ Change the value of `resource-groups.config-file` to point to a JSON config file
 -   `schedulingWeight` (optional): weight of this sub-group. See above. Defaults to `1`.
 -   `jmxExport` (optional): If true, group statistics are exported to JMX for monitoring. Defaults to `false`.
 -   `subGroups` (optional): list of sub-groups.
+-   `killPolicy`(optional): Specifies how running queries are selected to kill If overall memory usage exceed **softMemoryLimit** after queries being submitted to worker. 
+
+    - `no_kill` (default): Queries will not be killed.
+    - `recent_queries`: This means queries in the reverse order of execution will be killed. 
+    - `oldest_queries`: Queries in the order of execution will get killed.
+    - `high_memory_queries` : Queries in the order of memory usage will be killed. Query having higher memory usage will get killed first so that with minimum number of query kill, more memory gets freed.
+    As part of this policy, we try to balance memory usage and percentage completion. So if two queries memory usage are within 10% (configurable as resource-groups.memory-margin-percent) of limit, then we pick the query which has progressed (% of execution) less. Incase these two queries difference in terms of percentage of completion are within 5% (configurable as resource-groups.query-progress-margin-percent) then we chose based on memory itself.
+    - `finish_percentage_queries`:  Query in the order of percentage of query execution will be killed. Query with least percentage of execution will be killed first.
 
 ## Selector Rules
 
@@ -65,6 +81,25 @@ Client tags can be set as follows:
 
 - CLI: use the `--client-tags` option.
 - JDBC: set the `ClientTags` client info property on the `Connection` instance.
+
+## Throttling and Kill Queries
+
+It may happen that once query got submitted to worker, then memory limit exceeded, in that case we need to handle these running queries using below mechanism:
+
+- Throttle Queries
+- Kill Queries
+
+### Throttle Queries
+
+Throttling of new split schedule is done to stop further increase in memory at worker. If memory usage by current query resource group has already exceeded **softReservedMemory** then further new splits will not get scheduled till memory usage comes below **softReservedMemory**.
+
+**softReservedMemory** is recommended to configure lesser than **softMemoryLimit**.
+
+User can also chose to **disable throttling** by omitting **softReservedMemory** configuration for a group.
+
+### Kill Queries
+
+If query could not get throttle and memory usage exceed softMemoryLimit, then query will be killed (made to fail) as per the kill policy configured. Only queries running from leaf group are considered to kill.
 
 ## Example
 

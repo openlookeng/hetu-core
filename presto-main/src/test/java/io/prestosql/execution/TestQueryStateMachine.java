@@ -20,6 +20,7 @@ import io.airlift.testing.TestingTicker;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.client.FailureInfo;
+import io.prestosql.execution.resourcegroups.NoOpResourceGroupManager;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.memory.VersionedMemoryPoolId;
 import io.prestosql.metadata.Metadata;
@@ -498,6 +499,7 @@ public class TestQueryStateMachine
                 TEST_SESSION,
                 LOCATION,
                 new ResourceGroupId("test"),
+                new NoOpResourceGroupManager(),
                 false,
                 transactionManager,
                 accessControl,

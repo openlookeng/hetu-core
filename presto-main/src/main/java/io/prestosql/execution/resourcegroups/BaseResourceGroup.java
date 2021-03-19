@@ -21,6 +21,7 @@ import io.prestosql.execution.ManagedQueryExecution;
 import io.prestosql.server.QueryStateInfo;
 import io.prestosql.server.ResourceGroupInfo;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.resourcegroups.KillPolicy;
 import io.prestosql.spi.resourcegroups.ResourceGroup;
 import io.prestosql.spi.resourcegroups.ResourceGroupId;
 import io.prestosql.spi.resourcegroups.ResourceGroupState;
@@ -89,6 +90,12 @@ public abstract class BaseResourceGroup
     protected SchedulingPolicy schedulingPolicy = FAIR;
     @GuardedBy("root")
     protected boolean jmxExport;
+    @GuardedBy("root")
+    protected KillPolicy killPolicy = KillPolicy.NO_KILL;
+    @GuardedBy("root")
+    protected int memoryMarginPercent = 10;
+    @GuardedBy("root")
+    protected int queryProgressMarginPercent = 5;
 
     // Live data structures
     // ====================
@@ -142,6 +149,7 @@ public abstract class BaseResourceGroup
                     hardConcurrencyLimit,
                     hardReservedConcurrency,
                     maxQueuedQueries,
+                    killPolicy,
                     DataSize.succinctBytes(cachedMemoryUsageBytes),
                     getQueuedQueries(),
                     getRunningQueries(),
@@ -173,6 +181,7 @@ public abstract class BaseResourceGroup
                     hardConcurrencyLimit,
                     hardReservedConcurrency,
                     maxQueuedQueries,
+                    killPolicy,
                     DataSize.succinctBytes(cachedMemoryUsageBytes),
                     getQueuedQueries(),
                     getRunningQueries(),
@@ -199,6 +208,7 @@ public abstract class BaseResourceGroup
                     hardConcurrencyLimit,
                     hardReservedConcurrency,
                     maxQueuedQueries,
+                    killPolicy,
                     DataSize.succinctBytes(cachedMemoryUsageBytes),
                     getQueuedQueries(),
                     getRunningQueries(),
@@ -369,6 +379,14 @@ public abstract class BaseResourceGroup
     }
 
     @Override
+    public KillPolicy getKillPolicy()
+    {
+        synchronized (root) {
+            return killPolicy;
+        }
+    }
+
+    @Override
     public boolean getJmxExport()
     {
         synchronized (root) {
@@ -383,6 +401,30 @@ public abstract class BaseResourceGroup
             jmxExport = export;
         }
         jmxExportListener.accept(this, export);
+    }
+
+    public int getMemoryMarginPercent()
+    {
+        return memoryMarginPercent;
+    }
+
+    public void setMemoryMarginPercent(int memoryMarginPercent)
+    {
+        synchronized (root) {
+            this.memoryMarginPercent = memoryMarginPercent;
+        }
+    }
+
+    public int getQueryProgressMarginPercent()
+    {
+        return queryProgressMarginPercent;
+    }
+
+    public void setQueryProgressMarginPercent(int queryProgressMarginPercent)
+    {
+        synchronized (root) {
+            this.queryProgressMarginPercent = queryProgressMarginPercent;
+        }
     }
 
     /**
@@ -546,4 +588,6 @@ public abstract class BaseResourceGroup
      * @param elapsedSeconds Elapsed seconds since last quota generation
      */
     public abstract void generateCpuQuota(long elapsedSeconds);
+
+    public abstract long getCachedMemoryUsageBytes();
 }
