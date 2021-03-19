@@ -56,7 +56,7 @@ public final class HindexQueryRunner
         DistributedQueryRunner queryRunner; // Use this to return if no exceptions
 
         // Try to get a free port and start up the host
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 20; i++) {
             int port = -1;
             try {
                 port = SslSocketUtil.getAvailablePort();
@@ -64,8 +64,8 @@ public final class HindexQueryRunner
                 Map<String, String> configs = new HashMap<>();
                 configs.put("http-server.http.port", Integer.toString(port));
                 configs.put("hetu.heuristicindex.filter.enabled", "true");
-                configs.put("hetu.heuristicindex.filter.cache.max-memory", "1GB");
-                configs.put("hetu.heuristicindex.filter.cache.loading-delay", "100ms");
+                configs.put("hetu.heuristicindex.filter.cache.max-memory", "5GB");
+                configs.put("hetu.heuristicindex.filter.cache.loading-delay", "0ms");
                 configs.put("hetu.heuristicindex.indexstore.uri", folder.getRoot().getAbsolutePath());
                 configs.put("hetu.heuristicindex.indexstore.filesystem.profile", "__test__hdfs__");
                 Map<String, String> metastoreConfig = new HashMap<>();

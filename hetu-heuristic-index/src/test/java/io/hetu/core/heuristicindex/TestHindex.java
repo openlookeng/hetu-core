@@ -28,6 +28,8 @@ import static org.testng.Assert.assertTrue;
 public class TestHindex
         extends TestIndexResources
 {
+    private static final long INDEX_LOAD_WAIT_TIME = 500;
+
     // Tests the supported data types with the different index types while queries utilize the BETWEEN operator.
     // Tests omit BitmapIndex because BitmapIndex's row filtering should have combined inserts, it is tested separately
     @Test(dataProvider = "supportedDataTypesBetweenValues")
@@ -48,10 +50,10 @@ public class TestHindex
         MaterializedResult resultLoadingIndex = resultPairLoadingIndex.getSecond();
 
         // Wait before continuing
-        Thread.sleep(1000);
+        Thread.sleep(INDEX_LOAD_WAIT_TIME);
 
         // Get splits and result
-        Pair<Integer, MaterializedResult> resultPairIndexLoaded = getSplitAndMaterializedResult(testerQuery);
+        Pair<Integer, MaterializedResult> resultPairIndexLoaded = runTwiceGetSplitAndMaterializedResult(testerQuery);
         int splitsIndexLoaded = resultPairIndexLoaded.getFirst();
         MaterializedResult resultIndexLoaded = resultPairIndexLoaded.getSecond();
 
@@ -71,6 +73,7 @@ public class TestHindex
     public void testSplitsWithIndexAndData(String indexType, String dataType)
             throws Exception
     {
+        System.out.println("Running testSplitsWithIndexAndData[" + indexType + "," + dataType + "]");
         String tableName = getNewTableName();
         String indexName = getNewIndexName();
         String testerQuery = createTableDataTypeWithQuery(tableName, dataType);
@@ -91,10 +94,10 @@ public class TestHindex
         long inputRowsLoadingIndex = getInputRowsOfLastQueryExecution(testerQuery);
 
         // Wait before continuing
-        Thread.sleep(1000);
+        Thread.sleep(INDEX_LOAD_WAIT_TIME);
 
         // Get splits and result
-        Pair<Integer, MaterializedResult> resultPairIndexLoaded = getSplitAndMaterializedResult(testerQuery);
+        Pair<Integer, MaterializedResult> resultPairIndexLoaded = runTwiceGetSplitAndMaterializedResult(testerQuery);
         int splitsIndexLoaded = resultPairIndexLoaded.getFirst();
         MaterializedResult resultIndexLoaded = resultPairIndexLoaded.getSecond();
         long inputRowsIndexLoaded = getInputRowsOfLastQueryExecution(testerQuery);
@@ -141,9 +144,9 @@ public class TestHindex
         MaterializedResult resultLoadingIndex = resultPairLoadingIndex.getSecond();
 
         // Wait before continuing
-        Thread.sleep(1000);
+        Thread.sleep(INDEX_LOAD_WAIT_TIME);
 
-        Pair<Integer, MaterializedResult> resultPairIndexLoaded = getSplitAndMaterializedResult(testerQuery);
+        Pair<Integer, MaterializedResult> resultPairIndexLoaded = runTwiceGetSplitAndMaterializedResult(testerQuery);
         int splitsIndexLoaded = resultPairIndexLoaded.getFirst();
         MaterializedResult resultIndexLoaded = resultPairIndexLoaded.getSecond();
 
@@ -198,9 +201,9 @@ public class TestHindex
         MaterializedResult resultLoadingIndex = resultPairLoadingIndex.getSecond();
 
         // Wait before continuing
-        Thread.sleep(1000);
+        Thread.sleep(INDEX_LOAD_WAIT_TIME);
 
-        Pair<Integer, MaterializedResult> resultPairIndexLoaded = getSplitAndMaterializedResult(testerQuery);
+        Pair<Integer, MaterializedResult> resultPairIndexLoaded = runTwiceGetSplitAndMaterializedResult(testerQuery);
         int splitsIndexLoaded = resultPairIndexLoaded.getFirst();
         MaterializedResult resultIndexLoaded = resultPairIndexLoaded.getSecond();
 
@@ -211,7 +214,7 @@ public class TestHindex
         MaterializedResult resultDeletingData = resultPairDeletingData.getSecond();
 
         // Wait before continuing
-        Thread.sleep(1000);
+        Thread.sleep(INDEX_LOAD_WAIT_TIME);
 
         Pair<Integer, MaterializedResult> resultPairDataDeleted = getSplitAndMaterializedResult(testerQuery);
         int splitsDataDeleted = resultPairDataDeleted.getFirst();
@@ -266,9 +269,9 @@ public class TestHindex
         int splitsLoadingIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
 
         // Wait before continuing
-        Thread.sleep(1000);
+        Thread.sleep(INDEX_LOAD_WAIT_TIME);
 
-        Pair<Integer, MaterializedResult> resultPairIndexLoaded = getSplitAndMaterializedResult(testerQuery);
+        Pair<Integer, MaterializedResult> resultPairIndexLoaded = runTwiceGetSplitAndMaterializedResult(testerQuery);
         int splitsIndexLoaded = resultPairIndexLoaded.getFirst();
         MaterializedResult resultIndexLoaded = resultPairIndexLoaded.getSecond();
 
@@ -323,10 +326,10 @@ public class TestHindex
         int splitsLoadingIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
 
         // Wait before continuing
-        Thread.sleep(1000);
+        Thread.sleep(INDEX_LOAD_WAIT_TIME);
 
         // Get splits and result
-        Pair<Integer, MaterializedResult> resultPairIndexLoaded = getSplitAndMaterializedResult(testerQuery);
+        Pair<Integer, MaterializedResult> resultPairIndexLoaded = runTwiceGetSplitAndMaterializedResult(testerQuery);
         int splitsIndexLoaded = resultPairIndexLoaded.getFirst();
         MaterializedResult resultIndexLoaded = resultPairIndexLoaded.getSecond();
 
@@ -368,10 +371,10 @@ public class TestHindex
         int splitsLoadingIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
 
         // Wait before continuing
-        Thread.sleep(1000);
+        Thread.sleep(INDEX_LOAD_WAIT_TIME);
 
         // Get splits and result
-        Pair<Integer, MaterializedResult> resultPairIndexLoaded = getSplitAndMaterializedResult(testerQuery);
+        Pair<Integer, MaterializedResult> resultPairIndexLoaded = runTwiceGetSplitAndMaterializedResult(testerQuery);
         int splitsIndexLoaded = resultPairIndexLoaded.getFirst();
         MaterializedResult resultIndexLoaded = resultPairIndexLoaded.getSecond();
 
@@ -484,7 +487,7 @@ public class TestHindex
         MaterializedResult resultLoadingIndex = computeActual(testerQuery);
 
         // Wait before continuing
-        Thread.sleep(1000);
+        Thread.sleep(INDEX_LOAD_WAIT_TIME);
 
         MaterializedResult resultIndexLoaded = computeActual(testerQuery);
 
