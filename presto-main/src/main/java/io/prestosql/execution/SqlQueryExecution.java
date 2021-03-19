@@ -113,6 +113,7 @@ import static io.prestosql.execution.buffer.OutputBuffers.BROADCAST_PARTITION_ID
 import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
 import static io.prestosql.execution.scheduler.SqlQueryScheduler.createSqlQueryScheduler;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
+import static io.prestosql.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static io.prestosql.sql.planner.DistributedExecutionPlanner.Mode.NORMAL;
 import static io.prestosql.sql.planner.DistributedExecutionPlanner.Mode.RESUME;
 import static io.prestosql.sql.planner.DistributedExecutionPlanner.Mode.SNAPSHOT;
@@ -530,44 +531,62 @@ public class SqlQueryExecution
                 .withBuffer(OUTPUT_BUFFER_ID, BROADCAST_PARTITION_ID)
                 .withNoMoreBufferIds();
 
-        // Check if there is a snapshot we can restore to, or restart from beginning,
-        // and update marker split sources so they know where to resume from.
-        // This MUST be done BEFORE creating the new scheduler, because it resets the snapshotManager internal states.
-        OptionalLong snapshotId = snapshotManager.getResumeSnapshotId();
-        MarkerAnnouncer announcer = splitManager.getMarkerAnnouncer(stateMachine.getSession());
-        announcer.resumeSnapshot(snapshotId.orElse(0));
+        Map<StageId, Integer> taskCounts = oldScheduler.getStageTaskCounts();
+        // In case the last snapshot can't be resumed to because of insufficient available worker,
+        // then try a previous snapshot, until we reach the beginning, in which case we don't enforce task count
+        for (; ; ) {
+            // Check if there is a snapshot we can restore to, or restart from beginning,
+            // and update marker split sources so they know where to resume from.
+            // This MUST be done BEFORE creating the new scheduler, because it resets the snapshotManager internal states.
+            OptionalLong snapshotId = snapshotManager.getResumeSnapshotId();
+            MarkerAnnouncer announcer = splitManager.getMarkerAnnouncer(stateMachine.getSession());
+            announcer.resumeSnapshot(snapshotId.orElse(0));
 
-        // Create a new scheduler, to schedule new stages and tasks
-        DistributedExecutionPlanner distributedExecutionPlanner = new DistributedExecutionPlanner(splitManager, metadata);
-        StageExecutionPlan executionPlan = distributedExecutionPlanner.plan(plan.getRoot(), stateMachine.getSession(),
-                RESUME, snapshotId.isPresent() ? snapshotId.getAsLong() : null, announcer.currentSnapshotId());
-        // build the stage execution objects (this doesn't schedule execution)
-        SqlQueryScheduler scheduler = createSqlQueryScheduler(
-                stateMachine,
-                locationFactory,
-                executionPlan,
-                nodePartitioningManager,
-                nodeScheduler,
-                remoteTaskFactory,
-                stateMachine.getSession(),
-                plan.isSummarizeTaskInfos(),
-                scheduleSplitBatchSize,
-                queryExecutor,
-                schedulerExecutor,
-                failureDetector,
-                rootOutputBuffers,
-                nodeTaskMap,
-                executionPolicy,
-                schedulerStats,
-                dynamicFilterService,
-                heuristicIndexerManager,
-                snapshotManager,
-                oldScheduler.getStageTaskCounts());
-        queryScheduler.set(scheduler);
+            // Create a new scheduler, to schedule new stages and tasks
+            DistributedExecutionPlanner distributedExecutionPlanner = new DistributedExecutionPlanner(splitManager, metadata);
+            StageExecutionPlan executionPlan = distributedExecutionPlanner.plan(plan.getRoot(), stateMachine.getSession(),
+                    RESUME, snapshotId.isPresent() ? snapshotId.getAsLong() : null, announcer.currentSnapshotId());
 
-        log.debug("Restarting query %s from a resumable task failure.", getQueryId());
-        scheduler.start();
-        stateMachine.transitionToStarting();
+            try {
+                // build the stage execution objects (this doesn't schedule execution)
+                SqlQueryScheduler scheduler = createSqlQueryScheduler(
+                        stateMachine,
+                        locationFactory,
+                        executionPlan,
+                        nodePartitioningManager,
+                        nodeScheduler,
+                        remoteTaskFactory,
+                        stateMachine.getSession(),
+                        plan.isSummarizeTaskInfos(),
+                        scheduleSplitBatchSize,
+                        queryExecutor,
+                        schedulerExecutor,
+                        failureDetector,
+                        rootOutputBuffers,
+                        nodeTaskMap,
+                        executionPolicy,
+                        schedulerStats,
+                        dynamicFilterService,
+                        heuristicIndexerManager,
+                        snapshotManager,
+                        // Don't enforce task count when we rerun query from beginning
+                        snapshotId.isPresent() ? taskCounts : null);
+
+                queryScheduler.set(scheduler);
+                log.debug("Restarting query %s from a resumable task failure.", getQueryId());
+                scheduler.start();
+                stateMachine.transitionToStarting();
+                break;
+            }
+            catch (PrestoException e) {
+                if (snapshotId.isPresent() && e.getErrorCode().equals(NO_NODES_AVAILABLE.toErrorCode())) {
+                    // Not enough worker to resume all tasks. Try an ealier snapshot.
+                    continue;
+                }
+                // Failure is not due to task count. Can't recover from it.
+                throw e;
+            }
+        }
     }
 
     @Override

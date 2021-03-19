@@ -311,6 +311,9 @@ public class TestHashAggregationOperator
 
         Map<String, Object> variableWidthBlockBuilderMapping = new HashMap<>();
 
+        List<Object> channelBuildersMapping = new ArrayList<>();
+        channelBuildersMapping.add(new ArrayList<>());
+
         //TODO-cp-I2DSGQ: change expectedMapping after implementation of operatorContext capture
         expectedMapping.put("operatorContext", 0);
         expectedMapping.put("hashCollisionsCounter", hashCollisionsCounterMapping);
@@ -342,6 +345,7 @@ public class TestHashAggregationOperator
         groupByHashMapping.put("expectedHashCollisions", 0.0);
         groupByHashMapping.put("preallocatedMemoryInBytes", 0L);
         groupByHashMapping.put("currentPageSizeInBytes", 1703144L);
+        groupByHashMapping.put("channelBuilders", channelBuildersMapping);
 
         aggregatorsMapping.add(aggregator0Mapping);
         aggregatorsMapping.add(aggregator1Mapping);

@@ -15,6 +15,8 @@
 package io.prestosql.snapshot;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
+import io.airlift.log.Logger;
 import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
@@ -39,6 +41,8 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import static java.util.Objects.requireNonNull;
 
@@ -47,6 +51,10 @@ import static java.util.Objects.requireNonNull;
  */
 public class SnapshotUtils
 {
+    private static final Logger LOG = Logger.get(SnapshotUtils.class);
+    private static final int CLEANUP_INTERVAL_MINUTES = 3; // 3 minutes
+    private static final long DELETION_RETRY_PERIOD = 15L * 60 * 1000; // 15 minutes
+
     private final boolean isCoordinator;
     private final FileSystemClientManager fileSystemClientManager;
     private final SnapshotConfig snapshotConfig;
@@ -58,6 +66,9 @@ public class SnapshotUtils
     String rootPath = "/tmp/hetu/snapshot/";
 
     private final Map<QueryId, QuerySnapshotManager> snapshotManagers = new ConcurrentHashMap<>();
+    // Key is query id; value is number of attempts
+    private final Map<String, Long> snapshotsToDelete = new ConcurrentHashMap<>();
+    private final ScheduledThreadPoolExecutor deleteSnapshotExecutor = new ScheduledThreadPoolExecutor(1);
 
     @Inject
     public SnapshotUtils(FileSystemClientManager fileSystemClientManager, SnapshotConfig snapshotConfig, InternalNodeManager nodeManager)
@@ -65,6 +76,15 @@ public class SnapshotUtils
         this.isCoordinator = nodeManager.getCurrentNode().isCoordinator();
         this.fileSystemClientManager = requireNonNull(fileSystemClientManager);
         this.snapshotConfig = requireNonNull(snapshotConfig);
+
+        // When a query finishes abnormally (including being cancelled by the user), we may not be able to delete
+        // the snapshot folder, because tasks may be updating snapshot files at the same time.
+        // When this occurs, we keep track of "failed-to-delete" snapshots, and try to remove them in a scheduled task.
+        deleteSnapshotExecutor.scheduleAtFixedRate(
+                this::cleanupSnapshots,
+                CLEANUP_INTERVAL_MINUTES,
+                CLEANUP_INTERVAL_MINUTES,
+                TimeUnit.MINUTES);
     }
 
     public boolean isCoordinator()
@@ -73,20 +93,25 @@ public class SnapshotUtils
     }
 
     public void initialize()
-            throws Exception
     {
         snapshotStoreClient = buildSnapshotStoreClient();
     }
 
     private SnapshotStoreClient buildSnapshotStoreClient()
-            throws Exception
     {
         if (storeType == SnapshotStoreType.FILESYSTEM) {
             String profile = snapshotConfig.getSnapshotProfile();
             Path root = Paths.get(rootPath);
-            HetuFileSystemClient fs = profile == null ?
-                    fileSystemClientManager.getFileSystemClient(root) : fileSystemClientManager.getFileSystemClient(profile, root);
-            return new SnapshotFileBasedClient(fs, root);
+            try {
+                HetuFileSystemClient fs = profile == null ?
+                        fileSystemClientManager.getFileSystemClient(root) : fileSystemClientManager.getFileSystemClient(profile, root);
+                return new SnapshotFileBasedClient(fs, root);
+            }
+            catch (Exception e) {
+                LOG.warn(e, "Failed to create SnapshotFileBasedClient");
+                // This is OK if the snapshot feature is not used.
+                return null;
+            }
         }
         else {
             throw new UnsupportedOperationException("Not valid snapshot store type: " + storeType);
@@ -147,12 +172,6 @@ public class SnapshotUtils
             throws Exception
     {
         return snapshotStoreClient.loadSnapshotResult(queryId);
-    }
-
-    public void deleteAll(String queryId)
-            throws Exception
-    {
-        snapshotStoreClient.deleteAll(queryId);
     }
 
     /**
@@ -246,5 +265,32 @@ public class SnapshotUtils
     public void removeQuerySnapshotManager(QueryId queryId)
     {
         snapshotManagers.remove(queryId);
+        // clear all stored states for this query
+        try {
+            snapshotStoreClient.deleteAll(queryId.getId());
+        }
+        catch (Exception e) {
+            LOG.debug("Failed to delete stored snapshot states for %s: %s", queryId, e.getMessage());
+        }
+        // Always add query to retry list, in case tasks are still active and creates the snapshot folder
+        snapshotsToDelete.put(queryId.getId(), System.currentTimeMillis());
+    }
+
+    @VisibleForTesting
+    void cleanupSnapshots()
+    {
+        for (String queryId : ImmutableSet.copyOf(snapshotsToDelete.keySet())) {
+            long age = System.currentTimeMillis() - snapshotsToDelete.get(queryId);
+            try {
+                snapshotStoreClient.deleteAll(queryId);
+                if (age > DELETION_RETRY_PERIOD) {
+                    // Keep query for at least 15 minutes, in case some tasks are still hanging around and writing snapshot files
+                    snapshotsToDelete.remove(queryId);
+                }
+            }
+            catch (Exception e) {
+                LOG.debug("Failed to delete stored snapshot states for %s [age %d ms]: %s", queryId, age, e.getMessage());
+            }
+        }
     }
 }

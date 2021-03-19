@@ -34,12 +34,7 @@ public class TestingSnapshotUtils
         SnapshotConfig snapshotConfig = new SnapshotConfig();
         FileSystemClientManager fileSystemClientManager = new NoopFileSystemClientManager();
         NOOP_SNAPSHOT_UTILS = new SnapshotUtils(fileSystemClientManager, snapshotConfig, new InMemoryNodeManager());
-        try {
-            NOOP_SNAPSHOT_UTILS.initialize();
-        }
-        catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        NOOP_SNAPSHOT_UTILS.initialize();
     }
 
     private TestingSnapshotUtils()

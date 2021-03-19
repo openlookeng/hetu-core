@@ -25,7 +25,6 @@ import io.prestosql.execution.TaskId;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -51,10 +50,6 @@ import static java.util.Objects.requireNonNull;
 public class QuerySnapshotManager
 {
     private static final Logger LOG = Logger.get(QuerySnapshotManager.class);
-    public static final Object NO_STATE = new Object();
-
-    //TODO-cp-I2D63N remove DEBUG after testing is done
-    private static final boolean DEBUG = Boolean.parseBoolean(System.getProperty("snapshot.debug", "false"));
 
     private final QueryId queryId;
     private final SnapshotUtils snapshotUtils;
@@ -101,108 +96,6 @@ public class QuerySnapshotManager
     public boolean isCoordinator()
     {
         return snapshotUtils.isCoordinator();
-    }
-
-    /**
-     * Store the state of snapshotStateId in snapshot store
-     */
-    public void storeState(SnapshotStateId snapshotStateId, Object state)
-            throws Exception
-    {
-        snapshotUtils.storeState(snapshotStateId, state);
-    }
-
-    /**
-     * Load the state of snapshotStateId from snapshot store. Returns:
-     * - Empty: state file doesn't exist
-     * - NO_STATE: bug situation
-     * - Other object: previously saved state
-     */
-    public Optional<Object> loadState(SnapshotStateId snapshotStateId)
-            throws Exception
-    {
-        // Operators may have finished when a snapshot is taken, then in the snapshot the operator won't have a corresponding state,
-        // but they still needs to be restored to rebuild their internal states.
-        // Need to check previous snapshots for their stored states.
-        Optional<Object> state = snapshotUtils.loadState(snapshotStateId);
-        Map<Long, SnapshotResult> snapshotToSnapshotResultMap = null;
-        while (!state.isPresent()) {
-            if (snapshotToSnapshotResultMap == null) {
-                snapshotToSnapshotResultMap = snapshotUtils.loadSnapshotResult(queryId.getId());
-            }
-            // Snapshot is complete but no entry for this id, then the component must have finished
-            // before the snapshot was taken. Look at previous complete snapshots for last saved state.
-            OptionalLong prevSnapshotId = getPreviousSnapshotIdIfComplete(snapshotToSnapshotResultMap, snapshotStateId.getSnapshotId());
-            if (!prevSnapshotId.isPresent()) {
-                return state;
-            }
-            if (prevSnapshotId.getAsLong() == 0) {
-                // We reached the beginning. This should not happen.
-                // We should either have hit an incomplete snapshot (so empty should be returned),
-                // or we should have found a snapshot that includes this component.
-                // Return empty so an error can be reported.
-                return Optional.of(NO_STATE);
-            }
-            snapshotStateId = snapshotStateId.withSnapshotId(prevSnapshotId.getAsLong());
-            state = snapshotUtils.loadState(snapshotStateId);
-        }
-        return state;
-    }
-
-    public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile)
-            throws Exception
-    {
-        snapshotUtils.storeFile(snapshotStateId, sourceFile);
-    }
-
-    public Boolean loadFile(SnapshotStateId snapshotStateId, Path targetFile)
-            throws Exception
-    {
-        requireNonNull(targetFile);
-
-        // Logic of this function is very similar to that of "loadState"
-        boolean loadResult = snapshotUtils.loadFile(snapshotStateId, targetFile);
-        Map<Long, SnapshotResult> snapshotToSnapshotResultMap = null;
-        while (!loadResult) {
-            if (snapshotToSnapshotResultMap == null) {
-                snapshotToSnapshotResultMap = snapshotUtils.loadSnapshotResult(queryId.getId());
-            }
-            OptionalLong prevSnapshotId = getPreviousSnapshotIdIfComplete(snapshotToSnapshotResultMap, snapshotStateId.getSnapshotId());
-            if (!prevSnapshotId.isPresent()) {
-                return false;
-            }
-            if (prevSnapshotId.getAsLong() == 0) {
-                return null;
-            }
-            snapshotStateId = snapshotStateId.withSnapshotId(prevSnapshotId.getAsLong());
-            loadResult = snapshotUtils.loadFile(snapshotStateId, targetFile);
-        }
-        return true;
-    }
-
-    private OptionalLong getPreviousSnapshotIdIfComplete(Map<Long, SnapshotResult> snapshotToSnapshotResultMap, long snapshotId)
-    {
-        try {
-            List<Map.Entry<Long, SnapshotResult>> entryList = new ArrayList<>(snapshotToSnapshotResultMap.entrySet());
-            for (int i = entryList.size() - 1; i >= 0; i--) {
-                long sId = entryList.get(i).getKey();
-                SnapshotResult restoreResult = entryList.get(i).getValue();
-                if (sId < snapshotId) {
-                    if (restoreResult == SnapshotResult.SUCCESSFUL) {
-                        return OptionalLong.of(sId);
-                    }
-                    // Skip over NA entries
-                    else if (restoreResult != SnapshotResult.NA) {
-                        return OptionalLong.empty();
-                    }
-                }
-            }
-        }
-        catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        // We reach the beginning. Return 0 to indicate that.
-        return OptionalLong.of(0);
     }
 
     // coordinator specified functions
@@ -355,16 +248,6 @@ public class QuerySnapshotManager
 
         resetForQuery();
 
-        if (!DEBUG) {
-            // clear all stored states for this query
-            try {
-                snapshotUtils.deleteAll(queryId.getId());
-            }
-            catch (Exception e) {
-                LOG.warn(e, "Failed to delete stored snapshot states for %s, state %s", queryId, state);
-            }
-        }
-
         snapshotUtils.removeQuerySnapshotManager(queryId);
     }
 
@@ -419,12 +302,12 @@ public class QuerySnapshotManager
             SnapshotResult result = restoreResult.get().getSnapshotResult();
             long snapshotId = restoreResult.get().getSnapshotId();
             if (result == SnapshotResult.FAILED) {
-                updateQueryRestore(snapshotId, taskId, SnapshotComponentCounter.ComponentState.FAILED);
                 LOG.debug("[FATAL] Failed to resume for: " + taskId + ", snapshot " + snapshotId);
+                updateQueryRestore(snapshotId, taskId, SnapshotComponentCounter.ComponentState.FAILED);
             }
             else if (result == SnapshotResult.FAILED_FATAL) {
-                updateQueryRestore(snapshotId, taskId, SnapshotComponentCounter.ComponentState.FAILED_FATAL);
                 LOG.debug("Failed to resume for: " + taskId + ", snapshot " + snapshotId);
+                updateQueryRestore(snapshotId, taskId, SnapshotComponentCounter.ComponentState.FAILED_FATAL);
             }
             else if (result == SnapshotResult.SUCCESSFUL) {
                 updateQueryRestore(snapshotId, taskId, SnapshotComponentCounter.ComponentState.SUCCESSFUL);
@@ -487,10 +370,17 @@ public class QuerySnapshotManager
             synchronized (restoreResult) {
                 changed = restoreResult.setSnapshotResult(snapshotId, snapshotResult);
             }
-            if (changed && snapshotResult.isDone()) {
-                LOG.debug("Finished restoring snapshot %d for query %s. Result is %s.", snapshotId, queryId.getId(), snapshotResult);
-                // inform the listeners(ie schedulers) if query snapshot result is finished
-                queryRestoreComplete(restoreResult);
+            if (changed) {
+                if (snapshotResult.isDone()) {
+                    LOG.debug("Finished restoring snapshot %d for query %s. Result is %s.", snapshotId, queryId.getId(), snapshotResult);
+                    // inform the listeners(ie schedulers) if query snapshot result is finished
+                    queryRestoreComplete(restoreResult);
+                }
+                else if (snapshotResult == SnapshotResult.IN_PROGRESS_FAILED || snapshotResult == SnapshotResult.IN_PROGRESS_FAILED_FATAL) {
+                    LOG.debug("Failed to restore snapshot %d for query %s. Result is %s.", snapshotId, queryId.getId(), snapshotResult);
+                    // inform the listeners(ie schedulers) if query snapshot result is finished
+                    queryRestoreComplete(restoreResult);
+                }
             }
         }
     }

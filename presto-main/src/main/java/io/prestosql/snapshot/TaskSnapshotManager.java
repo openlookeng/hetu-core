@@ -21,13 +21,17 @@ import io.prestosql.operator.Operator;
 import io.prestosql.operator.exchange.LocalMergeSourceOperator;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 import static com.google.common.base.Preconditions.checkState;
+import static java.util.Objects.requireNonNull;
 
 /**
  * TaskSnapshotManager keeps track of snapshot status of task components
@@ -35,6 +39,7 @@ import static com.google.common.base.Preconditions.checkState;
 public class TaskSnapshotManager
 {
     private static final Logger LOG = Logger.get(TaskSnapshotManager.class);
+    public static final Object NO_STATE = new Object();
 
     private final TaskId taskId;
     private final SnapshotUtils snapshotUtils;
@@ -62,14 +67,40 @@ public class TaskSnapshotManager
     }
 
     /**
-     * Load the state of snapshotStateId from snapshot store
-     *
-     * @return state of snapshotStateId; Optional.empty() if the state doesn't exist
+     * Load the state of snapshotStateId from snapshot store. Returns:
+     * - Empty: state file doesn't exist
+     * - NO_STATE: bug situation
+     * - Other object: previously saved state
      */
     public Optional<Object> loadState(SnapshotStateId snapshotStateId)
             throws Exception
     {
-        return snapshotUtils.loadState(snapshotStateId);
+        // Operators may have finished when a snapshot is taken, then in the snapshot the operator won't have a corresponding state,
+        // but they still needs to be restored to rebuild their internal states.
+        // Need to check previous snapshots for their stored states.
+        Optional<Object> state = snapshotUtils.loadState(snapshotStateId);
+        Map<Long, SnapshotResult> snapshotToSnapshotResultMap = null;
+        while (!state.isPresent()) {
+            if (snapshotToSnapshotResultMap == null) {
+                snapshotToSnapshotResultMap = snapshotUtils.loadSnapshotResult(snapshotStateId.getTaskId().getQueryId().getId());
+            }
+            // Snapshot is complete but no entry for this id, then the component must have finished
+            // before the snapshot was taken. Look at previous complete snapshots for last saved state.
+            OptionalLong prevSnapshotId = getPreviousSnapshotIdIfComplete(snapshotToSnapshotResultMap, snapshotStateId.getSnapshotId());
+            if (!prevSnapshotId.isPresent()) {
+                return state;
+            }
+            if (prevSnapshotId.getAsLong() == 0) {
+                // We reached the beginning. This should not happen.
+                // We should either have hit an incomplete snapshot (so empty should be returned),
+                // or we should have found a snapshot that includes this component.
+                // Return empty so an error can be reported.
+                return Optional.of(NO_STATE);
+            }
+            snapshotStateId = snapshotStateId.withSnapshotId(prevSnapshotId.getAsLong());
+            state = snapshotUtils.loadState(snapshotStateId);
+        }
+        return state;
     }
 
     public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile)
@@ -81,7 +112,51 @@ public class TaskSnapshotManager
     public Boolean loadFile(SnapshotStateId snapshotStateId, Path targetFile)
             throws Exception
     {
-        return snapshotUtils.loadFile(snapshotStateId, targetFile);
+        requireNonNull(targetFile);
+
+        // Logic of this function is very similar to that of "loadState"
+        boolean loadResult = snapshotUtils.loadFile(snapshotStateId, targetFile);
+        Map<Long, SnapshotResult> snapshotToSnapshotResultMap = null;
+        while (!loadResult) {
+            if (snapshotToSnapshotResultMap == null) {
+                snapshotToSnapshotResultMap = snapshotUtils.loadSnapshotResult(snapshotStateId.getTaskId().getQueryId().getId());
+            }
+            OptionalLong prevSnapshotId = getPreviousSnapshotIdIfComplete(snapshotToSnapshotResultMap, snapshotStateId.getSnapshotId());
+            if (!prevSnapshotId.isPresent()) {
+                return false;
+            }
+            if (prevSnapshotId.getAsLong() == 0) {
+                return null;
+            }
+            snapshotStateId = snapshotStateId.withSnapshotId(prevSnapshotId.getAsLong());
+            loadResult = snapshotUtils.loadFile(snapshotStateId, targetFile);
+        }
+        return true;
+    }
+
+    private OptionalLong getPreviousSnapshotIdIfComplete(Map<Long, SnapshotResult> snapshotToSnapshotResultMap, long snapshotId)
+    {
+        try {
+            List<Map.Entry<Long, SnapshotResult>> entryList = new ArrayList<>(snapshotToSnapshotResultMap.entrySet());
+            for (int i = entryList.size() - 1; i >= 0; i--) {
+                long sId = entryList.get(i).getKey();
+                SnapshotResult restoreResult = entryList.get(i).getValue();
+                if (sId < snapshotId) {
+                    if (restoreResult == SnapshotResult.SUCCESSFUL) {
+                        return OptionalLong.of(sId);
+                    }
+                    // Skip over NA entries
+                    else if (restoreResult != SnapshotResult.NA) {
+                        return OptionalLong.empty();
+                    }
+                }
+            }
+        }
+        catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        // We reach the beginning. Return 0 to indicate that.
+        return OptionalLong.of(0);
     }
 
     public void setTotalComponents(int totalComponents)

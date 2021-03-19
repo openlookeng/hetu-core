@@ -571,52 +571,6 @@ public class HiveWriterFactory
             acidOptions = Optional.empty();
         }
 
-        if (session.isSnapshotEnabled() && !forMerge) {
-            // Add a suffix to file name for sub files
-            fileNameWithExtension = toSnapshotSubFile(fileNameWithExtension);
-            path = new Path(path.getParent(), fileNameWithExtension);
-        }
-        Path finalPath = path;
-
-        conf.set("table.write.path", writeInfo.getWritePath().toString());
-        HiveFileWriter hiveFileWriter = null;
-        for (HiveFileWriterFactory fileWriterFactory : fileWriterFactories) {
-            Optional<HiveFileWriter> fileWriter = fileWriterFactory.createFileWriter(
-                    path,
-                    dataColumns.stream()
-                            .map(DataColumn::getName)
-                            .collect(toList()),
-                    outputStorageFormat,
-                    schema,
-                    conf,
-                    session,
-                    acidOptions,
-                    Optional.of(acidWriteType));
-            if (fileWriter.isPresent()) {
-                hiveFileWriter = fileWriter.get();
-                break;
-            }
-        }
-
-        if (session.isSnapshotEnabled()) {
-            // TODO-cp-I2BZ0A: assuming all files to be of ORC type
-            checkState(hiveFileWriter instanceof OrcFileWriter, "Only support ORC format with snapshot");
-        }
-
-        if (hiveFileWriter == null) {
-            hiveFileWriter = new RecordFileWriter(
-                    path,
-                    dataColumns.stream()
-                            .map(DataColumn::getName)
-                            .collect(toList()),
-                    outputStorageFormat,
-                    schema,
-                    partitionStorageFormat.getEstimatedWriterSystemMemoryUsage(),
-                    conf,
-                    typeManager,
-                    session);
-        }
-
         FileSystem fileSystem;
         try {
             fileSystem = hdfsEnvironment.getFileSystem(session.getUser(), path, conf);
@@ -624,10 +578,77 @@ public class HiveWriterFactory
         catch (IOException e) {
             throw new PrestoException(HIVE_WRITER_OPEN_ERROR, e);
         }
-        if (isTxnTable) {
-            hiveFileWriter.initWriter(true, path, fileSystem);
+
+        HiveFileWriter hiveFileWriter = null;
+        if (session.isSnapshotEnabled() && !forMerge) {
+            // Add a suffix to file name for sub files
+            String oldFileName = path.getName();
+            String newFileName = toSnapshotSubFile(oldFileName);
+            path = new Path(path.getParent(), newFileName);
+            if (fileNameWithExtension.equals(oldFileName)) {
+                fileNameWithExtension = newFileName;
+            }
+            // Always create a simple ORC writer for snapshot files. These will be merged in the end.
+            try {
+                Path finalPath = path;
+                hiveFileWriter = new SnapshotTempFileWriter(
+                        orcFileWriterFactory.createOrcDataSink(session, fileSystem, path),
+                        dataColumns.stream()
+                                .map(column -> column.getHiveType().getType(typeManager))
+                                .collect(Collectors.toList()),
+                        () -> {
+                            fileSystem.delete(finalPath, false);
+                            return null;
+                        });
+            }
+            catch (IOException e) {
+                throw new PrestoException(HiveErrorCode.HIVE_WRITER_OPEN_ERROR, "Error creating ORC file", e);
+            }
+        }
+        else {
+            conf.set("table.write.path", writeInfo.getWritePath().toString());
+            for (HiveFileWriterFactory fileWriterFactory : fileWriterFactories) {
+                Optional<HiveFileWriter> fileWriter = fileWriterFactory.createFileWriter(
+                        path,
+                        dataColumns.stream()
+                                .map(DataColumn::getName)
+                                .collect(toList()),
+                        outputStorageFormat,
+                        schema,
+                        conf,
+                        session,
+                        acidOptions,
+                        Optional.of(acidWriteType));
+                if (fileWriter.isPresent()) {
+                    hiveFileWriter = fileWriter.get();
+                    break;
+                }
+            }
+
+            if (session.isSnapshotEnabled()) {
+                // TODO-cp-I2BZ0A: assuming all files to be of ORC type
+                checkState(hiveFileWriter instanceof OrcFileWriter, "Only support ORC format with snapshot");
+            }
+
+            if (hiveFileWriter == null) {
+                hiveFileWriter = new RecordFileWriter(
+                        path,
+                        dataColumns.stream()
+                                .map(DataColumn::getName)
+                                .collect(toList()),
+                        outputStorageFormat,
+                        schema,
+                        partitionStorageFormat.getEstimatedWriterSystemMemoryUsage(),
+                        conf,
+                        typeManager,
+                        session);
+            }
+            if (isTxnTable) {
+                hiveFileWriter.initWriter(true, path, fileSystem);
+            }
         }
 
+        Path finalPath = path;
         String writerImplementation = hiveFileWriter.getClass().getName();
 
         Consumer<HiveWriter> onCommit;
@@ -923,12 +944,16 @@ public class HiveWriterFactory
             String filePath = removeSnapshotSuffix(path);
             // Loop through all files in the containing folder,
             // and remove those with a suffix that exceeds the starting index.
-            for (FileStatus status : fileSystem.listStatus(new Path(filePath).getParent())) {
-                String file = status.getPath().toString();
-                if (file.startsWith(filePath)) {
-                    int index = Integer.valueOf(file.substring(filePath.length()));
-                    if (index >= startSuffix) {
-                        fileSystem.delete(status.getPath());
+            Path folder = new Path(filePath).getParent();
+            // Staging folder may have been deleted
+            if (fileSystem.exists(folder)) {
+                for (FileStatus status : fileSystem.listStatus(folder)) {
+                    String file = status.getPath().toString();
+                    if (file.startsWith(filePath)) {
+                        int index = Integer.valueOf(file.substring(filePath.length()));
+                        if (index >= startSuffix) {
+                            fileSystem.delete(status.getPath());
+                        }
                     }
                 }
             }

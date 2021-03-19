@@ -59,7 +59,7 @@ import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
 
 // This implementation assumes arrays used in the hash are always a power of 2
-@RestorableConfig(uncapturedFields = {"types", "hashTypes", "channels", "hashStrategy", "channelBuilders",
+@RestorableConfig(uncapturedFields = {"types", "hashTypes", "channels", "hashStrategy",
         "inputHashChannel", "hashGenerator", "updateMemory"})
 public class MultiChannelGroupByHash
         implements GroupByHash
@@ -936,6 +936,19 @@ public class MultiChannelGroupByHash
         myState.expectedHashCollisions = expectedHashCollisions;
         myState.preallocatedMemoryInBytes = preallocatedMemoryInBytes;
         myState.currentPageSizeInBytes = currentPageSizeInBytes;
+
+        myState.channelBuilders = new byte[channelBuilders.size()][][];
+        for (int i = 0; i < channelBuilders.size(); i++) {
+            if (channelBuilders.get(i).size() > 0) {
+                // The last block in channelBuilder[i] is always in currentPageBuilder
+                myState.channelBuilders[i] = new byte[channelBuilders.get(i).size() - 1][];
+                for (int j = 0; j < channelBuilders.get(i).size() - 1; j++) {
+                    SliceOutput sliceOutput = new DynamicSliceOutput(1);
+                    serdeProvider.getBlockEncodingSerde().writeBlock(sliceOutput, channelBuilders.get(i).get(j));
+                    myState.channelBuilders[i][j] = sliceOutput.getUnderlyingSlice().getBytes();
+                }
+            }
+        }
         return myState;
     }
 
@@ -969,6 +982,18 @@ public class MultiChannelGroupByHash
         this.expectedHashCollisions = myState.expectedHashCollisions;
         this.preallocatedMemoryInBytes = myState.preallocatedMemoryInBytes;
         this.currentPageSizeInBytes = myState.currentPageSizeInBytes;
+
+        checkState(myState.channelBuilders.length == this.channelBuilders.size());
+        for (int i = 0; i < myState.channelBuilders.length; i++) {
+            if (myState.channelBuilders[i] != null) {
+                this.channelBuilders.get(i).clear();
+                for (int j = 0; j < myState.channelBuilders[i].length; j++) {
+                    Slice input = Slices.wrappedBuffer(myState.channelBuilders[i][j]);
+                    this.channelBuilders.get(i).add(serdeProvider.getBlockEncodingSerde().readBlock(input.getInput()));
+                }
+                this.channelBuilders.get(i).add(this.currentPageBuilder.getBlockBuilder(i));
+            }
+        }
     }
 
     private static class MultiChannelGroupByHashState
@@ -993,5 +1018,7 @@ public class MultiChannelGroupByHash
         private double expectedHashCollisions;
         private long preallocatedMemoryInBytes;
         private long currentPageSizeInBytes;
+
+        private byte[][][] channelBuilders;
     }
 }

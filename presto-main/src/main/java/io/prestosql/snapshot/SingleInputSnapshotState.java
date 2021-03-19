@@ -99,7 +99,7 @@ public class SingleInputSnapshotState
                     snapshotManager.failedToRestore(componentId, true);
                     LOG.warn("Can't locate saved state for snapshot %d, component %s", snapshotId, restorableId);
                 }
-                else if (state.get() == QuerySnapshotManager.NO_STATE) {
+                else if (state.get() == TaskSnapshotManager.NO_STATE) {
                     snapshotManager.failedToRestore(componentId, true);
                     LOG.error("BUG! State of component %s has never been stored successfully before snapshot %d", restorableId, snapshotId);
                 }

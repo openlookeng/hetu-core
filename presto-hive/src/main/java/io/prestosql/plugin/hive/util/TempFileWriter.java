@@ -68,6 +68,11 @@ public class TempFileWriter
         return orcWriter.getWrittenBytes();
     }
 
+    public long getRetainedBytes()
+    {
+        return orcWriter.getRetainedBytes();
+    }
+
     private static OrcWriter createOrcFileWriter(OrcDataSink sink, List<Type> types)
     {
         List<String> columnNames = IntStream.range(0, types.size())
