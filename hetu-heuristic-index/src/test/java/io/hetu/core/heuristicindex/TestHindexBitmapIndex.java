@@ -23,25 +23,20 @@ public class TestHindexBitmapIndex
         extends TestIndexResources
 {
     @Test(dataProvider = "bitmapOperatorInputRowsTest")
-    public void testBitmapOperatorInputRows(String predicateQuery, String baseQuery)
+    public void testBitmapOperatorInputRows(String predicateQuery)
             throws Exception
     {
+        System.out.println("Testing for predicate query: " + predicateQuery);
         String tableName = getNewTableName();
-        createTable2(tableName);
+        createTableBitmapSupportedDataTypes(tableName);
         String indexName = getNewIndexName();
 
-        // baseQuery is the query at which all, most or at least more selected than predicateQuery
-        // baseQuery does not use indexing, predicateQuery does
-        // predicateQuery should have less input rows than baseQuery
-        baseQuery = "SELECT * FROM " + tableName + baseQuery;
         predicateQuery = "SELECT * FROM " + tableName + " WHERE " + predicateQuery;
 
-        MaterializedResult baseQueryResult = computeActual(baseQuery);
-        long baseQueryInputRows = getInputRowsOfLastQueryExecution(baseQuery);
-
-        assertQuerySucceeds("CREATE INDEX " + indexName + " USING bitmap ON " + tableName + " (key)");
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING bitmap ON " + tableName + " (p1)");
 
         MaterializedResult predicateQueryResultLoadingIndex = computeActual(predicateQuery);
+        long predicateQueryInputRowsLoadingIndex = getInputRowsOfLastQueryExecution(predicateQuery);
 
         // Wait before continuing
         Thread.sleep(1000);
@@ -51,13 +46,73 @@ public class TestHindexBitmapIndex
 
         assertTrue(verifyEqualResults(predicateQueryResultLoadingIndex, predicateQueryResultIndexLoaded),
                 "The results should be equal.");
-        assertTrue(baseQueryResult.getRowCount() > predicateQueryResultIndexLoaded.getRowCount(),
-                "Predicate query with index loaded should have less results than base query. " +
-                        "baseQueryResult row count: " + baseQueryResult.getRowCount() +
-                        " predicateQueryResultIndexLoaded row count: " + predicateQueryResultIndexLoaded.getRowCount());
-        assertTrue(baseQueryInputRows > predicateQueryInputRowsIndexLoaded,
-                "Predicate query with index loaded should have less input rows than base query. " +
-                        "baseQueryInputRows: " + baseQueryInputRows +
+        assertTrue(predicateQueryInputRowsLoadingIndex > predicateQueryInputRowsIndexLoaded ||
+                        predicateQueryInputRowsIndexLoaded == 0,
+                "Predicate query with index loaded should have the least input rows. " +
+                        "predicateQueryInputRowsLoadingIndex: " + predicateQueryInputRowsLoadingIndex +
                         " predicateQueryInputRowsIndexLoaded: " + predicateQueryInputRowsIndexLoaded);
+    }
+
+    @Test(dataProvider = "bitmapSupportedDataTypesBetweenValues")
+    public void testBitmapDataTypesBetweenValues(String column, String queryCondition)
+            throws Exception
+    {
+        String indexType = "bitmap";
+        String tableName = getNewTableName();
+        createTableBitmapSupportedDataTypes(tableName);
+        String testerQuery = "SELECT * FROM " + tableName + " WHERE " + column + " " + queryCondition;
+
+        // Create index
+        String indexName = getNewIndexName();
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " + indexType + " ON " + tableName + " (" + column + ")");
+
+        MaterializedResult resultLoadingIndex = getSplitAndMaterializedResult(testerQuery).getSecond();
+        long inputRowsLoadingIndex = getInputRowsOfLastQueryExecution(testerQuery);
+
+        // Wait before continuing
+        Thread.sleep(1000);
+
+        MaterializedResult resultIndexLoaded = getSplitAndMaterializedResult(testerQuery).getSecond();
+        long inputRowsIndexLoaded = getInputRowsOfLastQueryExecution(testerQuery);
+
+        assertTrue(verifyEqualResults(resultLoadingIndex, resultIndexLoaded), "The results should be equal for" +
+                " index type: " + indexType + ", condition: " + queryCondition);
+        assertTrue(inputRowsLoadingIndex > inputRowsIndexLoaded,
+                "The numbers of input rows should decrease after index loaded:" +
+                        " index type: " + indexType + " condition: " + queryCondition +
+                        " inputRowsLoadingIndex: " + inputRowsLoadingIndex +
+                        " inputRowsIndexLoaded: " + inputRowsIndexLoaded);
+    }
+
+    @Test(dataProvider = "bitmapSupportedDataTypesRangedValues")
+    public void testBitmapSupportedDataTypesRangedValues(String column, String queryCondition)
+            throws Exception
+    {
+        System.out.println("Testing for queryCondition: " + column + " " + queryCondition);
+        String tableName = getNewTableName();
+        createTableSupportedRangedTypes(tableName);
+        String testerQuery = "SELECT * FROM " + tableName + " WHERE " + column + " " + queryCondition;
+        String indexType = "bitmap";
+
+        // Create index
+        String indexName = getNewIndexName();
+        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " + indexType + " ON " + tableName + " (" + column + ")");
+
+        MaterializedResult resultLoadingIndex = getSplitAndMaterializedResult(testerQuery).getSecond();
+        long inputRowsLoadingIndex = getInputRowsOfLastQueryExecution(testerQuery);
+
+        // Wait before continuing
+        Thread.sleep(1000);
+
+        MaterializedResult resultIndexLoaded = getSplitAndMaterializedResult(testerQuery).getSecond();
+        long inputRowsIndexLoaded = getInputRowsOfLastQueryExecution(testerQuery);
+
+        assertTrue(verifyEqualResults(resultLoadingIndex, resultIndexLoaded), "The results should be equal for" +
+                " index type: " + indexType + ", condition: " + queryCondition);
+        assertTrue(inputRowsLoadingIndex > inputRowsIndexLoaded,
+                "The numbers of input rows should decrease after index is loaded:" +
+                        " index type: " + indexType + " condition: " + queryCondition +
+                        " inputRowsLoadingIndex: " + inputRowsLoadingIndex +
+                        " inputRowsIndexLoaded: " + inputRowsIndexLoaded);
     }
 }
