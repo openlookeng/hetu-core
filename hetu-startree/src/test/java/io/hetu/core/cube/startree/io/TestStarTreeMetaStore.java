@@ -68,6 +68,7 @@ public class TestStarTreeMetaStore
         cubeMetadataService = new StarTreeProvider().getCubeMetaStore(metaStore, properties);
         cubeMetadata1 = new StarTreeMetadata("star1",
                 "a",
+                1000,
                 ImmutableList.of(
                         new AggregateColumn("sum_cost", "SUM", "cost", false),
                         new DimensionColumn("value", "value")),
@@ -77,6 +78,7 @@ public class TestStarTreeMetaStore
                 CubeStatus.READY);
         cubeMetadata2 = new StarTreeMetadata("star2",
                 "a",
+                1000,
                 ImmutableList.of(
                         new AggregateColumn("sum_cost", "SUM", "cost", false),
                         new DimensionColumn("value", "value")),
@@ -93,7 +95,7 @@ public class TestStarTreeMetaStore
 
         assertFalse(metaStore.getCatalogs().isEmpty());
         assertFalse(metaStore.getAllDatabases(CUBE_CATALOG).isEmpty());
-        assertTrue(metaStore.getTable(CUBE_CATALOG, CUBE_DATABASE, cubeMetadata1.getCubeTableName()).isPresent());
+        assertTrue(metaStore.getTable(CUBE_CATALOG, CUBE_DATABASE, cubeMetadata1.getCubeName()).isPresent());
     }
 
     @Test
@@ -103,8 +105,8 @@ public class TestStarTreeMetaStore
         cubeMetadataService.persist(cubeMetadata2);
         assertFalse(metaStore.getCatalogs().isEmpty());
         assertFalse(metaStore.getAllDatabases(CUBE_CATALOG).isEmpty());
-        assertTrue(metaStore.getTable(CUBE_CATALOG, CUBE_DATABASE, cubeMetadata1.getCubeTableName()).isPresent());
-        assertTrue(metaStore.getTable(CUBE_CATALOG, CUBE_DATABASE, cubeMetadata2.getCubeTableName()).isPresent());
+        assertTrue(metaStore.getTable(CUBE_CATALOG, CUBE_DATABASE, cubeMetadata1.getCubeName()).isPresent());
+        assertTrue(metaStore.getTable(CUBE_CATALOG, CUBE_DATABASE, cubeMetadata2.getCubeName()).isPresent());
     }
 
     @Test
@@ -117,8 +119,8 @@ public class TestStarTreeMetaStore
 
         assertFalse(metaStore.getCatalogs().isEmpty());
         assertFalse(metaStore.getAllDatabases(CUBE_CATALOG).isEmpty());
-        assertTrue(metaStore.getTable(CUBE_CATALOG, CUBE_DATABASE, cubeMetadata1.getCubeTableName()).isPresent());
-        assertFalse(metaStore.getTable(CUBE_CATALOG, CUBE_DATABASE, cubeMetadata2.getCubeTableName()).isPresent());
+        assertTrue(metaStore.getTable(CUBE_CATALOG, CUBE_DATABASE, cubeMetadata1.getCubeName()).isPresent());
+        assertFalse(metaStore.getTable(CUBE_CATALOG, CUBE_DATABASE, cubeMetadata2.getCubeName()).isPresent());
     }
 
     @Test
@@ -135,7 +137,7 @@ public class TestStarTreeMetaStore
 
         assertFalse(cubeMetadataService.getMetadataList("a").isEmpty());
         cubeMetadataService.getMetadataList("a").forEach(cube -> {
-            assertEquals(cube.getOriginalTableName(), "a");
+            assertEquals(cube.getSourceTableName(), "a");
             assertEquals(cube.getDimensions(), Collections.singleton("value"));
         });
         assertEquals(cubeMetadataService.getMetadataList("a").size(), 2);
@@ -153,12 +155,23 @@ public class TestStarTreeMetaStore
     }
 
     @Test
+    public void testGetAllCubes()
+    {
+        cubeMetadataService.persist(cubeMetadata1);
+        cubeMetadataService.persist(cubeMetadata2);
+        List<CubeMetadata> result = cubeMetadataService.getAllCubes();
+        assertEquals(result.size(), 2);
+        assertTrue(result.containsAll(ImmutableList.of(cubeMetadata1, cubeMetadata2)));
+    }
+
+    @Test
     public void testUpdateMetadata()
     {
         cubeMetadataService.persist(cubeMetadata1);
         StarTreeMetadata starTreeMetadata = (StarTreeMetadata) cubeMetadata1;
         StarTreeMetadataBuilder builder = new StarTreeMetadataBuilder(starTreeMetadata);
-        CubeMetadata updated = builder.build(System.currentTimeMillis());
+        builder.setCubeLastUpdatedTime(System.currentTimeMillis());
+        CubeMetadata updated = builder.build();
         assertNotEquals(cubeMetadata1, updated);
     }
 

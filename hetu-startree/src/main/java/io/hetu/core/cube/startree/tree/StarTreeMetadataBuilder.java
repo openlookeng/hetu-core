@@ -28,31 +28,48 @@ public class StarTreeMetadataBuilder
         implements CubeMetadataBuilder
 {
     private final String starTableName;
-    private final String tableName;
+    private final String sourceTableName;
     private final List<StarTreeColumn> columns = new ArrayList<>();
     private final List<Set<String>> groups = new ArrayList<>();
     private String predicateString;
     private CubeStatus cubeStatus;
+    private long tableLastUpdatedTime;
+    private long cubeLastUpdatedTime;
 
-    public StarTreeMetadataBuilder(String starTableName, String tableName)
+    public StarTreeMetadataBuilder(String starTableName, String sourceTableName)
     {
         this.starTableName = starTableName;
-        this.tableName = tableName;
+        this.sourceTableName = sourceTableName;
     }
 
     public StarTreeMetadataBuilder(StarTreeMetadata starTreeMetadata)
     {
-        this.starTableName = starTreeMetadata.getCubeTableName();
-        this.tableName = starTreeMetadata.getOriginalTableName();
+        this.starTableName = starTreeMetadata.getCubeName();
+        this.sourceTableName = starTreeMetadata.getSourceTableName();
         this.columns.addAll(starTreeMetadata.getColumns());
         this.groups.add(starTreeMetadata.getGroup());
         this.predicateString = starTreeMetadata.getPredicateString();
+        this.tableLastUpdatedTime = starTreeMetadata.getSourceTableLastUpdatedTime();
+        this.cubeLastUpdatedTime = starTreeMetadata.getLastUpdatedTime();
+        this.cubeStatus = starTreeMetadata.getCubeStatus();
     }
 
     @Override
     public void setCubeStatus(CubeStatus cubeStatus)
     {
         this.cubeStatus = cubeStatus;
+    }
+
+    @Override
+    public void setTableLastUpdatedTime(long tableLastUpdatedTime)
+    {
+        this.tableLastUpdatedTime = tableLastUpdatedTime;
+    }
+
+    @Override
+    public void setCubeLastUpdatedTime(long cubeLastUpdatedTime)
+    {
+        this.cubeLastUpdatedTime = cubeLastUpdatedTime;
     }
 
     @Override
@@ -84,24 +101,12 @@ public class StarTreeMetadataBuilder
     {
         return new StarTreeMetadata(
                 starTableName,
-                tableName,
+                sourceTableName,
+                tableLastUpdatedTime,
                 columns,
                 groups,
                 predicateString,
-                System.currentTimeMillis(),
-                cubeStatus);
-    }
-
-    @Override
-    public CubeMetadata build(long updatedTime)
-    {
-        return new StarTreeMetadata(
-                starTableName,
-                tableName,
-                columns,
-                groups,
-                predicateString,
-                updatedTime,
+                cubeLastUpdatedTime,
                 cubeStatus);
     }
 }

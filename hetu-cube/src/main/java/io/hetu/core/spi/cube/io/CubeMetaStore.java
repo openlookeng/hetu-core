@@ -36,10 +36,10 @@ public interface CubeMetaStore
     /**
      * Create a new Metadata builder
      * @param cubeName Name of the cube
-     * @param originalTableName Name of the original table
+     * @param sourceTableName Name of the table from which cube was created
      * @return a metadata builder
      */
-    CubeMetadataBuilder getBuilder(String cubeName, String originalTableName);
+    CubeMetadataBuilder getBuilder(String cubeName, String sourceTableName);
 
     /**
      * Create new metadata builder from the existing metadata

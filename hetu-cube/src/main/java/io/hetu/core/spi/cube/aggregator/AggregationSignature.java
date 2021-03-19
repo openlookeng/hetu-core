@@ -21,16 +21,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Serializable;
 import java.util.Objects;
 
+import static io.hetu.core.spi.cube.CubeAggregateFunction.AVG;
+import static io.hetu.core.spi.cube.CubeAggregateFunction.COUNT;
+import static io.hetu.core.spi.cube.CubeAggregateFunction.MAX;
+import static io.hetu.core.spi.cube.CubeAggregateFunction.MIN;
+import static io.hetu.core.spi.cube.CubeAggregateFunction.SUM;
+
 public class AggregationSignature
         implements Serializable, Comparable<AggregationSignature>
 {
-    public static final String AVG_FUNCTION_NAME = "avg";
-    public static final String COUNT_FUNCTION_NAME = "count";
-    public static final String SUM_FUNCTION_NAME = "sum";
-    public static final String MIN_FUNCTION_NAME = "min";
-    public static final String MAX_FUNCTION_NAME = "max";
-
-    private static final AggregationSignature COUNT_SIGNATURE = new AggregationSignature(COUNT_FUNCTION_NAME, "*", false);
+    private static final AggregationSignature COUNT_SIGNATURE = new AggregationSignature(COUNT.getName(), "*", false);
 
     private String function;
     private String dimension;
@@ -54,27 +54,27 @@ public class AggregationSignature
 
     public static AggregationSignature count(String dimension, boolean distinct)
     {
-        return new AggregationSignature(COUNT_FUNCTION_NAME, dimension, distinct);
+        return new AggregationSignature(COUNT.getName(), dimension, distinct);
     }
 
     public static AggregationSignature sum(String dimension, boolean distinct)
     {
-        return new AggregationSignature(SUM_FUNCTION_NAME, dimension, distinct);
+        return new AggregationSignature(SUM.toString(), dimension, distinct);
     }
 
     public static AggregationSignature avg(String dimension, boolean distinct)
     {
-        return new AggregationSignature(AVG_FUNCTION_NAME, dimension, distinct);
+        return new AggregationSignature(AVG.toString(), dimension, distinct);
     }
 
     public static AggregationSignature min(String dimension, boolean distinct)
     {
-        return new AggregationSignature(MIN_FUNCTION_NAME, dimension, distinct);
+        return new AggregationSignature(MIN.getName(), dimension, distinct);
     }
 
     public static AggregationSignature max(String dimension, boolean distinct)
     {
-        return new AggregationSignature(MAX_FUNCTION_NAME, dimension, distinct);
+        return new AggregationSignature(MAX.getName(), dimension, distinct);
     }
 
     @JsonProperty

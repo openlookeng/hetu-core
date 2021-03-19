@@ -875,11 +875,13 @@ public class Analysis
     public static final class CubeInsert
     {
         private final TableHandle target;
+        private final TableHandle sourceTable;
         private final List<ColumnHandle> columns;
 
-        public CubeInsert(TableHandle target, List<ColumnHandle> columns)
+        public CubeInsert(TableHandle target, TableHandle sourceTable, List<ColumnHandle> columns)
         {
             this.target = requireNonNull(target, "target is null");
+            this.sourceTable = requireNonNull(sourceTable, "sourceTable is null");
             this.columns = requireNonNull(columns, "columns is null");
             checkArgument(columns.size() > 0, "No columns given to insert");
         }
@@ -892,6 +894,11 @@ public class Analysis
         public TableHandle getTarget()
         {
             return target;
+        }
+
+        public TableHandle getSourceTable()
+        {
+            return sourceTable;
         }
     }
 

@@ -536,7 +536,7 @@ public class IoPlanPrinter
         @Override
         public Void visitCubeFinish(CubeFinishNode node, IoPlanBuilder context)
         {
-            QualifiedObjectName qualifiedObjectName = QualifiedObjectName.valueOf(node.getCubeName());
+            QualifiedObjectName qualifiedObjectName = QualifiedObjectName.valueOf(node.getMetadata().getCubeName());
             context.setOutputTable(new CatalogSchemaTableName(
                     qualifiedObjectName.getCatalogName(),
                     qualifiedObjectName.getSchemaName(),

@@ -63,6 +63,7 @@ import io.prestosql.sql.tree.GrantRoles;
 import io.prestosql.sql.tree.GrantorSpecification;
 import io.prestosql.sql.tree.Identifier;
 import io.prestosql.sql.tree.Insert;
+import io.prestosql.sql.tree.InsertCube;
 import io.prestosql.sql.tree.Intersect;
 import io.prestosql.sql.tree.Isolation;
 import io.prestosql.sql.tree.Join;
@@ -979,19 +980,22 @@ public final class SqlFormatter
             }
             builder.append(formatName(node.getCubeName()));
             builder.append(" ON ");
-            builder.append(formatName(node.getTableName()));
-            builder.append(" WITH ");
-            List<String> aggregations = node.getAggregations().stream().map(Expression::toString).collect(Collectors.toList());
-            String propertyList = node.getProperties().stream()
-                    .map(element -> formatExpression(element.getName(), parameters) + " = " +
-                            formatExpression(element.getValue(), parameters))
+            builder.append(formatName(node.getSourceTableName()));
+            builder.append(" WITH (");
+            String aggregations = node.getAggregations().stream()
+                    .map(Expression::toString)
                     .collect(joining(", "));
-            String groupsList = node.getGroupingSet().stream()
-                    .map(Identifier::toString)
+            String group = node.getGroupingSet().stream()
+                    .map(Identifier::getValue)
                     .collect(joining(", "));
-            builder.append(" ( AGGREGATIONS = (").append(String.join(", ", aggregations)).append(")");
-            builder.append(", GROUP=(").append(groupsList).append(")");
-            builder.append(", PROPERTIES = (").append(propertyList).append(")");
+            builder.append("AGGREGATIONS = (").append(aggregations).append("), ");
+            builder.append("GROUP=(").append(group).append(")");
+            if (!node.getProperties().isEmpty()) {
+                String properties = node.getProperties().stream()
+                        .map(element -> formatExpression(element.getName(), parameters) + " = " + formatExpression(element.getValue(), parameters))
+                        .collect(joining(", "));
+                builder.append(", ").append(properties);
+            }
             builder.append(" )");
             return null;
         }
@@ -1295,6 +1299,24 @@ public final class SqlFormatter
 
             process(node.getQuery(), indent);
 
+            return null;
+        }
+
+        @Override
+        public Void visitInsertCube(InsertCube node, Integer indent)
+        {
+            if (node.isOverwrite()) {
+                builder.append("INSERT OVERWRITE CUBE ")
+                        .append(node.getCubeName());
+            }
+            else {
+                builder.append("INSERT INTO CUBE ")
+                        .append(node.getCubeName());
+            }
+            if (node.getWhere().isPresent()) {
+                builder.append(" WHERE ")
+                        .append(formatExpression(node.getWhere().get(), Optional.empty()));
+            }
             return null;
         }
 

@@ -68,6 +68,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static io.hetu.core.spi.cube.CubeAggregateFunction.COUNT;
+import static io.hetu.core.spi.cube.CubeAggregateFunction.SUM;
 import static io.prestosql.spi.StandardErrorCode.CUBE_ERROR;
 import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
@@ -98,7 +100,7 @@ public class AggregationRewriteWithCube
 
     public PlanNode rewrite(AggregationNode originalAggregationNode, PlanNode filterNode)
     {
-        QualifiedObjectName starTreeTableName = QualifiedObjectName.valueOf(cubeMetadata.getCubeTableName());
+        QualifiedObjectName starTreeTableName = QualifiedObjectName.valueOf(cubeMetadata.getCubeName());
         TableHandle cubeTableHandle = metadata.getTableHandle(session, starTreeTableName)
                 .orElseThrow(() -> new CubeNotFoundException(starTreeTableName.toString()));
         Map<String, ColumnHandle> cubeColumnsMap = metadata.getColumnHandles(session, cubeTableHandle);
@@ -130,7 +132,7 @@ public class AggregationRewriteWithCube
             ColumnMetadata cubeColumnMetadata = metadata.getColumnMetadata(session, cubeTableHandle, cubeColHandle);
             AggregationSignature aggregationSignature = cubeMetadata.getAggregationSignature(cubeColumnMetadata.getName())
                     .orElseThrow(() -> new ColumnNotFoundException(new SchemaTableName(starTreeTableName.getSchemaName(), starTreeTableName.getObjectName()), cubeColHandle.getColumnName()));
-            String aggFunction = AggregationSignature.COUNT_FUNCTION_NAME.equals(aggregationSignature.getFunction()) ? "sum" : aggregationSignature.getFunction();
+            String aggFunction = COUNT.getName().equals(aggregationSignature.getFunction()) ? "sum" : aggregationSignature.getFunction();
             SymbolReference argument = toSymbolReference(aggregatorSource.getScanSymbol());
             FunctionHandle functionHandle = metadata.getFunctionAndTypeManager().lookupFunction(aggFunction, TypeSignatureProvider.fromTypeSignatures(typeSignature));
             aggregationsBuilder.put(aggregatorSource.getOriginalAggSymbol(), new AggregationNode.Aggregation(
@@ -320,7 +322,7 @@ public class AggregationRewriteWithCube
                             }
                             break;
                         case "avg":
-                            AggregationSignature sumSignature = new AggregationSignature(AggregationSignature.SUM_FUNCTION_NAME, originalColumnName, distinct);
+                            AggregationSignature sumSignature = new AggregationSignature(SUM.getName(), originalColumnName, distinct);
                             String sumColumnName = cubeMetadata.getColumn(sumSignature)
                                     .orElseThrow(() -> new PrestoException(CUBE_ERROR, "Cannot find column associated with aggregation " + sumSignature));
                             ColumnHandle sumColumnHandle = cubeColumnsMap.get(sumColumnName);
@@ -341,7 +343,7 @@ public class AggregationRewriteWithCube
                                     }
                                 }
                             }
-                            AggregationSignature countSignature = new AggregationSignature(AggregationSignature.COUNT_FUNCTION_NAME, originalColumnName, distinct);
+                            AggregationSignature countSignature = new AggregationSignature(COUNT.getName(), originalColumnName, distinct);
                             String countColumnName = cubeMetadata.getColumn(countSignature)
                                     .orElseThrow(() -> new PrestoException(CUBE_ERROR, "Cannot find column associated with aggregation " + countSignature));
                             ColumnHandle countColumnHandle = cubeColumnsMap.get(countColumnName);

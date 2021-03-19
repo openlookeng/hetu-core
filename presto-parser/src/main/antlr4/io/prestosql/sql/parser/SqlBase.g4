@@ -61,8 +61,8 @@ statement
     | CREATE CUBE (IF NOT EXISTS)? cubeName=qualifiedName
         ON tableName=qualifiedName
         WITH '(' AGGREGATIONS EQ '(' aggregations ')' ',' GROUP EQ '(' cubeGroup ')' (',' cubeProperties)? ')'   #createCube
-    | INSERT INTO CUBE cubeName=qualifiedName WHERE expression     #insertCube
-    | INSERT OVERWRITE CUBE cubeName=qualifiedName WHERE expression     #insertOverwriteCube
+    | INSERT INTO CUBE cubeName=qualifiedName (WHERE expression)?     #insertCube
+    | INSERT OVERWRITE CUBE cubeName=qualifiedName (WHERE expression)?     #insertOverwriteCube
     | DROP CUBE (IF EXISTS)? cubeName=qualifiedName                    #dropCube
     | SHOW CUBES (FOR tableName=qualifiedName)?                                 #showCubes
     | CREATE INDEX (IF NOT EXISTS)? indexName=qualifiedName

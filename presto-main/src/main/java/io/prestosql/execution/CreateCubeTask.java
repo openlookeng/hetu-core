@@ -17,6 +17,7 @@ package io.prestosql.execution;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.hetu.core.spi.cube.CubeAggregateFunction;
 import io.hetu.core.spi.cube.CubeMetadataBuilder;
 import io.hetu.core.spi.cube.CubeStatus;
 import io.hetu.core.spi.cube.aggregator.AggregationSignature;
@@ -108,7 +109,7 @@ public class CreateCubeTask
             throw new RuntimeException("HetuMetaStore is not initialized");
         }
         QualifiedObjectName cubeName = createQualifiedObjectName(session, statement, statement.getCubeName());
-        QualifiedObjectName tableName = createQualifiedObjectName(session, statement, statement.getTableName());
+        QualifiedObjectName tableName = createQualifiedObjectName(session, statement, statement.getSourceTableName());
         Optional<TableHandle> cubeHandle = metadata.getTableHandle(session, cubeName);
         Optional<TableHandle> tableHandle = metadata.getTableHandle(session, tableName);
 
@@ -134,12 +135,12 @@ public class CreateCubeTask
         }
 
         if (!tableHandle.isPresent()) {
-            throw new SemanticException(MISSING_TABLE, statement, "Table %s does not exist", cubeName);
+            throw new SemanticException(MISSING_TABLE, statement, "Table '%s' does not exist", tableName);
         }
 
         TableMetadata tableMetadata = metadata.getTableMetadata(session, tableHandle.get());
         List<String> groupingSet = statement.getGroupingSet().stream().map(Identifier::getValue).collect(Collectors.toList());
-        Map<String, ColumnMetadata> originalTableColumns = tableMetadata.getColumns().stream().collect(Collectors.toMap(ColumnMetadata::getName, col -> col));
+        Map<String, ColumnMetadata> sourceTableColumns = tableMetadata.getColumns().stream().collect(Collectors.toMap(ColumnMetadata::getName, col -> col));
         List<ColumnMetadata> cubeColumns = new ArrayList<>();
         Map<String, AggregationSignature> aggregations = new HashMap<>();
         Analysis analysis = analyzeStatement(statement, session, metadata, accessControl, parameters, stateMachine.getWarningCollector());
@@ -150,21 +151,22 @@ public class CreateCubeTask
             String argument = aggFunction.getArguments().isEmpty() || aggFunction.getArguments().get(0) instanceof LongLiteral ? null : ((Identifier) aggFunction.getArguments().get(0)).getValue();
             boolean distinct = aggFunction.isDistinct();
             String cubeColumnName = aggFunctionName + "_" + (argument == null ? "all" : argument) + (aggFunction.isDistinct() ? "_distinct" : "");
-            switch (aggFunctionName) {
-                case AggregationSignature.SUM_FUNCTION_NAME:
+            CubeAggregateFunction cubeAggregateFunction = CubeAggregateFunction.valueOf(aggFunctionName.toUpperCase(ENGLISH));
+            switch (cubeAggregateFunction) {
+                case SUM:
                     aggregations.put(cubeColumnName, AggregationSignature.sum(argument, distinct));
                     break;
-                case AggregationSignature.COUNT_FUNCTION_NAME:
+                case COUNT:
                     AggregationSignature aggregationSignature = argument == null ? AggregationSignature.count() : AggregationSignature.count(argument, distinct);
                     aggregations.put(cubeColumnName, aggregationSignature);
                     break;
-                case AggregationSignature.AVG_FUNCTION_NAME:
+                case AVG:
                     aggregations.put(cubeColumnName, AggregationSignature.avg(argument, distinct));
                     break;
-                case AggregationSignature.MAX_FUNCTION_NAME:
+                case MAX:
                     aggregations.put(cubeColumnName, AggregationSignature.max(argument, distinct));
                     break;
-                case AggregationSignature.MIN_FUNCTION_NAME:
+                case MIN:
                     aggregations.put(cubeColumnName, AggregationSignature.min(argument, distinct));
                     break;
                 default:
@@ -195,15 +197,16 @@ public class CreateCubeTask
 
         if (properties.containsKey("partitioned_by")) {
             List<String> partitionCols = new ArrayList<>(((List<String>) properties.get("partitioned_by")));
+            // put all partition columns at the end of the list
             groupingSet.removeAll(partitionCols);
             groupingSet.addAll(partitionCols);
         }
 
         for (String dimension : groupingSet) {
-            if (!originalTableColumns.containsKey(dimension)) {
+            if (!sourceTableColumns.containsKey(dimension)) {
                 throw new SemanticException(MISSING_COLUMN, statement, "Column %s does not exist", dimension);
             }
-            ColumnMetadata tableCol = originalTableColumns.get(dimension);
+            ColumnMetadata tableCol = sourceTableColumns.get(dimension);
             ColumnMetadata cubeCol = new ColumnMetadata(
                     dimension,
                     tableCol.getType(),
@@ -230,7 +233,10 @@ public class CreateCubeTask
         groupingSet.forEach(dimension -> builder.addDimensionColumn(dimension, dimension));
         aggregations.forEach((column, aggregationSignature) -> builder.addAggregationColumn(column, aggregationSignature.getFunction(), aggregationSignature.getDimension(), aggregationSignature.isDistinct()));
         builder.addGroup(new HashSet<>(groupingSet));
+        //Status and Table modified time will be updated on the first insert into the cube
         builder.setCubeStatus(CubeStatus.INACTIVE);
+        builder.setTableLastUpdatedTime(-1L);
+        builder.setCubeLastUpdatedTime(System.currentTimeMillis());
         optionalCubeMetaStore.get().persist(builder.build());
 
         return immediateFuture(null);

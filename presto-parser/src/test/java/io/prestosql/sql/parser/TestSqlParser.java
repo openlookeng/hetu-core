@@ -36,6 +36,7 @@ import io.prestosql.sql.tree.ColumnDefinition;
 import io.prestosql.sql.tree.Comment;
 import io.prestosql.sql.tree.Commit;
 import io.prestosql.sql.tree.ComparisonExpression;
+import io.prestosql.sql.tree.CreateCube;
 import io.prestosql.sql.tree.CreateRole;
 import io.prestosql.sql.tree.CreateSchema;
 import io.prestosql.sql.tree.CreateTable;
@@ -76,6 +77,7 @@ import io.prestosql.sql.tree.GroupingSets;
 import io.prestosql.sql.tree.Identifier;
 import io.prestosql.sql.tree.IfExpression;
 import io.prestosql.sql.tree.Insert;
+import io.prestosql.sql.tree.InsertCube;
 import io.prestosql.sql.tree.Intersect;
 import io.prestosql.sql.tree.IntervalLiteral;
 import io.prestosql.sql.tree.IntervalLiteral.IntervalField;
@@ -1385,38 +1387,6 @@ public class TestSqlParser
     }
 
     @Test
-    public void testCreateCube()
-    {
-//        assertStatement("CREATE CUBE foo ON bar WITH (DIMENSIONS=key,val, AGGREGATIONS=count(\"*\"))",
-//                new CreateCube(QualifiedName.of("foo"),
-//                        QualifiedName.of("bar"),
-//                        ImmutableList.of(
-//                                new Identifier("key"),
-//                                new Identifier("val")),
-//                        false,
-//                        ImmutableList.of(new FunctionCall(QualifiedName.of("COUNT"), ImmutableList.of(new Identifier("*")))),
-//                        Optional.empty()));
-//        assertStatement("CREATE CUBE foo ON bar WITH (DIMENSIONS=key,val, AGGREGATIONS=sum(cost))",
-//                new CreateCube(QualifiedName.of("foo"),
-//                        QualifiedName.of("bar"),
-//                        ImmutableList.of(
-//                                new Identifier("key"),
-//                                new Identifier("val")),
-//                        false,
-//                        ImmutableList.of(new FunctionCall(QualifiedName.of("SUM"), ImmutableList.of(new Identifier("cost")))),
-//                        Optional.empty()));
-//        assertStatement("CREATE CUBE IF NOT EXISTS foo ON bar WITH (DIMENSIONS=key,val, AGGREGATIONS=sum(cost))",
-//                new CreateCube(QualifiedName.of("foo"),
-//                        QualifiedName.of("bar"),
-//                        ImmutableList.of(
-//                                new Identifier("key"),
-//                                new Identifier("val")),
-//                        true,
-//                        ImmutableList.of(new FunctionCall(QualifiedName.of("SUM"), ImmutableList.of(new Identifier("cost")))),
-//                        Optional.empty()));
-    }
-
-    @Test
     public void testCreateTable()
     {
         assertStatement("CREATE TABLE foo (a VARCHAR, b BIGINT COMMENT 'hello world', c IPADDRESS)",
@@ -1662,6 +1632,68 @@ public class TestSqlParser
     }
 
     @Test
+    public void testCreateCube()
+    {
+        assertStatement("CREATE CUBE foo ON bar WITH (AGGREGATIONS=(count(c)), GROUP = (a, b))",
+                new CreateCube(QualifiedName.of("foo"),
+                        QualifiedName.of("bar"),
+                        ImmutableList.of(
+                                new Identifier("a"),
+                                new Identifier("b")),
+                        ImmutableSet.of(
+                                new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("c")))),
+                        false,
+                        ImmutableList.of()));
+
+        assertStatement("CREATE CUBE foo ON bar WITH (AGGREGATIONS=(count(c), sum(d), avg(e)), GROUP = (a, b))",
+                new CreateCube(QualifiedName.of("foo"),
+                        QualifiedName.of("bar"),
+                        ImmutableList.of(
+                                new Identifier("a"),
+                                new Identifier("b")),
+                        ImmutableSet.of(
+                                new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("c"))),
+                                new FunctionCall(QualifiedName.of("sum"), ImmutableList.of(new Identifier("d"))),
+                                new FunctionCall(QualifiedName.of("sum"), ImmutableList.of(new Identifier("e"))),
+                                new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("e")))),
+                        false,
+                        ImmutableList.of()));
+
+        assertStatement("CREATE CUBE c1.s1.foo ON c2.s2.bar WITH (AGGREGATIONS=(count(c)), GROUP = (a, b))",
+                new CreateCube(QualifiedName.of("c1", "s1", "foo"),
+                        QualifiedName.of("c2", "s2", "bar"),
+                        ImmutableList.of(
+                                new Identifier("a"),
+                                new Identifier("b")),
+                        ImmutableSet.of(
+                                new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("c")))),
+                        false,
+                        ImmutableList.of()));
+
+        assertStatement("CREATE CUBE IF NOT EXISTS foo ON bar WITH (AGGREGATIONS=(count(c)), GROUP = (a, b))",
+                new CreateCube(QualifiedName.of("foo"),
+                        QualifiedName.of("bar"),
+                        ImmutableList.of(
+                                new Identifier("a"),
+                                new Identifier("b")),
+                        ImmutableSet.of(
+                                new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("c")))),
+                        true,
+                        ImmutableList.of()));
+
+        assertStatement("CREATE CUBE IF NOT EXISTS foo ON bar WITH (AGGREGATIONS=(count(c)), GROUP = (a, b), format = 'ORC', partitioned_by = ARRAY[ 'd' ])",
+                new CreateCube(QualifiedName.of("foo"),
+                        QualifiedName.of("bar"),
+                        ImmutableList.of(
+                                new Identifier("a"),
+                                new Identifier("b")),
+                        ImmutableSet.of(
+                                new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("c")))),
+                        true,
+                        ImmutableList.of(new Property(new Identifier("format"), new StringLiteral("ORC")), new Property(new Identifier("partitioned_by"), new ArrayConstructor(ImmutableList.of(new StringLiteral("d")))))));
+    }
+
+    @Test
     public void testDropCache()
     {
         assertStatement("DROP CACHE a", new DropCache(QualifiedName.of("a"), false));
@@ -1733,6 +1765,32 @@ public class TestSqlParser
 
         assertStatement("INSERT OVERWRITE a (c1, c2) SELECT * FROM t",
                 new Insert(table, Optional.of(ImmutableList.of(identifier("c1"), identifier("c2"))), query, true));
+    }
+
+    @Test
+    public void testInsertIntoCube()
+    {
+        assertStatement("INSERT INTO CUBE foo WHERE d1 > 10",
+                new InsertCube(QualifiedName.of("foo"),
+                        Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10"))),
+                        false));
+        assertStatement("INSERT INTO CUBE c1.s1.foo WHERE d1 > 10",
+                new InsertCube(QualifiedName.of("c1", "s1", "foo"),
+                        Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10"))),
+                        false));
+    }
+
+    @Test
+    public void testInsertOverwriteCube()
+    {
+        assertStatement("INSERT OVERWRITE CUBE foo WHERE d1 BETWEEN 1012020 AND 31012020",
+                new InsertCube(QualifiedName.of("foo"),
+                        Optional.of(new BetweenPredicate(new Identifier("d1"), new LongLiteral("1012020"), new LongLiteral("31012020"))),
+                        true));
+        assertStatement("INSERT OVERWRITE CUBE c1.s1.foo WHERE d1 BETWEEN 1012020 AND 31012020",
+                new InsertCube(QualifiedName.of("c1", "s1", "foo"),
+                        Optional.of(new BetweenPredicate(new Identifier("d1"), new LongLiteral("1012020"), new LongLiteral("31012020"))),
+                        true));
     }
 
     @Test

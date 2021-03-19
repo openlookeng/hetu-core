@@ -30,29 +30,29 @@ public class CreateCube
 {
     private final QualifiedName cubeName;
     private final boolean notExists;
-    private final QualifiedName tableName;
+    private final QualifiedName sourceTableName;
     private final List<Identifier> groupingSet;
     private final Set<FunctionCall> aggregations;
     private final List<Property> properties;
 
-    public CreateCube(QualifiedName cubeName, QualifiedName tableName, List<Identifier> groupingSet,
+    public CreateCube(QualifiedName cubeName, QualifiedName sourceTableName, List<Identifier> groupingSet,
             Set<FunctionCall> aggregations, boolean notExists, List<Property> properties)
     {
-        this(Optional.empty(), cubeName, tableName, groupingSet, aggregations, notExists, properties);
+        this(Optional.empty(), cubeName, sourceTableName, groupingSet, aggregations, notExists, properties);
     }
 
-    public CreateCube(NodeLocation location, QualifiedName cubeName, QualifiedName tableName, List<Identifier> groupingSet,
+    public CreateCube(NodeLocation location, QualifiedName cubeName, QualifiedName sourceTableName, List<Identifier> groupingSet,
             Set<FunctionCall> aggregations, boolean notExists, List<Property> properties)
     {
-        this(Optional.of(location), cubeName, tableName, groupingSet, aggregations, notExists, properties);
+        this(Optional.of(location), cubeName, sourceTableName, groupingSet, aggregations, notExists, properties);
     }
 
-    private CreateCube(Optional<NodeLocation> location, QualifiedName cubeName, QualifiedName tableName, List<Identifier> groupingSet,
+    private CreateCube(Optional<NodeLocation> location, QualifiedName cubeName, QualifiedName sourceTableName, List<Identifier> groupingSet,
             Set<FunctionCall> aggregations, boolean notExists, List<Property> properties)
     {
         super(location);
         this.cubeName = requireNonNull(cubeName, "cube name is null");
-        this.tableName = requireNonNull(tableName, "table name is null");
+        this.sourceTableName = requireNonNull(sourceTableName, "table name is null");
         this.groupingSet = groupingSet;
         this.aggregations = aggregations;
         this.notExists = notExists;
@@ -64,9 +64,9 @@ public class CreateCube
         return cubeName;
     }
 
-    public QualifiedName getTableName()
+    public QualifiedName getSourceTableName()
     {
-        return tableName;
+        return sourceTableName;
     }
 
     public List<Property> getProperties()
@@ -109,7 +109,7 @@ public class CreateCube
     {
         return Objects.hash(
                 cubeName,
-                tableName,
+                sourceTableName,
                 groupingSet,
                 aggregations,
                 notExists,
@@ -121,7 +121,7 @@ public class CreateCube
     {
         return toStringHelper(this)
                 .add("cubeName", cubeName)
-                .add("tableName", tableName)
+                .add("tableName", sourceTableName)
                 .add("groupingSet", groupingSet)
                 .add("aggregations", aggregations)
                 .add("notExists", notExists)
@@ -140,7 +140,7 @@ public class CreateCube
         }
         CreateCube that = (CreateCube) o;
         return Objects.equals(cubeName, that.cubeName) &&
-                Objects.equals(tableName, that.tableName) &&
+                Objects.equals(sourceTableName, that.sourceTableName) &&
                 Objects.equals(groupingSet, that.groupingSet) &&
                 Objects.equals(aggregations, that.aggregations) &&
                 Objects.equals(notExists, that.notExists) &&

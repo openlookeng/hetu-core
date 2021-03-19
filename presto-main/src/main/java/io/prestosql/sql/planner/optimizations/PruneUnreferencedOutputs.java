@@ -764,9 +764,7 @@ public class PruneUnreferencedOutputs
                     node.getId(),
                     source,
                     node.getRowCountSymbol(),
-                    node.getCubeName(),
-                    node.getDataPredicate(),
-                    node.isOverwrite());
+                    node.getMetadata());
         }
 
         @Override
