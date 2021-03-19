@@ -485,7 +485,8 @@ public class ServerMainModule
         // presto announcement
         discoveryBinder(binder).bindHttpAnnouncement("presto")
                 .addProperty("node_version", nodeVersion.toString())
-                .addProperty("coordinator", String.valueOf(serverConfig.isCoordinator()));
+                .addProperty("coordinator", String.valueOf(serverConfig.isCoordinator()))
+                .addProperty("worker", String.valueOf(!serverConfig.isCoordinator() || buildConfigObject(NodeSchedulerConfig.class).isIncludeCoordinator()));
 
         // server info resource
         jaxrsBinder(binder).bind(ServerInfoResource.class);

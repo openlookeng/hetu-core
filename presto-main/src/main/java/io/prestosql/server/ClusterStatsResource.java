@@ -20,6 +20,7 @@ import io.prestosql.execution.QueryState;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.memory.ClusterMemoryManager;
 import io.prestosql.memory.MemoryInfo;
+import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.metadata.NodeState;
 
@@ -58,11 +59,11 @@ public class ClusterStatsResource
         long blockedQueries = 0;
         long queuedQueries = 0;
         long activeNodes = nodeManager.getNodes(NodeState.ACTIVE).stream()
-                .filter(node -> isIncludeCoordinator || !node.isCoordinator())
+                .filter(InternalNode::isWorker)
                 .count();
 
         long activeCoordinators = nodeManager.getNodes(NodeState.ACTIVE).stream()
-                .filter(node -> node.isCoordinator())
+                .filter(InternalNode::isCoordinator)
                 .count();
         long totalAvailableProcessors = clusterMemoryManager.getTotalAvailableProcessors();
         long totalClusterMemory = clusterMemoryManager.getClusterMemoryBytes();

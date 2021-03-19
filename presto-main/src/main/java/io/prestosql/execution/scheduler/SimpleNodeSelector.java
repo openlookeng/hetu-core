@@ -114,11 +114,8 @@ public class SimpleNodeSelector
     public int selectableNodeCount()
     {
         NodeMap map = nodeMap.get().get();
-        if (includeCoordinator) {
-            return map.getNodesByHostAndPort().size();
-        }
         return (int) map.getNodesByHostAndPort().values().stream()
-                .filter(node -> !map.getCoordinatorNodeIds().contains(node.getNodeIdentifier()))
+                .filter(InternalNode::isWorker)
                 .count();
     }
 
@@ -132,7 +129,7 @@ public class SimpleNodeSelector
     @Override
     public List<InternalNode> selectRandomNodes(int limit, Set<InternalNode> excludedNodes)
     {
-        return selectNodes(limit, randomizedNodes(nodeMap.get().get(), includeCoordinator, excludedNodes));
+        return selectNodes(limit, randomizedNodes(nodeMap.get().get(), excludedNodes));
     }
 
     @Override
@@ -142,7 +139,7 @@ public class SimpleNodeSelector
         NodeMap nodeMap = this.nodeMap.get().get();
         NodeAssignmentStats assignmentStats = new NodeAssignmentStats(nodeTaskMap, nodeMap, existingTasks);
 
-        ResettableRandomizedIterator<InternalNode> randomCandidates = randomizedNodes(nodeMap, includeCoordinator, ImmutableSet.of());
+        ResettableRandomizedIterator<InternalNode> randomCandidates = randomizedNodes(nodeMap, ImmutableSet.of());
         Set<InternalNode> blockedExactNodes = new HashSet<>();
         boolean splitWaitingForAnyNode = false;
         // splitsToBeRedistributed becomes true only when splits go through locality-based assignment
