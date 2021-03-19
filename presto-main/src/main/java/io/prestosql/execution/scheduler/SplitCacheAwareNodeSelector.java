@@ -113,7 +113,7 @@ public class SplitCacheAwareNodeSelector
     @Override
     public List<InternalNode> selectRandomNodes(int limit, Set<InternalNode> excludedNodes)
     {
-        return selectNodes(limit, randomizedNodes(nodeMap.get().get(), includeCoordinator, excludedNodes));
+        return selectNodes(limit, randomizedNodes(nodeMap.get().get(), excludedNodes));
     }
 
     @Override

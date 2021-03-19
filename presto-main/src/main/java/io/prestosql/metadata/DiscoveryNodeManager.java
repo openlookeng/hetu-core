@@ -131,7 +131,7 @@ public final class DiscoveryNodeManager
             URI uri = getHttpUri(service, httpsRequired);
             NodeVersion nodeVersion = getNodeVersion(service);
             if (uri != null && nodeVersion != null) {
-                InternalNode node = new InternalNode(service.getNodeId(), uri, nodeVersion, isCoordinator(service));
+                InternalNode node = new InternalNode(service.getNodeId(), uri, nodeVersion, isCoordinator(service), isWorker(service));
 
                 if (node.getNodeIdentifier().equals(currentNodeId)) {
                     checkState(
@@ -240,7 +240,7 @@ public final class DiscoveryNodeManager
             NodeVersion nodeVersion = getNodeVersion(service);
             boolean coordinator = isCoordinator(service);
             if (uri != null && nodeVersion != null) {
-                InternalNode node = new InternalNode(service.getNodeId(), uri, nodeVersion, coordinator);
+                InternalNode node = new InternalNode(service.getNodeId(), uri, nodeVersion, coordinator, isWorker(service));
                 NodeState nodeState = getNodeState(node);
 
                 switch (nodeState) {
@@ -436,5 +436,10 @@ public final class DiscoveryNodeManager
     private static boolean isCoordinator(ServiceDescriptor service)
     {
         return Boolean.parseBoolean(service.getProperties().get("coordinator"));
+    }
+
+    private static boolean isWorker(ServiceDescriptor service)
+    {
+        return Boolean.parseBoolean(service.getProperties().get("worker"));
     }
 }

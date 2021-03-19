@@ -14,7 +14,6 @@
 package io.prestosql.cost;
 
 import io.prestosql.Session;
-import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.InternalNodeManager;
 
@@ -33,17 +32,13 @@ public class TaskCountEstimator
     private final IntSupplier numberOfNodes;
 
     @Inject
-    public TaskCountEstimator(NodeSchedulerConfig nodeSchedulerConfig, InternalNodeManager nodeManager)
+    public TaskCountEstimator(InternalNodeManager nodeManager)
     {
-        requireNonNull(nodeSchedulerConfig, "nodeSchedulerConfig is null");
         requireNonNull(nodeManager, "nodeManager is null");
         this.numberOfNodes = () -> {
             Set<InternalNode> activeNodes = nodeManager.getAllNodes().getActiveNodes();
-            if (nodeSchedulerConfig.isIncludeCoordinator()) {
-                return activeNodes.size();
-            }
             return toIntExact(activeNodes.stream()
-                    .filter(node -> !node.isCoordinator())
+                    .filter(InternalNode::isWorker)
                     .count());
         };
     }

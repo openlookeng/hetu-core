@@ -225,10 +225,10 @@ public class NodeScheduler
         return selected;
     }
 
-    public static ResettableRandomizedIterator<InternalNode> randomizedNodes(NodeMap nodeMap, boolean includeCoordinator, Set<InternalNode> excludedNodes)
+    public static ResettableRandomizedIterator<InternalNode> randomizedNodes(NodeMap nodeMap, Set<InternalNode> excludedNodes)
     {
         ImmutableList<InternalNode> nodes = nodeMap.getNodesByHostAndPort().values().stream()
-                .filter(node -> includeCoordinator || !nodeMap.getCoordinatorNodeIds().contains(node.getNodeIdentifier()))
+                .filter(InternalNode::isWorker)
                 .filter(node -> !excludedNodes.contains(node))
                 .collect(toImmutableList());
         return new ResettableRandomizedIterator<>(nodes);
@@ -237,11 +237,10 @@ public class NodeScheduler
     public static List<InternalNode> selectExactNodes(NodeMap nodeMap, List<HostAddress> hosts, boolean includeCoordinator)
     {
         Set<InternalNode> chosen = new LinkedHashSet<>();
-        Set<String> coordinatorIds = nodeMap.getCoordinatorNodeIds();
 
         for (HostAddress host : hosts) {
             nodeMap.getNodesByHostAndPort().get(host).stream()
-                    .filter(node -> includeCoordinator || !coordinatorIds.contains(node.getNodeIdentifier()))
+                    .filter(InternalNode::isWorker)
                     .forEach(chosen::add);
 
             InetAddress address;
@@ -256,7 +255,7 @@ public class NodeScheduler
             // consider a split with a host without a port as being accessible by all nodes in that host
             if (!host.hasPort()) {
                 nodeMap.getNodesByHost().get(address).stream()
-                        .filter(node -> includeCoordinator || !coordinatorIds.contains(node.getNodeIdentifier()))
+                        .filter(InternalNode::isWorker)
                         .forEach(chosen::add);
             }
         }

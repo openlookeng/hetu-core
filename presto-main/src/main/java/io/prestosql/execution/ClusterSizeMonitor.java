@@ -19,8 +19,8 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.units.Duration;
 import io.prestosql.execution.scheduler.DynamicSplitPlacementPolicy;
-import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.metadata.AllNodes;
+import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.service.PropertyService;
@@ -32,9 +32,11 @@ import javax.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
@@ -48,7 +50,6 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 public class ClusterSizeMonitor
 {
     private final InternalNodeManager nodeManager;
-    private final boolean includeCoordinator;
     private final int executionMinCount;
     private final Duration executionMaxWait;
     private final ScheduledExecutorService executor;
@@ -62,11 +63,10 @@ public class ClusterSizeMonitor
     private final List<SettableFuture<?>> futures = new ArrayList<>();
 
     @Inject
-    public ClusterSizeMonitor(InternalNodeManager nodeManager, NodeSchedulerConfig nodeSchedulerConfig, QueryManagerConfig queryManagerConfig)
+    public ClusterSizeMonitor(InternalNodeManager nodeManager, QueryManagerConfig queryManagerConfig)
     {
         this(
                 nodeManager,
-                requireNonNull(nodeSchedulerConfig, "nodeSchedulerConfig is null").isIncludeCoordinator(),
                 requireNonNull(queryManagerConfig, "queryManagerConfig is null").getRequiredWorkers(),
                 queryManagerConfig.getRequiredWorkersMaxWait());
     }
@@ -74,12 +74,10 @@ public class ClusterSizeMonitor
     //TODO remove queryRetryWait after Discovery Service AA is implemented
     public ClusterSizeMonitor(
             InternalNodeManager nodeManager,
-            boolean includeCoordinator,
             int executionMinCount,
             Duration executionMaxWait)
     {
         this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
-        this.includeCoordinator = includeCoordinator;
         checkArgument(executionMinCount >= 0, "executionMinCount is negative");
         this.executionMinCount = executionMinCount;
         this.executionMaxWait = requireNonNull(executionMaxWait, "executionMaxWait is null");
@@ -143,12 +141,8 @@ public class ClusterSizeMonitor
 
     private synchronized void updateAllNodes(AllNodes allNodes)
     {
-        if (includeCoordinator) {
-            currentCount = allNodes.getActiveNodes().size();
-        }
-        else {
-            currentCount = Sets.difference(allNodes.getActiveNodes(), allNodes.getActiveCoordinators()).size();
-        }
+        Set<InternalNode> nonWorkerCoordinators = allNodes.getActiveCoordinators().stream().filter(node -> !node.isWorker()).collect(Collectors.toSet());
+        currentCount = Sets.difference(allNodes.getActiveNodes(), nonWorkerCoordinators).size();
         if (currentCount >= executionMinCount) {
             ImmutableList<SettableFuture<?>> listeners = ImmutableList.copyOf(futures);
             futures.clear();
