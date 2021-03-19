@@ -375,7 +375,6 @@ public class OrcSelectiveRecordReader
             matchingRowsInBatchArray = new int[matchingRowsInBlock.size()];
             IntStream.range(0, matchingRowsInBlock.size()).forEach(
                     i -> matchingRowsInBatchArray[i] = matchingRowsInBlock.get(i));
-            log.debug("Find matching rows from stripe. Matching row count for the block = %d", matchingRowsInBatchArray.length);
         }
 
         if (positions == null || positions.length < batchSize) {
