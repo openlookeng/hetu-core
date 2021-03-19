@@ -27,6 +27,7 @@ import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.type.Type;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -178,9 +179,9 @@ public class PartitionIndexWriter
             partitionIndex.setProperties(properties);
             Path filePath = Paths.get(dbPath + "/" + BTreeIndex.FILE_NAME);
 
-            try {
-                fs.createDirectories(filePath.getParent());
-                partitionIndex.serialize(fs.newOutputStream(filePath));
+            fs.createDirectories(filePath.getParent());
+            try (OutputStream os = fs.newOutputStream(filePath)) {
+                partitionIndex.serialize(os);
             }
             catch (IOException e) {
                 // roll back creation
