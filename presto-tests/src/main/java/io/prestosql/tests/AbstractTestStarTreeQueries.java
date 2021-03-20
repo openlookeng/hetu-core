@@ -84,35 +84,37 @@ public abstract class AbstractTestStarTreeQueries
     @Test
     public void testShowCubes()
     {
-        assertUpdate(sessionNoStarTree, "CREATE CUBE nation_show_cube_1 ON nation " +
+        computeActual("CREATE TABLE nation_show_cube_table_1 AS SELECT * FROM nation");
+        assertUpdate(sessionNoStarTree, "CREATE CUBE nation_show_cube_1 ON nation_show_cube_table_1 " +
                 "WITH (AGGREGATIONS=(count(*), COUNT(distinct nationkey), count(distinct regionkey), avg(nationkey), count(regionkey), sum(regionkey)," +
                 " min(regionkey), max(regionkey), max(nationkey), min(nationkey))," +
                 " group=(nationkey), format= 'orc', partitioned_by = ARRAY['nationkey'])");
-        assertUpdate(sessionNoStarTree, "CREATE CUBE nation_show_cube_2 ON nation " +
+        assertUpdate(sessionNoStarTree, "CREATE CUBE nation_show_cube_2 ON nation_show_cube_table_1 " +
                 "WITH (AGGREGATIONS=(count(*), COUNT(distinct nationkey), count(distinct regionkey), avg(nationkey), count(regionkey), sum(regionkey)," +
                 " min(regionkey), max(regionkey), max(nationkey), min(nationkey))," +
                 " group=())");
-        MaterializedResult result = computeActual("SHOW CUBES");
+        MaterializedResult result = computeActual("SHOW CUBES FOR nation_show_cube_table_1");
         MaterializedRow matchingRow1 = result.getMaterializedRows().stream().filter(row -> row.getField(0).toString().contains("nation_show_cube_1")).findFirst().orElse(null);
         assertNotNull(matchingRow1);
-        assertTrue(matchingRow1.getFields().containsAll(ImmutableList.of("hive.tpch.nation_show_cube_1", "hive.tpch.nation", "Inactive", "nationkey")));
+        assertTrue(matchingRow1.getFields().containsAll(ImmutableList.of("hive.tpch.nation_show_cube_1", "hive.tpch.nation_show_cube_table_1", "Inactive", "nationkey")));
 
         MaterializedRow matchingRow2 = result.getMaterializedRows().stream().filter(row -> row.getField(0).toString().contains("nation_show_cube_2")).findFirst().orElse(null);
         assertNotNull(matchingRow2);
-        assertTrue(matchingRow2.getFields().containsAll(ImmutableList.of("hive.tpch.nation_show_cube_2", "hive.tpch.nation", "Inactive", "")));
+        assertTrue(matchingRow2.getFields().containsAll(ImmutableList.of("hive.tpch.nation_show_cube_2", "hive.tpch.nation_show_cube_table_1", "Inactive", "")));
 
-        result = computeActual("SHOW CUBES FOR nation");
+        result = computeActual("SHOW CUBES FOR nation_show_cube_table_1");
         assertEquals(result.getRowCount(), 2);
 
         matchingRow1 = result.getMaterializedRows().stream().filter(row -> row.getField(0).toString().contains("nation_show_cube_1")).findFirst().orElse(null);
         assertNotNull(matchingRow1);
-        assertTrue(result.getMaterializedRows().get(0).getFields().containsAll(ImmutableList.of("hive.tpch.nation_show_cube_1", "hive.tpch.nation", "Inactive", "nationkey")));
+        assertTrue(result.getMaterializedRows().get(0).getFields().containsAll(ImmutableList.of("hive.tpch.nation_show_cube_1", "hive.tpch.nation_show_cube_table_1", "Inactive", "nationkey")));
 
         matchingRow2 = result.getMaterializedRows().stream().filter(row -> row.getField(0).toString().contains("nation_show_cube_2")).findFirst().orElse(null);
         assertNotNull(matchingRow2);
-        assertTrue(result.getMaterializedRows().get(1).getFields().containsAll(ImmutableList.of("hive.tpch.nation_show_cube_2", "hive.tpch.nation", "Inactive", "")));
+        assertTrue(result.getMaterializedRows().get(1).getFields().containsAll(ImmutableList.of("hive.tpch.nation_show_cube_2", "hive.tpch.nation_show_cube_table_1", "Inactive", "")));
         assertUpdate("DROP CUBE nation_show_cube_1");
         assertUpdate("DROP CUBE nation_show_cube_2");
+        assertUpdate("DROP TABLE nation_show_cube_table_1");
     }
 
     @Test
@@ -188,11 +190,6 @@ public abstract class AbstractTestStarTreeQueries
         assertNotNull(matchingRow);
         assertEquals(matchingRow.getField(2), "Active");
 
-        assertUpdate("INSERT INTO nation_table_status_test VALUES (12345, 'name', 54321, 'comment')", 1);
-        result = computeActual("SHOW CUBES FOR nation_table_status_test");
-        matchingRow = result.getMaterializedRows().stream().filter(row -> row.getField(0).toString().contains("nation_status_cube_1")).findFirst().orElse(null);
-        assertNotNull(matchingRow);
-        assertEquals(matchingRow.getField(2), "Expired");
         assertUpdate("DROP CUBE nation_status_cube_1");
         assertUpdate("DROP TABLE nation_table_status_test");
     }
