@@ -18,7 +18,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import io.airlift.log.Logging;
-import io.airlift.testing.mysql.TestingMySqlServer;
 import io.airlift.tpch.TpchTable;
 import io.hetu.core.cube.startree.StarTreePlugin;
 import io.hetu.core.metastore.HetuMetastorePlugin;
@@ -85,12 +84,6 @@ public final class HiveQueryRunner
             throws Exception
     {
         return createQueryRunner(tables, ImmutableMap.of(), Optional.empty());
-    }
-
-    public static DistributedQueryRunner createQueryRunnerWithMetaStore(Iterable<TpchTable<?>> tables, TestingMySqlServer mySqlServer)
-            throws Exception
-    {
-        return createQueryRunner(tables, ImmutableMap.of(), "sql-standard", ImmutableMap.of(), Optional.empty(), false, mySqlServer.getJdbcUrl("hive"));
     }
 
     public static DistributedQueryRunner createQueryRunnerWithStateStore(Iterable<TpchTable<?>> tables)
