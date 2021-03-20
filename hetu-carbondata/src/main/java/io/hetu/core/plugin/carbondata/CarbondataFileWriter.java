@@ -93,6 +93,7 @@ public class CarbondataFileWriter
 {
     private static final Logger LOG =
             LogServiceFactory.getLogService(CarbondataFileWriter.class.getName());
+    private static final io.airlift.log.Logger AIR_LOG = io.airlift.log.Logger.get(CarbondataFileWriter.class);
 
     private static final String LOAD_MODEL = "mapreduce.carbontable.load.model";
 
@@ -143,6 +144,7 @@ public class CarbondataFileWriter
                 Long.toString(System.currentTimeMillis()));
         this.taskId = taskId.orElseGet(() -> 0);
 
+        AIR_LOG.debug("[carbonWriterTask] taskId: " + this.taskId + ", outputPath: " + this.outPutPath);
         try {
             if (HiveACIDWriteType.isUpdateOrDelete(this.acidWriteType)) {
                 String encodedCarbonTable = configuration.get(CarbondataConstants.CarbonTable);
@@ -187,7 +189,7 @@ public class CarbondataFileWriter
                     fileColumnTypes.get(structFields.get(i).getFieldID()));
         }
 
-        if (this.acidWriteType == HiveACIDWriteType.INSERT | this.acidWriteType == HiveACIDWriteType.INSERT_OVERWRITE) {
+        if (this.acidWriteType == HiveACIDWriteType.INSERT || this.acidWriteType == HiveACIDWriteType.INSERT_OVERWRITE) {
             try {
                 boolean compress = HiveConf.getBoolVar(configuration, COMPRESSRESULT);
 

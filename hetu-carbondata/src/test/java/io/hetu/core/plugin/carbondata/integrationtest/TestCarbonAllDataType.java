@@ -50,6 +50,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.text.ParseException;
@@ -61,6 +62,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.stream.Stream;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -1529,6 +1531,95 @@ public class TestCarbonAllDataType
         hetuServer.execute("drop table if exists  testdb.partitiontesttable1");
         hetuServer.execute("drop table if exists testdb.partitiontesttable2");
         assertEquals("true", "false");
+    }
+
+    @Test
+    public void test_writer_count() throws SQLException
+    {
+        hetuServer.execute("drop table if exists testdb.testorders1");
+        hetuServer.execute("set session task_writer_count=32");
+        hetuServer.execute("set session implicit_conversion=true");
+        hetuServer.execute("CREATE TABLE testdb.testorders1(orderkey int, orderstatus STRING, totalprice double, orderdate date)");
+        hetuServer.execute("INSERT INTO testdb.testorders1 VALUES(10,'SUCCESS', 125.15, DATE'2919-05-17')");
+        hetuServer.execute("INSERT INTO testdb.testorders1 VALUES(20,'SUCCESS', 125.15, DATE'2919-05-17')");
+        hetuServer.execute("INSERT INTO testdb.testorders1 VALUES(30,'SUCCESS', 125.15, DATE'2919-05-17')");
+
+        hetuServer.execute("CREATE TABLE testdb.testorders_bak(orderkey bigint, orderstatus varchar(7), totalprice double, orderdate date)");
+        hetuServer.execute("insert into testdb.testorders_bak(orderkey, orderstatus, totalprice) select orderkey, orderstatus, totalprice from testorders1");
+
+        hetuServer.execute("set session task_writer_count=1");
+        List<Map<String, Object>>  actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testorders_bak");
+
+        List<Map<String, Object>>  expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{    put("RESULT", 3); }});
+        }};
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        // checking correct number of files created in Fact
+        File files1 = null;
+        files1 = new File(storePath + "/carbon.store/testdb/testorders_bak/Fact");
+        File[] fileListPart0 = files1.listFiles();//Part0
+
+        if (fileListPart0.length == 1) {
+            File[] Segment_0 = fileListPart0[0].listFiles();
+            if (Segment_0.length == 1) {
+                File[] fileListSegment_0 = Segment_0[0].listFiles();
+                if (fileListSegment_0.length == 6) {
+                    assertEquals("true", "true");
+                }
+                assertEquals(fileListSegment_0.length, 6);
+            }
+            assertEquals(Segment_0.length, 1);
+        }
+        assertEquals(fileListPart0.length, 1);
+
+        //test with 16
+        hetuServer.execute("set session task_writer_count=16");
+        hetuServer.execute("insert into testdb.testorders_bak(orderkey, orderstatus, totalprice) select orderkey, orderstatus, totalprice from testorders1");
+
+        hetuServer.execute("set session task_writer_count=1");
+        actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testorders_bak");
+
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{    put("RESULT", 6); }});
+        }};
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        //test with 8
+        hetuServer.execute("set session task_writer_count=8");
+        hetuServer.execute("insert into testdb.testorders_bak(orderkey, orderstatus, totalprice) select orderkey, orderstatus, totalprice from testorders1");
+
+        hetuServer.execute("set session task_writer_count=1");
+        actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testorders_bak");
+
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{    put("RESULT", 9); }});
+        }};
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        //test with 2
+        hetuServer.execute("set session task_writer_count=2");
+        hetuServer.execute("insert into testdb.testorders_bak(orderkey, orderstatus, totalprice) select orderkey, orderstatus, totalprice from testorders1");
+
+        hetuServer.execute("set session task_writer_count=1");
+        actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testorders_bak");
+
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{    put("RESULT", 12); }});
+        }};
+        Assert.assertEquals(actualResult.toString(), expectedResult.toString());
+
+        try {
+            hetuServer.execute("set session task_writer_count=32");
+            hetuServer.execute("VACUUM TABLE testdb.testorders_bak AND WAIT");
+            assertEquals(FileFactory.isFileExist(storePath +
+                    "/carbon.store/testdb/testorders_bak/Fact/Part0/Segment_0.1", false), true);
+        } catch (IOException e) {
+        }
+
+        hetuServer.execute("drop table if exists testdb.testorders1");
+        hetuServer.execute("drop table if exists testdb.testorders_bak");
+        hetuServer.execute("set session task_writer_count=1");
     }
 
 }

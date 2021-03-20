@@ -30,6 +30,7 @@ import org.apache.hadoop.mapred.JobConf;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Properties;
 
 import static java.util.Objects.requireNonNull;
@@ -67,10 +68,19 @@ public class CarbondataFileWriterFactory
                                                      Optional<HiveACIDWriteType> acidWriteType)
     {
         try {
+            int taskId = session.getTaskId().getAsInt();
+            int driverId = session.getDriverId().getAsInt();
+            int taskWriterCount = session.getTaskWriterCount();
+            //taskId starts from 0.
+            //driverId starts from 0 and will be < taskWriterCount.
+            //taskWriterCount starts from 1
+            // for taskId n, buckets will be between n*taskWriterCount (inclusive) and (n+1)*taskWriterCount (exclusive)
+            int bucketNumber = taskId * taskWriterCount + driverId;
+
             /* Create a DeleteDeltaFileWriter */
             return Optional
                     .of(new CarbondataFileWriter(path, inputColumnNames, schema, configuration,
-                            typeManager, acidOptions, acidWriteType, session.getTaskId()));
+                            typeManager, acidOptions, acidWriteType, OptionalInt.of(bucketNumber)));
         }
         catch (SerDeException e) {
             throw new RuntimeException("Error while creating carbon file writer", e);
