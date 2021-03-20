@@ -31,6 +31,7 @@ import io.prestosql.execution.TableCacheInfo;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.MetadataManager;
 import io.prestosql.metadata.SessionPropertyManager.SessionPropertyValue;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.HetuConstant;
@@ -230,6 +231,12 @@ final class ShowQueriesRewrite
         @Override
         protected Node visitShowTables(ShowTables showTables, Void context)
         {
+            if (metadata instanceof MetadataManager) {
+                MetadataManager metadataManager = (MetadataManager) metadata;
+                if (metadataManager.getDataCenterConnectorManager() != null) {
+                    metadataManager.getDataCenterConnectorManager().loadAllDCCatalogs();
+                }
+            }
             CatalogSchemaName schema = createCatalogSchemaName(session, showTables, showTables.getSchema());
 
             accessControl.checkCanShowTablesMetadata(session.getRequiredTransactionId(), session.getIdentity(), schema);

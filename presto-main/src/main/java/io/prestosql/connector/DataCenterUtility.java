@@ -40,8 +40,14 @@ public class DataCenterUtility
     public static void loadDCCatalogForUseTask(Use statement, Metadata metadata, Session session)
     {
         Optional<Identifier> catalogIdentifier = statement.getCatalog();
-        if (catalogIdentifier.isPresent()) {
-            Optional<String> catalogName = Optional.ofNullable(catalogIdentifier.get().getValue());
+        Optional<String> catalogName = Optional.empty();
+        if (!catalogIdentifier.isPresent()) {
+            catalogName = session.getCatalog();
+        }
+        else {
+            catalogName = Optional.ofNullable(catalogIdentifier.get().getValue());
+        }
+        if (catalogName.isPresent()) {
             if (catalogName.isPresent()) {
                 MetadataManager metadataManager = (MetadataManager) metadata;
                 DataCenterConnectorManager dataCenterConnectorManager = metadataManager.getDataCenterConnectorManager();
