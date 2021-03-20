@@ -35,6 +35,7 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static io.prestosql.statestore.StateStoreConstants.CROSS_REGION_DYNAMIC_FILTER_COLLECTION;
 import static java.util.Objects.requireNonNull;
@@ -51,10 +52,13 @@ public class CrossRegionDynamicFilterOperator
     private boolean finished;
     private Page currentPage;
     private final Map<Integer, BloomFilter> bloomFilterMap = new HashMap<>();
+    private final List<Symbol> outputNodeSybmols;
+    private final Map<String, Integer> columnToSymbolMapping = new HashMap<>();
+    private boolean enabledDynamicFilter = true;
 
     private final SingleInputSnapshotState snapshotState;
 
-    public CrossRegionDynamicFilterOperator(OperatorContext operatorContext, String queryId, List<Symbol> symbols, TypeProvider typeProvider, DynamicFilterCacheManager dynamicFilterCacheManager, List<String> columns)
+    public CrossRegionDynamicFilterOperator(OperatorContext operatorContext, String queryId, List<Symbol> symbols, TypeProvider typeProvider, DynamicFilterCacheManager dynamicFilterCacheManager, List<String> columns, List<Symbol> outputNodeSybmols)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.queryId = queryId;
@@ -62,6 +66,8 @@ public class CrossRegionDynamicFilterOperator
         this.symbols = symbols;
         this.columns = columns;
         this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, null) : null;
+        this.outputNodeSybmols = outputNodeSybmols;
+        findMapping();
     }
 
     @Override
@@ -74,6 +80,25 @@ public class CrossRegionDynamicFilterOperator
     public boolean needsInput()
     {
         return !finished && currentPage == null;
+    }
+
+    private void findMapping()
+    {
+        if (columns == null || symbols == null || outputNodeSybmols == null) {
+            enabledDynamicFilter = false;
+            return;
+        }
+
+        for (int i = 0; i < symbols.size(); i++) {
+            Symbol symbol = symbols.get(i);
+            for (int j = 0; j < outputNodeSybmols.size(); j++) {
+                Symbol outputSymbol = outputNodeSybmols.get(j);
+                if (symbol.getName().equals(outputSymbol.getName())) {
+                    columnToSymbolMapping.put(columns.get(j), i);
+                    break;
+                }
+            }
+        }
     }
 
     @Override
@@ -90,10 +115,15 @@ public class CrossRegionDynamicFilterOperator
             }
         }
 
-        updateBloomFilter();
+        if (enabledDynamicFilter) {
+            updateBloomFilter();
 
-        if (!bloomFilterMap.isEmpty()) {
-            currentPage = BloomFilterUtils.filter(page, bloomFilterMap);
+            if (!bloomFilterMap.isEmpty()) {
+                currentPage = BloomFilterUtils.filter(page, bloomFilterMap);
+            }
+            else {
+                currentPage = page;
+            }
         }
         else {
             currentPage = page;
@@ -147,19 +177,12 @@ public class CrossRegionDynamicFilterOperator
                 return;
             }
 
-            for (int i = 0; i < symbols.size(); i++) {
-                String columnName;
-                // if symbols is not null, we use columns to get columnName
-                if (columns != null && columns.size() > 0) {
-                    columnName = columns.get(i);
-                }
-                else {
-                    columnName = symbols.get(i).getName();
-                }
-                if (bloomFilters.containsKey(columnName) && !bloomFilterMap.containsKey(i)) {
+            Set<String> columnNames = columnToSymbolMapping.keySet();
+            for (String columnName : columnNames) {
+                if (bloomFilters.containsKey(columnName) && !bloomFilterMap.containsKey(columnToSymbolMapping.get(columnName))) {
                     // Deserialize new bloomfilters
                     try (ByteArrayInputStream input = new ByteArrayInputStream(bloomFilters.get(columnName))) {
-                        bloomFilterMap.put(i, BloomFilter.readFrom(input));
+                        bloomFilterMap.put(columnToSymbolMapping.get(columnName), BloomFilter.readFrom(input));
                     }
                     catch (IOException e) {
                         // ignore the bloomfilter if broken
@@ -207,8 +230,9 @@ public class CrossRegionDynamicFilterOperator
         private final List<Symbol> symbols;
         private final TypeProvider typeProvider;
         private final List<String> columns;
+        private final List<Symbol> outputNodeSybmols;
 
-        public CrossRegionDynamicFilterOperatorFactory(int operatorId, PlanNodeId planNodeId, String queryId, List<Symbol> symbols, TypeProvider typeProvider, DynamicFilterCacheManager dynamicFilterCacheManager, List<String> columns)
+        public CrossRegionDynamicFilterOperatorFactory(int operatorId, PlanNodeId planNodeId, String queryId, List<Symbol> symbols, TypeProvider typeProvider, DynamicFilterCacheManager dynamicFilterCacheManager, List<String> columns, List<Symbol> outputNodeSybmols)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -217,13 +241,14 @@ public class CrossRegionDynamicFilterOperator
             this.typeProvider = requireNonNull(typeProvider, "typeProvider is null");
             this.dynamicFilterCacheManager = dynamicFilterCacheManager;
             this.columns = columns;
+            this.outputNodeSybmols = outputNodeSybmols;
         }
 
         @Override
         public Operator createOperator(DriverContext driverContext)
         {
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, CrossRegionDynamicFilterOperator.class.getSimpleName());
-            return new CrossRegionDynamicFilterOperator(operatorContext, queryId, symbols, typeProvider, dynamicFilterCacheManager, columns);
+            return new CrossRegionDynamicFilterOperator(operatorContext, queryId, symbols, typeProvider, dynamicFilterCacheManager, columns, outputNodeSybmols);
         }
 
         @Override
@@ -234,7 +259,7 @@ public class CrossRegionDynamicFilterOperator
         @Override
         public OperatorFactory duplicate()
         {
-            return new CrossRegionDynamicFilterOperatorFactory(operatorId, planNodeId, queryId, symbols, typeProvider, dynamicFilterCacheManager, columns);
+            return new CrossRegionDynamicFilterOperatorFactory(operatorId, planNodeId, queryId, symbols, typeProvider, dynamicFilterCacheManager, columns, outputNodeSybmols);
         }
     }
 }
