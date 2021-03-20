@@ -64,57 +64,55 @@ public class TestIndexRecordManager
                 .setDbPassword(mysqlServer.getPassword()));
     }
 
-// TODO: This test is not stable. There are chances that index records are not properly created. Probably needs changes from hetu-metastore.
+    @Test(timeOut = 30000)
+    public void testConcurrentMultipleManagers()
+            throws IOException, InterruptedException
+    {
+        Random random = new Random();
+        String[] names = new String[] {"a", "b", "c"};
+        Thread[] threads = new Thread[4];
 
-//    @Test(timeOut = 30000)
-//    public void testConcurrentMultipleManagers()
-//            throws IOException, InterruptedException
-//    {
-//        Random random = new Random();
-//        String[] names = new String[] {"a", "b", "c"};
-//        Thread[] threads = new Thread[4];
-//
-//        // create index with name[0], name[1], name[2]
-//        for (int i = 0; i < 3; i++) {
-//            int finalI = i;
-//            threads[i] = new Thread(() -> {
-//                try {
-//                    Thread.sleep(random.nextInt(100));
-//                    new IndexRecordManager(testMetastore1)
-//                            .addIndexRecord(names[finalI], "testUser", "c.s.t", new String[] {"testColumn"}, names[finalI], Collections.emptyList(), Arrays.asList("cp=1"));
-//                }
-//                catch (IOException | InterruptedException e) {
-//                    throw new RuntimeException(e);
-//                }
-//            });
-//            threads[i].start();
-//        }
-//
-//        // delete index with name[0]
-//        threads[3] = new Thread(() -> {
-//            try {
-//                IndexRecordManager indexRecordManager = new IndexRecordManager(testMetastore1);
-//                while (indexRecordManager.lookUpIndexRecord(names[0]) == null) {
-//                    Thread.sleep(random.nextInt(100));
-//                }
-//                indexRecordManager.deleteIndexRecord(names[0], Collections.emptyList());
-//            }
-//            catch (IOException | InterruptedException e) {
-//                throw new RuntimeException(e);
-//            }
-//        });
-//        threads[3].start();
-//
-//        for (Thread thread : threads) {
-//            thread.join();
-//        }
-//
-//        IndexRecordManager indexRecordManager = new IndexRecordManager(testMetastore1);
-//        assertEquals(indexRecordManager.getIndexRecords().size(), 2);
-//        assertNull(indexRecordManager.lookUpIndexRecord(names[0]));
-//        assertNotNull(indexRecordManager.lookUpIndexRecord(names[1]));
-//        assertNotNull(indexRecordManager.lookUpIndexRecord(names[2]));
-//    }
+        // create index with name[0], name[1], name[2]
+        for (int i = 0; i < 3; i++) {
+            int finalI = i;
+            threads[i] = new Thread(() -> {
+                try {
+                    Thread.sleep(random.nextInt(100));
+                    new IndexRecordManager(testMetastore1)
+                            .addIndexRecord(names[finalI], "testUser", "c.s.t", new String[] {"testColumn"}, names[finalI], Collections.emptyList(), Arrays.asList("cp=1"));
+                }
+                catch (IOException | InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            threads[i].start();
+        }
+
+        // delete index with name[0]
+        threads[3] = new Thread(() -> {
+            try {
+                IndexRecordManager indexRecordManager = new IndexRecordManager(testMetastore1);
+                while (indexRecordManager.lookUpIndexRecord(names[0]) == null) {
+                    Thread.sleep(random.nextInt(100));
+                }
+                indexRecordManager.deleteIndexRecord(names[0], Collections.emptyList());
+            }
+            catch (IOException | InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        threads[3].start();
+
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        IndexRecordManager indexRecordManager = new IndexRecordManager(testMetastore1);
+        assertEquals(indexRecordManager.getIndexRecords().size(), 2);
+        assertNull(indexRecordManager.lookUpIndexRecord(names[0]));
+        assertNotNull(indexRecordManager.lookUpIndexRecord(names[1]));
+        assertNotNull(indexRecordManager.lookUpIndexRecord(names[2]));
+    }
 
     @Test(timeOut = 20000)
     public void testConcurrentSingleManager()

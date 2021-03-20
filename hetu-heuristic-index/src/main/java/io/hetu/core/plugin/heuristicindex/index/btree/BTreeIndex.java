@@ -95,6 +95,7 @@ public class BTreeIndex
             dataFile = dataDir.getRoot().toPath().resolve("btree-" + UUID.randomUUID().toString()).toFile();
         }
         catch (IOException e) {
+            dataDir.close();
             throw new UncheckedIOException("Failed to create temp directory for BTREE data", e);
         }
     }
