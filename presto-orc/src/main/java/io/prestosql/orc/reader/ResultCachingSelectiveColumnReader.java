@@ -17,6 +17,7 @@ import com.google.common.cache.Cache;
 import io.airlift.log.Logger;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcDataSourceId;
+import io.prestosql.orc.OrcDataSourceIdWithTimeStamp;
 import io.prestosql.orc.OrcPredicate;
 import io.prestosql.orc.OrcRowDataCacheKey;
 import io.prestosql.orc.OrcSelectiveRowDataCacheKey;
@@ -46,6 +47,7 @@ public class ResultCachingSelectiveColumnReader<T>
     private final OrcPredicate predicate;
 
     private OrcDataSourceId orcDataSourceId;
+    private long lastModifiedTime;
     private long stripeOffset;
     private long rowGroupOffset;
     private int offset;
@@ -153,11 +155,12 @@ public class ResultCachingSelectiveColumnReader<T>
 
         StreamSourceMeta streamSourceMeta = dataStreamSources.getStreamSourceMeta();
         orcDataSourceId = streamSourceMeta.getDataSourceId();
+        lastModifiedTime = streamSourceMeta.getLastModifiedTime();
         stripeOffset = streamSourceMeta.getStripeOffset();
         rowGroupOffset = streamSourceMeta.getRowGroupOffset();
 
         OrcSelectiveRowDataCacheKey newCachKey = new OrcSelectiveRowDataCacheKey();
-        newCachKey.setOrcDataSourceId(orcDataSourceId);
+        newCachKey.setOrcDataSourceId(new OrcDataSourceIdWithTimeStamp(orcDataSourceId, lastModifiedTime));
         newCachKey.setStripeOffset(streamSourceMeta.getStripeOffset());
         newCachKey.setRowGroupOffset(streamSourceMeta.getRowGroupOffset());
         newCachKey.setColumnId(column.getColumnId());

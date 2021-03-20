@@ -128,7 +128,7 @@ public class StripeReader
     {
         // read the stripe footer
         OrcStripeFooterCacheKey cacheKey = new OrcStripeFooterCacheKey();
-        cacheKey.setOrcDataSourceId(orcDataSource.getId());
+        cacheKey.setOrcDataSourceId(new OrcDataSourceIdWithTimeStamp(orcDataSource.getId(), orcDataSource.getLastModifiedTime()));
         cacheKey.setStripeOffset(stripe.getOffset());
 
         StripeFooter stripeFooter;
@@ -231,7 +231,7 @@ public class StripeReader
                 List<RowGroupIndex> rowGroupIndexes;
                 if (orcCacheProperties.isRowIndexCacheEnabled()) {
                     OrcRowIndexCacheKey indexCacheKey = new OrcRowIndexCacheKey();
-                    indexCacheKey.setOrcDataSourceId(orcDataSource.getId());
+                    indexCacheKey.setOrcDataSourceId(new OrcDataSourceIdWithTimeStamp(orcDataSource.getId(), orcDataSource.getLastModifiedTime()));
                     indexCacheKey.setStripeOffset(stripe.getOffset());
                     indexCacheKey.setStreamId(entry.getKey());
                     try {
@@ -444,7 +444,7 @@ public class StripeReader
                 OrcInputStream inputStream = new OrcInputStream(streamsData.get(entry.getKey()));
                 if (orcCacheProperties.isBloomFilterCacheEnabled()) {
                     OrcBloomFilterCacheKey bloomFilterCacheKey = new OrcBloomFilterCacheKey();
-                    bloomFilterCacheKey.setOrcDataSourceId(orcDataSource.getId());
+                    bloomFilterCacheKey.setOrcDataSourceId(new OrcDataSourceIdWithTimeStamp(orcDataSource.getId(), orcDataSource.getLastModifiedTime()));
                     bloomFilterCacheKey.setStripeOffset(stripe.getOffset());
                     bloomFilterCacheKey.setStreamId(entry.getKey());
                     try {
@@ -467,7 +467,7 @@ public class StripeReader
                 OrcInputStream inputStream = new OrcInputStream(streamsData.get(entry.getKey()));
                 if (orcCacheProperties.isBloomFilterCacheEnabled()) {
                     OrcBloomFilterCacheKey bloomFilterCacheKey = new OrcBloomFilterCacheKey();
-                    bloomFilterCacheKey.setOrcDataSourceId(orcDataSource.getId());
+                    bloomFilterCacheKey.setOrcDataSourceId(new OrcDataSourceIdWithTimeStamp(orcDataSource.getId(), orcDataSource.getLastModifiedTime()));
                     bloomFilterCacheKey.setStripeOffset(stripe.getOffset());
                     bloomFilterCacheKey.setStreamId(entry.getKey());
                     try {
@@ -499,7 +499,7 @@ public class StripeReader
                 List<RowGroupIndex> rowGroupIndexes;
                 if (orcCacheProperties.isRowIndexCacheEnabled()) {
                     OrcRowIndexCacheKey indexCacheKey = new OrcRowIndexCacheKey();
-                    indexCacheKey.setOrcDataSourceId(orcDataSource.getId());
+                    indexCacheKey.setOrcDataSourceId(new OrcDataSourceIdWithTimeStamp(orcDataSource.getId(), orcDataSource.getLastModifiedTime()));
                     indexCacheKey.setStripeOffset(stripe.getOffset());
                     indexCacheKey.setStreamId(entry.getKey());
                     try {

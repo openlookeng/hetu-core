@@ -19,6 +19,7 @@ import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.airlift.log.Logger;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcDataSourceId;
+import io.prestosql.orc.OrcDataSourceIdWithTimeStamp;
 import io.prestosql.orc.OrcRowDataCacheKey;
 import io.prestosql.orc.metadata.ColumnEncoding;
 import io.prestosql.orc.metadata.ColumnMetadata;
@@ -44,6 +45,7 @@ public class CachingColumnReader<T>
     private final OrcColumnId columnId;
 
     private OrcDataSourceId orcDataSourceId;
+    private long lastModifiedTime;
     private long stripeOffset;
     private long rowGroupOffset;
     private int offset;
@@ -91,6 +93,7 @@ public class CachingColumnReader<T>
 
         StreamSourceMeta streamSourceMeta = dataStreamSources.getStreamSourceMeta();
         orcDataSourceId = streamSourceMeta.getDataSourceId();
+        lastModifiedTime = streamSourceMeta.getLastModifiedTime();
         stripeOffset = streamSourceMeta.getStripeOffset();
         rowGroupOffset = streamSourceMeta.getRowGroupOffset();
         cachedBlock = getCachedBlock(streamSourceMeta.getRowCount(), dataStreamSources);
@@ -101,7 +104,7 @@ public class CachingColumnReader<T>
     private Block getCachedBlock(long rowCount, InputStreamSources dataStreamSources) throws IOException
     {
         OrcRowDataCacheKey cacheKey = new OrcRowDataCacheKey();
-        cacheKey.setOrcDataSourceId(orcDataSourceId);
+        cacheKey.setOrcDataSourceId(new OrcDataSourceIdWithTimeStamp(orcDataSourceId, lastModifiedTime));
         cacheKey.setStripeOffset(stripeOffset);
         cacheKey.setRowGroupOffset(rowGroupOffset);
         cacheKey.setColumnId(columnId);

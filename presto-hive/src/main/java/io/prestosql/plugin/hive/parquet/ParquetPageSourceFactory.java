@@ -122,7 +122,8 @@ public class ParquetPageSourceFactory
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
             SplitMetadata splitMetadata,
-            boolean splitCacheable)
+            boolean splitCacheable,
+            long dataSourceLastModifiedTime)
     {
         if (!PARQUET_SERDE_CLASS_NAMES.contains(getDeserializerClassName(schema))) {
             return Optional.empty();

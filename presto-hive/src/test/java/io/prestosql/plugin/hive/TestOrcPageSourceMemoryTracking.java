@@ -517,7 +517,7 @@ public class TestOrcPageSourceMemoryTracking
                     Optional.empty(),
                     Optional.empty(),
                     null,
-                    false)
+                    false, -1L)
                     .get();
         }
 

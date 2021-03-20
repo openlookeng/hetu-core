@@ -25,10 +25,10 @@ public class FileOrcDataSource
 {
     private final RandomAccessFile input;
 
-    public FileOrcDataSource(File path, DataSize maxMergeDistance, DataSize maxReadSize, DataSize streamBufferSize, boolean lazyReadSmallRanges)
+    public FileOrcDataSource(File path, DataSize maxMergeDistance, DataSize maxReadSize, DataSize streamBufferSize, boolean lazyReadSmallRanges, long lastModifiedTime)
             throws FileNotFoundException
     {
-        super(new OrcDataSourceId(path.getPath()), path.length(), maxMergeDistance, maxReadSize, streamBufferSize, lazyReadSmallRanges);
+        super(new OrcDataSourceId(path.getPath()), path.length(), maxMergeDistance, maxReadSize, streamBufferSize, lazyReadSmallRanges, lastModifiedTime);
         this.input = new RandomAccessFile(path, "r");
     }
 

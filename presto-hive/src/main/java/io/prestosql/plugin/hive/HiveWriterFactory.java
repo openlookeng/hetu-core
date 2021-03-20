@@ -899,15 +899,17 @@ public class HiveWriterFactory
                 if (fileSystem.exists(file)) {
                     // TODO-cp-I2BZ0A: assuming all files to be of ORC type.
                     // Using same parameters as used by SortingFileWriter
+                    FileStatus fileStatus = fileSystem.getFileStatus(file);
                     OrcDataSource dataSource = new HdfsOrcDataSource(
                             new OrcDataSourceId(file.toString()),
-                            fileSystem.getFileStatus(file).getLen(),
+                            fileStatus.getLen(),
                             new DataSize(1, MEGABYTE),
                             new DataSize(8, MEGABYTE),
                             new DataSize(8, MEGABYTE),
                             false,
                             fileSystem.open(file),
-                            new FileFormatDataSourceStats());
+                            new FileFormatDataSourceStats(),
+                            fileStatus.getModificationTime());
                     TempFileReader reader = new TempFileReader(types, dataSource);
                     while (reader.hasNext()) {
                         writer.append(reader.next());

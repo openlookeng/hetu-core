@@ -87,7 +87,7 @@ public class TestOrcLz4
 
         public InMemoryOrcDataSource(byte[] data)
         {
-            super(new OrcDataSourceId("memory"), data.length, SIZE, SIZE, SIZE, false);
+            super(new OrcDataSourceId("memory"), data.length, SIZE, SIZE, SIZE, false, System.currentTimeMillis());
             this.data = data;
         }
 

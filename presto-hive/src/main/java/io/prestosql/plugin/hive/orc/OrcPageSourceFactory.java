@@ -25,7 +25,9 @@ import io.prestosql.orc.OrcCacheStore;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcDataSource;
 import io.prestosql.orc.OrcDataSourceId;
+import io.prestosql.orc.OrcDataSourceIdWithTimeStamp;
 import io.prestosql.orc.OrcFileTail;
+import io.prestosql.orc.OrcFileTailCacheKey;
 import io.prestosql.orc.OrcReader;
 import io.prestosql.orc.OrcRecordReader;
 import io.prestosql.orc.TupleDomainOrcPredicate;
@@ -163,7 +165,8 @@ public class OrcPageSourceFactory
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
             SplitMetadata splitMetadata,
-            boolean splitCacheable)
+            boolean splitCacheable,
+            long dataSourceLastModifiedTime)
     {
         if (!HiveUtil.isDeserializerClass(schema, OrcSerde.class)) {
             return Optional.empty();
@@ -209,7 +212,8 @@ public class OrcPageSourceFactory
                 orcCacheStore,
                 orcCacheProperties,
                 domainCompactionThreshold,
-                session.isPageMetadataEnabled()));
+                session.isPageMetadataEnabled(),
+                dataSourceLastModifiedTime));
     }
 
     public static OrcPageSource createOrcPageSource(
@@ -242,7 +246,8 @@ public class OrcPageSourceFactory
             OrcCacheStore orcCacheStore,
             OrcCacheProperties orcCacheProperties,
             int domainCompactionThreshold,
-            boolean pageMetadataEnabled)
+            boolean pageMetadataEnabled,
+            long dataSourceLastModifiedTime)
     {
         for (HiveColumnHandle column : columns) {
             checkArgument(
@@ -266,7 +271,8 @@ public class OrcPageSourceFactory
                     streamBufferSize,
                     lazyReadSmallRanges,
                     inputStream,
-                    stats);
+                    stats,
+                    dataSourceLastModifiedTime);
         }
         catch (Exception e) {
             if (nullToEmpty(e.getMessage()).trim().equals("Filesystem closed") ||
@@ -282,7 +288,8 @@ public class OrcPageSourceFactory
             OrcFileTail fileTail;
             if (orcCacheProperties.isFileTailCacheEnabled()) {
                 try {
-                    fileTail = orcCacheStore.getFileTailCache().get(readerLocalDataSource.getId(), () -> OrcPageSourceFactory.createFileTail(orcDataSource));
+                    OrcDataSourceIdWithTimeStamp orcDataSourceIdWithTimeStamp = new OrcDataSourceIdWithTimeStamp(readerLocalDataSource.getId(), readerLocalDataSource.getLastModifiedTime());
+                    fileTail = orcCacheStore.getFileTailCache().get(new OrcFileTailCacheKey(orcDataSourceIdWithTimeStamp), () -> OrcPageSourceFactory.createFileTail(orcDataSource));
                 }
                 catch (UncheckedExecutionException | ExecutionException executionException) {
                     handleCacheLoadException(executionException);

@@ -19,6 +19,7 @@ import io.prestosql.orc.OrcDataSourceId;
 public class StreamSourceMeta
 {
     private OrcDataSourceId dataSourceId;
+    private long lastModifiedTime;
     private long stripeOffset = -1;
     private long rowGroupOffset = -1;
     private long rowCount;
@@ -36,6 +37,16 @@ public class StreamSourceMeta
     public long getStripeOffset()
     {
         return stripeOffset;
+    }
+
+    public long getLastModifiedTime()
+    {
+        return lastModifiedTime;
+    }
+
+    public void setLastModifiedTime(long lastModifiedTime)
+    {
+        this.lastModifiedTime = lastModifiedTime;
     }
 
     public void setStripeOffset(long stripeOffset)

@@ -182,7 +182,7 @@ public class TestOrcAcidPageSource
                 Optional.empty(),
                 Optional.empty(),
                 null,
-                false).get();
+                false, -1L).get();
 
         int nationKeyColumn = columnNames.indexOf("n_nationkey");
         int nameColumn = columnNames.indexOf("n_name");

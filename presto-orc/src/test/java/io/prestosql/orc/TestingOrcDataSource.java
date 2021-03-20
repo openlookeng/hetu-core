@@ -42,6 +42,12 @@ class TestingOrcDataSource
         return delegate.getId();
     }
 
+    @Override
+    public long getLastModifiedTime()
+    {
+        return delegate.getLastModifiedTime();
+    }
+
     public int getReadCount()
     {
         return readCount;

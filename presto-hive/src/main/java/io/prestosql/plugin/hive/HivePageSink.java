@@ -345,7 +345,7 @@ public class HivePageSink
             return doFinish();
         }
         catch (IOException e) {
-            log.warn("exception '%s' while merging subfile", e);
+            log.debug("exception '%s' while merging subfile", e);
             throw new RuntimeException(e);
         }
     }

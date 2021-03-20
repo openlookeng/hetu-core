@@ -25,6 +25,8 @@ public interface OrcDataSource
 {
     OrcDataSourceId getId();
 
+    long getLastModifiedTime();
+
     long getReadBytes();
 
     long getReadTimeNanos();
