@@ -210,4 +210,12 @@ public class TestCatalogResource
             }
         }
     }
+
+    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "Failed to load catalog. Please check your configuration.")
+    // create a data center catalog, but connection is not available.
+    public void testAddDcCatalogCheckConnectionFailed()
+            throws Exception
+    {
+        executeAddCatalogCall("datacenter", "dc", dcProperties, ImmutableList.of(), ImmutableList.of());
+    }
 }

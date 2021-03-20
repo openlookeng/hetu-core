@@ -77,7 +77,9 @@ public class TestDynamicCatalogRunner
             .put("hive.hdfs.wire-encryption.enabled", "true")
             .put("hive.hdfs.hetu.principal", "test@HADOOP.COM")
             .build();
-
+    final Map<String, String> dcProperties = new ImmutableMap.Builder<String, String>()
+            .put("connection-url", "http://localhost:8090")
+            .build();
     final String testResources = Resources.getResource("dynamiccatalog").getPath();
     String localPath;
     String sharePath;

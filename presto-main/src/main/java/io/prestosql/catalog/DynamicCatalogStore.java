@@ -135,6 +135,12 @@ public class DynamicCatalogStore
         return getCatalogStore(type).getCatalogInformation(catalogName).getVersion();
     }
 
+    /**
+     * This method will try to load catalog for all types of catalog.
+     * @param localCatalogStore the local storage instance of catalog.
+     * @param catalogInfo catalog information.
+     * @param configFiles catalog configuration files.
+     */
     private void loadLocalCatalog(CatalogStore localCatalogStore, CatalogInfo catalogInfo, CatalogFileInputStream configFiles)
     {
         String catalogName = catalogInfo.getCatalogName();
@@ -149,7 +155,7 @@ public class DynamicCatalogStore
             Map<String, String> properties = new HashMap<>(loadPropertiesFrom(propertiesFile.getPath()));
             catalogStoreUtil.decryptEncryptedProperties(catalogName, properties);
             properties.remove(CATALOG_NAME);
-            connectorManager.createConnection(catalogName, catalogInfo.getConnectorName(), ImmutableMap.copyOf(properties));
+            connectorManager.createAndCheckConnection(catalogName, catalogInfo.getConnectorName(), ImmutableMap.copyOf(properties));
 
             // add catalog to announcer, then each node knows current node has this catalog.
             connectorManager.updateConnectorIds();

@@ -40,6 +40,8 @@ import io.prestosql.security.AccessControlManager;
 import io.prestosql.server.ServerConfig;
 import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PageSorter;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.PrestoTransportException;
 import io.prestosql.spi.VersionEmbedder;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
 import io.prestosql.spi.connector.CatalogName;
@@ -93,7 +95,9 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static io.prestosql.metadata.FunctionExtractor.extractExternalFunctions;
+import static io.prestosql.spi.HetuConstant.CONNECTION_USER;
 import static io.prestosql.spi.HetuConstant.DATA_CENTER_CONNECTOR_NAME;
+import static io.prestosql.spi.StandardErrorCode.REMOTE_TASK_ERROR;
 import static io.prestosql.spi.connector.CatalogName.createInformationSchemaCatalogName;
 import static io.prestosql.spi.connector.CatalogName.createSystemTablesCatalogName;
 import static java.lang.String.format;
@@ -243,15 +247,23 @@ public class ConnectorManager
         handleResolver.addConnectorName(connectorFactory.getName(), connectorFactory.getHandleResolver());
     }
 
+    public synchronized CatalogName createAndCheckConnection(String catalogName, String connectorName, Map<String, String> properties)
+    {
+        requireNonNull(connectorName, "connectorName is null");
+        ConnectorFactory connectorFactory = connectorFactories.get(connectorName);
+        checkArgument(connectorFactory != null, "No factory for connector [%s].  Available factories: %s", connectorName, connectorFactories.keySet());
+        return createConnection(catalogName, connectorFactory, properties, true);
+    }
+
     public synchronized CatalogName createConnection(String catalogName, String connectorName, Map<String, String> properties)
     {
         requireNonNull(connectorName, "connectorName is null");
         ConnectorFactory connectorFactory = connectorFactories.get(connectorName);
         checkArgument(connectorFactory != null, "No factory for connector [%s].  Available factories: %s", connectorName, connectorFactories.keySet());
-        return createConnection(catalogName, connectorFactory, properties);
+        return createConnection(catalogName, connectorFactory, properties, false);
     }
 
-    private synchronized CatalogName createConnection(String catalogName, ConnectorFactory connectorFactory, Map<String, String> properties)
+    private synchronized CatalogName createConnection(String catalogName, ConnectorFactory connectorFactory, Map<String, String> properties, boolean checkConnection)
     {
         checkState(!stopped.get(), "ConnectorManager is stopped");
         requireNonNull(catalogName, "catalogName is null");
@@ -262,7 +274,7 @@ public class ConnectorManager
         CatalogName catalog = new CatalogName(catalogName);
         checkState(!connectors.containsKey(catalog), "A catalog %s already exists", catalog);
 
-        addCatalogConnector(catalog, connectorFactory, properties);
+        addCatalogConnector(catalog, connectorFactory, properties, checkConnection);
 
         return catalog;
     }
@@ -273,8 +285,9 @@ public class ConnectorManager
      * @param catalogName the catalog name
      * @param factory the connector factory
      * @param properties catalog properties
+     * @param checkConnection check whether connection of catalog is available.
      */
-    private synchronized void addCatalogConnector(CatalogName catalogName, ConnectorFactory factory, Map<String, String> properties)
+    private synchronized void addCatalogConnector(CatalogName catalogName, ConnectorFactory factory, Map<String, String> properties, boolean checkConnection)
     {
         // create all connectors before adding, so a broken connector does not leave the system half updated
         // Hetu reads the DC Connector properties file and dynamically creates <data-center>.<catalog-name> catalogs for each catalogs in that data center
@@ -282,6 +295,17 @@ public class ConnectorManager
         if (DATA_CENTER_CONNECTOR_NAME.equals(factory.getName())) {
             // It registers the Connector and Properties in the DataCenterConnectorStore
             catalogConnectorStore.registerConnectorAndProperties(catalogName, catalogConnector, properties);
+            if (checkConnection) {
+                // check connection
+                String catalog = catalogName.getCatalogName();
+                Connector connector = catalogConnectorStore.getCatalogConnector(catalog);
+                try {
+                    connector.getCatalogs(properties.get(CONNECTION_USER), properties);
+                }
+                catch (PrestoTransportException e) {
+                    throw new PrestoException(REMOTE_TASK_ERROR, "Failed to get catalogs from remote data center.");
+                }
+            }
         }
         else {
             addCatalogConnector(catalogName, catalogConnector);
