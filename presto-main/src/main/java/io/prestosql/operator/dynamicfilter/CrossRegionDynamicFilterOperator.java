@@ -40,7 +40,7 @@ import java.util.Set;
 import static io.prestosql.statestore.StateStoreConstants.CROSS_REGION_DYNAMIC_FILTER_COLLECTION;
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(uncapturedFields = {"symbols", "dynamicFilterCacheManager", "columns", "finished", "currentPage", "snapshotState"})
+@RestorableConfig(uncapturedFields = {"symbols", "dynamicFilterCacheManager", "columns", "finished", "currentPage", "outputNodeSybmols", "columnToSymbolMapping", "enabledDynamicFilter", "snapshotState"})
 public class CrossRegionDynamicFilterOperator
         implements Operator
 {
