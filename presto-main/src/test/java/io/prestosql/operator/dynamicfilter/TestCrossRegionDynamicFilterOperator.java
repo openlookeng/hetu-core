@@ -120,7 +120,7 @@ public class TestCrossRegionDynamicFilterOperator
         CrossRegionDynamicFilterOperator operator = createBloomFilterOperator(queryId, dynamicFilterCacheManager);
 
         addBloomFilter("orderId", ImmutableList.of("10003", "10004"), dynamicFilterCacheManager, queryId);
-        addBloomFilter("custKey", ImmutableList.of("0001", "0002"), dynamicFilterCacheManager, queryId);
+        addBloomFilter("custkey", ImmutableList.of("0001", "0002"), dynamicFilterCacheManager, queryId);
 
         List<Page> pages = rowPagesBuilder(types)
                 .row("10001", "0001")
@@ -144,7 +144,8 @@ public class TestCrossRegionDynamicFilterOperator
                 createSymbolList(),
                 createTypeProvider(),
                 dynamicFilterCacheManager,
-                new ArrayList<>());
+                createColumns(),
+                createSymbolList());
         DriverContext driverContext = createTaskContext(executor, executor, TEST_SESSION)
                 .addPipelineContext(0, true, true, false)
                 .addDriverContext();
@@ -155,20 +156,28 @@ public class TestCrossRegionDynamicFilterOperator
     private static List<Symbol> createSymbolList()
     {
         List<Symbol> symbols = new ArrayList<>();
-        Symbol symbol = new Symbol("orderId");
+        Symbol symbol = new Symbol("orderId_1");
         symbols.add(symbol);
 
-        symbol = new Symbol("custKey");
+        symbol = new Symbol("custKey_1");
         symbols.add(symbol);
 
         return symbols;
     }
 
+    private static List<String> createColumns()
+    {
+        List<String> columns = new ArrayList<>();
+        columns.add("orderId");
+        columns.add("custkey");
+        return columns;
+    }
+
     private static TypeProvider createTypeProvider()
     {
         Map<Symbol, Type> types = new HashMap<>();
-        types.put(new Symbol("orderId"), VarcharType.VARCHAR);
-        types.put(new Symbol("custKey"), VarcharType.VARCHAR);
+        types.put(new Symbol("orderId_1"), VarcharType.VARCHAR);
+        types.put(new Symbol("custKey_1"), VarcharType.VARCHAR);
 
         return TypeProvider.viewOf(types);
     }

@@ -990,7 +990,7 @@ public class LocalExecutionPlanner
             if (isCrossRegionDynamicFilterEnabled(session)) {
                 String queryId = context.getSession().getQueryId().getId();
                 List<Symbol> inputSymbols = node.getSource().getOutputSymbols();
-                OperatorFactory operatorFactory = new CrossRegionDynamicFilterOperator.CrossRegionDynamicFilterOperatorFactory(context.getNextOperatorId(), node.getId(), queryId, inputSymbols, context.getTypes(), dynamicFilterCacheManager, node.getColumnNames());
+                OperatorFactory operatorFactory = new CrossRegionDynamicFilterOperator.CrossRegionDynamicFilterOperatorFactory(context.getNextOperatorId(), node.getId(), queryId, inputSymbols, context.getTypes(), dynamicFilterCacheManager, node.getColumnNames(), node.getOutputSymbols());
                 return new PhysicalOperation(operatorFactory, makeLayout(node.getSource()), context, source);
             }
 
