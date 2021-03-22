@@ -34,6 +34,7 @@ import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.FunctionMetadata;
 import io.prestosql.spi.function.OperatorType;
+import io.prestosql.spi.function.SqlFunction;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalParseResult;
@@ -44,7 +45,6 @@ import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeNotFoundException;
-import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.TypeSignatureParameter;
 import io.prestosql.spi.type.VarcharType;
 import io.prestosql.sql.parser.SqlParser;
@@ -115,6 +115,7 @@ import io.prestosql.type.TypeCoercion;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -122,7 +123,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
@@ -130,6 +130,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.metadata.CastType.CAST;
 import static io.prestosql.metadata.FunctionAndTypeManager.qualifyObjectName;
+import static io.prestosql.metadata.FunctionResolver.constructFunctionNotFoundErrorMessage;
 import static io.prestosql.spi.StandardErrorCode.FUNCTION_NOT_FOUND;
 import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.spi.function.OperatorType.SUBSCRIPT;
@@ -167,6 +168,7 @@ import static io.prestosql.sql.analyzer.SemanticErrorCode.STANDALONE_LAMBDA;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.TOO_MANY_ARGUMENTS;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.TYPE_MISMATCH;
 import static io.prestosql.sql.analyzer.SemanticExceptions.missingAttributeException;
+import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.planner.SymbolUtils.from;
 import static io.prestosql.sql.tree.ArrayConstructor.ARRAY_CONSTRUCTOR;
 import static io.prestosql.sql.tree.Extract.Field.TIMEZONE_HOUR;
@@ -1014,12 +1016,9 @@ public class ExpressionAnalyzer
                     Type actualType = typeManager.getType(argumentTypes.get(i).getTypeSignature());
                     CatalogSchemaName catalogSchemaName = functionMetadata.getName().getCatalogSchemaName();
                     if (!DEFAULT_NAMESPACE.equals(catalogSchemaName) && !expectedType.equals(actualType)) {
-                        throw new PrestoException(FUNCTION_NOT_FOUND, format(
-                                "Unexpected parameters %s for external function %s. Expected: %s(%s)",
-                                actualType.getDisplayName(),
-                                functionMetadata.getName().toString(),
-                                functionMetadata.getName().toString(),
-                                functionMetadata.getArgumentTypes().stream().map(TypeSignature::toString).collect(Collectors.joining(", "))));
+                        Collection<? extends SqlFunction> candidates = functionAndTypeManager.getFunctions(Optional.empty(), functionMetadata.getName());
+                        String errorMessage = constructFunctionNotFoundErrorMessage(functionMetadata.getName(), argumentTypes, candidates);
+                        throw new PrestoException(FUNCTION_NOT_FOUND, errorMessage);
                     }
                     coerceType(expression, actualType, expectedType, format("Function %s argument %d", function, i));
                 }
@@ -1519,7 +1518,7 @@ public class ExpressionAnalyzer
 
             FunctionMetadata operatorMetadata;
             try {
-                operatorMetadata = functionAndTypeManager.getFunctionMetadata(functionAndTypeManager.resolveOperatorFunctionHandle(operatorType, TypeSignatureProvider.fromTypes(argumentTypes.build())));
+                operatorMetadata = functionAndTypeManager.getFunctionMetadata(functionAndTypeManager.resolveOperatorFunctionHandle(operatorType, fromTypes(argumentTypes.build())));
             }
             catch (OperatorNotFoundException e) {
                 throw new SemanticException(TYPE_MISMATCH, node, "%s", e.getMessage());
