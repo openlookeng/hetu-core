@@ -330,7 +330,7 @@ public final class FunctionResolver
         return true;
     }
 
-    static String constructFunctionNotFoundErrorMessage(QualifiedObjectName functionName, List<TypeSignatureProvider> parameterTypes, Collection<? extends SqlFunction> candidates)
+    public static String constructFunctionNotFoundErrorMessage(QualifiedObjectName functionName, List<TypeSignatureProvider> parameterTypes, Collection<? extends SqlFunction> candidates)
     {
         String name = toConciseFunctionName(functionName);
         List<String> expectedParameters = new ArrayList<>();
