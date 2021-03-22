@@ -416,7 +416,7 @@ export class QueryList extends React.Component {
             else {
                 newFilters.push(filter);
             }
-            stateSelectAll = newFilters.length > 0 ? true : false;
+            stateSelectAll = newFilters.length == Object.keys(FILTER_TYPE).length ? true : false;
         }
 
         this.setState({
@@ -459,7 +459,7 @@ export class QueryList extends React.Component {
             else {
                 newFilters.push(errorType);
             }
-            errorSelectAll = newFilters.length > 0 ? true : false;
+            errorSelectAll = newFilters.length == Object.keys(ERROR_TYPE).length ? true : false;
         }
 
         this.setState({
