@@ -36,6 +36,9 @@ public class TestHindex
     public void testDataTypesBetweenValues(String indexType, String column, String queryCondition)
             throws Exception
     {
+        System.out.println("Running testDataTypesBetweenValues[indexType: " + indexType +
+                ", column: " + column + ", queryCondition: " + queryCondition + "]");
+
         String tableName = getNewTableName();
         createTableSupportedDataTypes(tableName);
         String testerQuery = "SELECT * FROM " + tableName + " WHERE " + column + " " + queryCondition;
@@ -73,7 +76,9 @@ public class TestHindex
     public void testSplitsWithIndexAndData(String indexType, String dataType)
             throws Exception
     {
-        System.out.println("Running testSplitsWithIndexAndData[" + indexType + "," + dataType + "]");
+        System.out.println("Running testSplitsWithIndexAndData[indexType: " + indexType +
+                ", dataType: " + dataType + "]");
+
         String tableName = getNewTableName();
         String indexName = getNewIndexName();
         String testerQuery = createTableDataTypeWithQuery(tableName, dataType);
@@ -126,6 +131,9 @@ public class TestHindex
     public void testDataConsistencyWithAdditionChange(String indexType, String queryVariable, String queryValue)
             throws Exception
     {
+        System.out.println("Running testDataConsistencyWithAdditionChange[indexType: " + indexType +
+                ", queryVariable: " + queryVariable + ", queryValue: " + queryValue + "]");
+
         String tableName = getNewTableName();
         createTable1(tableName);
         String testerQuery = "SELECT * FROM " + tableName + " WHERE " + queryVariable + "=" + queryValue;
@@ -185,6 +193,9 @@ public class TestHindex
     public void testDataConsistencyWithDataDeletionChange(String indexType, String queryVariable, String queryValue)
             throws Exception
     {
+        System.out.println("Running testDataConsistencyWithDataDeletionChange[indexType: " + indexType +
+                ", queryVariable: " + queryVariable + ", queryValue: " + queryValue + "]");
+
         String tableName = getNewTableName();
         createTable2(tableName);
         String testerQuery = "SELECT * FROM " + tableName + " WHERE " + queryVariable + "=" + queryValue;
@@ -253,6 +264,9 @@ public class TestHindex
     public void testNullDataHandling(String indexType, String queryVariable, String queryValue)
             throws Exception
     {
+        System.out.println("Running testNullDataHandling[indexType: " + indexType +
+                ", queryVariable: " + queryVariable + ", queryValue: " + queryValue + "]");
+
         String tableName = getNewTableName();
         createTableNullData(tableName);
         String testerQuery = "SELECT * FROM " + tableName + " WHERE " + queryVariable + "=" + queryValue;
@@ -350,6 +364,8 @@ public class TestHindex
     public void testIndexDeletionBeforeSplitsAffected(String indexType)
             throws Exception
     {
+        System.out.println("Running testIndexDeletionBeforeSplitsAffected[indexType: " + indexType + "]");
+
         String tableName = getNewTableName();
         String indexName = getNewIndexName();
         String testerQuery = "SELECT * FROM " + tableName + " WHERE id = 2";
@@ -388,8 +404,9 @@ public class TestHindex
     // Tests the case of creating index with if not exists.
     @Test(dataProvider = "indexTypes")
     public void testIndexIfNotExistsCreation(String indexType)
-            throws Exception
     {
+        System.out.println("Running testIndexIfNotExistsCreation[indexType: " + indexType + "]");
+
         String tableName = getNewTableName();
         String indexName = getNewIndexName();
         createTable1(tableName);
@@ -460,8 +477,9 @@ public class TestHindex
     // Tests the case of creating index where variable name is capitalized. Expected to pass regardless of variable case.
     @Test(dataProvider = "indexTypes")
     public void testIndexWithCapitalColumnNameCreation(String indexType)
-            throws Exception
     {
+        System.out.println("Running testIndexWithCapitalColumnNameCreation[indexType: " + indexType + "]");
+
         String tableName = getNewTableName();
         assertQuerySucceeds("CREATE TABLE " + tableName + " (P1 INTEGER, P2 VARCHAR(10))");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(1, 'test')");
@@ -476,6 +494,9 @@ public class TestHindex
     public void testQueryOperator(String testerQuery, String indexType)
             throws Exception
     {
+        System.out.println("Running testIndexWithCapitalColumnNameCreation[testerQuery: " + testerQuery +
+                ", indexType: " + indexType + "]");
+
         String tableName = getNewTableName();
         createTable1(tableName);
         testerQuery = "SELECT * FROM " + tableName + " WHERE " + testerQuery;
