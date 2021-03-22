@@ -16,6 +16,8 @@ package io.prestosql.sql.planner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import io.hetu.core.spi.cube.CubeMetadata;
+import io.hetu.core.spi.cube.CubeStatus;
 import io.prestosql.Session;
 import io.prestosql.cost.CachingCostProvider;
 import io.prestosql.cost.CachingStatsProvider;
@@ -53,11 +55,13 @@ import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
 import io.prestosql.sql.ExpressionFormatter;
+import io.prestosql.sql.ExpressionUtils;
 import io.prestosql.sql.analyzer.Analysis;
 import io.prestosql.sql.analyzer.Field;
 import io.prestosql.sql.analyzer.RelationId;
 import io.prestosql.sql.analyzer.RelationType;
 import io.prestosql.sql.analyzer.Scope;
+import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.planner.StatisticsAggregationPlanner.TableStatisticAggregation;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.planner.plan.CubeFinishNode;
@@ -74,6 +78,7 @@ import io.prestosql.sql.planner.plan.VacuumTableNode;
 import io.prestosql.sql.planner.sanity.PlanSanityChecker;
 import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.Analyze;
+import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.CreateTableAsSelect;
@@ -120,11 +125,13 @@ import static com.google.common.collect.Streams.zip;
 import static io.prestosql.metadata.MetadataUtil.toSchemaTableName;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
+import static io.prestosql.spi.StandardErrorCode.QUERY_REJECTED;
 import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.spi.statistics.TableStatisticType.ROW_COUNT;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static io.prestosql.sql.ParsingUtil.createParsingOptions;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_HASH_DISTRIBUTION;
@@ -482,6 +489,14 @@ public class LogicalPlanner
             rewritten = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session, namedSubPlan, uniqueIdAllocator)
                     .rewriteExpression(tableWriterPlan, cubeWhere, analysis, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator));
         }
+        CubeMetadata cubeMetadata = insert.getMetadata();
+        if (!insertCubeStatement.isOverwrite() && !insertCubeStatement.getWhere().isPresent() && cubeMetadata.getCubeStatus() != CubeStatus.INACTIVE) {
+            //Means data some data was inserted before, but trying to insert entire dataset
+            throw new PrestoException(QUERY_REJECTED, "Cannot allow insert. Inserting entire dataset but cube already has partial data");
+        }
+        else if (!insertCubeStatement.isOverwrite() && insertCubeStatement.getWhere().isPresent() && arePredicatesOverlapping(rewritten, cubeMetadata)) {
+            throw new PrestoException(QUERY_REJECTED, String.format("Cannot allow insert. Cube already contains data for the given predicate '%s'", ExpressionFormatter.formatExpression(insertCubeStatement.getWhere().get(), Optional.empty())));
+        }
         TableHandle sourceTableHandle = insert.getSourceTable();
         //At this point it has been verified that source table has not been updated
         //so insert into cube should be allowed
@@ -497,6 +512,31 @@ public class LogicalPlanner
                         cubeWhere != null ? ExpressionFormatter.formatExpression(rewritten, Optional.empty()) : null,
                         insertCubeStatement.isOverwrite()));
         return new RelationPlan(cubeFinishNode, analysis.getScope(insertCubeStatement), cubeFinishNode.getOutputSymbols());
+    }
+
+    private boolean arePredicatesOverlapping(Expression newDataPredicate, CubeMetadata cubeMetadata)
+    {
+        //Cannot do this check inside StatementAnalyzer because predicate expressions have not been rewritten by then.
+        TypeProvider types = planSymbolAllocator.getTypes();
+        newDataPredicate = ExpressionUtils.rewriteIdentifiersToSymbolReferences(newDataPredicate);
+        ExpressionDomainTranslator.ExtractionResult decomposedNewDataPredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, newDataPredicate, types);
+        if (!BooleanLiteral.TRUE_LITERAL.equals(decomposedNewDataPredicate.getRemainingExpression())) {
+            throw new RuntimeException(String.format("Cannot support predicate '%s'", ExpressionFormatter.formatExpression(newDataPredicate, Optional.empty())));
+        }
+        if (cubeMetadata.getCubeStatus() == CubeStatus.INACTIVE) {
+            //Inactive cubes are empty. So inserts should be allowed.
+            return false;
+        }
+
+        if (cubeMetadata.getPredicateString() == null) {
+            //Means Cube was created for entire dataset.
+            return true;
+        }
+        SqlParser sqlParser = new SqlParser();
+        Expression cubePredicateAsExpr = sqlParser.createExpression(cubeMetadata.getPredicateString(), createParsingOptions(session));
+        cubePredicateAsExpr = ExpressionUtils.rewriteIdentifiersToSymbolReferences(cubePredicateAsExpr);
+        ExpressionDomainTranslator.ExtractionResult decomposedCubePredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, cubePredicateAsExpr, types);
+        return decomposedCubePredicate.getTupleDomain().overlaps(decomposedNewDataPredicate.getTupleDomain());
     }
 
     private Expression noTruncationCast(Expression expression, Type fromType, Type toType)

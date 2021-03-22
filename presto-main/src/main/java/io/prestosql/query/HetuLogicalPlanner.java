@@ -65,8 +65,8 @@ public class HetuLogicalPlanner
     private final WarningCollector warningCollector;
 
     public HetuLogicalPlanner(Session session, List<PlanOptimizer> planOptimizers, PlanNodeIdAllocator idAllocator,
-                              Metadata metadata, TypeAnalyzer typeAnalyzer, StatsCalculator statsCalculator, CostCalculator costCalculator,
-                              WarningCollector warningCollector)
+            Metadata metadata, TypeAnalyzer typeAnalyzer, StatsCalculator statsCalculator, CostCalculator costCalculator,
+            WarningCollector warningCollector)
     {
         super(session, planOptimizers, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator,
                 warningCollector);

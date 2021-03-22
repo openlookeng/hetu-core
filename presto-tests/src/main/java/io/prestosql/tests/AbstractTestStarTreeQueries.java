@@ -19,15 +19,22 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.sql.planner.Plan;
+import io.prestosql.sql.planner.optimizations.PlanNodeSearcher;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.MaterializedRow;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.util.Optional;
+import java.util.function.Consumer;
+
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 public abstract class AbstractTestStarTreeQueries
         extends AbstractTestQueryFramework
@@ -133,6 +140,24 @@ public abstract class AbstractTestStarTreeQueries
     }
 
     @Test
+    public void testInsertIntoCubeWithoutPredicate()
+    {
+        computeActual("CREATE TABLE nation_table_cube_insert_2 AS SELECT * FROM nation");
+        assertUpdate("CREATE CUBE nation_cube_insert_2 ON nation_table_cube_insert_2 WITH (AGGREGATIONS=(count(*)), group=(name))");
+        assertQuerySucceeds("INSERT INTO CUBE nation_cube_insert_2");
+        assertQuery(sessionNoStarTree,
+                "SELECT count(*) FROM nation_table_cube_insert_2 WHERE name = 'CHINA' GROUP BY name",
+                "SELECT count(*) FROM nation WHERE name = 'CHINA' GROUP BY name",
+                assertTableScan("nation_table_cube_insert_2"));
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_cube_insert_2 WHERE name = 'CHINA' GROUP BY name",
+                "SELECT count(*) FROM nation WHERE name = 'CHINA' GROUP BY name",
+                assertTableScan("nation_cube_insert_2"));
+        assertUpdate("DROP CUBE nation_cube_insert_2");
+        assertUpdate("DROP TABLE nation_table_cube_insert_2");
+    }
+
+    @Test
     public void testInsertOverwriteCube()
     {
         computeActual("CREATE TABLE nation_table_cube_insert_overwrite_test_1 AS SELECT * FROM nation");
@@ -146,6 +171,88 @@ public abstract class AbstractTestStarTreeQueries
         assertEquals(computeScalar("SELECT COUNT(*) FROM nation_insert_overwrite_cube_1"), 19L);
         assertUpdate("DROP CUBE nation_insert_overwrite_cube_1");
         assertUpdate("DROP TABLE nation_table_cube_insert_overwrite_test_1");
+    }
+
+    @Test
+    public void testCountAggregation()
+    {
+        assertQuerySucceeds("CREATE TABLE nation_table_count_agg_1 AS SELECT * FROM nation");
+        assertUpdate("CREATE CUBE nation_count_agg_cube_1 ON nation_table_count_agg_1 WITH (AGGREGATIONS=(count(*)), group=(name))");
+        assertQuerySucceeds("INSERT INTO CUBE nation_count_agg_cube_1 where name = 'CHINA'");
+        assertQuery(sessionNoStarTree,
+                "SELECT count(*) FROM nation_table_count_agg_1 WHERE name = 'CHINA' GROUP BY name",
+                "SELECT count(*) FROM nation WHERE name = 'CHINA' GROUP BY name",
+                assertTableScan("nation_table_count_agg_1"));
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_count_agg_1 WHERE name = 'CHINA' GROUP BY name",
+                "SELECT count(*) FROM nation WHERE name = 'CHINA' GROUP BY name",
+                assertTableScan("nation_count_agg_cube_1"));
+        assertQuerySucceeds("INSERT INTO CUBE nation_count_agg_cube_1 where name = 'CANADA'");
+        assertQuery(sessionNoStarTree,
+                "SELECT count(*) FROM nation_table_count_agg_1 WHERE name = 'CANADA' GROUP BY name",
+                "SELECT count(*) FROM nation WHERE name = 'CANADA' GROUP BY name",
+                assertTableScan("nation_table_count_agg_1"));
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_count_agg_1 WHERE name = 'CANADA' OR name = 'CHINA' GROUP BY name",
+                "SELECT count(*) FROM nation WHERE name = 'CANADA' OR name = 'CHINA' GROUP BY name",
+                assertTableScan("nation_count_agg_cube_1"));
+        assertUpdate("DROP CUBE nation_count_agg_cube_1");
+        assertUpdate("DROP TABLE nation_table_count_agg_1");
+    }
+
+    @Test
+    public void testMultiColumnGroup()
+    {
+        assertQuerySucceeds("CREATE TABLE nation_table_multi_column_group AS SELECT * FROM nation");
+        assertUpdate("CREATE CUBE nation_cube_multi_column_group ON nation_table_multi_column_group WITH (AGGREGATIONS=(count(*)), group=(name, regionkey))");
+        assertQuerySucceeds("INSERT INTO CUBE nation_cube_multi_column_group where name = 'CHINA'");
+        assertQuery(sessionNoStarTree,
+                "SELECT count(*) FROM nation_table_multi_column_group WHERE name = 'CHINA' GROUP BY name, regionkey",
+                "SELECT count(*) FROM nation WHERE name = 'CHINA' GROUP BY name, regionkey",
+                assertTableScan("nation_table_multi_column_group"));
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_multi_column_group WHERE name = 'CHINA' GROUP BY name",
+                "SELECT count(*) FROM nation WHERE name = 'CHINA' GROUP BY name",
+                assertTableScan("nation_table_multi_column_group"));
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_multi_column_group WHERE name = 'CHINA' GROUP BY name, regionkey",
+                "SELECT count(*) FROM nation WHERE name = 'CHINA' GROUP BY name, regionkey",
+                assertTableScan("nation_cube_multi_column_group"));
+        assertUpdate("DROP CUBE nation_cube_multi_column_group");
+        assertUpdate("DROP TABLE nation_table_multi_column_group");
+    }
+
+    @Test
+    public void testDuplicateDataInsert()
+    {
+        assertQuerySucceeds("CREATE TABLE nation_table_duplicate_insert_1 AS SELECT * FROM nation");
+        assertUpdate("CREATE CUBE nation_cube_duplicate_insert_1 ON nation_table_duplicate_insert_1 WITH (AGGREGATIONS=(count(*)), group=(name))");
+        assertQuerySucceeds("INSERT INTO CUBE nation_cube_duplicate_insert_1 where name = 'CHINA'");
+        assertQueryFails("INSERT INTO CUBE nation_cube_duplicate_insert_1 where name = 'CHINA'", "Cannot allow insert. Cube already contains data for the given predicate.*");
+        assertUpdate("DROP CUBE nation_cube_duplicate_insert_1");
+        assertUpdate("DROP TABLE nation_table_duplicate_insert_1");
+    }
+
+    @Test
+    public void testDuplicateInsertCubeWithAllData()
+    {
+        assertQuerySucceeds("CREATE TABLE nation_table_duplicate_insert_2 AS SELECT * FROM nation");
+        assertUpdate("CREATE CUBE nation_cube_duplicate_insert_2 ON nation_table_duplicate_insert_2 WITH (AGGREGATIONS=(count(*)), group=(name))");
+        assertQuerySucceeds("INSERT INTO CUBE nation_cube_duplicate_insert_2 where name = 'CHINA'");
+        assertQueryFails("INSERT INTO CUBE nation_cube_duplicate_insert_2", "Cannot allow insert. Inserting entire dataset but cube already has partial data*");
+        assertUpdate("DROP CUBE nation_cube_duplicate_insert_2");
+        assertUpdate("DROP TABLE nation_table_duplicate_insert_2");
+    }
+
+    @Test
+    public void testMultipleInsertIntoCube()
+    {
+        assertQuerySucceeds("CREATE TABLE nation_table_multi_insert_1 AS SELECT * FROM nation");
+        assertUpdate("CREATE CUBE nation_multi_insert_cube_1 ON nation_table_multi_insert_1 WITH (AGGREGATIONS=(count(*)), group=(name))");
+        assertQuerySucceeds("INSERT INTO CUBE nation_multi_insert_cube_1 where name = 'CHINA'");
+        assertQuerySucceeds("INSERT INTO CUBE nation_multi_insert_cube_1 where name = 'CANADA'");
+        assertUpdate("DROP CUBE nation_multi_insert_cube_1");
+        assertUpdate("DROP TABLE nation_table_multi_insert_1");
     }
 
     @Test
@@ -192,5 +299,19 @@ public abstract class AbstractTestStarTreeQueries
 
         assertUpdate("DROP CUBE nation_status_cube_1");
         assertUpdate("DROP TABLE nation_table_status_test");
+    }
+
+    private Consumer<Plan> assertTableScan(String tableName)
+    {
+        return plan ->
+        {
+            Optional<TableScanNode> tableScanNode = PlanNodeSearcher.searchFrom(plan.getRoot())
+                    .where(TableScanNode.class::isInstance)
+                    .findSingle()
+                    .map(TableScanNode.class::cast);
+            if (!tableScanNode.isPresent() || !tableScanNode.get().getTable().getFullyQualifiedName().endsWith(tableName)) {
+                fail("Table " + tableName + " was not used for scan");
+            }
+        };
     }
 }

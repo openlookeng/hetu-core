@@ -126,8 +126,8 @@ public class CachedSqlQueryExecution
 
     @Override
     protected Plan createPlan(Analysis analysis, Session session, List<PlanOptimizer> planOptimizers,
-                              PlanNodeIdAllocator idAllocator, Metadata metadata, TypeAnalyzer typeAnalyzer, StatsCalculator statsCalculator,
-                              CostCalculator costCalculator, WarningCollector warningCollector)
+            PlanNodeIdAllocator idAllocator, Metadata metadata, TypeAnalyzer typeAnalyzer, StatsCalculator statsCalculator,
+            CostCalculator costCalculator, WarningCollector warningCollector)
     {
         Statement statement = analysis.getStatement();
 
