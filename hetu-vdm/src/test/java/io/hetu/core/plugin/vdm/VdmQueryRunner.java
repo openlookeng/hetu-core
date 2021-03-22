@@ -90,6 +90,7 @@ public final class VdmQueryRunner
                 bufferedWriter.write("hetu.metastore.type = jdbc\n");
                 bufferedWriter.write("hetu.metastore.db.user = user\n");
                 bufferedWriter.write("hetu.metastore.db.password = testpass\n");
+                bufferedWriter.write("hetu.metastore.cache.ttl = 0s");
             }
             queryRunner = DistributedQueryRunner.builder(createSession())
                     .setNodeCount(1)

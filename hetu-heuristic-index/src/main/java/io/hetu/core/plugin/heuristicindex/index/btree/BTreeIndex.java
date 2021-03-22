@@ -89,10 +89,11 @@ public class BTreeIndex
 
     public BTreeIndex()
     {
-        dataDir = new TempFolder();
+        dataDir = new TempFolder("btree");
         try {
             dataDir.create();
             dataFile = dataDir.getRoot().toPath().resolve("btree-" + UUID.randomUUID().toString()).toFile();
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> dataDir.close()));
         }
         catch (IOException e) {
             dataDir.close();

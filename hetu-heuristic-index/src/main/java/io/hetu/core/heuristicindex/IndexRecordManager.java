@@ -14,7 +14,6 @@
  */
 package io.hetu.core.heuristicindex;
 
-import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.prestosql.spi.heuristicindex.IndexRecord;
 import io.prestosql.spi.metastore.HetuMetastore;
@@ -24,11 +23,11 @@ import io.prestosql.spi.metastore.model.TableEntity;
 import io.prestosql.spi.metastore.model.TableEntityType;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 public class IndexRecordManager
 {
@@ -45,17 +44,27 @@ public class IndexRecordManager
     {
         long startTime = System.currentTimeMillis();
 
-        ImmutableList.Builder<IndexRecord> records = ImmutableList.builder();
-        getNewIndexStream().forEach(records::add);
-        LOG.debug("%dms spent on index record scan from hetu metastore", System.currentTimeMillis() - startTime);
+        List<IndexRecord> records = new ArrayList<>();
+        for (CatalogEntity catalogEntity : metastore.getCatalogs()) {
+            for (DatabaseEntity databaseEntity : metastore.getAllDatabases(catalogEntity.getName())) {
+                for (TableEntity tableEntity : metastore.getAllTables(catalogEntity.getName(), databaseEntity.getName())) {
+                    for (Map.Entry<String, String> param : tableEntity.getParameters().entrySet()) {
+                        if (param.getKey().startsWith(IndexRecord.INDEX_METASTORE_PREFIX)) {
+                            records.add(new IndexRecord(tableEntity, param));
+                        }
+                    }
+                }
+            }
+        }
 
-        return records.build();
+        LOG.debug("%dms spent on index record scan from hetu metastore", System.currentTimeMillis() - startTime);
+        return records;
     }
 
     public IndexRecord lookUpIndexRecord(String name)
             throws IOException
     {
-        return getNewIndexStream().filter(indexRecord -> indexRecord.name.equals(name)).findFirst().orElse(null);
+        return getIndexRecords().stream().filter(indexRecord -> indexRecord.name.equals(name)).findFirst().orElse(null);
     }
 
     public IndexRecord lookUpIndexRecord(String table, String[] columns, String indexType)
@@ -129,7 +138,7 @@ public class IndexRecordManager
     public synchronized void deleteIndexRecord(String name, List<String> partitionsToRemove)
             throws IOException
     {
-        getNewIndexStream().filter(record -> record.name.equals(name))
+        getIndexRecords().stream().filter(record -> record.name.equals(name))
                 .forEach(record -> {
                     if (partitionsToRemove.isEmpty()) {
                         metastore.alterTableParameter(
@@ -151,15 +160,5 @@ public class IndexRecordManager
                                 newRecord.partitions.isEmpty() ? null : newRecord.serializeValue()); // if the last partition of the index has been dropped, remove the record
                     }
                 });
-    }
-
-    private Stream<IndexRecord> getNewIndexStream()
-    {
-        return metastore.getCatalogs().stream()
-                .flatMap(catalogEntity -> metastore.getAllDatabases(catalogEntity.getName()).stream())
-                .flatMap(databaseEntity -> metastore.getAllTables(databaseEntity.getCatalogName(), databaseEntity.getName()).stream())
-                .flatMap(tableEntity -> tableEntity.getParameters().entrySet().stream()
-                        .filter(e -> e.getKey().startsWith(IndexRecord.INDEX_METASTORE_PREFIX))
-                        .map(e -> new IndexRecord(tableEntity, e)));
     }
 }

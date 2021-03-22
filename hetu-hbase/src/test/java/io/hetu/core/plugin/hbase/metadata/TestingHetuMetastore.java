@@ -75,6 +75,7 @@ public class TestingHetuMetastore
                     .put("hetu.metastore.db.url", mySqlServer.getJdbcUrl(TEST_DATABASES))
                     .put("hetu.metastore.db.user", TEST_MYSQL_USER)
                     .put("hetu.metastore.db.password", TEST_MYSQL_PASSWORD)
+                    .put("hetu.metastore.cache.ttl", "0s")
                     .build();
 
             Bootstrap app = new Bootstrap(

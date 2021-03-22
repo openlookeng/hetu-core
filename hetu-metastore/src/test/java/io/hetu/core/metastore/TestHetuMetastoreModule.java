@@ -79,6 +79,7 @@ public class TestHetuMetastoreModule
                 .put("hetu.metastore.db.url", database.getUrl())
                 .put("hetu.metastore.db.user", user)
                 .put("hetu.metastore.db.password", password)
+                .put("hetu.metastore.cache.ttl", "0s")
                 .build();
         try {
             Bootstrap app = new Bootstrap(
