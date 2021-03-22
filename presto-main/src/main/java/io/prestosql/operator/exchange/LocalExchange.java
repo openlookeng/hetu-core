@@ -160,7 +160,7 @@ public class LocalExchange
             Iterator<LocalExchangeSource> sourceIterator = this.sources.iterator();
             exchangerSupplier = () -> {
                 checkState(sourceIterator.hasNext(), "no more sources");
-                return new PassthroughExchanger(sourceIterator.next(), maxBufferedBytes.toBytes() / bufferCount, memoryManager::updateMemoryUsage);
+                return new PassthroughExchanger(sourceIterator.next(), maxBufferedBytes.toBytes() / bufferCount, memoryManager::updateMemoryUsage, isForMerge);
             };
         }
         else {
