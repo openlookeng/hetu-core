@@ -48,6 +48,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.IntStream;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Iterables.transform;
 import static io.prestosql.connector.informationschema.InformationSchemaMetadata.INFORMATION_SCHEMA;
@@ -2593,6 +2594,41 @@ public abstract class AbstractTestQueries
         assertEquals(functions.get("split_part").asList().get(0).getField(3), "scalar");
 
         assertFalse(functions.containsKey("like"), "Expected function names " + functions + " not to contain 'like'");
+    }
+
+    @Test
+    public void testShowFunctionsLike()
+    {
+        // the precondition for this test is that we have built in functions named "var_pop", "var_samp" and "variance"
+        // Match function names with prefix var
+        MaterializedResult functionsLike = computeActual("SHOW FUNCTIONS LIKE 'var%'");
+        List<String> functionNamesLike = functionsLike.getMaterializedRows().stream()
+                .map(MaterializedRow::getFields)
+                .map(list -> list.get(0))
+                .map(String.class::cast)
+                .distinct()
+                .collect(toImmutableList());
+        assertEquals(functionNamesLike, ImmutableList.of("var_pop", "var_samp", "variance"));
+
+        // Match both "var_" and "variance" because '_' is treated as a wildcard, not a literal
+        MaterializedResult functionsLikeWithoutEscape = computeActual("SHOW FUNCTIONS LIKE 'var_%'");
+        List<String> functionNamesLikeWithoutEscape = functionsLikeWithoutEscape.getMaterializedRows().stream()
+                .map(MaterializedRow::getFields)
+                .map(list -> list.get(0))
+                .map(String.class::cast)
+                .distinct()
+                .collect(toImmutableList());
+        assertEquals(functionNamesLikeWithoutEscape, ImmutableList.of("var_pop", "var_samp", "variance"));
+
+        // Match "var_" but not "variance" because '_' is now escaped
+        MaterializedResult functionsLikeWithEscape = computeActual("SHOW FUNCTIONS LIKE 'var$_%' ESCAPE '$'");
+        List<String> functionNamesLikeWithEscape = functionsLikeWithEscape.getMaterializedRows().stream()
+                .map(MaterializedRow::getFields)
+                .map(list -> list.get(0))
+                .map(String.class::cast)
+                .distinct()
+                .collect(toImmutableList());
+        assertEquals(functionNamesLikeWithEscape, ImmutableList.of("var_pop", "var_samp"));
     }
 
     @Test
