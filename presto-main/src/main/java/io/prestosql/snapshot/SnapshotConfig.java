@@ -32,20 +32,20 @@ public class SnapshotConfig
     // Don't use all nodes. Reserve some to be used to schedule tasks from failed nodes
     public static final float MAX_NODE_ALLOCATION = 80 / 100F;
 
-    public static final String SNAPSHOT_PROFILE = "hetu.snapshot.profile";
-    public static final String SNAPSHOT_INTERVAL_TYPE = "hetu.snapshot.intervalType";
-    public static final String SNAPSHOT_TIME_INTERVAL = "hetu.snapshot.timeInterval";
-    public static final String SNAPSHOT_SPLIT_COUNT_INTERVAL = "hetu.snapshot.splitCountInterval";
+    public static final String SNAPSHOT_PROFILE = "hetu.experimental.snapshot.profile";
+    public static final String SNAPSHOT_INTERVAL_TYPE = "hetu.internal.snapshot.intervalType";
+    public static final String SNAPSHOT_TIME_INTERVAL = "hetu.internal.snapshot.timeInterval";
+    public static final String SNAPSHOT_SPLIT_COUNT_INTERVAL = "hetu.internal.snapshot.splitCountInterval";
     public static final String SNAPSHOT_MAX_RETRIES = "hetu.snapshot.maxRetries";
     public static final String SNAPSHOT_RETRY_TIMEOUT = "hetu.snapshot.retryTimeout";
 
     private String snapshotProfile;
 
     private IntervalType snapshotIntervalType = IntervalType.TIME;
-    private Duration snapshotTimeInterval = new Duration(2, TimeUnit.MINUTES);
+    private Duration snapshotTimeInterval = new Duration(5, TimeUnit.MINUTES);
     private long snapshotSplitCountInterval = 1_000;
     private long snapshotMaxRetries = 10;
-    private Duration snapshotRetryTimeout = new Duration(3, TimeUnit.MINUTES);
+    private Duration snapshotRetryTimeout = new Duration(10, TimeUnit.MINUTES);
 
     public enum IntervalType
     {

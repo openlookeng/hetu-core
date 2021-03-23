@@ -402,7 +402,7 @@ public class HivePageSink
                 // Ignore. Containing staging folder may have been deleted.
             }
             catch (IOException e) {
-                log.debug("exception '%s' while aborting subfile", e);
+                log.debug(e, "exception while aborting all subfiles");
                 rollbackException = Optional.of(e);
             }
         }

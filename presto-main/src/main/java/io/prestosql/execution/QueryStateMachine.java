@@ -107,7 +107,6 @@ public class QueryStateMachine
     private final TransactionManager transactionManager;
     private final Metadata metadata;
     private final QueryOutputManager outputManager;
-    private final boolean isSnapshotEnabled;
 
     private final AtomicReference<VersionedMemoryPoolId> memoryPool = new AtomicReference<>(new VersionedMemoryPoolId(GENERAL_POOL, 0));
 
@@ -178,7 +177,6 @@ public class QueryStateMachine
         this.transactionManager = requireNonNull(transactionManager, "transactionManager is null");
         this.queryStateTimer = new QueryStateTimer(ticker);
         this.metadata = requireNonNull(metadata, "metadata is null");
-        this.isSnapshotEnabled = SystemSessionProperties.isSnapshotEnabled(session);
 
         this.queryState = new StateMachine<>("query " + query, executor, QUEUED, TERMINAL_QUERY_STATES);
         this.finalQueryInfo = new StateMachine<>("finalQueryInfo-" + queryId, executor, Optional.empty());
@@ -1024,7 +1022,7 @@ public class QueryStateMachine
         if (queryInfo.isFinalQueryInfo()) {
             finalQueryInfo.compareAndSet(Optional.empty(), Optional.of(queryInfo));
         }
-        else if (isSnapshotEnabled) {
+        else if (SystemSessionProperties.isSnapshotEnabled(session)) {
             if (queryInfo.getState() == RESCHEDULING && queryInfo.areAllStagesDone()) {
                 // Snapsoht: All remote tasks have been cancelled. Can start scheduling new ones.
                 transitionToResuming();

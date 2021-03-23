@@ -1550,7 +1550,7 @@ public class HiveMetadata
 
         HiveWriteUtils.OpertionType operationType = HiveWriteUtils.OpertionType.INSERT;
         boolean isInsertExistingPartitionsOverwrite = HiveSessionProperties.getInsertExistingPartitionsBehavior(session) ==
-                HiveSessionProperties.InsertExistingPartitionsBehavior.OVERWRITE ? true : false;
+                HiveSessionProperties.InsertExistingPartitionsBehavior.OVERWRITE;
         if (isInsertExistingPartitionsOverwrite || writeType == HiveACIDWriteType.INSERT_OVERWRITE) {
             operationType = HiveWriteUtils.OpertionType.INSERT_OVERWRITE;
         }
@@ -2884,6 +2884,29 @@ public class HiveMetadata
     public boolean isExecutionPlanCacheSupported(ConnectorSession session, ConnectorTableHandle handle)
     {
         return true;
+    }
+
+    @Override
+    public boolean isSnapshotSupportedAsInput(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return true;
+    }
+
+    @Override
+    public boolean isSnapshotSupportedAsOutput(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        HiveTableHandle tableHandle = (HiveTableHandle) handle;
+        Optional<Table> table = metastore.getTable(
+                new HiveIdentity(session),
+                tableHandle.getSchemaName(),
+                tableHandle.getTableName());
+        return table.isPresent() && HiveMetadata.extractHiveStorageFormat(table.get()) == ORC;
+    }
+
+    @Override
+    public boolean isSnapshotSupportedAsNewTable(ConnectorSession session, Map<String, Object> tableProperties)
+    {
+        return getHiveStorageFormat(tableProperties) == ORC;
     }
 
     protected void finishInsertOverwrite(ConnectorSession session, HiveInsertTableHandle handle, Table table, PartitionUpdate partitionUpdate, PartitionStatistics partitionStatistics)

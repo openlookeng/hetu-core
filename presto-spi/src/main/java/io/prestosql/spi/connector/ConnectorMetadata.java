@@ -926,4 +926,40 @@ public interface ConnectorMetadata
     {
         return false;
     }
+
+    /**
+     * Whether this table can be used as input for snapshot-enabled query executions.
+     *
+     * @param session Presto session
+     * @param table Connector specific table handle
+     */
+    default boolean isSnapshotSupportedAsInput(ConnectorSession session, ConnectorTableHandle table)
+    {
+        // Most connectors do *not* support snapshot. Only Hive, TPCDS, and TPCH support it.
+        return false;
+    }
+
+    /**
+     * Whether this table can be used as output for snapshot-enabled query executions
+     *
+     * @param session Presto session
+     * @param table Connector specific table handle
+     */
+    default boolean isSnapshotSupportedAsOutput(ConnectorSession session, ConnectorTableHandle table)
+    {
+        // Most connectors do *not* support snapshot. Only Hive with ORC format supports it.
+        return false;
+    }
+
+    /**
+     * Whether new table with specified format can be used as output for snapshot-enabled
+     *
+     * @param session Presto session
+     * @param tableProperties Table properties
+     */
+    default boolean isSnapshotSupportedAsNewTable(ConnectorSession session, Map<String, Object> tableProperties)
+    {
+        // Most connectors do *not* support snapshot. Only Hive with ORC format supports it.
+        return false;
+    }
 }

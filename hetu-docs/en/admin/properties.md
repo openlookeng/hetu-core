@@ -26,8 +26,8 @@ This section describes the most important config properties that may be used to 
 > - **Type：** `boolean`
 > - **Allowed values：** `true`, `false`
 > - **Default value：** `false`
-> 
-> This property make exception stack trace which happen in openLooKeng visible or invisible. While it is set to be `true`, the stack trace is visible for all users. While it is set as default or `false`, the stack trace is invisible for all users. 
+>
+> This property make exception stack trace which happen in openLooKeng visible or invisible. While it is set to be `true`, the stack trace is visible for all users. While it is set as default or `false`, the stack trace is invisible for all users.
 
 
 ## http security headers properties
@@ -36,42 +36,42 @@ This section describes the most important config properties that may be used to 
 
 > - **Type:** `string`
 > - **Default value:** `object-src 'none'`
-> 
+>
 > Property to set the http security header `content-security-policy` .
 
 ### `http-header.referrer-policy`
 
 > - **Type:** `string`
 > - **Default value:** `strict-origin-when-cross-origin`
-> 
+>
 > Property to set the http security header  `referrer-policy`.
 
 ### `http-header.x-content-type-options`
 
 > - **类型:** `string`
 > - **Default value:** `nosniff`
-> 
+>
 > Property to set the http security header `content-security-policy` .
 
 ### `http-header.x-frame-options`
 
 > - **Type:** `string`
 > - **Default value:** `deny`
-> 
+>
 > Property to set the http security header  `content-security-policy`.
 
 ### `http-header.x-permitted-cross-domain-policies`
 
 > - **Type=:** `string`
 > - **Default value:** `master-only`
-> 
+>
 > Property to set the http security header `x-permitted-cross-domain-policies` .
 
 ### `http-header.x-xss-protection`
 
 > - **Type:** `string`
 > - **Default value:** `1; mode=block`
-> 
+>
 > Property to set the http security header `http-header.x-xss-protection`.
 
 
@@ -120,16 +120,16 @@ This section describes the most important config properties that may be used to 
 > -   **Default value:** `false`
 >
 > Try spilling memory to disk to avoid exceeding memory limits for the query.
-> 
-> 
-> 
+>
+>
+>
 > Spilling works by offloading memory to disk. This process can allow a query with a large memory footprint to pass at the cost of slower execution times. Spilling is supported for aggregations, joins (inner and outer), sorting, and window functions. This property will not reduce memory usage required for other join types.
-> 
->  
-> 
+>
+>
+>
 >Be aware that this is an experimental feature and should be used with care.
-> 
->  
+>
+>
 >
 > This config property can be overridden by the `spill_enabled` session property.
 
@@ -139,8 +139,8 @@ This section describes the most important config properties that may be used to 
 > -   **Default value:** `true`
 >
 > Try spilling memory to disk to avoid exceeding memory limits for the query when running sorting operators. This property must be used in conjunction with the `experimental.spill-enabled` property.
-> 
->  
+>
+>
 >
 > This config property can be overridden by the `spill_order_by` session property.
 
@@ -150,8 +150,8 @@ This section describes the most important config properties that may be used to 
 > -   **Default value:** `true`
 >
 > Try spilling memory to disk to avoid exceeding memory limits for the query when running window operators; This property must be used in conjunction with the `experimental.spill-enabled` property.
-> 
->  
+>
+>
 >
 > This config property can be overridden by the `spill_window_operator` session property.
 
@@ -161,8 +161,8 @@ This section describes the most important config properties that may be used to 
 > -   **Default value:** `false`
 >
 > Try spilling memory to disk to avoid exceeding memory limits for the query when running Reuse Exchange; This property must be used in conjunction with the `experimental.spill-enabled` property.
-> 
->  
+>
+>
 >
 > This config property can be overridden by the `spill_reuse_tablescan` session property.
 
@@ -172,8 +172,8 @@ This section describes the most important config properties that may be used to 
 > -   **No default value.** Must be set when spilling is enabled
 >
 > Directory where spilled content will be written. It can be a comma separated list to spill simultaneously to multiple directories, which helps to utilize multiple drives installed in the system.
-> 
->  
+>
+>
 >
 > It is not recommended to spill to system drives. Most importantly, do not spill to the drive on which the JVM logs are written, as disk overutilization might cause JVM to pause for lengthy periods, causing queries to fail.
 
@@ -268,8 +268,8 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > -   **Default value:** `16MB`
 >
 > Maximum size of a response returned from an exchange request. The response will be placed in the exchange client buffer which is shared across all concurrent requests for the exchange.
-> 
->  
+>
+>
 >
 > Increasing the value may improve network throughput if there is high latency. Decreasing the value may improve query performance for large clusters as it reduces skew due to the exchange client buffer holding responses for more tasks (rather than hold more data from fewer tasks).
 
@@ -352,13 +352,13 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > -   **Default value:** `100`
 >
 > The target value for the total number of splits that can be running for each worker node.
-> 
-> 
-> 
+>
+>
+>
 > Using a higher value is recommended if queries are submitted in large batches (e.g., running a large group of reports periodically) or for connectors that produce many splits that complete quickly. Increasing this value may improve query latency by ensuring that the workers have enough splits to keep them fully utilized.
-> 
->  
-> 
+>
+>
+>
 >Setting this too high will waste memory and may result in lower performance due to splits not being balanced across workers. Ideally, it should be set such that there is always at least one split waiting to be processed, but not higher.
 
 ### `node-scheduler.max-pending-splits-per-task`
@@ -367,9 +367,9 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > -   **Default value:** `10`
 >
 > The number of outstanding splits that can be queued for each worker node for a single stage of a query, even when the node is already at the limit for total number of splits. Allowing a minimum number of splits per stage is required to prevent starvation and deadlocks.
-> 
->  
-> 
+>
+>
+>
 >This value must be smaller than `node-scheduler.max-splits-per-node`, will usually be increased for the same reasons, and has similar drawbacks if set too high.
 
 ### `node-scheduler.min-candidates`
@@ -403,9 +403,9 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > -   **Default value:** `true`
 >
 > Compute hash codes for distribution, joins, and aggregations early during execution, allowing result to be shared between operations later in the query. This can reduce CPU usage by avoiding computing the same hash multiple times, but at the cost of additional network transfer for the hashes. In most cases it will decrease overall query processing time. This can also be specified on a per-query basis using the `optimize_hash_generation` session property.
-> 
->  
-> 
+>
+>
+>
 > It is often helpful to disable this property when using [EXPLAIN](../sql/explain.md) in order to make the query plan easier to read.
 
 ### `optimizer.optimize-metadata-queries`
@@ -414,9 +414,9 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > -   **Default value:** `false`
 >
 > Enable optimization of some aggregations by using values that are stored as metadata. This allows openLooKeng to execute some simple queries in constant time. Currently, this optimization applies to `max`, `min` and `approx_distinct` of partition keys and other aggregation insensitive to the cardinality of the input (including `DISTINCT` aggregates). Using this may speed up some queries significantly.
-> 
->  
-> 
+>
+>
+>
 > The main drawback is that it can produce incorrect results if the connector returns partition keys for partitions that have no rows. In particular, the Hive connector can return empty partitions if they were created by other systems (openLooKeng cannot create them).
 
 ### `optimizer.push-aggregation-through-join`
@@ -425,9 +425,9 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > -   **Default value:** `true`
 >
 > When an aggregation is above an outer join and all columns from the outer side of the join are in the grouping clause, the aggregation is pushed below the outer join. This optimization is particularly useful for correlated scalar subqueries, which get rewritten to an aggregation over an outer join. For example:
-> 
->  
-> 
+>
+>
+>
 > ```sql
 >SELECT * FROM item i
 >        WHERE i.i_current_price > (
@@ -435,8 +435,8 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 >                WHERE i.i_category = j.i_category);
 > ```
 >
->  
-> 
+>
+>
 > Enabling this optimization can substantially speed up queries by reducing the amount of data that needs to be processed by the join.  However, it may slow down some queries that have very selective joins. This can also be specified on a per-query basis using the `push_aggregation_through_join` session property.
 
 ### `optimizer.push-table-write-through-union`
@@ -460,11 +460,11 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > -   **Default value:** `9`
 >
 > When optimizer.join-reordering-strategy is set to cost-based, this property determines the maximum number of joins that can be reordered at once.
-> 
->  
+>
+>
 >
 > **Warning**
-> 
+>
 > The number of possible join orders scales factorially with the number of relations, so increasing this value can cause serious performance issues.
 
 ### `hetu.query-pushdown`
@@ -472,7 +472,7 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > -   **Type:** `boolean`
 > -   **Default value:** `true`
 >
-> Switch for controlling the push-down feature of the JDBC connector and DC connector. 
+> Switch for controlling the push-down feature of the JDBC connector and DC connector.
 
 ### `optimizer.reuse-table-scan`
 
@@ -480,7 +480,7 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > -   **Default value:** `false`
 >
 > Use Reuse Exchange to cache data in memory if the query contains tables or Common Table Expressions(CTE) which are present more than one time with the same projections and filters on them. Enabling this feature will reduce the time taken to execute the query by caching data in memory and avoiding reading from disk multiple times.
-> This can also be specified on a per-query basis using the `reuse_table_scan` session property. 
+> This can also be specified on a per-query basis using the `reuse_table_scan` session property.
 
 ### `optimizer.cte-reuse-enabled`
 
@@ -522,23 +522,23 @@ The following properties allow tuning the [regexp](../functions/regexp.md).
 ## Heuristic Index Properties
 
 Heuristic index is external index module that which can be used to filter to out rows at the connector level. Bitmap, Bloom, MinMaxIndex are list of indexes provided by openLooKeng. As of now, bitmap index supports supports hive connector for tables with ORC storage format.
- 
+
 ### `hetu.heuristicindex.filter.enabled`
- 
+
 > -   **Type:** `boolean`
 > -   **Default value:** `false`
 >
 > This property enables heuristic index. There is also a session property `heuristicindex_filter_enabled` which can be set per session. Note: the session property should ONLY be used to turn on and off index filtering temporarily when this global property in config file is set as `true`. The session property CANNOT be used to turn on index filter when it's not enabled globally.
- 
+
 ### `hetu.heuristicindex.filter.cache.max-memory`
- 
+
 > -   **Type:** `data size`
 > -   **Default value:** `10GB`
 >
 > Caching the index files provides better performance, index files are read only and modified very rarely. Caching saves time spent on reading the files from indexstore. This property controls the maximum memory used by the index cache. When limit exceeded, existing entries will be removed from cache based on LRU and new entry will be added to cache.
 
 ### `hetu.heuristicindex.filter.cache.soft-reference`
- 
+
 > -   **Type:** `boolean`
 > -   **Default value:** `true`
 >
@@ -547,21 +547,21 @@ Heuristic index is external index module that which can be used to filter to out
 > Be aware that this is an experimental feature and should be used with care.
 
 ### `hetu.heuristicindex.filter.cache.ttl`
- 
+
 > -   **Type:** `Duration`
 > -   **Default value:** `24h`
 >
 > The time period after which index cache expires.
 
 ### `hetu.heuristicindex.filter.cache.loading-threads`
- 
+
 > -   **Type:** `integer`
 > -   **Default value:** `10`
 >
 > The number of threads used to load indices in parallel.
 
 ### `hetu.heuristicindex.filter.cache.loading-delay`
- 
+
 > -   **Type:** `Duration`
 > -   **Default value:** `10s`
 >
@@ -575,67 +575,67 @@ Heuristic index is external index module that which can be used to filter to out
 > Preload the specified indices (comma-separated) when the server starts. Put `ALL` to load all indices.
 
 ### `hetu.heuristicindex.indexstore.uri`
- 
+
 > -   **Type:** `string`
 > -   **Default value:** `/opt/hetu/indices/`
-> 
-> Directory under which all index files are stored. Each index will be stored in its own subdirectory. 
- 
-### `hetu.heuristicindex.indexstore.filesystem.profile`
- 
-> -   **Type** `string` 
 >
-> This property defines the filesystem profile used to read and write index. The corresponding profile must exist in `etc/filesystem`. For example, if this property is set as `hetu.heuristicindex.filter.indexstore.filesystem.profile=index-hdfs1`, a profile describing this filesystem access `index-hdfs1.properties` must be created in `etc/filesystem` with necessary information including authentication type, config, and keytabs (if applicable). 
-> 
+> Directory under which all index files are stored. Each index will be stored in its own subdirectory.
+
+### `hetu.heuristicindex.indexstore.filesystem.profile`
+
+> -   **Type** `string`
+>
+> This property defines the filesystem profile used to read and write index. The corresponding profile must exist in `etc/filesystem`. For example, if this property is set as `hetu.heuristicindex.filter.indexstore.filesystem.profile=index-hdfs1`, a profile describing this filesystem access `index-hdfs1.properties` must be created in `etc/filesystem` with necessary information including authentication type, config, and keytabs (if applicable).
+>
 > `LOCAL` filesystem type should only be used during testing or in single node clusters.
-> 
+>
 > `HDFS` filesystem type should be used in production in order for the index to be accessible by all nodes in the cluster. All nodes should be configured to use the same filesystem profile.
 
 ## Execution Plan Cache Properties
 
 Execution plan cache feature allows the coordinator to reuse execution plans between identical queries, instead
 of constructing another execution plan, thus reducing the amount of query pre-processing required.
- 
+
 ### `hetu.executionplan.cache.enabled`
 >
-> -    **Type:** `boolean` 
-> -    **Default value:** `false` 
+> -    **Type:** `boolean`
+> -    **Default value:** `false`
 >
 > Enable or disable execution plan cache. Disabled by default.
- 
+
 ### `hetu.executionplan.cache.limit`
-> 
+>
 > -  **Type:** `integer`
 > - **Default value:** `10000`
 >
 > Maximum number of execution plans to keep in the cache
- 
+
 ### `hetu.executionplan.cache.timeout`
-> 
+>
 > - **Type:** `integer`
 > - **Default value:** `86400000 ms`
-> 
+>
 > Time in milliseconds to expire cached execution plans after the last access
- 
+
 ## SplitCacheMap Properties
 
-SplitCacheMap must be enabled to support caching row data. When enabled, the coordinator stores table, partition and split scheduling metadata that 
+SplitCacheMap must be enabled to support caching row data. When enabled, the coordinator stores table, partition and split scheduling metadata that
 helps with cache affinity scheduling.
- 
+
 ### `hetu.split-cache-map.enabled`
-    
+
 > -   **Type:** `boolean`
 > -   **Default value:** `false`
 >
 > This property enables split caching functionality.
-> If state store is enabled, the split cache map configuration is automatically replicated in state store as well. 
-> In case of HA setup with multiple coordinators, the state store is used to share split cache map between the coordinators. 
- 
+> If state store is enabled, the split cache map configuration is automatically replicated in state store as well.
+> In case of HA setup with multiple coordinators, the state store is used to share split cache map between the coordinators.
+
 ### `hetu.split-cache-map.state-update-interval`
-    
+
 > -   **Type:** `integer`
 > -   **Default value:** `2 seconds`
-> 
+>
 > This property controls how frequently the split cache map is updated in state store. It is primarily applicable for HA deployment.
 
 ## Auto-Vacuum
@@ -679,7 +679,7 @@ helps with cache affinity scheduling.
 > -   **Type:** `int`
 > -   **Default value:** `1024`
 >
-> The maximum number of pages per processing queue.  The number of processing queues is equal to the number of the CTE references in the main query. 
+> The maximum number of pages per processing queue.  The number of processing queues is equal to the number of the CTE references in the main query.
 > This can also be specified on a per-query basis using the `cte_max_queue_size` session property.
 
 ### `cte.cte-max-prefetch-queue-size`
@@ -691,3 +691,40 @@ helps with cache affinity scheduling.
 > This can also be specified on a per-query basis using the `cte_max_prefetch_queue_size` session property.
 >
 > **Note:** This should be configured in all workers.
+
+## Distributed Snapshot
+
+### `snapshot_enabled`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> This session property is used to enable or disable the distributed snapshot functionality.
+
+### `hetu.experimental.snapshot.profile`
+
+> -   **Type:** `string`
+>
+> This property defines the file system profile used to stored snapshots. The corresponding profile must exist in `etc/filesystem`. For example, if this property is set as `hetu.experimental.snapshot.profile=snapshot-hdfs1`, a profile describing this filesystem `snapshot-hdfs1.properties` must be created in `etc/filesystem` with necessary information including authentication type, config, and keytabs (if applicable).
+>
+> This property is required if any query is executed with distributed snapshot turned on. It must be included in configuration files for all coordinators and all workers. The specified file system must be accessible by all workers, and they must be able to read from and write to the `/tmp/hetu/snapshot` folder in the specified file system.
+>
+> This is an experimental property. In the future it may be allowed to store snapshots in non-file-system locations, e.g. in a connector.
+
+### `hetu.snapshot.maxRetries`
+
+> -   **Type:** `int`
+> -   **Default value:** `10`
+>
+> This property defines the maxinum number of error recovery attempts for a query. When the limit is reached, the query fails.
+>
+> This can also be specified on a per-query basis using the `snapshot_max_retries` session property.
+
+### `hetu.snapshot.retryTimeout`
+
+> -   **Type:** `duration`
+> -   **Default value:** `10m` (10 minutes)
+>
+> This property defines the maxinum amount of time for the system to wait until all tasks are successfully restored. If any task is not ready within this timeout, then the recovery attempt is considered a failure, and the query will try to resume from an earlier snapshot if available.
+>
+> This can also be specified on a per-query basis using the `snapshot_retry_timeout` session property.

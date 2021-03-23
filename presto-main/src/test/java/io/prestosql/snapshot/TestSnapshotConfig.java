@@ -30,20 +30,20 @@ public class TestSnapshotConfig
         ConfigAssertions.assertRecordedDefaults(ConfigAssertions.recordDefaults(SnapshotConfig.class)
                 .setSnapshotProfile(null)
                 .setSnapshotIntervalType(SnapshotConfig.IntervalType.TIME)
-                .setSnapshotTimeInterval(new Duration(2, TimeUnit.MINUTES))
+                .setSnapshotTimeInterval(new Duration(5, TimeUnit.MINUTES))
                 .setSnapshotSplitCountInterval(1000)
                 .setSnapshotMaxRetries(10)
-                .setSnapshotRetryTimeout(new Duration(3, TimeUnit.MINUTES)));
+                .setSnapshotRetryTimeout(new Duration(10, TimeUnit.MINUTES)));
     }
 
     @Test
     public void testExplicitPropertyMappings()
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
-                .put("hetu.snapshot.profile", "snapshot-config-hdfs")
-                .put("hetu.snapshot.intervalType", "SPLIT_COUNT")
-                .put("hetu.snapshot.timeInterval", "3m")
-                .put("hetu.snapshot.splitCountInterval", "1000000")
+                .put("hetu.experimental.snapshot.profile", "snapshot-config-hdfs")
+                .put("hetu.internal.snapshot.intervalType", "SPLIT_COUNT")
+                .put("hetu.internal.snapshot.timeInterval", "3m")
+                .put("hetu.internal.snapshot.splitCountInterval", "1000000")
                 .put("hetu.snapshot.maxRetries", "20")
                 .put("hetu.snapshot.retryTimeout", "5m")
                 .build();

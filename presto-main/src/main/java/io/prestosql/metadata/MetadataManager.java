@@ -1070,6 +1070,50 @@ public final class MetadataManager
         return metadata.isPreAggregationSupported(session.toConnectorSession());
     }
 
+    /**
+     * Whether this table can be used as input for snapshot-enabled query executions
+     *
+     * @param session Presto session
+     * @param table Connector specific table handle
+     */
+    @Override
+    public boolean isSnapshotSupportedAsInput(Session session, TableHandle table)
+    {
+        CatalogName catalogName = table.getCatalogName();
+        ConnectorMetadata metadata = getMetadata(session, catalogName);
+
+        return metadata.isSnapshotSupportedAsInput(session.toConnectorSession(catalogName), table.getConnectorHandle());
+    }
+
+    /**
+     * Whether this table can be used as output for snapshot-enabled query executions
+     *
+     * @param session Presto session
+     * @param table Connector specific table handle
+     */
+    @Override
+    public boolean isSnapshotSupportedAsOutput(Session session, TableHandle table)
+    {
+        CatalogName catalogName = table.getCatalogName();
+        ConnectorMetadata metadata = getMetadata(session, catalogName);
+
+        return metadata.isSnapshotSupportedAsOutput(session.toConnectorSession(catalogName), table.getConnectorHandle());
+    }
+
+    /**
+     * Whether new table with specified format can be used as output for snapshot-enabled
+     *
+     * @param session Presto session
+     * @param catalogName Catalog name
+     * @param tableProperties Table properties
+     */
+    @Override
+    public boolean isSnapshotSupportedAsNewTable(Session session, CatalogName catalogName, Map<String, Object> tableProperties)
+    {
+        ConnectorMetadata metadata = getMetadata(session, catalogName);
+        return metadata.isSnapshotSupportedAsNewTable(session.toConnectorSession(catalogName), tableProperties);
+    }
+
     @Override
     public Optional<LimitApplicationResult<TableHandle>> applyLimit(Session session, TableHandle table, long limit)
     {
