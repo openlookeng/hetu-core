@@ -1317,7 +1317,7 @@ public class HiveAstBuilder
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: LIKE", context.pattern);
         }
 
-        return new ShowFunctions(getLocation(context));
+        return new ShowFunctions(getLocation(context), Optional.empty(), Optional.empty());
     }
 
     @Override

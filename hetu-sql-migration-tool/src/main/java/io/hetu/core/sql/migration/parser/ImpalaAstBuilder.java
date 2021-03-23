@@ -1064,7 +1064,7 @@ public class ImpalaAstBuilder
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "LIKE is not supported", context);
         }
 
-        return new ShowFunctions(getLocation(context));
+        return new ShowFunctions(getLocation(context), Optional.empty(), Optional.empty());
     }
 
     @Override
