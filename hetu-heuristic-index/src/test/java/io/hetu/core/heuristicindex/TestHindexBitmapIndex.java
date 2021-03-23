@@ -26,7 +26,8 @@ public class TestHindexBitmapIndex
     public void testBitmapOperatorInputRows(String predicateQuery)
             throws Exception
     {
-        System.out.println("Testing for predicate query: " + predicateQuery);
+        System.out.println("Running testBitmapOperatorInputRows[predicateQuery: " + predicateQuery + "]");
+
         String tableName = getNewTableName();
         createTableBitmapSupportedDataTypes(tableName);
         String indexName = getNewIndexName();
@@ -57,6 +58,8 @@ public class TestHindexBitmapIndex
     public void testBitmapDataTypesBetweenValues(String column, String queryCondition)
             throws Exception
     {
+        System.out.println("Running testBitmapDataTypesBetweenValues[queryCondition: " + column + " " + queryCondition + "]");
+
         String indexType = "bitmap";
         String tableName = getNewTableName();
         createTableBitmapSupportedDataTypes(tableName);
@@ -88,7 +91,8 @@ public class TestHindexBitmapIndex
     public void testBitmapSupportedDataTypesRangedValues(String column, String queryCondition)
             throws Exception
     {
-        System.out.println("Testing for queryCondition: " + column + " " + queryCondition);
+        System.out.println("Running testBitmapSupportedDataTypesRangedValues[queryCondition: " + column + " " + queryCondition + "]");
+
         String tableName = getNewTableName();
         createTableSupportedRangedTypes(tableName);
         String testerQuery = "SELECT * FROM " + tableName + " WHERE " + column + " " + queryCondition;

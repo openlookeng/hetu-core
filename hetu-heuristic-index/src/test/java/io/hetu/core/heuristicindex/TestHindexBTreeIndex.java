@@ -170,6 +170,8 @@ public class TestHindexBTreeIndex
     @Test(dataProvider = "btreeTable1Operators")
     public void testBtreeIndexOperators(String condition)
     {
+        System.out.println("Running testBtreeIndexOperators[condition: " + condition + "]");
+
         String tableName = getNewTableName();
         createBtreeTable1(tableName);
 
