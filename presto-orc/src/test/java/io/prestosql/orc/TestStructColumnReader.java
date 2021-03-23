@@ -274,7 +274,7 @@ public class TestStructColumnReader
             throws IOException
     {
         DataSize dataSize = new DataSize(1, MEGABYTE);
-        OrcDataSource orcDataSource = new FileOrcDataSource(tempFile.getFile(), dataSize, dataSize, dataSize, true);
+        OrcDataSource orcDataSource = new FileOrcDataSource(tempFile.getFile(), dataSize, dataSize, dataSize, true, tempFile.getFile().lastModified());
         OrcReader orcReader = new OrcReader(orcDataSource, dataSize, dataSize, dataSize);
 
         OrcRecordReader recordReader = orcReader.createRecordReader(

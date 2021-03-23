@@ -18,16 +18,16 @@ import java.util.Objects;
 
 public class OrcRowIndexCacheKey
 {
-    private OrcDataSourceId orcDataSourceId;
+    private OrcDataSourceIdWithTimeStamp orcDataSourceId;
     private long stripeOffset;
     private StreamId streamId;
 
-    public OrcDataSourceId getOrcDataSourceId()
+    public OrcDataSourceIdWithTimeStamp getOrcDataSourceId()
     {
         return orcDataSourceId;
     }
 
-    public void setOrcDataSourceId(OrcDataSourceId orcDataSourceId)
+    public void setOrcDataSourceId(OrcDataSourceIdWithTimeStamp orcDataSourceId)
     {
         this.orcDataSourceId = orcDataSourceId;
     }

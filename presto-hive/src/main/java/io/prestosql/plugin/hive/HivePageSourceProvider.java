@@ -192,7 +192,8 @@ public class HivePageSourceProvider
                     hiveTable.getPredicateColumns(),
                     hiveTable.getDisjunctCompactEffectivePredicate(),
                     hiveSplit.getBucketConversion(),
-                    hiveSplit.getBucketNumber());
+                    hiveSplit.getBucketNumber(),
+                    hiveSplit.getLastModifiedTime());
         }
 
         Optional<ConnectorPageSource> pageSource = createHivePageSource(
@@ -219,7 +220,8 @@ public class HivePageSourceProvider
                 hiveSplit.getStartRowOffsetOfFile(),
                 indexOptional,
                 splitMetadata,
-                hiveSplit.isCacheable());
+                hiveSplit.isCacheable(),
+                hiveSplit.getLastModifiedTime());
         if (pageSource.isPresent()) {
             return pageSource.get();
         }
@@ -280,7 +282,8 @@ public class HivePageSourceProvider
             Map<String, HiveColumnHandle> predicateColumns,
             Optional<List<TupleDomain<HiveColumnHandle>>> additionPredicates,
             Optional<HiveSplit.BucketConversion> bucketConversion,
-            OptionalInt bucketNumber)
+            OptionalInt bucketNumber,
+            long dataSourceLastModifiedTime)
     {
         Set<HiveColumnHandle> interimColumns = ImmutableSet.<HiveColumnHandle>builder()
                 .addAll(predicateColumns.values())
@@ -340,7 +343,8 @@ public class HivePageSourceProvider
                     indexes,
                     splitCacheable,
                     columnMappings,
-                    coercers);
+                    coercers,
+                    dataSourceLastModifiedTime);
             if (pageSource.isPresent()) {
                 return new HivePageSource(
                                 columnMappings,
@@ -381,7 +385,8 @@ public class HivePageSourceProvider
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
             SplitMetadata splitMetadata,
-            boolean splitCacheable)
+            boolean splitCacheable,
+            long dataSourceLastModifiedTime)
     {
         List<ColumnMapping> columnMappings = ColumnMapping.buildColumnMappings(
                 partitionKeys,
@@ -413,7 +418,8 @@ public class HivePageSourceProvider
                     startRowOffsetOfFile,
                     indexes,
                     splitMetadata,
-                    splitCacheable);
+                    splitCacheable,
+                    dataSourceLastModifiedTime);
             if (pageSource.isPresent()) {
                 return Optional.of(
                         new HivePageSource(

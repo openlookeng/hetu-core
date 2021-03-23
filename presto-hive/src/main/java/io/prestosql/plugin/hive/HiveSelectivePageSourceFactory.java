@@ -48,5 +48,6 @@ public interface HiveSelectivePageSourceFactory
             Optional<List<IndexMetadata>> indexes,
             boolean splitCacheable,
             List<HivePageSourceProvider.ColumnMapping> columnMappings,
-            Map<Integer, HiveCoercer> coercers);
+            Map<Integer, HiveCoercer> coercers,
+            long dataSourceLastModifiedTime);
 }

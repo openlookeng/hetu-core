@@ -34,7 +34,7 @@ public class OrcCacheStore
             null,
             null);
 
-    private Cache<OrcDataSourceId, OrcFileTail> fileTailCache;
+    private Cache<OrcFileTailCacheKey, OrcFileTail> fileTailCache;
     private Cache<OrcStripeFooterCacheKey, StripeFooter> stripeFooterCache;
     private Cache<OrcRowIndexCacheKey, List<RowGroupIndex>> rowIndexCache;
     private Cache<OrcBloomFilterCacheKey, List<HashableBloomFilter>> bloomFiltersCache;
@@ -45,7 +45,7 @@ public class OrcCacheStore
         //do nothing
     }
 
-    private OrcCacheStore(Cache<OrcDataSourceId, OrcFileTail> fileTailCache,
+    private OrcCacheStore(Cache<OrcFileTailCacheKey, OrcFileTail> fileTailCache,
             Cache<OrcStripeFooterCacheKey, StripeFooter> stripeFooterCache,
             Cache<OrcRowIndexCacheKey, List<RowGroupIndex>> rowIndexCache,
             Cache<OrcBloomFilterCacheKey, List<HashableBloomFilter>> bloomFiltersCache,
@@ -58,7 +58,7 @@ public class OrcCacheStore
         this.rowDataCache = rowDataCache;
     }
 
-    public Cache<OrcDataSourceId, OrcFileTail> getFileTailCache()
+    public Cache<OrcFileTailCacheKey, OrcFileTail> getFileTailCache()
     {
         return fileTailCache;
     }
@@ -111,7 +111,7 @@ public class OrcCacheStore
             return store;
         }
 
-        private Cache<OrcDataSourceId, OrcFileTail> buildOrcFileTailCache(long maximumSize, Duration ttl, boolean isOrcCacheStatsMetricCollectionEnabled)
+        private Cache<OrcFileTailCacheKey, OrcFileTail> buildOrcFileTailCache(long maximumSize, Duration ttl, boolean isOrcCacheStatsMetricCollectionEnabled)
         {
             CacheBuilder cacheBuilder = CacheBuilder.newBuilder().maximumSize(maximumSize).expireAfterAccess(ttl);
             if (isOrcCacheStatsMetricCollectionEnabled) {

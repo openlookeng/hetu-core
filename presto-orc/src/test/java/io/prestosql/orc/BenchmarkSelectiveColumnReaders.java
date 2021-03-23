@@ -158,7 +158,7 @@ public class BenchmarkSelectiveColumnReaders
         public OrcSelectiveRecordReader createRecordReader(Optional<TupleDomainFilter> filter)
                 throws IOException
         {
-            OrcDataSource dataSource = new FileOrcDataSource(orcFile, new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), true);
+            OrcDataSource dataSource = new FileOrcDataSource(orcFile, new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), true, orcFile.lastModified());
             OrcReader orcReader = new OrcReader(dataSource, new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE));
 
             return orcReader.createSelectiveRecordReader(

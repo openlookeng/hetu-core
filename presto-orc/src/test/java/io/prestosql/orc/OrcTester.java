@@ -529,7 +529,7 @@ public class OrcTester
             Map<Integer, TupleDomainFilter> filters)
             throws IOException
     {
-        OrcDataSource orcDataSource = new FileOrcDataSource(tempFile.getFile(), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), true);
+        OrcDataSource orcDataSource = new FileOrcDataSource(tempFile.getFile(), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), true, tempFile.getFile().lastModified());
         OrcReader orcReader = new OrcReader(orcDataSource, OrcFileTail.readFrom(orcDataSource, Optional.empty()), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE));
 
         assertEquals(orcReader.getColumnNames(), makeColumnNames(types.size()));
@@ -791,7 +791,7 @@ public class OrcTester
     static OrcRecordReader createCustomOrcRecordReader(TempFile tempFile, OrcPredicate predicate, Type type, int initialBatchSize)
             throws IOException
     {
-        OrcDataSource orcDataSource = new FileOrcDataSource(tempFile.getFile(), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), true);
+        OrcDataSource orcDataSource = new FileOrcDataSource(tempFile.getFile(), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), true, tempFile.getFile().lastModified());
         OrcReader orcReader = new OrcReader(orcDataSource, new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), MAX_BLOCK_SIZE);
 
         assertEquals(orcReader.getColumnNames(), ImmutableList.of("test"));
@@ -811,7 +811,7 @@ public class OrcTester
             throws IOException
     {
         OrcDataSource orcDataSource = new FileOrcDataSource(tempFile.getFile(), new DataSize(1, MEGABYTE),
-                new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), true);
+                new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), true, tempFile.getFile().lastModified());
         OrcReader orcReader = new OrcReader(orcDataSource, new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE),
                 MAX_BLOCK_SIZE);
 
@@ -863,7 +863,7 @@ public class OrcTester
 
         writer.write(new Page(blockBuilder.build()));
         writer.close();
-        writer.validate(new FileOrcDataSource(outputFile, new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), true));
+        writer.validate(new FileOrcDataSource(outputFile, new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), true, outputFile.lastModified()));
     }
 
     private static void writeValue(Type type, BlockBuilder blockBuilder, Object value)

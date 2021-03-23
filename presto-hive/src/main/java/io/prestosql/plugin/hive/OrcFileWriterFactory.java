@@ -30,6 +30,7 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.io.AcidOutputFormat;
@@ -180,15 +181,17 @@ public class OrcFileWriterFactory
             if (HiveSessionProperties.isOrcOptimizedWriterValidate(session)) {
                 validationInputFactory = Optional.of(() -> {
                     try {
+                        FileStatus fileStatus = fileSystem.getFileStatus(path);
                         return new HdfsOrcDataSource(
                                 new OrcDataSourceId(path.toString()),
-                                fileSystem.getFileStatus(path).getLen(),
+                                fileStatus.getLen(),
                                 HiveSessionProperties.getOrcMaxMergeDistance(session),
                                 HiveSessionProperties.getOrcMaxBufferSize(session),
                                 HiveSessionProperties.getOrcStreamBufferSize(session),
                                 false,
                                 fileSystem.open(path),
-                                readStats);
+                                readStats,
+                                fileStatus.getModificationTime());
                     }
                     catch (IOException e) {
                         throw new PrestoException(HiveErrorCode.HIVE_WRITE_VALIDATION_FAILED, e);

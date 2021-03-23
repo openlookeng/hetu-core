@@ -45,5 +45,6 @@ public interface HivePageSourceFactory
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
             SplitMetadata splitMetadata,
-            boolean splitCacheable);
+            boolean splitCacheable,
+            long dataSourceLastModifiedTime);
 }

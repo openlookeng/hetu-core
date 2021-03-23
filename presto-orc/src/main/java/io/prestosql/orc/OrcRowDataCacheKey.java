@@ -20,7 +20,7 @@ import java.util.Objects;
 
 public class OrcRowDataCacheKey
 {
-    private OrcDataSourceId orcDataSourceId;
+    private OrcDataSourceIdWithTimeStamp orcDataSourceId;
     private long stripeOffset;
     private long rowGroupOffset;
     private OrcColumnId columnId;
@@ -30,12 +30,12 @@ public class OrcRowDataCacheKey
         //default constructor
     }
 
-    public OrcDataSourceId getOrcDataSourceId()
+    public OrcDataSourceIdWithTimeStamp getOrcDataSourceId()
     {
         return orcDataSourceId;
     }
 
-    public void setOrcDataSourceId(OrcDataSourceId orcDataSourceId)
+    public void setOrcDataSourceId(OrcDataSourceIdWithTimeStamp orcDataSourceId)
     {
         this.orcDataSourceId = orcDataSourceId;
     }

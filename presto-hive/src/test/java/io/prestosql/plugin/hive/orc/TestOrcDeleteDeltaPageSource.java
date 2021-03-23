@@ -51,7 +51,7 @@ public class TestOrcDeleteDeltaPageSource
                 false,
                 new FileFormatDataSourceStats());
 
-        OrcDeleteDeltaPageSource pageSource = pageSourceFactory.createPageSource(new Path(DELETE_FILE.toURI()), DELETE_FILE.length());
+        OrcDeleteDeltaPageSource pageSource = pageSourceFactory.createPageSource(new Path(DELETE_FILE.toURI()), DELETE_FILE.length(), DELETE_FILE.lastModified());
         MaterializedResult materializedRows = MaterializedResult.materializeSourceDataStream(HiveTestUtils.SESSION, pageSource, ImmutableList.of(BIGINT, INTEGER, BIGINT));
 
         assertEquals(materializedRows.getRowCount(), 1);

@@ -24,7 +24,9 @@ import io.prestosql.orc.OrcCacheStore;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcDataSource;
 import io.prestosql.orc.OrcDataSourceId;
+import io.prestosql.orc.OrcDataSourceIdWithTimeStamp;
 import io.prestosql.orc.OrcFileTail;
+import io.prestosql.orc.OrcFileTailCacheKey;
 import io.prestosql.orc.OrcReader;
 import io.prestosql.orc.OrcSelectiveRecordReader;
 import io.prestosql.orc.TupleDomainFilter;
@@ -167,7 +169,8 @@ public class OrcSelectivePageSourceFactory
             Optional<List<IndexMetadata>> indexes,
             boolean splitCacheable,
             List<HivePageSourceProvider.ColumnMapping> columnMappings,
-            Map<Integer, HiveCoercer> coercers)
+            Map<Integer, HiveCoercer> coercers,
+            long dataSourceLastModifiedTime)
     {
         if (!HiveUtil.isDeserializerClass(schema, OrcSerde.class)) {
             return Optional.empty();
@@ -222,7 +225,8 @@ public class OrcSelectivePageSourceFactory
                     additionPredicates.orElseGet(() -> ImmutableList.of()),
                     positions,
                     columnMappings,
-                    coercers));
+                    coercers,
+                    dataSourceLastModifiedTime));
 
             /* Todo(Nitin): For Append Pattern
             appendPredicates.get().stream().forEach(newDomainPredicate ->
@@ -295,7 +299,8 @@ public class OrcSelectivePageSourceFactory
                 ImmutableList.of(),
                 null,
                 columnMappings,
-                coercers));
+                coercers,
+                dataSourceLastModifiedTime));
     }
 
     public static OrcSelectivePageSource createOrcPageSource(
@@ -330,7 +335,8 @@ public class OrcSelectivePageSourceFactory
             List<TupleDomain<HiveColumnHandle>> disjunctDomains,
             List<Integer> positions,
             List<HivePageSourceProvider.ColumnMapping> columnMappings,
-            Map<Integer, HiveCoercer> coercers)
+            Map<Integer, HiveCoercer> coercers,
+            long dataSourceLastModifiedTime)
     {
         checkArgument(!domainPredicate.isNone(), "Unexpected NONE domain");
         String sessionUser = session.getUser();
@@ -349,7 +355,8 @@ public class OrcSelectivePageSourceFactory
                     streamBufferSize,
                     lazyReadSmallRanges,
                     inputStream,
-                    stats);
+                    stats,
+                    dataSourceLastModifiedTime);
         }
         catch (Exception e) {
             if (nullToEmpty(e.getMessage()).trim().equals("Filesystem closed") ||
@@ -364,7 +371,8 @@ public class OrcSelectivePageSourceFactory
             OrcDataSource readerLocalDataSource = OrcReader.wrapWithCacheIfTiny(orcDataSource, tinyStripeThreshold);
             OrcFileTail fileTail;
             if (orcCacheProperties.isFileTailCacheEnabled()) {
-                fileTail = orcCacheStore.getFileTailCache().get(readerLocalDataSource.getId(), () -> OrcSelectivePageSourceFactory.createFileTail(orcDataSource));
+                OrcDataSourceIdWithTimeStamp orcDataSourceIdWithTimeStamp = new OrcDataSourceIdWithTimeStamp(readerLocalDataSource.getId(), readerLocalDataSource.getLastModifiedTime());
+                fileTail = orcCacheStore.getFileTailCache().get(new OrcFileTailCacheKey(orcDataSourceIdWithTimeStamp), () -> OrcSelectivePageSourceFactory.createFileTail(orcDataSource));
             }
             else {
                 fileTail = OrcSelectivePageSourceFactory.createFileTail(orcDataSource);

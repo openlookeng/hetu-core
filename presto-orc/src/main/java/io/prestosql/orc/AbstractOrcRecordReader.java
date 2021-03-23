@@ -732,6 +732,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
                         || columnReader instanceof DataCachingSelectiveColumnReader) {
                     StreamSourceMeta streamSourceMeta = new StreamSourceMeta();
                     streamSourceMeta.setDataSourceId(orcDataSource.getId());
+                    streamSourceMeta.setLastModifiedTime(orcDataSource.getLastModifiedTime());
                     streamSourceMeta.setStripeOffset(stripes.get(currentStripe).getOffset());
                     streamSourceMeta.setRowGroupOffset(currentRowGroup.getRowOffset());
                     streamSourceMeta.setRowCount(currentRowGroup.getRowCount());

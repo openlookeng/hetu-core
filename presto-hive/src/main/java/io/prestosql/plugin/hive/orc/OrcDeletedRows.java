@@ -178,7 +178,7 @@ public class OrcDeletedRows
                     FileSystem fileSystem = hdfsEnvironment.getFileSystem(sessionUser, path, configuration);
                     FileStatus fileStatus = hdfsEnvironment.doAs(sessionUser, () -> fileSystem.getFileStatus(path));
 
-                    pageSources.add(pageSourceFactory.createPageSource(fileStatus.getPath(), fileStatus.getLen()));
+                    pageSources.add(pageSourceFactory.createPageSource(fileStatus.getPath(), fileStatus.getLen(), fileStatus.getModificationTime()));
                 }
                 catch (FileNotFoundException ignored) {
                     // source file does not have a delta delete file in this location

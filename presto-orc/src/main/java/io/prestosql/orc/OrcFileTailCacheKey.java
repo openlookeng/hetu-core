@@ -12,24 +12,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.orc;
 
 import java.util.Objects;
 
-public class OrcStripeFooterCacheKey
+public class OrcFileTailCacheKey
 {
     private OrcDataSourceIdWithTimeStamp orcDataSourceId;
-    private long stripeOffset;
 
-    public OrcStripeFooterCacheKey()
+    public OrcFileTailCacheKey()
     {
         //default constructor
     }
 
-    public OrcStripeFooterCacheKey(OrcDataSourceIdWithTimeStamp orcDataSourceId, long stripeOffset)
+    public OrcFileTailCacheKey(OrcDataSourceIdWithTimeStamp orcDataSourceId)
     {
         this.orcDataSourceId = orcDataSourceId;
-        this.stripeOffset = stripeOffset;
     }
 
     public OrcDataSourceIdWithTimeStamp getOrcDataSourceId()
@@ -42,16 +41,6 @@ public class OrcStripeFooterCacheKey
         this.orcDataSourceId = orcDataSourceId;
     }
 
-    public long getStripeOffset()
-    {
-        return stripeOffset;
-    }
-
-    public void setStripeOffset(long stripeOffset)
-    {
-        this.stripeOffset = stripeOffset;
-    }
-
     @Override
     public boolean equals(Object o)
     {
@@ -61,14 +50,13 @@ public class OrcStripeFooterCacheKey
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        OrcStripeFooterCacheKey that = (OrcStripeFooterCacheKey) o;
-        return stripeOffset == that.stripeOffset &&
-                orcDataSourceId.equals(that.orcDataSourceId);
+        OrcFileTailCacheKey that = (OrcFileTailCacheKey) o;
+        return orcDataSourceId.equals(that.orcDataSourceId);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(orcDataSourceId, stripeOffset);
+        return Objects.hash(orcDataSourceId);
     }
 }

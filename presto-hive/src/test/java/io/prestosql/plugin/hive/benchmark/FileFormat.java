@@ -357,7 +357,8 @@ public enum FileFormat
                         Optional.empty(),
                         Optional.empty(),
                         null,
-                        false)
+                        false,
+                        targetFile.lastModified())
                 .get();
     }
 

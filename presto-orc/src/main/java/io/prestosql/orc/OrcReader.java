@@ -107,7 +107,7 @@ public class OrcReader
     }
 
     public OrcReader(OrcDataSource orcDataSource, OrcFileTail fileTail, DataSize maxMergeDistance,
-                     DataSize tinyStripeThreshold, DataSize maxBlockSize)
+            DataSize tinyStripeThreshold, DataSize maxBlockSize)
     {
         this.orcDataSource = orcDataSource;
         this.metadataReader = new ExceptionWrappingMetadataReader(orcDataSource.getId(), new OrcMetadataReader());
