@@ -195,6 +195,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Iterables.getLast;
 import static com.google.common.collect.Iterables.transform;
 import static io.prestosql.SystemSessionProperties.getMaxGroupingSets;
+import static io.prestosql.SystemSessionProperties.isEnableStarTreeIndex;
 import static io.prestosql.cube.CubeManager.STAR_TREE;
 import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
 import static io.prestosql.spi.StandardErrorCode.INVALID_COLUMN_MASK;
@@ -202,6 +203,7 @@ import static io.prestosql.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static io.prestosql.spi.StandardErrorCode.INVALID_ROW_FILTER;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.connector.CreateIndexMetadata.Level.UNDEFINED;
+import static io.prestosql.spi.connector.StandardWarningCode.CUBE_NOT_FOUND;
 import static io.prestosql.spi.connector.StandardWarningCode.REDUNDANT_ORDER_BY;
 import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static io.prestosql.spi.function.FunctionKind.WINDOW;
@@ -1497,7 +1499,27 @@ class StatementAnalyzer
                 computeAndAssignOrderByScopeWithAggregation(node.getOrderBy().get(), sourceScope, outputScope, orderByAggregations, groupByExpressions, orderByGroupingOperations);
             }
 
+            //visit cubes associated with original Table
+            if (isEnableStarTreeIndex(session) && hasAggregates(node)) {
+                Collection<TableHandle> tableHandles = analysis.getTables();
+                tableHandles.forEach(this::analyzeCubes);
+            }
+
             return outputScope;
+        }
+
+        private void analyzeCubes(TableHandle originalTable)
+        {
+            CubeMetaStore cubeMetaStore = cubeManager.getMetaStore(STAR_TREE).orElseThrow(() -> new RuntimeException("Hetu metastore must be initialized"));
+            List<CubeMetadata> cubeMetadataList = cubeMetaStore.getMetadataList(originalTable.getFullyQualifiedName());
+            for (CubeMetadata cubeMetadata : cubeMetadataList) {
+                QualifiedObjectName cubeName = QualifiedObjectName.valueOf(cubeMetadata.getCubeName());
+                Optional<TableHandle> cubeHandle = metadata.getTableHandle(session, cubeName);
+                cubeHandle.ifPresent(cubeTH -> analysis.registerCubeForTable(originalTable, cubeTH));
+                if (!cubeHandle.isPresent()) {
+                    warningCollector.add(new PrestoWarning(CUBE_NOT_FOUND, String.format("Cube with name '%s' not found.", cubeName)));
+                }
+            }
         }
 
         @Override
