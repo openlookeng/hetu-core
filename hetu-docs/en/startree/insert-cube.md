@@ -27,3 +27,38 @@ See Also
 --------
 
 [INSERT OVERWRITE CUBE](./insert-overwrite-cube.md), [CREATE CUBE](./create-cube.md), [SHOW CUBES](./show-cubes.md), [DROP CUBE](./drop-cube.md)
+
+
+Limitations
+----------
+1. Insert statement does not work properly if two different columns are used in where clause predicate.
+
+```sql
+   CREATE CUBE orders_cube ON orders WITH (AGGREGATIONS = (count(*)), GROUP = (orderdate));
+   
+   INSERT INTO CUBE orders_cube WHERE orderdate BETWEEN date '1999-01-01' AND date '1999-01-05';
+   
+   -- This statement would fail because its possible the Cube already contain rows matching the given predicate.
+   INSERT INTO CUBE orders_cube WHERE location = 'Canada';
+```
+   
+2. Range Predicate issue. 
+
+```sql
+   CREATE CUBE orders_cube ON orders WITH (AGGREGATIONS = (count(*)), GROUP = (orderdate));
+   
+   INSERT INTO CUBE orders_cube WHERE orderdate BETWEEN date '1999-01-01' AND date '1999-01-05';
+   INSERT INTO CUBE orders_cube WHERE orderdate BETWEEN date '1999-01-06' AND date '1999-01-10';
+   
+   SET SESSION enable_star_tree_index=true;
+   
+   -- This statement uses orders_cube --
+   SELECT count(*) FROM orders WHERE orderdate BETWEEN date '1999-01-03' AND date '1999-01-04';
+   -- This statement uses orders_cube --
+   SELECT count(*) FROM orders WHERE orderdate BETWEEN date '1999-01-07' AND date '1999-01-09';
+   -- This statement does not user orders_cube because the two predicates used in the INSERT statement cannot be merged 
+   -- and the TupleDomain evaluation to check cubePredicate.contains(statementPredicate) evaluates to false
+   
+   SELECT count(*) FROM orders WHERE orderdate BETWEEN date '1999-01-04' AND date '1999-01-07';
+```
+      

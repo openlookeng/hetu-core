@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multiset;
+import io.hetu.core.spi.cube.CubeMetadata;
 import io.prestosql.execution.Output;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.connector.CatalogName;
@@ -877,9 +878,11 @@ public class Analysis
         private final TableHandle target;
         private final TableHandle sourceTable;
         private final List<ColumnHandle> columns;
+        private final CubeMetadata metadata;
 
-        public CubeInsert(TableHandle target, TableHandle sourceTable, List<ColumnHandle> columns)
+        public CubeInsert(CubeMetadata metadata, TableHandle target, TableHandle sourceTable, List<ColumnHandle> columns)
         {
+            this.metadata = requireNonNull(metadata, "cubeMetadata is null");
             this.target = requireNonNull(target, "target is null");
             this.sourceTable = requireNonNull(sourceTable, "sourceTable is null");
             this.columns = requireNonNull(columns, "columns is null");
@@ -899,6 +902,11 @@ public class Analysis
         public TableHandle getSourceTable()
         {
             return sourceTable;
+        }
+
+        public CubeMetadata getMetadata()
+        {
+            return metadata;
         }
     }
 
