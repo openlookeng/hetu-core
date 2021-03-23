@@ -24,14 +24,23 @@ import java.util.UUID;
 public class TempFolder
         implements AutoCloseable
 {
+    private final String prefix;
     private File root;
 
-    public TempFolder() {}
+    public TempFolder()
+    {
+        this("");
+    }
+
+    public TempFolder(String user)
+    {
+        this.prefix = "hetu-tmp-folder-" + user;
+    }
 
     public TempFolder create()
             throws IOException
     {
-        root = Files.createTempDirectory("hetu-tmp-folder-").toFile();
+        root = Files.createTempDirectory(prefix).toFile();
         return this;
     }
 
@@ -72,6 +81,20 @@ public class TempFolder
         throw new IOException("Not able to create folder " + relativePath);
     }
 
+    @Override
+    public void close()
+    {
+        if (root != null && root.exists()) {
+            // retry deletion for 3 times
+            for (int i = 0; i < 3; i++) {
+                if (deleteRecursively(root)) {
+                    return;
+                }
+            }
+            throw new RuntimeException("Temporary folder not deleted. Manual deletion required.");
+        }
+    }
+
     private boolean deleteRecursively(File fileToDelete)
     {
         if (fileToDelete.delete()) {
@@ -86,15 +109,5 @@ public class TempFolder
             }
         }
         return fileToDelete.delete();
-    }
-
-    @Override
-    public void close()
-    {
-        if (root != null && root.exists()) {
-            if (!deleteRecursively(root)) {
-                throw new RuntimeException("Temporary folder not deleted. Manual deletion required.");
-            }
-        }
     }
 }

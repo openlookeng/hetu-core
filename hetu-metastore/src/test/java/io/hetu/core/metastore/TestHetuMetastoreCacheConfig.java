@@ -24,7 +24,6 @@ import static io.airlift.configuration.testing.ConfigAssertions.assertFullMappin
 import static io.airlift.configuration.testing.ConfigAssertions.assertRecordedDefaults;
 import static io.airlift.configuration.testing.ConfigAssertions.recordDefaults;
 import static java.util.concurrent.TimeUnit.HOURS;
-import static java.util.concurrent.TimeUnit.SECONDS;
 
 public class TestHetuMetastoreCacheConfig
 {
@@ -33,7 +32,7 @@ public class TestHetuMetastoreCacheConfig
     {
         assertRecordedDefaults(recordDefaults(HetuMetastoreCacheConfig.class)
                 .setMetaStoreCacheMaxSize(10000)
-                .setMetaStoreCacheTtl(new Duration(0, SECONDS)));
+                .setMetaStoreCacheTtl(new Duration(4, HOURS)));
     }
 
     @Test

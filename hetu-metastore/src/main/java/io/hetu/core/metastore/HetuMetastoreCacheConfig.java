@@ -19,12 +19,12 @@ import io.airlift.configuration.ConfigDescription;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.concurrent.TimeUnit.HOURS;
 
 public class HetuMetastoreCacheConfig
 {
     private long metaStoreCacheMaxSize = 10000;
-    private Duration metaStoreCacheTtl = new Duration(0, SECONDS);
+    private Duration metaStoreCacheTtl = new Duration(4, HOURS);
 
     @Config("hetu.metastore.cache.size")
     @ConfigDescription("Set the max metastore cache size, default value 50000.")
