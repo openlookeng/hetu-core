@@ -296,7 +296,7 @@ DELETE FROM schemeName.tableName;
 
 Statement `show tables` can only display the tables that the user has established the associations with HBase data source. Because HBase does not provide an interface to retrieve metadata of tables.
 
-When a large amount of data is inserted into HBase using Openlk, the insertion success depends on the processing capability of the HBase server. If an error occurs during data insertion, advise to increase the related parameters of HBase server.
+When a large amount of data is inserted into HBase using Openlk, the insertion success depends on the processing capability of the HBase server. If an error occurs during data insertion, you can increase the related parameters of HBase server. You are advised to use a third-party(Bulk) tool rather than openlk to export HBase data.
 
 vi hbase-site.xml
 ```

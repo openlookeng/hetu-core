@@ -659,8 +659,8 @@ public class HiveWriterFactory
         else {
             onCommit = hiveWriter -> {
                 Optional<Long> size;
-                try {
-                    size = Optional.of(hdfsEnvironment.getFileSystem(session.getUser(), finalPath, conf).getFileStatus(finalPath).getLen());
+                try (FileSystem fileSystemFinal = hdfsEnvironment.getFileSystem(session.getUser(), finalPath, conf)) {
+                    size = Optional.of(fileSystemFinal.getFileStatus(finalPath).getLen());
                 }
                 catch (IOException | RuntimeException e) {
                     // Do not fail the query if file system is not available
@@ -885,37 +885,37 @@ public class HiveWriterFactory
             return;
         }
 
-        FileSystem fileSystem = hdfsEnvironment.getFileSystem(session.getUser(), new Path(writers.get(0).getFilePath()), conf);
+        try (FileSystem fileSystem = hdfsEnvironment.getFileSystem(session.getUser(), new Path(writers.get(0).getFilePath()), conf)) {
+            List<Type> types = dataColumns.stream()
+                    .map(column -> column.getHiveType().getType(typeManager))
+                    .collect(toList());
 
-        List<Type> types = dataColumns.stream()
-                .map(column -> column.getHiveType().getType(typeManager))
-                .collect(toList());
+            for (HiveWriter writer : writers) {
+                String filePath = writer.getFilePath();
 
-        for (HiveWriter writer : writers) {
-            String filePath = writer.getFilePath();
-
-            for (int i = 0; i <= snapshotSuffix; i++) {
-                Path file = new Path(toSnapshotSubFile(filePath, i));
-                if (fileSystem.exists(file)) {
-                    // TODO-cp-I2BZ0A: assuming all files to be of ORC type.
-                    // Using same parameters as used by SortingFileWriter
-                    FileStatus fileStatus = fileSystem.getFileStatus(file);
-                    OrcDataSource dataSource = new HdfsOrcDataSource(
-                            new OrcDataSourceId(file.toString()),
-                            fileStatus.getLen(),
-                            new DataSize(1, MEGABYTE),
-                            new DataSize(8, MEGABYTE),
-                            new DataSize(8, MEGABYTE),
-                            false,
-                            fileSystem.open(file),
-                            new FileFormatDataSourceStats(),
-                            fileStatus.getModificationTime());
-                    TempFileReader reader = new TempFileReader(types, dataSource);
-                    while (reader.hasNext()) {
-                        writer.append(reader.next());
+                for (int i = 0; i <= snapshotSuffix; i++) {
+                    Path file = new Path(toSnapshotSubFile(filePath, i));
+                    if (fileSystem.exists(file)) {
+                        // TODO-cp-I2BZ0A: assuming all files to be of ORC type.
+                        // Using same parameters as used by SortingFileWriter
+                        FileStatus fileStatus = fileSystem.getFileStatus(file);
+                        OrcDataSource dataSource = new HdfsOrcDataSource(
+                                new OrcDataSourceId(file.toString()),
+                                fileStatus.getLen(),
+                                new DataSize(1, MEGABYTE),
+                                new DataSize(8, MEGABYTE),
+                                new DataSize(8, MEGABYTE),
+                                false,
+                                fileSystem.open(file),
+                                new FileFormatDataSourceStats(),
+                                fileStatus.getModificationTime());
+                        TempFileReader reader = new TempFileReader(types, dataSource);
+                        while (reader.hasNext()) {
+                            writer.append(reader.next());
+                        }
+                        dataSource.close();
+                        fileSystem.delete(file);
                     }
-                    dataSource.close();
-                    fileSystem.delete(file);
                 }
             }
         }
@@ -940,21 +940,21 @@ public class HiveWriterFactory
             return;
         }
 
-        FileSystem fileSystem = hdfsEnvironment.getFileSystem(session.getUser(), new Path(paths.get(0)), conf);
-
-        for (String path : paths) {
-            String filePath = removeSnapshotSuffix(path);
-            // Loop through all files in the containing folder,
-            // and remove those with a suffix that exceeds the starting index.
-            Path folder = new Path(filePath).getParent();
-            // Staging folder may have been deleted
-            if (fileSystem.exists(folder)) {
-                for (FileStatus status : fileSystem.listStatus(folder)) {
-                    String file = status.getPath().toString();
-                    if (file.startsWith(filePath)) {
-                        int index = Integer.valueOf(file.substring(filePath.length()));
-                        if (index >= startSuffix) {
-                            fileSystem.delete(status.getPath());
+        try (FileSystem fileSystem = hdfsEnvironment.getFileSystem(session.getUser(), new Path(paths.get(0)), conf)) {
+            for (String path : paths) {
+                String filePath = removeSnapshotSuffix(path);
+                // Loop through all files in the containing folder,
+                // and remove those with a suffix that exceeds the starting index.
+                Path folder = new Path(filePath).getParent();
+                // Staging folder may have been deleted
+                if (fileSystem.exists(folder)) {
+                    for (FileStatus status : fileSystem.listStatus(folder)) {
+                        String file = status.getPath().toString();
+                        if (file.startsWith(filePath)) {
+                            int index = Integer.valueOf(file.substring(filePath.length()));
+                            if (index >= startSuffix) {
+                                fileSystem.delete(status.getPath());
+                            }
                         }
                     }
                 }
