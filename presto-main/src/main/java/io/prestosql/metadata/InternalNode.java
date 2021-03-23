@@ -59,7 +59,7 @@ public class InternalNode
             @JsonProperty("internalUri") URI internalUri,
             @JsonProperty("nodeVersion") NodeVersion nodeVersion,
             @JsonProperty("coordinator") boolean coordinator,
-            @JsonProperty("coordinator") boolean worker)
+            @JsonProperty("worker") boolean worker)
     {
         nodeIdentifier = emptyToNull(nullToEmpty(nodeIdentifier).trim());
         this.nodeIdentifier = requireNonNull(nodeIdentifier, "nodeIdentifier is null or empty");

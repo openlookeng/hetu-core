@@ -94,10 +94,7 @@ public class SnapshotUtils
 
     public void initialize()
     {
-        try {
-            snapshotStoreClient = buildSnapshotStoreClient();
-        }
-        catch (Exception e) { }
+        snapshotStoreClient = buildSnapshotStoreClient();
     }
 
     private SnapshotStoreClient buildSnapshotStoreClient()
