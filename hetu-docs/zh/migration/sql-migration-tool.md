@@ -132,6 +132,7 @@ SELECT (DECIMAL '2.0' * 3)
 | DELETE|
 | EXPLAIN ANALYZE|
 | SHOW|
+| SHOW FUCNTIONS|
 
 以下Hive语句部分支持，即不支持某些关键字或属性：
 
@@ -146,7 +147,6 @@ SELECT (DECIMAL '2.0' * 3)
 | SHOW CREATE TABLE| 对Hive而言，SHOW TABLE可用于表和视图。但在openLooKeng中，这只能应用于表。| [SHOW CREATE TABLE](../sql/show-create-table.md)|
 | DESCRIBE| 支持带列名的语句| [DESCRIBE](../sql/describe.md)|
 | CREATE VIEW| 不支持带“COMMENT”、“WITH DBPROPERTIES”的语句| [CREATE VIEW](../sql/create-view.md)|
-| SHOW FUCNTIONS| 不支持带“like”的语句| [SHOW FUCNTIONS](../sql/show-functions.md)|
 | SHOW COLUMNS| 不支持带“like”的语句| [SHOW COLUMNS](../sql/show-columns.md)|
 | SHOW GRANT| 不支持指定用户或角色的语句| [SHOW GRANT](../sql/show-grants.md)|
 | INSERT| 不支持带“partition”的语句| [INSERT](../sql/insert.md)|
@@ -234,7 +234,7 @@ SELECT (DECIMAL '2.0' * 3)
 | ADD COMMENTS           | 不支持给数据库和列添加评论                  | [COMMENT](../sql/comment.md)                       |
 | SET SESSION            | 仅支持 "SET" 和 "SET ALL"                                          | [SET SESSION](../sql/set-session.md)                       |
 | ADD COLUMNS            | 不支持在一条语句添加多列，也不支持设置kudu属性                          | [ALTER TABLE](../sql/alter-table.md)                       |
-| SHOW FUNCTIONS         | 仅支持显示全部的函数                          | [SHOW FUNCTIONS](../sql/show-functions.md)                       |
+| SHOW FUNCTIONS         | 仅支持显示全部的函数或带“LIKE”的语句                          | [SHOW FUNCTIONS](../sql/show-functions.md)                       |
 
 
 由于特性差异，如下Impala语句暂不支持：

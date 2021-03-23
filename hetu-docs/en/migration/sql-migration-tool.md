@@ -134,6 +134,7 @@ Below Hive statements are fully supported:
 | DELETE              |
 | EXPLAIN ANALYZE     |
 | SHOW                |
+| SHOW FUCNTIONS      |
 
 
 Below Hive statements are partially supported, which mean some keywords or attributes are not supported:
@@ -149,7 +150,6 @@ Below Hive statements are partially supported, which mean some keywords or attri
 | SHOW CREATE TABLE      | To hive show table can works on both table and view. But in openLooKeng,  this can only be applied to table. | [SHOW CREATE TABLE](../sql/show-create-table.md) |
 | DESCRIBE               | statement with column name is supported                      | [DESCRIBE](../sql/describe.md)                   |
 | CREATE VIEW            | statement with   "COMMENT", "WITH DBPROPERTIES" is not supported | [CREATE VIEW](../sql/create-view.md)             |
-| SHOW FUCNTIONS         | statement with "like" is not supported                       | [SHOW FUCNTIONS](../sql/show-functions.md)       |
 | SHOW COLUMNS           | statement with  "like" is not supported                      | [SHOW COLUMNS](../sql/show-columns.md)           |
 | SHOW GRANT             | Statement with Specified  user or role is not supported      | [SHOW GRANT](../sql/show-grants.md)              |
 | INSERT                 | statement with "partition"  is not supported                 | [INSERT](../sql/insert.md)                       |
@@ -238,7 +238,7 @@ Below Impala statements are partially supported, which mean some keywords or att
 | ADD COMMENTS           | Adding comments to databases or columns is not supported                  | [COMMENT](../sql/comment.md)                       |
 | SET SESSION            | Only support "SET" and "SET ALL"                                          | [SET SESSION](../sql/set-session.md)                       |
 | ADD COLUMNS            | ADD multiple columns within single statement is not supported, kudu properties are not supported.    | [ALTER TABLE](../sql/alter-table.md)                       |
-| SHOW FUNCTIONS         | Only support show all functions.                          | [SHOW FUNCTIONS](../sql/show-functions.md)                       |
+| SHOW FUNCTIONS         | Only support show all functions or statement with "LIKE".                          | [SHOW FUNCTIONS](../sql/show-functions.md)                       |
 
 
 Below Impala statements are not supported, because of feature differences:

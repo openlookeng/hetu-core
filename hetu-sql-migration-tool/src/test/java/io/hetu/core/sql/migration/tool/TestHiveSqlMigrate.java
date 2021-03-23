@@ -743,7 +743,8 @@ public class TestHiveSqlMigrate
         assertSuccess(sql, expectedSql);
 
         sql = "SHOW FUNCTIONS LIKE 'YEAR'";
-        assertUnsupported(sql, Optional.of("LIKE"));
+        expectedSql = sql;
+        assertSuccess(sql, expectedSql);
 
         sql = "SELECT IF(ID=10, 1, 2) FROM T1";
         expectedSql = "SELECT IF((ID = 10), 1, 2)\n" +

@@ -904,7 +904,7 @@ public class TestImpalaSqlMigrate
         assertUnsupported(sql2, Optional.of("AGGREGATE"));
         assertUnsupported(sql3, Optional.of("ANALYTIC"));
         assertSuccess(sql4, "SHOW FUNCTIONS");
-        assertUnsupported(sql5, Optional.of("LIKE"));
+        assertSuccess(sql5, "SHOW FUNCTIONS LIKE 'TEST'");
     }
 
     @Test void testFunctionCall()
