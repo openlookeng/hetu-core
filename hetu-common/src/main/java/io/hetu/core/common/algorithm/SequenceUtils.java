@@ -18,16 +18,14 @@ package io.hetu.core.common.algorithm;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.PriorityQueue;
 
 /**
- * Algorithms for sequence operations (merge, union, intersect)
- *
- * @author Han
+ * Algorithms for ordered iterator operations (merge, union, intersect)
  */
 public class SequenceUtils
 {
@@ -47,12 +45,10 @@ public class SequenceUtils
         return merge(iterators, false);
     }
 
-    public static <T extends Comparable<T>> Iterator<T> union(Iterator<T> iterator1, Iterator<T> iterator2)
+    @SafeVarargs
+    public static <T extends Comparable<T>> Iterator<T> union(Iterator<T>... iterators)
     {
-        List<Iterator<T>> iterators = new ArrayList<>(2);
-        iterators.add(iterator1);
-        iterators.add(iterator2);
-        return union(iterators);
+        return union(Arrays.asList(iterators));
     }
 
     /**
@@ -122,12 +118,10 @@ public class SequenceUtils
         };
     }
 
-    public static <T extends Comparable<T>> Iterator<T> merge(Iterator<T> iterator1, Iterator<T> iterator2, boolean keepDuplication)
+    @SafeVarargs
+    public static <T extends Comparable<T>> Iterator<T> merge(boolean keepDuplication, Iterator<T>... iterators)
     {
-        List<Iterator<T>> iterators = new ArrayList<>(2);
-        iterators.add(iterator1);
-        iterators.add(iterator2);
-        return merge(iterators, keepDuplication);
+        return merge(Arrays.asList(iterators), keepDuplication);
     }
 
     /**
@@ -205,12 +199,10 @@ public class SequenceUtils
         };
     }
 
-    public static <T extends Comparable<T>> Iterator<T> intersect(Iterator<T> iterator1, Iterator<T> iterator2)
+    @SafeVarargs
+    public static <T extends Comparable<T>> Iterator<T> intersect(Iterator<T>... iterators)
     {
-        List<Iterator<T>> iterators = new ArrayList<>(2);
-        iterators.add(iterator1);
-        iterators.add(iterator2);
-        return intersect(iterators);
+        return intersect(Arrays.asList(iterators));
     }
 
     private static <T> T allEquals(T[] arr)

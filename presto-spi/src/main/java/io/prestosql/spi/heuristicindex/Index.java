@@ -98,12 +98,13 @@ public interface Index
      *
      * @param expression the expression to apply
      * @return the Iterator of positions that matches the expression result
-     * {@code null} if the index does not support lookUp operation
+     * @throws IndexLookUpException if lookUp operation cannot be completed.
+     * In this case the caller should treat it as "universe" iterator (contain everything) and not perform any filtering
      */
     default <T extends Comparable<T>> Iterator<T> lookUp(Object expression)
             throws UnsupportedOperationException, IndexLookUpException
     {
-        return null;
+        throw new IndexLookUpException();
     }
 
     /**
