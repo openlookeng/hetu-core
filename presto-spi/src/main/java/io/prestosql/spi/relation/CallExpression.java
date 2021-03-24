@@ -19,10 +19,10 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.type.Type;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -160,8 +160,8 @@ public final class CallExpression
 
         try {
             CallExpression that = (CallExpression) o;
-            OperatorType operator = Signature.unmangleOperator(this.displayName);
-            OperatorType operatorThat = Signature.unmangleOperator(that.displayName);
+            OperatorType operator = OperatorType.valueOf(this.displayName.toUpperCase(Locale.ENGLISH));
+            OperatorType operatorThat = OperatorType.valueOf(that.displayName.toUpperCase(Locale.ENGLISH));
             if (!operator.isComparisonOperator() || !operatorThat.isComparisonOperator() ||
                     this.getArguments().size() != 2 || that.getArguments().size() != 2) {
                 return false;
