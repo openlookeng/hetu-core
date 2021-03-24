@@ -61,6 +61,7 @@ public class MarkerSplitSource
     private boolean sourceExhausted;
     private final List<Split> splitBuffer = new ArrayList<>();
     private int bufferPosition;
+    private boolean sentFinalMarker;
 
     // Keep track of how many splits are before each snapshot. Key is snapshotId.
     // This is used to determine the value of bufferPosition above.
@@ -216,6 +217,7 @@ public class MarkerSplitSource
         Split marker = new Split(getCatalogName(), MarkerSplit.snapshotSplit(getCatalogName(), snapshotId), lifespan);
         SplitBatch batch = new SplitBatch(Collections.singletonList(marker), lastBatch);
         if (lastBatch) {
+            sentFinalMarker = true;
             deactivate();
         }
         return batch;
@@ -249,6 +251,7 @@ public class MarkerSplitSource
             resumingSnapshotId = OptionalLong.of(snapshotId);
         }
 
+        sentFinalMarker = false;
         remainingDependencies.clear();
         remainingDependencies.addAll(allDependencies);
     }
@@ -273,6 +276,6 @@ public class MarkerSplitSource
     @Override
     public boolean isFinished()
     {
-        return bufferPosition == splitBuffer.size() && (sourceExhausted || source.isFinished());
+        return sentFinalMarker;
     }
 }
