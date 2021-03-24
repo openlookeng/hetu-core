@@ -280,7 +280,7 @@ DELETE FROM schemeName.tableName;
 
 语句`show tables`只能显示用户已与HBase数据源建立关联的表，因为HBase没有提供接口来检索表的元数据。
 
-当使用openlk插入大量的数据到hbase中时，插入成功与否取决于hbase server的处理能力。当插入数据时出现错误时，建议增大hbase server的相关参数。
+当使用openlk插入大量的数据到hbase中时，插入成功与否取决于hbase server的处理能力。当插入数据时出现错误时，建议增大hbase server的相关参数。我们不建议使用openlk导hbase数据，而是使用第三方工具（Bulk）。
 
 vi hbase-site.xml
 ```
