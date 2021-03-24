@@ -214,8 +214,10 @@ public class HetuMetastoreCache
             delegate.createTable(table);
         }
         finally {
-            String key = table.getCatalogName() + "." + table.getDatabaseName();
-            tablesCache.invalidate(key);
+            String databaseKey = table.getCatalogName() + "." + table.getDatabaseName();
+            String tableKey = databaseKey + '.' + table.getName();
+            tableCache.invalidate(tableKey);
+            tablesCache.invalidate(databaseKey);
         }
     }
 
@@ -226,8 +228,10 @@ public class HetuMetastoreCache
             delegate.createTableIfNotExist(table);
         }
         finally {
-            String key = table.getCatalogName() + "." + table.getDatabaseName();
-            tablesCache.invalidate(key);
+            String databaseKey = table.getCatalogName() + "." + table.getDatabaseName();
+            String tableKey = databaseKey + '.' + table.getName();
+            tableCache.invalidate(tableKey);
+            tablesCache.invalidate(databaseKey);
         }
     }
 
@@ -278,9 +282,7 @@ public class HetuMetastoreCache
     {
         try {
             String key = catalogName + '.' + databaseName + '.' + tableName;
-            return tableCache.get(key, () -> {
-                return delegate.getTable(catalogName, databaseName, tableName);
-            });
+            return tableCache.get(key, () -> delegate.getTable(catalogName, databaseName, tableName));
         }
         catch (ExecutionException executionException) {
             log.debug(executionException.getCause(),
@@ -294,13 +296,11 @@ public class HetuMetastoreCache
     {
         try {
             String key = catalogName + "." + databaseName;
-            return tablesCache.get(key, () -> {
-                return delegate.getAllTables(catalogName, databaseName);
-            });
+            return tablesCache.get(key, () -> delegate.getAllTables(catalogName, databaseName));
         }
         catch (ExecutionException executionException) {
             log.debug(executionException.getCause(),
-                    String.format("Error while caching all tables metadata in %s.%s. Falling back to default flow"), catalogName, databaseName);
+                    String.format("Error while caching all tables metadata in %s.%s. Falling back to default flow", catalogName, databaseName));
             return delegate.getAllTables(catalogName, databaseName);
         }
     }
