@@ -260,6 +260,15 @@ public class SourcePartitionedScheduler
 
                     // add split filter to filter out split has no valid rows
                     Pair<Optional<RowExpression>, Map<Symbol, ColumnHandle>> pair = SplitFiltering.getExpression(stage);
+
+                    if (SystemSessionProperties.isSnapshotEnabled(session)) {
+                        List<Split> batchSplits = nextSplits.getSplits();
+                        // Don't apply filter to MarkerSplit
+                        if (batchSplits.size() == 1 && batchSplits.get(0).getConnectorSplit() instanceof MarkerSplit) {
+                            applyFilter = false;
+                        }
+                    }
+
                     List<Split> filteredSplit = applyFilter ? SplitFiltering.getFilteredSplit(pair.getFirst(),
                             SplitFiltering.getFullyQualifiedName(stage), pair.getSecond(), nextSplits, heuristicIndexerManager) : nextSplits.getSplits();
 
