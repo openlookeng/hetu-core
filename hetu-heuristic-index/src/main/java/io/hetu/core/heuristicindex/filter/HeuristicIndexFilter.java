@@ -171,8 +171,15 @@ public class HeuristicIndexFilter
         return false;
     }
 
+    /**
+     * Lookup all index available according to the expression and union the result.
+     * <p>
+     * It returns {@code null} as the special value for "universe" result U such that,
+     * for any other results A: U \and A == A, U \or A == U.
+     * <p>
+     * If any of the index throws {@code IndexLookUpException} during lookup, it immediately break and return null.
+     */
     private <T extends Comparable<T>> Iterator<T> lookUpAll(RowExpression expression)
-            throws IndexLookUpException
     {
         RowExpression varRef = null;
 
@@ -210,10 +217,7 @@ public class HeuristicIndexFilter
             return SequenceUtils.union(iterators);
         }
         catch (RuntimeException re) {
-            if (re.getCause() instanceof IndexLookUpException) {
-                throw (IndexLookUpException) re.getCause();
-            }
-            throw re;
+            return null;
         }
     }
 }
