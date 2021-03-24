@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import io.airlift.log.Logger;
 import io.prestosql.metadata.Split;
+import io.prestosql.snapshot.MarkerSplit;
 import io.prestosql.sql.tree.QualifiedName;
 
 import java.io.IOException;
@@ -34,11 +35,11 @@ public class SplitKey
     private final String catalog;
     private final String schema;
     private final String table;
-    private long start;
-    private long end;
-    private long lastModifiedTime;
-    private QualifiedName qualifiedTableName;
-    private String path;
+    private final long start;
+    private final long end;
+    private final long lastModifiedTime;
+    private final QualifiedName qualifiedTableName;
+    private final String path;
 
     public SplitKey(
             Split split,
@@ -52,10 +53,19 @@ public class SplitKey
         this.table = requireNonNull(table, "table is null");
         this.qualifiedTableName = QualifiedName.of(catalog, schema, table);
 
-        this.start = split.getConnectorSplit().getStartIndex();
-        this.end = split.getConnectorSplit().getEndIndex();
-        this.path = split.getConnectorSplit().getFilePath();
-        this.lastModifiedTime = split.getConnectorSplit().getLastModifiedTime();
+        // Create split key with dummy values when it's a MarkerSplit
+        if (split.getConnectorSplit() instanceof MarkerSplit) {
+            this.start = ((MarkerSplit) split.getConnectorSplit()).getSnapshotId();
+            this.end = this.start;
+            this.path = "";
+            this.lastModifiedTime = 0;
+        }
+        else {
+            this.start = split.getConnectorSplit().getStartIndex();
+            this.end = split.getConnectorSplit().getEndIndex();
+            this.path = split.getConnectorSplit().getFilePath();
+            this.lastModifiedTime = split.getConnectorSplit().getLastModifiedTime();
+        }
     }
 
     @JsonCreator
