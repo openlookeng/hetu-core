@@ -50,6 +50,27 @@ public class TestStarTreeMetadata
             1000,
             CubeStatus.READY);
 
+    private final CubeMetadata emptyGroupMetadata = new StarTreeMetadata(
+            "memory.default.empty_group_cube",
+            "tpch.tiny.lineitem",
+            100,
+            ImmutableList.of(
+                    new DimensionColumn("suppkey", "suppkey"),
+                    new DimensionColumn("returnflag", "returnflag"),
+                    new DimensionColumn("linestatus", "linestatus"),
+                    new DimensionColumn("shipdate", "shipdate"),
+                    new DimensionColumn("discount", "discount"),
+                    new DimensionColumn("quantity", "quantity"),
+                    new AggregateColumn("sum_quantity", "sum", "quantity", false),
+                    new AggregateColumn("sum_extendedprice", "sum", "extendedprice", false),
+                    new AggregateColumn("count_quantity", "count", "quantity", false),
+                    new AggregateColumn("count_extendprice", "count", "extendprice", false),
+                    new AggregateColumn("count_discount", "count", "discount", false)),
+            ImmutableList.of(ImmutableSet.of()),
+            null,
+            1000,
+            CubeStatus.READY);
+
     @Test
     public void testCubeMetadata()
     {
@@ -84,5 +105,16 @@ public class TestStarTreeMetadata
                 .groupBy("returnflag", "linestatus")
                 .build();
         assertFalse(metadata.matches(statement), "failed to detect an invalid cube statement");
+    }
+
+    @Test
+    public void testMatchEmptyGroupMetadata()
+    {
+        CubeStatement statement = CubeStatement.newBuilder()
+                .select("returnflag", "linestatus")
+                .aggregate(avg("quantity", false))
+                .from("tpch.tiny.lineitem")
+                .build();
+        assertTrue(emptyGroupMetadata.matches(statement));
     }
 }

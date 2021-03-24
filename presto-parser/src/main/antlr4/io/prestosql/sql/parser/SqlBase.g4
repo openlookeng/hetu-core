@@ -60,7 +60,7 @@ statement
     | SHOW CACHE qualifiedName?                            #showCache
     | CREATE CUBE (IF NOT EXISTS)? cubeName=qualifiedName
         ON tableName=qualifiedName
-        WITH '(' AGGREGATIONS EQ '(' aggregations ')' ',' GROUP EQ '(' cubeGroup ')' (',' cubeProperties)? ')'   #createCube
+        WITH cubeProperties                                           #createCube
     | INSERT INTO CUBE cubeName=qualifiedName (WHERE expression)?     #insertCube
     | INSERT OVERWRITE CUBE cubeName=qualifiedName (WHERE expression)?     #insertOverwriteCube
     | DROP CUBE (IF EXISTS)? cubeName=qualifiedName                    #dropCube
@@ -181,7 +181,13 @@ likeClause
     ;
 
 cubeProperties
-    : property (',' property)*
+    : '(' (cubeProperty (',' cubeProperty)*)? ')'
+    ;
+
+cubeProperty
+    : AGGREGATIONS EQ '(' aggregations ')'
+    | GROUP EQ '(' cubeGroup ')'
+    | property
     ;
 
 properties

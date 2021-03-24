@@ -152,6 +152,7 @@ public class InsertCubeRewrite
             List<List<Expression>> groupingSets = new ArrayList<>();
             groupingSets.add(cubeGroup
                     .stream()
+                    .filter(column -> !column.isEmpty())
                     .map(Identifier::new)
                     .collect(Collectors.toList()));
             GroupBy groupBy = new GroupBy(false, Lists.newArrayList(new GroupingSets(groupingSets)));
