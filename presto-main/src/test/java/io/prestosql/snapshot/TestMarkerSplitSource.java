@@ -14,6 +14,7 @@
  */
 package io.prestosql.snapshot;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.metadata.Split;
@@ -58,6 +59,7 @@ public class TestMarkerSplitSource
     private static final SplitBatch lastBatch = new SplitBatch(splits, true);
     private static final SplitBatch testBatch1 = new SplitBatch(Collections.singletonList(split1), false);
     private static final SplitBatch testBatch2 = new SplitBatch(Collections.singletonList(split2), false);
+    private static final SplitBatch emptyLastBatch = new SplitBatch(ImmutableList.of(), true);
 
     private SplitSource splitSource;
     private MarkerAnnouncer announcer;
@@ -371,5 +373,41 @@ public class TestMarkerSplitSource
         result = markerSource.getNextBatch(null, lifespan, 2);
         splits = result.get().getSplits();
         assertTrue(!splits.isEmpty());
+    }
+
+    @Test(dataProvider = "initializers")
+    public void testGetNextBatchWithFinish(Runnable initializer)
+            throws Exception
+    {
+        initializer.run();
+
+        final boolean[] closed = new boolean[1];
+        when(splitSource.getNextBatch(anyObject(), anyObject(), anyInt()))
+                .thenReturn(Futures.immediateFuture(testBatch))
+                .then(invocation -> {
+                    if (closed[0]) {
+                        throw new IllegalStateException();
+                    }
+                    return Futures.immediateFuture(emptyLastBatch);
+                });
+        when(splitSource.isFinished())
+                .thenReturn(true)
+                .then(invocation -> {
+                    if (closed[0]) {
+                        throw new IllegalStateException();
+                    }
+                    return true;
+                });
+        when(announcer.shouldGenerateMarker(anyObject())).thenReturn(OptionalLong.empty());
+
+        Future<SplitBatch> result = markerSource.getNextBatch(null, lifespan, 3);
+        assertEquals(result.get(), testBatch);
+        if (markerSource.isFinished()) {
+            closed[0] = true;
+            markerSource.close();
+        }
+        markerSource.resumeSnapshot(0);
+        result = markerSource.getNextBatch(null, lifespan, 10);
+        assertEquals(result.get().getSplits(), testBatch.getSplits());
     }
 }
