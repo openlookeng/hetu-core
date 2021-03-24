@@ -303,8 +303,45 @@ class AstBuilder
     @Override
     public Node visitCreateCube(SqlBaseParser.CreateCubeContext context)
     {
-        List<Identifier> groupingSet = visit(context.cubeGroup().identifier(), Identifier.class);
-        List<FunctionCall> aggregations = new ArrayList<>(visit(context.aggregations().expression(), FunctionCall.class));
+        if (context.cubeProperties() == null) {
+            throw new IllegalArgumentException("Missing properties: AGGREGATIONS, GROUP");
+        }
+
+        QualifiedName cubeName = getQualifiedName(context.cubeName);
+        QualifiedName sourceTableName = getQualifiedName(context.tableName);
+        List<Identifier> groupingSet = ImmutableList.of();
+        List<FunctionCall> aggregations = ImmutableList.of();
+        List<Property> properties = new ArrayList<>();
+        boolean cubeGroupProvided = false;
+        boolean aggregationsProvided = false;
+        for (SqlBaseParser.CubePropertyContext propertyContext : context.cubeProperties().cubeProperty()) {
+            if (propertyContext.cubeGroup() != null) {
+                if (cubeGroupProvided) {
+                    throw new IllegalArgumentException("Duplicate property: GROUP");
+                }
+                groupingSet = visit(propertyContext.cubeGroup().identifier(), Identifier.class);
+                cubeGroupProvided = true;
+            }
+            else if (propertyContext.aggregations() != null) {
+                if (aggregationsProvided) {
+                    throw new IllegalArgumentException("Duplicate property: AGGREGATIONS");
+                }
+                aggregations = visit(propertyContext.aggregations().expression(), FunctionCall.class);
+                aggregationsProvided = true;
+            }
+            else if (propertyContext.property() != null) {
+                properties.add((Property) visitProperty(propertyContext.property()));
+            }
+        }
+
+        if (!cubeGroupProvided) {
+            throw new IllegalArgumentException("Missing property: GROUP");
+        }
+
+        if (!aggregationsProvided) {
+            throw new IllegalArgumentException("Missing property: AGGREGATIONS");
+        }
+
         Set<FunctionCall> decomposedAggregations = new LinkedHashSet<>();
         aggregations.forEach(aggItem -> {
             if (!"avg".equals(aggItem.getName().toString())) {
@@ -329,15 +366,6 @@ class AstBuilder
                         aggItem.getArguments()));
             }
         });
-
-        QualifiedName cubeName = getQualifiedName(context.cubeName);
-        QualifiedName sourceTableName = getQualifiedName(context.tableName);
-
-        List<Property> properties = ImmutableList.of();
-        if (context.cubeProperties() != null) {
-            properties = visit(context.cubeProperties().property(), Property.class);
-        }
-
         return new CreateCube(getLocation(context), cubeName, sourceTableName, groupingSet, decomposedAggregations, context.EXISTS() != null, properties);
     }
 

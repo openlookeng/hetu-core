@@ -301,6 +301,37 @@ public abstract class AbstractTestStarTreeQueries
         assertUpdate("DROP TABLE nation_table_status_test");
     }
 
+    @Test
+    public void testEmptyGroup()
+    {
+        assertQuerySucceeds("CREATE TABLE nation_table_empty_group_test_1 AS SELECT * FROM nation");
+        assertUpdate("CREATE CUBE nation_cube_empty_group_test_1 ON nation_table_empty_group_test_1 WITH (aggregations=(count(*)), group=())");
+        assertQuerySucceeds("INSERT INTO CUBE nation_cube_empty_group_test_1");
+        Object rowCount = computeScalar("SELECT count(*) FROM nation_cube_empty_group_test_1");
+        assertEquals(rowCount, 1L);
+        assertQuery(sessionNoStarTree,
+                "SELECT count(*) FROM nation_table_empty_group_test_1",
+                "SELECT count(*) FROM nation",
+                assertTableScan("nation_table_empty_group_test_1"));
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_empty_group_test_1",
+                "SELECT count(*) FROM nation",
+                assertTableScan("nation_cube_empty_group_test_1"));
+        assertUpdate("DROP CUBE nation_cube_empty_group_test_1");
+        assertUpdate("DROP TABLE nation_table_empty_group_test_1");
+    }
+
+    @Test
+    public void testCreateCubeSyntax()
+    {
+        assertQueryFails("CREATE CUBE cube_syntax_test_1 ON nation WITH ()", "Missing property: GROUP");
+        assertQueryFails("CREATE CUBE cube_syntax_test_2 ON nation WITH (AGGREGATIONS = (count(*), sum(nation_key)))", "Missing property: GROUP");
+        assertQueryFails("CREATE CUBE cube_syntax_test_3 ON nation WITH (GROUP=(name))", "Missing property: AGGREGATIONS");
+        assertQueryFails("CREATE CUBE cube_syntax_test_4 ON nation WITH (format = 'ORC', partitioned_by = ARRAY['region_key'], GROUP=(name))", "Missing property: AGGREGATIONS");
+        assertQueryFails("CREATE CUBE cube_syntax_test_5 ON nation WITH (AGGREGATIONS = (count(*), sum(nation_key)), GROUP = (name), AGGREGATIONS = (sum(region_key)))", "Duplicate property: AGGREGATIONS");
+        assertQueryFails("CREATE CUBE cube_syntax_test_6 ON nation WITH (GROUP = (country), GROUP = (name), AGGREGATIONS = (sum(region_key)))", "Duplicate property: GROUP");
+    }
+
     private Consumer<Plan> assertTableScan(String tableName)
     {
         return plan ->

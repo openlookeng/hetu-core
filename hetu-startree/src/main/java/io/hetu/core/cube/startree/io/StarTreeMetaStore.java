@@ -37,6 +37,7 @@ import io.prestosql.spi.metastore.model.TableEntityType;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -87,7 +88,8 @@ public class StarTreeMetaStore
                 }
             });
             String groupingString = table.getParameters().get(GROUPING_STRING);
-            builder.addGroup(Sets.newHashSet(groupingString.split(COLUMN_DELIMITER)));
+            //Create empty set to support Empty Group
+            builder.addGroup((groupingString == null || groupingString.isEmpty()) ? new HashSet<>() : Sets.newHashSet(groupingString.split(COLUMN_DELIMITER)));
             builder.withPredicate(table.getParameters().get(PREDICATE_STRING));
             builder.setCubeStatus(CubeStatus.forValue(Integer.parseInt(table.getParameters().get(CUBE_STATUS))));
             builder.setTableLastUpdatedTime(Long.parseLong(table.getParameters().get(SOURCE_TABLE_LAST_UPDATED_TIME)));
