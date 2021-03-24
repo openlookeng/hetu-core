@@ -54,7 +54,8 @@ public final class PlanSanityChecker
                         new VerifyNoFilteredAggregations(),
                         new ValidateAggregationsWithDefaultValues(forceSingleNode),
                         new ValidateStreamingAggregations(),
-                        new DynamicFiltersChecker())
+                        new DynamicFiltersChecker(),
+                        new ExternalFunctionPushDownChecker())
                 .build();
     }
 

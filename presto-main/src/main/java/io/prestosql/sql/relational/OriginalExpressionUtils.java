@@ -66,6 +66,14 @@ public final class OriginalExpressionUtils
     }
 
     /**
+     * check a RowExpression is a OriginalExpression instance or not
+     */
+    public static boolean isOriginalExpression(RowExpression rowExpression)
+    {
+        return rowExpression instanceof OriginalExpression;
+    }
+
+    /**
      * OriginalExpression is a RowExpression container holding an {@param Expression} object
      * that cannot be translated directly while constructing PlanNode.
      * Typical examples are cases with `WITH` clauses or alias that the type or arguments information

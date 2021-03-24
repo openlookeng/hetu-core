@@ -40,4 +40,8 @@ For more information, please refer to: [External Function Registration and Push 
 External Function Push Down
 -------------------
 Now openLooKeng support to push `external function` down to data source.
-For more information, please refer to: [External Function Registration and Push Down](../develop/externalfunction-registration-pushdown.md)。
+For more information, please refer to: [External Function Registration and Push Down](../develop/externalfunction-registration-pushdown.md)
+
+> Notes
+> External functions only support to push down to data source to execute.
+> If an external function cannot push down to data source, the query with external function will fail.
