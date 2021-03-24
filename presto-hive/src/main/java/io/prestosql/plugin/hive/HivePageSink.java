@@ -396,7 +396,12 @@ public class HivePageSink
         if (session.isSnapshotEnabled() && !resuming) {
             try {
                 // Remove all sub files
-                writerFactory.removeAllSubFiles(writerParams.stream().map(param -> param.filePath).collect(toList()));
+                List<String> paths = writerParams.stream()
+                        // writerParams may also contain nulls
+                        .filter(Objects::nonNull)
+                        .map(param -> param.filePath)
+                        .collect(toList());
+                writerFactory.removeAllSubFiles(paths);
             }
             catch (FileNotFoundException e) {
                 // Ignore. Containing staging folder may have been deleted.
@@ -809,7 +814,7 @@ public class HivePageSink
             writers.add(null);
         }
         // The 2 lists may start with different sizes (e.g. writer is 0 after resume; but writerParams has entries),
-        // The will end up with same size after the loops
+        // They will end up with same size after the loops
         while (writerParams.size() <= pagePartitioner.getMaxIndex()) {
             writerParams.add(null);
         }

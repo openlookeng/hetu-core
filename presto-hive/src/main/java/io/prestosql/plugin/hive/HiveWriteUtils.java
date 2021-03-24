@@ -494,8 +494,8 @@ public final class HiveWriteUtils
 
     public static FileStatus[] getChildren(HdfsContext context, HdfsEnvironment hdfsEnvironment, Path path)
     {
-        try (FileSystem fileSystem = hdfsEnvironment.getFileSystem(context, path)) {
-            return fileSystem.listStatus(path);
+        try {
+            return hdfsEnvironment.getFileSystem(context, path).listStatus(path);
         }
         catch (IOException e) {
             throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, "Failed getting listStatus: " + path, e);

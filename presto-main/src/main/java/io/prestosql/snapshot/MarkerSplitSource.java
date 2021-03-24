@@ -109,6 +109,9 @@ public class MarkerSplitSource
             Split marker = new Split(getCatalogName(), MarkerSplit.resumeSplit(getCatalogName(), snapshotId), lifespan);
             List<Split> splits = Collections.singletonList(marker);
             boolean lastBatch = sourceExhausted && bufferPosition == splitBuffer.size();
+            if (lastBatch) {
+                sentFinalMarker = true;
+            }
             LOG.debug("Sending out resuming marker %d after %d splits for source: %s (%s)", snapshotId, bufferPosition, getCatalogName(), toString());
             return Futures.immediateFuture(new SplitBatch(splits, lastBatch));
         }

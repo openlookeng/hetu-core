@@ -108,6 +108,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Throwables.throwIfInstanceOf;
@@ -550,6 +551,19 @@ public class SqlQueryExecution
             MarkerAnnouncer announcer = splitManager.getMarkerAnnouncer(stateMachine.getSession());
             announcer.resumeSnapshot(snapshotId.orElse(0));
 
+            if (!snapshotId.isPresent()) {
+                if (nodeScheduler.createNodeSelector(null).selectableNodeCount() == 1) {
+                    // When there is no snapshot id to resume to, and there is only 1 worker available,
+                    // then resume will fail, because schedulers will require at least 2 workers.
+                    // To avoid this, require 1 task for each stage.
+                    taskCounts = taskCounts.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> 1));
+                }
+                else {
+                    // Otherwise don't enforce task count when we rerun query from beginning
+                    taskCounts = null;
+                }
+            }
+
             // Create a new scheduler, to schedule new stages and tasks
             DistributedExecutionPlanner distributedExecutionPlanner = new DistributedExecutionPlanner(splitManager, metadata);
             StageExecutionPlan executionPlan = distributedExecutionPlanner.plan(plan.getRoot(), stateMachine.getSession(),
@@ -577,8 +591,7 @@ public class SqlQueryExecution
                         dynamicFilterService,
                         heuristicIndexerManager,
                         snapshotManager,
-                        // Don't enforce task count when we rerun query from beginning
-                        snapshotId.isPresent() ? taskCounts : null);
+                        taskCounts);
 
                 queryScheduler.set(scheduler);
                 log.debug("Restarting query %s from a resumable task failure.", getQueryId());
