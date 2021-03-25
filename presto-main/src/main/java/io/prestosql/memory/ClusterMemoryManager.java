@@ -63,6 +63,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -136,10 +137,10 @@ public class ClusterMemoryManager
     private final boolean isBinaryEncoding;
 
     @GuardedBy("this")
-    private final Map<String, RemoteNodeMemory> nodes = new HashMap<>();
+    private final Map<String, RemoteNodeMemory> nodes = new LinkedHashMap<>();
 
     @GuardedBy("this")
-    private final Map<String, RemoteNodeMemory> allNodes = new HashMap<>();
+    private final Map<String, RemoteNodeMemory> allNodes = new LinkedHashMap<>();
 
     @GuardedBy("this")
     private final Map<MemoryPoolId, List<Consumer<MemoryPoolInfo>>> changeListeners = new HashMap<>();
@@ -609,13 +610,13 @@ public class ClusterMemoryManager
 
     public synchronized Map<String, JsonNode> getWorkerMemoryAndStateInfo()
     {
-        Map<String, JsonNode> memoryInfo = new HashMap<>();
+        Map<String, JsonNode> memoryInfo = new LinkedHashMap<>();
         for (Entry<String, RemoteNodeMemory> entry : allNodes.entrySet()) {
             // workerId is of the form "node_identifier [node_host] role"
             InternalNode node = entry.getValue().getNode();
             String role = node.isCoordinator() ? (node.isWorker() ? "Coordinator & Worker" : "Coordinator") :
                     "Worker";
-            String workerId = entry.getKey() + " [" + entry.getValue().getNode().getHost() + "] " + role;
+            String workerId = "[" + entry.getValue().getNode().getInternalUri().toString() + "] " + role;
             URI stateURI = uriBuilderFrom(entry.getValue().getNode().getInternalUri())
                     .appendPath("/v1/info/state")
                     .build();
@@ -629,12 +630,13 @@ public class ClusterMemoryManager
                 log.info("Worker disconnect");
             }
             String state = stateTemp.substring(0, 2).toUpperCase(Locale.ENGLISH) + stateTemp.substring(2).toLowerCase(Locale.ENGLISH);
+            String id = "\"" + node.getNodeIdentifier() + "\"";
             JsonNode jsonNode = null;
             try {
                 MemoryInfo info = entry.getValue().getInfo().orElse(new MemoryInfo(0, 0, 0, new DataSize(0,
                         DataSize.Unit.BYTE), new HashMap<>()));
                 String memoryInfoJson = new ObjectMapper().writeValueAsString(info);
-                StringBuilder memoryAndStateInfo = new StringBuilder(memoryInfoJson).insert(memoryInfoJson.length() - 1, ",\"state\":" + state);
+                StringBuilder memoryAndStateInfo = new StringBuilder(memoryInfoJson).insert(memoryInfoJson.length() - 1, ",\"state\":" + state + ",\"id\":" + id);
                 jsonNode = new ObjectMapper().readTree(memoryAndStateInfo.toString());
             }
             catch (JsonProcessingException e) {
