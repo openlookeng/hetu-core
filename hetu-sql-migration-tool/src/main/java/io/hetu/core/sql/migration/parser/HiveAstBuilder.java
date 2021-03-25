@@ -1312,12 +1312,9 @@ public class HiveAstBuilder
     @Override
     public Node visitShowFunctions(HiveSqlParser.ShowFunctionsContext context)
     {
-        if (context.LIKE() != null) {
-            addDiff(DiffType.UNSUPPORTED, context.LIKE().getText(), "[LIKE] is not supported");
-            throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "Unsupported attribute: LIKE", context.pattern);
-        }
-
-        return new ShowFunctions(getLocation(context), Optional.empty(), Optional.empty());
+        return new ShowFunctions(getLocation(context),
+                getTextIfPresent(context.pattern).map(HiveAstBuilder::unquote),
+                Optional.empty());
     }
 
     @Override

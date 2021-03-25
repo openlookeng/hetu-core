@@ -1059,12 +1059,10 @@ public class ImpalaAstBuilder
             addDiff(DiffType.UNSUPPORTED, context.IN().getText(), "[IN] is not supported");
             throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "IN is not supported", context);
         }
-        if (context.LIKE() != null) {
-            addDiff(DiffType.UNSUPPORTED, context.LIKE().getText(), "[LIKE] is not supported");
-            throw unsupportedError(ErrorType.UNSUPPORTED_STATEMENT, "LIKE is not supported", context);
-        }
 
-        return new ShowFunctions(getLocation(context), Optional.empty(), Optional.empty());
+        return new ShowFunctions(getLocation(context),
+                getTextIfPresent(context.pattern).map(ImpalaAstBuilder::unquote),
+                Optional.empty());
     }
 
     @Override
