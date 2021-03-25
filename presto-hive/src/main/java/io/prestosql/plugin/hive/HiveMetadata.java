@@ -645,7 +645,8 @@ public class HiveMetadata
                 .orElseThrow(() -> new TableNotFoundException(tableName));
         String tableLocation = table.getStorage().getLocation();
         Path tablePath = new Path(tableLocation);
-        try (FileSystem fileSystem = this.hdfsEnvironment.getFileSystem(new HdfsContext(session, tableName.getSchemaName()), tablePath)) {
+        try {
+            FileSystem fileSystem = this.hdfsEnvironment.getFileSystem(new HdfsContext(session, tableName.getSchemaName()), tablePath);
             // We use the directory modification time to represent the table modification time
             // since HDFS is append-only and any table modification will trigger directory update.
             return fileSystem.getFileStatus(tablePath).getModificationTime();
