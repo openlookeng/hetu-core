@@ -332,6 +332,87 @@ public abstract class AbstractTestStarTreeQueries
         assertQueryFails("CREATE CUBE cube_syntax_test_6 ON nation WITH (GROUP = (country), GROUP = (name), AGGREGATIONS = (sum(region_key)))", "Duplicate property: GROUP");
     }
 
+    @Test
+    public void testInsertWithDifferentSecondInsertPredicates()
+    {
+        assertUpdate("CREATE CUBE partial_inserts_test_1 ON nation WITH (AGGREGATIONS= (count(*)), GROUP=(regionkey, nationkey))");
+        assertUpdate("INSERT INTO CUBE partial_inserts_test_1 WHERE nationkey = 1", 1);
+        assertQueryFails("INSERT INTO CUBE partial_inserts_test_1 WHERE regionkey = 1", "Where condition must only use the columns from the first insert: nationkey.");
+        assertQueryFails("INSERT INTO CUBE partial_inserts_test_1 WHERE nationkey > 1 and regionkey = 1", "Where condition must only use the columns from the first insert: nationkey.");
+        assertUpdate("INSERT INTO CUBE partial_inserts_test_1 WHERE nationkey = 2", 1);
+
+        assertUpdate("CREATE CUBE partial_inserts_test_2 ON nation WITH (AGGREGATIONS= (count(*)), GROUP=(regionkey, nationkey))");
+        assertUpdate("INSERT INTO CUBE partial_inserts_test_2 WHERE nationkey = 1 and regionkey = 1", 1);
+        assertQueryFails("INSERT INTO CUBE partial_inserts_test_2 WHERE regionkey = 2", "Where condition must only use the columns from the first insert: nationkey, regionkey.");
+        assertQueryFails("INSERT INTO CUBE partial_inserts_test_2", "Cannot allow insert. Inserting entire dataset but cube already has partial data");
+
+        assertUpdate("DROP CUBE partial_inserts_test_1");
+        assertUpdate("DROP CUBE partial_inserts_test_2");
+    }
+
+    @Test
+    public void testAggregationsWithPartialData()
+    {
+        computeActual("CREATE TABLE nation_table_partial_data_test_1 AS SELECT * FROM nation");
+        assertUpdate("CREATE CUBE nation_cube_partial_data_1 ON nation_table_partial_data_test_1 WITH (AGGREGATIONS=(count(*)), GROUP=(nationkey))");
+        assertUpdate("INSERT INTO CUBE nation_cube_partial_data_1 WHERE nationkey = 1", 1);
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_partial_data_test_1 WHERE nationkey > 1",
+                "SELECT count(*) FROM nation WHERE nationkey > 1",
+                assertTableScan("nation_table_partial_data_test_1"));
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_partial_data_test_1 WHERE nationkey = 1",
+                "SELECT count(*) FROM nation WHERE nationkey = 1",
+                assertTableScan("nation_cube_partial_data_1"));
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_partial_data_test_1 WHERE nationkey >= 1",
+                "SELECT count(*) FROM nation WHERE nationkey >= 1",
+                assertTableScan("nation_table_partial_data_test_1"));
+        assertUpdate("DROP CUBE nation_cube_partial_data_1");
+        assertUpdate("CREATE CUBE nation_cube_partial_data_2 ON nation_table_partial_data_test_1 WITH (AGGREGATIONS=(count(*)), GROUP=(nationkey, regionkey))");
+        assertUpdate("INSERT INTO CUBE nation_cube_partial_data_2 WHERE nationkey = 1 and regionkey = 1", 1);
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_partial_data_test_1 WHERE nationkey > 1",
+                "SELECT count(*) FROM nation WHERE nationkey > 1",
+                assertTableScan("nation_table_partial_data_test_1"));
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_partial_data_test_1 WHERE nationkey = 1",
+                "SELECT count(*) FROM nation WHERE nationkey = 1",
+                assertTableScan("nation_table_partial_data_test_1"));
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_partial_data_test_1 WHERE nationkey >= 1",
+                "SELECT count(*) FROM nation WHERE nationkey >= 1",
+                assertTableScan("nation_table_partial_data_test_1"));
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_partial_data_test_1 WHERE nationkey = 1 and regionkey = 1",
+                "SELECT count(*) FROM nation WHERE nationkey = 1 and regionkey = 1",
+                assertTableScan("nation_cube_partial_data_2"));
+        assertUpdate("INSERT INTO CUBE nation_cube_partial_data_2 WHERE nationkey > 1 and regionkey = 2", 5);
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_partial_data_test_1 WHERE nationkey > 1",
+                "SELECT count(*) FROM nation WHERE nationkey > 1",
+                assertTableScan("nation_table_partial_data_test_1"));
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_partial_data_test_1 WHERE nationkey = 1 and regionkey = 1",
+                "SELECT count(*) FROM nation WHERE nationkey = 1 and regionkey = 1",
+                assertTableScan("nation_cube_partial_data_2"));
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_partial_data_test_1 WHERE nationkey > 1 and regionkey = 2",
+                "SELECT count(*) FROM nation WHERE nationkey > 1 and regionkey = 2",
+                assertTableScan("nation_cube_partial_data_2"));
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_partial_data_test_1 WHERE nationkey > 1 and regionkey > 1",
+                "SELECT count(*) FROM nation WHERE nationkey > 1 and regionkey > 1",
+                assertTableScan("nation_table_partial_data_test_1"));
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_partial_data_test_1 WHERE nationkey > 1 and regionkey = 1",
+                "SELECT count(*) FROM nation WHERE nationkey > 1 and regionkey = 1",
+                assertTableScan("nation_table_partial_data_test_1"));
+
+        assertUpdate("DROP CUBE nation_cube_partial_data_2");
+        assertUpdate("DROP TABLE nation_table_partial_data_test_1");
+    }
+
     private Consumer<Plan> assertTableScan(String tableName)
     {
         return plan ->

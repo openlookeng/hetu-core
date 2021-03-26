@@ -46,8 +46,9 @@ SELECT nationkey, avg(nationkey), max(regionkey) WHERE nationkey > 5 GROUP BY na
 
 ## Optimizer Changes
 
-The star tree aggregation rule is an Iterative optimizer that optimizes the logical plan by replacing the original aggregation sub-tree 
-and original table scan with pre-aggregation table scan.
+The star tree aggregation rule is an Iterative optimizer that optimizes the logical plan by replacing the original aggregation sub-tree
+and original table scan with pre-aggregation table scan. This optimizer uses the TupleDomain construct to match if predicates provided in the Query can
+be supported by the Cubes. The exact rows are not queried to check if Cube is applicable or not.
 
 
 ## Dependencies

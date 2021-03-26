@@ -31,7 +31,7 @@ See Also
 
 Limitations
 ----------
-1. Insert statement does not work properly if two different columns are used in where clause predicate.
+1. Insert statement does not allow different columns to be used in the where clause for successive inserts.
 
 ```sql
    CREATE CUBE orders_cube ON orders WITH (AGGREGATIONS = (count(*)), GROUP = (orderdate));
@@ -41,7 +41,8 @@ Limitations
    -- This statement would fail because its possible the Cube already contain rows matching the given predicate.
    INSERT INTO CUBE orders_cube WHERE location = 'Canada';
 ```
-   
+Note: this means that columns used in the first insert must be used in every insert predicate following the first to avoid inserting duplicate data.
+
 2. Range Predicate issue. 
 
 ```sql
