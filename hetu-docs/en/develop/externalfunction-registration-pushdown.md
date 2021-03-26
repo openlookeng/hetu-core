@@ -30,6 +30,28 @@ we build `ExternalFunctionInfo` static instances and register them to return set
 Of course you can build you own code to load the set of `ExternalFunctionInfo` instances, for example, load an external file and format it to `ExternalFunctionInfo` instances.
 In the example, we only supply a general-purpose framework.
 
+Only the following types which define in the `io.prestosql.spi.type.StandardTypes` are supported to declared in external functions.
+
+| Supported type                                      |
+| ------------------------------------------------------------ |
+|  StandardTypes.TINYINT |
+|  StandardTypes.SMALLINT|
+|  StandardTypes.INTEGER |
+|  StandardTypes.BIGINT |
+|  StandardTypes.DECIMAL |
+|  StandardTypes.REAL |
+|  StandardTypes.DOUBLE |
+|  StandardTypes.BOOLEAN |
+|  StandardTypes.CHAR |
+|  StandardTypes.VARCHAR |
+|  StandardTypes.VARBINARY |
+|  StandardTypes.DATE |
+|  StandardTypes.TIME |
+|  StandardTypes.TIMESTAMP |
+|  StandardTypes.TIME_WITH_TIME_ZONE |
+|  StandardTypes.TIMESTAMP_WITH_TIME_ZONE |
+
+
 2. After you implement the `ExternalFunctionHub` interface,
 you only need to register `ExternalFunctionHub` instance into the Connector. You can find example code in `MySqlClientModule.java` and `MysqlJdbcClient.java`.
 

@@ -15,26 +15,47 @@
 package io.prestosql.metadata;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.ExternalFunctionInfo;
 import io.prestosql.spi.function.Parameter;
 import io.prestosql.spi.function.RoutineCharacteristics;
 import io.prestosql.spi.function.SqlInvokedFunction;
+import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.TypeSignature;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
+import static java.lang.String.format;
 
 public class ExternalFunctionsParser
 {
     private static final String ALPHABET = "abcdefghijklmnopqrstuvwxyz";
     private static final String EXTERNAL_FUNCTION_BODY = "EXTERNAL";
+    private static final Set<String> SUPPORTED_TYPE = ImmutableSet.of(
+            StandardTypes.TINYINT,
+            StandardTypes.SMALLINT,
+            StandardTypes.INTEGER,
+            StandardTypes.BIGINT,
+            StandardTypes.DECIMAL,
+            StandardTypes.REAL,
+            StandardTypes.DOUBLE,
+            StandardTypes.BOOLEAN,
+            StandardTypes.CHAR,
+            StandardTypes.VARCHAR,
+            StandardTypes.VARBINARY,
+            StandardTypes.DATE,
+            StandardTypes.TIME,
+            StandardTypes.TIMESTAMP,
+            StandardTypes.TIME_WITH_TIME_ZONE,
+            StandardTypes.TIMESTAMP_WITH_TIME_ZONE);
 
     public static Optional<SqlInvokedFunction> parseExternalFunction(ExternalFunctionInfo externalFunctionInfo, CatalogSchemaName catalogSchemaName, RoutineCharacteristics.Language language)
     {
@@ -47,7 +68,24 @@ public class ExternalFunctionsParser
         if (functionName.isPresent() && returnType.isPresent()) {
             QualifiedObjectName qualifiedObjectName = new QualifiedObjectName(catalogSchemaName.getCatalogName(), catalogSchemaName.getSchemaName(), functionName.get());
             List<Parameter> parameters = inputArgs.stream()
-                    .map(str -> new Parameter(getRandomString((inputArgs.size() / ALPHABET.length() + 1), ALPHABET), parseTypeSignature(str)))
+                    .map(str -> {
+                        checkState(SUPPORTED_TYPE.contains(str), format("external function do not supported type: %s", str));
+                        if (str.equals(StandardTypes.DECIMAL)) {
+                            return new Parameter(
+                                    getRandomString((inputArgs.size() / ALPHABET.length() + 1), ALPHABET),
+                                    parseTypeSignature(str + "(p, s)", ImmutableSet.of("p", "s")));
+                        }
+                        else if (str.equals(StandardTypes.CHAR) || str.equals(StandardTypes.VARCHAR)) {
+                            return new Parameter(
+                                    getRandomString((inputArgs.size() / ALPHABET.length() + 1), ALPHABET),
+                                    parseTypeSignature(str + "(x)", ImmutableSet.of("x")));
+                        }
+                        else {
+                            return new Parameter(
+                                    getRandomString((inputArgs.size() / ALPHABET.length() + 1), ALPHABET),
+                                    parseTypeSignature(str));
+                        }
+                    })
                     .collect(toImmutableList());
             TypeSignature reType = parseTypeSignature(returnType.get());
             String deter = deterministic ? "DETERMINISTIC" : "NOT_DETERMINISTIC";

@@ -28,6 +28,28 @@ public interface ExternalFunctionHub
 也就是你只需要注册和返回一个`ExternalFunctionInfo`的实例集合即可。
 在这里我们仅提供基本的通用框架。
 
+另外，我们仅支持在外部函数中声明下列定义在`io.prestosql.spi.type.StandardTypes`中的类型。
+
+| Supported type                                      |
+| ------------------------------------------------------------ |
+|  StandardTypes.TINYINT |
+|  StandardTypes.SMALLINT|
+|  StandardTypes.INTEGER |
+|  StandardTypes.BIGINT |
+|  StandardTypes.DECIMAL |
+|  StandardTypes.REAL |
+|  StandardTypes.DOUBLE |
+|  StandardTypes.BOOLEAN |
+|  StandardTypes.CHAR |
+|  StandardTypes.VARCHAR |
+|  StandardTypes.VARBINARY |
+|  StandardTypes.DATE |
+|  StandardTypes.TIME |
+|  StandardTypes.TIMESTAMP |
+|  StandardTypes.TIME_WITH_TIME_ZONE |
+|  StandardTypes.TIMESTAMP_WITH_TIME_ZONE |
+
+
 2. 实现`ExternalFunctionHub`接口之后，你只需要将其通过实例注入的方式(参考`MySqlClientModule.java`)，注入到`JdbcClient`(参考`MysqlJdbcClient.java`)。
 
 ## 配置外部函数注册的命名空间
