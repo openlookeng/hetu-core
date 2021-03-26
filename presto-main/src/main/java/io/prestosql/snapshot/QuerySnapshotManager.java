@@ -217,9 +217,9 @@ public class QuerySnapshotManager
         {
             public void run()
             {
-                LOG.warn("Snapshot restore timed out, failed to restore snapshot for %s, snapshot %d", queryId.getId(), lastTriedId.getAsLong());
                 synchronized (this) {
                     if (retryTimer.isPresent()) {
+                        LOG.warn("Snapshot restore timed out, failed to restore snapshot for %s, snapshot %s", queryId.getId(), lastTriedId.toString());
                         retryTimer = Optional.empty();
                     }
                     else {
@@ -427,5 +427,10 @@ public class QuerySnapshotManager
     public RestoreResult getQuerySnapshotRestoreResult()
     {
         return restoreResult;
+    }
+
+    public SnapshotUtils getSnapshotUtils()
+    {
+        return snapshotUtils;
     }
 }

@@ -736,6 +736,16 @@ public class SqlQueryExecution
             reasons.add("Requires more than 1 worker nodes");
         }
 
+        if (!snapshotManager.getSnapshotUtils().hasStoreClient()) {
+            String snapshotProfile = snapshotManager.getSnapshotUtils().getSnapshotProfile();
+            if (snapshotProfile == null) {
+                reasons.add("Property hetu.experimental.snapshot.profile is not specified");
+            }
+            else {
+                reasons.add("Specified value '" + snapshotProfile + "' for property hetu.experimental.snapshot.profile is not valid");
+            }
+        }
+
         if (!reasons.isEmpty()) {
             // Disable snapshot support in the session. If this value has been used before this point,
             // then we may need to remedy those places to disable snapshot as well. Fortunately,
