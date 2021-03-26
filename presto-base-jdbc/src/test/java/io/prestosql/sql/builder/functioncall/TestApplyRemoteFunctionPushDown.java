@@ -78,7 +78,7 @@ public class TestApplyRemoteFunctionPushDown
         Optional<String> result1 = this.applyRemoteFunctionPushDown.rewriteRemoteFunction(builtin, baseJdbcRowExpressionConverter, new JdbcConverterContext());
         assertFalse(result1.isPresent());
 
-        CallExpression mockExternal = new CallExpression("format",
+        CallExpression mockExternal = new CallExpression("foo",
                 EXTERNAL_JDBC_V1,
                 DOUBLE,
                 ImmutableList.of());
@@ -90,12 +90,12 @@ public class TestApplyRemoteFunctionPushDown
     public void testIsConnectorSupportedRemoteFunction()
     {
         assertFalse(this.applyRemoteFunctionPushDown.isConnectorSupportedRemoteFunction(null));
-        CallExpression mockExternalJdbcV1 = new CallExpression("format",
+        CallExpression mockExternalJdbcV1 = new CallExpression("foo",
                 EXTERNAL_JDBC_V1,
                 DOUBLE,
                 ImmutableList.of(castToRowExpression(toSymbolReference(columnA))));
         assertTrue(this.applyRemoteFunctionPushDown.isConnectorSupportedRemoteFunction(mockExternalJdbcV1));
-        CallExpression externalFooV1 = new CallExpression("format",
+        CallExpression externalFooV1 = new CallExpression("foo",
                 EXTERNAL_FOO_V1,
                 DOUBLE,
                 ImmutableList.of(castToRowExpression(toSymbolReference(columnA))));

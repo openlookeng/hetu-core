@@ -37,3 +37,7 @@
 ## 外部函数下推到数据源执行
 
 openLooKeng系统支持外部函数通过Jdbc Connector下推到数据源执行。具体请参考 [外部函数注册](../develop/externalfunction-registration-pushdown.md)。
+
+> 注意
+> 外部函数仅支持下推到数据源执行。
+> 如果一个外部函数不能下推到数据源，则当前的包含外部函数调用的查询将会失败。
