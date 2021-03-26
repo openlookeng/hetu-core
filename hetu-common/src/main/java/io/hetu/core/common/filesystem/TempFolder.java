@@ -13,9 +13,13 @@
  */
 package io.hetu.core.common.filesystem;
 
+import io.airlift.log.Logger;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.UUID;
 
 /**
@@ -24,6 +28,7 @@ import java.util.UUID;
 public class TempFolder
         implements AutoCloseable
 {
+    private static final Logger LOG = Logger.get(TempFolder.class);
     private final String prefix;
     private File root;
 
@@ -91,7 +96,23 @@ public class TempFolder
                     return;
                 }
             }
-            throw new RuntimeException("Temporary folder not deleted. Manual deletion required.");
+
+            if (!root.exists()) {
+                return;
+            }
+
+            LOG.warn("Temporary folder can not be deleted. Shutdown hook added: " + root.toPath().toAbsolutePath());
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    Files.walk(root.toPath())
+                            .sorted(Comparator.reverseOrder())
+                            .map(Path::toFile)
+                            .forEach(File::delete);
+                }
+                catch (IOException e) {
+                    LOG.warn("Temporary folder not deleted. Manual deletion required: " + root.toPath().toAbsolutePath());
+                }
+            }));
         }
     }
 
