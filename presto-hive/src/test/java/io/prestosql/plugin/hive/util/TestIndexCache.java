@@ -106,6 +106,8 @@ public class TestIndexCache
             IndexCache indexCache = new IndexCache(indexCacheLoader, new NoOpIndexClient());
             List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
                     effectivePredicate, testPartitions);
+            // Try getting actual splits again due to a slight chance of not being loaded
+            actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
             assertEquals(actualSplitIndex.size(), 0);
             Thread.sleep(loadDelay + 500);
             actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
@@ -132,6 +134,8 @@ public class TestIndexCache
             IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay, new NoOpIndexClient());
             List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
                     effectivePredicate, testPartitions);
+            // Try getting actual splits again due to a slight chance of not being loaded
+            actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
             assertEquals(actualSplitIndex.size(), 0);
             Thread.sleep(loadDelay + 500);
             actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
@@ -159,6 +163,8 @@ public class TestIndexCache
             IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay, new NoOpIndexClient());
             List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
                     effectivePredicate, testPartitions);
+            // Try getting actual splits again due to a slight chance of not being loaded
+            actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
             assertEquals(actualSplitIndex.size(), 0);
             Thread.sleep(loadDelay + 500);
             actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
@@ -194,6 +200,8 @@ public class TestIndexCache
             IndexCache indexCache = new IndexCache(indexCacheLoader, loadDelay, new NoOpIndexClient());
             List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
                     effectivePredicateForPartition, partitionColumns);
+            // Try getting actual splits again due to a slight chance of not being loaded
+            actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicateForPartition, partitionColumns);
             assertEquals(actualSplitIndex.size(), 0);
             Thread.sleep(loadDelay + 500);
             actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicateForPartition,
@@ -223,6 +231,8 @@ public class TestIndexCache
 
             List<IndexMetadata> actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit,
                     effectivePredicate, testPartitions);
+            // Try getting actual splits again due to a slight chance of not being loaded
+            actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
             assertEquals(actualSplitIndex.size(), 0);
             Thread.sleep(loadDelay + 500);
             actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate,
@@ -244,6 +254,8 @@ public class TestIndexCache
             when(indexCacheLoader.load(any())).thenReturn(expectedIndices2);
 
             // previous indexes should be evicted bc cache was at max weight limit and new ones should be added
+            actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
+            // Try getting actual splits again due to a slight chance of not being loaded
             actualSplitIndex = indexCache.getIndices(catalog, table, testHiveSplit, effectivePredicate, testPartitions);
             assertEquals(actualSplitIndex.size(), 0);
             assertEquals(indexCache.getCacheSize(), numberOfIndexTypes);
