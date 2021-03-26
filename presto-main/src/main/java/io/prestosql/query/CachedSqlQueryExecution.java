@@ -365,6 +365,7 @@ public class CachedSqlQueryExecution
         private final Metadata metadata;
         private final Map<String, TableHandle> tables;
         private final Map<ConnectorTransactionHandle, ConnectorTransactionHandle> connectorTransactionHandleMap; // Old ConnectorTransactionHandle from cached plan to new ConnectorTransactionHandle from metadata
+        private HashMap<UUID, UUID> reuseTableScanNewMappingIdMap;
 
         TableHandleRewriter(Session session, Analysis analysis, Metadata metadata)
         {
@@ -383,6 +384,7 @@ public class CachedSqlQueryExecution
                 });
             }
             this.tables = tables;
+            this.reuseTableScanNewMappingIdMap = new HashMap();
         }
 
         @Override
@@ -394,8 +396,14 @@ public class CachedSqlQueryExecution
             // in other nodes if necessary
             connectorTransactionHandleMap.put(tableHandle.getTransaction(), newTableHandle.getTransaction());
 
+            UUID newMappingID = node.getReuseTableScanMappingId();
+            if (node.getStrategy() != ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT) {
+                newMappingID = reuseTableScanNewMappingIdMap.computeIfAbsent(newMappingID, k -> UUID.randomUUID());
+            }
+
             // Return a new table handle with the ID, output symbols, assignments, and enforced constraints of the cached table handle
-            return new TableScanNode(node.getId(), newTableHandle, node.getOutputSymbols(), node.getAssignments(), node.getEnforcedConstraint(), node.getPredicate(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0, false);
+            return new TableScanNode(node.getId(), newTableHandle, node.getOutputSymbols(), node.getAssignments(), node.getEnforcedConstraint(),
+                    node.getPredicate(), node.getStrategy(), newMappingID, node.getConsumerTableScanNodeCount(), false);
         }
 
         @Override
