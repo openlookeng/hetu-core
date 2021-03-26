@@ -154,7 +154,7 @@ public class TestSqlTaskManager
             assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
             assertNull(taskInfo.getStats().getEndTime());
 
-            taskInfo = sqlTaskManager.cancelTask(taskId, TaskState.CANCELED);
+            taskInfo = sqlTaskManager.cancelTask(taskId, TaskState.CANCELED, "");
             assertEquals(taskInfo.getTaskStatus().getState(), TaskState.CANCELED);
             assertNotNull(taskInfo.getStats().getEndTime());
 
@@ -177,7 +177,7 @@ public class TestSqlTaskManager
             assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
             assertNull(taskInfo.getStats().getEndTime());
 
-            taskInfo = sqlTaskManager.cancelTask(taskId, TaskState.ABORTED);
+            taskInfo = sqlTaskManager.cancelTask(taskId, TaskState.ABORTED, "");
             assertEquals(taskInfo.getTaskStatus().getState(), TaskState.ABORTED);
             assertNotNull(taskInfo.getStats().getEndTime());
 
@@ -219,7 +219,7 @@ public class TestSqlTaskManager
             TaskInfo taskInfo = createTask(sqlTaskManager, taskId, createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds());
             assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
 
-            taskInfo = sqlTaskManager.cancelTask(taskId, TaskState.CANCELED);
+            taskInfo = sqlTaskManager.cancelTask(taskId, TaskState.CANCELED, "");
             assertEquals(taskInfo.getTaskStatus().getState(), TaskState.CANCELED);
 
             taskInfo = sqlTaskManager.getTaskInfo(taskId, null);

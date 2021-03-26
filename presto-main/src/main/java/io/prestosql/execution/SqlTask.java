@@ -367,16 +367,6 @@ public class SqlTask
 
         TaskStatus taskStatus = createTaskStatus(taskHolder);
 
-        if (!isSnapshotEnabled || taskHolder.taskExecution == null) {
-            return new TaskInfo(
-                    taskStatus,
-                    lastHeartbeat.get(),
-                    outputBuffer.getInfo(),
-                    noMoreSplits,
-                    taskStats,
-                    needsPlan.get());
-        }
-
         return new TaskInfo(
                 taskStatus,
                 lastHeartbeat.get(),

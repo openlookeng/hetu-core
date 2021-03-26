@@ -90,6 +90,7 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.airlift.http.client.Request.Builder.prepareDelete;
 import static io.airlift.http.client.Request.Builder.preparePost;
+import static io.prestosql.client.PrestoHeaders.PRESTO_TASK_INSTANCE_ID;
 import static io.prestosql.execution.TaskInfo.createInitialTask;
 import static io.prestosql.execution.TaskState.ABORTED;
 import static io.prestosql.execution.TaskState.CANCELED_TO_RESUME;
@@ -637,6 +638,7 @@ public final class HttpRemoteTask
         HttpUriBuilder uriBuilder = getHttpUriBuilder(taskStatus).addParameter("targetState", targetState.toString());
         Request request = setContentTypeHeaders(isBinaryEncoding, prepareDelete())
                 .setUri(uriBuilder.build())
+                .addHeader(PRESTO_TASK_INSTANCE_ID, taskStatus.getTaskInstanceId())
                 .build();
         scheduleAsyncCleanupRequest(createCleanupBackoff(), request, targetState.toString());
     }
