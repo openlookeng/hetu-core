@@ -41,6 +41,7 @@ import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
@@ -299,6 +300,15 @@ public class StarTreeAggregationRule
         return Result.ofPlanNode(aggregationRewriteWithCube.rewrite(aggregationNode, filterNode.orElse(null)));
     }
 
+    private boolean atLeastMatchesOne(List<Expression> cubeSupportedPredicates, TupleDomain<Symbol> statementPredicate, Session session, TypeProvider types)
+    {
+        return cubeSupportedPredicates.stream().anyMatch(cubeSupportedPredicate -> {
+            ExpressionDomainTranslator.ExtractionResult decomposedCubePredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, cubeSupportedPredicate, types);
+            return BooleanLiteral.TRUE_LITERAL.equals(decomposedCubePredicate.getRemainingExpression())
+                    && decomposedCubePredicate.getTupleDomain().contains(statementPredicate);
+        });
+    }
+
     private boolean filterPredicateMatches(Optional<FilterNode> filterNode, CubeMetadata cubeMetadata, Session session, TypeProvider types)
     {
         if (cubeMetadata.getPredicateString() == null) {
@@ -321,6 +331,12 @@ public class StarTreeAggregationRule
                 return false;
             }
             ExpressionDomainTranslator.ExtractionResult decomposedCubePredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, cubePredicateAsExpr, types);
+            if (!BooleanLiteral.TRUE_LITERAL.equals(decomposedCubePredicate.getRemainingExpression())) {
+                //Can't create TupleDomain construct for this Expression.
+                //eg: (col1 = 1 AND col2 = 1) OR (col1 > 1 and col2 = 2)
+                //Extract disjuncts from the Expression expression and evaluate separately
+                return atLeastMatchesOne(ExpressionUtils.extractDisjuncts(cubePredicateAsExpr), decomposeStatementPredicate.getTupleDomain(), session, types);
+            }
             return decomposedCubePredicate.getTupleDomain().contains(decomposeStatementPredicate.getTupleDomain());
         }
         else {

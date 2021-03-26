@@ -31,6 +31,7 @@ import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.sql.ExpressionFormatter;
 import io.prestosql.sql.analyzer.QueryExplainer;
+import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.tree.AstVisitor;
 import io.prestosql.sql.tree.DefaultExpressionTraversalVisitor;
@@ -78,7 +79,7 @@ public class InsertCubeRewrite
             WarningCollector warningCollector,
             HeuristicIndexerManager heuristicIndexerManager)
     {
-        return (Statement) new Visitor(session, cubeManager).process(node, null);
+        return (Statement) new Visitor(session, cubeManager, parser).process(node, null);
     }
 
     private static class Visitor
@@ -86,11 +87,13 @@ public class InsertCubeRewrite
     {
         private final Session session;
         private final CubeManager cubeManager;
+        private final SqlParser sqlParser;
 
-        public Visitor(Session session, CubeManager cubeManager)
+        public Visitor(Session session, CubeManager cubeManager, SqlParser parser)
         {
             this.session = requireNonNull(session, "session is null");
             this.cubeManager = requireNonNull(cubeManager, "cubeManager is null");
+            this.sqlParser = parser;
         }
 
         @Override
@@ -102,17 +105,32 @@ public class InsertCubeRewrite
             CubeMetadata cubeMetadata = cubeMetaStore.getMetadataFromCubeName(targetCube.toString()).orElseThrow(() -> new PrestoException(StandardErrorCode.CUBE_ERROR, String.format("Cube not found '%s'", targetCube.toString())));
             Set<String> group = cubeMetadata.getGroup();
             ImmutableList.Builder<Identifier> builder = ImmutableList.builder();
+            ImmutableList.Builder<Identifier> cubeMetadataPredicateBuilder = ImmutableList.builder();
             if (node.getWhere().isPresent()) {
                 new IdentifierBuilderVisitor().process(node.getWhere().get(), builder);
                 Set<String> whereColumns = builder.build()
                         .stream()
                         .map(Identifier::getValue)
                         .collect(Collectors.toCollection(() -> new TreeSet<>(String.CASE_INSENSITIVE_ORDER)));
+
                 if (whereColumns.isEmpty()) {
                     throw new IllegalArgumentException("Invalid predicate. " + ExpressionFormatter.formatExpression(node.getWhere().get(), Optional.empty()));
                 }
                 if (!group.containsAll(whereColumns)) {
                     throw new IllegalArgumentException("All columns in where clause must be part Cube group.");
+                }
+                if (cubeMetadata.getPredicateString() != null) {
+                    Expression cubePredicateAsExpr = sqlParser.createExpression(cubeMetadata.getPredicateString(), new ParsingOptions());
+
+                    new IdentifierBuilderVisitor().process(cubePredicateAsExpr, cubeMetadataPredicateBuilder);
+                    Set<String> metadataWhereColumns = cubeMetadataPredicateBuilder.build()
+                            .stream()
+                            .map(Identifier::getValue)
+                            .collect(Collectors.toCollection(() -> new TreeSet<>(String.CASE_INSENSITIVE_ORDER)));
+                    if (whereColumns.size() != metadataWhereColumns.size() || !metadataWhereColumns.containsAll(whereColumns)) {
+                        throw new IllegalArgumentException(String.format("Where condition must only use the columns from the first insert: %s.",
+                                String.join(", ", metadataWhereColumns)));
+                    }
                 }
             }
             return buildCubeInsert(cubeMetadata, node, group);
