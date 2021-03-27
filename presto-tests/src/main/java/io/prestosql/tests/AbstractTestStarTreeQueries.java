@@ -27,6 +27,7 @@ import io.prestosql.testing.MaterializedRow;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -411,6 +412,71 @@ public abstract class AbstractTestStarTreeQueries
 
         assertUpdate("DROP CUBE nation_cube_partial_data_2");
         assertUpdate("DROP TABLE nation_table_partial_data_test_1");
+    }
+
+    @Test
+    public void testCubeMustNotBeUsed()
+    {
+        computeActual("CREATE TABLE line_item_table_test_1 AS SELECT * FROM lineitem");
+        assertUpdate("CREATE CUBE line_item_cube_test_1 ON line_item_table_test_1 WITH (AGGREGATIONS=(sum(extendedprice)), GROUP=(orderkey))");
+        assertQuerySucceeds("INSERT INTO CUBE line_item_cube_test_1");
+        assertQuery(sessionStarTree,
+                "SELECT custkey FROM orders o WHERE 100000 < (SELECT sum(extendedprice) FROM line_item_table_test_1 l WHERE l.orderkey = o.orderkey) ORDER BY custkey LIMIT 10",
+                "SELECT custkey FROM orders o WHERE 100000 < (SELECT sum(extendedprice) FROM lineitem l WHERE l.orderkey = o.orderkey) ORDER BY custkey LIMIT 10",
+                assertInTableScans("line_item_table_test_1"));
+        assertUpdate("DROP CUBE line_item_cube_test_1");
+        assertUpdate("DROP TABLE line_item_table_test_1");
+    }
+
+    @Test
+    public void testOtherQueryTypes()
+    {
+        List<Session> sessions = ImmutableList.of(
+                Session.builder(getSession())
+                .setSystemProperty(SystemSessionProperties.ENABLE_STAR_TREE_INDEX, "true")
+                .setSystemProperty(SystemSessionProperties.ENABLE_EXECUTION_PLAN_CACHE, "true")
+                .build(),
+                Session.builder(getSession())
+                .setSystemProperty(SystemSessionProperties.ENABLE_STAR_TREE_INDEX, "false")
+                .setSystemProperty(SystemSessionProperties.ENABLE_EXECUTION_PLAN_CACHE, "true")
+                .build(),
+                Session.builder(getSession())
+                .setSystemProperty(SystemSessionProperties.ENABLE_STAR_TREE_INDEX, "true")
+                .setSystemProperty(SystemSessionProperties.ENABLE_EXECUTION_PLAN_CACHE, "false")
+                .build(),
+                Session.builder(getSession())
+                .setSystemProperty(SystemSessionProperties.ENABLE_STAR_TREE_INDEX, "false")
+                .setSystemProperty(SystemSessionProperties.ENABLE_EXECUTION_PLAN_CACHE, "false")
+                .build());
+        for (Session session : sessions) {
+            assertQuery(session,
+                    "WITH temp_table as(SELECT nationkey, count(*) AS count FROM nation WHERE nationkey > 10 GROUP BY nationkey) SELECT nationkey, count FROM temp_table");
+            assertQuery(session,
+                    "SELECT o.orderpriority, COUNT(*) FROM orders o WHERE o.orderdate >= date '1993-07-01' AND EXISTS (SELECT * FROM lineitem l WHERE l.orderkey = o.orderkey AND (l.returnflag = 'R' OR l.receiptdate > l.commitdate)) GROUP BY o.orderpriority");
+            assertQuerySucceeds(session,
+                    "create view count_by_shipmode_cube_test_1 as select shipmode, count(*) as count from lineitem group by shipmode");
+            assertQuerySucceeds(session,
+                    "DROP VIEW count_by_shipmode_cube_test_1");
+            assertQuerySucceeds(session,
+                    "select sum(l.extendedprice) / 7.0 as avg_yearly from lineitem l, part p where p.partkey = l.partkey and p.brand = 'Brand#33' and p.container = 'WRAP PACK' and l.quantity < (select 0.2 * avg(l2.quantity) from lineitem l2 where l2.partkey = p.partkey)");
+        }
+    }
+
+    private Consumer<Plan> assertInTableScans(String tableName)
+    {
+        return plan ->
+        {
+            boolean matchFound = PlanNodeSearcher.searchFrom(plan.getRoot())
+                    .where(TableScanNode.class::isInstance)
+                    .findAll()
+                    .stream()
+                    .map(TableScanNode.class::cast)
+                    .anyMatch(node -> node.getTable().getFullyQualifiedName().endsWith(tableName));
+
+            if (!matchFound) {
+                fail("Table " + tableName + " was not used for scan");
+            }
+        };
     }
 
     private Consumer<Plan> assertTableScan(String tableName)
