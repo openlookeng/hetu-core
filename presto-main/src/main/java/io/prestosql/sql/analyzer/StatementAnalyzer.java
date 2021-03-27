@@ -322,7 +322,7 @@ class StatementAnalyzer
     {
         this(analysis, metadata, sqlParser, accessControl, session, warningCollector);
         this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
-        this.cubeManager = cubeManager;
+        this.cubeManager = requireNonNull(cubeManager, "cubeManager is null");
     }
 
     public Scope analyze(Node node, Scope outerQueryScope)
@@ -1510,7 +1510,12 @@ class StatementAnalyzer
 
         private void analyzeCubes(TableHandle originalTable)
         {
-            CubeMetaStore cubeMetaStore = cubeManager.getMetaStore(STAR_TREE).orElseThrow(() -> new RuntimeException("Hetu metastore must be initialized"));
+            if (cubeManager == null || !cubeManager.getMetaStore(STAR_TREE).isPresent()) {
+                //Skip if aggregation was part of subqueries and expressions, etc..
+                //StarTreeAggregation optimizer would be skipped as well
+                return;
+            }
+            CubeMetaStore cubeMetaStore = cubeManager.getMetaStore(STAR_TREE).get();
             List<CubeMetadata> cubeMetadataList = cubeMetaStore.getMetadataList(originalTable.getFullyQualifiedName());
             for (CubeMetadata cubeMetadata : cubeMetadataList) {
                 QualifiedObjectName cubeName = QualifiedObjectName.valueOf(cubeMetadata.getCubeName());
