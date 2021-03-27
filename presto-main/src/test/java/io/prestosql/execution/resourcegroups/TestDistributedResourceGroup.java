@@ -666,7 +666,6 @@ public class TestDistributedResourceGroup
     {
         return new SharedQueryState(
                 query.getBasicQueryInfo(),
-                query.getSession().toSessionRepresentation(),
                 query.getErrorCode(),
                 query.getUserMemoryReservation(),
                 query.getTotalMemoryReservation(),
