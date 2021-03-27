@@ -50,11 +50,14 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static io.hetu.core.plugin.functionnamespace.FunctionNameSpaceConstants.ONLY_VERSION;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_USER_ERROR;
+import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -68,7 +71,7 @@ public abstract class AbstractSqlInvokedFunctionNamespaceManager
     private final String catalogName;
     private final LoadingCache<QualifiedObjectName, Collection<SqlInvokedFunction>> functions;
     private final LoadingCache<SqlFunctionHandle, FunctionMetadata> metadataByHandle;
-    private final LoadingCache<SqlFunctionHandle, ScalarFunctionImplementation> implementationByHandle;
+    private final Map<SqlFunctionHandle, FunctionMetadata> boundedFunctionMetadata;
     private Optional<FunctionNamespaceManagerContext> functionNamespaceManagerContextOp = Optional.empty();
     SqlInvokedFunctionNamespaceManagerConfig sqlInvokedFunctionNamespaceManagerConfig;
 
@@ -77,6 +80,7 @@ public abstract class AbstractSqlInvokedFunctionNamespaceManager
         this.catalogName = requireNonNull(catalogName, "catalogName is null");
         requireNonNull(config, "config is null");
         this.sqlInvokedFunctionNamespaceManagerConfig = config;
+        this.boundedFunctionMetadata = new ConcurrentHashMap<>();
         this.functions = CacheBuilder.newBuilder()
                 .expireAfterWrite(config.getFunctionCacheExpiration().toMillis(), MILLISECONDS)
                 .build(new CacheLoader<QualifiedObjectName, Collection<SqlInvokedFunction>>()
@@ -102,16 +106,6 @@ public abstract class AbstractSqlInvokedFunctionNamespaceManager
                     public FunctionMetadata load(SqlFunctionHandle functionHandle)
                     {
                         return fetchFunctionMetadataDirect(functionHandle);
-                    }
-                });
-        this.implementationByHandle = CacheBuilder.newBuilder()
-                .expireAfterWrite(config.getFunctionInstanceCacheExpiration().toMillis(), MILLISECONDS)
-                .build(new CacheLoader<SqlFunctionHandle, ScalarFunctionImplementation>()
-                {
-                    @Override
-                    public ScalarFunctionImplementation load(SqlFunctionHandle functionHandle)
-                    {
-                        return fetchFunctionImplementationDirect(functionHandle);
                     }
                 });
     }
@@ -188,9 +182,7 @@ public abstract class AbstractSqlInvokedFunctionNamespaceManager
     @Override
     public final ScalarFunctionImplementation getScalarFunctionImplementation(FunctionHandle functionHandle)
     {
-        checkCatalog(functionHandle);
-        checkArgument(functionHandle instanceof SqlFunctionHandle, "Unsupported FunctionHandle type '%s'", functionHandle.getClass().getSimpleName());
-        return implementationByHandle.getUnchecked((SqlFunctionHandle) functionHandle);
+        throw new UnsupportedOperationException("External function only support to push down to data source to execute and function implementation is not supported yet.");
     }
 
     @Override
@@ -281,6 +273,22 @@ public abstract class AbstractSqlInvokedFunctionNamespaceManager
         return functions.getUnchecked(functionName);
     }
 
+    protected static boolean isSqlFunctionIdEqualsWithoutBound(SqlFunctionId id1, SqlFunctionId id2)
+    {
+        boolean name = id1.getFunctionName().equals(id2.getFunctionName());
+        boolean type = true;
+        List<TypeSignature> typeSignatureList1 = id1.getArgumentTypes();
+        List<TypeSignature> typeSignatureList2 = id2.getArgumentTypes();
+        if (typeSignatureList2.size() == typeSignatureList1.size()) {
+            for (int i = 0; (i < typeSignatureList2.size()) && type; i++) {
+                boolean base = typeSignatureList2.get(i).getBase().equals(typeSignatureList1.get(i).getBase());
+                boolean size = typeSignatureList2.get(i).getParameters().size() == typeSignatureList1.get(i).getParameters().size();
+                type = base && size;
+            }
+        }
+        return name && type;
+    }
+
     private class FunctionCollection
     {
         @GuardedBy("this")
@@ -288,6 +296,9 @@ public abstract class AbstractSqlInvokedFunctionNamespaceManager
 
         @GuardedBy("this")
         private final Map<SqlFunctionId, SqlFunctionHandle> functionHandles = new ConcurrentHashMap<>();
+
+        @GuardedBy("this")
+        private final Map<SqlFunctionId, SqlFunctionHandle> functionHandlesBounded = new ConcurrentHashMap<>();
 
         public synchronized List<SqlInvokedFunction> loadAndGetFunctionsTransactional(QualifiedObjectName functionName)
         {
@@ -298,7 +309,23 @@ public abstract class AbstractSqlInvokedFunctionNamespaceManager
 
         public synchronized FunctionHandle getFunctionHandle(SqlFunctionId functionId)
         {
-            return functionHandles.get(functionId);
+            if (functionHandlesBounded.containsKey(functionId)) {
+                return functionHandlesBounded.get(functionId);
+            }
+            else if (functionHandles.containsKey(functionId)) {
+                return functionHandles.get(functionId);
+            }
+            else {
+                List<SqlFunctionId> list = functionHandles.keySet().stream().filter(id -> isSqlFunctionIdEqualsWithoutBound(id, functionId)).collect(Collectors.toList());
+                if (list.size() > 0) {
+                    SqlFunctionHandle functionHandle = new SqlFunctionHandle(functionId, ONLY_VERSION);
+                    functionHandlesBounded.put(functionId, functionHandle);
+                    return functionHandle;
+                }
+                else {
+                    throw new PrestoException(NOT_SUPPORTED, format("unknown function: %s", functionId.getFunctionName()));
+                }
+            }
         }
     }
 }

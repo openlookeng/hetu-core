@@ -29,12 +29,10 @@ import io.prestosql.security.AccessControl;
 import io.prestosql.security.DenyAllAccessControl;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.StandardErrorCode;
-import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.FunctionMetadata;
 import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.function.SqlFunction;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalParseResult;
@@ -115,7 +113,6 @@ import io.prestosql.type.TypeCoercion;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -130,9 +127,6 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.metadata.CastType.CAST;
 import static io.prestosql.metadata.FunctionAndTypeManager.qualifyObjectName;
-import static io.prestosql.metadata.FunctionResolver.constructFunctionNotFoundErrorMessage;
-import static io.prestosql.spi.StandardErrorCode.FUNCTION_NOT_FOUND;
-import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.spi.function.OperatorType.SUBSCRIPT;
 import static io.prestosql.spi.type.ArrayParametricType.ARRAY;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -1014,12 +1008,6 @@ public class ExpressionAnalyzer
                 }
                 else {
                     Type actualType = typeManager.getType(argumentTypes.get(i).getTypeSignature());
-                    CatalogSchemaName catalogSchemaName = functionMetadata.getName().getCatalogSchemaName();
-                    if (!DEFAULT_NAMESPACE.equals(catalogSchemaName) && !expectedType.equals(actualType)) {
-                        Collection<? extends SqlFunction> candidates = functionAndTypeManager.getFunctions(Optional.empty(), functionMetadata.getName());
-                        String errorMessage = constructFunctionNotFoundErrorMessage(functionMetadata.getName(), argumentTypes, candidates);
-                        throw new PrestoException(FUNCTION_NOT_FOUND, errorMessage);
-                    }
                     coerceType(expression, actualType, expectedType, format("Function %s argument %d", function, i));
                 }
             }
