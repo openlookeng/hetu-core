@@ -56,10 +56,7 @@ import javax.annotation.PreDestroy;
 import javax.annotation.concurrent.GuardedBy;
 import javax.inject.Inject;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -84,7 +81,6 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.MoreCollectors.toOptional;
 import static com.google.common.collect.Sets.difference;
-import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.airlift.units.DataSize.succinctBytes;
 import static io.airlift.units.Duration.nanosSince;
 import static io.prestosql.ExceededMemoryLimitException.exceededGlobalTotalLimit;
@@ -540,8 +536,9 @@ public class ClusterMemoryManager
         // Add new nodes
         for (InternalNode node : aliveNodes) {
             if (!nodes.containsKey(node.getNodeIdentifier()) && shouldIncludeNode(node)) {
-                nodes.put(node.getNodeIdentifier(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
-                allNodes.put(node.getNodeIdentifier(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
+//                nodes.put(node.getNodeIdentifier(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
+                nodes.put(node.getInternalUri().toString(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
+                allNodes.put(node.getInternalUri().toString(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
             }
         }
 
@@ -614,29 +611,28 @@ public class ClusterMemoryManager
         for (Entry<String, RemoteNodeMemory> entry : allNodes.entrySet()) {
             // workerId is of the form "node_identifier [node_host] role"
             InternalNode node = entry.getValue().getNode();
-            String role = node.isCoordinator() ? (node.isWorker() ? "Coordinator & Worker" : "Coordinator") :
-                    "Worker";
-            String workerId = "[" + entry.getValue().getNode().getInternalUri().toString() + "] " + role;
-            URI stateURI = uriBuilderFrom(entry.getValue().getNode().getInternalUri())
-                    .appendPath("/v1/info/state")
-                    .build();
+            StringBuilder role = new StringBuilder(node.isCoordinator() ? (node.isWorker() ? "Coordinator & Worker" : "Coordinator") :
+                    "Worker");
+            role = new StringBuilder("\"" + role + "\"");
+            String workerId = entry.getValue().getNode().getInternalUri().toString();
             String stateTemp = "\"" + NodeState.DISCONNECTION + "\"";
-            try (
-                    InputStreamReader inputStreamReader = new InputStreamReader(stateURI.toURL().openStream());
-                    BufferedReader reader = new BufferedReader(inputStreamReader)) {
-                stateTemp = reader.readLine();
-            }
-            catch (IOException e) {
-                log.info("Worker disconnect");
+            if (nodes.containsKey(entry.getKey())) {
+                stateTemp = "\"" + ACTIVE + "\"";
             }
             String state = stateTemp.substring(0, 2).toUpperCase(Locale.ENGLISH) + stateTemp.substring(2).toLowerCase(Locale.ENGLISH);
             String id = "\"" + node.getNodeIdentifier() + "\"";
             JsonNode jsonNode = null;
             try {
-                MemoryInfo info = entry.getValue().getInfo().orElse(new MemoryInfo(0, 0, 0, new DataSize(0,
-                        DataSize.Unit.BYTE), new HashMap<>()));
+                MemoryInfo activeInfo = new MemoryInfo(0, 0, 0, new DataSize(0,
+                        DataSize.Unit.BYTE), new HashMap<>());
+                for (Entry<String, RemoteNodeMemory> activeEntry : nodes.entrySet()) {
+                    activeInfo = activeEntry.getValue().getInfo().orElse(new MemoryInfo(0, 0, 0, new DataSize(0,
+                            DataSize.Unit.BYTE), new HashMap<>()));
+                    break;
+                }
+                MemoryInfo info = entry.getValue().getInfo().orElse(activeInfo);
                 String memoryInfoJson = new ObjectMapper().writeValueAsString(info);
-                StringBuilder memoryAndStateInfo = new StringBuilder(memoryInfoJson).insert(memoryInfoJson.length() - 1, ",\"state\":" + state + ",\"id\":" + id);
+                StringBuilder memoryAndStateInfo = new StringBuilder(memoryInfoJson).insert(memoryInfoJson.length() - 1, ",\"state\":" + state + ",\"id\":" + id + ",\"role\":" + role);
                 jsonNode = new ObjectMapper().readTree(memoryAndStateInfo.toString());
             }
             catch (JsonProcessingException e) {
