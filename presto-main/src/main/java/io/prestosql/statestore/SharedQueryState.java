@@ -38,7 +38,6 @@ import static java.util.Objects.requireNonNull;
 public class SharedQueryState
 {
     private final BasicQueryInfo basicQueryInfo;
-    private final SessionRepresentation session;
     private final Optional<ErrorCode> errorCode;
     private final Duration totalCpuTime;
     private final DataSize totalMemoryReservation;
@@ -49,7 +48,6 @@ public class SharedQueryState
     @JsonCreator
     public SharedQueryState(
             @JsonProperty("basicQueryInfo") BasicQueryInfo basicQueryInfo,
-            @JsonProperty("session") SessionRepresentation session,
             @JsonProperty("errorCode") Optional<ErrorCode> errorCode,
             @JsonProperty("userMemoryReservation") DataSize userMemoryReservation,
             @JsonProperty("totalMemoryReservation") DataSize totalMemoryReservation,
@@ -58,7 +56,6 @@ public class SharedQueryState
             @JsonProperty("executionStartTime") Optional<DateTime> executionStartTime)
     {
         this.basicQueryInfo = basicQueryInfo;
-        this.session = session;
         this.errorCode = errorCode;
         this.userMemoryReservation = userMemoryReservation;
         this.totalMemoryReservation = totalMemoryReservation;
@@ -79,7 +76,6 @@ public class SharedQueryState
 
         return new SharedQueryState(
                 query.getBasicQueryInfo(),
-                query.getSession().toSessionRepresentation(),
                 query.getErrorCode(),
                 query.getUserMemoryReservation(),
                 query.getTotalMemoryReservation(),
@@ -97,7 +93,7 @@ public class SharedQueryState
     @JsonProperty
     public SessionRepresentation getSession()
     {
-        return session;
+        return basicQueryInfo.getSession();
     }
 
     @JsonProperty

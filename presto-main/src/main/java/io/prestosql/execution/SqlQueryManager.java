@@ -113,7 +113,7 @@ public class SqlQueryManager
         this.queryManagementExecutor = Executors.newScheduledThreadPool(queryManagerConfig.getQueryManagerExecutorPoolSize(), threadsNamed("query-management-%s"));
         this.queryManagementExecutorMBean = new ThreadPoolExecutorMBean((ThreadPoolExecutor) queryManagementExecutor);
 
-        this.queryTracker = new QueryTracker<>(queryManagerConfig, queryManagementExecutor);
+        this.queryTracker = new QueryTracker<>(queryManagerConfig, queryManagementExecutor, stateStoreProvider);
         // Inject LocalStateProvider
         this.stateStoreProvider = stateStoreProvider;
         this.sessionPropertyManager = sessionPropertyManager;

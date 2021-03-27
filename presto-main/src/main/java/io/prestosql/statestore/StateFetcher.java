@@ -259,7 +259,6 @@ public class StateFetcher
 
         SharedQueryState newState = new SharedQueryState(
                 newQueryInfo,
-                oldState.getSession(),
                 Optional.of(SERVER_SHUTTING_DOWN.toErrorCode()),
                 oldState.getUserMemoryReservation(),
                 oldState.getTotalMemoryReservation(),
