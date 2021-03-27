@@ -86,7 +86,7 @@ public class DistributedResourceGroupUtils
      */
     public static void accumulateCpuUsage(StateStore stateStore)
     {
-        StateCollection queryStateCollection = stateStore.getStateCollection(StateStoreConstants.QUERY_STATE_COLLECTION_NAME);
+        StateCollection queryStateCollection = stateStore.getStateCollection(StateStoreConstants.FINISHED_QUERY_STATE_COLLECTION_NAME);
         if (queryStateCollection == null) {
             return;
         }
