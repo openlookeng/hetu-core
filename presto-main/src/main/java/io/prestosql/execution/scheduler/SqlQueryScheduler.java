@@ -288,10 +288,10 @@ public class SqlQueryScheduler
     // either as a result of a task failure, or a failed attempt to resume the query
     public void cancelToResume()
     {
+        queryStateMachine.transitionToRescheduling();
         for (SqlStageExecution stageExecution : stages.values()) {
             stageExecution.cancelToResume();
         }
-        queryStateMachine.transitionToRescheduling();
     }
 
     // this is a separate method to ensure that the `this` reference is not leaked during construction
@@ -740,7 +740,11 @@ public class SqlQueryScheduler
             RuntimeException closeError = new RuntimeException();
             for (StageScheduler scheduler : stageSchedulers.values()) {
                 try {
-                    scheduler.close();
+                    // Snapshot: when trying to reschedule, then don't close the scheduler (and more importantly, split sources in it)
+                    QueryState state = queryStateMachine.getQueryState();
+                    if (state != QueryState.RESCHEDULING && state != QueryState.RESUMING) {
+                        scheduler.close();
+                    }
                 }
                 catch (Throwable t) {
                     queryStateMachine.transitionToFailed(t);

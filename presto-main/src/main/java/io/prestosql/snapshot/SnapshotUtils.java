@@ -92,6 +92,16 @@ public class SnapshotUtils
         return isCoordinator;
     }
 
+    public boolean hasStoreClient()
+    {
+        return snapshotStoreClient != null;
+    }
+
+    public String getSnapshotProfile()
+    {
+        return snapshotConfig.getSnapshotProfile();
+    }
+
     public void initialize()
     {
         snapshotStoreClient = buildSnapshotStoreClient();
