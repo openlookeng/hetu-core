@@ -22,6 +22,7 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
+import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.statestore.StateStoreConstants;
 import io.prestosql.statestore.StateStoreProvider;
 import org.joda.time.DateTime;
@@ -254,7 +255,11 @@ public class QueryTracker<T extends TrackedQuery>
 
     private void removeQueryInStateStore(QueryId queryId)
     {
-        StateCollection stateCollection = stateStoreProvider.getStateStore().getStateCollection(StateStoreConstants.QUERY_STATE_COLLECTION_NAME);
+        StateStore stateStore = stateStoreProvider.getStateStore();
+        if (stateStore == null) {
+            return;
+        }
+        StateCollection stateCollection = stateStore.getStateCollection(StateStoreConstants.FINISHED_QUERY_STATE_COLLECTION_NAME);
         if (stateCollection != null && stateCollection.getType().equals(StateCollection.Type.MAP)) {
             ((StateMap<String, String>) stateCollection).remove(queryId.getId());
         }

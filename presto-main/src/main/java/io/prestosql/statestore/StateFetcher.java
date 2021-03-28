@@ -24,6 +24,7 @@ import io.prestosql.server.BasicQueryInfo;
 import io.prestosql.spi.ErrorType;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
+import io.prestosql.spi.statestore.StateStore;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
@@ -43,6 +44,12 @@ import java.util.concurrent.locks.Lock;
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.concurrent.Threads.threadsNamed;
 import static io.prestosql.spi.StandardErrorCode.SERVER_SHUTTING_DOWN;
+import static io.prestosql.statestore.StateStoreConstants.CPU_USAGE_STATE_COLLECTION_NAME;
+import static io.prestosql.statestore.StateStoreConstants.DEFAULT_ACQUIRED_LOCK_TIME_MS;
+import static io.prestosql.statestore.StateStoreConstants.FINISHED_QUERY_STATE_COLLECTION_NAME;
+import static io.prestosql.statestore.StateStoreConstants.HANDLE_EXPIRED_QUERY_LOCK_NAME;
+import static io.prestosql.statestore.StateStoreConstants.OOM_QUERY_STATE_COLLECTION_NAME;
+import static io.prestosql.statestore.StateStoreConstants.QUERY_STATE_COLLECTION_NAME;
 import static io.prestosql.utils.StateUtils.removeState;
 
 /**
@@ -147,7 +154,7 @@ public class StateFetcher
                 if (stateCollection == null) {
                     continue;
                 }
-                if (stateCollectionName.equals(StateStoreConstants.CPU_USAGE_STATE_COLLECTION_NAME)) {
+                if (stateCollectionName.equals(CPU_USAGE_STATE_COLLECTION_NAME)) {
                     StateCacheStore.get().setCachedStates(stateCollectionName, ((StateMap) stateCollection).getAll());
                     continue;
                 }
@@ -169,6 +176,46 @@ public class StateFetcher
                     LOG.warn("Unsupported state collection type: %s", stateCollection.getType());
                 }
             }
+            long end = System.currentTimeMillis();
+            LOG.debug("fetchStates ends at current time milliseconds: %s, at format HH:mm:ss:SSS:%s, total time use: %s",
+                    end,
+                    new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(end)),
+                    end - start);
+        }
+    }
+
+    /**
+     * Fetch state from state store to cache store
+     *
+     * @throws IOException exception when failed to deserialize states
+     */
+    public void fetchQueryStates(StateStore stateStore)
+            throws IOException
+    {
+        synchronized (this) {
+            long start = System.currentTimeMillis();
+            LOG.debug("fetchStates starts at current time milliseconds: %s, at format HH:mm:ss:SSS:%s",
+                    start,
+                    new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(start)));
+
+            DateTime currentTime = new DateTime(DateTimeZone.UTC);
+            StateCollection cpuUsageCollection = stateStore.getStateCollection(CPU_USAGE_STATE_COLLECTION_NAME);
+            StateCollection queryStateCollection = stateStore.getStateCollection(QUERY_STATE_COLLECTION_NAME);
+
+            StateCacheStore.get().setCachedStates(CPU_USAGE_STATE_COLLECTION_NAME, ((StateMap) cpuUsageCollection).getAll());
+
+            Map<String, String> states = ((StateMap<String, String>) queryStateCollection).getAll();
+
+            ImmutableMap.Builder<String, SharedQueryState> queryStatesBuilder = ImmutableMap.builder();
+            for (Map.Entry<String, String> entry : states.entrySet()) {
+                SharedQueryState state = MAPPER.readerFor(SharedQueryState.class).readValue(entry.getValue());
+                if (isStateExpired(state, currentTime)) {
+                    handleExpiredQueryState(state);
+                }
+                queryStatesBuilder.put(entry.getKey(), state);
+            }
+            StateCacheStore.get().setCachedStates(QUERY_STATE_COLLECTION_NAME, queryStatesBuilder.build());
+
             long end = System.currentTimeMillis();
             LOG.debug("updateStates ends at current time milliseconds: %s, at format HH:mm:ss:SSS:%s, total time use: %s",
                     end,
@@ -197,15 +244,16 @@ public class StateFetcher
     private void handleExpiredQueryState(SharedQueryState state)
     {
         // State store hasn't been loaded yet
-        if (stateStoreProvider.getStateStore() == null) {
+        final StateStore stateStore = stateStoreProvider.getStateStore();
+        if (stateStore == null) {
             return;
         }
 
         Lock lock = null;
         boolean locked = false;
         try {
-            lock = stateStoreProvider.getStateStore().getLock(StateStoreConstants.HANDLE_EXPIRED_QUERY_LOCK_NAME);
-            locked = lock.tryLock(StateStoreConstants.DEFAULT_ACQUIRED_LOCK_TIME_MS, TimeUnit.MILLISECONDS);
+            lock = stateStore.getLock(HANDLE_EXPIRED_QUERY_LOCK_NAME);
+            locked = lock.tryLock(DEFAULT_ACQUIRED_LOCK_TIME_MS, TimeUnit.MILLISECONDS);
             if (locked) {
                 LOG.debug(String.format("EXPIRED!!! REMOVING... Id: %s, state: %s, uri: %s, query: %s",
                         state.getBasicQueryInfo().getQueryId().getId(),
@@ -214,11 +262,11 @@ public class StateFetcher
                         state.getBasicQueryInfo().getQuery()));
 
                 // remove expired query from oom
-                StateCollection stateCollection = stateStoreProvider.getStateStore().getStateCollection(StateStoreConstants.OOM_QUERY_STATE_COLLECTION_NAME);
+                StateCollection stateCollection = stateStore.getStateCollection(OOM_QUERY_STATE_COLLECTION_NAME);
                 removeState(stateCollection, Optional.of(state.getBasicQueryInfo().getQueryId()), LOG);
 
                 // update query to failed in stateCollection if exists
-                stateCollection = stateStoreProvider.getStateStore().getStateCollection(StateStoreConstants.QUERY_STATE_COLLECTION_NAME);
+                stateCollection = stateStore.getStateCollection(FINISHED_QUERY_STATE_COLLECTION_NAME);
                 if (stateCollection != null && stateCollection.getType().equals(StateCollection.Type.MAP)) {
                     Map<String, String> queryStateMap = ((StateMap<String, String>) stateCollection).getAll();
                     if (queryStateMap.get(state.getBasicQueryInfo().getQueryId().getId()) != null) {
