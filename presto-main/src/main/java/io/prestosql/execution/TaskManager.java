@@ -88,9 +88,13 @@ public interface TaskManager
 
     /**
      * Cancels a task.  If the task does not already exist, is is created and then
-     * canceled.
+     * canceled. Snapshot: If a worker dies and then brought back, we don't want
+     * to create a new task on it then cancel when this method is called. We would
+     * return null if we can't find the task with the particular taskInstanceId to
+     * create a new abortedTaskInfo with the given taskInstanceId and return that
+     * to the caller to avoid RemoteTaskMismatch.
      */
-    TaskInfo cancelTask(TaskId taskId, TaskState targetState);
+    TaskInfo cancelTask(TaskId taskId, TaskState targetState, String expectedTaskInstanceId);
 
     /**
      * Gets results from a task either immediately or in the future.  If the

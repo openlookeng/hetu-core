@@ -147,7 +147,7 @@ public class TaskResource
                 taskUpdateRequest.getConsumerId(),
                 taskUpdateRequest.getTaskInstanceId());
         if (taskInfo == null) {
-            return Response.ok().entity(createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath())).build();
+            return Response.ok().entity(createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath(), taskUpdateRequest.getTaskInstanceId())).build();
         }
 
         if (shouldSummarize(uriInfo)) {
@@ -181,7 +181,7 @@ public class TaskResource
 
         ListenableFuture<TaskInfo> futureTaskInfo = taskManager.getTaskInfo(taskId, currentState, taskInstanceId);
         if (futureTaskInfo == null) {
-            asyncResponse.resume(createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath()));
+            asyncResponse.resume(createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath(), taskInstanceId));
             return;
         }
         Duration waitTime = randomizeWaitTime(maxWait);
@@ -205,7 +205,7 @@ public class TaskResource
     {
         TaskInfo taskInfo = taskManager.getTaskInfo(taskId, taskInstanceId);
         if (taskInfo == null) {
-            taskInfo = createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath());
+            taskInfo = createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath(), taskInstanceId);
         }
         return taskInfo;
     }
@@ -230,7 +230,7 @@ public class TaskResource
 
         ListenableFuture<TaskStatus> futureTaskStatus = taskManager.getTaskStatus(taskId, currentState, taskInstanceId);
         if (futureTaskStatus == null) {
-            asyncResponse.resume(createAbortedTaskStatus(taskId, uriInfo.getAbsolutePath()));
+            asyncResponse.resume(createAbortedTaskStatus(taskId, uriInfo.getAbsolutePath(), taskInstanceId));
             return;
         }
         Duration waitTime = randomizeWaitTime(maxWait);
@@ -253,7 +253,7 @@ public class TaskResource
     {
         TaskStatus taskStatus = taskManager.getTaskStatus(taskId, taskInstanceId);
         if (taskStatus == null) {
-            taskStatus = createAbortedTaskStatus(taskId, uriInfo.getAbsolutePath());
+            taskStatus = createAbortedTaskStatus(taskId, uriInfo.getAbsolutePath(), taskInstanceId);
         }
         return taskStatus;
     }
@@ -263,13 +263,19 @@ public class TaskResource
     @Produces({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
     public TaskInfo deleteTask(
             @PathParam("taskId") TaskId taskId,
+            @HeaderParam(PRESTO_TASK_INSTANCE_ID) String taskInstanceId,
             @QueryParam("targetState") String targetStateStr,
             @Context UriInfo uriInfo)
     {
         SecurityRequireNonNull.requireNonNull(taskId, "taskId is null");
 
         TaskState targetState = targetStateStr == null ? TaskState.ABORTED : TaskState.valueOf(targetStateStr);
-        TaskInfo taskInfo = taskManager.cancelTask(taskId, targetState);
+        TaskInfo taskInfo = taskManager.cancelTask(taskId, targetState, taskInstanceId);
+
+        if (taskInfo == null) {
+            taskInfo = createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath(), taskInstanceId);
+        }
+
         if (shouldSummarize(uriInfo)) {
             taskInfo = taskInfo.summarize();
         }
@@ -406,14 +412,14 @@ public class TaskResource
     }
 
     // Snapshot: Request includes an invalid task instance id. Return "aborted" result to indicate the task doesn't exist (anymore).
-    private TaskStatus createAbortedTaskStatus(TaskId taskId, URI uri)
+    private TaskStatus createAbortedTaskStatus(TaskId taskId, URI uri, String taskInstanceId)
     {
-        return TaskStatus.failWith(initialTaskStatus(taskId, uri, ""), TaskState.ABORTED, ImmutableList.of());
+        return TaskStatus.failWith(initialTaskStatus(taskId, uri, "", taskInstanceId), TaskState.ABORTED, ImmutableList.of());
     }
 
-    private TaskInfo createAbortedTaskInfo(TaskId taskId, URI uri)
+    private TaskInfo createAbortedTaskInfo(TaskId taskId, URI uri, String taskInstanceId)
     {
         return TaskInfo.createInitialTask(taskId, uri, "", ImmutableList.of(), new TaskStats(DateTime.now(), null))
-                .withTaskStatus(createAbortedTaskStatus(taskId, uri));
+                .withTaskStatus(createAbortedTaskStatus(taskId, uri, taskInstanceId));
     }
 }

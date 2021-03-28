@@ -495,13 +495,25 @@ public class SqlTaskManager
     }
 
     @Override
-    public TaskInfo cancelTask(TaskId taskId, TaskState targetState)
+    public TaskInfo cancelTask(TaskId taskId, TaskState targetState, String expectedTaskInstanceId)
     {
         requireNonNull(taskId, "taskId is null");
         requireNonNull(targetState, "targetState is null");
 
-        TaskState oldState = tasks.getUnchecked(taskId).getTaskStatus().getState();
-        TaskInfo result = tasks.getUnchecked(taskId).cancel(targetState);
+        SqlTask sqlTask;
+        if (isNullOrEmpty(expectedTaskInstanceId)) {
+            sqlTask = tasks.getUnchecked(taskId);
+        }
+        else {
+            sqlTask = currentTaskInstanceIds.get(expectedTaskInstanceId);
+            if (sqlTask == null) {
+                return null;
+            }
+        }
+
+        TaskState oldState = sqlTask.getTaskStatus().getState();
+        TaskInfo result = sqlTask.cancel(targetState);
+
         log.debug("Cancelling task %s. Old state: %s; new state: %s", taskId, oldState, targetState);
         if (targetState == TaskState.CANCELED_TO_RESUME) {
             cleanupTaskToResume(taskId);

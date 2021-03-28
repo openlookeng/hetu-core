@@ -263,9 +263,14 @@ public class TaskStatus
 
     public static TaskStatus initialTaskStatus(TaskId taskId, URI location, String nodeId)
     {
+        return initialTaskStatus(taskId, location, nodeId, "");
+    }
+
+    public static TaskStatus initialTaskStatus(TaskId taskId, URI location, String nodeId, String taskInstanceId)
+    {
         return new TaskStatus(
                 taskId,
-                "",
+                taskInstanceId,
                 MIN_VERSION,
                 PLANNED,
                 location,
