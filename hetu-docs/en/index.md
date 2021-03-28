@@ -204,6 +204,7 @@ headless: true
     - [Heuristic indexer]({{< relref "./docs/develop/indexer.md" >}})
     - [Hive ORC Cache]({{< relref "./docs/develop/hive-orc-cache.md" >}})
     - [External Function Registration and Push Down]({{< relref "./docs/develop/externalfunction-registration-pushdown.md" >}})
+    - [Star Tree Cube]({{< relref "./docs/develop/star-tree-cube.md" >}})
 
 - [openLooKeng REST API]({{< relref "./docs/rest/_index.md" >}})
     - [Node Resource]({{< relref "./docs/rest/node.md" >}})

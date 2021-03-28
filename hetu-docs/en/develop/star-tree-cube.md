@@ -1,8 +1,11 @@
 # Star-Tree 
 
-Star tree cubing is a pre-aggregation technique to achieve low latency runtime for iceberg queries. Star tree cubing aimed to reduce 
-latency for iceberg queries. An iceberg query computes an aggregate function over an attribute ( or set of attributes) in order to 
-find aggregate values above a specified threshold.
+Star tree cubing is a pre-aggregation technique to achieve low latency runtime for iceberg queries. An iceberg query computes an aggregate function over 
+an attribute ( or set of attributes) in order to find aggregate values above a specified threshold. Using this technique, User is provided with an option to 
+create a cube with necessary aggregations and dimensions. Then, when aggregation queries are executed, the cube is used to executing the query instead of the 
+original table. The actual performance gain is achieved during the TableScan operation as cubes are pre-computed and pre-aggregated. 
+
+For this reason, the cubing technique is highly effective when the group by cardinality results in lesser rows than the original table.
 
 ## Supported functions
     COUNT, COUNT DISTINCT, MIN, MAX, SUM, AVG
@@ -49,7 +52,6 @@ SELECT nationkey, avg(nationkey), max(regionkey) WHERE nationkey > 5 GROUP BY na
 The star tree aggregation rule is an Iterative optimizer that optimizes the logical plan by replacing the original aggregation sub-tree
 and original table scan with pre-aggregation table scan. This optimizer uses the TupleDomain construct to match if predicates provided in the Query can
 be supported by the Cubes. The exact rows are not queried to check if Cube is applicable or not.
-
 
 ## Dependencies
 
