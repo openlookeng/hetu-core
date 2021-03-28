@@ -222,6 +222,10 @@ public class BigintGroupByHash
                 nullGroupId = nextGroupId++;
             }
 
+            // increase capacity, if necessary. after nextGroupId++, it maybe equals maxFill, so need to check whether need rehash
+            if (needRehash()) {
+                tryRehash();
+            }
             return nullGroupId;
         }
 
