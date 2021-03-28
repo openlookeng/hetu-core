@@ -129,7 +129,9 @@ public class StateUpdater
      */
     public void unregisterQuery(String stateCollectionName, ManagedQueryExecution query)
     {
-        registeredQueries.remove(stateCollectionName, query);
+        synchronized (registeredQueries) {
+            registeredQueries.remove(stateCollectionName, query);
+        }
     }
 
     /**
