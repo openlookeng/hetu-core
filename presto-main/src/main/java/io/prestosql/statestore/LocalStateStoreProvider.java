@@ -120,7 +120,6 @@ public class LocalStateStoreProvider
         // Create essential state collections
         stateStore.createStateCollection(StateStoreConstants.DISCOVERY_SERVICE_COLLECTION_NAME, StateCollection.Type.MAP);
         stateStore.createStateCollection(StateStoreConstants.QUERY_STATE_COLLECTION_NAME, StateCollection.Type.MAP);
-        stateStore.createStateCollection(StateStoreConstants.FINISHED_QUERY_STATE_COLLECTION_NAME, StateCollection.Type.MAP);
         stateStore.createStateCollection(StateStoreConstants.OOM_QUERY_STATE_COLLECTION_NAME, StateCollection.Type.MAP);
         stateStore.createStateCollection(StateStoreConstants.CPU_USAGE_STATE_COLLECTION_NAME, StateCollection.Type.MAP);
         stateStore.createStateCollection(StateStoreConstants.TRANSACTION_STATE_COLLECTION_NAME, StateCollection.Type.MAP);

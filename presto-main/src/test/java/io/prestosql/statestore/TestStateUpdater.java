@@ -68,6 +68,7 @@ public class TestStateUpdater
 {
     private static final int MINIMUM_UPDATE_INTERVAL = 10;
     private static final String STATE_COLLECTION_QUERY = "query";
+    private static final String DISPATCH_QUERY_ENTRY = "dispatchquery";
     private static final String NULL_STRING = null;
     private static final String MOCK_QUERY_ID = "20191122_174317_00000_q9aun";
     private static final String URI_LOCALHOST = "http://localhost:8080";
@@ -222,7 +223,7 @@ public class TestStateUpdater
         StateUpdater stateUpdater = new StateUpdater(stateStoreProvider, updateInterval);
         DispatchQuery dispatchQuery = mockDispatchQueryData(true);
         updateStateChange(dispatchQuery);
-        stateUpdater.registerQuery(STATE_COLLECTION_QUERY, dispatchQuery);
+        stateUpdater.registerQuery(DISPATCH_QUERY_ENTRY, dispatchQuery);
         when(stateStoreProvider.getStateStore()).then(new Returns(stateStore));
         when(stateStoreProvider.getStateStore().getStateCollection(any())).then(new Returns(Mockito.mock(StateMap.class)));
         when(stateStoreProvider.getStateStore().getStateCollection(any()).getType()).then(new Returns(StateCollection.Type.MAP));

@@ -51,11 +51,6 @@ public class StateStoreConstants
     public static final String QUERY_STATE_COLLECTION_NAME = "query";
 
     /**
-     * Finished query state collection name
-     */
-    public static final String FINISHED_QUERY_STATE_COLLECTION_NAME = "finished-query";
-
-    /**
      * OOM Query state collection name
      */
     public static final String OOM_QUERY_STATE_COLLECTION_NAME = "oom-query";

@@ -39,7 +39,6 @@ import io.prestosql.spi.QueryId;
 import io.prestosql.spi.resourcegroups.SelectionContext;
 import io.prestosql.spi.resourcegroups.SelectionCriteria;
 import io.prestosql.spi.service.PropertyService;
-import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.statestore.SharedQueryState;
 import io.prestosql.statestore.StateCacheStore;
 import io.prestosql.statestore.StateFetcher;
@@ -65,7 +64,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -312,11 +310,7 @@ public class DispatchManager
         List<BasicQueryInfo> queryInfos;
         if (isMultiCoordinatorEnabled() && StateCacheStore.get().getCachedStates(StateStoreConstants.QUERY_STATE_COLLECTION_NAME) != null) {
             Map<String, SharedQueryState> queryStates = StateCacheStore.get().getCachedStates(StateStoreConstants.QUERY_STATE_COLLECTION_NAME);
-            Map<String, SharedQueryState> finishedQueryStates = StateCacheStore.get().getCachedStates(StateStoreConstants.FINISHED_QUERY_STATE_COLLECTION_NAME);
-
-            queryInfos = Stream.concat(
-                    queryStates.values().stream(),
-                    finishedQueryStates.values().stream())
+            queryInfos = queryStates.values().stream()
                     .map(SharedQueryState::getBasicQueryInfo)
                     .collect(Collectors.toList());
         }
@@ -401,7 +395,6 @@ public class DispatchManager
 
         // Start state fetcher
         stateFetcher.registerStateCollection(StateStoreConstants.QUERY_STATE_COLLECTION_NAME);
-        stateFetcher.registerStateCollection(StateStoreConstants.FINISHED_QUERY_STATE_COLLECTION_NAME);
         stateFetcher.registerStateCollection(StateStoreConstants.OOM_QUERY_STATE_COLLECTION_NAME);
         stateFetcher.registerStateCollection(StateStoreConstants.CPU_USAGE_STATE_COLLECTION_NAME);
         stateFetcher.start();
@@ -423,13 +416,12 @@ public class DispatchManager
     private synchronized void submitQuerySync(DispatchQuery dispatchQuery, SelectionContext selectionContext)
             throws InterruptedException, PrestoException
     {
-        StateStore stateStore = stateStoreProvider.getStateStore();
-        if (stateStore == null) {
+        if (stateStoreProvider.getStateStore() == null) {
             LOG.error("StateStore is not loaded yet");
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Coordinator is not ready to accept queries");
         }
 
-        Lock lock = stateStore.getLock(StateStoreConstants.SUBMIT_QUERY_LOCK_NAME);
+        Lock lock = stateStoreProvider.getStateStore().getLock(StateStoreConstants.SUBMIT_QUERY_LOCK_NAME);
         // Make sure query submission is synchronized
         boolean locked = lock.tryLock(hetuConfig.getQuerySubmitTimeout().toMillis(), TimeUnit.MILLISECONDS);
         long start = 0L;
@@ -440,7 +432,7 @@ public class DispatchManager
                         dispatchQuery.getQueryId(),
                         start,
                         new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(start)));
-                stateFetcher.fetchQueryStates(stateStore);
+                stateFetcher.fetchStates();
                 resourceGroupManager.submit(dispatchQuery, selectionContext, queryExecutor);
                 // Register dispatch query to StateUpdater
                 if (PropertyService.getBooleanProperty(HetuConstant.MULTI_COORDINATOR_ENABLED) && stateUpdater != null) {
@@ -449,7 +441,7 @@ public class DispatchManager
                 stateUpdater.updateStates();
             }
             catch (IOException e) {
-                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to fetch states from or update states to state store: " + e.getMessage());
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Failed to fetch states from or update states to state store: " + e.getMessage()));
             }
             catch (Throwable e) {
                 // dispatch query has already been registered, so just fail it directly
@@ -467,7 +459,7 @@ public class DispatchManager
         }
         else {
             // TODO maybe just queue the query if the queue size is not a problem
-            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Coordinator probably too busy at the moment, please try again in a few minutes");
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Coordinator probably too busy at the moment, please try again in a few minutes"));
         }
     }
 }

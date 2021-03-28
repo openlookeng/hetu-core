@@ -18,22 +18,22 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import io.airlift.json.ObjectMapperProvider;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.prestosql.dispatcher.DispatchQuery;
 import io.prestosql.execution.ManagedQueryExecution;
 import io.prestosql.execution.QueryState;
+import io.prestosql.spi.QueryId;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
-import io.prestosql.spi.statestore.StateStore;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -43,9 +43,6 @@ import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.concurrent.Threads.threadsNamed;
 import static io.prestosql.spi.StandardErrorCode.CLUSTER_OUT_OF_MEMORY;
 import static io.prestosql.spi.StandardErrorCode.EXCEEDED_GLOBAL_MEMORY_LIMIT;
-import static io.prestosql.statestore.StateStoreConstants.FINISHED_QUERY_STATE_COLLECTION_NAME;
-import static io.prestosql.statestore.StateStoreConstants.OOM_QUERY_STATE_COLLECTION_NAME;
-import static io.prestosql.statestore.StateStoreConstants.QUERY_STATE_COLLECTION_NAME;
 import static io.prestosql.utils.StateUtils.removeState;
 
 /**
@@ -59,7 +56,7 @@ public class StateUpdater
 
     private final StateStoreProvider stateStoreProvider;
     private final Duration updateInterval;
-    private final Multimap<String, DispatchQuery> registeredQueries = Multimaps.synchronizedMultimap(ArrayListMultimap.create());
+    private final Multimap<String, DispatchQuery> states = ArrayListMultimap.create();
     private final ScheduledExecutorService stateUpdateExecutor;
     private ScheduledFuture<?> backgroundTask;
 
@@ -97,7 +94,7 @@ public class StateUpdater
         synchronized (this) {
             if (backgroundTask != null) {
                 backgroundTask.cancel(true);
-                registeredQueries.clear();
+                states.clear();
             }
         }
     }
@@ -111,14 +108,14 @@ public class StateUpdater
      */
     public void registerQuery(String stateCollectionName, DispatchQuery query)
     {
-        synchronized (registeredQueries) {
-            registeredQueries.put(stateCollectionName, query);
+        synchronized (states) {
+            states.put(stateCollectionName, query);
+            query.addStateChangeListener(state -> {
+                if (state.isDone()) {
+                    queryFinished(query);
+                }
+            });
         }
-        query.addStateChangeListener(state -> {
-            if (state.isDone()) {
-                queryFinished(query);
-            }
-        });
     }
 
     /**
@@ -129,8 +126,8 @@ public class StateUpdater
      */
     public void unregisterQuery(String stateCollectionName, ManagedQueryExecution query)
     {
-        synchronized (registeredQueries) {
-            registeredQueries.remove(stateCollectionName, query);
+        synchronized (states) {
+            states.remove(stateCollectionName, query);
         }
     }
 
@@ -142,55 +139,54 @@ public class StateUpdater
     public void updateStates()
             throws JsonProcessingException
     {
-        // State store hasn't been loaded yet
-        final StateStore stateStore = stateStoreProvider.getStateStore();
-        if (stateStore == null) {
-            return;
-        }
+        synchronized (states) {
+            // State store hasn't been loaded yet
+            if (stateStoreProvider.getStateStore() == null) {
+                return;
+            }
 
-        long start = System.currentTimeMillis();
-        LOG.debug("UpdateStates starts at current time milliseconds: %s, at format HH:mm:ss:SSS:%s",
-                start,
-                new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(start)));
+            long start = System.currentTimeMillis();
+            LOG.debug("UpdateStates starts at current time milliseconds: %s, at format HH:mm:ss:SSS:%s",
+                    start,
+                    new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(start)));
 
-        StateCollection finishedQueries = stateStore.getStateCollection(FINISHED_QUERY_STATE_COLLECTION_NAME);
-        StateCollection queries = stateStore.getStateCollection(QUERY_STATE_COLLECTION_NAME);
+            for (String stateCollectionName : states.keySet()) {
+                StateCollection stateCollection = stateStoreProvider.getStateStore().getStateCollection(stateCollectionName);
+                Set<QueryId> finishedQueries = new HashSet<>();
+                for (DispatchQuery query : states.get(stateCollectionName)) {
+                    SharedQueryState state = SharedQueryState.create(query);
+                    String stateJson = MAPPER.writeValueAsString(state);
 
-        List<DispatchQuery> queriesToUnregister = new LinkedList<>();
-        synchronized (registeredQueries) {
-            for (DispatchQuery query : registeredQueries.get(QUERY_STATE_COLLECTION_NAME)) {
-                SharedQueryState state = SharedQueryState.create(query);
-                String stateJson = MAPPER.writeValueAsString(state);
+                    switch (stateCollection.getType()) {
+                        case MAP:
+                            ((StateMap) stateCollection).put(state.getBasicQueryInfo().getQueryId().getId(), stateJson);
+                            break;
+                        default:
+                            LOG.error("Unsupported state collection type: %s", stateCollection.getType());
+                    }
 
-                if (state.getBasicQueryInfo().getState() == QueryState.FINISHED || state.getBasicQueryInfo().getState() == QueryState.FAILED) {
-                    // No need to update states for finished queries
-                    // also move finished queries to finished-query state collection
-                    queriesToUnregister.add(query);
-                    ((StateMap) finishedQueries).put(state.getBasicQueryInfo().getQueryId().getId(), stateJson);
-                    continue;
+                    if (state.getBasicQueryInfo().getState() == QueryState.FINISHED || state.getBasicQueryInfo().getState() == QueryState.FAILED) {
+                        finishedQueries.add(state.getBasicQueryInfo().getQueryId());
+                    }
                 }
 
-                ((StateMap) queries).put(state.getBasicQueryInfo().getQueryId().getId(), stateJson);
+                // No need to update states for finished queries
+                unregisterFinishedQueries(stateCollectionName, finishedQueries);
             }
-        }
 
-        for (DispatchQuery query : queriesToUnregister) {
-            removeFromStateCollection(stateStore, QUERY_STATE_COLLECTION_NAME, query);
+            long end = System.currentTimeMillis();
+            LOG.debug("updateStates ends at current time milliseconds: %s, at format HH:mm:ss:SSS:%s, total time use: %s",
+                    end,
+                    new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(end)),
+                    end - start);
         }
-
-        long end = System.currentTimeMillis();
-        LOG.debug("updateStates ends at current time milliseconds: %s, at format HH:mm:ss:SSS:%s, total time use: %s",
-                end,
-                new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(end)),
-                end - start);
     }
 
     private void queryFinished(ManagedQueryExecution query)
     {
-        StateStore stateStore = stateStoreProvider.getStateStore();
         // If query killed by OOM remove the query from OOM query state store
-        if (stateStore != null && isQueryKilledByOOMKiller(query)) {
-            removeFromStateCollection(stateStore, OOM_QUERY_STATE_COLLECTION_NAME, query);
+        if (isQueryKilledByOOMKiller(query)) {
+            removeFromStateStore(StateStoreConstants.OOM_QUERY_STATE_COLLECTION_NAME, query);
         }
     }
 
@@ -200,14 +196,42 @@ public class StateUpdater
             return false;
         }
 
-        return query.getErrorCode().get().equals(CLUSTER_OUT_OF_MEMORY.toErrorCode()) ||
-                query.getErrorCode().get().equals(EXCEEDED_GLOBAL_MEMORY_LIMIT.toErrorCode());
+        if (query.getErrorCode().get().equals(CLUSTER_OUT_OF_MEMORY.toErrorCode()) ||
+                query.getErrorCode().get().equals(EXCEEDED_GLOBAL_MEMORY_LIMIT.toErrorCode())) {
+            return true;
+        }
+
+        return false;
     }
 
-    private void removeFromStateCollection(StateStore stateStore, String stateCollectionName, ManagedQueryExecution query)
+    private void removeFromStateStore(String stateCollectionName, ManagedQueryExecution query)
     {
-        StateCollection stateCollection = stateStore.getStateCollection(stateCollectionName);
-        removeState(stateCollection, Optional.of(query.getBasicQueryInfo().getQueryId()), LOG);
-        unregisterQuery(stateCollectionName, query);
+        // State store hasn't been loaded yet
+        if (stateStoreProvider.getStateStore() == null) {
+            return;
+        }
+
+        synchronized (states) {
+            StateCollection stateCollection = stateStoreProvider.getStateStore().getStateCollection(stateCollectionName);
+            removeState(stateCollection, Optional.of(query.getBasicQueryInfo().getQueryId()), LOG);
+            states.remove(stateCollectionName, query);
+        }
+    }
+
+    /**
+     * For finished or failed queries, no need to keep updating their states to state store
+     * so unregister them from state updater
+     *
+     * @param stateCollectionName state collection name
+     * @param queryIds Queries to be unregistered
+     */
+    private void unregisterFinishedQueries(String stateCollectionName, Set<QueryId> queryIds)
+    {
+        Iterator<DispatchQuery> iterator = states.get(stateCollectionName).iterator();
+        while (iterator.hasNext()) {
+            if (queryIds.contains(iterator.next().getQueryId())) {
+                iterator.remove();
+            }
+        }
     }
 }

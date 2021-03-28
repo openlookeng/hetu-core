@@ -152,7 +152,7 @@ public class TestDistributedResourceGroupUtils
 
             ResourceGroupId root = new ResourceGroupId("root");
 
-            StateStore stateStore = setupMockStateStore(new HashMap<>(), new HashMap<>(), new HashMap<>());
+            StateStore stateStore = setupMockStateStore(new HashMap<>(), new HashMap<>());
 
             //query1 completed, query2 completed, query3 running
             MockManagedQueryExecution query1 = new MockManagedQueryExecution(0, "query1", 0,
@@ -178,8 +178,8 @@ public class TestDistributedResourceGroupUtils
             SharedQueryState queryState2 = getSharedQueryState(query2);
             SharedQueryState queryState3 = getSharedQueryState(query3);
 
-            ((StateMap) stateStore.getStateCollection(StateStoreConstants.FINISHED_QUERY_STATE_COLLECTION_NAME)).put(query1.toString(), mapper.writeValueAsString(queryState1));
-            ((StateMap) stateStore.getStateCollection(StateStoreConstants.FINISHED_QUERY_STATE_COLLECTION_NAME)).put(query2.toString(), mapper.writeValueAsString(queryState2));
+            ((StateMap) stateStore.getStateCollection(StateStoreConstants.QUERY_STATE_COLLECTION_NAME)).put(query1.toString(), mapper.writeValueAsString(queryState1));
+            ((StateMap) stateStore.getStateCollection(StateStoreConstants.QUERY_STATE_COLLECTION_NAME)).put(query2.toString(), mapper.writeValueAsString(queryState2));
             ((StateMap) stateStore.getStateCollection(StateStoreConstants.QUERY_STATE_COLLECTION_NAME)).put(query3.toString(), mapper.writeValueAsString(queryState3));
 
             DistributedResourceGroupUtils.accumulateCpuUsage(stateStore);
@@ -196,28 +196,21 @@ public class TestDistributedResourceGroupUtils
         }
     }
 
-    private static StateStore setupMockStateStore(Map<String, String> queryMap, Map<String, String> finishedQueryMap, Map<String, Long> cpuUsageMap)
+    private static StateStore setupMockStateStore(Map<String, String> queryMap, Map<String, Long> cpuUsageMap)
     {
         StateMap mockQueryMap = mock(StateMap.class);
-        StateMap mockFinishedQueryMap = mock(StateMap.class);
         StateMap mockCpuUsageMap = mock(StateMap.class);
 
         when(mockQueryMap.put(anyString(), anyString())).thenAnswer(i -> queryMap.put((String) i.getArguments()[0], (String) i.getArguments()[1]));
-        when(mockFinishedQueryMap.put(anyString(), anyString())).thenAnswer(i -> finishedQueryMap.put((String) i.getArguments()[0], (String) i.getArguments()[1]));
         when(mockCpuUsageMap.put(anyString(), anyString())).thenAnswer(i -> cpuUsageMap.put((String) i.getArguments()[0], (Long) i.getArguments()[1]));
 
         when(mockQueryMap.get(anyString())).thenAnswer(i -> queryMap.get(i.getArguments()[0]));
         when(mockQueryMap.getAll()).thenReturn(queryMap);
-
-        when(mockFinishedQueryMap.get(anyString())).thenAnswer(i -> finishedQueryMap.get(i.getArguments()[0]));
-        when(mockFinishedQueryMap.getAll()).thenReturn(finishedQueryMap);
-
         when(mockCpuUsageMap.get(anyString())).thenAnswer(i -> cpuUsageMap.get(i.getArguments()[0]));
         when(mockCpuUsageMap.getAll()).thenReturn(cpuUsageMap);
 
         StateStore stateStore = mock(StateStore.class);
         when(stateStore.getStateCollection(StateStoreConstants.QUERY_STATE_COLLECTION_NAME)).thenReturn(mockQueryMap);
-        when(stateStore.getStateCollection(StateStoreConstants.FINISHED_QUERY_STATE_COLLECTION_NAME)).thenReturn(mockFinishedQueryMap);
         when(stateStore.getStateCollection(StateStoreConstants.CPU_USAGE_STATE_COLLECTION_NAME)).thenReturn(mockCpuUsageMap);
         return stateStore;
     }
