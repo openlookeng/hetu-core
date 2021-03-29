@@ -291,7 +291,7 @@ public class TestHivePageSink
         return new TestingConnectorSession(new HiveSessionProperties(config, new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
     }
 
-    private static List<HiveColumnHandle> getColumnHandles()
+    public static List<HiveColumnHandle> getColumnHandles()
     {
         ImmutableList.Builder<HiveColumnHandle> handles = ImmutableList.builder();
         List<LineItemColumn> columns = getTestColumns();

@@ -46,6 +46,9 @@ import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.TestingSplit;
 import org.testng.annotations.Test;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -397,7 +400,318 @@ public class TestScanFilterAndProjectOperator
         assertEquals(toValues(BIGINT, output.getBlock(0)), toValues(BIGINT, input.getBlock(0)));
     }
 
+    @Test
+    public void testReusePageSource()
+    {
+        UUID uuid = UUID.randomUUID();
+        final Page input = SequencePageBuilder.createSequencePage(ImmutableList.of(VARCHAR), 10_000, 0);
+        DriverContext driverContext = newDriverContext();
+        List<Page> producerPages;
+
+        SourceOperator operatorProducer = createScanFilterAndProjectOperator("0", uuid, 0, input, driverContext, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER, false, 10, 1);
+
+        producerPages = toPages(operatorProducer);
+        MaterializedResult producerExpected = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), ImmutableList.of(input));
+        MaterializedResult producerActual = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), producerPages);
+        assertEquals(producerActual.getRowCount(), producerExpected.getRowCount());
+        assertEquals(producerActual, producerExpected);
+
+        //Consumer
+        SourceOperator operatorConsumer = createScanFilterAndProjectOperator("0", uuid, 1, input, driverContext, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER, false, 10, 1);
+        MaterializedResult consumerExpected = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), producerPages);
+        MaterializedResult consumerActual = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), toPages(operatorConsumer));
+        assertEquals(consumerActual.getRowCount(), consumerExpected.getRowCount());
+        assertEquals(consumerActual, consumerExpected);
+    }
+
+    @Test
+    public void testReuseExchangeSpill()
+    {
+        UUID uuid = UUID.randomUUID();
+        final Page input = SequencePageBuilder.createSequencePage(ImmutableList.of(VARCHAR), 10_000, 0);
+        DriverContext driverContext = newDriverContext();
+        List<Page> producerPages;
+
+        SourceOperator operatorProducer = createScanFilterAndProjectOperator("0", uuid, 0, input, driverContext,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER, true, 10, 1);
+        WorkProcessorSourceOperatorAdapter workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorProducer;
+        producerPages = toPages(operatorProducer);
+
+        // check spilling is done
+        boolean notSpilled = workProcessorSourceOperatorAdapter.isNotSpilled();
+        assertEquals(false, notSpilled);
+        MaterializedResult producerExpected = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), ImmutableList.of(input));
+        MaterializedResult producerActual = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), producerPages);
+        assertEquals(producerActual.getRowCount(), producerExpected.getRowCount());
+        assertEquals(producerActual, producerExpected);
+
+        //Consumer
+        SourceOperator operatorConsumer = createScanFilterAndProjectOperator("0", uuid, 1, input, driverContext,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER, true, 10, 1);
+        MaterializedResult consumerExpected = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), producerPages);
+        MaterializedResult consumerActual = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), toPages(operatorConsumer));
+        assertEquals(consumerActual.getRowCount(), consumerExpected.getRowCount());
+        assertEquals(consumerActual, consumerExpected);
+    }
+
+    @Test
+    public void testReuseExchangeInMemorySpill()
+    {
+        UUID uuid = UUID.randomUUID();
+        final Page input = SequencePageBuilder.createSequencePage(ImmutableList.of(VARCHAR), 10_000, 0);
+        DriverContext driverContext = newDriverContext();
+        List<Page> producerPages;
+
+        SourceOperator operatorProducer = createScanFilterAndProjectOperator("0", uuid, 0, input, driverContext,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER, true, 75000, 1);
+        WorkProcessorSourceOperatorAdapter workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorProducer;
+        producerPages = toPages(operatorProducer);
+
+        // check spilling is done
+        boolean notSpilled = workProcessorSourceOperatorAdapter.isNotSpilled();
+        assertEquals(true, notSpilled);
+        MaterializedResult producerExpected = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), ImmutableList.of(input));
+        MaterializedResult producerActual = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), producerPages);
+        assertEquals(producerActual.getRowCount(), producerExpected.getRowCount());
+        assertEquals(producerActual, producerExpected);
+
+        //Consumer
+        SourceOperator operatorConsumer = createScanFilterAndProjectOperator("0", uuid, 1, input, driverContext,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER, true, 75000, 0);
+        workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorConsumer;
+        boolean flag = getWorkProcessorSourceOperatorAdapterCheckFinished(workProcessorSourceOperatorAdapter);
+        assertEquals(false, flag);
+        MaterializedResult consumerExpected = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), producerPages);
+        MaterializedResult consumerActual = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), toPages(operatorConsumer));
+        assertEquals(consumerActual.getRowCount(), consumerExpected.getRowCount());
+        assertEquals(consumerActual, consumerExpected);
+
+        workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorConsumer;
+        flag = getWorkProcessorSourceOperatorAdapterCheckFinished(workProcessorSourceOperatorAdapter);
+        assertEquals(true, flag);
+    }
+
+    @Test
+    public void testReuseExchangeMultipleConsumer()
+    {
+        UUID uuid = UUID.randomUUID();
+        final Page input = SequencePageBuilder.createSequencePage(ImmutableList.of(VARCHAR), 10_000, 0);
+        DriverContext driverContext = newDriverContext();
+        List<Page> producerPages;
+
+        SourceOperator operatorProducer = createScanFilterAndProjectOperator("0", uuid, 0, input, driverContext,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER, true, 800000, 2);
+        WorkProcessorSourceOperatorAdapter workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorProducer;
+        producerPages = toPages(operatorProducer);
+
+        // check spilling is done
+        boolean notSpilled = workProcessorSourceOperatorAdapter.isNotSpilled();
+        assertEquals(true, notSpilled);
+        MaterializedResult producerExpected = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), ImmutableList.of(input));
+        MaterializedResult producerActual = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), producerPages);
+        assertEquals(producerActual.getRowCount(), producerExpected.getRowCount());
+        assertEquals(producerActual, producerExpected);
+
+        //Consumer 1
+        SourceOperator operatorConsumer = createScanFilterAndProjectOperator("1", uuid, 1, input, driverContext,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER, true, 800000, 0);
+        workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorConsumer;
+        boolean flag = getWorkProcessorSourceOperatorAdapterCheckFinished(workProcessorSourceOperatorAdapter);
+        assertEquals(false, flag);
+        MaterializedResult consumerExpected = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), producerPages);
+        MaterializedResult consumerActual = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), toPages(operatorConsumer));
+        assertEquals(consumerActual.getRowCount(), consumerExpected.getRowCount());
+        assertEquals(consumerActual, consumerExpected);
+        flag = getWorkProcessorSourceOperatorAdapterCheckFinished(workProcessorSourceOperatorAdapter);
+        assertEquals(true, flag);
+
+        //Consumer 2
+        SourceOperator operatorConsumer1 = createScanFilterAndProjectOperator("2", uuid, 2, input, driverContext,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER, true, 80000, 0);
+        workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorConsumer1;
+        flag = getWorkProcessorSourceOperatorAdapterCheckFinished(workProcessorSourceOperatorAdapter);
+        assertEquals(false, flag);
+        MaterializedResult consumerExpected1 = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), producerPages);
+        MaterializedResult consumerActual1 = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), toPages(operatorConsumer1));
+        assertEquals(consumerActual1.getRowCount(), consumerExpected1.getRowCount());
+        assertEquals(consumerActual1, consumerExpected1);
+
+        workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorConsumer1;
+        flag = getWorkProcessorSourceOperatorAdapterCheckFinished(workProcessorSourceOperatorAdapter);
+        assertEquals(true, flag);
+    }
+
+    @Test
+    public void testReuseExchangeInMemorySpillMultipleConsumer()
+    {
+        UUID uuid = UUID.randomUUID();
+        final Page input = SequencePageBuilder.createSequencePage(ImmutableList.of(VARCHAR), 10_000, 0);
+        DriverContext driverContext = newDriverContext();
+        List<Page> producerPages;
+
+        SourceOperator operatorProducer = createScanFilterAndProjectOperator("0", uuid, 0, input, driverContext,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER, true, 75000, 2);
+        WorkProcessorSourceOperatorAdapter workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorProducer;
+        producerPages = toPages(operatorProducer);
+
+        // check spilling is done
+        boolean notSpilled = workProcessorSourceOperatorAdapter.isNotSpilled();
+        assertEquals(true, notSpilled);
+        MaterializedResult producerExpected = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), ImmutableList.of(input));
+        MaterializedResult producerActual = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), producerPages);
+        assertEquals(producerActual.getRowCount(), producerExpected.getRowCount());
+        assertEquals(producerActual, producerExpected);
+
+        //Consumer 1
+        SourceOperator operatorConsumer = createScanFilterAndProjectOperator("1", uuid, 1, input, driverContext,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER, true, 75000, 0);
+        workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorConsumer;
+        boolean flag = getWorkProcessorSourceOperatorAdapterCheckFinished(workProcessorSourceOperatorAdapter);
+        assertEquals(false, flag);
+        List<Page> consumer1Pages = new ArrayList<>();
+        // read pages 1st time from pageCaches
+        consumer1Pages.addAll(toPages(operatorConsumer, true));
+        flag = getWorkProcessorSourceOperatorAdapterCheckFinished(workProcessorSourceOperatorAdapter);
+        assertEquals(false, flag);
+
+        //Consumer 2
+        SourceOperator operatorConsumer2 = createScanFilterAndProjectOperator("2", uuid, 2, input, driverContext,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER, true, 75000, 0);
+        workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorConsumer2;
+        flag = getWorkProcessorSourceOperatorAdapterCheckFinished(workProcessorSourceOperatorAdapter);
+        assertEquals(false, flag);
+        List<Page> consumer2Pages = new ArrayList<>();
+        // read pages 1st time from pageCaches
+        consumer2Pages.addAll(toPages(operatorConsumer2));
+        assertEquals(producerPages.size(), consumer2Pages.size());
+
+        // read pages 2nd time after pages are moved form pagesToSpill to pageCaches
+        consumer1Pages.addAll(toPages(operatorConsumer));
+        assertEquals(producerPages.size(), consumer1Pages.size());
+
+        //consumer1 should be finished after reading from pagesToSpill & pageCaches
+        workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorConsumer;
+        flag = getWorkProcessorSourceOperatorAdapterCheckFinished(workProcessorSourceOperatorAdapter);
+        assertEquals(true, flag);
+
+        //consumer2 should be finished after reading from pagesToSpill & pageCaches
+        workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorConsumer2;
+        flag = getWorkProcessorSourceOperatorAdapterCheckFinished(workProcessorSourceOperatorAdapter);
+        assertEquals(true, flag);
+    }
+
+    @Test
+    public void testReuseExchangeSpillToDiskMultipleConsumer()
+    {
+        UUID uuid = UUID.randomUUID();
+        final Page input = SequencePageBuilder.createSequencePage(ImmutableList.of(VARCHAR), 10_000, 0);
+        DriverContext driverContext = newDriverContext();
+        List<Page> producerPages;
+
+        SourceOperator operatorProducer = createScanFilterAndProjectOperator("0", uuid, 0, input, driverContext,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER, true, 4000, 2);
+        WorkProcessorSourceOperatorAdapter workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorProducer;
+        producerPages = toPages(operatorProducer);
+
+        // check spilling is done
+        boolean notSpilled = workProcessorSourceOperatorAdapter.isNotSpilled();
+        assertEquals(false, notSpilled);
+        MaterializedResult producerExpected = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), ImmutableList.of(input));
+        MaterializedResult producerActual = toMaterializedResult(driverContext.getSession(), ImmutableList.of(VARCHAR), producerPages);
+        assertEquals(producerActual.getRowCount(), producerExpected.getRowCount());
+        assertEquals(producerActual, producerExpected);
+
+        //Consumer 1
+        SourceOperator operatorConsumer = createScanFilterAndProjectOperator("1", uuid, 1, input, driverContext,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER, true, 4000, 0);
+        workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorConsumer;
+        boolean flag = getWorkProcessorSourceOperatorAdapterCheckFinished(workProcessorSourceOperatorAdapter);
+        assertEquals(false, flag);
+        List<Page> consumer1Pages = new ArrayList<>();
+        // read pages 1st time from pageCaches
+        consumer1Pages.addAll(toPages(operatorConsumer, true));
+        flag = getWorkProcessorSourceOperatorAdapterCheckFinished(workProcessorSourceOperatorAdapter);
+        assertEquals(false, flag);
+
+        //Consumer 2
+        SourceOperator operatorConsumer2 = createScanFilterAndProjectOperator("2", uuid, 2, input, driverContext,
+                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER, true, 4000, 0);
+        workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorConsumer2;
+        flag = getWorkProcessorSourceOperatorAdapterCheckFinished(workProcessorSourceOperatorAdapter);
+        assertEquals(false, flag);
+        List<Page> consumer2Pages = new ArrayList<>();
+        //since its last consumer it will read pages  pageCaches & pagesToSpill at a time
+        consumer2Pages.addAll(toPages(operatorConsumer2));
+        assertEquals(producerPages.size(), consumer2Pages.size());
+
+        //consumer2 should be finished after reading from pagesToSpill & pageCaches
+        workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorConsumer2;
+        flag = getWorkProcessorSourceOperatorAdapterCheckFinished(workProcessorSourceOperatorAdapter);
+        assertEquals(true, flag);
+
+        // read pages 2nd time after pages are moved form pagesToSpill to pageCaches
+        consumer1Pages.addAll(toPages(operatorConsumer));
+        assertEquals(producerPages.size(), consumer1Pages.size());
+
+        //consumer1 should be finished after reading from pagesToSpill & pageCaches
+        workProcessorSourceOperatorAdapter = (WorkProcessorSourceOperatorAdapter) operatorConsumer;
+        flag = getWorkProcessorSourceOperatorAdapterCheckFinished(workProcessorSourceOperatorAdapter);
+        assertEquals(true, flag);
+    }
+
+    private boolean getWorkProcessorSourceOperatorAdapterCheckFinished(WorkProcessorSourceOperatorAdapter workProcessorSourceOperatorAdapter)
+    {
+        boolean returnValue = false;
+        try {
+            Method privateStringMethod = WorkProcessorSourceOperatorAdapter.class.getDeclaredMethod("checkFinished", null);
+            privateStringMethod.setAccessible(true);
+            returnValue = (boolean)
+                    privateStringMethod.invoke(workProcessorSourceOperatorAdapter, null);
+        }
+        catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+        }
+        return returnValue;
+    }
+
+    private SourceOperator createScanFilterAndProjectOperator(String sourceId, UUID uuid, int operatorId, Page input, DriverContext driverContext,
+                                                              ReuseExchangeOperator.STRATEGY strategy, boolean spillEnabled, Integer spillerThreshold,
+                                                              Integer consumerTableScanNodeCount)
+    {
+        List<RowExpression> projections = ImmutableList.of(field(0, VARCHAR));
+        Supplier<CursorProcessor> cursorProcessor = expressionCompiler.compileCursorProcessor(Optional.empty(), projections, "key");
+        Supplier<PageProcessor> pageProcessor = expressionCompiler.compilePageProcessor(Optional.empty(), projections);
+
+        ScanFilterAndProjectOperator.ScanFilterAndProjectOperatorFactory factory = new ScanFilterAndProjectOperator.ScanFilterAndProjectOperatorFactory(
+                operatorId,
+                new PlanNodeId("test"),
+                new PlanNodeId(sourceId),
+                (session, split, table, columns, dynamicFilter) -> new FixedPageSource(ImmutableList.of(input)),
+                cursorProcessor,
+                pageProcessor,
+                TEST_TABLE_HANDLE,
+                ImmutableList.of(),
+                null,
+                ImmutableList.of(VARCHAR),
+                new DataSize(0, BYTE),
+                0,
+                strategy,
+                uuid,
+                spillEnabled,
+                Optional.of(new DummySpillerFactory()),
+                spillerThreshold,
+                consumerTableScanNodeCount);
+        SourceOperator operator = factory.createOperator(driverContext);
+        operator.addSplit(new Split(new CatalogName("test"), TestingSplit.createLocalSplit(), Lifespan.taskWide()));
+        operator.noMoreSplits();
+        return operator;
+    }
+
     private static List<Page> toPages(Operator operator)
+    {
+        return toPages(operator, false);
+    }
+
+    private static List<Page> toPages(Operator operator, boolean retNotFinished)
     {
         ImmutableList.Builder<Page> outputPages = ImmutableList.builder();
 
@@ -406,6 +720,9 @@ public class TestScanFilterAndProjectOperator
         while (!operator.isFinished()) {
             Page outputPage = operator.getOutput();
             if (outputPage == null) {
+                if (retNotFinished) {
+                    return outputPages.build();
+                }
                 // break infinite loop due to null pages
                 assertTrue(nullPages < 1_000_000, "Too many null pages; infinite loop?");
                 nullPages++;

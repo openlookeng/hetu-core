@@ -507,7 +507,7 @@ public class TestSourcePartitionedScheduler
                 ImmutableMap.of(tableScanNodeId, new TableInfo(new QualifiedObjectName("test", "test", "test"), TupleDomain.all())));
     }
 
-    private static ConnectorSplitSource createFixedSplitSource(int splitCount, Supplier<ConnectorSplit> splitFactory)
+    public static ConnectorSplitSource createFixedSplitSource(int splitCount, Supplier<ConnectorSplit> splitFactory)
     {
         ImmutableList.Builder<ConnectorSplit> splits = ImmutableList.builder();
 

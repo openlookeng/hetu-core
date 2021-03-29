@@ -23,6 +23,7 @@ import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.utils.HetuConfig;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static io.prestosql.SystemSessionProperties.REUSE_TABLE_SCAN;
 import static io.prestosql.SystemSessionProperties.SNAPSHOT_ENABLED;
 import static io.prestosql.plugin.tpch.TpchMetadata.TINY_SCHEMA_NAME;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
@@ -36,6 +37,15 @@ public final class SessionTestUtils
             .setClientCapabilities(stream(ClientCapabilities.values())
                     .map(ClientCapabilities::toString)
                     .collect(toImmutableSet()))
+            .build();
+
+    public static final Session TEST_SESSION_REUSE = testSessionBuilder()
+            .setCatalog("tpch")
+            .setSchema(TINY_SCHEMA_NAME)
+            .setClientCapabilities(stream(ClientCapabilities.values())
+                    .map(ClientCapabilities::toString)
+                    .collect(toImmutableSet()))
+            .setSystemProperty(REUSE_TABLE_SCAN, "true")
             .build();
 
     public static final Session TEST_SNAPSHOT_SESSION;

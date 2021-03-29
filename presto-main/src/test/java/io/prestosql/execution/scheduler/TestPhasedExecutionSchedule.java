@@ -231,12 +231,17 @@ public class TestPhasedExecutionSchedule
 
     private static PlanFragment createTableScanPlanFragment(String name)
     {
+        return createTableScanPlanFragment(name, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0);
+    }
+
+    public static PlanFragment createTableScanPlanFragment(String name, ReuseExchangeOperator.STRATEGY strategy, UUID reuseTableScanMappingId, Integer consumerTableScanNodeCount)
+    {
         Symbol symbol = new Symbol("column");
         PlanNode planNode = TableScanNode.newInstance(
                 new PlanNodeId(name),
                 TEST_TABLE_HANDLE,
                 ImmutableList.of(symbol),
-                ImmutableMap.of(symbol, new TestingColumnHandle("column")), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0, false);
+                ImmutableMap.of(symbol, new TestingColumnHandle("column")), strategy, reuseTableScanMappingId, consumerTableScanNodeCount, false);
 
         return createFragment(planNode);
     }

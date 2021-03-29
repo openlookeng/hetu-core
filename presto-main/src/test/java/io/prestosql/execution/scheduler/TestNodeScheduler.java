@@ -40,26 +40,44 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import io.prestosql.MockSplit;
 import io.prestosql.client.NodeVersion;
+import io.prestosql.dynamicfilter.DynamicFilterService;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.MockRemoteTaskFactory;
 import io.prestosql.execution.NodeTaskMap;
 import io.prestosql.execution.RemoteTask;
 import io.prestosql.execution.SplitCacheMap;
 import io.prestosql.execution.SplitKey;
+import io.prestosql.execution.SqlStageExecution;
+import io.prestosql.execution.StageId;
+import io.prestosql.execution.TableInfo;
 import io.prestosql.execution.TaskId;
+import io.prestosql.execution.TestSqlTaskManager;
+import io.prestosql.failuredetector.NoOpFailureDetector;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.metadata.InMemoryNodeManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
+import io.prestosql.seedstore.SeedStoreManager;
+import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.HostAddress;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorSplit;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.service.PropertyService;
+import io.prestosql.split.ConnectorAwareSplitSource;
+import io.prestosql.sql.planner.PlanFragment;
+import io.prestosql.sql.planner.StageExecutionPlan;
 import io.prestosql.sql.tree.QualifiedName;
+import io.prestosql.statestore.LocalStateStoreProvider;
+import io.prestosql.testing.TestingSplit;
 import io.prestosql.util.FinalizerService;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -77,14 +95,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
+import static io.prestosql.SessionTestUtils.TEST_SESSION;
+import static io.prestosql.SessionTestUtils.TEST_SESSION_REUSE;
+import static io.prestosql.execution.SqlStageExecution.createSqlStageExecution;
 import static io.prestosql.execution.scheduler.NetworkLocation.ROOT_LOCATION;
+import static io.prestosql.execution.scheduler.TestPhasedExecutionSchedule.createTableScanPlanFragment;
+import static io.prestosql.execution.scheduler.TestSourcePartitionedScheduler.createFixedSplitSource;
 import static io.prestosql.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.testing.TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS;
 import static io.prestosql.testing.assertions.PrestoExceptionAssert.assertPrestoExceptionThrownBy;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -856,6 +881,153 @@ public class TestNodeScheduler
         assertTrue(assignments3.isEmpty());
     }
 
+    @Test
+    public void testRuseExchangeComputeAssignments()
+    {
+        setUpNodes();
+        Split split = new Split(CONNECTOR_ID, new TestSplitLocallyAccessible(), Lifespan.taskWide());
+        Set<Split> splits = ImmutableSet.of(split);
+
+        NodeTaskMap nodeTaskMap = new NodeTaskMap(new FinalizerService());
+
+        StageId stageId = new StageId(new QueryId("query"), 0);
+
+        UUID uuid = UUID.randomUUID();
+        PlanFragment testFragmentProducer = createTableScanPlanFragment("build", ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER, uuid, 1);
+        PlanNodeId tableScanNodeId = new PlanNodeId("plan_id");
+
+        StageExecutionPlan producerStageExecutionPlan = new StageExecutionPlan(
+                testFragmentProducer,
+                ImmutableMap.of(tableScanNodeId, new ConnectorAwareSplitSource(CONNECTOR_ID, createFixedSplitSource(0, TestingSplit::createRemoteSplit))),
+                ImmutableList.of(),
+                ImmutableMap.of(tableScanNodeId, new TableInfo(new QualifiedObjectName("test", TEST_SCHEMA, "test"), TupleDomain.all())));
+
+        SqlStageExecution producerStage = createSqlStageExecution(
+                stageId,
+                new TestSqlTaskManager.MockLocationFactory().createStageLocation(stageId),
+                producerStageExecutionPlan.getFragment(),
+                producerStageExecutionPlan.getTables(),
+                new MockRemoteTaskFactory(remoteTaskExecutor, remoteTaskScheduledExecutor),
+                TEST_SESSION_REUSE,
+                true,
+                nodeTaskMap,
+                remoteTaskExecutor,
+                new NoOpFailureDetector(),
+                new SplitSchedulerStats(),
+                new DynamicFilterService(new LocalStateStoreProvider(
+                        new SeedStoreManager(new FileSystemClientManager()))),
+                new QuerySnapshotManager(stageId.getQueryId(), NOOP_SNAPSHOT_UTILS, TEST_SESSION));
+        Map.Entry<InternalNode, Split> producerAssignment = Iterables.getOnlyElement(nodeSelector.computeAssignments(splits, ImmutableList.copyOf(taskMap.values()), Optional.of(producerStage)).getAssignments().entries());
+
+        PlanFragment testFragmentConsumer = createTableScanPlanFragment("build", ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER, uuid, 1);
+
+        StageExecutionPlan consumerStageExecutionPlan = new StageExecutionPlan(
+                testFragmentConsumer,
+                ImmutableMap.of(tableScanNodeId, new ConnectorAwareSplitSource(CONNECTOR_ID, createFixedSplitSource(0, TestingSplit::createRemoteSplit))),
+                ImmutableList.of(),
+                ImmutableMap.of(tableScanNodeId, new TableInfo(new QualifiedObjectName("test", TEST_SCHEMA, "test"), TupleDomain.all())));
+
+        SqlStageExecution stage = createSqlStageExecution(
+                stageId,
+                new TestSqlTaskManager.MockLocationFactory().createStageLocation(stageId),
+                consumerStageExecutionPlan.getFragment(),
+                consumerStageExecutionPlan.getTables(),
+                new MockRemoteTaskFactory(remoteTaskExecutor, remoteTaskScheduledExecutor),
+                TEST_SESSION_REUSE,
+                true,
+                nodeTaskMap,
+                remoteTaskExecutor,
+                new NoOpFailureDetector(),
+                new SplitSchedulerStats(),
+                new DynamicFilterService(new LocalStateStoreProvider(
+                        new SeedStoreManager(new FileSystemClientManager()))),
+                new QuerySnapshotManager(stageId.getQueryId(), NOOP_SNAPSHOT_UTILS, TEST_SESSION));
+
+        Map.Entry<InternalNode, Split> consumerAssignment = Iterables.getOnlyElement(nodeSelector.computeAssignments(splits, ImmutableList.copyOf(taskMap.values()), Optional.of(stage)).getAssignments().entries());
+
+        Split producerSplit = producerAssignment.getValue();
+        Split consumerSplit = consumerAssignment.getValue();
+        SplitKey splitKeyProducer = new SplitKey(producerSplit, producerSplit.getCatalogName().getCatalogName(), TEST_SCHEMA, "test");
+        SplitKey splitKeyConsumer = new SplitKey(producerSplit, consumerSplit.getCatalogName().getCatalogName(), TEST_SCHEMA, "test");
+        if (splitKeyProducer.equals(splitKeyConsumer)) {
+            assertEquals(true, true);
+        }
+        else {
+            assertEquals(false, true);
+        }
+    }
+
+    @Test
+    public void testRuseExchangeComputeAssignmentsSplitsNotMatchProdConsumer()
+    {
+        setUpNodes();
+        Split split = new Split(CONNECTOR_ID, new TestSplitLocallyAccessible(), Lifespan.taskWide());
+        Set<Split> splits = ImmutableSet.of(split);
+        NodeTaskMap nodeTaskMap = new NodeTaskMap(new FinalizerService());
+        StageId stageId = new StageId(new QueryId("query"), 0);
+        UUID uuid = UUID.randomUUID();
+
+        PlanFragment testFragmentProducer = createTableScanPlanFragment("build", ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER, uuid, 1);
+        PlanNodeId tableScanNodeId = new PlanNodeId("plan_id");
+        StageExecutionPlan producerStageExecutionPlan = new StageExecutionPlan(
+                testFragmentProducer,
+                ImmutableMap.of(tableScanNodeId, new ConnectorAwareSplitSource(CONNECTOR_ID, createFixedSplitSource(0, TestingSplit::createRemoteSplit))),
+                ImmutableList.of(),
+                ImmutableMap.of(tableScanNodeId, new TableInfo(new QualifiedObjectName("test", TEST_SCHEMA, "test"), TupleDomain.all())));
+
+        SqlStageExecution producerStage = createSqlStageExecution(
+                stageId,
+                new TestSqlTaskManager.MockLocationFactory().createStageLocation(stageId),
+                producerStageExecutionPlan.getFragment(),
+                producerStageExecutionPlan.getTables(),
+                new MockRemoteTaskFactory(remoteTaskExecutor, remoteTaskScheduledExecutor),
+                TEST_SESSION_REUSE,
+                true,
+                nodeTaskMap,
+                remoteTaskExecutor,
+                new NoOpFailureDetector(),
+                new SplitSchedulerStats(),
+                new DynamicFilterService(new LocalStateStoreProvider(
+                        new SeedStoreManager(new FileSystemClientManager()))),
+                new QuerySnapshotManager(stageId.getQueryId(), NOOP_SNAPSHOT_UTILS, TEST_SESSION));
+        nodeSelector.computeAssignments(splits, ImmutableList.copyOf(taskMap.values()), Optional.of(producerStage)).getAssignments().entries();
+
+        // Consumer
+        Split splitConsumer = new Split(CONNECTOR_ID, new TestSplitLocallyAccessibleDifferentIndex(), Lifespan.taskWide());
+        Set<Split> splitConsumers = ImmutableSet.of(splitConsumer);
+        PlanFragment testFragmentConsumer = createTableScanPlanFragment("build", ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER, uuid, 1);
+
+        StageExecutionPlan consumerStageExecutionPlan = new StageExecutionPlan(
+                testFragmentConsumer,
+                ImmutableMap.of(tableScanNodeId, new ConnectorAwareSplitSource(CONNECTOR_ID, createFixedSplitSource(0, TestingSplit::createRemoteSplit))),
+                ImmutableList.of(),
+                ImmutableMap.of(tableScanNodeId, new TableInfo(new QualifiedObjectName("test", TEST_SCHEMA, "test"), TupleDomain.all())));
+
+        SqlStageExecution stage = createSqlStageExecution(
+                stageId,
+                new TestSqlTaskManager.MockLocationFactory().createStageLocation(stageId),
+                consumerStageExecutionPlan.getFragment(),
+                consumerStageExecutionPlan.getTables(),
+                new MockRemoteTaskFactory(remoteTaskExecutor, remoteTaskScheduledExecutor),
+                TEST_SESSION_REUSE,
+                true,
+                nodeTaskMap,
+                remoteTaskExecutor,
+                new NoOpFailureDetector(),
+                new SplitSchedulerStats(),
+                new DynamicFilterService(new LocalStateStoreProvider(
+                        new SeedStoreManager(new FileSystemClientManager()))),
+                new QuerySnapshotManager(stageId.getQueryId(), NOOP_SNAPSHOT_UTILS, TEST_SESSION));
+        try {
+            nodeSelector.computeAssignments(splitConsumers, ImmutableList.copyOf(taskMap.values()), Optional.of(stage)).getAssignments().entries();
+        }
+        catch (PrestoException e) {
+            assertEquals("Producer & consumer splits are not same", e.getMessage());
+            return;
+        }
+        assertEquals(false, true);
+    }
+
     private static class TestSplitLocal
             implements ConnectorSplit
     {
@@ -878,7 +1050,7 @@ public class TestNodeScheduler
         }
     }
 
-    private static class TestSplitLocallyAccessible
+    public static class TestSplitLocallyAccessible
             implements ConnectorSplit
     {
         @Override
@@ -897,6 +1069,76 @@ public class TestNodeScheduler
         public Object getInfo()
         {
             return ImmutableMap.builder().build();
+        }
+
+        @Override
+        public long getStartIndex()
+        {
+            return 1;
+        }
+
+        @Override
+        public long getEndIndex()
+        {
+            return 100;
+        }
+
+        @Override
+        public long getLastModifiedTime()
+        {
+            return 200;
+        }
+
+        @Override
+        public String getFilePath()
+        {
+            return "";
+        }
+    }
+
+    public static class TestSplitLocallyAccessibleDifferentIndex
+            implements ConnectorSplit
+    {
+        @Override
+        public boolean isRemotelyAccessible()
+        {
+            return false;
+        }
+
+        @Override
+        public List<HostAddress> getAddresses()
+        {
+            return ImmutableList.of(HostAddress.fromString("10.0.0.1:11"));
+        }
+
+        @Override
+        public Object getInfo()
+        {
+            return ImmutableMap.builder().build();
+        }
+
+        @Override
+        public long getStartIndex()
+        {
+            return 100;
+        }
+
+        @Override
+        public long getEndIndex()
+        {
+            return 200;
+        }
+
+        @Override
+        public long getLastModifiedTime()
+        {
+            return 300;
+        }
+
+        @Override
+        public String getFilePath()
+        {
+            return "";
         }
     }
 
