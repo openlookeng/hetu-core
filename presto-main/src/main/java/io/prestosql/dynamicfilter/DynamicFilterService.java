@@ -226,24 +226,26 @@ public class DynamicFilterService
         List<String> handledQuery = new ArrayList<>();
         StateMap mergedStateCollection = (StateMap) stateStoreProvider.getStateStore().getOrCreateStateCollection(DynamicFilterUtils.MERGED_DYNAMIC_FILTERS, MAP);
         // Clear registered dynamic filter tasks
-        for (String queryId : finishedQuery) {
-            Map<String, DynamicFilterRegistryInfo> filters = dynamicFilters.get(queryId);
-            if (filters != null) {
-                for (Entry<String, DynamicFilterRegistryInfo> entry : filters.entrySet()) {
-                    String filterId = entry.getKey();
-                    clearPartialResults(filterId, queryId);
-                    if (entry.getValue().isMerged()) {
-                        String filterKey = createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId);
-                        mergedStateCollection.remove(filterKey);
+        synchronized (finishedQuery) {
+            for (String queryId : finishedQuery) {
+                Map<String, DynamicFilterRegistryInfo> filters = dynamicFilters.get(queryId);
+                if (filters != null) {
+                    for (Entry<String, DynamicFilterRegistryInfo> entry : filters.entrySet()) {
+                        String filterId = entry.getKey();
+                        clearPartialResults(filterId, queryId);
+                        if (entry.getValue().isMerged()) {
+                            String filterKey = createKey(DynamicFilterUtils.FILTERPREFIX, filterId, queryId);
+                            mergedStateCollection.remove(filterKey);
+                        }
                     }
                 }
-            }
-            dynamicFilters.remove(queryId);
+                dynamicFilters.remove(queryId);
 
-            cachedDynamicFilters.remove(queryId);
-            handledQuery.add(queryId);
+                cachedDynamicFilters.remove(queryId);
+                handledQuery.add(queryId);
+            }
+            finishedQuery.removeAll(handledQuery);
         }
-        finishedQuery.removeAll(handledQuery);
     }
 
     private static BloomFilter mergeBloomFilters(Collection<Object> partialBloomFilters)
@@ -355,7 +357,9 @@ public class DynamicFilterService
      */
     public void clearDynamicFiltersForQuery(String queryId)
     {
-        finishedQuery.add(queryId);
+        synchronized (finishedQuery) {
+            finishedQuery.add(queryId);
+        }
     }
 
     /**
