@@ -204,8 +204,8 @@ public class StateUpdater
 
     private void removeFromStateCollection(StateStore stateStore, String stateCollectionName, ManagedQueryExecution query)
     {
+        unregisterQuery(stateCollectionName, query);
         StateCollection stateCollection = stateStore.getStateCollection(stateCollectionName);
         removeState(stateCollection, Optional.of(query.getBasicQueryInfo().getQueryId()), LOG);
-        unregisterQuery(stateCollectionName, query);
     }
 }
