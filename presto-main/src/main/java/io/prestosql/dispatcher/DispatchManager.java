@@ -440,7 +440,7 @@ public class DispatchManager
                         dispatchQuery.getQueryId(),
                         start,
                         new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(start)));
-                stateFetcher.fetchQueryStates(stateStore);
+                stateFetcher.fetchRunningQueryStates(stateStore);
                 resourceGroupManager.submit(dispatchQuery, selectionContext, queryExecutor);
                 // Register dispatch query to StateUpdater
                 if (PropertyService.getBooleanProperty(HetuConstant.MULTI_COORDINATOR_ENABLED) && stateUpdater != null) {

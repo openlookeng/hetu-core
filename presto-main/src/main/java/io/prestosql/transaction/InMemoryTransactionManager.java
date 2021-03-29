@@ -357,10 +357,25 @@ public class InMemoryTransactionManager
 
     private void removeStateStoreTransaction(TransactionId transactionId)
     {
+        boolean removed = false;
+        int attempts = 1;
+        final int maxAttempts = 3;
         if (stateStoreProvider != null && stateStoreProvider.getStateStore() != null) {
-            StateMap stateMap = (StateMap<String, String>) stateStoreProvider.getStateStore().getStateCollection(StateStoreConstants.TRANSACTION_STATE_COLLECTION_NAME);
-            if (stateMap != null) {
-                stateMap.remove(transactionId.toString());
+            while (!removed && attempts <= maxAttempts) {
+                try {
+                    StateMap stateMap = (StateMap<String, String>) stateStoreProvider.getStateStore().getStateCollection(StateStoreConstants.TRANSACTION_STATE_COLLECTION_NAME);
+                    if (stateMap != null) {
+                        stateMap.remove(transactionId.toString());
+                        removed = true;
+                    }
+                }
+                catch (RuntimeException e) {
+                    // Catch the exception so the caller future won't get interrupted
+                    log.warn(attempts + "attempt failed to remove transaction " + transactionId + " from state store due to: " + e.getMessage());
+                }
+                finally {
+                    attempts++;
+                }
             }
         }
     }
