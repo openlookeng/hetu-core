@@ -42,6 +42,7 @@ import java.util.stream.IntStream;
 import static com.google.common.math.DoubleMath.log2;
 import static io.prestosql.RowPagesBuilder.rowPagesBuilder;
 import static io.prestosql.block.BlockAssertions.createLongSequenceBlock;
+import static io.prestosql.block.BlockAssertions.createLongSequenceBlockWithNull;
 import static io.prestosql.block.BlockAssertions.createLongsBlock;
 import static io.prestosql.block.BlockAssertions.createStringSequenceBlock;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
@@ -208,6 +209,21 @@ public class TestGroupByHash
                     assertEquals(groupId, value);
                 }
             }
+        }
+    }
+
+    @Test
+    public void testGetGroupNeedRehash()
+    {
+        GroupByHash groupByHash = createGroupByHash(TEST_SESSION, ImmutableList.of(BIGINT), new int[] {0}, Optional.of(1), 100, JOIN_COMPILER);
+        // GroupByHash: the default maxFill=192, so we add a null into block when position is 192.
+        Block block = createLongSequenceBlockWithNull(1, 200, 192);
+        Block hashBlock = TypeUtils.getHashBlock(ImmutableList.of(BIGINT), block);
+        Page page = new Page(block, hashBlock);
+        Work<GroupByIdBlock> work = groupByHash.getGroupIds(page);
+        boolean flag = work.process();
+        if (!flag) {
+            throw new RuntimeException("the block not be all process.");
         }
     }
 

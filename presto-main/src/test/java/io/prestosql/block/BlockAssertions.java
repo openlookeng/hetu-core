@@ -380,6 +380,22 @@ public final class BlockAssertions
         return builder.build();
     }
 
+    public static Block createLongSequenceBlockWithNull(int start, int end, int nullIndex)
+    {
+        BlockBuilder builder = BIGINT.createFixedSizeBlockBuilder(end - start);
+
+        for (int i = start; i < end; i++) {
+            if (i == nullIndex) {
+                builder.appendNull();
+            }
+            else {
+                BIGINT.writeLong(builder, i);
+            }
+        }
+
+        return builder.build();
+    }
+
     public static Block createLongDictionaryBlock(int start, int length)
     {
         checkArgument(length > 5, "block must have more than 5 entries");
