@@ -17,9 +17,11 @@ import io.airlift.configuration.Config;
 import io.airlift.units.Duration;
 import io.airlift.units.MaxDuration;
 import io.airlift.units.MinDuration;
+import io.omnicache.OmniCacheImplType;
 
 import javax.validation.constraints.NotNull;
 
+import static io.omnicache.OmniCacheImplType.OPEN_LOOKENG;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 public class ServerConfig
@@ -29,6 +31,7 @@ public class ServerConfig
     private boolean includeExceptionInResponse = true;
     private Duration gracePeriod = new Duration(2, MINUTES);
     private boolean enhancedErrorReporting = true;
+    private OmniCacheImplType omniCacheImplType = OPEN_LOOKENG;
     // Main coordinator TODO: remove this when main coordinator election is implemented
 
     public boolean isCoordinator()
@@ -94,6 +97,18 @@ public class ServerConfig
     public ServerConfig setEnhancedErrorReporting(boolean value)
     {
         this.enhancedErrorReporting = value;
+        return this;
+    }
+
+    public OmniCacheImplType getOmniCacheImplType()
+    {
+        return omniCacheImplType;
+    }
+
+    @Config("omnicache.impl-type")
+    public ServerConfig setOmniCacheImplType(OmniCacheImplType omniCacheImplType)
+    {
+        this.omniCacheImplType = omniCacheImplType;
         return this;
     }
 }

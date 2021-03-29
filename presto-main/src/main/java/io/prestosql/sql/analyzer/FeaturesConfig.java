@@ -155,6 +155,7 @@ public class FeaturesConfig
     private int maxGroupingSets = 2048;
     //transform selfjoin to aggregates if applicable
     private boolean transformSelfJoinToGroupby = true;
+    private String materializedViewCatalogName = "hive";
 
     public enum JoinReorderingStrategy
     {
@@ -1212,6 +1213,20 @@ public class FeaturesConfig
     public FeaturesConfig setSpillOperatorThresholdReuseExchange(int spillOperatorThresholdReuseExchange)
     {
         this.spillOperatorThresholdReuseExchange = spillOperatorThresholdReuseExchange;
+        return this;
+    }
+
+    @NotNull
+    public String getMaterializedViewCatalogName()
+    {
+        return materializedViewCatalogName;
+    }
+
+    @Config("materialized-view-catalog-name")
+    @ConfigDescription("Catalog used to store materialized view")
+    public FeaturesConfig setMaterializedViewCatalogName(String catalogName)
+    {
+        this.materializedViewCatalogName = catalogName;
         return this;
     }
 }

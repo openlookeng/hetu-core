@@ -35,7 +35,9 @@ import io.prestosql.operator.ReuseExchangeOperator;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
+import io.prestosql.spi.connector.ConnectorMaterializedViewDefinition;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
+import io.prestosql.spi.connector.ConnectorViewDefinition;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.statistics.TableStatisticsMetadata;
 import io.prestosql.spi.type.CharType;
@@ -69,6 +71,7 @@ import io.prestosql.sql.planner.sanity.PlanSanityChecker;
 import io.prestosql.sql.tree.Analyze;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.ComparisonExpression;
+import io.prestosql.sql.tree.CreateMaterializedView;
 import io.prestosql.sql.tree.CreateTableAsSelect;
 import io.prestosql.sql.tree.Delete;
 import io.prestosql.sql.tree.Explain;
@@ -96,6 +99,7 @@ import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -106,6 +110,7 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Streams.zip;
+import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.statistics.TableStatisticType.ROW_COUNT;
@@ -129,6 +134,7 @@ public class LogicalPlanner
         CREATED, OPTIMIZED, OPTIMIZED_AND_VALIDATED
     }
 
+    private static final String AS = "as";
     private final PlanNodeIdAllocator idAllocator;
 
     private final Session session;
@@ -178,14 +184,14 @@ public class LogicalPlanner
         this.warningCollector = requireNonNull(warningCollector, "warningCollector is null");
     }
 
-    public Plan plan(Analysis analysis)
+    public Plan plan(Analysis analysis, String originQuery)
     {
-        return plan(analysis, Stage.OPTIMIZED_AND_VALIDATED);
+        return plan(analysis, originQuery, Stage.OPTIMIZED_AND_VALIDATED);
     }
 
-    public Plan plan(Analysis analysis, Stage stage)
+    public Plan plan(Analysis analysis, String originQuery, Stage stage)
     {
-        PlanNode root = planStatement(analysis, analysis.getStatement());
+        PlanNode root = planStatement(analysis, analysis.getStatement(), originQuery);
 
         planSanityChecker.validateIntermediatePlan(root, session, metadata, typeAnalyzer, symbolAllocator.getTypes(), warningCollector);
 
@@ -193,7 +199,7 @@ public class LogicalPlanner
             for (PlanOptimizer optimizer : planOptimizers) {
                 if (OptimizerUtils.isEnabledLegacy(optimizer, session, root)) {
                     root = optimizer.optimize(root, session, symbolAllocator.getTypes(), symbolAllocator, idAllocator,
-                        warningCollector);
+                            warningCollector);
                     requireNonNull(root, format("%s returned a null plan", optimizer.getClass().getName()));
                 }
             }
@@ -210,7 +216,7 @@ public class LogicalPlanner
         return new Plan(root, types, StatsAndCosts.create(root, statsProvider, costProvider));
     }
 
-    public PlanNode planStatement(Analysis analysis, Statement statement)
+    public PlanNode planStatement(Analysis analysis, Statement statement, String originQuery)
     {
         if (statement instanceof CreateTableAsSelect && analysis.isCreateTableAsSelectNoOp()) {
             checkState(analysis.getCreateTableDestination().isPresent(), "Table destination is missing");
@@ -218,16 +224,25 @@ public class LogicalPlanner
             PlanNode source = new ValuesNode(idAllocator.getNextId(), ImmutableList.of(symbol), ImmutableList.of(ImmutableList.of(new LongLiteral("0"))));
             return new OutputNode(idAllocator.getNextId(), source, ImmutableList.of("rows"), ImmutableList.of(symbol));
         }
-        return createOutputPlan(planStatementWithoutOutput(analysis, statement), analysis);
+        return createOutputPlan(planStatementWithoutOutput(analysis, statement, originQuery), analysis);
     }
 
-    private RelationPlan planStatementWithoutOutput(Analysis analysis, Statement statement)
+    private RelationPlan planStatementWithoutOutput(Analysis analysis, Statement statement, String originQuery)
     {
         if (statement instanceof CreateTableAsSelect) {
             if (analysis.isCreateTableAsSelectNoOp()) {
                 throw new PrestoException(NOT_SUPPORTED, "CREATE TABLE IF NOT EXISTS is not supported in this context " + statement.getClass().getSimpleName());
             }
             return createTableCreationPlan(analysis, ((CreateTableAsSelect) statement).getQuery());
+        }
+        else if (statement instanceof CreateMaterializedView) {
+            if (analysis.isCreateTableAsSelectNoOp()) {
+                throw new PrestoException(NOT_SUPPORTED, "CREATE MATERIALIZED VIEW IF NOT EXISTS is not supported in this context " + statement.getClass().getSimpleName());
+            }
+            CreateMaterializedView createMaterializedView = (CreateMaterializedView) statement;
+            String originalFullSql = originQuery;
+            String executeSql = originQuery.substring(originQuery.toLowerCase(Locale.ENGLISH).indexOf(AS) + AS.length()).trim();
+            return createMaterializedViewCreationPlan(analysis, createMaterializedView, executeSql, originalFullSql);
         }
         else if (statement instanceof Analyze) {
             return createAnalyzePlan(analysis, (Analyze) statement);
@@ -258,7 +273,7 @@ public class LogicalPlanner
 
     private RelationPlan createExplainAnalyzePlan(Analysis analysis, Explain statement)
     {
-        RelationPlan underlyingPlan = planStatementWithoutOutput(analysis, statement.getStatement());
+        RelationPlan underlyingPlan = planStatementWithoutOutput(analysis, statement.getStatement(), null);
         PlanNode root = underlyingPlan.getRoot();
         Scope scope = analysis.getScope(statement);
         Symbol outputSymbol = symbolAllocator.newSymbol(scope.getRelationType().getFieldByIndex(0));
@@ -308,6 +323,51 @@ public class LogicalPlanner
                 tableStatisticsMetadata.getTableStatistics().contains(ROW_COUNT),
                 tableStatisticAggregation.getDescriptor());
         return new RelationPlan(planNode, analysis.getScope(analyzeStatement), planNode.getOutputSymbols());
+    }
+
+    private RelationPlan createMaterializedViewCreationPlan(Analysis analysis, CreateMaterializedView statement, String executeSql, String originalFullSql)
+    {
+        QualifiedObjectName destination = analysis.getCreateTableDestination().get();
+
+        RelationPlan plan = createRelationPlan(analysis, statement.getQuery());
+        String originalTargetCatalog = createQualifiedObjectName(session, statement, statement.getName()).getCatalogName();
+        String originalSqlCatalog = session.getCatalog().orElse(null);
+        String originalSqlSchema = session.getSchema().orElse(null);
+
+        ConnectorTableMetadata tableMetadata = createTableMetadata(
+                destination,
+                getOutputTableColumns(plan, analysis.getColumnAliases()),
+                analysis.getCreateTableProperties(),
+                analysis.getParameters(),
+                analysis.getCreateTableComment());
+        ConnectorMaterializedViewDefinition definition = new ConnectorMaterializedViewDefinition(
+                executeSql,
+                Optional.of(destination.getCatalogName()),
+                Optional.of(destination.getSchemaName()),
+                getViewColumns(plan, analysis.getColumnAliases()),
+                Optional.of(session.getUser()),
+                false,
+                originalFullSql,
+                originalTargetCatalog,
+                originalSqlCatalog,
+                originalSqlSchema,
+                "DISABLE");
+        Optional<NewTableLayout> newTableLayout = metadata.getNewTableLayout(session, destination.getCatalogName(), tableMetadata);
+
+        List<String> columnNames = tableMetadata.getColumns().stream()
+                .filter(column -> !column.isHidden())
+                .map(ColumnMetadata::getName)
+                .collect(toImmutableList());
+
+        TableStatisticsMetadata statisticsMetadata = metadata.getStatisticsCollectionMetadataForWrite(session, destination.getCatalogName(), tableMetadata);
+
+        return createTableWriterPlan(
+                analysis,
+                plan,
+                new TableWriterNode.CreateMaterializedReference(destination.getCatalogName(), tableMetadata, newTableLayout, definition),
+                columnNames,
+                newTableLayout,
+                statisticsMetadata);
     }
 
     private RelationPlan createTableCreationPlan(Analysis analysis, Query query)
@@ -542,7 +602,7 @@ public class LogicalPlanner
         TableHandle handle = analysis.getTableHandle(node.getTable());
         if (handle.getConnectorHandle().isDeleteAsInsertSupported()) {
             QueryPlanner.UpdateDeleteRelationPlan deletePlan = new QueryPlanner(analysis, symbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, symbolAllocator), metadata, session)
-                        .planDeleteRowAsInsert(node);
+                    .planDeleteRowAsInsert(node);
 
             RelationPlan plan = deletePlan.getPlan();
 
@@ -727,6 +787,18 @@ public class LogicalPlanner
         for (Field field : plan.getDescriptor().getVisibleFields()) {
             String columnName = columnAliases.isPresent() ? columnAliases.get().get(aliasPosition).getValue() : field.getName().get();
             columns.add(new ColumnMetadata(columnName, field.getType()));
+            aliasPosition++;
+        }
+        return columns.build();
+    }
+
+    private static List<ConnectorViewDefinition.ViewColumn> getViewColumns(RelationPlan plan, Optional<List<Identifier>> columnAliases)
+    {
+        ImmutableList.Builder<ConnectorViewDefinition.ViewColumn> columns = ImmutableList.builder();
+        int aliasPosition = 0;
+        for (Field field : plan.getDescriptor().getVisibleFields()) {
+            String columnName = columnAliases.isPresent() ? columnAliases.get().get(aliasPosition).getValue() : field.getName().get();
+            columns.add(new ConnectorViewDefinition.ViewColumn(columnName, field.getType().getTypeSignature()));
             aliasPosition++;
         }
         return columns.build();

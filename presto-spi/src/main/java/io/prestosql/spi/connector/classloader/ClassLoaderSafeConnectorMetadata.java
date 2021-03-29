@@ -19,6 +19,7 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorDeleteAsInsertTableHandle;
 import io.prestosql.spi.connector.ConnectorInsertTableHandle;
+import io.prestosql.spi.connector.ConnectorMaterializedViewDefinition;
 import io.prestosql.spi.connector.ConnectorMetadata;
 import io.prestosql.spi.connector.ConnectorNewTableLayout;
 import io.prestosql.spi.connector.ConnectorOutputMetadata;
@@ -379,6 +380,22 @@ public class ClassLoaderSafeConnectorMetadata
     }
 
     @Override
+    public ConnectorOutputTableHandle beginCreateMaterializedView(ConnectorTableMetadata tableMetadata, ConnectorMaterializedViewDefinition definition)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.beginCreateMaterializedView(tableMetadata, definition);
+        }
+    }
+
+    @Override
+    public Optional<ConnectorOutputMetadata> finishCreateMaterializedView(SchemaTableName name)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.finishCreateMaterializedView(name);
+        }
+    }
+
+    @Override
     public void beginQuery(ConnectorSession session)
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
@@ -479,6 +496,22 @@ public class ClassLoaderSafeConnectorMetadata
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             delegate.dropView(session, viewName);
+        }
+    }
+
+    @Override
+    public void dropMaterializedView(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            delegate.dropMaterializedView(session, tableHandle);
+        }
+    }
+
+    @Override
+    public void refreshMaterializedView(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            delegate.refreshMaterializedView(session, tableHandle);
         }
     }
 

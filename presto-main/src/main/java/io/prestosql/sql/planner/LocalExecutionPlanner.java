@@ -289,6 +289,7 @@ import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.LOCAL;
 import static io.prestosql.sql.planner.plan.JoinNode.Type.FULL;
 import static io.prestosql.sql.planner.plan.JoinNode.Type.INNER;
 import static io.prestosql.sql.planner.plan.JoinNode.Type.RIGHT;
+import static io.prestosql.sql.planner.plan.TableWriterNode.CreateMaterializedTarget;
 import static io.prestosql.sql.planner.plan.TableWriterNode.CreateTarget;
 import static io.prestosql.sql.planner.plan.TableWriterNode.DeleteAsInsertTarget;
 import static io.prestosql.sql.planner.plan.TableWriterNode.InsertTarget;
@@ -3055,6 +3056,10 @@ public class LocalExecutionPlanner
         return (fragments, statistics) -> {
             if (target instanceof CreateTarget) {
                 return metadata.finishCreateTable(session, ((CreateTarget) target).getHandle(), fragments, statistics);
+            }
+            else if (target instanceof CreateMaterializedTarget) {
+                CreateMaterializedTarget materializedTarget = (CreateMaterializedTarget) target;
+                return metadata.finishCreateMaterializedView(session, materializedTarget.getHandle(), fragments, statistics, materializedTarget.getOriginalTargetCatalog(), materializedTarget.getSchemaTableName());
             }
             else if (target instanceof InsertTarget) {
                 return metadata.finishInsert(session, ((InsertTarget) target).getHandle(), fragments, statistics);

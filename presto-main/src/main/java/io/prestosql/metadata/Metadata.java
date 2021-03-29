@@ -25,6 +25,7 @@ import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorCapabilities;
+import io.prestosql.spi.connector.ConnectorMaterializedViewDefinition;
 import io.prestosql.spi.connector.ConnectorOutputMetadata;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.ConnectorViewDefinition;
@@ -33,6 +34,7 @@ import io.prestosql.spi.connector.ConstraintApplicationResult;
 import io.prestosql.spi.connector.LimitApplicationResult;
 import io.prestosql.spi.connector.ProjectionApplicationResult;
 import io.prestosql.spi.connector.SampleType;
+import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SubQueryApplicationResult;
 import io.prestosql.spi.connector.SystemTable;
 import io.prestosql.spi.expression.ConnectorExpression;
@@ -196,6 +198,20 @@ public interface Metadata
      */
     void dropTable(Session session, TableHandle tableHandle);
 
+    /**
+     * Drops the specified materialized view
+     *
+     * @throws RuntimeException if the table can not be dropped or table handle is no longer valid
+     */
+    void dropMaterializedView(Session session, ConnectorMaterializedViewDefinition definition, QualifiedObjectName name);
+
+    /**
+     * Refresh the specified materialized view
+     *
+     * @throws RuntimeException if the table can not be dropped or table handle is no longer valid
+     */
+    void refreshMaterializedView(Session session, TableHandle tableHandle);
+
     Optional<NewTableLayout> getNewTableLayout(Session session, String catalogName, ConnectorTableMetadata tableMetadata);
 
     /**
@@ -207,6 +223,16 @@ public interface Metadata
      * Finish a table creation with data after the data is written.
      */
     Optional<ConnectorOutputMetadata> finishCreateTable(Session session, OutputTableHandle tableHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics);
+
+    /**
+     * Begin the atomic creation of a table with data.
+     */
+    OutputTableHandle beginCreateMaterializedView(Session session, String catalogName, ConnectorTableMetadata tableMetadata, ConnectorMaterializedViewDefinition definition, Optional<NewTableLayout> layout);
+
+    /**
+     * Finish a materialized view creation with data after the data is written.
+     */
+    Optional<ConnectorOutputMetadata> finishCreateMaterializedView(Session session, OutputTableHandle tableHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics, String originalTargetCatalog, SchemaTableName name);
 
     Optional<NewTableLayout> getInsertLayout(Session session, TableHandle target);
 

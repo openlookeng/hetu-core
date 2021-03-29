@@ -370,6 +370,24 @@ public class AccessControlManager
     }
 
     @Override
+    public void checkCanCreateMaterializedTable(TransactionId transactionId, Identity identity, QualifiedObjectName tableName, Set<String> columnNames)
+    {
+        return;
+    }
+
+    @Override
+    public void checkCanRefreshMaterializedTable(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
+    {
+        return;
+    }
+
+    @Override
+    public void checkCanDropMaterializedTable(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
+    {
+        return;
+    }
+
+    @Override
     public void checkCanShowTablesMetadata(TransactionId transactionId, Identity identity, CatalogSchemaName schema)
     {
         requireNonNull(identity, "identity is null");

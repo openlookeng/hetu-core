@@ -97,7 +97,8 @@ public class TableWriterOperator
             this.columnChannels = requireNonNull(columnChannels, "columnChannels is null");
             this.pageSinkManager = requireNonNull(pageSinkManager, "pageSinkManager is null");
             checkArgument(writerTarget instanceof CreateTarget || writerTarget instanceof InsertTarget || writerTarget instanceof TableWriterNode.UpdateTarget
-                            || writerTarget instanceof TableWriterNode.DeleteAsInsertTarget, "writerTarget must be CreateTarget or InsertTarget or UpdateTarget");
+                    || writerTarget instanceof TableWriterNode.DeleteAsInsertTarget || writerTarget instanceof TableWriterNode.CreateMaterializedTarget,
+                    "writerTarget must be CreateTarget or CreateMaterializedTarget or InsertTarget or UpdateTarget");
             this.target = requireNonNull(writerTarget, "writerTarget is null");
             this.session = session;
             this.taskId = taskId;
@@ -120,6 +121,9 @@ public class TableWriterOperator
             Optional<DriverTaskId> driverTaskId = Optional.of(new DriverTaskId(taskId, driverContext.getDriverId()));
             if (target instanceof CreateTarget) {
                 return pageSinkManager.createPageSink(session, driverTaskId, ((CreateTarget) target).getHandle());
+            }
+            if (target instanceof TableWriterNode.CreateMaterializedTarget) {
+                return pageSinkManager.createPageSink(session, driverTaskId, ((TableWriterNode.CreateMaterializedTarget) target).getHandle());
             }
             if (target instanceof InsertTarget) {
                 return pageSinkManager.createPageSink(session, driverTaskId, ((InsertTarget) target).getHandle());

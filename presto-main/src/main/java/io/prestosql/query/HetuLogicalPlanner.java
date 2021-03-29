@@ -82,9 +82,9 @@ public class HetuLogicalPlanner
     }
 
     @Override
-    public Plan plan(Analysis analysis, Stage stage)
+    public Plan plan(Analysis analysis, String originQuery, Stage stage)
     {
-        PlanNode root = planStatement(analysis, analysis.getStatement());
+        PlanNode root = planStatement(analysis, analysis.getStatement(), originQuery);
 
         planSanityChecker.validateIntermediatePlan(root, session, metadata, typeAnalyzer, symbolAllocator.getTypes(),
                 warningCollector);

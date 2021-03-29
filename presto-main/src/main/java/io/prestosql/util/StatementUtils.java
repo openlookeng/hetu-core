@@ -22,6 +22,7 @@ import io.prestosql.sql.tree.Call;
 import io.prestosql.sql.tree.Comment;
 import io.prestosql.sql.tree.Commit;
 import io.prestosql.sql.tree.CreateIndex;
+import io.prestosql.sql.tree.CreateMaterializedView;
 import io.prestosql.sql.tree.CreateRole;
 import io.prestosql.sql.tree.CreateSchema;
 import io.prestosql.sql.tree.CreateTable;
@@ -34,6 +35,7 @@ import io.prestosql.sql.tree.DescribeOutput;
 import io.prestosql.sql.tree.DropCache;
 import io.prestosql.sql.tree.DropColumn;
 import io.prestosql.sql.tree.DropIndex;
+import io.prestosql.sql.tree.DropMaterializedView;
 import io.prestosql.sql.tree.DropRole;
 import io.prestosql.sql.tree.DropSchema;
 import io.prestosql.sql.tree.DropTable;
@@ -44,6 +46,7 @@ import io.prestosql.sql.tree.GrantRoles;
 import io.prestosql.sql.tree.Insert;
 import io.prestosql.sql.tree.Prepare;
 import io.prestosql.sql.tree.Query;
+import io.prestosql.sql.tree.RefreshMaterializedView;
 import io.prestosql.sql.tree.RenameColumn;
 import io.prestosql.sql.tree.RenameIndex;
 import io.prestosql.sql.tree.RenameSchema;
@@ -95,6 +98,8 @@ public final class StatementUtils
         builder.put(Analyze.class, QueryType.ANALYZE);
 
         builder.put(CreateTableAsSelect.class, QueryType.INSERT);
+        builder.put(CreateMaterializedView.class, QueryType.INSERT);
+        builder.put(RefreshMaterializedView.class, QueryType.INSERT);
         builder.put(Insert.class, QueryType.INSERT);
         builder.put(Update.class, QueryType.UPDATE);
 
@@ -131,6 +136,7 @@ public final class StatementUtils
         builder.put(DropIndex.class, QueryType.DATA_DEFINITION);
         builder.put(CreateView.class, QueryType.DATA_DEFINITION);
         builder.put(DropView.class, QueryType.DATA_DEFINITION);
+        builder.put(DropMaterializedView.class, QueryType.DATA_DEFINITION);
         builder.put(Use.class, QueryType.DATA_DEFINITION);
         builder.put(SetSession.class, QueryType.DATA_DEFINITION);
         builder.put(ResetSession.class, QueryType.DATA_DEFINITION);

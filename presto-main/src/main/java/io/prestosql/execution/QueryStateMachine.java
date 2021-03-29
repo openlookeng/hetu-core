@@ -254,6 +254,11 @@ public class QueryStateMachine
         return queryId;
     }
 
+    public String getQuery()
+    {
+        return query;
+    }
+
     public Session getSession()
     {
         return session;

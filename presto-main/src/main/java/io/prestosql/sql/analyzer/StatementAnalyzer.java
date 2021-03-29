@@ -70,6 +70,7 @@ import io.prestosql.sql.tree.Call;
 import io.prestosql.sql.tree.Comment;
 import io.prestosql.sql.tree.Commit;
 import io.prestosql.sql.tree.CreateIndex;
+import io.prestosql.sql.tree.CreateMaterializedView;
 import io.prestosql.sql.tree.CreateSchema;
 import io.prestosql.sql.tree.CreateTable;
 import io.prestosql.sql.tree.CreateTableAsSelect;
@@ -82,6 +83,7 @@ import io.prestosql.sql.tree.DereferenceExpression;
 import io.prestosql.sql.tree.DropCache;
 import io.prestosql.sql.tree.DropColumn;
 import io.prestosql.sql.tree.DropIndex;
+import io.prestosql.sql.tree.DropMaterializedView;
 import io.prestosql.sql.tree.DropSchema;
 import io.prestosql.sql.tree.DropTable;
 import io.prestosql.sql.tree.DropView;
@@ -631,6 +633,60 @@ class StatementAnalyzer
         }
 
         @Override
+        protected Scope visitCreateMaterializedView(CreateMaterializedView node, Optional<Scope> scope)
+        {
+            analysis.setUpdateType("CREATE MATERIALIZED VIEW");
+
+            // turn this into a query that has a new table writer node on top.
+            //get catalog name from config.properties file: materialized-view-catalog-name=;
+            String configuredCatalogName = SystemSessionProperties.getMaterializedViewCatalogName(session);
+            String targetCatalogName = node.getTargetCatalogName(configuredCatalogName);
+            if (!metadata.catalogExists(session, targetCatalogName)) {
+                throw new SemanticException(MISSING_CATALOG, node, "Destination catalog '%s' not exists", targetCatalogName);
+            }
+
+            QualifiedObjectName targetTable = createQualifiedObjectName(session, node, node.getName());
+            targetTable = new QualifiedObjectName(targetCatalogName, targetTable.getSchemaName(), targetTable.getObjectName());
+            analysis.setCreateTableDestination(targetTable);
+
+            Optional<TableHandle> targetTableHandle = metadata.getTableHandle(session, targetTable);
+            if (targetTableHandle.isPresent()) {
+                if (node.isNotExists()) {
+                    analysis.setCreateTableAsSelectNoOp(true);
+                    return createAndAssignScope(node, scope, Field.newUnqualified("rows", BIGINT));
+                }
+                throw new SemanticException(TABLE_ALREADY_EXISTS, node, "Destination table '%s' already exists", targetTable);
+            }
+
+            validateProperties(node.getProperties(), scope);
+            analysis.setCreateTableProperties(mapFromProperties(node.getProperties()));
+
+            node.getColumnAliases().ifPresent(analysis::setCreateTableColumnAliases);
+            analysis.setCreateTableComment(node.getComment());
+
+            accessControl.checkCanCreateTable(session.getRequiredTransactionId(), session.getIdentity(), targetTable);
+
+            // analyze the query that creates the table
+            Scope queryScope = process(node.getQuery(), scope);
+
+            if (node.getColumnAliases().isPresent()) {
+                validateColumnAliases(node.getColumnAliases().get(), queryScope.getRelationType().getVisibleFieldCount());
+
+                // analzie only column types in subquery if column alias exists
+                for (Field field : queryScope.getRelationType().getVisibleFields()) {
+                    if (field.getType().equals(UNKNOWN)) {
+                        throw new SemanticException(COLUMN_TYPE_UNKNOWN, node, "Column type is unknown at position %s", queryScope.getRelationType().indexOf(field) + 1);
+                    }
+                }
+            }
+            else {
+                validateColumns(node, queryScope.getRelationType());
+            }
+
+            return createAndAssignScope(node, scope, Field.newUnqualified("rows", BIGINT));
+        }
+
+        @Override
         protected Scope visitCreateTableAsSelect(CreateTableAsSelect node, Optional<Scope> scope)
         {
             analysis.setUpdateType("CREATE TABLE");
@@ -794,6 +850,12 @@ class StatementAnalyzer
 
         @Override
         protected Scope visitDropTable(DropTable node, Optional<Scope> scope)
+        {
+            return createAndAssignScope(node, scope);
+        }
+
+        @Override
+        protected Scope visitDropMaterializedView(DropMaterializedView node, Optional<Scope> scope)
         {
             return createAndAssignScope(node, scope);
         }

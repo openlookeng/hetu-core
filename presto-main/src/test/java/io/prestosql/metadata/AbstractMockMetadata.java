@@ -27,6 +27,7 @@ import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorCapabilities;
+import io.prestosql.spi.connector.ConnectorMaterializedViewDefinition;
 import io.prestosql.spi.connector.ConnectorMetadata;
 import io.prestosql.spi.connector.ConnectorOutputMetadata;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
@@ -36,6 +37,7 @@ import io.prestosql.spi.connector.ConstraintApplicationResult;
 import io.prestosql.spi.connector.LimitApplicationResult;
 import io.prestosql.spi.connector.ProjectionApplicationResult;
 import io.prestosql.spi.connector.SampleType;
+import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SubQueryApplicationResult;
 import io.prestosql.spi.connector.SystemTable;
 import io.prestosql.spi.expression.ConnectorExpression;
@@ -707,5 +709,29 @@ public abstract class AbstractMockMetadata
     public boolean isHeuristicIndexSupported(Session session, QualifiedObjectName tableName)
     {
         return true;
+    }
+
+    @Override
+    public void dropMaterializedView(Session session, ConnectorMaterializedViewDefinition definition, QualifiedObjectName name)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void refreshMaterializedView(Session session, TableHandle tableHandle)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public OutputTableHandle beginCreateMaterializedView(Session session, String catalogName, ConnectorTableMetadata tableMetadata, ConnectorMaterializedViewDefinition definition, Optional<NewTableLayout> layout)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Optional<ConnectorOutputMetadata> finishCreateMaterializedView(Session session, OutputTableHandle tableHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics, String originalTargetCatalog, SchemaTableName name)
+    {
+        throw new UnsupportedOperationException();
     }
 }

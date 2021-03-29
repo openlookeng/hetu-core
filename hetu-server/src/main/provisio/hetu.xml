@@ -138,6 +138,12 @@
         </artifact>
     </artifactSet>
 
+    <artifactSet to="plugin/materialized-view">
+        <artifact id="${project.groupId}:hetu-mv:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
     <!--
     Skipped as they are not first class connectors
     <artifactSet to="plugin/cassandra">

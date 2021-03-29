@@ -21,6 +21,7 @@ import io.airlift.http.server.HttpServerConfig;
 import io.airlift.http.server.HttpServerInfo;
 import io.airlift.node.NodeInfo;
 import io.airlift.units.Duration;
+import io.omnicache.jdbc.OmniCacheJdbcImpl;
 import io.prestosql.GroupByHashPageIndexerFactory;
 import io.prestosql.PagesIndexPageSorter;
 import io.prestosql.Session;
@@ -52,6 +53,7 @@ import io.prestosql.execution.CreateTableTask;
 import io.prestosql.execution.CreateViewTask;
 import io.prestosql.execution.DataDefinitionTask;
 import io.prestosql.execution.DeallocateTask;
+import io.prestosql.execution.DropMaterializedViewTask;
 import io.prestosql.execution.DropTableTask;
 import io.prestosql.execution.DropViewTask;
 import io.prestosql.execution.Lifespan;
@@ -161,6 +163,7 @@ import io.prestosql.sql.tree.Commit;
 import io.prestosql.sql.tree.CreateTable;
 import io.prestosql.sql.tree.CreateView;
 import io.prestosql.sql.tree.Deallocate;
+import io.prestosql.sql.tree.DropMaterializedView;
 import io.prestosql.sql.tree.DropTable;
 import io.prestosql.sql.tree.DropView;
 import io.prestosql.sql.tree.Prepare;
@@ -374,7 +377,8 @@ public class LocalQueryRunner
                 null,
                 new ServerConfig(),
                 new NodeSchedulerConfig(),
-                heuristicIndexerManager);
+                heuristicIndexerManager,
+                new OmniCacheJdbcImpl());
 
         GlobalSystemConnectorFactory globalSystemConnectorFactory = new GlobalSystemConnectorFactory(ImmutableSet.of(
                 new NodeSystemTable(nodeManager),
@@ -448,6 +452,7 @@ public class LocalQueryRunner
                 .put(CreateView.class, new CreateViewTask(sqlParser, featuresConfig))
                 .put(DropTable.class, new DropTableTask())
                 .put(DropView.class, new DropViewTask())
+                .put(DropMaterializedView.class, new DropMaterializedViewTask())
                 .put(RenameColumn.class, new RenameColumnTask())
                 .put(RenameTable.class, new RenameTableTask())
                 .put(RenameIndex.class, new RenameIndexTask())
@@ -908,7 +913,7 @@ public class LocalQueryRunner
         LogicalPlanner logicalPlanner = new LogicalPlanner(session, optimizers, new PlanSanityChecker(true), idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, warningCollector);
 
         Analysis analysis = analyzer.analyze(preparedQuery.getStatement());
-        return logicalPlanner.plan(analysis, stage);
+        return logicalPlanner.plan(analysis, sql, stage);
     }
 
     private static List<Split> getNextBatch(SplitSource splitSource)

@@ -293,6 +293,26 @@ public interface ConnectorMetadata
     }
 
     /**
+     * Drops the specified materialized view
+     *
+     * @throws RuntimeException if the table can not be dropped or table handle is no longer valid
+     */
+    default void dropMaterializedView(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support dropping materialized view");
+    }
+
+    /**
+     * Refresh the specified materialized view
+     *
+     * @throws RuntimeException if the table can not be dropped or table handle is no longer valid
+     */
+    default void refreshMaterializedView(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support refreshing materialized view");
+    }
+
+    /**
      * Add the specified column
      */
     default void addColumn(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnMetadata column)
@@ -396,6 +416,22 @@ public interface ConnectorMetadata
     default Optional<ConnectorOutputMetadata> finishCreateTable(ConnectorSession session, ConnectorOutputTableHandle tableHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
     {
         throw new PrestoException(GENERIC_INTERNAL_ERROR, "ConnectorMetadata beginCreateTable() is implemented without finishCreateTable()");
+    }
+
+    /**
+     * Begin the atomic creation materialized view of a table with data.
+     */
+    default ConnectorOutputTableHandle beginCreateMaterializedView(ConnectorTableMetadata tableMetadata, ConnectorMaterializedViewDefinition definition)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support creating materialized view with data");
+    }
+
+    /**
+     * Finish a materialized view creation with data after the data is written.
+     */
+    default Optional<ConnectorOutputMetadata> finishCreateMaterializedView(SchemaTableName name)
+    {
+        throw new PrestoException(GENERIC_INTERNAL_ERROR, "ConnectorMetadata beginCreateMaterializedView() is implemented without finishCreateMaterializedView()");
     }
 
     /**

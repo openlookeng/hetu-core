@@ -28,6 +28,7 @@ import io.prestosql.sql.tree.ColumnDefinition;
 import io.prestosql.sql.tree.Comment;
 import io.prestosql.sql.tree.Commit;
 import io.prestosql.sql.tree.CreateIndex;
+import io.prestosql.sql.tree.CreateMaterializedView;
 import io.prestosql.sql.tree.CreateRole;
 import io.prestosql.sql.tree.CreateSchema;
 import io.prestosql.sql.tree.CreateTable;
@@ -40,6 +41,7 @@ import io.prestosql.sql.tree.DescribeOutput;
 import io.prestosql.sql.tree.DropCache;
 import io.prestosql.sql.tree.DropColumn;
 import io.prestosql.sql.tree.DropIndex;
+import io.prestosql.sql.tree.DropMaterializedView;
 import io.prestosql.sql.tree.DropRole;
 import io.prestosql.sql.tree.DropSchema;
 import io.prestosql.sql.tree.DropTable;
@@ -652,6 +654,18 @@ public final class SqlFormatter
         }
 
         @Override
+        protected Void visitDropMaterializedView(DropMaterializedView node, Integer context)
+        {
+            builder.append("DROP MATERIALIZED VIEW ");
+            if (node.isExists()) {
+                builder.append("IF EXISTS ");
+            }
+            builder.append(node.getTableName());
+
+            return null;
+        }
+
+        @Override
         protected Void visitExplain(Explain node, Integer indent)
         {
             builder.append("EXPLAIN ");
@@ -928,6 +942,31 @@ public final class SqlFormatter
             if (!node.isWithData()) {
                 builder.append(" WITH NO DATA");
             }
+
+            return null;
+        }
+
+        @Override
+        protected Void visitCreateMaterializedView(CreateMaterializedView node, Integer indent)
+        {
+            builder.append("CREATE MATERIALIZED VIEW ");
+            if (node.isNotExists()) {
+                builder.append("IF NOT EXISTS ");
+            }
+            builder.append(formatName(node.getName()));
+
+            if (node.getColumnAliases().isPresent()) {
+                String columnList = node.getColumnAliases().get().stream().map(element -> formatExpression(element, parameters)).collect(joining(", "));
+                builder.append(format("( %s )", columnList));
+            }
+
+            if (node.getComment().isPresent()) {
+                builder.append("\nCOMMENT " + formatStringLiteral(node.getComment().get()));
+            }
+
+            builder.append(formatPropertiesSingleLine(node.getProperties()));
+            builder.append(" AS \n");
+            process(node.getQuery(), indent);
 
             return null;
         }

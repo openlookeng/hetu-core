@@ -35,6 +35,7 @@ import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.connector.CatalogSchemaName;
+import io.prestosql.spi.connector.ConnectorMaterializedViewDefinition;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.ConnectorViewDefinition;
 import io.prestosql.spi.connector.SchemaTableName;
@@ -54,6 +55,7 @@ import io.prestosql.sql.tree.ArrayConstructor;
 import io.prestosql.sql.tree.AstVisitor;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.ColumnDefinition;
+import io.prestosql.sql.tree.CreateMaterializedView;
 import io.prestosql.sql.tree.CreateTable;
 import io.prestosql.sql.tree.CreateView;
 import io.prestosql.sql.tree.DoubleLiteral;
@@ -136,6 +138,7 @@ import static io.prestosql.sql.analyzer.SemanticErrorCode.NOT_SUPPORTED;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.VIEW_PARSE_ERROR;
 import static io.prestosql.sql.tree.BooleanLiteral.FALSE_LITERAL;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
+import static io.prestosql.sql.tree.ShowCreate.Type.MATERIALIZED;
 import static io.prestosql.sql.tree.ShowCreate.Type.TABLE;
 import static io.prestosql.sql.tree.ShowCreate.Type.VIEW;
 import static java.lang.String.format;
@@ -441,6 +444,29 @@ final class ShowQueriesRewrite
         {
             QualifiedObjectName objectName = createQualifiedObjectName(session, node, node.getName());
             Optional<ConnectorViewDefinition> viewDefinition = metadata.getView(session, objectName);
+            StringBuilder header = new StringBuilder();
+
+            if (node.getType() == MATERIALIZED) {
+                if (!viewDefinition.isPresent()) {
+                    if (metadata.getTableHandle(session, objectName).isPresent()) {
+                        throw new SemanticException(NOT_SUPPORTED, node, "Relation '%s' is a table, not a materialized view", objectName);
+                    }
+                    throw new SemanticException(MISSING_TABLE, node, "Materialized View '%s' does not exist", objectName);
+                }
+
+                ConnectorMaterializedViewDefinition definition = (ConnectorMaterializedViewDefinition) viewDefinition.get();
+                Query query = parseView(definition.getOriginalSql(), objectName, node);
+
+                CreateMaterializedView createMaterializedView = new CreateMaterializedView(
+                        QualifiedName.of(objectName.getCatalogName(), objectName.getSchemaName(), objectName.getObjectName()),
+                        query,
+                        false,
+                        Collections.emptyList(),
+                        Optional.empty(),
+                        Optional.empty());
+                String sql = formatSql(createMaterializedView, Optional.of(parameters)).trim();
+                return singleValueQuery("Create Materialized View", sql);
+            }
 
             if (node.getType() == VIEW) {
                 if (!viewDefinition.isPresent()) {
@@ -459,7 +485,7 @@ final class ShowQueriesRewrite
                 return singleValueQuery("Create View", sql);
             }
 
-            if (node.getType() == TABLE) {
+            if (node.getType() == TABLE || node.getType() == MATERIALIZED) {
                 if (viewDefinition.isPresent()) {
                     throw new SemanticException(NOT_SUPPORTED, node, "Relation '%s' is a view, not a table", objectName);
                 }
@@ -473,10 +499,11 @@ final class ShowQueriesRewrite
 
                 Map<String, PropertyMetadata<?>> allColumnProperties = metadata.getColumnPropertyManager().getAllProperties().get(tableHandle.get().getCatalogName());
 
+                QualifiedObjectName finalObjectName = objectName;
                 List<TableElement> columns = connectorTableMetadata.getColumns().stream()
                         .filter(column -> !column.isHidden())
                         .map(column -> {
-                            List<Property> propertyNodes = buildProperties(objectName, Optional.of(column.getName()), INVALID_COLUMN_PROPERTY, column.getProperties(), allColumnProperties);
+                            List<Property> propertyNodes = buildProperties(finalObjectName, Optional.of(column.getName()), INVALID_COLUMN_PROPERTY, column.getProperties(), allColumnProperties);
                             return new ColumnDefinition(new Identifier(column.getName()), column.getType().getDisplayName(), column.isNullable(), propertyNodes, Optional.ofNullable(column.getComment()));
                         })
                         .collect(toImmutableList());
@@ -494,7 +521,7 @@ final class ShowQueriesRewrite
                 return singleValueQuery("Create Table", formatSql(createTable, Optional.of(parameters)).trim());
             }
 
-            throw new UnsupportedOperationException("SHOW CREATE only supported for tables and views");
+            throw new UnsupportedOperationException("SHOW CREATE only supported for tables, views and materialized views");
         }
 
         private List<Property> buildProperties(

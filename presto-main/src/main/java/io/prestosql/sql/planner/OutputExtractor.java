@@ -65,6 +65,13 @@ public class OutputExtractor
                         "cannot have more than a single create, insert or delete in a query");
                 schemaTableName = target.getSchemaTableName();
             }
+            else if (writerTarget instanceof TableWriterNode.CreateMaterializedTarget) {
+                TableWriterNode.CreateMaterializedTarget target = (TableWriterNode.CreateMaterializedTarget) writerTarget;
+                catalogName = target.getHandle().getCatalogName();
+                checkState(schemaTableName == null || schemaTableName.equals(target.getSchemaTableName()),
+                        "cannot have more than a single create, insert or delete in a query");
+                schemaTableName = target.getSchemaTableName();
+            }
             else if (writerTarget instanceof InsertTarget) {
                 InsertTarget target = (InsertTarget) writerTarget;
                 catalogName = target.getHandle().getCatalogName();

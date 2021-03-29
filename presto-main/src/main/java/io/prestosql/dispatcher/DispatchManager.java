@@ -13,10 +13,13 @@
  */
 package io.prestosql.dispatcher;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.AbstractFuture;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.log.Logger;
+import io.omnicache.OmniCache;
 import io.prestosql.Session;
+import io.prestosql.SystemSessionProperties;
 import io.prestosql.execution.QueryIdGenerator;
 import io.prestosql.execution.QueryInfo;
 import io.prestosql.execution.QueryManagerConfig;
@@ -26,6 +29,9 @@ import io.prestosql.execution.QueryPreparer.PreparedQuery;
 import io.prestosql.execution.QueryState;
 import io.prestosql.execution.QueryTracker;
 import io.prestosql.execution.resourcegroups.ResourceGroupManager;
+import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.QualifiedObjectName;
+import io.prestosql.metadata.QualifiedTablePrefix;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.queryeditorui.QueryEditorUIModule;
 import io.prestosql.security.AccessControl;
@@ -36,6 +42,8 @@ import io.prestosql.server.SessionSupplier;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.connector.ConnectorMaterializedViewDefinition;
+import io.prestosql.spi.connector.ConnectorViewDefinition;
 import io.prestosql.spi.resourcegroups.SelectionContext;
 import io.prestosql.spi.resourcegroups.SelectionCriteria;
 import io.prestosql.spi.service.PropertyService;
@@ -47,6 +55,11 @@ import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.statestore.StateUpdater;
 import io.prestosql.transaction.TransactionManager;
 import io.prestosql.utils.HetuConfig;
+import org.apache.calcite.jdbc.CalcitePrepare;
+import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.prepare.Prepare;
+import org.apache.calcite.sql.validate.SqlValidator;
+import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.weakref.jmx.Flatten;
 import org.weakref.jmx.Managed;
 
@@ -56,8 +69,10 @@ import javax.inject.Inject;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
@@ -68,6 +83,8 @@ import java.util.stream.Collectors;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static io.prestosql.SystemSessionProperties.isMaterializedViewCboPlannerUsed;
+import static io.prestosql.SystemSessionProperties.isMaterializedViewEnabled;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.QUERY_TEXT_TOO_LARGE;
 import static io.prestosql.util.StatementUtils.getQueryType;
@@ -79,6 +96,11 @@ import static java.util.Objects.requireNonNull;
 public class DispatchManager
 {
     private static final Logger LOG = Logger.get(DispatchManager.class);
+    private static final String SYSTEM_JDBC = "system.jdbc";
+    private static final String SELECT = "select";
+    private static final String WITH = "with";
+    private static final String MV_CATALOG_NAME = "mv";
+    private static final String INFORMATION_SCHEMA = "information_schema";
 
     private final QueryIdGenerator queryIdGenerator;
     private final QueryPreparer queryPreparer;
@@ -101,6 +123,8 @@ public class DispatchManager
     private final QueryTracker<DispatchQuery> queryTracker;
 
     private final QueryManagerStats stats = new QueryManagerStats();
+    private final Metadata metadata;
+    private final OmniCache omniCache;
 
     @Inject
     public DispatchManager(
@@ -116,7 +140,9 @@ public class DispatchManager
             QueryManagerConfig queryManagerConfig,
             DispatchExecutor dispatchExecutor,
             StateStoreProvider stateStoreProvider,
-            HetuConfig hetuConfig)
+            HetuConfig hetuConfig,
+            Metadata metadata,
+            OmniCache omniCache)
     {
         this.queryIdGenerator = requireNonNull(queryIdGenerator, "queryIdGenerator is null");
         this.queryPreparer = requireNonNull(queryPreparer, "queryPreparer is null");
@@ -138,6 +164,8 @@ public class DispatchManager
         this.queryExecutor = requireNonNull(dispatchExecutor, "dispatchExecutor is null").getExecutor();
 
         this.queryTracker = new QueryTracker<>(queryManagerConfig, dispatchExecutor.getScheduledExecutor());
+        this.metadata = metadata;
+        this.omniCache = omniCache;
     }
 
     @PostConstruct
@@ -205,6 +233,9 @@ public class DispatchManager
 
             // decode session
             session = sessionSupplier.createSession(queryId, sessionContext);
+            if (isMaterializedViewEnabled(session)) {
+                query = rewriteQuery(session, query);
+            }
 
             // prepare query
             PreparedQuery preparedQuery = queryPreparer.prepareQuery(session, query);
@@ -264,6 +295,89 @@ public class DispatchManager
             else {
                 dispatchQuery.fail(throwable);
             }
+        }
+    }
+
+    private String rewriteQuery(Session session, String query)
+    {
+        String rewrittenQuery = query;
+        if (query.contains(SYSTEM_JDBC)) {
+            return rewrittenQuery;
+        }
+
+        if (!query.toLowerCase(Locale.ENGLISH).startsWith(SELECT) && !query.toLowerCase(Locale.ENGLISH).startsWith(WITH)) {
+            return rewrittenQuery;
+        }
+
+        try {
+            if (!session.getTransactionId().isPresent()) {
+                session = session.beginTransactionId(transactionManager.beginTransaction(true), transactionManager, accessControl);
+            }
+
+            // rewrite sql using materialized view
+            CalcitePrepare.Context prepareContext = omniCache.getPrepareContext();
+            RelOptPlanner planner = omniCache.getRelOptPlanner(prepareContext, isMaterializedViewCboPlannerUsed(session));
+
+            List<String> schemas = metadata.listSchemaNames(session, MV_CATALOG_NAME);
+            for (String schema : schemas) {
+                if (schema.equals(INFORMATION_SCHEMA)) {
+                    continue;
+                }
+
+                List<QualifiedObjectName> tables = metadata.listTables(session, new QualifiedTablePrefix(MV_CATALOG_NAME, schema));
+                for (QualifiedObjectName tableName : tables) {
+                    addMaterializedView(session, tableName, prepareContext, planner);
+                }
+            }
+
+            if (planner.getMaterializations().size() == 0) {
+                return rewrittenQuery;
+            }
+
+            List<String> defaultSchemaPath = new ArrayList<>();
+            if (session.getCatalog().isPresent()) {
+                defaultSchemaPath.add(session.getCatalog().get());
+            }
+            if (session.getSchema().isPresent()) {
+                defaultSchemaPath.add(session.getSchema().get());
+            }
+
+            Prepare.CatalogReader catalogReader = omniCache.getCatalogReader(prepareContext, defaultSchemaPath);
+            SqlValidator sqlValidator = omniCache.getSqlValidator(prepareContext, catalogReader);
+            SqlToRelConverter sqlToRelConverter = omniCache.getSqlToRelConverter(prepareContext, catalogReader, sqlValidator, planner);
+            rewrittenQuery = omniCache.rewriteSql(sqlValidator, sqlToRelConverter, planner, query);
+        }
+        catch (Exception e) {
+            LOG.warn("rewrite sql failed since : " + e.getMessage());
+        }
+        finally {
+            return rewrittenQuery;
+        }
+    }
+
+    private void addMaterializedView(Session session, QualifiedObjectName tableName, CalcitePrepare.Context prepareContext, RelOptPlanner planner)
+    {
+        Optional<ConnectorViewDefinition> connectorViewDefinition = metadata.getView(session, tableName);
+
+        if (connectorViewDefinition.isPresent()) {
+            List<String> viewDefaultSchemaPath = new ArrayList<>();
+            if (connectorViewDefinition.get() instanceof ConnectorMaterializedViewDefinition) {
+                String viewCatalog = ((ConnectorMaterializedViewDefinition) connectorViewDefinition.get()).getCurrentCatalog();
+                String viewSchema = ((ConnectorMaterializedViewDefinition) connectorViewDefinition.get()).getCurrentSchema();
+                if (viewCatalog != null) {
+                    viewDefaultSchemaPath.add(viewCatalog);
+                }
+                if (viewSchema != null) {
+                    viewDefaultSchemaPath.add(viewSchema);
+                }
+            }
+            Prepare.CatalogReader viewCatalogReader = omniCache.getCatalogReader(prepareContext, viewDefaultSchemaPath);
+            SqlValidator viewSqlValidator = omniCache.getSqlValidator(prepareContext, viewCatalogReader);
+            SqlToRelConverter viewSqlToRelConverter = omniCache.getSqlToRelConverter(prepareContext, viewCatalogReader, viewSqlValidator, planner);
+
+            omniCache.addMaterializationView(viewCatalogReader, viewSqlValidator, viewSqlToRelConverter, planner,
+                    ImmutableList.of(SystemSessionProperties.getMaterializedViewCatalogName(session), tableName.getSchemaName(), tableName.getObjectName()),
+                    connectorViewDefinition.get().getOriginalSql());
         }
     }
 

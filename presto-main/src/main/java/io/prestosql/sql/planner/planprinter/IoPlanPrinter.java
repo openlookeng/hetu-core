@@ -33,6 +33,8 @@ import io.prestosql.sql.planner.plan.PlanNode;
 import io.prestosql.sql.planner.plan.PlanVisitor;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableScanNode;
+import io.prestosql.sql.planner.plan.TableWriterNode;
+import io.prestosql.sql.planner.plan.TableWriterNode.CreateMaterializedTarget;
 import io.prestosql.sql.planner.plan.TableWriterNode.CreateReference;
 import io.prestosql.sql.planner.plan.TableWriterNode.CreateTarget;
 import io.prestosql.sql.planner.plan.TableWriterNode.DeleteAsInsertTarget;
@@ -494,6 +496,13 @@ public class IoPlanPrinter
                         target.getSchemaTableName().getSchemaName(),
                         target.getSchemaTableName().getTableName()));
             }
+            else if (writerTarget instanceof CreateMaterializedTarget) {
+                CreateMaterializedTarget target = (CreateMaterializedTarget) writerTarget;
+                context.setOutputTable(new CatalogSchemaTableName(
+                        target.getHandle().getCatalogName().getCatalogName(),
+                        target.getSchemaTableName().getSchemaName(),
+                        target.getSchemaTableName().getTableName()));
+            }
             else if (writerTarget instanceof InsertTarget) {
                 InsertTarget target = (InsertTarget) writerTarget;
                 context.setOutputTable(new CatalogSchemaTableName(
@@ -522,7 +531,7 @@ public class IoPlanPrinter
                         target.getSchemaTableName().getSchemaName(),
                         target.getSchemaTableName().getTableName()));
             }
-            else if (writerTarget instanceof CreateReference || writerTarget instanceof InsertReference || writerTarget instanceof UpdateReference) {
+            else if (writerTarget instanceof CreateReference || writerTarget instanceof TableWriterNode.CreateMaterializedReference || writerTarget instanceof InsertReference || writerTarget instanceof UpdateReference) {
                 throw new IllegalStateException(format("%s should not appear in final plan", writerTarget.getClass().getSimpleName()));
             }
             else {

@@ -16,24 +16,28 @@ package io.prestosql.sql.rewrite;
 
 import io.airlift.log.Logger;
 import io.prestosql.Session;
+import io.prestosql.SystemSessionProperties;
 import io.prestosql.connector.DataCenterUtility;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.metadata.MetadataUtil;
 import io.prestosql.metadata.QualifiedObjectName;
 import io.prestosql.metadata.TableHandle;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
+import io.prestosql.spi.connector.ConnectorMaterializedViewDefinition;
+import io.prestosql.spi.connector.ConnectorViewDefinition;
 import io.prestosql.spi.security.AccessDeniedException;
 import io.prestosql.sql.analyzer.QueryExplainer;
+import io.prestosql.sql.analyzer.SemanticException;
 import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.tree.AliasedRelation;
 import io.prestosql.sql.tree.AllColumns;
 import io.prestosql.sql.tree.AstVisitor;
 import io.prestosql.sql.tree.CreateIndex;
+import io.prestosql.sql.tree.CreateMaterializedView;
 import io.prestosql.sql.tree.CreateTableAsSelect;
 import io.prestosql.sql.tree.Except;
 import io.prestosql.sql.tree.Expression;
@@ -46,6 +50,7 @@ import io.prestosql.sql.tree.Node;
 import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.QueryBody;
 import io.prestosql.sql.tree.QuerySpecification;
+import io.prestosql.sql.tree.RefreshMaterializedView;
 import io.prestosql.sql.tree.Relation;
 import io.prestosql.sql.tree.SampledRelation;
 import io.prestosql.sql.tree.Select;
@@ -68,7 +73,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
 import static io.prestosql.sql.ParsingUtil.createParsingOptions;
+import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_TABLE;
 import static java.util.Objects.requireNonNull;
 
 public class RowFilterColumnMaskingRewrite
@@ -221,7 +228,7 @@ public class RowFilterColumnMaskingRewrite
             if (!table.getName().getPrefix().isPresent() && (!session.getCatalog().isPresent() || !session.getSchema().isPresent())) {
                 return table;
             }
-            QualifiedObjectName qualifiedObjectName = MetadataUtil.createQualifiedObjectName(session, table, table.getName());
+            QualifiedObjectName qualifiedObjectName = createQualifiedObjectName(session, table, table.getName());
             // This section of code is used to load DC sub-catalogs dynamically
             DataCenterUtility.loadDCCatalogForQueryFlow(session, metadata, qualifiedObjectName.getCatalogName());
 
@@ -384,6 +391,42 @@ public class RowFilterColumnMaskingRewrite
                     new CreateTableAsSelect(createTableAsSelect.getName(), query, createTableAsSelect.isNotExists(),
                             createTableAsSelect.getProperties(), createTableAsSelect.isWithData(), createTableAsSelect.getColumnAliases(),
                             createTableAsSelect.getComment());
+        }
+
+        @Override
+        protected Node visitCreateMaterializedView(CreateMaterializedView createMaterializedView, Void context)
+        {
+            Query query = (Query) visitQuery(createMaterializedView.getQuery(), context);
+            return createMaterializedView.getLocation().isPresent() ?
+                    new CreateMaterializedView(createMaterializedView.getLocation().get(), createMaterializedView.getName(), query,
+                            createMaterializedView.isNotExists(), createMaterializedView.getProperties(),
+                            createMaterializedView.getColumnAliases(), createMaterializedView.getComment()) :
+                    new CreateMaterializedView(createMaterializedView.getName(), query, createMaterializedView.isNotExists(),
+                            createMaterializedView.getProperties(), createMaterializedView.getColumnAliases(),
+                            createMaterializedView.getComment());
+        }
+
+        @Override
+        protected Node visitRefreshMaterializedView(RefreshMaterializedView refreshMaterializedView, Void context)
+        {
+            QualifiedObjectName tableName = createQualifiedObjectName(session, refreshMaterializedView, refreshMaterializedView.getTableName());
+            Optional<ConnectorViewDefinition> definition = metadata.getView(session, tableName);
+
+            if (!definition.isPresent()) {
+                throw new SemanticException(MISSING_TABLE, refreshMaterializedView, "Materialized View '%s' does not exist", tableName.toString());
+            }
+            ConnectorMaterializedViewDefinition mvDefinition = (ConnectorMaterializedViewDefinition) definition.get();
+            if (!mvDefinition.getCatalog().get().equals(
+                    session.getSystemProperties().get(SystemSessionProperties.MATERIALIZED_VIEW_CATALOG_NAME))) {
+                throw new SemanticException(MISSING_TABLE, refreshMaterializedView,
+                        "Please set session to original catalog, like set session materialized_view_catalog_name = '%s'",
+                        mvDefinition.getCatalog().get());
+            }
+            metadata.dropMaterializedView(session, mvDefinition, tableName);
+            String sql = mvDefinition.getFullSql();
+            Statement statement = sqlParser.createStatement(sql, createParsingOptions(session));
+            CreateMaterializedView createMv = (CreateMaterializedView) statement;
+            return createMv;
         }
 
         @Override

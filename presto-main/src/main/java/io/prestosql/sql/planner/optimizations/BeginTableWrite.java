@@ -19,6 +19,7 @@ import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TableHandle;
+import io.prestosql.spi.connector.ConnectorMaterializedViewDefinition;
 import io.prestosql.sql.planner.PlanNodeIdAllocator;
 import io.prestosql.sql.planner.SymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
@@ -34,6 +35,8 @@ import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableScanNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
+import io.prestosql.sql.planner.plan.TableWriterNode.CreateMaterializedReference;
+import io.prestosql.sql.planner.plan.TableWriterNode.CreateMaterializedTarget;
 import io.prestosql.sql.planner.plan.TableWriterNode.CreateReference;
 import io.prestosql.sql.planner.plan.TableWriterNode.CreateTarget;
 import io.prestosql.sql.planner.plan.TableWriterNode.DeleteAsInsertReference;
@@ -203,6 +206,12 @@ public class BeginTableWrite
             if (target instanceof CreateReference) {
                 CreateReference create = (CreateReference) target;
                 return new CreateTarget(metadata.beginCreateTable(session, create.getCatalog(), create.getTableMetadata(), create.getLayout()), create.getTableMetadata().getTable());
+            }
+            if (target instanceof CreateMaterializedReference) {
+                CreateMaterializedReference create = (CreateMaterializedReference) target;
+                return new CreateMaterializedTarget(metadata.beginCreateMaterializedView(session, create.getCatalog(), create.getTableMetadata(), (ConnectorMaterializedViewDefinition) create.getDefinition(), create.getLayout()),
+                        create.getTableMetadata().getTable(),
+                        ((ConnectorMaterializedViewDefinition) create.getDefinition()).getMetaCatalog());
             }
             if (target instanceof InsertReference) {
                 InsertReference insert = (InsertReference) target;

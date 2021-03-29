@@ -143,6 +143,27 @@ public interface AccessControl
     void checkCanSetTableComment(TransactionId transactionId, Identity identity, QualifiedObjectName tableName);
 
     /**
+     * Check if identity is allowed to create the materialized table.
+     *
+     * @throws io.prestosql.spi.security.AccessDeniedException if not allowed
+     */
+    void checkCanCreateMaterializedTable(TransactionId transactionId, Identity identity, QualifiedObjectName tableName, Set<String> columnNames);
+
+    /**
+     * Check if identity is allowed to refresh the materialized table.
+     *
+     * @throws io.prestosql.spi.security.AccessDeniedException if not allowed
+     */
+    void checkCanRefreshMaterializedTable(TransactionId transactionId, Identity identity, QualifiedObjectName tableName);
+
+    /**
+     * Check if identity is allowed to drop the materialized table.
+     *
+     * @throws io.prestosql.spi.security.AccessDeniedException if not allowed
+     */
+    void checkCanDropMaterializedTable(TransactionId transactionId, Identity identity, QualifiedObjectName tableName);
+
+    /**
      * Check if identity is allowed to show metadata of tables by executing SHOW TABLES, SHOW GRANTS etc. in a catalog.
      * <p>
      * NOTE: This method is only present to give users an error message when listing is not allowed.

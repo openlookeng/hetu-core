@@ -549,7 +549,7 @@ public class SqlQueryExecution
                               WarningCollector warningCollector)
     {
         LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector);
-        return logicalPlanner.plan(analysis);
+        return logicalPlanner.plan(analysis, stateMachine.getQuery());
     }
 
     private static Set<CatalogName> extractConnectors(Analysis analysis)
@@ -706,6 +706,11 @@ public class SqlQueryExecution
     public QueryId getQueryId()
     {
         return stateMachine.getQueryId();
+    }
+
+    public String getQuery()
+    {
+        return stateMachine.getQuery();
     }
 
     @Override

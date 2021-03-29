@@ -48,6 +48,11 @@ statement
          (COMMENT string)?
          (WITH properties)?                                            #createTable
     | DROP TABLE (IF EXISTS)? qualifiedName                            #dropTable
+    | CREATE MATERIALIZED VIEW (IF NOT EXISTS)? qualifiedName columnAliases?
+             (COMMENT string)?
+             (WITH properties)? AS (query | '('query')')               #createMaterializedView
+    | REFRESH MATERIALIZED VIEW (CONCURRENTLY)? qualifiedName          #refreshMaterializedView
+    | DROP MATERIALIZED VIEW (IF NOT EXISTS)? qualifiedName            #dropMaterializedView
     | CACHE TABLE tableName=qualifiedName
         (WHERE booleanExpression)?
         (WITH properties)?                #cacheTable
@@ -109,6 +114,7 @@ statement
         ('(' explainOption (',' explainOption)* ')')? statement        #explain
     | SHOW CREATE TABLE qualifiedName                                  #showCreateTable
     | SHOW CREATE VIEW qualifiedName                                   #showCreateView
+    | SHOW CREATE MATERIALIZED VIEW qualifiedName                      #showCreateMaterializedView
     | SHOW TABLES ((FROM | IN) qualifiedName)?
         (LIKE pattern=string (ESCAPE escape=string)?)?                 #showTables
     | SHOW (SCHEMAS | DATABASES) ((FROM | IN) (cluster=identifier '.')? catalog=identifier)?
@@ -541,7 +547,7 @@ nonReserved
     | SHOW | SOME | START | STATS | SUBSTRING | SYSTEM
     | TABLES | TABLESAMPLE | TEXT | TIES | TIME | TIMESTAMP | TO | TRANSACTION | TRY_CAST | TYPE
     | UNBOUNDED | UNCOMMITTED | USE | USER
-    | VALIDATE | VERBOSE | VIEW
+    | VALIDATE | VERBOSE | VIEW | MATERIALIZED
     | WORK | WRITE
     | YEAR
     | ZONE
@@ -749,6 +755,8 @@ WORK: 'WORK';
 WRITE: 'WRITE';
 YEAR: 'YEAR';
 ZONE: 'ZONE';
+MATERIALIZED: 'MATERIALIZED';
+REFRESH: 'REFRESH';
 INDEX: 'INDEX';
 BITMAP: 'BITMAP';
 BLOOM: 'BLOOM';

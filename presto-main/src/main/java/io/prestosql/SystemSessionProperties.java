@@ -149,6 +149,9 @@ public final class SystemSessionProperties
     public static final String REUSE_TABLE_SCAN = "reuse_table_scan";
     public static final String SPILL_REUSE_TABLESCAN = "spill_reuse_tablescan";
     public static final String SPILL_THRESHOLD_REUSE_TABLESCAN = "spill_threshold_reuse_tablescan";
+    public static final String MATERIALIZED_VIEW_CATALOG_NAME = "materialized_view_catalog_name";
+    public static final String MATERIALIZED_VIEW_ENABLED = "materialized_view_enabled";
+    public static final String MATERIALIZED_VIEW_USE_CBO_PLANNER = "materialized_view_use_cbo_planner";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -684,6 +687,19 @@ public final class SystemSessionProperties
                         SPILL_THRESHOLD_REUSE_TABLESCAN,
                         "Spiller Threshold (in MB) for TableScanOperator and WorkProcessorSourceOperatorAdapter for Reuse Exchange",
                         featuresConfig.getSpillOperatorThresholdReuseExchange(),
+                        false),
+                stringProperty(
+                        MATERIALIZED_VIEW_CATALOG_NAME,
+                        "Catalog used to store materialized view",
+                        featuresConfig.getMaterializedViewCatalogName(),
+                        false),
+                booleanProperty(MATERIALIZED_VIEW_ENABLED,
+                        "Enable materialized view",
+                        false,
+                        false),
+                booleanProperty(MATERIALIZED_VIEW_USE_CBO_PLANNER,
+                        "Materialized view use volcanoplanner or hepplanner",
+                        true,
                         false));
     }
 
@@ -1206,5 +1222,20 @@ public final class SystemSessionProperties
     public static int getSpillOperatorThresholdReuseExchange(Session session)
     {
         return session.getSystemProperty(SPILL_THRESHOLD_REUSE_TABLESCAN, Integer.class);
+    }
+
+    public static String getMaterializedViewCatalogName(Session session)
+    {
+        return session.getSystemProperty(MATERIALIZED_VIEW_CATALOG_NAME, String.class);
+    }
+
+    public static boolean isMaterializedViewEnabled(Session session)
+    {
+        return session.getSystemProperty(MATERIALIZED_VIEW_ENABLED, Boolean.class);
+    }
+
+    public static boolean isMaterializedViewCboPlannerUsed(Session session)
+    {
+        return session.getSystemProperty(MATERIALIZED_VIEW_USE_CBO_PLANNER, Boolean.class);
     }
 }

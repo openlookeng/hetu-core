@@ -27,6 +27,8 @@ import io.airlift.stats.JmxGcMonitor;
 import io.airlift.stats.PauseMeter;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
+import io.omnicache.OmniCache;
+import io.omnicache.OmniCacheFactory;
 import io.prestosql.GroupByHashPageIndexerFactory;
 import io.prestosql.PagesIndexPageSorter;
 import io.prestosql.SystemSessionProperties;
@@ -260,6 +262,9 @@ public class ServerMainModule
         configBinder(binder).bindConfig(SqlEnvironmentConfig.class);
 
         newOptionalBinder(binder, ExplainAnalyzeContext.class);
+
+        //omni cache
+        binder.bind(OmniCache.class).toInstance(OmniCacheFactory.create(serverConfig.getOmniCacheImplType()));
 
         // GC Monitor
         binder.bind(GcMonitor.class).to(JmxGcMonitor.class).in(Scopes.SINGLETON);

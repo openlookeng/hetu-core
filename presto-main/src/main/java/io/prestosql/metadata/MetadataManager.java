@@ -51,6 +51,7 @@ import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorCapabilities;
 import io.prestosql.spi.connector.ConnectorDeleteAsInsertTableHandle;
 import io.prestosql.spi.connector.ConnectorInsertTableHandle;
+import io.prestosql.spi.connector.ConnectorMaterializedViewDefinition;
 import io.prestosql.spi.connector.ConnectorMetadata;
 import io.prestosql.spi.connector.ConnectorOutputMetadata;
 import io.prestosql.spi.connector.ConnectorOutputTableHandle;
@@ -669,6 +670,38 @@ public final class MetadataManager
     }
 
     @Override
+    public void dropMaterializedView(Session session, ConnectorMaterializedViewDefinition definition, QualifiedObjectName name)
+    {
+        //drop table data
+        CatalogMetadata dataCatalogMetadata = getCatalogMetadataForWrite(session, definition.getCatalog().orElse(null));
+        CatalogName dataCatalogName = dataCatalogMetadata.getCatalogName();
+        ConnectorMetadata dataMetadata = getMetadataForWrite(session, dataCatalogName);
+        QualifiedObjectName dataTable = new QualifiedObjectName(
+                definition.getCatalog().orElse(null),
+                name.getSchemaName(),
+                name.getObjectName());
+        Optional<TableHandle> dataTableHandle = getTableHandle(session, dataTable);
+        dataTableHandle.ifPresent(tableHandle -> dataMetadata.dropTable(session.toConnectorSession(dataCatalogName), tableHandle.getConnectorHandle()));
+
+        //drop material view
+        Optional<CatalogMetadata> mvCatalogMetadata = getOptionalCatalogMetadata(session, name.getCatalogName());
+        if (mvCatalogMetadata.isPresent()) {
+            CatalogName mvCatalogName = mvCatalogMetadata.get().getCatalogName();
+            ConnectorMetadata mvMetadata = getMetadata(session, mvCatalogName);
+            Optional<TableHandle> mvTableHandle = getTableHandle(session, name);
+            mvTableHandle.ifPresent(tableHandle -> mvMetadata.dropMaterializedView(session.toConnectorSession(mvCatalogName), tableHandle.getConnectorHandle()));
+        }
+    }
+
+    @Override
+    public void refreshMaterializedView(Session session, TableHandle tableHandle)
+    {
+        CatalogName catalogName = tableHandle.getCatalogName();
+        ConnectorMetadata metadata = getMetadataForWrite(session, catalogName);
+        metadata.refreshMaterializedView(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle());
+    }
+
+    @Override
     public Optional<NewTableLayout> getInsertLayout(Session session, TableHandle table)
     {
         CatalogName catalogName = table.getCatalogName();
@@ -768,6 +801,37 @@ public final class MetadataManager
         CatalogName catalogName = tableHandle.getCatalogName();
         ConnectorMetadata metadata = getMetadata(session, catalogName);
         return metadata.finishCreateTable(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle(), fragments, computedStatistics);
+    }
+
+    @Override
+    public OutputTableHandle beginCreateMaterializedView(Session session, String catalogName, ConnectorTableMetadata tableMetadata, ConnectorMaterializedViewDefinition definition, Optional<NewTableLayout> layout)
+    {
+        String metaCatalog = definition.getMetaCatalog();
+        CatalogMetadata catalogMetadata = getOptionalCatalogMetadata(session, metaCatalog).get();
+        CatalogName catalog = catalogMetadata.getCatalogName();
+        ConnectorMetadata metadata = catalogMetadata.getMetadata();
+        metadata.beginCreateMaterializedView(tableMetadata, definition);
+
+        CatalogMetadata dataCatalogMetadata = getCatalogMetadataForWrite(session, catalogName);
+        CatalogName dataCatalog = dataCatalogMetadata.getCatalogName();
+        ConnectorMetadata dataConnectorMetadata = dataCatalogMetadata.getMetadata();
+        ConnectorTransactionHandle transactionHandle = dataCatalogMetadata.getTransactionHandleFor(dataCatalog);
+        ConnectorSession dataConnectorSession = session.toConnectorSession(dataCatalog);
+        ConnectorOutputTableHandle outputTablehandle = dataConnectorMetadata.beginCreateTable(dataConnectorSession, tableMetadata, layout.map(NewTableLayout::getLayout));
+        return new OutputTableHandle(dataCatalog, transactionHandle, outputTablehandle);
+    }
+
+    @Override
+    public Optional<ConnectorOutputMetadata> finishCreateMaterializedView(Session session, OutputTableHandle tableHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics, String originalTargetCatalog, SchemaTableName name)
+    {
+        CatalogMetadata catalogMetadata = getOptionalCatalogMetadata(session, originalTargetCatalog).get();
+        ConnectorMetadata metadata = catalogMetadata.getMetadata();
+        metadata.finishCreateMaterializedView(name);
+
+        CatalogMetadata dataCatalogMetadata = getCatalogMetadataForWrite(session, tableHandle.getCatalogName().getCatalogName());
+        CatalogName dataCatalogName = dataCatalogMetadata.getCatalogName();
+        ConnectorMetadata dataConnectorMetadata = getMetadata(session, dataCatalogName);
+        return dataConnectorMetadata.finishCreateTable(session.toConnectorSession(dataCatalogName), tableHandle.getConnectorHandle(), fragments, computedStatistics);
     }
 
     @Override

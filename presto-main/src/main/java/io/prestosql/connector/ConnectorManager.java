@@ -20,6 +20,7 @@ import io.airlift.discovery.client.Announcer;
 import io.airlift.discovery.client.ServiceAnnouncement;
 import io.airlift.log.Logger;
 import io.airlift.node.NodeInfo;
+import io.omnicache.OmniCache;
 import io.prestosql.connector.informationschema.InformationSchemaConnector;
 import io.prestosql.connector.system.DelegatingSystemTablesProvider;
 import io.prestosql.connector.system.MetadataBasedSystemTablesProvider;
@@ -82,6 +83,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
+import static io.omnicache.OmniCacheImplType.OPEN_LOOKENG;
 import static io.prestosql.connector.CatalogName.createInformationSchemaCatalogName;
 import static io.prestosql.connector.CatalogName.createSystemTablesCatalogName;
 import static io.prestosql.spi.HetuConstant.DATA_CENTER_CONNECTOR_NAME;
@@ -124,6 +126,7 @@ public class ConnectorManager
     private final Announcer announcer;
     private final ServerConfig serverConfig;
     private final NodeSchedulerConfig schedulerConfig;
+    private final OmniCache omniCache;
 
     @Inject
     public ConnectorManager(
@@ -147,7 +150,8 @@ public class ConnectorManager
             Announcer announcer,
             ServerConfig serverConfig,
             NodeSchedulerConfig schedulerConfig,
-            HeuristicIndexerManager heuristicIndexerManager)
+            HeuristicIndexerManager heuristicIndexerManager,
+            OmniCache omniCache)
     {
         this.hetuMetaStoreManager = hetuMetaStoreManager;
         this.metadataManager = metadataManager;
@@ -170,6 +174,7 @@ public class ConnectorManager
         this.serverConfig = serverConfig;
         this.schedulerConfig = schedulerConfig;
         this.heuristicIndexerManager = heuristicIndexerManager;
+        this.omniCache = omniCache;
     }
 
     @PreDestroy
@@ -243,7 +248,32 @@ public class ConnectorManager
 
         addCatalogConnector(catalog, connectorFactory, properties);
 
+        if (serverConfig.isCoordinator()) {
+            addSchema(catalogName);
+        }
+
         return catalog;
+    }
+
+    private void addSchema(String catalogName)
+    {
+        Map<String, Object> operand = new HashMap<>();
+
+        if (serverConfig.getOmniCacheImplType() == OPEN_LOOKENG) {
+            // for openlookeng catalog
+            operand.put("catalog", catalogName);
+            operand.put("transaction", transactionManager);
+            operand.put("metadata", metadataManager);
+        }
+        else {
+            // for jdbc catalog
+            String jdbcUrl = "jdbc:lk:" + nodeManager.getCurrentNode().getInternalUri().getRawSchemeSpecificPart();
+            operand.put("jdbcDriver", "io.hetu.core.jdbc.OpenLooKengDriver");
+            operand.put("jdbcUrl", jdbcUrl);
+            operand.put("jdbcUser", "user");
+            operand.put("jdbcCatalog", catalogName);
+        }
+        omniCache.addSchema(catalogName, operand);
     }
 
     /**

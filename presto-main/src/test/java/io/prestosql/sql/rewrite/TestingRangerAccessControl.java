@@ -136,6 +136,21 @@ public class TestingRangerAccessControl
     }
 
     @Override
+    public void checkCanCreateMaterializedTable(TransactionId transactionId, Identity identity, QualifiedObjectName tableName, Set<String> columnNames)
+    {
+    }
+
+    @Override
+    public void checkCanRefreshMaterializedTable(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
+    {
+    }
+
+    @Override
+    public void checkCanDropMaterializedTable(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
+    {
+    }
+
+    @Override
     public void checkCanShowTablesMetadata(TransactionId transactionId, Identity identity, CatalogSchemaName schema)
     {
     }

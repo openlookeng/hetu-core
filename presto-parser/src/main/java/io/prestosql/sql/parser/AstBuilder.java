@@ -41,6 +41,7 @@ import io.prestosql.sql.tree.Comment;
 import io.prestosql.sql.tree.Commit;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.CreateIndex;
+import io.prestosql.sql.tree.CreateMaterializedView;
 import io.prestosql.sql.tree.CreateRole;
 import io.prestosql.sql.tree.CreateSchema;
 import io.prestosql.sql.tree.CreateTable;
@@ -60,6 +61,7 @@ import io.prestosql.sql.tree.DoubleLiteral;
 import io.prestosql.sql.tree.DropCache;
 import io.prestosql.sql.tree.DropColumn;
 import io.prestosql.sql.tree.DropIndex;
+import io.prestosql.sql.tree.DropMaterializedView;
 import io.prestosql.sql.tree.DropRole;
 import io.prestosql.sql.tree.DropSchema;
 import io.prestosql.sql.tree.DropTable;
@@ -126,6 +128,7 @@ import io.prestosql.sql.tree.QuantifiedComparisonExpression;
 import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.QueryBody;
 import io.prestosql.sql.tree.QuerySpecification;
+import io.prestosql.sql.tree.RefreshMaterializedView;
 import io.prestosql.sql.tree.Relation;
 import io.prestosql.sql.tree.RenameColumn;
 import io.prestosql.sql.tree.RenameIndex;
@@ -274,6 +277,52 @@ class AstBuilder
                 getLocation(context),
                 getQualifiedName(context.qualifiedName()),
                 (Identifier) visit(context.identifier()));
+    }
+
+    @Override
+    public Node visitCreateMaterializedView(SqlBaseParser.CreateMaterializedViewContext context)
+    {
+        Optional<String> comment = Optional.empty();
+        if (context.COMMENT() != null) {
+            comment = Optional.of(((StringLiteral) visit(context.string())).getValue());
+        }
+
+        Optional<List<Identifier>> columnAliases = Optional.empty();
+        if (context.columnAliases() != null) {
+            columnAliases = Optional.of(visit(context.columnAliases().identifier(), Identifier.class));
+        }
+
+        List<Property> properties = ImmutableList.of();
+        if (context.properties() != null) {
+            properties = visit(context.properties().property(), Property.class);
+        }
+
+        return new CreateMaterializedView(
+                getLocation(context),
+                getQualifiedName(context.qualifiedName()),
+                (Query) visit(context.query()),
+                context.EXISTS() != null,
+                properties,
+                columnAliases,
+                comment);
+    }
+
+    @Override
+    public Node visitDropMaterializedView(SqlBaseParser.DropMaterializedViewContext context)
+    {
+        return new DropMaterializedView(getLocation(context), getQualifiedName(context.qualifiedName()), context.EXISTS() != null);
+    }
+
+    @Override
+    public Node visitRefreshMaterializedView(SqlBaseParser.RefreshMaterializedViewContext context)
+    {
+        return new RefreshMaterializedView(getLocation(context), getQualifiedName(context.qualifiedName()), context.CONCURRENTLY() != null);
+    }
+
+    @Override
+    public Node visitShowCreateMaterializedView(SqlBaseParser.ShowCreateMaterializedViewContext context)
+    {
+        return new ShowCreate(getLocation(context), ShowCreate.Type.MATERIALIZED, getQualifiedName(context.qualifiedName()));
     }
 
     @Override

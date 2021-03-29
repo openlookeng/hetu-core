@@ -27,7 +27,9 @@ import io.prestosql.metadata.TableHandle;
 import io.prestosql.metadata.UpdateTableHandle;
 import io.prestosql.metadata.VacuumTableHandle;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.connector.ConnectorMaterializedViewDefinition;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
+import io.prestosql.spi.connector.ConnectorViewDefinition;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.sql.planner.PartitioningScheme;
 import io.prestosql.sql.planner.Symbol;
@@ -178,6 +180,7 @@ public class TableWriterNode
     @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "@type")
     @JsonSubTypes({
             @JsonSubTypes.Type(value = CreateTarget.class, name = "CreateTarget"),
+            @JsonSubTypes.Type(value = CreateMaterializedTarget.class, name = "CreateMaterializedTarget"),
             @JsonSubTypes.Type(value = InsertTarget.class, name = "InsertTarget"),
             @JsonSubTypes.Type(value = UpdateTarget.class, name = "UpdateTarget"),
             @JsonSubTypes.Type(value = DeleteTarget.class, name = "DeleteTarget"),
@@ -227,6 +230,49 @@ public class TableWriterNode
         }
     }
 
+    public static class CreateMaterializedTarget
+            extends WriterTarget
+    {
+        private final OutputTableHandle handle;
+        private final SchemaTableName schemaTableName;
+        private final String originalTargetCatalog;
+
+        @JsonCreator
+        public CreateMaterializedTarget(
+                @JsonProperty("handle") OutputTableHandle handle,
+                @JsonProperty("schemaTableName") SchemaTableName schemaTableName,
+                @JsonProperty("originalTargetCatalog") String originalTargetCatalog)
+        {
+            this.handle = requireNonNull(handle, "handle is null");
+            this.schemaTableName = requireNonNull(schemaTableName, "schemaTableName is null");
+            this.originalTargetCatalog = requireNonNull(originalTargetCatalog, "schemaTableName is null");
+        }
+
+        @JsonProperty
+        public OutputTableHandle getHandle()
+        {
+            return handle;
+        }
+
+        @JsonProperty
+        public SchemaTableName getSchemaTableName()
+        {
+            return schemaTableName;
+        }
+
+        @JsonProperty
+        public String getOriginalTargetCatalog()
+        {
+            return originalTargetCatalog;
+        }
+
+        @Override
+        public String toString()
+        {
+            return handle.toString();
+        }
+    }
+
     public static class CreateTarget
             extends WriterTarget
     {
@@ -258,6 +304,50 @@ public class TableWriterNode
         public String toString()
         {
             return handle.toString();
+        }
+    }
+
+    // only used during planning -- will not be serialized
+    public static class CreateMaterializedReference
+            extends WriterTarget
+    {
+        private final String catalog;
+        private final ConnectorTableMetadata tableMetadata;
+        private final ConnectorMaterializedViewDefinition definition;
+        private final Optional<NewTableLayout> layout;
+
+        public CreateMaterializedReference(String catalog, ConnectorTableMetadata tableMetadata, Optional<NewTableLayout> layout, ConnectorMaterializedViewDefinition definition)
+        {
+            this.catalog = requireNonNull(catalog, "catalog is null");
+            this.tableMetadata = requireNonNull(tableMetadata, "tableMetadata is null");
+            this.layout = requireNonNull(layout, "layout is null");
+            this.definition = definition;
+        }
+
+        public String getCatalog()
+        {
+            return catalog;
+        }
+
+        public ConnectorTableMetadata getTableMetadata()
+        {
+            return tableMetadata;
+        }
+
+        public Optional<NewTableLayout> getLayout()
+        {
+            return layout;
+        }
+
+        public ConnectorViewDefinition getDefinition()
+        {
+            return definition;
+        }
+
+        @Override
+        public String toString()
+        {
+            return catalog + "." + tableMetadata.getTable();
         }
     }
 
