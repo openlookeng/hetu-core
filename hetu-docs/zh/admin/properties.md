@@ -543,12 +543,13 @@
 
 ### `hetu.heuristicindex.indexstore.filesystem.profile`
 
-> - **类型** `string`
-> 
-> 此属性定义用于存储索引文件的文件系统属性描述文件名称，该名称对应的属性文件应该存在于`etc/filesystem/`中。
+> - 类型 `string`
 >
-> - `LOCAL` 本地文件系统只应该被用于本地测试，或单节点部署情形。（否则索引文件将无法在机器之间共享）
-> - `HDFS` 应用于生产环境来在集群中共享数据。
+> 此属性定义用于读取和写入索引的文件系统配置文件。对应的配置文件必须存在于`etc/filesystem`中。例如，如果将该属性设置为`hetu.heuristicindex.filter.indexstore.filesystem.profile=index-hdfs1`，则必须在`etc/filesystem`中创建描述该文件系统访问的配置文件`index-hdfs1.properties`，其中包含的必要信息包括身份验证类型、配置和密钥表（如适用）。
+>
+> `LOCAL`文件系统类型仅应在测试期间或单节点群集中使用。
+>
+> 应在生产中使用`HDFS`文件系统类型，以便集群中的所有节点都能访问索引。所有节点都应配置为使用相同的文件系统配置文件。
 
 ## 执行计划缓存属性
 
@@ -641,3 +642,40 @@
 > 处理队列已满时，预取队列可以容纳的最大页数。预取队列用于急切读取数据，从而无需等待I/O执行查询。也可以使用 cte_max_prefetch_queue_size会话属性对每个查询指定。
 >
 > **说明：** 应在所有工作节点上配置该属性。
+
+## 分布式快照
+
+### `snapshot_enabled`
+
+> - 类型：`boolean`
+> - **默认值**：`false`
+>
+> 此会话属性用于启用或禁用分布式快照功能。
+
+### `hetu.experimental.snapshot.profile`
+
+> - 类型：`string`
+>
+> 此属性定义用于存储快照的文件系统配置文件。对应的配置文件必须存在于`etc/filesystem`中。例如，如果将该属性设置为`hetu.experimental.snapshot.profile=snapshot-hdfs1`，则必须在`etc/filesystem`中创建描述此文件系统的配置文件`snapshot-hdfs1.properties`，其中包含的必要信息包括身份验证类型、配置和密钥表（如适用）。
+>
+> 如在打开分布式快照的情况下执行任何查询时，需要配本属性。此属性必须包含在所有协调节点和工作节点的配置文件中。指定的文件系统必须可由所有工作节点访问，且这些工作节点必须能够读取和写入指定文件系统中的`/tmp/hetu/snapshot`文件夹。
+>
+> 作为实验性属性，或可以将快照存储在非文件系统位置，如连接器。
+
+### `hetu.snapshot.maxRetries`
+
+> - 类型：`int`
+> - **默认值**：`10`
+>
+> 此属性定义查询的错误恢复尝试的最大次数。达到限制时，查询失败。
+>
+> 也可以使用`snapshot_max_retries`会话属性在每个查询基础上指定。
+
+### `hetu.snapshot.retryTimeout`
+
+> - 类型：`duration`
+> - **默认值：**`10m`（10分钟）
+>
+> 此属性定义系统等待所有任务成功恢复的最大时长。如果在此超时时限内任何任务未就绪，则认为恢复失败，查询将尝试从较早快照恢复（如果可用）。
+>
+> 也可以使用`snapshot_retry_timeout`会话属性在每个查询基础上指定。
