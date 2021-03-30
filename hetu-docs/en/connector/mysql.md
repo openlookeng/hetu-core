@@ -42,19 +42,19 @@ Config the external function namespace `catalog.schema`
 which the external function will register to in the catalog property file.
 For example in the `etc/catalog/mysql.properties`, we can write:
 ```Properties
-jdbc.pushdown.remotenamespace=example.default
+jdbc.pushdown.remotenamespace=mysqlfun.default
 ```
 
 External Function Push Down
 ---------------------------
-MySQL connector support to push external function down to data source:
+MySQL connector support to push external function down to data source.
 
 Config the function namespace `catalog.schema` in the catalog property file to declare
  which function namespaces the connector support to push down,
  for example in the `etc/catalog/mysql.properties`, we can write:
 ```Properties
-jdbc.pushdown.remotenamespace=example1.default|example2.default|example3.default|
-#declare that Connector can support to push down external function register in example1.default, example2.default and example3.default.
+jdbc.pushdown.remotenamespace=mysqlfun1.default|mysqlfun2.default|mysqlfun3.default
+#declare that Connector can support to push down external function register in mysqlfun1.default, mysqlfun2.default and mysqlfun3.default.
 ```
 
 

@@ -55,10 +55,10 @@ public interface ExternalFunctionHub
 ## 配置外部函数注册的命名空间
 
 在完成上述的注册过程之后，你就可以在Connector的Catalog文件中配置你所注册的外部函数需要写入的`function-namespace-manager`的`catalog.schema`的函数命名空间。
-例如在`etc/catalog/mysql.properties`配置`catalog.schema`函数命名空间为`example.default`：
+例如在`etc/catalog/mysql.properties`配置`catalog.schema`函数命名空间为`mysqlfun.default`：
 
 ```Properties
-connector.externalfunction.namespace=example.default
+connector.externalfunction.namespace=mysqlfun.default
 ```
 
 ## 外部函数下推
@@ -81,20 +81,20 @@ openLooKeng已经支持了包括datacenter、hana、oracle、mysql、greenplum�
 3.配置当前Connector支持下推的函数命名空间
 在上述代码开发完成后，你需要将当前Connector支持的函数命名空间配置在Connector的Catalog文件中。例如在`etc/catalog/mysql.properties`中配置：
 ```Properties
-jdbc.pushdown.remotenamespace=example.default
+jdbc.pushdown.remotenamespace=mysqlfun.default
 ```
 一个Connector实例可以声明自己支持多个函数命名空间中的函数，在`jdbc.pushdown.remotenamespace`配置项中使用'|'分割既可。例如：
 ```Properties
-jdbc.pushdown.remotenamespace=example1.default|example2.default|example3.default|
-#表示当前Connector实例同时支持example1.default、example2.default、example3.default三个函数命名空间最终的函数下推到当前连接的数据源中执行。
+jdbc.pushdown.remotenamespace=mysqlfun1.default|mysqlfun2.default|mysqlfun3.default
+#表示当前Connector实例同时支持 mysqlfun1.default、mysqlfun2.default、mysqlfun3.default三个函数命名空间最终的函数下推到当前连接的数据源中执行。
 ```
 
 在外部函数下推功能适配完成后，你就可以直接在输入openLooKeng的SQL 语句中直接使用外部函数处理数据源的数据。系统会将外部函数下推到Connector连接的数据源执行。
 例如SQL 语句：
 ```SQL
-select example.default.format(col1, 2) from double_table;
+select mysqlfun.default.format(col1, 2) from double_table;
 ```
-外部函数 `example.default.format`会下推到数据源执行。下推语句为符合数据源SQL 语法的SQL语句，例如可能为：
+外部函数 `mysqlfun.default.format`会下推到数据源执行。下推语句为符合数据源SQL 语法的SQL语句，例如可能为：
 ```SQL
 SELECT format(col1,2)  FROM double_table
 ```
