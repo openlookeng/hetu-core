@@ -29,6 +29,12 @@ This section describes the most important config properties that may be used to 
 >
 > This property make exception stack trace which happen in openLooKeng visible or invisible. While it is set to be `true`, the stack trace is visible for all users. While it is set as default or `false`, the stack trace is invisible for all users.
 
+### `openlookeng.admins`
+
+> - **Type：** `string`
+> - **Default value：** `No set`
+>
+> This property is used to set the admin user. The admin user has the authority to obtain all users query history and download all users WEB UI query results. The admin user is not set by default. When multiple admin users need to be set, use a comma to separate the multiple users.
 
 ## http security headers properties
 

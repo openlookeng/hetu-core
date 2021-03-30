@@ -41,10 +41,22 @@ service-defs
 
 2). Ranger 服务类型定义的注册
 
-使用 Ranger Admin 提供的 REST API 向 Ranger 注册服务类型定义。注册后，Ranger Admin 将提供 UI 以创建服务实例（在以前的版本中称为存储库）和服务类型策略。Ranger 插件使用服务类型定义和策略来确定请求是否有访问权限以进行授权。如下示例所示，可以使用 curl 命令调用 REST API 接口：
+使用 Ranger Admin 提供的 REST API 向 Ranger 注册服务类型定义。注册后，Ranger Admin 将提供 UI 以创建服务实例（在以前的版本中称为存储库）和服务类型策略。Ranger 插件使用服务类型定义和策略来确定请求是否有访问权限以进行授权。如下示例所示，可以使用 curl 命令调用 REST API 接口注册服务：
 
 ```
 curl -u admin:password -X POST -H "Accept: application/json" -H "Content-Type: application/json" -d @service-defs/ranger-servicedef-openlookeng.json http://ranger-admin-host:port/service/plugins/definitions
+```
+
+Ranger的服务查询 REST API 示例:
+
+```
+curl -u admin:password -X GET -H "Accept: application/json" -H "Content-Type: application/json" http://ranger-admin-host:port/service/plugins/definitions
+```
+
+Ranger的服务删除 REST API 示例:
+
+```
+curl -u admin:password -X DELETE http://ranger-admin-host:port/service/plugins/definitions/{service id}
 ```
 
 3). 复制 openlookeng 目录到 Ranger Admin 安装目录下的 ranger-plugins 目录 (例子：ranger-&lt;ranger.version&gt;-admin/ews/webapp/WEB-INF/classes/ranger-plugins/)
@@ -114,6 +126,8 @@ Ranger策略管理
     - show：显示当前 catalog 或者指定 catalog 下的所有授权 schema。
 - sessionproperty
     - alter：设置 catalog 会话属性。
+- impersonateuser
+    - impersonate : Kerberos或LDAP认证用户模拟openLooKeng查询用户。
 - schema
     - drop：删除已有 schema。
     - alter：修改已有 schema 的定义。
@@ -131,6 +145,25 @@ Ranger策略管理
     - show：显示指定表下的所有授权列的类型和其他属性。
 - column
     - select：检索数据；只有授予 select 权限，show columns 才能显示对应的列。
+  
+###  列掩码
+
+列掩码只适用于`select`操作，指定用户只能获取掩码后的数据。 openLooKeng目前支持8种掩码策略。
+
+| 掩码类型                            | 描述                                                  |
+| :--------------------------------- | :----------------------------------------------------------- |
+| `Redact`                           | 小写字母转化为`x`，大写字母转化为`X`，数字转化为`0`。 |
+| `Partial mask: show last 4`        | 显示最后四个字符；其他转化为'X'。 |
+| `Partial mask: show first 4`       | 显示前四个字符；其他转化为'X'。 |
+| `Hash`                             | 使用sha256得到的哈希值。 |
+| `Nullify`                          | 替换为NULL。 |
+| `Unmasked (retain original value)` | 不进行掩码。 |
+| `Date: show only year`             | Date类型：只显示年份。 |
+| `Custom`                           | 自定义。 例子: cast(concat({col}, "test") as {type})。 |
+
+###  行过滤
+
+行过滤只适用于`select`操作，指定用户只能获取过滤后的数据。通过将自定义过滤表达式作为SQL中的`where`条件实现数据过滤。
 
 ###  策略配置参考
 

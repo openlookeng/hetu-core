@@ -21,3 +21,13 @@ openLooKeng提供了一个用于监视和管理查询的Web界面。Web界面可
 有关查询的详细信息，请单击查询ID链接。查询详细信息页有一个摘要部分、查询的各个阶段的图形表示和任务列表。可以点击每个任务ID以获得有关该任务的更多信息。
 
 摘要部分有一个按钮，用于终止当前正在运行的查询。在摘要部分有两个可视化：任务执行和时间线。通过单击JSON链接，可以获得包含有关查询的信息和统计信息的完整JSON文档。这些可视化和其他统计信息可用于分析查询所花费的时间。
+
+## 通用属性
+
+### `hetu.queryeditor-ui.allow-insecure-over-http`
+
+> -   **类型:** `boolean`
+> -   **允许值** `true`, `false`
+> -   **默认值:** `false`
+>
+> 默认情况下，基于HTTP的非安全环境禁用WEB UI。可以通过配置`etc/config.properties`文件的`hetu.queryeditor-ui.allow-insecure-over-http`属性启用(例子: hetu.queryeditor-ui.allow-insecure-over-http=true)。
