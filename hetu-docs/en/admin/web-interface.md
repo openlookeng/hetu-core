@@ -24,3 +24,13 @@ For more detailed information about a query, simply click the query ID link. The
 
 The summary section has a button to kill the currently running query. There are two visualizations available in the summary section: task execution and timeline. The full JSON document containing information
 and statistics about the query is available by clicking the *JSON* link. These visualizations and other statistics can be used to analyze where time is being spent for a query.
+
+## General Properties
+
+### `hetu.queryeditor-ui.allow-insecure-over-http`
+
+> -   **Type:** `boolean`
+> -   **Allowed values:** `true`, `false`
+> -   **Default value:** `false`
+>
+> Insecure authentication over HTTP is disabled by default. This could be overridden via "hetu.queryeditor-ui.allow-insecure-over-http" property of "etc/config.properties" (e.g. hetu.queryeditor-ui.allow-insecure-over-http=true).

@@ -41,10 +41,22 @@ service-defs
 
 2). Register Service Type definition with Ranger
 
-Service type definition should be registered with Ranger using REST API provided by Ranger Admin.  Once registered, Ranger Admin will provide UI to create service instances (called as repositories in previous releases) and policies for the service-type. Ranger plugin uses the service type definition and the policies to determine if an access request should be granted or not. The REST API can be invoked using curl command as shown in the example below :
+Service type definition should be registered with Ranger using REST API provided by Ranger Admin.  Once registered, Ranger Admin will provide UI to create service instances (called as repositories in previous releases) and policies for the service-type. Ranger plugin uses the service type definition and the policies to determine if an access request should be granted or not. The register REST API can be invoked using curl command as shown in the example below :
 
 ```
 curl -u admin:password -X POST -H "Accept: application/json" -H "Content-Type: application/json" -d @service-defs/ranger-servicedef-openlookeng.json http://ranger-admin-host:port/service/plugins/definitions
+```
+
+The example of query REST API of Ranger:
+
+```
+curl -u admin:password -X GET -H "Accept: application/json" -H "Content-Type: application/json" http://ranger-admin-host:port/service/plugins/definitions
+```
+
+The example of delete REST API of Ranger:
+
+```
+curl -u admin:password -X DELETE http://ranger-admin-host:port/service/plugins/definitions/{service id}
 ```
 
 3). Copy openlookeng folder to ranger-plugins folder of Ranger Admin installed directory (e.g. ranger-&lt;ranger.version&gt;-admin/ews/webapp/WEB-INF/classes/ranger-plugins/)
@@ -114,6 +126,8 @@ You can add a new policy from the Ranger Admin's Policy Listing Page of openLooK
     - show : List the available schemas in `catalog` or in the current catalog.
 - sessionproperty
     - alter : Set a catalog session property value.
+- impersonateuser
+    - impersonate : Impersonate openLooKeng query user for the authenticated user of Kerberos or LDAP.
 - schema
     - drop : Drop an existing schema.
     - alter : Change the definition of an existing schema.
@@ -131,6 +145,25 @@ You can add a new policy from the Ranger Admin's Policy Listing Page of openLooK
     - show : List the available columns in `table` along with their data type and other attributes.
 - column
     - select : Retrieve rows from zero or more tables; Only the `select` privilege was granted, the column can be available for show columns.
+
+###  Column mask
+
+Column mask is only suitable for `select` operation, the specified user can only access the data after the mask. At present, openLooKeng support 8 mask policies.
+
+| Masking Option                     | Description                                                  |
+| :--------------------------------- | :----------------------------------------------------------- |
+| `Redact`                           | Replace lowercase with `x`, uppercase with `X`, digits with `0`. |
+| `Partial mask: show last 4`        | Show last 4 characters; replace rest with `X`. |
+| `Partial mask: show first 4`       | Show first 4 characters; replace rest with `x`. |
+| `Hash`                             | Hash the value of a varchar with sha256. |
+| `Nullify`                          | Replace with NULL. |
+| `Unmasked (retain original value)` | No masking. |
+| `Date: show only year`             | Date: show only year. |
+| `Custom`                           | Custom. Example: cast(concat({col}, "test") as {type}). |
+
+###  Row filter
+
+Row filter is only suitable for `select` operation, the specified user can only access the data after filter. You can customize the filter expression as the condition in `where` of SQL.
 
 ###  Policy Reference
 

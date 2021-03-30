@@ -27,6 +27,13 @@
 > 
 > 此属性控制系统是否能够在CLI、WEB UI等对外展示系统出现Exception时的代码调用栈. 当设置为`true`时对外展示给所有用户，设置为`false`或者采用默认设置，不展示给任何用户。
 
+### `openlookeng.admins`
+
+> - **类型：** `string`
+> - **默认值：** `不设置`
+>
+> 此属性用于设置admin用户，admin用户具有获取所有用户查询历史、下载所有用户WEB UI查询结果的权限。默认不设置admin用户，当需要设置多个admin用户时，多个用户间使用逗号隔开。
+
 ## http 安全头部属性
 
 ### `http-header.content-security-policy`
