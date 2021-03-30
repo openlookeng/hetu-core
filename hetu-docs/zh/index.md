@@ -44,7 +44,7 @@ headless: true
     - [状态存储]({{< relref "./docs/admin/state-store.md" >}})
     - [元数据存储]({{< relref "./docs/admin/meta-store.md" >}})
     - [审计日志]({{< relref "./docs/admin/audit-log.md" >}})
-
+    - [可靠查询执行]({{< relref "./docs/admin/reliable-execution.md" >}})
 - [查询优化器]("#")
     - [表统计]({{< relref "./docs/optimizer/statistics.md" >}})
     - [EXPLAIN成本]({{< relref "./docs/optimizer/cost-in-explain.md" >}})
@@ -198,7 +198,7 @@ headless: true
     - [启发式索引]({{< relref "./docs/develop/indexer.md" >}})
     - [Hive ORC Cache]({{< relref "./docs/develop/hive-orc-cache.md" >}})
     - [外部函数注册和下推]({{< relref "./docs/develop/externalfunction-registration-pushdown.md" >}})
-
+    - [Star-tree多维数据集]({{< relref "./docs/develop/star-tree-cube.md" >}})
 - [openLooKeng REST接口说明]({{< relref "./docs/rest/_index.md" >}})
     - [节点资源]({{< relref "./docs/rest/node.md" >}})
     - [查询资源]({{< relref "./docs/rest/query.md" >}})
