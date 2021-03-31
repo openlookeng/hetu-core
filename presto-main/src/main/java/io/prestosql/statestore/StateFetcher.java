@@ -14,6 +14,7 @@
  */
 package io.prestosql.statestore;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.json.ObjectMapperProvider;
@@ -87,7 +88,7 @@ public class StateFetcher
         checkState(backgroundTask == null, "StateFetcher already started");
         backgroundTask = stateUpdateExecutor.scheduleWithFixedDelay(() -> {
             try {
-                fetchStates();
+                fetchAllStates();
             }
             catch (Exception e) {
                 LOG.error("Error fetching query states: " + e.getMessage());
@@ -130,11 +131,11 @@ public class StateFetcher
     }
 
     /**
-     * Fetch state from state store to cache store
+     * Fetch all states from state store to cache store
      *
      * @throws IOException exception when failed to deserialize states
      */
-    public void fetchStates()
+    public void fetchAllStates()
             throws IOException
     {
         synchronized (this) {
@@ -148,7 +149,6 @@ public class StateFetcher
                     start,
                     new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(start)));
 
-            DateTime currentTime = new DateTime(DateTimeZone.UTC);
             for (String stateCollectionName : stateCollections) {
                 StateCollection stateCollection = stateStoreProvider.getStateStore().getStateCollection(stateCollectionName);
                 if (stateCollection == null) {
@@ -161,16 +161,7 @@ public class StateFetcher
 
                 if (stateCollection.getType() == StateCollection.Type.MAP) {
                     Map<String, String> states = ((StateMap<String, String>) stateCollection).getAll();
-
-                    ImmutableMap.Builder<String, SharedQueryState> queryStatesBuilder = ImmutableMap.builder();
-                    for (Map.Entry<String, String> entry : states.entrySet()) {
-                        SharedQueryState state = MAPPER.readerFor(SharedQueryState.class).readValue(entry.getValue());
-                        if (isStateExpired(state, currentTime)) {
-                            handleExpiredQueryState(state);
-                        }
-                        queryStatesBuilder.put(entry.getKey(), state);
-                    }
-                    StateCacheStore.get().setCachedStates(stateCollectionName, queryStatesBuilder.build());
+                    StateCacheStore.get().setCachedStates(stateCollectionName, deserializeFetchedStates(states));
                 }
                 else {
                     LOG.warn("Unsupported state collection type: %s", stateCollection.getType());
@@ -185,11 +176,12 @@ public class StateFetcher
     }
 
     /**
-     * Fetch state from state store to cache store
+     * Fetch states only related to running queries from state store to cache store
+     * This is used when not all the states are needed for better states fetching performance
      *
      * @throws IOException exception when failed to deserialize states
      */
-    public void fetchQueryStates(StateStore stateStore)
+    public void fetchRunningQueryStates(StateStore stateStore)
             throws IOException
     {
         synchronized (this) {
@@ -198,30 +190,35 @@ public class StateFetcher
                     start,
                     new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(start)));
 
-            DateTime currentTime = new DateTime(DateTimeZone.UTC);
             StateCollection cpuUsageCollection = stateStore.getStateCollection(CPU_USAGE_STATE_COLLECTION_NAME);
             StateCollection queryStateCollection = stateStore.getStateCollection(QUERY_STATE_COLLECTION_NAME);
 
             StateCacheStore.get().setCachedStates(CPU_USAGE_STATE_COLLECTION_NAME, ((StateMap) cpuUsageCollection).getAll());
 
             Map<String, String> states = ((StateMap<String, String>) queryStateCollection).getAll();
-
-            ImmutableMap.Builder<String, SharedQueryState> queryStatesBuilder = ImmutableMap.builder();
-            for (Map.Entry<String, String> entry : states.entrySet()) {
-                SharedQueryState state = MAPPER.readerFor(SharedQueryState.class).readValue(entry.getValue());
-                if (isStateExpired(state, currentTime)) {
-                    handleExpiredQueryState(state);
-                }
-                queryStatesBuilder.put(entry.getKey(), state);
-            }
-            StateCacheStore.get().setCachedStates(QUERY_STATE_COLLECTION_NAME, queryStatesBuilder.build());
+            StateCacheStore.get().setCachedStates(QUERY_STATE_COLLECTION_NAME, deserializeFetchedStates(states));
 
             long end = System.currentTimeMillis();
-            LOG.debug("updateStates ends at current time milliseconds: %s, at format HH:mm:ss:SSS:%s, total time use: %s",
+            LOG.debug("fetchStates ends at current time milliseconds: %s, at format HH:mm:ss:SSS:%s, total time use: %s",
                     end,
                     new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(end)),
                     end - start);
         }
+    }
+
+    private Map<String, SharedQueryState> deserializeFetchedStates(Map<String, String> states)
+            throws JsonProcessingException
+    {
+        DateTime currentTime = new DateTime(DateTimeZone.UTC);
+        ImmutableMap.Builder<String, SharedQueryState> queryStatesBuilder = ImmutableMap.builder();
+        for (Map.Entry<String, String> entry : states.entrySet()) {
+            SharedQueryState state = MAPPER.readerFor(SharedQueryState.class).readValue(entry.getValue());
+            if (isStateExpired(state, currentTime)) {
+                handleExpiredQueryState(state);
+            }
+            queryStatesBuilder.put(entry.getKey(), state);
+        }
+        return queryStatesBuilder.build();
     }
 
     /**

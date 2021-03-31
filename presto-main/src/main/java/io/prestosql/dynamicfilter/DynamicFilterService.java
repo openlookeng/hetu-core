@@ -309,10 +309,6 @@ public class DynamicFilterService
             if (!criterias.isEmpty()) {
                 registerTasksHelper(node, criterias.get(0).getRight(), joinNode.getDynamicFilters(), taskIds, workers, stateMachine);
             }
-            else {
-                log.warn("registerTasks is empty");
-            }
-        //    registerTasksHelper(node, (joinNode.getCriteria().isEmpty() ? null : joinNode.getCriteria().get(0).getRight()), joinNode.getDynamicFilters(), taskIds, workers, stateMachine);
         }
         else if (node instanceof SemiJoinNode) {
             SemiJoinNode semiJoinNode = (SemiJoinNode) node;

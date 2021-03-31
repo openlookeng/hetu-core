@@ -185,7 +185,7 @@ public class TestStateFetcher
     {
         supportCollectionTypeMAP(true);
         stateFetcher.start();
-        stateFetcher.fetchStates();
+        stateFetcher.fetchAllStates();
         assertEquals(StateCacheStore.get().getCachedStates(STATE_COLLECTION_QUERY).size(), CACHED_STATES_MAP_SIZE);
     }
 
@@ -194,7 +194,7 @@ public class TestStateFetcher
             throws Exception
     {
         supportCollectionWithInvalidStates();
-        stateFetcher.fetchStates();
+        stateFetcher.fetchAllStates();
         assertEquals(StateCacheStore.get().getCachedStates(STATE_COLLECTION_QUERY).size(), CACHED_STATES_MAP_SIZE);
     }
 
@@ -205,7 +205,7 @@ public class TestStateFetcher
         stateStoreMockData();
         mockStateCollectionData();
         when(stateStoreProvider.getStateStore()).then(new Returns(STRING_NULL));
-        stateFetcher.fetchStates();
+        stateFetcher.fetchAllStates();
         assertEquals(StateCacheStore.get().getCachedStates(STATE_COLLECTION_QUERY).size(), CACHED_STATES_MAP_SIZE);
     }
 
@@ -215,7 +215,7 @@ public class TestStateFetcher
     {
         stateStoreMockData();
         mockStateCollectionEmptyData();
-        stateFetcher.fetchStates();
+        stateFetcher.fetchAllStates();
         assertEquals(StateCacheStore.get().getCachedStates(STATE_COLLECTION_QUERY).size(), CACHED_STATES_MAP_SIZE);
     }
 
@@ -247,7 +247,7 @@ public class TestStateFetcher
             throws Exception
     {
         supportCollectionTypeMAP(true);
-        stateFetcher.fetchStates();
+        stateFetcher.fetchAllStates();
         assertEquals(StateCacheStore.get().getCachedStates(STATE_COLLECTION_QUERY).size(), CACHED_STATES_MAP_SIZE);
     }
 
@@ -256,7 +256,7 @@ public class TestStateFetcher
             throws Exception
     {
         supportCollectionTypeMAP(false);
-        stateFetcher.fetchStates();
+        stateFetcher.fetchAllStates();
         Map stateCacheStore = StateCacheStore.get().getCachedStates(STATE_COLLECTION_QUERY);
         assertEquals(StateCacheStore.get().getCachedStates(STATE_COLLECTION_QUERY).size(), CACHED_STATES_MAP_SIZE);
         //TODO check state change
