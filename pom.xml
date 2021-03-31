@@ -576,13 +576,13 @@
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-cube</artifactId>
-                <version>${dep.hetu.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-startree</artifactId>
-                <version>${dep.hetu.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
