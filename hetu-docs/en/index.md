@@ -214,6 +214,7 @@ headless: true
     - [Task Resource]({{< relref "./docs/rest/task.md" >}})
 
 - [Release Notes]("#")
+    - [1.2.0]({{< relref "./docs/releasenotes/releasenotes-1.2.0.md" >}})
     - [1.1.0]({{< relref "./docs/releasenotes/releasenotes-1.1.0.md" >}})
     - [1.0.1]({{< relref "./docs/releasenotes/releasenotes-1.0.1.md" >}})
     - [1.0.0]({{< relref "./docs/releasenotes/releasenotes-1.0.0.md" >}})
