@@ -316,18 +316,25 @@ public class SliceDictionarySelectiveColumnReader
     private void skip(int items)
             throws IOException
     {
-        if (presentStream != null) {
-            int dataToSkip = presentStream.countBitsSet(items);
-            if (inDictionaryStream != null) {
-                inDictionaryStream.skip(dataToSkip);
+        if (dataStream == null) {
+            if (presentStream != null) {
+                presentStream.skip(items);
             }
-            dataStream.skip(dataToSkip);
         }
         else {
-            if (inDictionaryStream != null) {
-                inDictionaryStream.skip(items);
+            if (presentStream != null) {
+                int dataToSkip = presentStream.countBitsSet(items);
+                if (inDictionaryStream != null) {
+                    inDictionaryStream.skip(dataToSkip);
+                }
+                dataStream.skip(dataToSkip);
             }
-            dataStream.skip(items);
+            else {
+                if (inDictionaryStream != null) {
+                    inDictionaryStream.skip(items);
+                }
+                dataStream.skip(items);
+            }
         }
     }
 
