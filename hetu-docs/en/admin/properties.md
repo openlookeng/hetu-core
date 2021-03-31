@@ -279,6 +279,15 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 >
 > Increasing the value may improve network throughput if there is high latency. Decreasing the value may improve query performance for large clusters as it reduces skew due to the exchange client buffer holding responses for more tasks (rather than hold more data from fewer tasks).
 
+### `exchange.max-error-duration`
+
+> -   **Type:** `duration`
+> -   **Minimum value:** `1m`
+> -   **Default value:** `7m`
+>
+> The maximum amount of time coordinator waits for inter-task related errors to be resolved before it's considered a failure.
+
+
 ### `sink.max-buffer-size`
 
 > -   **Type:** `data size`
@@ -698,6 +707,15 @@ helps with cache affinity scheduling.
 >
 > **Note:** This should be configured in all workers.
 
+## Query Manager
+
+### `query.remote-task.max-error-duration`
+
+> -   **Type:** `duration`
+> -   **Default value:** `5m`
+> 
+> The maximum time coordinator waits for remote-task related error to be resolved before it's considered a failure.
+
 ## Distributed Snapshot
 
 ### `snapshot_enabled`
@@ -711,7 +729,7 @@ helps with cache affinity scheduling.
 
 > -   **Type:** `string`
 >
-> This property defines the file system profile used to stored snapshots. The corresponding profile must exist in `etc/filesystem`. For example, if this property is set as `hetu.experimental.snapshot.profile=snapshot-hdfs1`, a profile describing this filesystem `snapshot-hdfs1.properties` must be created in `etc/filesystem` with necessary information including authentication type, config, and keytabs (if applicable).
+> This property defines the [filesystem](../develop/filesystem.md#Filesystem Access Utilities) profile used to stored snapshots. The corresponding profile must exist in `etc/filesystem`. For example, if this property is set as `hetu.experimental.snapshot.profile=snapshot-hdfs1`, a profile describing this filesystem `snapshot-hdfs1.properties` must be created in `etc/filesystem` with necessary information including authentication type, config, and keytabs (if applicable).
 >
 > This property is required if any query is executed with distributed snapshot turned on. It must be included in configuration files for all coordinators and all workers. The specified file system must be accessible by all workers, and they must be able to read from and write to the `/tmp/hetu/snapshot` folder in the specified file system.
 >
@@ -722,7 +740,7 @@ helps with cache affinity scheduling.
 > -   **Type:** `int`
 > -   **Default value:** `10`
 >
-> This property defines the maxinum number of error recovery attempts for a query. When the limit is reached, the query fails.
+> This property defines the maximum number of error recovery attempts for a query. When the limit is reached, the query fails.
 >
 > This can also be specified on a per-query basis using the `snapshot_max_retries` session property.
 
@@ -731,6 +749,6 @@ helps with cache affinity scheduling.
 > -   **Type:** `duration`
 > -   **Default value:** `10m` (10 minutes)
 >
-> This property defines the maxinum amount of time for the system to wait until all tasks are successfully restored. If any task is not ready within this timeout, then the recovery attempt is considered a failure, and the query will try to resume from an earlier snapshot if available.
+> This property defines the maximum amount of time for the system to wait until all tasks are successfully restored. If any task is not ready within this timeout, then the recovery attempt is considered a failure, and the query will try to resume from an earlier snapshot if available.
 >
 > This can also be specified on a per-query basis using the `snapshot_retry_timeout` session property.

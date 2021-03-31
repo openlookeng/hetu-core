@@ -19,7 +19,7 @@ Distributed snapshot is most useful for long running queries. It is disabled by 
 
 To be able to resume execution from a previously saved snapshot, there must be a sufficient number of workers available so that all previous tasks can be restored. To enable distributed snapshot for a query, the following is required:
 - at least 2 workers
-- at least 80% of previously available nodes still active for the resume to be successful. If not enough workers are available, the query reruns from the beginning.
+- at least 80% of previously available nodes still active for the resume to be successful. If not enough workers are available, the query will not be able to resume from any previous snapshot, so the query reruns from the beginning.
 
 ## Limitations
 
@@ -36,9 +36,9 @@ When a query that does not meet the above requirements is submitted with distrib
 
 ## Detection
 
-Error recovery is triggered when communication between the coordinator and a remote task fails for an extended period of time, as controlled by the `query.remote-task.max-error-duration` configuration.
+Error recovery is triggered when communication between the coordinator and a remote task fails for an extended period of time, as controlled by the [`query.remote-task.max-error-duration`](properties.md#queryremote-taskmax-error-duration) configuration.
 
-Another relevant configuration is `exchange.max-error-duration`, which affects inter-task communication errors. It is recommended that this property is configured with a duration longer than `query.remote-task.max-error-duration`, to increase the chance of worker failure recovery.
+Another relevant configuration is [`exchange.max-error-duration`](properties.md#exchangemax-error-duration), which affects inter-task communication errors. It is recommended that this property is configured with a duration longer than [`query.remote-task.max-error-duration`](properties.md#queryremote-taskmax-error-duration), to increase the chance of worker failure recovery.
 
 ## Storage Considerations
 

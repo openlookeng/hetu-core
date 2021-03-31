@@ -88,6 +88,7 @@ import io.prestosql.sql.planner.plan.OutputNode;
 import io.prestosql.sql.tree.CreateTableAsSelect;
 import io.prestosql.sql.tree.Explain;
 import io.prestosql.sql.tree.Insert;
+import io.prestosql.sql.tree.InsertCube;
 import io.prestosql.sql.tree.Statement;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.utils.HetuConfig;
@@ -696,7 +697,7 @@ public class SqlQueryExecution
     private void checkSnapshotSupport(Session session)
     {
         List<String> reasons = new ArrayList<>();
-
+        String featureName = "Snapshot Feature - ";
         // Only support create-table-as-select and insert statements
         Statement statement = analysis.getStatement();
         if (statement instanceof CreateTableAsSelect) {
@@ -712,8 +713,11 @@ public class SqlQueryExecution
                 reasons.add("Only support inserting into tables in Hive with ORC format");
             }
         }
+        else if (statement instanceof InsertCube) {
+            reasons.add("INSERT INTO CUBE is not supported, only support CTAS (create table as select) and INSERT INTO (tables) statements");
+        }
         else {
-            reasons.add("Only support CTAS (create table as select) and INSERT statements");
+            reasons.add("Only support CTAS (create table as select) and INSERT INTO (tables) statements");
         }
 
         // Doesn't work with the following features
@@ -756,7 +760,7 @@ public class SqlQueryExecution
             // will never receive any marker.
             session.disableSnapshot();
             reasons.forEach(reason -> {
-                warningCollector.add(new PrestoWarning(StandardWarningCode.SNAPSHOT_NOT_SUPPORTED, reason));
+                warningCollector.add(new PrestoWarning(StandardWarningCode.SNAPSHOT_NOT_SUPPORTED, featureName + reason));
             });
         }
     }

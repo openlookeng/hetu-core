@@ -259,6 +259,14 @@
 > 
 > 如果网络延迟较高，增大该值可以提高网络吞吐量。减小该值可以提高大型集群的查询性能，因为它减少了由于交换客户端缓冲区保存了较多任务（而不是保存较少任务中的较多数据）的响应而导致的倾斜。
 
+### `exchange.max-error-duration`
+
+> - **类型：** `duration`
+> - **最小值：** `1m`
+> - **默认值：** `7m`
+> 
+> 交换错误最大缓冲时间，超过该时限则查询失败。
+
 ### `sink.max-buffer-size`
 
 > - **类型：** `data size`
@@ -650,6 +658,15 @@
 >
 > **说明：** 应在所有工作节点上配置该属性。
 
+## 查询管理
+
+### `query.remote-task.max-error-duration`
+
+> - 类型：`duration`
+> - **默认值**：`5m`
+> 
+> 远程任务错误最大缓冲时间，超过该时限则查询失败。
+
 ## 分布式快照
 
 ### `snapshot_enabled`
@@ -663,7 +680,7 @@
 
 > - 类型：`string`
 >
-> 此属性定义用于存储快照的文件系统配置文件。对应的配置文件必须存在于`etc/filesystem`中。例如，如果将该属性设置为`hetu.experimental.snapshot.profile=snapshot-hdfs1`，则必须在`etc/filesystem`中创建描述此文件系统的配置文件`snapshot-hdfs1.properties`，其中包含的必要信息包括身份验证类型、配置和密钥表（如适用）。
+> 此属性定义用于存储快照的[文件系统](../develop/filesystem.md)配置文件。对应的配置文件必须存在于`etc/filesystem`中。例如，如果将该属性设置为`hetu.experimental.snapshot.profile=snapshot-hdfs1`，则必须在`etc/filesystem`中创建描述此文件系统的配置文件`snapshot-hdfs1.properties`，其中包含的必要信息包括身份验证类型、配置和密钥表（如适用）。
 >
 > 如在打开分布式快照的情况下执行任何查询时，需要配本属性。此属性必须包含在所有协调节点和工作节点的配置文件中。指定的文件系统必须可由所有工作节点访问，且这些工作节点必须能够读取和写入指定文件系统中的`/tmp/hetu/snapshot`文件夹。
 >
