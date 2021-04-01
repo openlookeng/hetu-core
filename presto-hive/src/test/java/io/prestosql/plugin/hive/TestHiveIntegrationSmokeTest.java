@@ -5206,13 +5206,14 @@ public class TestHiveIntegrationSmokeTest
         String[] types = {"double", "decimal(7,2)", "decimal(38,7)", "integer", "bigint", "string", "boolean"};
         for (String type : types) {
             testPushdownNullForType(session1, session2, type);
+            testPushdownGetAllNULLsForType(session1, session2, type);
         }
     }
 
     private void testPushdownNullForType(Session sessionWithOr, Session sessionWithoutOR, String type)
     {
         try {
-            assertUpdate(sessionWithOr, "CREATE TABLE test_predicate_or_NULL (a " + type + ", b " + type + ", c int) with (transactional=true, format='orc')");
+            assertUpdate(sessionWithOr, "CREATE TABLE test_predicate_or_NULL (a " + type + ", b " + type + ", c int) with (transactional=false, format='orc')");
             assertUpdate(sessionWithOr, "INSERT INTO test_predicate_or_NULL VALUES " +
                     "(cast(0 as " + type + "), cast(0 as " + type + "),0)," +
                     "(cast(1 as " + type + "), NULL, 1)," +
@@ -5262,6 +5263,70 @@ public class TestHiveIntegrationSmokeTest
             }
         }
         finally {
+            assertUpdate("DROP TABLE IF EXISTS test_predicate_or_NULL");
+        }
+    }
+
+    private void testPushdownGetAllNULLsForType(Session sessionWithOr, Session sessionWithoutOR, String type)
+    {
+        try {
+            assertUpdate(sessionWithOr, "CREATE TABLE test_predicate_or_NULL_tmp (a " + type + ", b " + type + ", c int) with (transactional=false, format='orc')");
+            assertUpdate(sessionWithOr, "INSERT INTO test_predicate_or_NULL_tmp VALUES " +
+                            "(cast(0 as " + type + "),NULL,0)," +
+                            "(NULL,NULL,1)," +
+                            "(cast(2 as " + type + "),NULL,2)," +
+                            "(NULL,NULL,3)," +
+                            "(cast(4 as " + type + "),NULL,4)," +
+                    "(NULL,NULL,NULL)",
+                    6);
+            assertUpdate(sessionWithOr, "INSERT INTO test_predicate_or_NULL_tmp SELECT * from test_predicate_or_NULL_tmp", 6); /* 12 rows */
+            assertUpdate(sessionWithOr, "INSERT INTO test_predicate_or_NULL_tmp SELECT * from test_predicate_or_NULL_tmp", 12); /* 24 rows */
+            assertUpdate(sessionWithOr, "INSERT INTO test_predicate_or_NULL_tmp SELECT * from test_predicate_or_NULL_tmp", 24); /* 48 rows */
+            assertUpdate(sessionWithOr, "INSERT INTO test_predicate_or_NULL_tmp SELECT * from test_predicate_or_NULL_tmp", 48); /* 96 rows */
+            assertUpdate(sessionWithOr, "INSERT INTO test_predicate_or_NULL_tmp SELECT * from test_predicate_or_NULL_tmp", 96); /* 192 rows */
+            assertUpdate(sessionWithOr, "INSERT INTO test_predicate_or_NULL_tmp SELECT * from test_predicate_or_NULL_tmp", 192); /* 384 rows */
+            assertUpdate(sessionWithOr, "INSERT INTO test_predicate_or_NULL_tmp SELECT * from test_predicate_or_NULL_tmp", 384); /* 768 rows */
+            assertUpdate(sessionWithOr, "INSERT INTO test_predicate_or_NULL_tmp SELECT * from test_predicate_or_NULL_tmp", 768); /* 1536 rows */
+
+            assertUpdate(sessionWithOr, "CREATE TABLE test_predicate_or_NULL WITH (transactional=false, format='orc')" +
+                    " AS SELECT * FROM test_predicate_or_NULL_tmp ORDER BY a, b, c",
+                    1536);
+
+            List<String> queries = new ArrayList<>();
+            queries.add("SELECT a FROM test_predicate_or_NULL WHERE c = 2 ORDER BY 1");
+            queries.add("SELECT a FROM test_predicate_or_NULL WHERE c >= 1 and c <= 3 ORDER BY 1");
+            queries.add("SELECT a FROM test_predicate_or_NULL WHERE c IN (1,3,5) ORDER BY 1");
+            queries.add("SELECT a FROM test_predicate_or_NULL WHERE c IN (0,2,4) ORDER BY 1");
+            queries.add("SELECT a FROM test_predicate_or_NULL WHERE c IS NULL ORDER BY 1");
+
+            queries.add("SELECT b FROM test_predicate_or_NULL WHERE c = 2 ORDER BY 1");
+            queries.add("SELECT b FROM test_predicate_or_NULL WHERE c >= 1 and c <= 3 ORDER BY 1");
+            queries.add("SELECT b FROM test_predicate_or_NULL WHERE c IN (1,3,5) ORDER BY 1");
+            queries.add("SELECT B FROM test_predicate_or_NULL WHERE c IN (0,2,4) ORDER BY 1");
+            queries.add("SELECT b FROM test_predicate_or_NULL WHERE c IS NULL ORDER BY 1");
+
+            queries.add("SELECT a,b FROM test_predicate_or_NULL WHERE c = 2 ORDER BY 1,2");
+            queries.add("SELECT b,a FROM test_predicate_or_NULL WHERE c >= 1 and c <= 3 ORDER BY 1,2");
+            queries.add("SELECT a,b FROM test_predicate_or_NULL WHERE c IN (1,3,5) ORDER BY 1,2");
+            queries.add("SELECT b,a FROM test_predicate_or_NULL WHERE c IN (0,2,4) ORDER BY 1,2");
+            queries.add("SELECT a,b,a FROM test_predicate_or_NULL WHERE c IS NULL ORDER BY 1,2");
+
+            MaterializedResult expected;
+            MaterializedResult resultPushdownOr;
+            MaterializedResult resultPushdown;
+            for (String query : queries) {
+                expected = computeActual(query);
+                resultPushdownOr = computeActual(sessionWithOr, query);
+                resultPushdown = computeActual(sessionWithoutOR, query);
+                System.out.println("Query [ " + query + " ]");
+
+                assertEquals(expected.getMaterializedRows(), resultPushdown.getMaterializedRows());
+                assertEquals(expected.getMaterializedRows(), resultPushdownOr.getMaterializedRows());
+                System.out.println("Type(" + type + ")\n-------------\n" + resultPushdown.getMaterializedRows().size());
+            }
+        }
+        finally {
+            assertUpdate("DROP TABLE IF EXISTS test_predicate_or_NULL_tmp");
             assertUpdate("DROP TABLE IF EXISTS test_predicate_or_NULL");
         }
     }
