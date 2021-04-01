@@ -12,11 +12,11 @@
 
 3. What should I do if I find a vulnerability in the openLooKeng?
    
-   > The community has a CVE handling process. If a suspected security issue is found, you can report it the community through secrets@openLooKeng.io. We will respond and handle the issue as soon as possible.
+   > The community has a CVE handling process. If a suspected security issue is found, you can report it the community through securities@openlookeng.io . We will respond and handle the issue as soon as possible.
 
 4. How do I report a bug?
    
-   > You can go the **Issues** tab page (https://gitee.com/organizations/openLooKeng/issues) of the openLooKeng community, find the repository to which the bug belongs, add an issue, and set the issue type to **Bug**.
+   > You can go the **Issues** tab page ( https://gitee.com/organizations/openLooKeng/issues ) of the openLooKeng community, find the repository to which the bug belongs, add an issue, and set the issue type to **Bug**.
 
 5. How do I submit a patch?
    
@@ -24,21 +24,21 @@
 
 6. What are the version plan and roadmap of the openLooKeng community?
    
-   > On June 30, 2020, the code was released to the community in the openLooKeng v0.1.0 version for sharing with global developers. It is planned that an iterative version is released every three months to continuously launch new features. The roadmap of the openLooKeng will be released as required. For details, visit the openLooKeng commuity bi-weekly PMC meeting (https://etherpad.openlookeng.io/p/PMC-weeklymeeting) or the openLooKeng Slack channel (https://openLooKeng.io/zh-cn/communication.html).
+   > On June 30, 2020, the code was released to the community in the openLooKeng v0.1.0 version for sharing with global developers. It is planned that an iterative version is released every three months to continuously launch new features. The roadmap of the openLooKeng will be released as required. For details, visit the openLooKeng commuity bi-weekly PMC meeting ( https://etherpad.openlookeng.io/p/PMC-weeklymeeting ) or the openLooKeng Slack channel ( https://openlookeng.io/communication.html  ).
 
 7. How can I obtain openLooKeng information and communicate with other developers about openLooKeng technologies?
    
-   > Community issues: https://gitee.com/openlookeng
+   > Community issues: https://gitee.com/openlookeng  
    >
-   > Official website: https://openlookeng.io
+   > Official website: https://openlookeng.io  
    >
-   > Slack channel: https://openlookeng.slack.com/
+   > Slack channel: https://openlookeng.slack.com/  
    >
-   > openLooKeng WeChat Official Account: **openLooKeng**
+   > openLooKeng WeChat Official Account: **openLooKeng**  
    >
-   > openLooKeng WeChat group: add the assistant's account **openLooKengoss**, and the assistant will invite you to join the group.
+   > openLooKeng WeChat group: add the assistant's account **openLooKengoss**, and the assistant will invite you to join the group.  
    >
-   > openLooKeng Bilibili channel: Search **openLooKeng** on https://www.bilibili.com/**.**
+   > openLooKeng Bilibili channel:  https://space.bilibili.com/627629884   
 
 ## Functions
 
@@ -81,7 +81,8 @@
 
 3. How do I develop UDFs for the openLooKeng?
    
-   > The openLooKeng provides the user-defined function feature. For details, see https://openlookeng.io/docs/docs/develop/functions.html. The openLooKeng also supports user-defined functions in the Hive data source. For details, see https://openlookeng.io/docs/docs/migration/hetu-hive-functions.html.
+   > The openLooKeng provides the user-defined function feature. For details, see  https://openlookeng.io/docs/docs/develop/functions.html .   
+   > The openLooKeng also supports user-defined functions in the Hive data source. For details, see  https://openlookeng.io/docs/docs/migration/hetu-hive-functions.html .  
 
 4. Can I manage manually added data sources after the dynamic directory function is enabled?
    
@@ -181,7 +182,7 @@
 
 ## Security
 
-2. How do I add openLooKeng service components on the Ranger page?
+1. How do I add openLooKeng service components on the Ranger page?
    
    > You can use cURL commands to register the Ranger service type definition. An example is as follows:
    > 
@@ -191,25 +192,25 @@
    > 
    > The openLooKeng service type can be viewed on the Ranger management page only after the openLooKeng service is registered. Then, you can add the openLooKeng service on the Ranger management page.
 
-3. How do I set openLooKeng service parameters in the Ranger page?
+2. How do I set openLooKeng service parameters in the Ranger page?
    
    > An example is as follows:
    > 
    > ![ranger_openlookeng_service](../images/ranger_openlookeng_service.png)
 
-4. Why is the warning message "WARN PolicyRefresher(serviceName=openlookengdev)-196 org.apache.Ranger.admin.client.RangerAdminRESTClient Error getting Roles. secureMode=false, user=root (auth:SIMPLE), response={"httpStatusCode":401,"statusCode":401,"msgDesc":"Authentication Failed"}, serviceName=openlookengdev" displayed in the openLooKeng log after the openLooKeng is connected to the Ranger?
+3. Why is the warning message "WARN PolicyRefresher(serviceName=openlookengdev)-196 org.apache.Ranger.admin.client.RangerAdminRESTClient Error getting Roles. secureMode=false, user=root (auth:SIMPLE), response={"httpStatusCode":401,"statusCode":401,"msgDesc":"Authentication Failed"}, serviceName=openlookengdev" displayed in the openLooKeng log after the openLooKeng is connected to the Ranger?
    
    > This problem is caused by the low RangerAdmin version. The Ranger plugin provided by the openLooKeng is used to connect to Ranger 2.1. Update the Ranger plugin.
 
-5. Is the internal communication security of the openLooKeng mandatory?
+4. Is the internal communication security of the openLooKeng mandatory?
    
    > This configuration is not mandatory. Setting the openLooKeng to the non-security mode is acceptable. However, if LDAP authentication is required, SSL must be configured. For details, see the **LDAP Authentication** section on the openLooKeng website.
 
-6. Does the openLooKeng support application log monitoring and audit? Is secondary development required?
+5. Does the openLooKeng support application log monitoring and audit? Is secondary development required?
    
    > Currently, the openLooKeng has the audit function for SQL creation and completion. If more user events need to be audited, for example, WebUI login events, you can perform secondary development to add the function.
 
-7. What do I do if the field association function on the RangerAdmin is unavailable when the openLooKeng is connected to the Ranger after Kerberos authentication is enabled?
+6. What do I do if the field association function on the RangerAdmin is unavailable when the openLooKeng is connected to the Ranger after Kerberos authentication is enabled?
    
    > The association function of RangerAdmin needs to send SQL statements to query olk-related resources. Therefore, when adding the openLooKeng service on RangerAdmin, you need to add the Kerberos information to the **jdbc.url** parameter. An example is as follows:
    > 
@@ -217,7 +218,7 @@
    > jdbc:lk://server1:10001/catalog?SSL=true&SSLKeyStorePath=/etc/openLooKeng_keystore.jks&SSLKeyStorePassword=keystore_password&KerberosRemoteServiceName=openLooKeng&KerberosConfigPath=/etc/krb5.conf&KerberosPrincipal=cpk@EXAMPLE.COM&KerberosKeytabPath=/etc/security/keytabs/cpk.keytab
    > ```
 
-8. How do I connect the openLooKeng to two Hive data sources configured with Kerberos?
+7. How do I connect the openLooKeng to two Hive data sources configured with Kerberos?
    
    > Ensure that the domain names of the two Hive data sources configured with Kerberos are different.
    > 
@@ -227,7 +228,7 @@
    > 
    > ![openlookeng_kerberos](../images/openlookeng_kerberos.png)
 
-9. How do I connect the openLooKeng to a Hive data source configured with Kerberos and a Hive data source not configured with Kerberos at the same time?
+8. How do I connect the openLooKeng to a Hive data source configured with Kerberos and a Hive data source not configured with Kerberos at the same time?
    
    > Add the following configuration to the **core-site.xml** file of the Hive data source that is not configured with Kerberos:
    > 
