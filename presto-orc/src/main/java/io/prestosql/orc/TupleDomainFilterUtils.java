@@ -66,7 +66,7 @@ public class TupleDomainFilterUtils
         }
 
         Type type = domain.getType();
-        if (ranges.size() == 1) {
+        if (ranges.size() == 1 && type != BOOLEAN) {
             return createRangeFilter(type, ranges.get(0), nullAllowed);
         }
 

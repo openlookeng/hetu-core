@@ -280,7 +280,10 @@ public class LongSelectiveColumnReader
     private void skip(int items)
             throws IOException
     {
-        if (presentStream != null) {
+        if (dataStream == null) {
+            presentStream.skip(items);
+        }
+        else if (presentStream != null) {
             int dataToSkip = presentStream.countBitsSet(items);
             dataStream.skip(dataToSkip);
         }
