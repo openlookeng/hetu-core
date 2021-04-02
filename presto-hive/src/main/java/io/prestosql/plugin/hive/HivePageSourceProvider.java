@@ -40,6 +40,7 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.eclipse.jetty.util.URIUtil;
 import org.joda.time.DateTimeZone;
 
 import javax.inject.Inject;
@@ -172,8 +173,7 @@ public class HivePageSourceProvider
         }
         Optional<List<IndexMetadata>> indexOptional =
                 indexes == null || indexes.isEmpty() ? Optional.empty() : Optional.of(indexes);
-
-        URI splitUri = URI.create(hiveSplit.getPath().replaceAll(" ", "%20"));
+        URI splitUri = URI.create(URIUtil.encodePath(hiveSplit.getPath()));
         SplitMetadata splitMetadata = new SplitMetadata(splitUri.getRawPath(), hiveSplit.getLastModifiedTime());
 
         /**

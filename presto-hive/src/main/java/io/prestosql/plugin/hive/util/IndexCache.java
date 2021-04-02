@@ -33,6 +33,7 @@ import io.prestosql.spi.heuristicindex.IndexRecord;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.service.PropertyService;
 import org.apache.hadoop.fs.Path;
+import org.eclipse.jetty.util.URIUtil;
 
 import java.io.IOException;
 import java.net.URI;
@@ -147,7 +148,7 @@ public class IndexCache
         long lastModifiedTime = hiveSplit.getLastModifiedTime();
         Path path = new Path(hiveSplit.getPath());
 
-        URI pathUri = URI.create(path.toString().replaceAll(" ", "%20"));
+        URI pathUri = URI.create(URIUtil.encodePath(path.toString()));
         String tableFqn = catalog + "." + table;
 
         // for each split, load indexes for each predicate (if the predicate contains an indexed column)

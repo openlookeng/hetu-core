@@ -361,6 +361,10 @@
           <artifactId>bootstrap</artifactId>
           <groupId>io.airlift</groupId>
         </exclusion>
+        <exclusion>
+          <artifactId>jetty-util</artifactId>
+          <groupId>org.eclipse.jetty</groupId>
+        </exclusion>
       </exclusions>
     </dependency>
 

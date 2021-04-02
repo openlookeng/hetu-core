@@ -610,6 +610,10 @@
             <artifactId>hetu-filesystem-client</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-util</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
