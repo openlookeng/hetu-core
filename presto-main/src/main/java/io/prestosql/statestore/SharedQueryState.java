@@ -26,6 +26,7 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
 import java.util.Optional;
+import java.util.OptionalDouble;
 
 import static java.util.Objects.requireNonNull;
 
@@ -77,7 +78,7 @@ public class SharedQueryState
         return new SharedQueryState(
                 query.getBasicQueryInfo(),
                 query.getErrorCode(),
-                query.getUserMemoryReservation(),
+                new DataSize(query.getCurrentUserMemory(), DataSize.Unit.BYTE),
                 query.getTotalMemoryReservation(),
                 query.getTotalCpuTime(),
                 new DateTime(DateTimeZone.UTC),
@@ -130,5 +131,11 @@ public class SharedQueryState
     public Optional<DateTime> getExecutionStartTime()
     {
         return executionStartTime;
+    }
+
+    @JsonProperty
+    public OptionalDouble getQueryProgress()
+    {
+        return basicQueryInfo.getQueryStats().getProgressPercentage();
     }
 }

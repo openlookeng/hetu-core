@@ -28,6 +28,7 @@ import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.execution.QueryExecution.QueryOutputInfo;
 import io.prestosql.execution.StateMachine.StateChangeListener;
+import io.prestosql.execution.resourcegroups.ResourceGroupManager;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.memory.VersionedMemoryPoolId;
 import io.prestosql.metadata.Metadata;
@@ -104,6 +105,7 @@ public class QueryStateMachine
     private final Session session;
     private final URI self;
     private final ResourceGroupId resourceGroup;
+    private final ResourceGroupManager resourceGroupManager;
     private final TransactionManager transactionManager;
     private final Metadata metadata;
     private final QueryOutputManager outputManager;
@@ -162,6 +164,7 @@ public class QueryStateMachine
             Session session,
             URI self,
             ResourceGroupId resourceGroup,
+            ResourceGroupManager resourceGroupManager,
             TransactionManager transactionManager,
             Executor executor,
             Ticker ticker,
@@ -174,6 +177,7 @@ public class QueryStateMachine
         this.queryId = session.getQueryId();
         this.self = requireNonNull(self, "self is null");
         this.resourceGroup = requireNonNull(resourceGroup, "resourceGroup is null");
+        this.resourceGroupManager = resourceGroupManager;
         this.transactionManager = requireNonNull(transactionManager, "transactionManager is null");
         this.queryStateTimer = new QueryStateTimer(ticker);
         this.metadata = requireNonNull(metadata, "metadata is null");
@@ -193,6 +197,7 @@ public class QueryStateMachine
             Session session,
             URI self,
             ResourceGroupId resourceGroup,
+            ResourceGroupManager resourceGroupManager,
             boolean transactionControl,
             TransactionManager transactionManager,
             AccessControl accessControl,
@@ -206,6 +211,7 @@ public class QueryStateMachine
                 session,
                 self,
                 resourceGroup,
+                resourceGroupManager,
                 transactionControl,
                 transactionManager,
                 accessControl,
@@ -215,12 +221,18 @@ public class QueryStateMachine
                 warningCollector);
     }
 
+    public long getCurrentUserMemory()
+    {
+        return currentUserMemory.get();
+    }
+
     static QueryStateMachine beginWithTicker(
             String query,
             Optional<String> preparedQuery,
             Session session,
             URI self,
             ResourceGroupId resourceGroup,
+            ResourceGroupManager resourceGroupManager,
             boolean transactionControl,
             TransactionManager transactionManager,
             AccessControl accessControl,
@@ -242,6 +254,7 @@ public class QueryStateMachine
                 session,
                 self,
                 resourceGroup,
+                resourceGroupManager,
                 transactionManager,
                 executor,
                 ticker,
@@ -255,6 +268,16 @@ public class QueryStateMachine
     public QueryId getQueryId()
     {
         return queryId;
+    }
+
+    public ResourceGroupId getResourceGroup()
+    {
+        return resourceGroup;
+    }
+
+    public ResourceGroupManager getResourceGroupManager()
+    {
+        return resourceGroupManager;
     }
 
     public Session getSession()

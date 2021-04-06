@@ -19,6 +19,7 @@ import io.airlift.units.Duration;
 import io.prestosql.execution.MockManagedQueryExecution;
 import io.prestosql.server.QueryStateInfo;
 import io.prestosql.server.ResourceGroupInfo;
+import io.prestosql.spi.resourcegroups.KillPolicy;
 import org.apache.commons.math3.distribution.BinomialDistribution;
 import org.testng.annotations.Test;
 
@@ -50,6 +51,7 @@ import static io.prestosql.spi.resourcegroups.SchedulingPolicy.QUERY_PRIORITY;
 import static io.prestosql.spi.resourcegroups.SchedulingPolicy.WEIGHTED;
 import static io.prestosql.spi.resourcegroups.SchedulingPolicy.WEIGHTED_FAIR;
 import static java.util.Collections.reverse;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -237,6 +239,127 @@ public class TestResourceGroups
         root.processQueuedQueries();
         assertEquals(query2.getState(), RUNNING);
         assertEquals(query3.getState(), RUNNING);
+    }
+
+    @Test(timeOut = 10_000)
+    public void testQueryKill()
+    {
+        InternalResourceGroup root = new InternalResourceGroup(Optional.empty(), "root", (group, export) -> {}, directExecutor());
+        root.setSoftMemoryLimit(new DataSize(1, BYTE));
+        root.setMaxQueuedQueries(4);
+        root.setHardConcurrencyLimit(3);
+        root.setKillPolicy(KillPolicy.RECENT_QUERIES);
+        MockManagedQueryExecution query1 = new MockManagedQueryExecution(2);
+        root.run(query1);
+        // Process the group to refresh stats
+        root.processQueuedQueries();
+        assertEquals(query1.getState(), FAILED);
+    }
+
+    @Test(timeOut = 10_000)
+    public void testQueryKillHighMemory()
+    {
+        InternalResourceGroup root = new InternalResourceGroup(Optional.empty(), "root", (group, export) -> {}, directExecutor());
+        root.setSoftMemoryLimit(new DataSize(2, BYTE));
+        root.setMaxQueuedQueries(4);
+        root.setHardConcurrencyLimit(3);
+        root.setKillPolicy(KillPolicy.HIGH_MEMORY_QUERIES);
+        MockManagedQueryExecution query1 = new MockManagedQueryExecution(2);
+        root.run(query1);
+        MockManagedQueryExecution query2 = new MockManagedQueryExecution(3);
+        root.run(query2);
+        // Process the group to refresh stats
+        root.processQueuedQueries();
+        assertEquals(query1.getState(), RUNNING);
+        assertEquals(query2.getState(), FAILED);
+    }
+
+    @Test(timeOut = 10_000)
+    public void testQueryKillRecent() throws InterruptedException
+    {
+        InternalResourceGroup root = new InternalResourceGroup(Optional.empty(), "root", (group, export) -> {}, directExecutor());
+        root.setSoftMemoryLimit(new DataSize(2, BYTE));
+        root.setMaxQueuedQueries(4);
+        root.setHardConcurrencyLimit(3);
+        root.setKillPolicy(KillPolicy.RECENT_QUERIES);
+        MockManagedQueryExecution query1 = new MockManagedQueryExecution(2);
+        MILLISECONDS.sleep(1);
+        root.run(query1);
+        MockManagedQueryExecution query2 = new MockManagedQueryExecution(2);
+        MILLISECONDS.sleep(1);
+        root.run(query2);
+        MockManagedQueryExecution query3 = new MockManagedQueryExecution(2);
+        root.run(query3);
+        // Process the group to refresh stats
+        root.processQueuedQueries();
+        assertEquals(query1.getState(), RUNNING);
+        assertEquals(query2.getState(), FAILED);
+        assertEquals(query3.getState(), FAILED);
+    }
+
+    @Test(timeOut = 10_000)
+    public void testQueryKillOldest() throws InterruptedException
+    {
+        InternalResourceGroup root = new InternalResourceGroup(Optional.empty(), "root", (group, export) -> {}, directExecutor());
+        root.setSoftMemoryLimit(new DataSize(2, BYTE));
+        root.setMaxQueuedQueries(4);
+        root.setHardConcurrencyLimit(3);
+        root.setKillPolicy(KillPolicy.OLDEST_QUERIES);
+        MockManagedQueryExecution query1 = new MockManagedQueryExecution(2);
+        MILLISECONDS.sleep(1);
+        root.run(query1);
+        MockManagedQueryExecution query2 = new MockManagedQueryExecution(2);
+        MILLISECONDS.sleep(1);
+        root.run(query2);
+        MockManagedQueryExecution query3 = new MockManagedQueryExecution(2);
+        root.run(query3);
+        // Process the group to refresh stats
+        root.processQueuedQueries();
+        assertEquals(query1.getState(), FAILED);
+        assertEquals(query2.getState(), FAILED);
+        assertEquals(query3.getState(), RUNNING);
+    }
+
+    @Test(timeOut = 10_000)
+    public void testQueryKillFinishPercent()
+    {
+        InternalResourceGroup root = new InternalResourceGroup(Optional.empty(), "root", (group, export) -> {}, directExecutor());
+        root.setSoftMemoryLimit(new DataSize(2, BYTE));
+        root.setMaxQueuedQueries(4);
+        root.setHardConcurrencyLimit(3);
+        root.setKillPolicy(KillPolicy.FINISH_PERCENTAGE_QUERIES);
+        MockManagedQueryExecution query1 = new MockManagedQueryExecution(2, 1);
+        root.run(query1);
+        MockManagedQueryExecution query2 = new MockManagedQueryExecution(2, 2);
+        root.run(query2);
+        MockManagedQueryExecution query3 = new MockManagedQueryExecution(2, 3);
+        root.run(query3);
+        // Process the group to refresh stats
+        root.processQueuedQueries();
+        assertEquals(query1.getState(), FAILED);
+        assertEquals(query2.getState(), FAILED);
+        assertEquals(query3.getState(), RUNNING);
+    }
+
+    @Test(timeOut = 10_000)
+    public void testQueryKillMemoryFinishPercent()
+    {
+        InternalResourceGroup root = new InternalResourceGroup(Optional.empty(), "root", (group, export) -> {}, directExecutor());
+        root.setSoftMemoryLimit(new DataSize(130, BYTE));
+        root.setMaxQueuedQueries(4);
+        root.setHardConcurrencyLimit(3);
+        root.setKillPolicy(KillPolicy.HIGH_MEMORY_QUERIES);
+        MockManagedQueryExecution query1 = new MockManagedQueryExecution(100, 20);
+        root.run(query1);
+        MockManagedQueryExecution query2 = new MockManagedQueryExecution(95, 10);
+        root.run(query2);
+        MockManagedQueryExecution query3 = new MockManagedQueryExecution(120, 5);
+        root.run(query3);
+        // Process the group to refresh stats
+        root.processQueuedQueries();
+        assertEquals(query1.getState(), RUNNING);
+        assertEquals(query2.getState(), FAILED);
+        assertEquals(query3.getState(), FAILED);
     }
 
     // new test case for softReservedMemory

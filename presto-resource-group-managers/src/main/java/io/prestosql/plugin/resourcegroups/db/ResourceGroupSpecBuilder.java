@@ -41,6 +41,7 @@ public class ResourceGroupSpecBuilder
     private final Optional<Boolean> jmxExport;
     private final Optional<Duration> softCpuLimit;
     private final Optional<Duration> hardCpuLimit;
+    private final Optional<String> killPolicy;
     private final Optional<Long> parentId;
     private final ImmutableList.Builder<ResourceGroupSpec> subGroups = ImmutableList.builder();
 
@@ -58,6 +59,7 @@ public class ResourceGroupSpecBuilder
             Optional<Boolean> jmxExport,
             Optional<String> softCpuLimit,
             Optional<String> hardCpuLimit,
+            Optional<String> killPolicy,
             Optional<Long> parentId)
     {
         this.id = id;
@@ -74,6 +76,7 @@ public class ResourceGroupSpecBuilder
         this.jmxExport = requireNonNull(jmxExport, "jmxExport is null");
         this.softCpuLimit = requireNonNull(softCpuLimit, "softCpuLimit is null").map(Duration::valueOf);
         this.hardCpuLimit = requireNonNull(hardCpuLimit, "hardCpuLimit is null").map(Duration::valueOf);
+        this.killPolicy = killPolicy;
         this.parentId = parentId;
     }
 
@@ -95,6 +98,11 @@ public class ResourceGroupSpecBuilder
     public Optional<Duration> getHardCpuLimit()
     {
         return hardCpuLimit;
+    }
+
+    public Optional<String> getKillPolicy()
+    {
+        return killPolicy;
     }
 
     public Optional<Long> getParentId()
@@ -123,7 +131,8 @@ public class ResourceGroupSpecBuilder
                 Optional.of(subGroups.build()),
                 jmxExport,
                 softCpuLimit,
-                hardCpuLimit);
+                hardCpuLimit,
+                killPolicy);
     }
 
     public static class Mapper
@@ -162,6 +171,12 @@ public class ResourceGroupSpecBuilder
             if (resultSet.wasNull()) {
                 hardReservedConcurrency = Optional.empty();
             }
+
+            Optional<String> killPolicy = Optional.ofNullable(resultSet.getString("kill_policy"));
+            if (resultSet.wasNull()) {
+                killPolicy = Optional.empty();
+            }
+
             return new ResourceGroupSpecBuilder(
                     id,
                     nameTemplate,
@@ -176,6 +191,7 @@ public class ResourceGroupSpecBuilder
                     jmxExport,
                     softCpuLimit,
                     hardCpuLimit,
+                    killPolicy,
                     parentId);
         }
     }

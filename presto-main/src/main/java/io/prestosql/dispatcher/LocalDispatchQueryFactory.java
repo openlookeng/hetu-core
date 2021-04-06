@@ -24,6 +24,7 @@ import io.prestosql.execution.QueryExecution.QueryExecutionFactory;
 import io.prestosql.execution.QueryManager;
 import io.prestosql.execution.QueryPreparer.PreparedQuery;
 import io.prestosql.execution.QueryStateMachine;
+import io.prestosql.execution.resourcegroups.ResourceGroupManager;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.execution.warnings.WarningCollectorFactory;
 import io.prestosql.metadata.Metadata;
@@ -91,7 +92,8 @@ public class LocalDispatchQueryFactory
             String query,
             PreparedQuery preparedQuery,
             String slug,
-            ResourceGroupId resourceGroup)
+            ResourceGroupId resourceGroup,
+            ResourceGroupManager resourceGroupManager)
     {
         WarningCollector warningCollector = warningCollectorFactory.create();
         QueryStateMachine stateMachine = QueryStateMachine.begin(
@@ -100,6 +102,7 @@ public class LocalDispatchQueryFactory
                 session,
                 locationFactory.createQueryLocation(session.getQueryId()),
                 resourceGroup,
+                resourceGroupManager,
                 isTransactionControlStatement(preparedQuery.getStatement()),
                 transactionManager,
                 accessControl,

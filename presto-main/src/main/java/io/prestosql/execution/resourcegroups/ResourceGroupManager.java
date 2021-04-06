@@ -44,4 +44,9 @@ public interface ResourceGroupManager<C>
 
     void loadConfigurationManager()
             throws Exception;
+
+    default long getCachedMemoryUsage(ResourceGroupId resourceGroupId)
+    {
+        return 0;
+    }
 }

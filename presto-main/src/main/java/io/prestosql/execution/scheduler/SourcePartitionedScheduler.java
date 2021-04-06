@@ -17,6 +17,7 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -71,6 +72,8 @@ import static java.util.Objects.requireNonNull;
 public class SourcePartitionedScheduler
         implements SourceScheduler
 {
+    private static final double ALLOWED_PERCENT_LIMIT = 0.1;
+
     private enum State
     {
         /**
@@ -110,6 +113,7 @@ public class SourcePartitionedScheduler
     private State state = State.INITIALIZED;
 
     private SettableFuture<?> whenFinishedOrNewLifespanAdded = SettableFuture.create();
+    private int throttledSplitsCount;
 
     private SourcePartitionedScheduler(
             SqlStageExecution stage,
@@ -131,6 +135,7 @@ public class SourcePartitionedScheduler
         checkArgument(splitBatchSize > 0, "splitBatchSize must be at least one");
         this.splitBatchSize = splitBatchSize;
         this.groupedExecution = groupedExecution;
+        this.throttledSplitsCount = 0;
     }
 
     public PlanNodeId getPlanNodeId()
@@ -315,7 +320,22 @@ public class SourcePartitionedScheduler
                 }
 
                 // calculate placements for splits
-                SplitPlacementResult splitPlacementResult = splitPlacementPolicy.computeAssignments(new HashSet<>(pendingSplits), this.stage);
+                SplitPlacementResult splitPlacementResult;
+                if (stage.isThrottledSchedule()) {
+                    // If asked for partial schedule incase of lesser resource, then schedule only 10% of splits.
+                    // 10% is calculated on initial number of splits and same is being used on subsequent schedule also.
+                    // But if later 10% of current pending splits more than earlier 10%, then it will schedule max of
+                    // these.
+                    // if throttledSplitsCount is more than number of pendingSplits, then it will schedule all.
+                    throttledSplitsCount = Math.max((int) Math.ceil(pendingSplits.size() * ALLOWED_PERCENT_LIMIT), throttledSplitsCount);
+                    splitPlacementResult = splitPlacementPolicy.computeAssignments(
+                                                    ImmutableSet.copyOf(Iterables.limit(pendingSplits, throttledSplitsCount)),
+                                                    this.stage);
+                }
+                else {
+                    splitPlacementResult = splitPlacementPolicy.computeAssignments(new HashSet<>(pendingSplits), this.stage);
+                }
+
                 splitAssignment = splitPlacementResult.getAssignments();
 
                 if (SystemSessionProperties.isSnapshotEnabled(session)) {

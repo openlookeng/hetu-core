@@ -20,6 +20,7 @@ import io.airlift.units.Duration;
 import io.prestosql.execution.MockManagedQueryExecution;
 import io.prestosql.server.QueryStateInfo;
 import io.prestosql.server.ResourceGroupInfo;
+import io.prestosql.spi.resourcegroups.KillPolicy;
 import io.prestosql.spi.resourcegroups.ResourceGroupId;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.statestore.SharedQueryState;
@@ -54,6 +55,7 @@ import static io.prestosql.spi.resourcegroups.SchedulingPolicy.FAIR;
 import static io.prestosql.spi.resourcegroups.SchedulingPolicy.QUERY_PRIORITY;
 import static io.prestosql.spi.resourcegroups.SchedulingPolicy.WEIGHTED;
 import static io.prestosql.spi.resourcegroups.SchedulingPolicy.WEIGHTED_FAIR;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.when;
@@ -286,6 +288,7 @@ public class TestDistributedResourceGroup
             assertEquals(query2.getState(), QUEUED);
             query1.complete();
             updateQueryStateCache(query1);
+            root.run(query2);
             root.processQueuedQueries();
             assertEquals(query2.getState(), RUNNING);
             StateCacheStore.get().resetCachedStates();
@@ -620,6 +623,129 @@ public class TestDistributedResourceGroup
         }
     }
 
+    @Test
+    public void testQueryKillMemory()
+    {
+        synchronized (lock) {
+            DistributedResourceGroup root = new DistributedResourceGroup(Optional.empty(), "root", (group, export) -> {}, directExecutor(), statestore);
+            resourceGroupBasicSetUp(root, FIVE_BYTE, 3, 4);
+            root.setKillPolicy(KillPolicy.HIGH_MEMORY_QUERIES);
+            Set<MockManagedQueryExecution> queries = new HashSet<>();
+            // query1 running in remote
+            MockManagedQueryExecution query1 = new MockManagedQueryExecution(2, "q1");
+            query1.startWaitingForResources();
+            query1.setResourceGroupId(root.getId());
+            updateQueryStateCache(query1);
+            // Process the group to refresh stats
+            root.run(query1);
+            assertEquals(query1.getState(), RUNNING);
+            MockManagedQueryExecution query2 = new MockManagedQueryExecution(10, "q2");
+            query2.setResourceGroupId(root.getId());
+            root.run(query2);
+            MockManagedQueryExecution query3 = new MockManagedQueryExecution(15, "q3");
+            query3.setResourceGroupId(root.getId());
+            root.run(query3);
+            MockManagedQueryExecution query4 = new MockManagedQueryExecution(3, "q4");
+            query4.setResourceGroupId(root.getId());
+            root.run(query4);
+            updateQueryStateCache(query2);
+            updateQueryStateCache(query3);
+            updateQueryStateCache(query4);
+            assertEquals(query3.getState(), RUNNING);
+            root.processQueuedQueries();
+            assertEquals(query1.getState(), RUNNING);
+            assertEquals(query2.getState(), FAILED);
+            assertEquals(query3.getState(), FAILED);
+            assertEquals(query4.getState(), RUNNING);
+            query1.complete();
+            query4.complete();
+            StateCacheStore.get().resetCachedStates();
+        }
+    }
+
+    @Test
+    public void testQueryKillMemoryFinishPercent()
+    {
+        synchronized (lock) {
+            DistributedResourceGroup root = new DistributedResourceGroup(Optional.empty(), "root", (group, export) -> {}, directExecutor(), statestore);
+            resourceGroupBasicSetUp(root, new DataSize(130, BYTE), 3, 4);
+            root.setKillPolicy(KillPolicy.HIGH_MEMORY_QUERIES);
+            Set<MockManagedQueryExecution> queries = new HashSet<>();
+            // query1 running in remote
+            MockManagedQueryExecution query1 = new MockManagedQueryExecution(2, "q1");
+            query1.startWaitingForResources();
+            query1.setResourceGroupId(root.getId());
+            updateQueryStateCache(query1);
+            // Process the group to refresh stats
+            root.run(query1);
+            assertEquals(query1.getState(), RUNNING);
+            MockManagedQueryExecution query2 = new MockManagedQueryExecution(100, "q2", 20.0);
+            query2.setResourceGroupId(root.getId());
+            root.run(query2);
+            MockManagedQueryExecution query3 = new MockManagedQueryExecution(95, "q3", 10.0);
+            query3.setResourceGroupId(root.getId());
+            root.run(query3);
+            MockManagedQueryExecution query4 = new MockManagedQueryExecution(120, "q4", 5.0);
+            query4.setResourceGroupId(root.getId());
+            root.run(query4);
+            updateQueryStateCache(query2);
+            updateQueryStateCache(query3);
+            updateQueryStateCache(query4);
+            assertEquals(query3.getState(), RUNNING);
+            root.processQueuedQueries();
+            assertEquals(query1.getState(), RUNNING);
+            assertEquals(query2.getState(), RUNNING);
+            assertEquals(query3.getState(), FAILED);
+            assertEquals(query4.getState(), FAILED);
+            query1.complete();
+            query2.complete();
+            StateCacheStore.get().resetCachedStates();
+        }
+    }
+
+    @Test
+    public void testQueryKillFinishPercent() throws InterruptedException
+    {
+        synchronized (lock) {
+            DistributedResourceGroup root = new DistributedResourceGroup(Optional.empty(), "root", (group, export) -> {}, directExecutor(), statestore);
+            resourceGroupBasicSetUp(root, new DataSize(12, BYTE), 4, 4);
+            root.setKillPolicy(KillPolicy.FINISH_PERCENTAGE_QUERIES);
+            Set<MockManagedQueryExecution> queries = new HashSet<>();
+            // query1 running in remote
+            MockManagedQueryExecution query1 = new MockManagedQueryExecution(2, "q1", 30.0);
+            query1.startWaitingForResources();
+            query1.setResourceGroupId(root.getId());
+            updateQueryStateCache(query1);
+            // Process the group to refresh stats
+            root.run(query1);
+            assertEquals(query1.getState(), RUNNING);
+            MockManagedQueryExecution query2 = new MockManagedQueryExecution(10, "q2", 5.0);
+            query2.setResourceGroupId(root.getId());
+            MILLISECONDS.sleep(1);
+            root.run(query2);
+            MockManagedQueryExecution query3 = new MockManagedQueryExecution(10, "q3", 10.0);
+            query3.setResourceGroupId(root.getId());
+            MILLISECONDS.sleep(1);
+            root.run(query3);
+            MockManagedQueryExecution query4 = new MockManagedQueryExecution(10, "q4", 15.0);
+            query4.setResourceGroupId(root.getId());
+            MILLISECONDS.sleep(1);
+            root.run(query4);
+            updateQueryStateCache(query2);
+            updateQueryStateCache(query3);
+            updateQueryStateCache(query4);
+            assertEquals(query3.getState(), RUNNING);
+            root.processQueuedQueries();
+            assertEquals(query1.getState(), RUNNING);
+            assertEquals(query2.getState(), FAILED);
+            assertEquals(query3.getState(), FAILED);
+            assertEquals(query4.getState(), RUNNING);
+            query1.complete();
+            query4.complete();
+            StateCacheStore.get().resetCachedStates();
+        }
+    }
+
     private void setResourceGroupCpuUsage(DistributedResourceGroup group, long cpuUsageMillis)
     {
         // manually add cpu usage of query1(1000ms) to root
@@ -679,7 +805,7 @@ public class TestDistributedResourceGroup
         int existingCount = existingQueries.size();
         Set<MockManagedQueryExecution> queries = new HashSet<>(existingQueries);
         for (int i = 0; i < count - existingCount; i++) {
-            MockManagedQueryExecution query = new MockManagedQueryExecution(0, group.getId().toString().replace(".", "") + Integer.toString(i), queryPriority ? i + 1 : 1);
+            MockManagedQueryExecution query = new MockManagedQueryExecution(0, "test", queryPriority ? i + 1 : 1);
             query.setResourceGroupId(group.getId());
             queries.add(query);
             group.run(query);

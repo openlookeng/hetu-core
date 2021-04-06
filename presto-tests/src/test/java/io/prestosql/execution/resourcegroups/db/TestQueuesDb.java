@@ -121,8 +121,8 @@ public class TestQueuesDb
         waitForRunningQueryCount(queryRunner, 1);
         // Update db to allow for 1 more running query in dashboard resource group
         // Hetu: add parameters softReservedMemory and hardReservedConcurrency
-        dao.updateResourceGroup(3, "user-${USER}", "1MB", "10%", 3, 4, 4, 4, null, null, null, null, null, 1L, TEST_ENVIRONMENT);
-        dao.updateResourceGroup(5, "dashboard-${USER}", "1MB", "10%", 1, 2, 2, 2, null, null, null, null, null, 3L, TEST_ENVIRONMENT);
+        dao.updateResourceGroup(3, "user-${USER}", "1MB", "10%", 3, 4, 4, 4, null, null, null, null, null, "RECENT_QUERIES", 1L, TEST_ENVIRONMENT);
+        dao.updateResourceGroup(5, "dashboard-${USER}", "1MB", "10%", 1, 2, 2, 2, null, null, null, null, null, "RECENT_QUERIES", 3L, TEST_ENVIRONMENT);
         waitForQueryState(queryRunner, secondDashboardQuery, RUNNING);
         QueryId thirdDashboardQuery = createQuery(queryRunner, dashboardSession(), LONG_LASTING_QUERY);
         waitForQueryState(queryRunner, thirdDashboardQuery, QUEUED);
@@ -170,8 +170,8 @@ public class TestQueuesDb
 
         // Allow one more query to run and resubmit third query
         // Hetu: add parameters softReservedMemory and hardReservedConcurrency
-        dao.updateResourceGroup(3, "user-${USER}", "1MB", "10%", 3, 4, 4, 4, null, null, null, null, null, 1L, TEST_ENVIRONMENT);
-        dao.updateResourceGroup(5, "dashboard-${USER}", "1MB", "10%", 1, 2, 2, 2, null, null, null, null, null, 3L, TEST_ENVIRONMENT);
+        dao.updateResourceGroup(3, "user-${USER}", "1MB", "10%", 3, 4, 4, 4, null, null, null, null, null, "RECENT_QUERIES", 1L, TEST_ENVIRONMENT);
+        dao.updateResourceGroup(5, "dashboard-${USER}", "1MB", "10%", 1, 2, 2, 2, null, null, null, null, null, "RECENT_QUERIES", 3L, TEST_ENVIRONMENT);
 
         InternalResourceGroupManager<?> manager = queryRunner.getCoordinator().getResourceGroupManager().get();
         DbResourceGroupConfigurationManager dbConfigurationManager = (DbResourceGroupConfigurationManager) manager.getConfigurationManager();
@@ -183,7 +183,7 @@ public class TestQueuesDb
         waitForQueryState(queryRunner, thirdDashboardQuery, QUEUED);
 
         // Lower running queries in dashboard resource groups and reload the config
-        dao.updateResourceGroup(5, "dashboard-${USER}", "1MB", "10%", 1, 1, 1, 1, null, null, null, null, null, 3L, TEST_ENVIRONMENT);
+        dao.updateResourceGroup(5, "dashboard-${USER}", "1MB", "10%", 1, 1, 1, 1, null, null, null, null, null, "RECENT_QUERIES", 3L, TEST_ENVIRONMENT);
         dbConfigurationManager.load();
 
         // Cancel query and verify that third query is still queued
@@ -245,7 +245,7 @@ public class TestQueuesDb
 
         // create a new resource group that rejects all queries submitted to it
         // Hetu: add parameters softReservedMemory and hardReservedConcurrency
-        dao.insertResourceGroup(8, "reject-all-queries", "1MB", "1MB", 0, 0, 0, 0, null, null, null, null, null, 3L, TEST_ENVIRONMENT);
+        dao.insertResourceGroup(8, "reject-all-queries", "1MB", "1MB", 0, 0, 0, 0, null, null, null, null, null, "RECENT_QUERIES", 3L, TEST_ENVIRONMENT);
 
         // add a new selector that has a higher priority than the existing dashboard selector and that routes queries to the "reject-all-queries" resource group
         dao.insertSelector(8, 200, "user.*", "(?i).*dashboard.*", null, null, null);
@@ -282,7 +282,7 @@ public class TestQueuesDb
         assertContains(queryManager.getFullQueryInfo(firstQuery).getFailureInfo().getMessage(), "Query exceeded the maximum execution time limit of 1.00ms");
         // set max running queries to 0 for the dashboard resource group so that new queries get queued immediately
         // Hetu: add parameters softReservedMemory and hardReservedConcurrency
-        dao.updateResourceGroup(5, "dashboard-${USER}", "1MB", "1MB", 1, null, 0, 0, null, null, null, null, null, 3L, TEST_ENVIRONMENT);
+        dao.updateResourceGroup(5, "dashboard-${USER}", "1MB", "1MB", 1, null, 0, 0, null, null, null, null, null, "RECENT_QUERIES", 3L, TEST_ENVIRONMENT);
         dbConfigurationManager.load();
         QueryId secondQuery = createQuery(
                 queryRunner,
@@ -301,7 +301,7 @@ public class TestQueuesDb
         assertEquals(dispatchManager.getQueryInfo(secondQuery).getState(), QUEUED);
         // reconfigure the resource group to run the second query
         // Hetu: add parameters softReservedMemory and hardReservedConcurrency
-        dao.updateResourceGroup(5, "dashboard-${USER}", "1MB", "1MB", 1, null, 1, 0, null, null, null, null, null, 3L, TEST_ENVIRONMENT);
+        dao.updateResourceGroup(5, "dashboard-${USER}", "1MB", "1MB", 1, null, 1, 0, null, null, null, null, null, "RECENT_QUERIES", 3L, TEST_ENVIRONMENT);
         dbConfigurationManager.load();
         // cancel the first one and let the second one start
         dispatchManager.cancelQuery(firstQuery);

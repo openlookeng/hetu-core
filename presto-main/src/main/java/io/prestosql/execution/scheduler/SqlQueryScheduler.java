@@ -21,6 +21,7 @@ import com.google.common.primitives.Ints;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.concurrent.SetThreadName;
+import io.airlift.log.Logger;
 import io.airlift.stats.TimeStat;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
@@ -121,6 +122,8 @@ import static java.util.stream.Collectors.toSet;
 
 public class SqlQueryScheduler
 {
+    private static final Logger log = Logger.get(SimpleNodeSelector.class);
+    private static final int[] THROTTLE_SLEEP_TIMER = {5, 10, 15}; //seconds
     private final QueryStateMachine queryStateMachine;
     private final ExecutionPolicy executionPolicy;
     private final Map<StageId, SqlStageExecution> stages;
@@ -139,6 +142,7 @@ public class SqlQueryScheduler
     private final SettableFuture<?> schedulingFuture = SettableFuture.create();
 
     private final Set<PlanFragmentId> visitedPlanFrags = new HashSet<>();
+    private int currentTimerLevel;
 
     public static SqlQueryScheduler createSqlQueryScheduler(
             QueryStateMachine queryStateMachine,
@@ -272,6 +276,7 @@ public class SqlQueryScheduler
 
         this.executor = queryExecutor;
         this.session = session;
+        this.currentTimerLevel = 0;
     }
 
     // Snapshot: return number of tasks for each stage from old scheduler, so new scheduler can match it.
@@ -657,6 +662,18 @@ public class SqlQueryScheduler
         }
     }
 
+    private boolean canScheduleMoreSplits()
+    {
+        long cachedMemoryUsage = queryStateMachine.getResourceGroupManager().getCachedMemoryUsage(queryStateMachine.getResourceGroup());
+        long softReservedMemory = queryStateMachine.getResourceGroupManager().getResourceGroupInfo(queryStateMachine.getResourceGroup()).getSoftReservedMemory().toBytes();
+        if (cachedMemoryUsage < softReservedMemory) {
+            return true;
+        }
+
+        log.debug("Splits scheduling throttled....!!! Used memory " + cachedMemoryUsage + " configured " + softReservedMemory);
+        return false;
+    }
+
     private void schedule()
     {
         try (SetThreadName ignored = new SetThreadName("Query-%s", queryStateMachine.getQueryId())) {
@@ -670,6 +687,25 @@ public class SqlQueryScheduler
                     }
 
                     stage.beginScheduling();
+
+                    // Resource group: Check if memory usage within the current resource grooup has exceeded
+                    // configured limit. If yes throttle further split scheduling.
+                    // Throttle Logic: Wait for x seconds (Wait time will increase till max as per THROTTLE_SLEEP_TIMER)
+                    // and then let it schedule 10% of splits.
+                    if (!canScheduleMoreSplits()) {
+                        try {
+                            SECONDS.sleep(THROTTLE_SLEEP_TIMER[currentTimerLevel]);
+                        }
+                        catch (InterruptedException e) {
+                            throw new PrestoException(GENERIC_INTERNAL_ERROR, "interrupted while sleeping");
+                        }
+                        currentTimerLevel = Math.min(currentTimerLevel + 1, THROTTLE_SLEEP_TIMER.length - 1);
+                        stage.setThrottledSchedule(true);
+                    }
+                    else {
+                        stage.setThrottledSchedule(false);
+                        currentTimerLevel = 0;
+                    }
 
                     // perform some scheduling work
                     ScheduleResult result = stageSchedulers.get(stage.getStageId())

@@ -28,6 +28,7 @@ import org.joda.time.DateTime;
 
 import java.net.URI;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.concurrent.Executor;
 
 import static com.google.common.util.concurrent.Futures.immediateFuture;
@@ -173,5 +174,11 @@ public class FailedDispatchQuery
     public DataSize getUserMemoryReservation()
     {
         return new DataSize(0, BYTE);
+    }
+
+    @Override
+    public OptionalDouble getQueryProgress()
+    {
+        return getBasicQueryInfo().getQueryStats().getProgressPercentage();
     }
 }

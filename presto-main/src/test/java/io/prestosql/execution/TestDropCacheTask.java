@@ -17,6 +17,7 @@ package io.prestosql.execution;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
+import io.prestosql.execution.resourcegroups.NoOpResourceGroupManager;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
@@ -207,6 +208,7 @@ public class TestDropCacheTask
                 session,
                 URI.create("fake://uri"),
                 new ResourceGroupId("test"),
+                new NoOpResourceGroupManager(),
                 true,
                 transactionManager,
                 new AccessControlManager(transactionManager),

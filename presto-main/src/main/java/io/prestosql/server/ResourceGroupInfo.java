@@ -15,6 +15,7 @@ package io.prestosql.server;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.airlift.units.DataSize;
+import io.prestosql.spi.resourcegroups.KillPolicy;
 import io.prestosql.spi.resourcegroups.ResourceGroupId;
 import io.prestosql.spi.resourcegroups.ResourceGroupState;
 import io.prestosql.spi.resourcegroups.SchedulingPolicy;
@@ -43,6 +44,7 @@ public class ResourceGroupInfo
     private final int hardConcurrencyLimit;
     private final int hardReservedConcurrency; // add parameter hardReservedConcurrency
     private final int maxQueuedQueries;
+    private final KillPolicy killPolicy;
 
     private final DataSize memoryUsage;
     private final int numQueuedQueries;
@@ -66,7 +68,7 @@ public class ResourceGroupInfo
             int hardConcurrencyLimit,
             int hardReservedConcurrency,
             int maxQueuedQueries,
-
+            KillPolicy killPolicy,
             DataSize memoryUsage,
             int numQueuedQueries,
             int numRunningQueries,
@@ -89,6 +91,7 @@ public class ResourceGroupInfo
         this.hardConcurrencyLimit = hardConcurrencyLimit;
         this.hardReservedConcurrency = hardReservedConcurrency; // initialize new parameter hardReservedConcurrency
         this.maxQueuedQueries = maxQueuedQueries;
+        this.killPolicy = killPolicy;
 
         this.memoryUsage = requireNonNull(memoryUsage, "memoryUsage is null");
         this.numQueuedQueries = numQueuedQueries;
@@ -166,6 +169,12 @@ public class ResourceGroupInfo
     public int getMaxQueuedQueries()
     {
         return maxQueuedQueries;
+    }
+
+    @JsonProperty
+    public KillPolicy getKillPolicy()
+    {
+        return killPolicy;
     }
 
     @JsonProperty

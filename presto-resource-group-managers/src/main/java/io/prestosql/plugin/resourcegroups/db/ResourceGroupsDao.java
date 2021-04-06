@@ -48,6 +48,7 @@ public interface ResourceGroupsDao
             "  jmx_export BOOLEAN NULL,\n" +
             "  soft_cpu_limit VARCHAR(128) NULL,\n" +
             "  hard_cpu_limit VARCHAR(128) NULL,\n" +
+            "  kill_policy VARCHAR(128) NULL,\n" +
             "  parent BIGINT NULL,\n" +
             "  environment VARCHAR(128) NULL,\n" +
             "  PRIMARY KEY (resource_group_id),\n" +
@@ -58,7 +59,7 @@ public interface ResourceGroupsDao
     // Hetu: add parameters soft_reserved_memory and hard_reserved_concurrency
     @SqlQuery("SELECT resource_group_id, name, soft_memory_limit,soft_reserved_memory,  max_queued, soft_concurrency_limit, " +
             "  hard_concurrency_limit, hard_reserved_concurrency, scheduling_policy, scheduling_weight, jmx_export, soft_cpu_limit, " +
-            "  hard_cpu_limit, parent\n" +
+            "  hard_cpu_limit, kill_policy, parent\n" +
             "FROM resource_groups\n" +
             "WHERE environment = :environment\n")
     @UseRowMapper(ResourceGroupSpecBuilder.Mapper.class)

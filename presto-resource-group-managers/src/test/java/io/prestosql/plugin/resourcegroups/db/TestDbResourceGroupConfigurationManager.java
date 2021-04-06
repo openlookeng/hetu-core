@@ -75,8 +75,8 @@ public class TestDbResourceGroupConfigurationManager
         dao.insertResourceGroupsGlobalProperties("cpu_quota_period", "1h");
         // two resource groups are the same except the group for the prod environment has a larger softMemoryLimit
         // Hetu: add values for new parameters softReservedMemory and hardReservedConcurrency
-        dao.insertResourceGroup(1, "prod_global", "10MB", "5MB", 1000, 100, 100, 50, "weighted", null, true, "1h", "1d", null, prodEnvironment);
-        dao.insertResourceGroup(2, "dev_global", "1MB", "5MB", 1000, 100, 100, 50, "weighted", null, true, "1h", "1d", null, devEnvironment);
+        dao.insertResourceGroup(1, "prod_global", "10MB", "5MB", 1000, 100, 100, 50, "weighted", null, true, "1h", "1d", "RECENT_QUERIES", null, prodEnvironment);
+        dao.insertResourceGroup(2, "dev_global", "1MB", "5MB", 1000, 100, 100, 50, "weighted", null, true, "1h", "1d", "RECENT_QUERIES", null, devEnvironment);
         dao.insertSelector(1, 1, ".*prod_user.*", null, null, null, null);
         dao.insertSelector(2, 2, ".*dev_user.*", null, null, null, null);
 
@@ -115,8 +115,8 @@ public class TestDbResourceGroupConfigurationManager
         dao.createSelectorsTable();
         dao.insertResourceGroupsGlobalProperties("cpu_quota_period", "1h");
         // Hetu: add values for new parameters softReservedMemory and hardReservedConcurrency
-        dao.insertResourceGroup(1, "global", "1MB", "5MB", 1000, 100, 100, 50, "weighted", null, true, "1h", "1d", null, ENVIRONMENT);
-        dao.insertResourceGroup(2, "sub", "2MB", "5MB", 4, 3, 3, 3, null, 5, null, null, null, 1L, ENVIRONMENT);
+        dao.insertResourceGroup(1, "global", "1MB", "5MB", 1000, 100, 100, 50, "weighted", null, true, "1h", "1d", "RECENT_QUERIES", null, ENVIRONMENT);
+        dao.insertResourceGroup(2, "sub", "2MB", "5MB", 4, 3, 3, 3, null, 5, null, null, null, "RECENT_QUERIES", 1L, ENVIRONMENT);
         dao.insertSelector(2, 1, null, null, null, null, null);
         DbResourceGroupConfigurationManager manager = new DbResourceGroupConfigurationManager((poolId, listener) -> {}, new DbResourceGroupConfig(), daoProvider.get(), ENVIRONMENT);
         AtomicBoolean exported = new AtomicBoolean();
@@ -138,9 +138,9 @@ public class TestDbResourceGroupConfigurationManager
         dao.createResourceGroupsTable();
         dao.createSelectorsTable();
         // Hetu: add values for new parameters softReservedMemory and hardReservedConcurrency
-        dao.insertResourceGroup(1, "global", "1MB", "5MB", 1000, 100, 100, 50, null, null, null, null, null, null, ENVIRONMENT);
+        dao.insertResourceGroup(1, "global", "1MB", "5MB", 1000, 100, 100, 50, null, null, null, null, null, "RECENT_QUERIES", null, ENVIRONMENT);
         try {
-            dao.insertResourceGroup(1, "global", "1MB", "5MB", 1000, 100, 100, 50, null, null, null, null, null, null, ENVIRONMENT);
+            dao.insertResourceGroup(1, "global", "1MB", "5MB", 1000, 100, 100, 50, null, null, null, null, null, "RECENT_QUERIES", null, ENVIRONMENT);
             fail("Expected to fail");
         }
         catch (RuntimeException ex) {
@@ -155,10 +155,10 @@ public class TestDbResourceGroupConfigurationManager
         dao.createResourceGroupsTable();
         dao.createSelectorsTable();
         // Hetu: add values for new parameters softReservedMemory and hardReservedConcurrency
-        dao.insertResourceGroup(1, "global", "1MB", "5MB", 1000, 100, 100, 50, null, null, null, null, null, null, ENVIRONMENT);
-        dao.insertResourceGroup(2, "sub", "1MB", "5MB", 1000, 100, 100, 50, null, null, null, null, null, 1L, ENVIRONMENT);
+        dao.insertResourceGroup(1, "global", "1MB", "5MB", 1000, 100, 100, 50, null, null, null, null, null, "RECENT_QUERIES", null, ENVIRONMENT);
+        dao.insertResourceGroup(2, "sub", "1MB", "5MB", 1000, 100, 100, 50, null, null, null, null, null, "RECENT_QUERIES", 1L, ENVIRONMENT);
         try {
-            dao.insertResourceGroup(2, "sub", "1MB", "5MB", 1000, 100, 100, 50, null, null, null, null, null, 1L, ENVIRONMENT);
+            dao.insertResourceGroup(2, "sub", "1MB", "5MB", 1000, 100, 100, 50, null, null, null, null, null, "RECENT_QUERIES", 1L, ENVIRONMENT);
         }
         catch (RuntimeException ex) {
             assertTrue(ex instanceof UnableToExecuteStatementException);
@@ -178,8 +178,8 @@ public class TestDbResourceGroupConfigurationManager
         dao.createResourceGroupsTable();
         dao.createSelectorsTable();
         // Hetu: add values for new parameters softReservedMemory and hardReservedConcurrency
-        dao.insertResourceGroup(1, "global", "1MB", "5MB", 1000, 100, 100, 50, "weighted", null, true, "1h", "1d", null, ENVIRONMENT);
-        dao.insertResourceGroup(2, "sub", "2MB", "5MB", 4, 3, 3, 3, null, 5, null, null, null, 1L, ENVIRONMENT);
+        dao.insertResourceGroup(1, "global", "1MB", "5MB", 1000, 100, 100, 50, "weighted", null, true, "1h", "1d", "RECENT_QUERIES", null, ENVIRONMENT);
+        dao.insertResourceGroup(2, "sub", "2MB", "5MB", 4, 3, 3, 3, null, 5, null, null, null, "RECENT_QUERIES", 1L, ENVIRONMENT);
         dao.insertResourceGroupsGlobalProperties("cpu_quota_period", "1h");
         dao.insertSelector(2, 1, null, null, null, null, null);
         DbResourceGroupConfigurationManager manager = new DbResourceGroupConfigurationManager((poolId, listener) -> {}, new DbResourceGroupConfig(), daoProvider.get(), ENVIRONMENT);
@@ -200,8 +200,8 @@ public class TestDbResourceGroupConfigurationManager
         dao.createResourceGroupsTable();
         dao.createSelectorsTable();
         // Hetu: add values for new parameters softReservedMemory and hardReservedConcurrency
-        dao.insertResourceGroup(1, "global", "1MB", "5MB", 1000, 100, 100, 50, "weighted", null, true, "1h", "1d", null, ENVIRONMENT);
-        dao.insertResourceGroup(2, "sub", "2MB", "5MB", 4, 3, 3, 3, null, 5, null, null, null, 1L, ENVIRONMENT);
+        dao.insertResourceGroup(1, "global", "1MB", "5MB", 1000, 100, 100, 50, "weighted", null, true, "1h", "1d", "RECENT_QUERIES", null, ENVIRONMENT);
+        dao.insertResourceGroup(2, "sub", "2MB", "5MB", 4, 3, 3, 3, null, 5, null, null, null, "RECENT_QUERIES", 1L, ENVIRONMENT);
         dao.insertSelector(2, 1, null, null, null, null, null);
         dao.insertResourceGroupsGlobalProperties("cpu_quota_period", "1h");
         DbResourceGroupConfigurationManager manager = new DbResourceGroupConfigurationManager((poolId, listener) -> {}, new DbResourceGroupConfig(), daoProvider.get(), ENVIRONMENT);
@@ -213,7 +213,7 @@ public class TestDbResourceGroupConfigurationManager
         manager.configure(globalSub, new SelectionContext<>(globalSub.getId(), new ResourceGroupIdTemplate("global.sub")));
         // Verify record exists
         assertEqualsResourceGroup(globalSub, "2MB", 4, 3, 3, FAIR, 5, false, new Duration(Long.MAX_VALUE, MILLISECONDS), new Duration(Long.MAX_VALUE, MILLISECONDS));
-        dao.updateResourceGroup(2, "sub", "3MB", "5MB", 2, 1, 1, 1, "weighted", 6, true, "1h", "1d", 1L, ENVIRONMENT);
+        dao.updateResourceGroup(2, "sub", "3MB", "5MB", 2, 1, 1, 1, "weighted", 6, true, "1h", "1d", "RECENT_QUERIES", 1L, ENVIRONMENT);
         do {
             MILLISECONDS.sleep(500);
         }
@@ -239,8 +239,8 @@ public class TestDbResourceGroupConfigurationManager
         dao.createSelectorsTable();
         dao.createExactMatchSelectorsTable();
         // Hetu: add values for new parameters softReservedMemory and hardReservedConcurrency
-        dao.insertResourceGroup(1, "global", "1MB", "5MB", 1000, 100, 100, 50, "weighted", null, true, "1h", "1d", null, ENVIRONMENT);
-        dao.insertResourceGroup(2, "sub", "2MB", "5MB", 4, 3, 3, 3, null, 5, null, null, null, 1L, ENVIRONMENT);
+        dao.insertResourceGroup(1, "global", "1MB", "5MB", 1000, 100, 100, 50, "weighted", null, true, "1h", "1d", "RECENT_QUERIES", null, ENVIRONMENT);
+        dao.insertResourceGroup(2, "sub", "2MB", "5MB", 4, 3, 3, 3, null, 5, null, null, null, "RECENT_QUERIES", 1L, ENVIRONMENT);
         dao.insertSelector(2, 1, null, null, null, null, null);
         dao.insertResourceGroupsGlobalProperties("cpu_quota_period", "1h");
         DbResourceGroupConfig config = new DbResourceGroupConfig();
@@ -265,7 +265,7 @@ public class TestDbResourceGroupConfigurationManager
         dao.createResourceGroupsTable();
         dao.createSelectorsTable();
         // Hetu: add values for new parameters softReservedMemory and hardReservedConcurrency
-        dao.insertResourceGroup(1, "global", "100%", "5MB", 100, 100, 100, 50, null, null, null, null, null, null, ENVIRONMENT);
+        dao.insertResourceGroup(1, "global", "100%", "5MB", 100, 100, 100, 50, null, null, null, null, null, "RECENT_QUERIES", null, ENVIRONMENT);
 
         final int numberOfUsers = 100;
         List<String> expectedUsers = new ArrayList<>();
@@ -308,7 +308,7 @@ public class TestDbResourceGroupConfigurationManager
         dao.createResourceGroupsTable();
         dao.createSelectorsTable();
         // Hetu: add values for new parameters softReservedMemory and hardReservedConcurrency
-        dao.insertResourceGroup(1, "global", "100%", "5MB", 100, 100, 100, 50, null, null, null, null, null, null, ENVIRONMENT);
+        dao.insertResourceGroup(1, "global", "100%", "5MB", 100, 100, 100, 50, null, null, null, null, null, "RECENT_QUERIES", null, ENVIRONMENT);
 
         DbResourceGroupConfigurationManager manager = new DbResourceGroupConfigurationManager(
                 (poolId, listener) -> {},
@@ -329,7 +329,7 @@ public class TestDbResourceGroupConfigurationManager
         dao.createResourceGroupsTable();
         dao.createSelectorsTable();
         // Hetu: add values for new parameters softReservedMemory and hardReservedConcurrency
-        dao.insertResourceGroup(1, "global", "100%", "5MB", 100, 100, 100, 50, null, null, null, null, null, null, ENVIRONMENT);
+        dao.insertResourceGroup(1, "global", "100%", "5MB", 100, 100, 100, 50, null, null, null, null, null, "RECENT_QUERIES", null, ENVIRONMENT);
 
         DbResourceGroupConfigurationManager manager = new DbResourceGroupConfigurationManager(
                 (poolId, listener) -> {},

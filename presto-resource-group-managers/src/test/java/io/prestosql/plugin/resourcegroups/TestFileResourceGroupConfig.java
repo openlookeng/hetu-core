@@ -17,10 +17,14 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.configuration.testing.ConfigAssertions;
 import org.testng.annotations.Test;
 
+import java.util.HashMap;
 import java.util.Map;
 
+import static com.google.common.io.Resources.getResource;
+import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
 import static io.airlift.configuration.testing.ConfigAssertions.assertFullMapping;
 import static io.airlift.configuration.testing.ConfigAssertions.assertRecordedDefaults;
+import static org.testng.Assert.assertEquals;
 
 public class TestFileResourceGroupConfig
 {
@@ -42,5 +46,15 @@ public class TestFileResourceGroupConfig
                 .setConfigFile("/test.json");
 
         assertFullMapping(properties, expected);
+    }
+
+    @Test
+    public void testMarginParameters() throws Exception
+    {
+        Map<String, String> properties = new HashMap<>(loadPropertiesFrom(getResource("resource-groups-margin.properties").getPath()));
+        String memoryMarginPercent = properties.get("resource-groups.memory-margin-percent");
+        String queryProgressMarginPercent = properties.get("resource-groups.query-progress-margin-percent");
+        assertEquals(memoryMarginPercent, "10");
+        assertEquals(queryProgressMarginPercent, "5");
     }
 }
