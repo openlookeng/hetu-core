@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -45,6 +46,7 @@ public class CommonTableExpressionOperator
     private final OperatorContext operatorContext;
     private final PlanNodeId consumer;
     private final CommonTableExecutionContext cteContext;
+    private final Function<Page, Page> pagePreprocessor;
     private final int operatorInstaceId;
     private boolean finish;
     private boolean isProducer;
@@ -54,13 +56,15 @@ public class CommonTableExpressionOperator
             PlanNodeId consumer,
             OperatorContext operatorContext,
             CommonTableExecutionContext cteContext,
-            int operatorInstaceId)
+            int operatorInstaceId,
+            Function<Page, Page> pagePreprocessor)
     {
         this.self = requireNonNull(self, "PlanNode Id is null");
         this.consumer = requireNonNull(consumer, "consumer cannot be null");
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.cteContext = requireNonNull(cteContext, "CTE context is null");
         this.operatorInstaceId = operatorInstaceId;
+        this.pagePreprocessor = pagePreprocessor;
 
         synchronized (cteContext) {
             if (cteContext.isProducer(consumer)) {
@@ -84,6 +88,7 @@ public class CommonTableExpressionOperator
         private final Set<PlanNodeId> parents = new HashSet<>();
         private final CommonTableExecutionContext cteCtx;
         private final AtomicInteger operatorCounter = new AtomicInteger(0);
+        private final Function<Page, Page> pagePreprocessor;
 
         public CommonTableExpressionOperatorFactory(
                 int operatorId,
@@ -91,7 +96,8 @@ public class CommonTableExpressionOperator
                 CommonTableExecutionContext cteCtx,
                 List<Type> types,
                 DataSize minOutputPageSize,
-                int minOutputPageRowCount)
+                int minOutputPageRowCount,
+                Function<Page, Page> pagePreprocessor)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -99,6 +105,7 @@ public class CommonTableExpressionOperator
             this.minOutputPageSize = requireNonNull(minOutputPageSize, "minOutputPageSize is null");
             this.minOutputPageRowCount = minOutputPageRowCount;
             this.cteCtx = cteCtx;
+            this.pagePreprocessor = pagePreprocessor;
         }
 
         @Override
@@ -112,7 +119,8 @@ public class CommonTableExpressionOperator
                     parents.stream().findAny().get(),
                     operatorContext,
                     cteCtx,
-                    operatorCounter.incrementAndGet());
+                    operatorCounter.incrementAndGet(),
+                    pagePreprocessor);
         }
 
         @Override
@@ -124,7 +132,7 @@ public class CommonTableExpressionOperator
         @Override
         public OperatorFactory duplicate()
         {
-            return new CommonTableExpressionOperatorFactory(operatorId, planNodeId, cteCtx, types, minOutputPageSize, minOutputPageRowCount);
+            return new CommonTableExpressionOperatorFactory(operatorId, planNodeId, cteCtx, types, minOutputPageSize, minOutputPageRowCount, pagePreprocessor);
         }
 
         public void addConsumer(PlanNodeId id)
@@ -169,6 +177,7 @@ public class CommonTableExpressionOperator
     public void addInput(Page page)
     {
         /* Got a new page... Place it in the Queue! */
+        page = pagePreprocessor.apply(page);
         cteContext.addPage(page);
         LOG.debug("CTE(" + cteContext.getName() + ")" + "[" + consumer + "-" + operatorInstaceId + "] Page added with " + page.getPositionCount() + " rows");
     }

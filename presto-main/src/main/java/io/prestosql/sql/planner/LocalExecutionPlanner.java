@@ -1338,6 +1338,7 @@ public class LocalExecutionPlanner
             CommonTableExecutionContext cteCtx;
             List<Type> outputTypes;
             PhysicalOperation source = null;
+            Function<Page, Page> pagePreprocessor = null;
 
             synchronized (this.getClass()) {
                 String cteId = context.getCteId(node.getId());
@@ -1345,6 +1346,7 @@ public class LocalExecutionPlanner
                 if (!context.isCteInitialized(cteId) && context.getProducerCTEId().isPresent()
                         && Integer.parseInt(context.getProducerCTEId().get().toString()) == stageId) {
                     source = node.getSource().accept(this, context);
+                    pagePreprocessor = enforceLayoutProcessor(node.getOutputSymbols(), makeLayout(node.getSource()));
                 }
 
                 /* Note: this should always be comming from remote node! */
@@ -1359,7 +1361,8 @@ public class LocalExecutionPlanner
                     cteCtx,
                     outputTypes,
                     getFilterAndProjectMinOutputPageSize(session),
-                    getFilterAndProjectMinOutputPageRowCount(session));
+                    getFilterAndProjectMinOutputPageRowCount(session),
+                    pagePreprocessor);
 
             cteOperatorFactory.addConsumer(context.getConsumerId());
 
@@ -1372,7 +1375,7 @@ public class LocalExecutionPlanner
             }
 
             return new PhysicalOperation(cteOperatorFactory,
-                    source.getLayout(),
+                    makeLayout(node),
                     context,
                     source);
         }

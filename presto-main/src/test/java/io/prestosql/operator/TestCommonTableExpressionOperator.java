@@ -71,7 +71,8 @@ public class TestCommonTableExpressionOperator
                 cteContext,
                 ImmutableList.of(VARCHAR),
                 new DataSize(0, DataSize.Unit.BYTE),
-                0);
+                0,
+                symbol -> symbol);
         parent1.addConsumer(new PlanNodeId("consumer_1"));
 
         CommonTableExpressionOperator.CommonTableExpressionOperatorFactory parent2 = new CommonTableExpressionOperator.CommonTableExpressionOperatorFactory(
@@ -80,7 +81,8 @@ public class TestCommonTableExpressionOperator
                 cteContext,
                 ImmutableList.of(VARCHAR),
                 new DataSize(0, DataSize.Unit.BYTE),
-                0);
+                0,
+                symbol -> symbol);
         parent2.addConsumer(new PlanNodeId("consumer_2"));
 
         //Operator operator = factory.createOperator(driverContext);
