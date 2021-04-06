@@ -33,8 +33,8 @@ type StageNodeInfo = {
     stageStats: any,
     state: string,
     nodes: Map<string, any>,
-    producerCTE: string,
-    producerCTEParentId: string,
+    feederCTE: string,
+    feederCTEParentId: string,
 }
 
 class StageStatistics extends React.Component<StageStatisticsProps, StageStatisticsState> {
@@ -60,8 +60,8 @@ class StageStatistics extends React.Component<StageStatisticsProps, StageStatist
             stageStats: stageInfo.stageStats,
             state: stageInfo.state,
             nodes: nodes,
-            producerCTE: stageInfo.plan.producerCTE,
-            parentProducerId: stageInfo.plan.producerCTEParentId,
+            feederCTE: stageInfo.plan.feederCTE,
+            parentFeederId: stageInfo.plan.feederCTEParentId,
         });
     }
 
@@ -164,8 +164,8 @@ export class LivePlan extends React.Component<LivePlanProps, LivePlanState> {
             graph: initializeGraph(),
             svg: null,
             render: new dagreD3.render(),
-            producerInfo: new Map(),
-            consumerProducerMap: new Map(),
+            feederInfo: new Map(),
+            consumerFeederMap: new Map(),
         };
     }
 
@@ -211,15 +211,15 @@ export class LivePlan extends React.Component<LivePlanProps, LivePlanState> {
         const stageRootNodeId = "stage-" + stage.id + "-root";
         const color = getStageStateColor(stage);
 
-        //check if producer
-        if(stage.producerCTE != undefined) {
-            // add producer detail to map to keep track
-            this.state.producerInfo.set(stage.parentProducerId, stage.producerCTE);
+        //check if feeder
+        if(stage.feederCTE != undefined) {
+            // add feeder detail to map to keep track
+            this.state.feederInfo.set(stage.parentFeederId, stage.feederCTE);
         }
         // check if consumer
-        if(stage.parentProducerId != undefined && stage.producerCTE == undefined) {
-            // store consumer stage to producer stage mapping info
-            this.state.consumerProducerMap.set(stage.id, this.state.producerInfo.get(stage.parentProducerId));
+        if(stage.parentFeederId != undefined && stage.feederCTE == undefined) {
+            // store consumer stage to feeder stage mapping info
+            this.state.consumerFeederMap.set(stage.id, this.state.feederInfo.get(stage.parentFeederId));
         }
         else {
             graph.setNode(clusterId, {style: 'fill: ' + color, labelStyle: 'fill: #fff'});
@@ -251,10 +251,10 @@ export class LivePlan extends React.Component<LivePlanProps, LivePlanState> {
                         if (source) {
                             const sourceStats = source.stageStats;
                             // if the exchange node has consumer as it source
-                            if(this.state.consumerProducerMap.has(sourceId)) {
-                                // create edge from producer instead of consumer to parent stage
-                                console.log("remote sources for edges is -" + this.state.consumerProducerMap.get(sourceId));
-                                graph.setEdge("stage-" + this.state.consumerProducerMap.get(sourceId) + "-root", nodeId, {
+                            if(this.state.consumerFeederMap.has(sourceId)) {
+                                // create edge from feeder instead of consumer to parent stage
+                                console.log("remote sources for edges is -" + this.state.consumerFeederMap.get(sourceId));
+                                graph.setEdge("stage-" + this.state.consumerFeederMap.get(sourceId) + "-root", nodeId, {
                                     class: "plan-edge",
                                     style: "stroke-width: 4px",
                                     arrowheadClass: "plan-arrowhead",

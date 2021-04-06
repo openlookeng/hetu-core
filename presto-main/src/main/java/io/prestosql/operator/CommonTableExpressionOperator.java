@@ -47,7 +47,7 @@ public class CommonTableExpressionOperator
     private final CommonTableExecutionContext cteContext;
     private final int operatorInstaceId;
     private boolean finish;
-    private boolean isProducer;
+    private boolean isFeeder;
 
     public CommonTableExpressionOperator(
             PlanNodeId self,
@@ -63,13 +63,13 @@ public class CommonTableExpressionOperator
         this.operatorInstaceId = operatorInstaceId;
 
         synchronized (cteContext) {
-            if (cteContext.isProducer(consumer)) {
-                this.isProducer = true;
-                cteContext.setProducerState(consumer, operatorInstaceId, true);
+            if (cteContext.isFeeder(consumer)) {
+                this.isFeeder = true;
+                cteContext.setFeederState(consumer, operatorInstaceId, true);
             }
         }
 
-        LOG.debug("CTE(" + cteContext.getName() + ")[" + consumer + "-" + operatorInstaceId + "] Operator Initialized (Producer: " + this.isProducer + ")");
+        LOG.debug("CTE(" + cteContext.getName() + ")[" + consumer + "-" + operatorInstaceId + "] Operator Initialized (Feeder: " + this.isFeeder + ")");
     }
 
     public static class CommonTableExpressionOperatorFactory
@@ -156,7 +156,7 @@ public class CommonTableExpressionOperator
     @Override
     public boolean needsInput()
     {
-        return isProducer && !finish;
+        return isFeeder && !finish;
     }
 
     /**
@@ -242,8 +242,8 @@ public class CommonTableExpressionOperator
     @Override
     public void finish()
     {
-        if (isProducer) {
-            cteContext.setProducerState(consumer, operatorInstaceId, false);
+        if (isFeeder) {
+            cteContext.setFeederState(consumer, operatorInstaceId, false);
         }
         LOG.debug("CTE(" + cteContext.getName() + ")[" + consumer + "-" + operatorInstaceId + "] Operator Finished (deferred)");
     }

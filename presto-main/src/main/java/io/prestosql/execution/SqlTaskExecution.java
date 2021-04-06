@@ -249,7 +249,7 @@ public class SqlTaskExecution
                             .collect(toImmutableMap(DriverFactory::getPipelineId, DriverFactory::getPipelineExecutionStrategy)));
             this.schedulingLifespanManager = new SchedulingLifespanManager(localExecutionPlan.getPartitionedSourceOrder(), localExecutionPlan.getStageExecutionDescriptor(), this.status);
 
-            checkArgument(!localExecutionPlan.getProducerCTEId().isPresent() || this.driverRunnerFactoriesWithSplitLifeCycle.keySet().equals(partitionedSources),
+            checkArgument(!localExecutionPlan.getFeederCTEId().isPresent() || this.driverRunnerFactoriesWithSplitLifeCycle.keySet().equals(partitionedSources),
                     "Fragment is partitioned, but not all partitioned drivers were found");
 
             // Pre-register Lifespans for ungrouped partitioned drivers in case they end up get no splits.

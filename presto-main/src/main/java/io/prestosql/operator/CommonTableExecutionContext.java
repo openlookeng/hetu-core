@@ -42,9 +42,9 @@ public class CommonTableExecutionContext
     private static final Logger LOG = Logger.get(CommonTableExecutionContext.class);
     private final String name;
     private final int queueCnt;
-    private final PlanNodeId producerId;
-    private boolean isProducerInitialized;
-    private List<Integer> producers = Collections.synchronizedList(new ArrayList<>());
+    private final PlanNodeId feederId;
+    private boolean isFeederInitialized;
+    private List<Integer> feeders = Collections.synchronizedList(new ArrayList<>());
 
     private Map<PlanNodeId, LinkedList<Page>> consumerQueues;
     private AtomicInteger size = new AtomicInteger(0);
@@ -56,11 +56,11 @@ public class CommonTableExecutionContext
     private final int maxMainQueueSize;
     private final int maxPrefetchQueueSize;
 
-    public CommonTableExecutionContext(String name, Set<PlanNodeId> consumers, PlanNodeId producerId, Executor notificationExecutor,
+    public CommonTableExecutionContext(String name, Set<PlanNodeId> consumers, PlanNodeId feederId, Executor notificationExecutor,
                                                 int taskCount, int maxMainQueueSize, int maxPrefetchQueueSize)
     {
         this.name = name;
-        this.producerId = producerId;
+        this.feederId = feederId;
         this.consumerQueues = consumers.stream().collect(Collectors.toMap(x -> x, x -> new LinkedList<>()));
         this.prefetchedQueue = new ConcurrentLinkedQueue<Page>();
         this.queueCnt = consumers.size();
@@ -74,7 +74,7 @@ public class CommonTableExecutionContext
 
     public void addPage(Page page)
     {
-        synchronized (consumerQueues.get(producerId)) {
+        synchronized (consumerQueues.get(feederId)) {
             checkArgument(!isMaxLimitReached(), "No more pages can be added");
             if (isConsumerQueueFull() && !isPrefetchQueueFull()) {
                 // Main queue is full, prefetch some more pages and keep it in a separate queue.
@@ -144,7 +144,7 @@ public class CommonTableExecutionContext
         // Either not yet done or there are some entries in prefetched queue.
         // If it is second case, then populate main consumer queue from prefetch queue.
         boolean isPageAdded = false;
-        synchronized (consumerQueues.get(producerId)) {
+        synchronized (consumerQueues.get(feederId)) {
             while (!isConsumerQueueFull() && !prefetchedQueue.isEmpty()) {
                 addPageToQueues(prefetchedQueue.poll());
                 isPageAdded = true;
@@ -174,32 +174,32 @@ public class CommonTableExecutionContext
         return (size.get() >= (maxMainQueueSize * queueCnt)) && (prefetchedQueue.size() >= maxPrefetchQueueSize);
     }
 
-    public synchronized boolean isProducer(PlanNodeId planNodeId)
+    public synchronized boolean isFeeder(PlanNodeId planNodeId)
     {
-        return planNodeId.equals(producerId);
+        return planNodeId.equals(feederId);
     }
 
-    public synchronized void setProducerState(PlanNodeId planNodeId, Integer opeartorInstance, boolean initialized)
+    public synchronized void setFeederState(PlanNodeId planNodeId, Integer opeartorInstance, boolean initialized)
     {
-        if (planNodeId.equals(producerId)) {
+        if (planNodeId.equals(feederId)) {
             if (initialized) {
-                if (!producers.contains(opeartorInstance)) {
-                    producers.add(opeartorInstance);
+                if (!feeders.contains(opeartorInstance)) {
+                    feeders.add(opeartorInstance);
 
-                    if (isProducerInitialized == false) {
-                        isProducerInitialized = true;
+                    if (isFeederInitialized == false) {
+                        isFeederInitialized = true;
                     }
                 }
             }
             else {
-                producers.remove(opeartorInstance);
+                feeders.remove(opeartorInstance);
             }
         }
     }
 
     private boolean isDone()
     {
-        return isProducerInitialized && producers.size() == 0;
+        return isFeederInitialized && feeders.size() == 0;
     }
 
     public String getName()
@@ -210,7 +210,7 @@ public class CommonTableExecutionContext
     public ListenableFuture<?> isBlocked(PlanNodeId planNodeId)
     {
         // proxy CTE operator will never block
-        if (!isProducer(planNodeId)) {
+        if (!isFeeder(planNodeId)) {
             return NOT_BLOCKED;
         }
 
@@ -253,7 +253,7 @@ public class CommonTableExecutionContext
     @Override
     public String toString()
     {
-        return "CTE Producer { id-" + name + ", size: " + size + ", capacity: " + maxMainQueueSize + " }";
+        return "CTE Feeder { id-" + name + ", size: " + size + ", capacity: " + maxMainQueueSize + " }";
     }
 
     public static class CTEDoneException

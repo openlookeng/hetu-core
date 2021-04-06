@@ -93,8 +93,8 @@ public class SqlTaskExecutionFactory
                         fragment.getStageExecutionDescriptor(),
                         fragment.getPartitionedSources(),
                         outputBuffer,
-                        fragment.getProducerCTEId(),
-                        fragment.getProducerCTEParentId(),
+                        fragment.getFeederCTEId(),
+                        fragment.getFeederCTEParentId(),
                         cteCtx);
             }
             catch (Throwable e) {

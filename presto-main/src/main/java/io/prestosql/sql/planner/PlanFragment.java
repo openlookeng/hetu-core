@@ -54,8 +54,8 @@ public class PlanFragment
     private final StageExecutionDescriptor stageExecutionDescriptor;
     private final StatsAndCosts statsAndCosts;
     private final Optional<String> jsonRepresentation;
-    private final Optional<PlanFragmentId> producerCTEId;
-    private final Optional<PlanNodeId> producerCTEParentId;
+    private final Optional<PlanFragmentId> feederCTEId;
+    private final Optional<PlanNodeId> feederCTEParentId;
 
     @JsonCreator
     public PlanFragment(
@@ -68,8 +68,8 @@ public class PlanFragment
             @JsonProperty("stageExecutionDescriptor") StageExecutionDescriptor stageExecutionDescriptor,
             @JsonProperty("statsAndCosts") StatsAndCosts statsAndCosts,
             @JsonProperty("jsonRepresentation") Optional<String> jsonRepresentation,
-            @JsonProperty("producerCTE") Optional<PlanFragmentId> producerCTEId,
-            @JsonProperty("producerCTEParentId") Optional<PlanNodeId> producerCTEParentId)
+            @JsonProperty("feederCTE") Optional<PlanFragmentId> feederCTEId,
+            @JsonProperty("feederCTEParentId") Optional<PlanNodeId> feederCTEParentId)
     {
         this.id = requireNonNull(id, "id is null");
         this.root = requireNonNull(root, "root is null");
@@ -80,8 +80,8 @@ public class PlanFragment
         this.stageExecutionDescriptor = requireNonNull(stageExecutionDescriptor, "stageExecutionDescriptor is null");
         this.statsAndCosts = requireNonNull(statsAndCosts, "statsAndCosts is null");
         this.jsonRepresentation = requireNonNull(jsonRepresentation, "jsonRepresentation is null");
-        this.producerCTEId = requireNonNull(producerCTEId, "jsonRepresentation is null");
-        this.producerCTEParentId = requireNonNull(producerCTEParentId, "jsonRepresentation is null");
+        this.feederCTEId = requireNonNull(feederCTEId, "jsonRepresentation is null");
+        this.feederCTEParentId = requireNonNull(feederCTEParentId, "jsonRepresentation is null");
 
         checkArgument(partitionedSourcesSet.size() == partitionedSources.size(), "partitionedSources contains duplicates");
         checkArgument(ImmutableSet.copyOf(root.getOutputSymbols()).containsAll(partitioningScheme.getOutputLayout()),
@@ -162,15 +162,15 @@ public class PlanFragment
     }
 
     @JsonProperty
-    public Optional<PlanFragmentId> getProducerCTEId()
+    public Optional<PlanFragmentId> getFeederCTEId()
     {
-        return producerCTEId;
+        return feederCTEId;
     }
 
     @JsonProperty
-    public Optional<PlanNodeId> getProducerCTEParentId()
+    public Optional<PlanNodeId> getFeederCTEParentId()
     {
-        return producerCTEParentId;
+        return feederCTEParentId;
     }
 
     public List<Type> getTypes()
@@ -224,17 +224,17 @@ public class PlanFragment
 
     public PlanFragment withBucketToPartition(Optional<int[]> bucketToPartition)
     {
-        return new PlanFragment(id, root, symbols, partitioning, partitionedSources, partitioningScheme.withBucketToPartition(bucketToPartition), stageExecutionDescriptor, statsAndCosts, jsonRepresentation, producerCTEId, producerCTEParentId);
+        return new PlanFragment(id, root, symbols, partitioning, partitionedSources, partitioningScheme.withBucketToPartition(bucketToPartition), stageExecutionDescriptor, statsAndCosts, jsonRepresentation, feederCTEId, feederCTEParentId);
     }
 
     public PlanFragment withFixedLifespanScheduleGroupedExecution(List<PlanNodeId> capableTableScanNodes)
     {
-        return new PlanFragment(id, root, symbols, partitioning, partitionedSources, partitioningScheme, StageExecutionDescriptor.fixedLifespanScheduleGroupedExecution(capableTableScanNodes), statsAndCosts, jsonRepresentation, producerCTEId, producerCTEParentId);
+        return new PlanFragment(id, root, symbols, partitioning, partitionedSources, partitioningScheme, StageExecutionDescriptor.fixedLifespanScheduleGroupedExecution(capableTableScanNodes), statsAndCosts, jsonRepresentation, feederCTEId, feederCTEParentId);
     }
 
     public PlanFragment withDynamicLifespanScheduleGroupedExecution(List<PlanNodeId> capableTableScanNodes)
     {
-        return new PlanFragment(id, root, symbols, partitioning, partitionedSources, partitioningScheme, StageExecutionDescriptor.dynamicLifespanScheduleGroupedExecution(capableTableScanNodes), statsAndCosts, jsonRepresentation, producerCTEId, producerCTEParentId);
+        return new PlanFragment(id, root, symbols, partitioning, partitionedSources, partitioningScheme, StageExecutionDescriptor.dynamicLifespanScheduleGroupedExecution(capableTableScanNodes), statsAndCosts, jsonRepresentation, feederCTEId, feederCTEParentId);
     }
 
     @Override
