@@ -208,8 +208,8 @@ public class PlanFragmenter
                 fragment.getStageExecutionDescriptor(),
                 fragment.getStatsAndCosts(),
                 fragment.getJsonRepresentation(),
-                fragment.getProducerCTEId(),
-                fragment.getProducerCTEParentId());
+                fragment.getFeederCTEId(),
+                fragment.getFeederCTEParentId());
 
         ImmutableList.Builder<SubPlan> childrenBuilder = ImmutableList.builder();
         for (SubPlan child : subPlan.getChildren()) {
@@ -249,7 +249,7 @@ public class PlanFragmenter
             return new PlanFragmentId(String.valueOf(nextFragmentId++));
         }
 
-        private SubPlan buildFragment(PlanNode root, FragmentProperties properties, PlanFragmentId fragmentId, boolean isProducerCTE, Optional<PlanNodeId> producerCTEParentId)
+        private SubPlan buildFragment(PlanNode root, FragmentProperties properties, PlanFragmentId fragmentId, boolean isFeederCTE, Optional<PlanNodeId> feederCTEParentId)
         {
             Set<Symbol> dependencies = SymbolsExtractor.extractAllSymbols(root, Lookup.noLookup());
 
@@ -269,8 +269,8 @@ public class PlanFragmenter
                     ungroupedExecution(),
                     statsAndCosts.getForSubplan(root),
                     Optional.of(jsonFragmentPlan(root, symbols, metadata, session)),
-                    isProducerCTE ? Optional.of(fragmentId) : Optional.empty(),
-                    producerCTEParentId);
+                    isFeederCTE ? Optional.of(fragmentId) : Optional.empty(),
+                    feederCTEParentId);
 
             return new SubPlan(fragment, properties.getChildren());
         }
@@ -390,8 +390,8 @@ public class PlanFragmenter
                                 currFragment.getStageExecutionDescriptor(),
                                 currFragment.getStatsAndCosts(),
                                 currFragment.getJsonRepresentation(),
-                                Optional.empty(),   // This is not producer CTE, so we pass empty
-                                currFragment.getProducerCTEParentId());
+                                Optional.empty(),   // This is not feeder CTE, so we pass empty
+                                currFragment.getFeederCTEParentId());
                         builder.add(new SubPlan(fragment, subPlanMap.get(planNodeId).getChildren()));
                         List<CTEScanNode> cteNodes = cteToParentsMap.get(planNodeId);
                         cteNodes.add(getCTENode(exchange.getSources().get(sourceIndex)));
@@ -455,11 +455,11 @@ public class PlanFragmenter
             return null;
         }
 
-        private SubPlan buildSubPlan(PlanNode node, FragmentProperties properties, RewriteContext<FragmentProperties> context, boolean isProducerCTE, Optional<PlanNodeId> producerCTEParentId)
+        private SubPlan buildSubPlan(PlanNode node, FragmentProperties properties, RewriteContext<FragmentProperties> context, boolean isfeederCTE, Optional<PlanNodeId> feederCTEParentId)
         {
             PlanFragmentId planFragmentId = nextFragmentId();
             PlanNode child = context.rewrite(node, properties);
-            return buildFragment(child, properties, planFragmentId, isProducerCTE, producerCTEParentId);
+            return buildFragment(child, properties, planFragmentId, isfeederCTE, feederCTEParentId);
         }
     }
 
