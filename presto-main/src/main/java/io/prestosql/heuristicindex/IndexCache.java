@@ -30,6 +30,7 @@ import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexNotCreatedException;
 import io.prestosql.spi.heuristicindex.IndexRecord;
 import io.prestosql.spi.service.PropertyService;
+import org.eclipse.jetty.util.URIUtil;
 
 import java.io.IOException;
 import java.net.URI;
@@ -194,7 +195,7 @@ public class IndexCache
             return Collections.emptyList();
         }
 
-        URI splitUri = URI.create(split.getConnectorSplit().getFilePath().replaceAll(" ", "%20"));
+        URI splitUri = URI.create(URIUtil.encodePath(split.getConnectorSplit().getFilePath()));
         long lastModifiedTime = split.getConnectorSplit().getLastModifiedTime();
         List<IndexMetadata> indices = new LinkedList<>();
 
