@@ -546,12 +546,13 @@ public class InternalResourceGroup
                     sortedQueryList = new ArrayList<>();
             }
 
+            long tempCacheMemoryUsageBytes = cachedMemoryUsageBytes;
             for (ManagedQueryExecution query : sortedQueryList) {
                 LOG.info("Query " + query.getBasicQueryInfo().getQueryId() + " is getting killed for resource group " + this + " query will be killed with policy " + killPolicy);
-                query.fail(new PrestoException(GENERIC_INSUFFICIENT_RESOURCES, "Memory consumption " + cachedMemoryUsageBytes + " exceed the limit " + softMemoryLimitBytes + "for resource group " + this));
+                query.fail(new PrestoException(GENERIC_INSUFFICIENT_RESOURCES, "Memory consumption " + tempCacheMemoryUsageBytes + " exceed the limit " + softMemoryLimitBytes + "for resource group " + this));
                 queryFinished(query);
-                cachedMemoryUsageBytes -= query.getCurrentUserMemory();
-                if (cachedMemoryUsageBytes <= softMemoryLimitBytes) {
+                tempCacheMemoryUsageBytes -= query.getCurrentUserMemory();
+                if (tempCacheMemoryUsageBytes <= softMemoryLimitBytes) {
                     break;
                 }
             }
