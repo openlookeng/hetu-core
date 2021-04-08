@@ -122,7 +122,7 @@ import static java.util.stream.Collectors.toSet;
 
 public class SqlQueryScheduler
 {
-    private static final Logger log = Logger.get(SimpleNodeSelector.class);
+    private static final Logger log = Logger.get(SqlQueryScheduler.class);
     private static final int[] THROTTLE_SLEEP_TIMER = {5, 10, 15}; //seconds
     private final QueryStateMachine queryStateMachine;
     private final ExecutionPolicy executionPolicy;
