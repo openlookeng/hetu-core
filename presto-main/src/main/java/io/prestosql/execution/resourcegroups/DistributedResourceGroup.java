@@ -469,7 +469,8 @@ public class DistributedResourceGroup
                             sortedQueryList = new ArrayList<>();
                     }
 
-                    long tempCachedMemoryUsage = cachedMemoryUsageBytes;
+                    long tempGlobalCachedMemoryUsage = cachedMemoryUsageBytes;
+                    long tempLocalCachedMemoryUsage = cachedMemoryUsageBytes;
 
                     // As per the kill policy, top queries are selected across all coordinators but we kill only local queries
                     // till memory reaches with-in required limit.
@@ -481,15 +482,15 @@ public class DistributedResourceGroup
                         for (ManagedQueryExecution localQuery : runningQueries) {
                             if (query.getBasicQueryInfo().getQueryId().equals(localQuery.getBasicQueryInfo().getQueryId())) {
                                 LOG.info("Query " + localQuery.getBasicQueryInfo().getQueryId() + " is getting killed for resource group " + this + " query will be killed with policy " + killPolicy);
-                                localQuery.fail(new PrestoException(GENERIC_INSUFFICIENT_RESOURCES, "Memory consumption " + cachedMemoryUsageBytes + " exceed the limit " + softMemoryLimitBytes + "for resource group " + this));
+                                localQuery.fail(new PrestoException(GENERIC_INSUFFICIENT_RESOURCES, "Memory consumption " + tempLocalCachedMemoryUsage + " exceed the limit " + softMemoryLimitBytes + "for resource group " + this));
                                 queryFinished(localQuery);
-                                cachedMemoryUsageBytes -= query.getUserMemoryReservation().toBytes();
+                                tempLocalCachedMemoryUsage -= query.getUserMemoryReservation().toBytes();
                                 break;
                             }
                         }
 
-                        tempCachedMemoryUsage -= query.getUserMemoryReservation().toBytes();
-                        if (tempCachedMemoryUsage <= softMemoryLimitBytes) {
+                        tempGlobalCachedMemoryUsage -= query.getUserMemoryReservation().toBytes();
+                        if (tempGlobalCachedMemoryUsage <= softMemoryLimitBytes) {
                             break;
                         }
                     }
