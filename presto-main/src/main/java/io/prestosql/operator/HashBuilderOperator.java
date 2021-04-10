@@ -484,7 +484,7 @@ public class HashBuilderOperator
             }
             else {
                 // Take a final snapshot of this operator
-                snapshotState.captureState(lastMarker.getSnapshotId() + 1);
+                snapshotState.captureExtraState(lastMarker.getSnapshotId() + 1);
             }
         }
         doFinish();

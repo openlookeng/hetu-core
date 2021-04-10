@@ -133,14 +133,19 @@ public class SingleInputSnapshotState
             }
         }
         else {
-            captureState(snapshotId);
+            captureState(snapshotId, true);
         }
         markers.add(marker);
         return true;
     }
 
     // Exposed only to be used by HashBuilderOperator
-    public void captureState(long snapshotId)
+    public void captureExtraState(long snapshotId)
+    {
+        captureState(snapshotId, false);
+    }
+
+    private void captureState(long snapshotId, boolean record)
     {
         SnapshotStateId componentId = snapshotStateIdGenerator.apply(snapshotId);
         try {
@@ -148,8 +153,13 @@ public class SingleInputSnapshotState
             if (restorable instanceof Spillable && ((Spillable) restorable).isSpilled()) {
                 storeSpilledFiles(snapshotId, (Spillable) restorable);
             }
-            snapshotManager.succeededToCapture(componentId);
-            LOG.debug("Successfully saved state to snapshot %d for %s", snapshotId, restorableId);
+            if (record) {
+                snapshotManager.succeededToCapture(componentId);
+                LOG.debug("Successfully saved state to snapshot %d for %s", snapshotId, restorableId);
+            }
+            else {
+                LOG.debug("Successfully saved EXTRA state to snapshot %d for %s", snapshotId, restorableId);
+            }
         }
         catch (Exception e) {
             LOG.warn(e, "Failed to capture and store snapshot state");

@@ -163,6 +163,7 @@ import static io.prestosql.plugin.hive.HiveUtil.isPrestoView;
 import static io.prestosql.plugin.hive.HiveUtil.toPartitionValues;
 import static io.prestosql.plugin.hive.HiveUtil.verifyPartitionTypeSupported;
 import static io.prestosql.plugin.hive.HiveWriteUtils.isS3FileSystem;
+import static io.prestosql.plugin.hive.HiveWriterFactory.getSnapshotSubFileIndex;
 import static io.prestosql.plugin.hive.HiveWriterFactory.isSnapshotFile;
 import static io.prestosql.plugin.hive.HiveWriterFactory.isSnapshotSubFile;
 import static io.prestosql.plugin.hive.HiveWriterFactory.removeSnapshotFileName;
@@ -1313,7 +1314,7 @@ public class HiveMetadata
         HiveOutputTableHandle handle = (HiveOutputTableHandle) tableHandle;
 
         if (session.isSnapshotEnabled()) {
-            updateSnapshotFiles(session, handle, false);
+            updateSnapshotFiles(session, handle, false, OptionalLong.empty());
         }
 
         List<PartitionUpdate> partitionUpdates = fragments.stream()
@@ -1612,7 +1613,7 @@ public class HiveMetadata
         HiveInsertTableHandle handle = (HiveInsertTableHandle) insertHandle;
 
         if (session.isSnapshotEnabled()) {
-            updateSnapshotFiles(session, handle, false);
+            updateSnapshotFiles(session, handle, false, OptionalLong.empty());
         }
 
         List<PartitionUpdate> partitionUpdates = fragments.stream()
@@ -2926,54 +2927,60 @@ public class HiveMetadata
     }
 
     @Override
-    public void resetInsertForRerun(ConnectorSession session, ConnectorInsertTableHandle tableHandle)
+    public void resetInsertForRerun(ConnectorSession session, ConnectorInsertTableHandle tableHandle, OptionalLong snapshotId)
     {
-        updateSnapshotFiles(session, (HiveWritableTableHandle) tableHandle, true);
+        updateSnapshotFiles(session, (HiveWritableTableHandle) tableHandle, true, snapshotId);
     }
 
     @Override
-    public void resetCreateForRerun(ConnectorSession session, ConnectorOutputTableHandle tableHandle)
+    public void resetCreateForRerun(ConnectorSession session, ConnectorOutputTableHandle tableHandle, OptionalLong snapshotId)
     {
-        updateSnapshotFiles(session, (HiveWritableTableHandle) tableHandle, true);
+        updateSnapshotFiles(session, (HiveWritableTableHandle) tableHandle, true, snapshotId);
     }
 
     // Visit table writePath recursively.
-    // reset=true:  (for rerun) remove all files with snapshot identifier
-    // reset=false: (for finish) remove sub-files; rename merged-files
-    private void updateSnapshotFiles(ConnectorSession session, HiveWritableTableHandle tableHandle, boolean reset)
+    // resume=true:  (for rerun) remove all files with snapshot identifier
+    // resume=false: (for finish) remove sub-files; rename merged-files
+    private void updateSnapshotFiles(ConnectorSession session, HiveWritableTableHandle tableHandle, boolean resume, OptionalLong snapshotId)
     {
         try {
             FileSystem fileSystem = hdfsEnvironment.getFileSystem(
                     new HdfsContext(session, tableHandle.getSchemaName(), tableHandle.getTableName()),
                     tableHandle.getLocationHandle().getWritePath());
-            updatePreviousFiles(fileSystem, tableHandle.getLocationHandle().getWritePath(), session.getQueryId(), reset);
+            updatePreviousFiles(fileSystem, tableHandle.getLocationHandle().getWritePath(), session.getQueryId(), resume, snapshotId.orElse(0));
         }
         catch (IOException e) {
             throw new PrestoException(HIVE_FILESYSTEM_ERROR, "Failed to update Hive files for " + tableHandle.getSchemaName() + "." + tableHandle.getTableName(), e);
         }
     }
 
-    private void updatePreviousFiles(FileSystem fileSystem, Path folder, String queryId, boolean reset)
+    private void updatePreviousFiles(FileSystem fileSystem, Path folder, String queryId, boolean resume, long snapshotId)
             throws IOException
     {
         if (fileSystem.exists(folder)) {
             for (FileStatus status : fileSystem.listStatus(folder)) {
                 if (status.isDirectory()) {
-                    updatePreviousFiles(fileSystem, status.getPath(), queryId, reset);
+                    updatePreviousFiles(fileSystem, status.getPath(), queryId, resume, snapshotId);
                 }
                 else if (isSnapshotFile(status.getPath().getName(), queryId)) {
-                    if (reset) {
-                        log.debug("Deleting file reset=true: %s", status.getPath().getName());
-                        fileSystem.delete(status.getPath());
-                    }
-                    else if (isSnapshotSubFile(status.getPath().getName(), queryId)) {
-                        log.debug("Deleting sub file reset=false: %s", status.getPath().getName());
-                        fileSystem.delete(status.getPath());
+                    if (resume) {
+                        long subFileIndex = getSnapshotSubFileIndex(status.getPath().getName(), queryId);
+                        // Remove any merged files and subfiles that are after the snapshot being resumed to
+                        if (subFileIndex < 0 || subFileIndex >= snapshotId) {
+                            log.debug("Deleting file resume=true: %s", status.getPath().getName());
+                            fileSystem.delete(status.getPath());
+                        }
                     }
                     else {
-                        log.debug("Renaming merged file reset=false: %s", status.getPath().getName());
-                        String newName = removeSnapshotFileName(status.getPath().getName(), queryId);
-                        fileSystem.rename(status.getPath(), new Path(folder, newName));
+                        if (isSnapshotSubFile(status.getPath().getName(), queryId)) {
+                            log.debug("Deleting sub file resume=false: %s", status.getPath().getName());
+                            fileSystem.delete(status.getPath());
+                        }
+                        else {
+                            String newName = removeSnapshotFileName(status.getPath().getName(), queryId);
+                            log.debug("Renaming merged file resume=false: %s to %s", status.getPath().getName(), newName);
+                            fileSystem.rename(status.getPath(), new Path(folder, newName));
+                        }
                     }
                 }
             }

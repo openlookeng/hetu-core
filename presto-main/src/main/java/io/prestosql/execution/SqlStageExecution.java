@@ -585,7 +585,7 @@ public final class SqlStageExecution
                         .map(ExecutionFailureInfo::toException)
                         .orElse(new PrestoException(GENERIC_INTERNAL_ERROR, "A task failed for an unknown reason"));
                 // Snapshot: if remote task failed because they received 5xx from other tasks, then we treat it as resumable.
-                if (failure.getMessage().contains("to be 200, but was 5")) {
+                if (failure.getMessage() != null && failure.getMessage().contains("to be 200, but was 5")) {
                     log.debug(failure, "Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
                     stateMachine.transitionToResumableFailure();
                     return;

@@ -175,7 +175,7 @@ public class Driver
         return sourceOperator.map(SourceOperator::getSourceId);
     }
 
-    public void reportFinishedDriver()
+    public synchronized void reportFinishedDriver()
     {
         if (isSnapshotEnabled && !reportedFinish) {
             TaskSnapshotManager snapshotManager = driverContext.getPipelineContext().getTaskContext().getSnapshotManager();
@@ -394,6 +394,11 @@ public class Driver
             for (int i = 0; i < activeOperators.size() - 1 && !driverContext.isDone(); i++) {
                 Operator current = activeOperators.get(i);
                 Operator next = activeOperators.get(i + 1);
+
+                if (log.isDebugEnabled()) {
+                    log.debug("Blocking info next=%s: getBlockedFuture(next)=%b; current.isFinished=%b; getBlockedFuture(next)=%b; next.needsInput=%b",
+                            next.getOperatorContext().getUniqueId(), getBlockedFuture(current).isPresent(), current.isFinished(), getBlockedFuture(next).isPresent(), next.needsInput());
+                }
 
                 // skip blocked operator
                 if (!(current instanceof CommonTableExpressionOperator) && getBlockedFuture(current).isPresent()) {
