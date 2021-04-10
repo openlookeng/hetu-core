@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 import static io.prestosql.execution.scheduler.ScheduleResult.BlockedReason.WRITER_SCALING;
-import static io.prestosql.snapshot.SnapshotConfig.MAX_NODE_ALLOCATION;
+import static io.prestosql.snapshot.SnapshotConfig.calculateTaskCount;
 import static io.prestosql.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static io.prestosql.util.Failures.checkCondition;
 import static java.util.Objects.requireNonNull;
@@ -71,6 +71,11 @@ public class ScaledWriterScheduler
         this.executor = requireNonNull(executor, "executor is null");
         this.writerMinSizeBytes = requireNonNull(writerMinSize, "minWriterSize is null").toBytes();
         this.isSnapshotEnabled = isSnapshotEnabled;
+        if (initialTaskCount != null) {
+            checkCondition(initialTaskCount <= nodeSelector.selectableNodeCount(),
+                    NO_NODES_AVAILABLE,
+                    "Snapshot: not enough worker nodes available to resume expected number of writer tasks: " + initialTaskCount);
+        }
         this.initialTaskCount = initialTaskCount == null ? 1 : initialTaskCount;
     }
 
@@ -100,7 +105,7 @@ public class ScaledWriterScheduler
 
         if (isSnapshotEnabled) {
             // Don't exceed max allocation limit
-            if (scheduledNodes.size() + 1 > nodeSelector.selectableNodeCount() * MAX_NODE_ALLOCATION) {
+            if (scheduledNodes.size() + 1 > calculateTaskCount(nodeSelector.selectableNodeCount())) {
                 return 0;
             }
         }
@@ -131,10 +136,7 @@ public class ScaledWriterScheduler
 
         List<InternalNode> nodes = nodeSelector.selectRandomNodes(count, scheduledNodes);
         if (scheduledNodes.isEmpty() && nodes.size() != initialTaskCount) {
-            String message = initialTaskCount > 1 ?
-                    "Snapshot: not enough worker nodes available to resume expected number of writer tasks: " + initialTaskCount :
-                    "No nodes available to run query";
-            checkCondition(false, NO_NODES_AVAILABLE, message);
+            checkCondition(false, NO_NODES_AVAILABLE, "No nodes available to run query");
         }
 
         ImmutableList.Builder<RemoteTask> tasks = ImmutableList.builder();

@@ -802,6 +802,7 @@ public class LocalQueryRunner
                 subplan.getFragment().getPartitioningScheme().getOutputLayout(),
                 plan.getTypes(),
                 subplan.getFragment().getPartitionedSources(),
+                null,
                 outputFactory,
                 Optional.empty(),
                 Optional.empty(),

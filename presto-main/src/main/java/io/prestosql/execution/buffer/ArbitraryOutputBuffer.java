@@ -234,18 +234,28 @@ public class ArbitraryOutputBuffer
             return;
         }
 
-        Collection<ClientBuffer> targetClients = null;
-        if (snapshotState != null) {
+        if (snapshotState == null) {
+            doEnqueue(pages, null);
+            return;
+        }
+
+        // Snapshot: pages being processed by the snapshotState and added to the buffer must be synchronized,
+        // otherwise it's possible for some pages to be recorded as "channel state" by the snapshotState (i.e. after marker),
+        // but still arrives at the buffer *before* the marker. These pages are potentially used twice, if we resume from this marker.
+        synchronized (this) {
             // All marker related processing is handled by this utility method
-            synchronized (this) {
-                pages = snapshotState.processSerializedPages(pages);
-            }
+            pages = snapshotState.processSerializedPages(pages);
+            Collection<ClientBuffer> targetClients = null;
             if (pages.size() == 1 && pages.get(0).isMarkerPage()) {
                 // Broadcast marker to all clients
                 targetClients = safeGetBuffersSnapshot();
             }
+            doEnqueue(pages, targetClients);
         }
+    }
 
+    private void doEnqueue(List<SerializedPage> pages, Collection<ClientBuffer> targetClients)
+    {
         // reserve memory
         long bytesAdded = pages.stream().mapToLong(SerializedPage::getRetainedSizeInBytes).sum();
         memoryManager.updateMemoryUsage(bytesAdded);
@@ -275,9 +285,7 @@ public class ArbitraryOutputBuffer
             // targetClients != null means current page is a marker page
             // Record the marker so when new buffers are added, the marker is sent to those new buffers
             serializedPageReferences.forEach(SerializedPageReference::addReference);
-            synchronized (this) {
-                markersForNewBuffers.addAll(serializedPageReferences);
-            }
+            markersForNewBuffers.addAll(serializedPageReferences);
         }
     }
 

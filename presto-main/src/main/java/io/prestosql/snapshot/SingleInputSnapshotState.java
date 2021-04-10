@@ -133,21 +133,28 @@ public class SingleInputSnapshotState
             }
         }
         else {
-            try {
-                snapshotManager.storeState(componentId, restorable.capture(pagesSerde));
-                if (restorable instanceof Spillable && ((Spillable) restorable).isSpilled()) {
-                    storeSpilledFiles(snapshotId, (Spillable) restorable);
-                }
-                snapshotManager.succeededToCapture(componentId);
-                LOG.debug("Successfully saved state to snapshot %d for %s", snapshotId, restorableId);
-            }
-            catch (Exception e) {
-                LOG.warn(e, "Failed to capture and store snapshot state");
-                snapshotManager.failedToCapture(componentId);
-            }
+            captureState(snapshotId);
         }
         markers.add(marker);
         return true;
+    }
+
+    // Exposed only to be used by HashBuilderOperator
+    public void captureState(long snapshotId)
+    {
+        SnapshotStateId componentId = snapshotStateIdGenerator.apply(snapshotId);
+        try {
+            snapshotManager.storeState(componentId, restorable.capture(pagesSerde));
+            if (restorable instanceof Spillable && ((Spillable) restorable).isSpilled()) {
+                storeSpilledFiles(snapshotId, (Spillable) restorable);
+            }
+            snapshotManager.succeededToCapture(componentId);
+            LOG.debug("Successfully saved state to snapshot %d for %s", snapshotId, restorableId);
+        }
+        catch (Exception e) {
+            LOG.warn(e, "Failed to capture and store snapshot state");
+            snapshotManager.failedToCapture(componentId);
+        }
     }
 
     public boolean hasMarker()

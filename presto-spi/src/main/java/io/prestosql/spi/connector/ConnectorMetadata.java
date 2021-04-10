@@ -962,4 +962,20 @@ public interface ConnectorMetadata
         // Most connectors do *not* support snapshot. Only Hive with ORC format supports it.
         return false;
     }
+
+    /**
+     * Snapshot: Remove any previous changes from previous execution attempt, to prepare for query resume
+     */
+    default void resetInsertForRerun(ConnectorSession session, ConnectorInsertTableHandle tableHandle)
+    {
+        throw new UnsupportedOperationException("This connector does not support query resuming");
+    }
+
+    /**
+     * Snapshot: Remove any previous changes from previous execution attempt, to prepare for query resume
+     */
+    default void resetCreateForRerun(ConnectorSession session, ConnectorOutputTableHandle tableHandle)
+    {
+        throw new UnsupportedOperationException("This connector does not support query resuming");
+    }
 }

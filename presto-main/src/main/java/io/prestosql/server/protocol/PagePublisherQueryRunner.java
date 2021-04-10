@@ -20,7 +20,6 @@ import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
-import io.prestosql.SystemSessionProperties;
 import io.prestosql.client.DataCenterQueryResults;
 import io.prestosql.client.StatementStats;
 import io.prestosql.datacenter.DataCenterStatementResource;
@@ -222,9 +221,6 @@ public class PagePublisherQueryRunner
         ExchangeClient exchangeClient = this.exchangeClientSupplier.get(
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(),
                         DataCenterStatementResource.class.getSimpleName()));
-        if (SystemSessionProperties.isSnapshotEnabled(session)) {
-            exchangeClient.setSnapshotEnabled();
-        }
         return Query.create(session, slug, queryManager, exchangeClient, executor, timeoutExecutor,
                 blockEncodingSerde);
     }

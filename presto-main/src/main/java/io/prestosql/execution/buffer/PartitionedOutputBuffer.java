@@ -32,6 +32,7 @@ import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.RestorableConfig;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -52,8 +53,8 @@ import static io.prestosql.execution.buffer.BufferState.OPEN;
 import static io.prestosql.execution.buffer.OutputBuffers.BufferType.PARTITIONED;
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(stateClassName = "PartitionedOutputBufferState", uncapturedFields = {"state", "outputBuffers", "memoryManager", "taskContext", "snapshotState",
-        "partitions", "noMoreInputChannels", "inputChannels"})
+@RestorableConfig(stateClassName = "PartitionedOutputBufferState", uncapturedFields = {"state", "outputBuffers", "memoryManager", "taskContext",
+        "snapshotStates", "isSnapshotEnabled", "partitions", "noMoreInputChannels", "inputChannels"})
 public class PartitionedOutputBuffer
         implements OutputBuffer, MultiInputRestorable
 {
@@ -64,9 +65,10 @@ public class PartitionedOutputBuffer
     private TaskContext taskContext;
     private boolean noMoreInputChannels;
     private final Set<String> inputChannels = Sets.newConcurrentHashSet();
-    private MultiInputSnapshotState snapshotState;
 
     private final List<ClientBuffer> partitions;
+    private final List<MultiInputSnapshotState> snapshotStates = new ArrayList<>();
+    private boolean isSnapshotEnabled;
 
     private final AtomicLong totalPagesAdded = new AtomicLong();
     private final AtomicLong totalRowsAdded = new AtomicLong();
@@ -198,28 +200,46 @@ public class PartitionedOutputBuffer
             return;
         }
 
-        int factor = 1;
-        if (snapshotState != null) {
-            // All marker related processing is handled by this utility method
-            synchronized (snapshotState) {
-                pages = snapshotState.processSerializedPages(pages);
-            }
-            // Broadcast marker to all clients
-            if (pages.size() == 1 && pages.get(0).isMarkerPage()) {
-                factor = partitions.size();
-            }
+        if (!isSnapshotEnabled) {
+            doEnqueue(partitionNumber, pages);
+            return;
         }
 
+        // Snapshot: pages being processed by the snapshotState and added to the buffer must be synchronized,
+        // otherwise it's possible for some pages to be recorded as "channel state" by the snapshotState (i.e. after marker),
+        // but still arrives at the buffer *before* the marker. These pages are potentially used twice, if we resume from this marker.
+        if (pages.size() == 1 && pages.get(0).isMarkerPage()) {
+            // Broadcast marker to all clients
+            for (int i = 0; i < partitions.size(); i++) {
+                MultiInputSnapshotState snapshotState = snapshotStates.get(i);
+                synchronized (snapshotState) {
+                    // All marker related processing is handled by this utility method
+                    List<SerializedPage> processedPages = snapshotState.processSerializedPages(pages);
+                    doEnqueue(i, processedPages);
+                }
+            }
+        }
+        else {
+            MultiInputSnapshotState snapshotState = snapshotStates.get(partitionNumber);
+            synchronized (snapshotState) {
+                List<SerializedPage> processedPages = snapshotState.processSerializedPages(pages);
+                doEnqueue(partitionNumber, processedPages);
+            }
+        }
+    }
+
+    private void doEnqueue(int partitionNumber, List<SerializedPage> pages)
+    {
         // reserve memory
         long bytesAdded = pages.stream().mapToLong(SerializedPage::getRetainedSizeInBytes).sum();
-        memoryManager.updateMemoryUsage(bytesAdded * factor);
+        memoryManager.updateMemoryUsage(bytesAdded);
 
         // update stats
         long rowCount = pages.stream().mapToLong(SerializedPage::getPositionCount).sum();
-        totalRowsAdded.addAndGet(rowCount * factor);
+        totalRowsAdded.addAndGet(rowCount);
 
         long pageCount = pages.size();
-        totalPagesAdded.addAndGet(pageCount * factor);
+        totalPagesAdded.addAndGet(pageCount);
 
         // create page reference counts with an initial single reference
         List<SerializedPageReference> serializedPageReferences = pages.stream()
@@ -227,13 +247,7 @@ public class PartitionedOutputBuffer
                 .collect(toImmutableList());
 
         // add pages to the buffer (this will increase the reference count by one)
-        if (factor == 1) {
-            partitions.get(partitionNumber).enqueuePages(serializedPageReferences);
-        }
-        else {
-            // Broadcast to all partitions
-            partitions.forEach(partition -> partition.enqueuePages(serializedPageReferences));
-        }
+        partitions.get(partitionNumber).enqueuePages(serializedPageReferences);
 
         // drop the initial reference
         serializedPageReferences.forEach(SerializedPageReference::dereferencePage);
@@ -335,9 +349,14 @@ public class PartitionedOutputBuffer
         checkArgument(taskContext != null, "taskContext is null");
         checkState(this.taskContext == null, "setTaskContext is called multiple times");
         this.taskContext = taskContext;
-        this.snapshotState = SystemSessionProperties.isSnapshotEnabled(taskContext.getSession())
-                ? MultiInputSnapshotState.forTaskComponent(this, taskContext, snapshotId -> SnapshotStateId.forTaskComponent(snapshotId, taskContext, "OutputBuffer"))
-                : null;
+        if (SystemSessionProperties.isSnapshotEnabled(taskContext.getSession())) {
+            isSnapshotEnabled = true;
+            for (int i = 0; i < partitions.size(); i++) {
+                // Create one snapshot state for each partition, because restored pages need to be associated with the same partition
+                String componentName = "OutputBuffer" + i;
+                snapshotStates.add(MultiInputSnapshotState.forTaskComponent(this, taskContext, snapshotId -> SnapshotStateId.forTaskComponent(snapshotId, taskContext, componentName)));
+            }
+        }
     }
 
     @Override

@@ -32,6 +32,7 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.UpdatablePageSource;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.MarkerPage;
 
 import javax.annotation.concurrent.GuardedBy;
 
@@ -216,7 +217,10 @@ public class Driver
 
         boolean finished = state.get() != State.ALIVE || driverContext.isDone() || activeOperators.isEmpty() || activeOperators.get(activeOperators.size() - 1).isFinished();
         if (finished) {
-            state.compareAndSet(State.ALIVE, State.NEED_DESTRUCTION);
+            State targetState = driverContext.getPipelineContext().getTaskContext().getState() == TaskState.CANCELED_TO_RESUME
+                    ? State.CANCEL_TO_RESUME // Snapshot: if task state is cancel-to-resume, then make sure operators are aware
+                    : State.NEED_DESTRUCTION;
+            state.compareAndSet(State.ALIVE, targetState);
         }
         return finished;
     }
@@ -363,6 +367,9 @@ public class Driver
         return newDriverBlockedFuture;
     }
 
+    // Snapshot: for debugging only, to print number of rows received by each operator for each snapshot
+    private final Map<Operator, Long> receivedRows = log.isDebugEnabled() ? new HashMap<>() : null;
+
     @GuardedBy("exclusiveLock")
     private ListenableFuture<?> processInternal(OperationTimer operationTimer)
     {
@@ -417,6 +424,17 @@ public class Driver
 
                     // if we got an output page, add it to the next operator
                     if (page != null && page.getPositionCount() != 0) {
+                        if (log.isDebugEnabled()) {
+                            // Snapshot: print number of rows received by each operator for each snapshot
+                            final Page p = page;
+                            if (page instanceof MarkerPage) {
+                                long count = receivedRows.compute(next, (o, v) -> v == null ? 0 : v);
+                                log.debug("Operator %s received %d rows at marker %s", next.getOperatorContext().getUniqueId(), count, page);
+                            }
+                            else {
+                                receivedRows.compute(next, (o, v) -> v == null ? p.getPositionCount() : v + p.getPositionCount());
+                            }
+                        }
                         next.addInput(page);
                         next.getOperatorContext().recordAddInput(operationTimer, page);
                         movedPage = true;
@@ -432,7 +450,8 @@ public class Driver
             }
 
             for (int index = activeOperators.size() - 1; index >= 0; index--) {
-                if (activeOperators.get(index).isFinished()) {
+                Operator operator = activeOperators.get(index);
+                if (operator.isFinished()) {
                     // close and remove this operator and all source operators
                     List<Operator> finishedOperators = this.activeOperators.subList(0, index + 1);
                     Throwable throwable = closeAndDestroyOperators(finishedOperators, false);
@@ -589,6 +608,10 @@ public class Driver
             for (Operator operator : operators) {
                 try {
                     if (toResume) {
+                        if (log.isDebugEnabled()) {
+                            long count = receivedRows.compute(operator, (o, v) -> v == null ? 0 : v);
+                            log.debug("Operator %s received %d rows when the operator is cancelled to resume", operator.getOperatorContext().getUniqueId(), count);
+                        }
                         // Snapshot: different ways to cancel operators. They may choose different strategies.
                         // e.g. for table-writer, normal cancel should remove any data that's been written,
                         // but cancel-to-resume should keep partial data, so it can be used after resume.
@@ -596,6 +619,10 @@ public class Driver
                         operator.cancelToResume();
                     }
                     else {
+                        if (log.isDebugEnabled()) {
+                            long count = receivedRows.compute(operator, (o, v) -> v == null ? 0 : v);
+                            log.debug("Operator %s received %d rows when the operator finishes", operator.getOperatorContext().getUniqueId(), count);
+                        }
                         operator.close();
                     }
                 }

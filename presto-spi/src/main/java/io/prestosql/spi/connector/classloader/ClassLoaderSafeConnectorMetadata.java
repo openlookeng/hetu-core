@@ -781,4 +781,16 @@ public class ClassLoaderSafeConnectorMetadata
     {
         return delegate.isSnapshotSupportedAsNewTable(session, tableProperties);
     }
+
+    @Override
+    public void resetInsertForRerun(ConnectorSession session, ConnectorInsertTableHandle tableHandle)
+    {
+        delegate.resetInsertForRerun(session, tableHandle);
+    }
+
+    @Override
+    public void resetCreateForRerun(ConnectorSession session, ConnectorOutputTableHandle tableHandle)
+    {
+        delegate.resetCreateForRerun(session, tableHandle);
+    }
 }

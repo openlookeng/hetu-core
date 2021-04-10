@@ -30,7 +30,7 @@ public class SnapshotConfig
 {
     // Temporary constant. May make configurable later.
     // Don't use all nodes. Reserve some to be used to schedule tasks from failed nodes
-    public static final float MAX_NODE_ALLOCATION = 80 / 100F;
+    private static final float MAX_NODE_ALLOCATION = 80 / 100F;
 
     public static final String SNAPSHOT_PROFILE = "hetu.experimental.snapshot.profile";
     public static final String SNAPSHOT_INTERVAL_TYPE = "hetu.internal.snapshot.intervalType";
@@ -51,6 +51,15 @@ public class SnapshotConfig
     {
         TIME,
         SPLIT_COUNT
+    }
+
+    public static int calculateTaskCount(int nodeCount)
+    {
+        if (nodeCount < 2) {
+            return nodeCount;
+        }
+        // Where possible, reserve some nodes in case of node failures
+        return (int) (nodeCount * MAX_NODE_ALLOCATION);
     }
 
     public String getSnapshotProfile()

@@ -19,8 +19,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import io.airlift.event.client.EventClient;
+import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
-import io.prestosql.orc.OrcDataSource;
 import io.prestosql.orc.OrcDataSourceId;
 import io.prestosql.plugin.hive.HdfsEnvironment.HdfsContext;
 import io.prestosql.plugin.hive.HiveSessionProperties.InsertExistingPartitionsBehavior;
@@ -64,6 +64,7 @@ import org.apache.hive.common.util.ReflectionUtil;
 import java.io.IOException;
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -108,6 +109,8 @@ import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.COMPRESSRESULT;
 public class HiveWriterFactory
         implements Restorable
 {
+    private static Logger log = Logger.get(HiveWriterFactory.class);
+
     private static final int MAX_BUCKET_COUNT = 100_000;
     private static final int BUCKET_NUMBER_PADDING = Integer.toString(MAX_BUCKET_COUNT - 1).length();
 
@@ -154,6 +157,7 @@ public class HiveWriterFactory
 
     // Snapshot: instead of writing to a "file", each snapshot is stored in a sub file "file.0", "file.1", etc.
     // These sub files are then merged to the final file when the operator finishes.
+    private boolean isSnapshotEnabled;
     private int snapshotSuffix;
 
     public HiveWriterFactory(
@@ -294,6 +298,8 @@ public class HiveWriterFactory
         this.hiveWriterStats = requireNonNull(hiveWriterStats, "hiveWriterStats is null");
 
         this.orcFileWriterFactory = requireNonNull(orcFileWriterFactory, "orcFileWriterFactory is null");
+
+        this.isSnapshotEnabled = session.isSnapshotEnabled();
     }
 
     JobConf getConf()
@@ -346,7 +352,7 @@ public class HiveWriterFactory
         }
         else {
             // Snapshot: don't use UUID. File name needs to be deterministic.
-            if (session.isSnapshotEnabled()) {
+            if (isSnapshotEnabled) {
                 fileName = String.format("%s_%d_%d", queryId, session.getTaskId().getAsInt(), session.getDriverId().getAsInt());
             }
             else {
@@ -579,8 +585,17 @@ public class HiveWriterFactory
             throw new PrestoException(HIVE_WRITER_OPEN_ERROR, e);
         }
 
+        if (isSnapshotEnabled) {
+            // Snapshot: use a recognizable name pattern, in case they need to be deleted/renamed
+            String oldFileName = path.getName();
+            String newFileName = toSnapshotFileName(oldFileName, queryId);
+            path = new Path(path.getParent(), newFileName);
+            if (fileNameWithExtension.equals(oldFileName)) {
+                fileNameWithExtension = newFileName;
+            }
+        }
         HiveFileWriter hiveFileWriter = null;
-        if (session.isSnapshotEnabled() && !forMerge) {
+        if (isSnapshotEnabled && !forMerge) {
             // Add a suffix to file name for sub files
             String oldFileName = path.getName();
             String newFileName = toSnapshotSubFile(oldFileName);
@@ -589,17 +604,14 @@ public class HiveWriterFactory
                 fileNameWithExtension = newFileName;
             }
             // Always create a simple ORC writer for snapshot files. These will be merged in the end.
+            logContainingFolderInfo(fileSystem, path, "Creating SnapshotTempFileWriter for %s", path);
             try {
                 Path finalPath = path;
                 hiveFileWriter = new SnapshotTempFileWriter(
                         orcFileWriterFactory.createOrcDataSink(session, fileSystem, path),
                         dataColumns.stream()
                                 .map(column -> column.getHiveType().getType(typeManager))
-                                .collect(Collectors.toList()),
-                        () -> {
-                            fileSystem.delete(finalPath, false);
-                            return null;
-                        });
+                                .collect(Collectors.toList()));
             }
             catch (IOException e) {
                 throw new PrestoException(HiveErrorCode.HIVE_WRITER_OPEN_ERROR, "Error creating ORC file", e);
@@ -625,9 +637,10 @@ public class HiveWriterFactory
                 }
             }
 
-            if (session.isSnapshotEnabled()) {
+            if (isSnapshotEnabled) {
                 // TODO-cp-I2BZ0A: assuming all files to be of ORC type
                 checkState(hiveFileWriter instanceof OrcFileWriter, "Only support ORC format with snapshot");
+                logContainingFolderInfo(fileSystem, path, "Creating file writer for final result: %s", path);
             }
 
             if (hiveFileWriter == null) {
@@ -652,7 +665,7 @@ public class HiveWriterFactory
         String writerImplementation = hiveFileWriter.getClass().getName();
 
         Consumer<HiveWriter> onCommit;
-        if (session.isSnapshotEnabled() && !forMerge) {
+        if (isSnapshotEnabled && !forMerge) {
             // Only send "commit" event for the merged file
             onCommit = hiveWriter -> {};
         }
@@ -744,7 +757,7 @@ public class HiveWriterFactory
                 path.toString(),
                 onCommit,
                 // Snapshot: only update stats when merging files
-                session.isSnapshotEnabled() && !forMerge ? null : hiveWriterStats,
+                isSnapshotEnabled && !forMerge ? null : hiveWriterStats,
                 hiveFileWriter.getExtraPartitionFiles());
     }
 
@@ -862,6 +875,29 @@ public class HiveWriterFactory
         // No additional properties to set for Hive tables
     }
 
+    static String toSnapshotFileName(String fileName, String queryId)
+    {
+        return fileName + "_snapshot_" + queryId;
+    }
+
+    static boolean isSnapshotFile(String fileName, String queryId)
+    {
+        String identifier = "_snapshot_" + queryId;
+        return fileName.contains(identifier);
+    }
+
+    static boolean isSnapshotSubFile(String fileName, String queryId)
+    {
+        String identifier = "_snapshot_" + queryId;
+        return fileName.contains(identifier) && !fileName.endsWith(identifier);
+    }
+
+    static String removeSnapshotFileName(String fileName, String queryId)
+    {
+        String identifier = "_snapshot_" + queryId;
+        return fileName.substring(0, fileName.indexOf(identifier));
+    }
+
     private String toSnapshotSubFile(String path)
     {
         return toSnapshotSubFile(path, snapshotSuffix);
@@ -894,13 +930,16 @@ public class HiveWriterFactory
         for (HiveWriter writer : writers) {
             String filePath = writer.getFilePath();
 
+            Path path = new Path(filePath);
+            logContainingFolderInfo(fileSystem, path, "Merging snapshot files to result file: %s", path);
+
             for (int i = 0; i <= snapshotSuffix; i++) {
                 Path file = new Path(toSnapshotSubFile(filePath, i));
                 if (fileSystem.exists(file)) {
                     // TODO-cp-I2BZ0A: assuming all files to be of ORC type.
                     // Using same parameters as used by SortingFileWriter
                     FileStatus fileStatus = fileSystem.getFileStatus(file);
-                    OrcDataSource dataSource = new HdfsOrcDataSource(
+                    try (TempFileReader reader = new TempFileReader(types, new HdfsOrcDataSource(
                             new OrcDataSourceId(file.toString()),
                             fileStatus.getLen(),
                             new DataSize(1, MEGABYTE),
@@ -909,13 +948,12 @@ public class HiveWriterFactory
                             false,
                             fileSystem.open(file),
                             new FileFormatDataSourceStats(),
-                            fileStatus.getModificationTime());
-                    TempFileReader reader = new TempFileReader(types, dataSource);
-                    while (reader.hasNext()) {
-                        writer.append(reader.next());
+                            fileStatus.getModificationTime()))) {
+                        while (reader.hasNext()) {
+                            writer.append(reader.next());
+                        }
                     }
-                    dataSource.close();
-                    fileSystem.delete(file);
+                    // DO NOT delete the sub file, in case we need to resume. Delete them when the query finishes.
                 }
             }
         }
@@ -924,12 +962,14 @@ public class HiveWriterFactory
     public void removeAllSubFiles(List<String> paths)
             throws IOException
     {
+        log.debug("Removing all sub files:\n  %s", String.join("  \n", paths));
         removeSubFiles(0, paths);
     }
 
     public void removeAdditionalSubFiles(List<String> paths)
             throws IOException
     {
+        log.debug("Removing additional sub files after %d:\n  %s", snapshotSuffix, String.join("  \n", paths));
         removeSubFiles(snapshotSuffix, paths);
     }
 
@@ -943,6 +983,9 @@ public class HiveWriterFactory
         FileSystem fileSystem = hdfsEnvironment.getFileSystem(session.getUser(), new Path(paths.get(0)), conf);
 
         for (String path : paths) {
+            Path apath = new Path(path);
+            logContainingFolderInfo(fileSystem, apath, "Removing sub files after %d for: %s", startSuffix, path);
+
             String filePath = removeSnapshotSuffix(path);
             // Loop through all files in the containing folder,
             // and remove those with a suffix that exceeds the starting index.
@@ -959,6 +1002,21 @@ public class HiveWriterFactory
                     }
                 }
             }
+        }
+    }
+
+    private void logContainingFolderInfo(FileSystem fileSystem, Path path, String message, Object... params)
+    {
+        try {
+            if (log.isDebugEnabled()) {
+                log.debug(message, params);
+                Arrays.stream(fileSystem.listStatus(path.getParent())).forEach(file -> {
+                    log.debug("%d\t%s", file.getLen(), file.getPath());
+                });
+            }
+        }
+        catch (IOException e) {
+            log.debug(e, "Failed to list folder content for %s: %s", path, e.getMessage());
         }
     }
 

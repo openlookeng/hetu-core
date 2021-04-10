@@ -1114,6 +1114,26 @@ public final class MetadataManager
         return metadata.isSnapshotSupportedAsNewTable(session.toConnectorSession(catalogName), tableProperties);
     }
 
+    /**
+     * Snapshot: Remove any previous changes from previous execution attempt, to prepare for query resume
+     */
+    @Override
+    public void resetInsertForRerun(Session session, InsertTableHandle tableHandle)
+    {
+        ConnectorMetadata metadata = getMetadata(session, tableHandle.getCatalogName());
+        metadata.resetInsertForRerun(session.toConnectorSession(tableHandle.getCatalogName()), tableHandle.getConnectorHandle());
+    }
+
+    /**
+     * Snapshot: Remove any previous changes from previous execution attempt, to prepare for query resume
+     */
+    @Override
+    public void resetCreateForRerun(Session session, OutputTableHandle tableHandle)
+    {
+        ConnectorMetadata metadata = getMetadata(session, tableHandle.getCatalogName());
+        metadata.resetCreateForRerun(session.toConnectorSession(tableHandle.getCatalogName()), tableHandle.getConnectorHandle());
+    }
+
     @Override
     public Optional<LimitApplicationResult<TableHandle>> applyLimit(Session session, TableHandle table, long limit)
     {

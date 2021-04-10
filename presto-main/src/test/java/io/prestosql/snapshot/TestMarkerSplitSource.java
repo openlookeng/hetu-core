@@ -410,4 +410,22 @@ public class TestMarkerSplitSource
         result = markerSource.getNextBatch(null, lifespan, 10);
         assertEquals(result.get().getSplits(), testBatch.getSplits());
     }
+
+    @Test
+    public void test2Resumes()
+            throws Exception
+    {
+        markerSource.resumeSnapshot(7);
+        // Should clear earlier resume snapshot id
+        markerSource.resumeSnapshot(0);
+
+        when(announcer.shouldGenerateMarker(anyObject())).thenReturn(OptionalLong.of(3));
+        Future<SplitBatch> result = markerSource.getNextBatch(null, lifespan, 3);
+        assertTrue(result.isDone());
+        List<Split> splits = result.get().getSplits();
+        assertEquals(splits.size(), 1);
+        assertTrue(splits.get(0).getConnectorSplit() instanceof MarkerSplit);
+        // Confirm what's returned is the snapshot marker (as opposed to the resume marker for snapshot id 7)
+        assertFalse(((MarkerSplit) splits.get(0).getConnectorSplit()).isResuming());
+    }
 }

@@ -215,13 +215,23 @@ public class BroadcastOutputBuffer
             return;
         }
 
-        if (snapshotState != null) {
-            // All marker related processing is handled by this utility method
-            synchronized (snapshotState) {
-                pages = snapshotState.processSerializedPages(pages);
-            }
+        if (snapshotState == null) {
+            doEnqueue(pages);
+            return;
         }
 
+        // Snapshot: pages being processed by the snapshotState and added to the buffer must be synchronized,
+        // otherwise it's possible for some pages to be recorded as "channel state" by the snapshotState (i.e. after marker),
+        // but still arrives at the buffer *before* the marker. These pages are potentially used twice, if we resume from this marker.
+        synchronized (this) {
+            // All marker related processing is handled by this utility method
+            pages = snapshotState.processSerializedPages(pages);
+            doEnqueue(pages);
+        }
+    }
+
+    private void doEnqueue(List<SerializedPage> pages)
+    {
         // reserve memory
         long bytesAdded = pages.stream().mapToLong(SerializedPage::getRetainedSizeInBytes).sum();
         memoryManager.updateMemoryUsage(bytesAdded);

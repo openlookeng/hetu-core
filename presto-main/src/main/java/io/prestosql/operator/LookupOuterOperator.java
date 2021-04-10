@@ -315,23 +315,31 @@ public class LookupOuterOperator
         LOG.debug("Received marker '%s' from source driver '%d' to target '%s'", marker.toString(), driverId, operatorContext.getUniqueId());
         // See Gitee issue Checkpoint - handle LookupOuterOperator pipelines
         // https://gitee.com/open_lookeng/dashboard/issues?id=I2LMIW
-        // This is for outer join with non-table-scan pipelines. Wait to receive marker from all drivers.
-        Set<Integer> result = incomingMarkers.compute(marker, (key, drivers) -> {
-            if (drivers == null) {
-                drivers = new HashSet<>();
+        // This is for outer join with non-table-scan pipelines.
+        Set<Integer> drivers = incomingMarkers.get(marker);
+        boolean toSend = false;
+        if (drivers == null) {
+            drivers = new HashSet<>();
+            incomingMarkers.put(marker, drivers);
+            if (marker.isResuming()) {
+                // For resume, send out marker when the first is received
+                toSend = true;
             }
-            if (!drivers.add(driverId)) {
-                String message = String.format("Received duplicate marker '%s' from source driver '%d' to target '%s'", marker.toString(), driverId, operatorContext.getUniqueId());
-                LOG.error(message);
+        }
+        if (!drivers.add(driverId)) {
+            String message = String.format("Received duplicate marker '%s' from source driver '%d' to target '%s'", marker.toString(), driverId, operatorContext.getUniqueId());
+            LOG.error(message);
+        }
+        if (drivers.size() == totalDrivers) {
+            incomingMarkers.remove(marker);
+            if (!marker.isResuming()) {
+                // For snapshot,  Wait to receive marker from all drivers.
+                // This may be a bit later, and capture more positions than it should, but this does no harm.
+                // The captured positions is only used in the end to determine which rows to include.
+                toSend = true;
             }
-            if (drivers.size() == totalDrivers) {
-                return null;
-            }
-            return drivers;
-        });
-
-        if (result == null) {
-            // Received marker from all drivers. Process it and make it available for next operator.
+        }
+        if (toSend) {
             snapshotState.processPage(marker);
             outgoingMarkers.add(marker);
             unblock();

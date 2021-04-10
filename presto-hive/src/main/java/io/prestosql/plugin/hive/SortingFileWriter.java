@@ -237,8 +237,10 @@ public class SortingFileWriter
                         fileSystem.open(file),
                         new FileFormatDataSourceStats(),
                         fileStatus.getModificationTime());
-                closer.register(dataSource);
-                iterators.add(new TempFileReader(types, dataSource));
+                TempFileReader reader = new TempFileReader(types, dataSource);
+                // Closing the reader also closes the data source
+                closer.register(reader);
+                iterators.add(reader);
             }
 
             new MergingPageIterator(iterators, types, sortFields, sortOrders)

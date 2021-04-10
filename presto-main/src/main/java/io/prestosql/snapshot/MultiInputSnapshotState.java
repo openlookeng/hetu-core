@@ -345,6 +345,7 @@ public class MultiInputSnapshotState
 
             snapshot = new SnapshotState(marker);
             states.add(snapshot);
+            pendingMarkers.add(marker);
         }
         else {
             // Seen marker with same snapshot id. Don't need to pass on this marker.

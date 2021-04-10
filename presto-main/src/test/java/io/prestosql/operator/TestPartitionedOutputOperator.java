@@ -16,16 +16,18 @@ package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
 import io.airlift.units.DataSize;
-import io.prestosql.execution.StateMachine;
-import io.prestosql.execution.buffer.OutputBuffers;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.execution.TaskId;
 import io.prestosql.execution.buffer.PartitionedOutputBuffer;
-import io.prestosql.memory.context.SimpleLocalMemoryContext;
 import io.prestosql.operator.exchange.LocalPartitionGenerator;
+import io.prestosql.snapshot.SnapshotUtils;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.snapshot.SnapshotTestUtil;
 import io.prestosql.spi.type.Type;
 import io.prestosql.testing.TestingTaskContext;
+import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
 
 import java.util.HashMap;
@@ -38,19 +40,20 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
 
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
-import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.prestosql.RowPagesBuilder.rowPagesBuilder;
-import static io.prestosql.SessionTestUtils.TEST_SESSION;
-import static io.prestosql.execution.buffer.BufferState.OPEN;
-import static io.prestosql.execution.buffer.BufferState.TERMINAL_BUFFER_STATES;
-import static io.prestosql.execution.buffer.OutputBuffers.BufferType.PARTITIONED;
-import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
-import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
+import static io.prestosql.SessionTestUtils.TEST_SNAPSHOT_SESSION;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.testing.assertions.Assert.assertEquals;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
+import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.anyObject;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertTrue;
 
 public class TestPartitionedOutputOperator
 {
@@ -62,24 +65,61 @@ public class TestPartitionedOutputOperator
 
     @Test
     public void testPartitionedOutputOperatorSnapshot()
+            throws Exception
     {
-        PartitionedOutputOperator operator = createPartitionedOutputOperator();
+        SnapshotUtils snapshotUtils = mock(SnapshotUtils.class);
+        PartitionedOutputBuffer buffer = mock(PartitionedOutputBuffer.class);
+
+        PartitionedOutputOperator operator = createPartitionedOutputOperator(snapshotUtils, buffer);
         List<Page> input = rowPagesBuilder(BIGINT)
-                .addSequencePage(3, 1)
-                .addSequencePage(3, 4)
+                .addSequencePage(1, 1)
+                .addSequencePage(2, 4)
                 .build();
+        MarkerPage marker = MarkerPage.snapshotPage(1);
+        MarkerPage marker2 = MarkerPage.snapshotPage(2);
+        MarkerPage marker3 = MarkerPage.snapshotPage(3);
+        MarkerPage resume = MarkerPage.resumePage(1);
+
         //Add first page, then capture and compare, then add second page, then restore, then compare, then add second page, then finish, then compare
         operator.addInput(input.get(0));
-        Object snapshot = operator.capture(operator.getOperatorContext().getDriverContext().getSerde());
-        assertEquals(SnapshotTestUtil.toFullSnapshotMapping(snapshot), createExpectedMappingBeforeFinish());
+        operator.addInput(marker);
+        ArgumentCaptor<Object> stateArgument = ArgumentCaptor.forClass(Object.class);
+        verify(snapshotUtils, times(1)).storeState(anyObject(), stateArgument.capture());
+        Object snapshot = stateArgument.getValue();
+//        assertEquals(SnapshotTestUtil.toFullSnapshotMapping(snapshot), createExpectedMappingBeforeFinish());
+
+        when(snapshotUtils.loadState(anyObject())).thenReturn(Optional.of(snapshot));
         operator.addInput(input.get(1));
-        operator.restore(snapshot, operator.getOperatorContext().getDriverContext().getSerde());
-        snapshot = operator.capture(operator.getOperatorContext().getDriverContext().getSerde());
+        operator.addInput(resume);
+
+        operator.addInput(marker2);
+        verify(snapshotUtils, times(2)).storeState(anyObject(), stateArgument.capture());
+        snapshot = stateArgument.getValue();
         assertEquals(SnapshotTestUtil.toFullSnapshotMapping(snapshot), createExpectedMappingBeforeFinish());
+
         operator.addInput(input.get(1));
         operator.finish();
-        snapshot = operator.capture(operator.getOperatorContext().getDriverContext().getSerde());
+        operator.addInput(marker3);
+        verify(snapshotUtils, times(3)).storeState(anyObject(), stateArgument.capture());
+        snapshot = stateArgument.getValue();
         assertEquals(SnapshotTestUtil.toFullSnapshotMapping(snapshot), createExpectedMappingAfterFinish());
+
+        ArgumentCaptor<List> pagesArgument = ArgumentCaptor.forClass(List.class);
+        verify(buffer, times(9)).enqueue(anyInt(), pagesArgument.capture());
+        List<List> pages = pagesArgument.getAllValues();
+        // 9 pages:
+        // 1 (page 1 partitioned)
+        // 1 (marker 1)
+        // 2 (page 2 before resume)
+        // 1 (resume marker)
+        // 1 (marker 2)
+        // 2 (page 2 after resume)
+        // 1 (marker 3)
+        assertEquals(pages.size(), 9);
+        assertTrue(((SerializedPage) pages.get(1).get(0)).isMarkerPage());
+        assertTrue(((SerializedPage) pages.get(4).get(0)).isMarkerPage());
+        assertTrue(((SerializedPage) pages.get(5).get(0)).isMarkerPage());
+        assertTrue(((SerializedPage) pages.get(8).get(0)).isMarkerPage());
     }
 
     private Map<String, Object> createExpectedMappingBeforeFinish()
@@ -88,11 +128,10 @@ public class TestPartitionedOutputOperator
         Map<String, Object> partitionFunctionMapping = new HashMap<>();
         expectedMapping.put("operatorContext", 0);
         expectedMapping.put("partitionFunction", partitionFunctionMapping);
-        expectedMapping.put("systemMemoryContext", 65563L);
+        expectedMapping.put("systemMemoryContext", 65536L);
         expectedMapping.put("finished", false);
-        partitionFunctionMapping.put("pageBuilders", Object[].class);
-        partitionFunctionMapping.put("rowsAdded", 0L);
-        partitionFunctionMapping.put("pagesAdded", 0L);
+        partitionFunctionMapping.put("rowsAdded", 1L); // Input page 1 has 3 rows; partitioned to 3 separate pages
+        partitionFunctionMapping.put("pagesAdded", 1L);
         partitionFunctionMapping.put("hasAnyRowBeenReplicated", false);
         return expectedMapping;
     }
@@ -103,25 +142,17 @@ public class TestPartitionedOutputOperator
         Map<String, Object> partitionFunctionMapping = new HashMap<>();
         expectedMapping.put("operatorContext", 0);
         expectedMapping.put("partitionFunction", partitionFunctionMapping);
-        expectedMapping.put("systemMemoryContext", 65590L);
+        expectedMapping.put("systemMemoryContext", 65554L);
         expectedMapping.put("finished", true);
-        partitionFunctionMapping.put("pageBuilders", Object[].class);
-        partitionFunctionMapping.put("rowsAdded", 6L);
-        partitionFunctionMapping.put("pagesAdded", 6L);
+        partitionFunctionMapping.put("rowsAdded", 3L);
+        partitionFunctionMapping.put("pagesAdded", 3L);
         partitionFunctionMapping.put("hasAnyRowBeenReplicated", false);
         return expectedMapping;
     }
 
-    private PartitionedOutputOperator createPartitionedOutputOperator()
+    private PartitionedOutputOperator createPartitionedOutputOperator(SnapshotUtils snapshotUtils, PartitionedOutputBuffer buffer)
     {
         PartitionFunction partitionFunction = new LocalPartitionGenerator(new InterpretedHashGenerator(ImmutableList.of(BIGINT), new int[] {0}), PARTITION_COUNT);
-        OutputBuffers buffers = createInitialEmptyOutputBuffers(PARTITIONED);
-        for (int partition = 0; partition < PARTITION_COUNT; partition++) {
-            buffers = buffers.withBuffer(new OutputBuffers.OutputBufferId(partition), partition);
-        }
-        PartitionedOutputBuffer buffer = createPartitionedBuffer(
-                buffers.withNoMoreBufferIds(),
-                new DataSize(Long.MAX_VALUE, BYTE)); // don't let output buffer block
         PartitionedOutputOperator.PartitionedOutputFactory operatorFactory = new PartitionedOutputOperator.PartitionedOutputFactory(
                 partitionFunction,
                 ImmutableList.of(0),
@@ -130,17 +161,19 @@ public class TestPartitionedOutputOperator
                 OptionalInt.empty(),
                 buffer,
                 new DataSize(1, GIGABYTE));
-        TaskContext taskContext = createTaskContext();
+        TaskContext taskContext = createTaskContext(snapshotUtils);
         return (PartitionedOutputOperator) operatorFactory
                 .createOutputOperator(0, new PlanNodeId("plan-node-0"), TYPES, Function.identity(), taskContext)
                 .createOperator(createDriverContext(taskContext));
     }
 
-    private TaskContext createTaskContext()
+    private TaskContext createTaskContext(SnapshotUtils snapshotUtils)
     {
-        return TestingTaskContext.builder(EXECUTOR, SCHEDULER, TEST_SESSION)
+        TaskContext taskContext = TestingTaskContext.builder(EXECUTOR, SCHEDULER, TEST_SNAPSHOT_SESSION, snapshotUtils)
                 .setMemoryPoolSize(MAX_MEMORY)
                 .build();
+        // So that
+        return TestingTaskContext.createTaskContext(taskContext.getQueryContext(), EXECUTOR, TEST_SNAPSHOT_SESSION, new TaskId("query.1.1"));
     }
 
     private DriverContext createDriverContext(TaskContext taskContext)
@@ -148,16 +181,5 @@ public class TestPartitionedOutputOperator
         return taskContext
                 .addPipelineContext(0, true, true, false)
                 .addDriverContext();
-    }
-
-    private PartitionedOutputBuffer createPartitionedBuffer(OutputBuffers buffers, DataSize dataSize)
-    {
-        return new PartitionedOutputBuffer(
-                "task-instance-id",
-                new StateMachine<>("bufferState", SCHEDULER, OPEN, TERMINAL_BUFFER_STATES),
-                buffers,
-                dataSize,
-                () -> new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                SCHEDULER);
     }
 }

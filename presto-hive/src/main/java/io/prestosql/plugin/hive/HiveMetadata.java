@@ -26,6 +26,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import io.airlift.json.JsonCodec;
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.units.Duration;
 import io.prestosql.plugin.hive.HdfsEnvironment.HdfsContext;
@@ -94,6 +95,7 @@ import io.prestosql.spi.statistics.TableStatisticsMetadata;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.VarcharType;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.TableType;
@@ -139,6 +141,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Streams.stream;
 import static io.prestosql.plugin.hive.HiveBucketing.containsTimestampBucketedV2;
+import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_FILESYSTEM_ERROR;
 import static io.prestosql.plugin.hive.HiveStorageFormat.ORC;
 import static io.prestosql.plugin.hive.HiveTableProperties.IS_EXTERNAL_TABLE;
 import static io.prestosql.plugin.hive.HiveTableProperties.LOCATION_PROPERTY;
@@ -160,6 +163,9 @@ import static io.prestosql.plugin.hive.HiveUtil.isPrestoView;
 import static io.prestosql.plugin.hive.HiveUtil.toPartitionValues;
 import static io.prestosql.plugin.hive.HiveUtil.verifyPartitionTypeSupported;
 import static io.prestosql.plugin.hive.HiveWriteUtils.isS3FileSystem;
+import static io.prestosql.plugin.hive.HiveWriterFactory.isSnapshotFile;
+import static io.prestosql.plugin.hive.HiveWriterFactory.isSnapshotSubFile;
+import static io.prestosql.plugin.hive.HiveWriterFactory.removeSnapshotFileName;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_USER_ERROR;
 import static io.prestosql.spi.StandardErrorCode.INVALID_ANALYZE_PROPERTY;
@@ -189,6 +195,8 @@ import static org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Cate
 public class HiveMetadata
         implements TransactionalMetadata
 {
+    private static final Logger log = Logger.get(HiveMetadata.class);
+
     public static final String PRESTO_VERSION_NAME = "presto_version";
     public static final String PRESTO_QUERY_ID_NAME = "presto_query_id";
     public static final String BUCKETING_VERSION = "bucketing_version";
@@ -652,7 +660,7 @@ public class HiveMetadata
             return fileSystem.getFileStatus(tablePath).getModificationTime();
         }
         catch (IOException exception) {
-            throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, "Cannot get the modification time.");
+            throw new PrestoException(HIVE_FILESYSTEM_ERROR, "Cannot get the modification time.");
         }
     }
 
@@ -1304,6 +1312,10 @@ public class HiveMetadata
     {
         HiveOutputTableHandle handle = (HiveOutputTableHandle) tableHandle;
 
+        if (session.isSnapshotEnabled()) {
+            updateSnapshotFiles(session, handle, false);
+        }
+
         List<PartitionUpdate> partitionUpdates = fragments.stream()
                 .map(Slice::getBytes)
                 .map(partitionUpdateCodec::fromJson)
@@ -1598,6 +1610,10 @@ public class HiveMetadata
             HiveACIDWriteType hiveACIDWriteType)
     {
         HiveInsertTableHandle handle = (HiveInsertTableHandle) insertHandle;
+
+        if (session.isSnapshotEnabled()) {
+            updateSnapshotFiles(session, handle, false);
+        }
 
         List<PartitionUpdate> partitionUpdates = fragments.stream()
                 .map(Slice::getBytes)
@@ -2907,6 +2923,61 @@ public class HiveMetadata
     public boolean isSnapshotSupportedAsNewTable(ConnectorSession session, Map<String, Object> tableProperties)
     {
         return getHiveStorageFormat(tableProperties) == ORC;
+    }
+
+    @Override
+    public void resetInsertForRerun(ConnectorSession session, ConnectorInsertTableHandle tableHandle)
+    {
+        updateSnapshotFiles(session, (HiveWritableTableHandle) tableHandle, true);
+    }
+
+    @Override
+    public void resetCreateForRerun(ConnectorSession session, ConnectorOutputTableHandle tableHandle)
+    {
+        updateSnapshotFiles(session, (HiveWritableTableHandle) tableHandle, true);
+    }
+
+    // Visit table writePath recursively.
+    // reset=true:  (for rerun) remove all files with snapshot identifier
+    // reset=false: (for finish) remove sub-files; rename merged-files
+    private void updateSnapshotFiles(ConnectorSession session, HiveWritableTableHandle tableHandle, boolean reset)
+    {
+        try {
+            FileSystem fileSystem = hdfsEnvironment.getFileSystem(
+                    new HdfsContext(session, tableHandle.getSchemaName(), tableHandle.getTableName()),
+                    tableHandle.getLocationHandle().getWritePath());
+            updatePreviousFiles(fileSystem, tableHandle.getLocationHandle().getWritePath(), session.getQueryId(), reset);
+        }
+        catch (IOException e) {
+            throw new PrestoException(HIVE_FILESYSTEM_ERROR, "Failed to update Hive files for " + tableHandle.getSchemaName() + "." + tableHandle.getTableName(), e);
+        }
+    }
+
+    private void updatePreviousFiles(FileSystem fileSystem, Path folder, String queryId, boolean reset)
+            throws IOException
+    {
+        if (fileSystem.exists(folder)) {
+            for (FileStatus status : fileSystem.listStatus(folder)) {
+                if (status.isDirectory()) {
+                    updatePreviousFiles(fileSystem, status.getPath(), queryId, reset);
+                }
+                else if (isSnapshotFile(status.getPath().getName(), queryId)) {
+                    if (reset) {
+                        log.debug("Deleting file reset=true: %s", status.getPath().getName());
+                        fileSystem.delete(status.getPath());
+                    }
+                    else if (isSnapshotSubFile(status.getPath().getName(), queryId)) {
+                        log.debug("Deleting sub file reset=false: %s", status.getPath().getName());
+                        fileSystem.delete(status.getPath());
+                    }
+                    else {
+                        log.debug("Renaming merged file reset=false: %s", status.getPath().getName());
+                        String newName = removeSnapshotFileName(status.getPath().getName(), queryId);
+                        fileSystem.rename(status.getPath(), new Path(folder, newName));
+                    }
+                }
+            }
+        }
     }
 
     protected void finishInsertOverwrite(ConnectorSession session, HiveInsertTableHandle handle, Table table, PartitionUpdate partitionUpdate, PartitionStatistics partitionStatistics)

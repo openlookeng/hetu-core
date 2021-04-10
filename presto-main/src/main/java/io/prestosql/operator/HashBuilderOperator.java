@@ -20,9 +20,12 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.snapshot.SingleInputSnapshotState;
+import io.prestosql.snapshot.SnapshotStateId;
+import io.prestosql.snapshot.TaskSnapshotManager;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spiller.SingleStreamSpiller;
 import io.prestosql.spiller.SingleStreamSpillerFactory;
@@ -55,7 +58,7 @@ import static java.util.Objects.requireNonNull;
 @RestorableConfig(uncapturedFields = {"lookupSourceFactory", "lookupSourceFactoryDestroyed", "outputChannels",
         "hashChannels", "filterFunctionFactory", "sortChannel", "searchFunctionFactories", "singleStreamSpillerFactory",
         "lookupSourceNotNeeded", "spilledLookupSourceHandle", "spiller", "spillInProgress", "unspillInProgress", "lookupSourceSupplier", "lookupSourceChecksum",
-        "finishMemoryRevoke", "snapshotState"})
+        "finishMemoryRevoke", "snapshotState", "lastMarker"})
 public class HashBuilderOperator
         implements SinkOperator
 {
@@ -240,6 +243,22 @@ public class HashBuilderOperator
     private Optional<Runnable> finishMemoryRevoke = Optional.empty();
 
     private final SingleInputSnapshotState snapshotState;
+    // Snapshot: special logic for taking an extra snapshot for HashBuilder operator, for outer joins.
+    // LookupOuterOperator uses matched indices to determine which rows on the build side to send out.
+    // When LookupOuterOperator captures its state, it captures the above indices. But when the query resumes from a snapshot,
+    // pages received by HashBuilderOperator may be in a different order from the initial run.
+    // This means rows may occupy different indices after the resume, which invalidates what LookupOuterOperator captured.
+    // Note that when LookupOuterOperator captures the indices, the snapshot id must be *after* the last snapshot taken by the HashBuilderOperator.
+    // To overcome this problem, an additional snapshot is taken of the HashBuilderOperator, when the operator finishes.
+    // This snapshot contains all the rows, so when it's restored, their indices will stay the same.
+    // When query resumes to a snapshot with non-empty indices captured by LookupOuterOperator, this final snapshot of HashBuilderOperator is used,
+    // ensuring that what's inside the hash and the restored "matched positions" have consistent indices.
+    // Note that when this extra snapshot is loaded, operators preceding the HashBuilderOperator are still at an earlier snapshot,
+    // and may try to send pages the HashBuilderOperator. These pages must be discarded because HashBuilderOperator already has them.
+    // The lastSnapshotId is used to determine what id to use for the final snapshot.
+    private MarkerPage lastMarker;
+    // If this flag is true, then it was restored from the extra snapshot, and should discard incoming pages.
+    private boolean alreadyFinished;
 
     public HashBuilderOperator(
             OperatorContext operatorContext,
@@ -338,6 +357,12 @@ public class HashBuilderOperator
 
         if (snapshotState != null) {
             if (snapshotState.processPage(page)) {
+                // Remember the last snapshot id, so we know what to use for the final snapshot
+                lastMarker = (MarkerPage) page;
+                return;
+            }
+            if (alreadyFinished) {
+                // We already have all the pages. Ignore additional ones.
                 return;
             }
         }
@@ -444,6 +469,28 @@ public class HashBuilderOperator
 
     @Override
     public void finish()
+    {
+        if (snapshotState != null && !alreadyFinished && lastMarker != null) {
+            // Update alreadyFinished field *before* calling captureState
+            alreadyFinished = true;
+            // There should have been at least one marker, either resume or snapshot.
+            // In case there isn't, then this must be the initial run but marker was never received,
+            // so no snapshot wil be marked complete. In this case there's no need to produce the final snapshot.
+            if (lastMarker.isResuming()) {
+                // If it was a resume marker, then we don't know what the "next" snapshot should be.
+                // Not able to produce a final snapshot makes the resume snapshot unusable.
+                TaskSnapshotManager snapshotManager = operatorContext.getDriverContext().getPipelineContext().getTaskContext().getSnapshotManager();
+                snapshotManager.failedToCapture(SnapshotStateId.forOperator(lastMarker.getSnapshotId(), operatorContext));
+            }
+            else {
+                // Take a final snapshot of this operator
+                snapshotState.captureState(lastMarker.getSnapshotId() + 1);
+            }
+        }
+        doFinish();
+    }
+
+    private void doFinish()
     {
         if (lookupSourceFactoryDestroyed.isDone()) {
             close();
@@ -660,6 +707,7 @@ public class HashBuilderOperator
         myState.index = index.capture(serdeProvider);
         myState.hashCollisionsCounter = hashCollisionsCounter.capture(serdeProvider);
         myState.state = state.toString();
+        myState.alreadyFinished = alreadyFinished;
         return myState;
     }
 
@@ -675,6 +723,7 @@ public class HashBuilderOperator
 
         this.hashCollisionsCounter.restore(myState.hashCollisionsCounter, serdeProvider);
         this.state = State.valueOf(myState.state);
+        this.alreadyFinished = myState.alreadyFinished;
     }
 
     private static class HashBuilderOperatorState
@@ -688,5 +737,6 @@ public class HashBuilderOperator
 
         private Object hashCollisionsCounter;
         private String state;
+        private boolean alreadyFinished;
     }
 }

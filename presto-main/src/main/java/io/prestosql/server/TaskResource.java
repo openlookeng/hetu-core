@@ -305,7 +305,7 @@ public class TaskResource
                     .header(PRESTO_TASK_INSTANCE_ID, taskInstanceId)
                     .header(PRESTO_PAGE_TOKEN, token)
                     .header(PRESTO_PAGE_NEXT_TOKEN, token)
-                    .header(PRESTO_BUFFER_COMPLETE, true)
+                    .header(PRESTO_BUFFER_COMPLETE, false) // keep requesting task running, until they are cancelled (to resume)
                     .build());
             return;
         }

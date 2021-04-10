@@ -59,9 +59,9 @@ public class TestSnapshotUtils
             throws IOException
     {
         QueryId queryId1 = new QueryId("query1");
-        snapshotUtils.addQuerySnapshotManager(queryId1, new QuerySnapshotManager(queryId1, snapshotUtils, TEST_SNAPSHOT_SESSION));
+        snapshotUtils.getOrCreateQuerySnapshotManager(queryId1, TEST_SNAPSHOT_SESSION);
         QueryId queryId2 = new QueryId("query2");
-        snapshotUtils.addQuerySnapshotManager(queryId2, new QuerySnapshotManager(queryId2, snapshotUtils, TEST_SNAPSHOT_SESSION));
+        snapshotUtils.getOrCreateQuerySnapshotManager(queryId2, TEST_SNAPSHOT_SESSION);
 
         when(fileSystemClient.deleteRecursively(anyObject()))
                 .thenReturn(true) // OK to remove query 1

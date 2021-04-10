@@ -527,6 +527,16 @@ public interface Metadata
     boolean isSnapshotSupportedAsNewTable(Session session, CatalogName catalogName, Map<String, Object> tableProperties);
 
     /**
+     * Snapshot: Remove any previous changes from previous execution attempt, to prepare for query resume
+     */
+    void resetInsertForRerun(Session session, InsertTableHandle tableHandle);
+
+    /**
+     * Snapshot: Remove any previous changes from previous execution attempt, to prepare for query resume
+     */
+    void resetCreateForRerun(Session session, OutputTableHandle tableHandle);
+
+    /**
      * Cube pre-aggregation is applicable only for supported connectors.
      *
      * @param session Hetu session

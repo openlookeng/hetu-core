@@ -170,7 +170,7 @@ public class MergeOperator
         URI location = ((RemoteSplit) split.getConnectorSplit()).getLocation();
         ExchangeClient exchangeClient = closer.register(exchangeClientSupplier.get(operatorContext.localSystemMemoryContext()));
         if (operatorContext.isSnapshotEnabled()) {
-            exchangeClient.setSnapshotEnabled();
+            exchangeClient.setSnapshotEnabled(operatorContext.getDriverContext().getPipelineContext().getTaskContext().getSnapshotManager().getQuerySnapshotManager());
             exchangeClient.setSnapshotState(snapshotState);
         }
         exchangeClient.addTarget(id);

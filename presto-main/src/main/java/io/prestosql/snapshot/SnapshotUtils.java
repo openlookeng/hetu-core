@@ -21,6 +21,7 @@ import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
+import io.prestosql.Session;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.spi.QueryId;
@@ -262,14 +263,14 @@ public class SnapshotUtils
         }
     }
 
-    public void addQuerySnapshotManager(QueryId queryId, QuerySnapshotManager querySnapshotManager)
-    {
-        snapshotManagers.put(queryId, querySnapshotManager);
-    }
-
     public QuerySnapshotManager getQuerySnapshotManager(QueryId queryId)
     {
         return snapshotManagers.get(queryId);
+    }
+
+    public QuerySnapshotManager getOrCreateQuerySnapshotManager(QueryId queryId, Session session)
+    {
+        return snapshotManagers.computeIfAbsent(queryId, ignore -> new QuerySnapshotManager(queryId, this, session));
     }
 
     public void removeQuerySnapshotManager(QueryId queryId)

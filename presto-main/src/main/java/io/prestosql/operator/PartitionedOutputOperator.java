@@ -325,6 +325,10 @@ public class PartitionedOutputOperator
         }
 
         if (page instanceof MarkerPage) {
+            // Send out all pending pages, then broadcast the marker. This must be done BEFORE snapshotState.processPage(),
+            // otherwise what's in PageBuilders are captured, and their content will be sent AGAIN after resume.
+            partitionFunction.flush(true);
+
             snapshotState.processPage(page);
             MarkerPage marker = snapshotState.nextMarker();
 
@@ -332,8 +336,7 @@ public class PartitionedOutputOperator
                 // Do not add marker to final output.
                 return;
             }
-            // Send out all pending pages, then broadcast the marker
-            partitionFunction.flush(true);
+
             // Snapshot: driver/thread 1 reaches here and adds marker 1 to the output buffer.
             // It's the first time marker 1 is received, so marker 1 will be broadcasted to all client buffers.
             // Then driver/thread 2 adds markers 1 and 2 to the output buffer.
@@ -362,7 +365,7 @@ public class PartitionedOutputOperator
     }
 
     @RestorableConfig(stateClassName = "PagePartitionerState", uncapturedFields = {"outputBuffer", "sourceTypes", "partitionFunction", "partitionChannels",
-            "partitionConstants", "serde"})
+            "partitionConstants", "serde", "pageBuilders"})
     private static class PagePartitioner
             implements Restorable
     {
@@ -519,9 +522,9 @@ public class PartitionedOutputOperator
         public Object capture(BlockEncodingSerdeProvider serdeProvider)
         {
             PagePartitionerState myState = new PagePartitionerState();
-            myState.pageBuilders = new Object[pageBuilders.length];
+            // This was just flushed, so page builders must be empty
             for (int i = 0; i < pageBuilders.length; i++) {
-                myState.pageBuilders[i] = pageBuilders[i].capture(serdeProvider);
+                checkState(pageBuilders[i].isEmpty());
             }
             myState.rowsAdded = rowsAdded.get();
             myState.pagesAdded = pagesAdded.get();
@@ -533,9 +536,6 @@ public class PartitionedOutputOperator
         public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
         {
             PagePartitionerState myState = (PagePartitionerState) state;
-            for (int i = 0; i < myState.pageBuilders.length; i++) {
-                this.pageBuilders[i].restore(myState.pageBuilders[i], serdeProvider);
-            }
             this.rowsAdded.set(myState.rowsAdded);
             this.pagesAdded.set(myState.pagesAdded);
             this.hasAnyRowBeenReplicated = myState.hasAnyRowBeenReplicated;
@@ -544,7 +544,6 @@ public class PartitionedOutputOperator
         private static class PagePartitionerState
                 implements Serializable
         {
-            private Object[] pageBuilders;
             private long rowsAdded;
             private long pagesAdded;
             private boolean hasAnyRowBeenReplicated;

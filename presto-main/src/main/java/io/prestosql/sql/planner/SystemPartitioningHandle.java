@@ -37,7 +37,7 @@ import java.util.Optional;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.SystemSessionProperties.getHashPartitionCount;
-import static io.prestosql.snapshot.SnapshotConfig.MAX_NODE_ALLOCATION;
+import static io.prestosql.snapshot.SnapshotConfig.calculateTaskCount;
 import static io.prestosql.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static io.prestosql.util.Failures.checkCondition;
 import static java.util.Objects.requireNonNull;
@@ -149,9 +149,8 @@ public final class SystemPartitioningHandle
             if (isSnapshotEnabled) {
                 if (nodeCount == null) {
                     // Snapshot: don't allocate all nodes
-                    nodeCount = Math.min(getHashPartitionCount(session), (int) (nodeSelector.selectableNodeCount() * MAX_NODE_ALLOCATION));
+                    nodeCount = Math.min(getHashPartitionCount(session), calculateTaskCount(nodeSelector.selectableNodeCount()));
                 }
-                checkCondition(nodeCount > 0, NO_NODES_AVAILABLE, "Snapshot: at least 2 worker nodes are required");
                 nodes = nodeSelector.selectRandomNodes(nodeCount);
                 checkCondition(nodes.size() == nodeCount, NO_NODES_AVAILABLE, "Snapshot: not enough worker nodes to resume expected number of tasks: " + nodeCount);
             }

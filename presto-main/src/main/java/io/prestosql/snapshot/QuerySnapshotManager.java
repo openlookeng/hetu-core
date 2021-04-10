@@ -50,6 +50,7 @@ import static java.util.Objects.requireNonNull;
 public class QuerySnapshotManager
 {
     private static final Logger LOG = Logger.get(QuerySnapshotManager.class);
+    private static final Runnable NO_OP = () -> {};
 
     private final QueryId queryId;
     private final SnapshotUtils snapshotUtils;
@@ -71,7 +72,7 @@ public class QuerySnapshotManager
     private Optional<Timer> retryTimer = Optional.empty();
     // How many numbers resume has been attempted for this query
     private long retryCount;
-    private Runnable rescheduler = () -> {}; // No-op by default. SqlQueryScheduler will set it.
+    private Runnable rescheduler = NO_OP; // No-op by default. SqlQueryScheduler will set it.
 
     public QuerySnapshotManager(QueryId queryId, SnapshotUtils snapshotUtils, Session session)
     {
@@ -85,7 +86,6 @@ public class QuerySnapshotManager
             this.maxRetry = SystemSessionProperties.getSnapshotMaxRetries(session);
             this.retryTimeout = SystemSessionProperties.getSnapshotRetryTimeout(session).toMillis();
         }
-        snapshotUtils.addQuerySnapshotManager(queryId, this);
     }
 
     public void setRescheduler(Runnable rescheduler)
@@ -121,9 +121,7 @@ public class QuerySnapshotManager
         retryCount++;
 
         lastTriedId = getResumeSnapshotId(lastTriedId);
-        if (lastTriedId.isPresent()) {
-            startSnapshotRestoreTimer();
-        }
+        startSnapshotRestoreTimer();
 
         // Clear entries that are no longer needed after resuming.
         // In particular, unfinishedTasks needs to be cleared in case it contains table-scan tasks that won't be restored.
@@ -187,18 +185,34 @@ public class QuerySnapshotManager
         }
     }
 
+    public boolean hasPendingResume()
+    {
+        if (retryTimer.isPresent()) {
+            LOG.warn("Query %s finished after resume, but resume was not done", queryId.getId());
+            return true;
+        }
+        return false;
+    }
+
+    private synchronized boolean cancelRestoreTimer()
+    {
+        if (!retryTimer.isPresent()) {
+            return false;
+        }
+
+        retryTimer.get().cancel();
+        retryTimer = Optional.empty();
+        return true;
+    }
+
     private void queryRestoreComplete(RestoreResult restoreResult)
     {
         if (!retryTimer.isPresent()) {
             return;
         }
 
-        synchronized (this) {
-            if (!retryTimer.isPresent()) {
-                return;
-            }
-            retryTimer.get().cancel();
-            retryTimer = Optional.empty();
+        if (!cancelRestoreTimer()) {
+            return;
         }
 
         if (restoreResult.getSnapshotResult() == SnapshotResult.SUCCESSFUL) {
@@ -212,6 +226,11 @@ public class QuerySnapshotManager
 
     private void startSnapshotRestoreTimer()
     {
+        if (!lastTriedId.isPresent()) {
+            cancelRestoreTimer();
+            return;
+        }
+
         // start timer for restoring snapshot
         TimerTask task = new TimerTask()
         {
@@ -234,9 +253,7 @@ public class QuerySnapshotManager
         timer.schedule(task, retryTimeout);
 
         synchronized (this) {
-            if (retryTimer.isPresent()) {
-                retryTimer.get().cancel();
-            }
+            cancelRestoreTimer();
             retryTimer = Optional.of(timer);
         }
     }
@@ -270,6 +287,7 @@ public class QuerySnapshotManager
         restoreComponentCounters.clear();
         restoreResult.setSnapshotResult(0, SnapshotResult.IN_PROGRESS);
         restoreCompleteListeners.clear();
+        cancelRestoreTimer();
     }
 
     public void addQueryRestoreCompleteListeners(Consumer<RestoreResult> listener)
@@ -432,5 +450,15 @@ public class QuerySnapshotManager
     public SnapshotUtils getSnapshotUtils()
     {
         return snapshotUtils;
+    }
+
+    // Returns true if cancel-to-resume is triggered; returns false if this was a no-op
+    public boolean cancelToResume()
+    {
+        if (rescheduler == NO_OP) {
+            return false;
+        }
+        rescheduler.run();
+        return true;
     }
 }

@@ -14,6 +14,7 @@
  */
 package io.prestosql.plugin.hive;
 
+import io.airlift.log.Logger;
 import io.prestosql.orc.OrcDataSink;
 import io.prestosql.plugin.hive.util.TempFileWriter;
 import io.prestosql.spi.Page;
@@ -24,7 +25,6 @@ import org.openjdk.jol.info.ClassLayout;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
-import java.util.concurrent.Callable;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_WRITER_CLOSE_ERROR;
@@ -32,18 +32,16 @@ import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_WRITER_CLOSE_ERROR;
 public class SnapshotTempFileWriter
         implements HiveFileWriter
 {
+    private static final Logger log = Logger.get(SnapshotTempFileWriter.class);
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SnapshotTempFileWriter.class).instanceSize();
 
     private final TempFileWriter writer;
-    private final Callable<Void> rollbackAction;
 
     public SnapshotTempFileWriter(
             OrcDataSink dataSink,
-            List<Type> types,
-            Callable<Void> rollbackAction)
+            List<Type> types)
     {
         writer = new TempFileWriter(types, dataSink);
-        this.rollbackAction = rollbackAction;
     }
 
     @Override
@@ -71,12 +69,7 @@ public class SnapshotTempFileWriter
             writer.close();
         }
         catch (IOException | UncheckedIOException e) {
-            try {
-                rollbackAction.call();
-            }
-            catch (Exception ignored) {
-                // ignore
-            }
+            // DO NOT delete the file. A newly schedule task may be recreating this file.
             throw new PrestoException(HIVE_WRITER_CLOSE_ERROR, "Error committing write to Hive", e);
         }
     }
@@ -85,15 +78,12 @@ public class SnapshotTempFileWriter
     public void rollback()
     {
         try {
-            try {
-                writer.close();
-            }
-            finally {
-                rollbackAction.call();
-            }
+            writer.close();
         }
         catch (Exception e) {
-            throw new PrestoException(HIVE_WRITER_CLOSE_ERROR, "Error rolling back write to Hive", e);
+            // DO NOT delete the file. A newly schedule task may be recreating this file.
+            // Don't need to throw the exception either. This is part of the cancel-to-resume task.
+            log.debug(e, "Error rolling back write to Hive");
         }
     }
 

@@ -38,6 +38,7 @@ import io.prestosql.execution.StageId;
 import io.prestosql.execution.TaskId;
 import io.prestosql.execution.TaskManagerConfig;
 import io.prestosql.execution.buffer.OutputBuffer;
+import io.prestosql.execution.buffer.OutputBufferInfo;
 import io.prestosql.expressions.LogicalRowExpressions;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.index.IndexManager;
@@ -448,7 +449,7 @@ public class LocalExecutionPlanner
                 partitioningScheme.getPartitioning().getHandle().equals(SCALED_WRITER_DISTRIBUTION) ||
                 partitioningScheme.getPartitioning().getHandle().equals(SINGLE_DISTRIBUTION) ||
                 partitioningScheme.getPartitioning().getHandle().equals(COORDINATOR_DISTRIBUTION)) {
-            return plan(taskContext, stageExecutionDescriptor, plan, outputLayout, types, partitionedSourceOrder, new TaskOutputFactory(outputBuffer), feederCTEId, feederCTEParentId, cteCtx);
+            return plan(taskContext, stageExecutionDescriptor, plan, outputLayout, types, partitionedSourceOrder, outputBuffer, new TaskOutputFactory(outputBuffer), feederCTEId, feederCTEParentId, cteCtx);
         }
 
         // We can convert the symbols directly into channels, because the root must be a sink and therefore the layout is fixed
@@ -504,6 +505,7 @@ public class LocalExecutionPlanner
                 outputLayout,
                 types,
                 partitionedSourceOrder,
+                outputBuffer,
                 new PartitionedOutputFactory(
                         partitionFunction,
                         partitionChannels,
@@ -524,6 +526,7 @@ public class LocalExecutionPlanner
             List<Symbol> outputLayout,
             TypeProvider types,
             List<PlanNodeId> partitionedSourceOrder,
+            OutputBuffer outputBuffer,
             OutputFactory outputOperatorFactory,
             Optional<PlanFragmentId> feederCTEId,
             Optional<PlanNodeId> feederCTEParentId,
@@ -567,13 +570,13 @@ public class LocalExecutionPlanner
 
         // calculate total number of components to be captured and add to snapshotManager
         if (SystemSessionProperties.isSnapshotEnabled(session)) {
-            taskContext.getSnapshotManager().setTotalComponents(calculateTotalCountOfTaskComponentToBeCaptured(taskContext, context));
+            taskContext.getSnapshotManager().setTotalComponents(calculateTotalCountOfTaskComponentToBeCaptured(taskContext, context, outputBuffer));
         }
 
         return new LocalExecutionPlan(context.getDriverFactories(), partitionedSourceOrder, stageExecutionDescriptor, feederCTEId);
     }
 
-    private static int calculateTotalCountOfTaskComponentToBeCaptured(TaskContext taskContext, LocalExecutionPlanContext context)
+    private static int calculateTotalCountOfTaskComponentToBeCaptured(TaskContext taskContext, LocalExecutionPlanContext context, OutputBuffer outputBuffer)
     {
         int totalCount = 0;
         boolean outputPipelineIsTableScan = false;
@@ -599,7 +602,15 @@ public class LocalExecutionPlanner
         // No OutputBuffer state needs to be captured for stage 0
         // If output pipeline is not also source pipeline, then OutputBuffer state needs to be captured
         if (stageId > 0 && !outputPipelineIsTableScan) {
-            totalCount++;
+            // For partitioned output buffer, each partition has its own snapshot state, so need to count all of them.
+            // For other output buffers, there is a single snapshot state, so use 1.
+            OutputBufferInfo info = outputBuffer.getInfo();
+            if (info.getType().equals("PARTITIONED")) {
+                totalCount += info.getBuffers().size();
+            }
+            else {
+                totalCount++;
+            }
         }
         return totalCount;
     }

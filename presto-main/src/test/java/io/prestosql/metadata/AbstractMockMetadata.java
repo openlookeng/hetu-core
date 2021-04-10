@@ -662,4 +662,14 @@ public abstract class AbstractMockMetadata
     {
         return true;
     }
+
+    @Override
+    public void resetInsertForRerun(Session session, InsertTableHandle tableHandle)
+    {
+    }
+
+    @Override
+    public void resetCreateForRerun(Session session, OutputTableHandle tableHandle)
+    {
+    }
 }

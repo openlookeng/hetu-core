@@ -28,6 +28,7 @@ import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.HttpPageBufferClient.ClientCallback;
 import io.prestosql.operator.WorkProcessor.ProcessState;
 import io.prestosql.snapshot.MultiInputSnapshotState;
+import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 
 import javax.annotation.Nullable;
@@ -78,7 +79,11 @@ public class ExchangeClient
     private final ConcurrentMap<String, HttpPageBufferClient> allClients = new ConcurrentHashMap<>();
 
     private boolean snapshotEnabled;
-    // Snapshot: whether momre target (exchange operators) can be added, and all known targets. Markers are sent to all of them.
+    private QuerySnapshotManager querySnapshotManager;
+    // Only set for MergeOperator, to capture marker pages
+    private MultiInputSnapshotState snapshotState;
+
+    // Snapshot: whether more targets (exchange operators) can be added, and all known targets. Markers are sent to all of them.
     private boolean noMoreTargets;
     private final Set<String> allTargets = new HashSet<>();
     // Markers received before all targets are known. These markers will be sent to all new targets.
@@ -109,9 +114,6 @@ public class ExchangeClient
 
     private final LocalMemoryContext systemMemoryContext;
     private final Executor pageBufferClientCallbackExecutor;
-
-    // Only set for MergeOperator, to capture marker pages
-    private MultiInputSnapshotState snapshotState;
 
     // ExchangeClientStatus.mergeWith assumes all clients have the same bufferCapacity.
     // Please change that method accordingly when this assumption becomes not true.
@@ -144,9 +146,10 @@ public class ExchangeClient
         return Collections.unmodifiableSet(allClients.keySet());
     }
 
-    public void setSnapshotEnabled()
+    public void setSnapshotEnabled(QuerySnapshotManager querySnapshotManager)
     {
         snapshotEnabled = true;
+        this.querySnapshotManager = querySnapshotManager;
     }
 
     void setSnapshotState(MultiInputSnapshotState snapshotState)
@@ -232,7 +235,8 @@ public class ExchangeClient
                 locationUri,
                 new ExchangeClientCallback(location),
                 scheduler,
-                pageBufferClientCallbackExecutor);
+                pageBufferClientCallbackExecutor,
+                querySnapshotManager);
         allClients.put(location, client);
         queuedClients.add(client);
 

@@ -24,6 +24,7 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.type.Type;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.List;
@@ -36,6 +37,7 @@ import static org.joda.time.DateTimeZone.UTC;
 
 public class TempFileReader
         extends AbstractIterator<Page>
+        implements Closeable
 {
     private final OrcRecordReader reader;
 
@@ -61,6 +63,13 @@ public class TempFileReader
         catch (IOException e) {
             throw handleException(e);
         }
+    }
+
+    @Override
+    public void close()
+            throws IOException
+    {
+        reader.close();
     }
 
     @Override

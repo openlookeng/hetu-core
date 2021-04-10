@@ -57,6 +57,11 @@ public class TaskSnapshotManager
         this.snapshotUtils = snapshotUtils;
     }
 
+    public QuerySnapshotManager getQuerySnapshotManager()
+    {
+        return snapshotUtils.getQuerySnapshotManager(taskId.getQueryId());
+    }
+
     /**
      * Store the state of snapshotStateId in snapshot store
      */

@@ -80,11 +80,14 @@ import io.prestosql.sql.planner.Plan;
 import io.prestosql.sql.planner.PlanFragment;
 import io.prestosql.sql.planner.PlanFragmenter;
 import io.prestosql.sql.planner.PlanOptimizers;
+import io.prestosql.sql.planner.SimplePlanVisitor;
 import io.prestosql.sql.planner.StageExecutionPlan;
 import io.prestosql.sql.planner.SubPlan;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.planner.plan.OutputNode;
+import io.prestosql.sql.planner.plan.TableFinishNode;
+import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.tree.CreateTableAsSelect;
 import io.prestosql.sql.tree.Explain;
 import io.prestosql.sql.tree.Insert;
@@ -109,7 +112,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Throwables.throwIfInstanceOf;
@@ -223,10 +225,7 @@ public class SqlQueryExecution
             this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
             this.warningCollector = requireNonNull(warningCollector);
 
-            this.snapshotManager = new QuerySnapshotManager(
-                    stateMachine.getQueryId(),
-                    requireNonNull(snapshotUtils, "snapshotUtils is null"),
-                    stateMachine.getSession());
+            this.snapshotManager = snapshotUtils.getOrCreateQuerySnapshotManager(stateMachine.getQueryId(), stateMachine.getSession());
 
             checkArgument(scheduleSplitBatchSize > 0, "scheduleSplitBatchSize must be greater than 0");
             this.scheduleSplitBatchSize = scheduleSplitBatchSize;
@@ -541,76 +540,88 @@ public class SqlQueryExecution
                 .withBuffer(OUTPUT_BUFFER_ID, BROADCAST_PARTITION_ID)
                 .withNoMoreBufferIds();
 
-        Map<StageId, Integer> taskCounts = oldScheduler.getStageTaskCounts();
-        // In case the last snapshot can't be resumed to because of insufficient available worker,
-        // then try a previous snapshot, until we reach the beginning, in which case we don't enforce task count
-        for (; ; ) {
-            // Check if there is a snapshot we can restore to, or restart from beginning,
-            // and update marker split sources so they know where to resume from.
-            // This MUST be done BEFORE creating the new scheduler, because it resets the snapshotManager internal states.
-            OptionalLong snapshotId = snapshotManager.getResumeSnapshotId();
-            MarkerAnnouncer announcer = splitManager.getMarkerAnnouncer(stateMachine.getSession());
-            announcer.resumeSnapshot(snapshotId.orElse(0));
-
-            if (!snapshotId.isPresent()) {
-                if (nodeScheduler.createNodeSelector(null).selectableNodeCount() == 1) {
-                    // When there is no snapshot id to resume to, and there is only 1 worker available,
-                    // then resume will fail, because schedulers will require at least 2 workers.
-                    // To avoid this, require 1 task for each stage.
-                    taskCounts = taskCounts.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> 1));
-                }
-                else {
-                    // Otherwise don't enforce task count when we rerun query from beginning
-                    taskCounts = null;
-                }
+        // build the stage execution objects (this doesn't schedule execution)
+        SqlQueryScheduler scheduler;
+        try {
+            scheduler = createResumeScheduler(plan, rootOutputBuffers);
+        }
+        catch (PrestoException e) {
+            if (e.getErrorCode() == NO_NODES_AVAILABLE.toErrorCode()) {
+                // Not enough worker to resume all tasks. Retrying from any saves snapshot likely wont' work either.
+                // Clear ongoing and existing snapshots and restart.
+                snapshotManager.invalidateAllSnapshots();
+                // Clear any temporary content written in to the table
+                resetOutputData(plan);
+                scheduler = createResumeScheduler(plan, rootOutputBuffers);
             }
-
-            // Create a new scheduler, to schedule new stages and tasks
-            DistributedExecutionPlanner distributedExecutionPlanner = new DistributedExecutionPlanner(splitManager, metadata);
-            StageExecutionPlan executionPlan = distributedExecutionPlanner.plan(plan.getRoot(), stateMachine.getSession(),
-                    RESUME, snapshotId.isPresent() ? snapshotId.getAsLong() : null, announcer.currentSnapshotId());
-
-            try {
-                // build the stage execution objects (this doesn't schedule execution)
-                SqlQueryScheduler scheduler = createSqlQueryScheduler(
-                        stateMachine,
-                        locationFactory,
-                        executionPlan,
-                        nodePartitioningManager,
-                        nodeScheduler,
-                        remoteTaskFactory,
-                        stateMachine.getSession(),
-                        plan.isSummarizeTaskInfos(),
-                        scheduleSplitBatchSize,
-                        queryExecutor,
-                        schedulerExecutor,
-                        failureDetector,
-                        rootOutputBuffers,
-                        nodeTaskMap,
-                        executionPolicy,
-                        schedulerStats,
-                        dynamicFilterService,
-                        heuristicIndexerManager,
-                        snapshotManager,
-                        taskCounts);
-
-                queryScheduler.set(scheduler);
-                log.debug("Restarting query %s from a resumable task failure.", getQueryId());
-                scheduler.start();
-                stateMachine.transitionToStarting();
-                break;
-            }
-            catch (PrestoException e) {
-                if (snapshotId.isPresent() && e.getErrorCode().equals(NO_NODES_AVAILABLE.toErrorCode())) {
-                    // Not enough worker to resume all tasks. Retrying from any saves snapshot likely wont' work either.
-                    // Clear ongoing and existing snapshots and restart.
-                    snapshotManager.invalidateAllSnapshots();
-                    continue;
-                }
-                // Failure is not due to task count. Can't recover from it.
+            else {
                 throw e;
             }
         }
+        queryScheduler.set(scheduler);
+        log.debug("Restarting query %s from a resumable task failure.", getQueryId());
+        scheduler.start();
+        stateMachine.transitionToStarting();
+    }
+
+    private SqlQueryScheduler createResumeScheduler(PlanRoot plan, OutputBuffers rootOutputBuffers)
+    {
+        // Check if there is a snapshot we can restore to, or restart from beginning,
+        // and update marker split sources so they know where to resume from.
+        // This MUST be done BEFORE creating the new scheduler, because it resets the snapshotManager internal states.
+        OptionalLong snapshotId = snapshotManager.getResumeSnapshotId();
+        MarkerAnnouncer announcer = splitManager.getMarkerAnnouncer(stateMachine.getSession());
+        announcer.resumeSnapshot(snapshotId.orElse(0));
+
+        // Create a new scheduler, to schedule new stages and tasks
+        DistributedExecutionPlanner distributedExecutionPlanner = new DistributedExecutionPlanner(splitManager, metadata);
+        StageExecutionPlan executionPlan = distributedExecutionPlanner.plan(plan.getRoot(), stateMachine.getSession(),
+                RESUME, snapshotId.isPresent() ? snapshotId.getAsLong() : null, announcer.currentSnapshotId());
+
+        // build the stage execution objects (this doesn't schedule execution)
+        return createSqlQueryScheduler(
+                stateMachine,
+                locationFactory,
+                executionPlan,
+                nodePartitioningManager,
+                nodeScheduler,
+                remoteTaskFactory,
+                stateMachine.getSession(),
+                plan.isSummarizeTaskInfos(),
+                scheduleSplitBatchSize,
+                queryExecutor,
+                schedulerExecutor,
+                failureDetector,
+                rootOutputBuffers,
+                nodeTaskMap,
+                executionPolicy,
+                schedulerStats,
+                dynamicFilterService,
+                heuristicIndexerManager,
+                snapshotManager,
+                // Require same number of tasks to be scheduled, but do not require it if starting from beginning
+                snapshotId.isPresent() ? queryScheduler.get().getStageTaskCounts() : null);
+    }
+
+    private void resetOutputData(PlanRoot plan)
+    {
+        plan.getRoot().getFragment().getRoot().accept(new SimplePlanVisitor<Void>()
+        {
+            @Override
+            public Void visitTableFinish(TableFinishNode node, Void context)
+            {
+                super.visitTableFinish(node, context);
+
+                // Find table-finish-node, which contains handle to the table
+                if (analysis.getStatement() instanceof CreateTableAsSelect) {
+                    metadata.resetCreateForRerun(getSession(), ((TableWriterNode.CreateTarget) node.getTarget()).getHandle());
+                }
+                else {
+                    metadata.resetInsertForRerun(getSession(), ((TableWriterNode.InsertTarget) node.getTarget()).getHandle());
+                }
+                return null;
+            }
+        }, null);
     }
 
     @Override

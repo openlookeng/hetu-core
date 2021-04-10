@@ -211,4 +211,20 @@ public class TestQuerySnapshotManager
         snapshotManager.updateQueryCapture(taskId1, Collections.singletonMap(1L, SnapshotResult.SUCCESSFUL));
         assertEquals(snapshotManager.getResumeSnapshotId().getAsLong(), 1);
     }
+
+    @Test
+    public void test2Resumes()
+    {
+        queryId = new QueryId("updatefinished");
+        QuerySnapshotManager snapshotManager = new QuerySnapshotManager(queryId, snapshotUtils, TEST_SNAPSHOT_SESSION);
+
+        TaskId taskId1 = new TaskId(queryId.getId(), 2, 3);
+        snapshotManager.addNewTask(taskId1);
+        snapshotManager.updateQueryCapture(taskId1, Collections.singletonMap(1L, SnapshotResult.SUCCESSFUL));
+
+        assertTrue(snapshotManager.getResumeSnapshotId().isPresent());
+        snapshotManager.invalidateAllSnapshots();
+        assertFalse(snapshotManager.getResumeSnapshotId().isPresent());
+        assertFalse(snapshotManager.hasPendingResume());
+    }
 }

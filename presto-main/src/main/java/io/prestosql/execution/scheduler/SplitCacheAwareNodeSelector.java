@@ -83,6 +83,7 @@ public class SplitCacheAwareNodeSelector
     public void lockDownNodes()
     {
         nodeMap.set(Suppliers.ofInstance(nodeMap.get().get()));
+        defaultNodeSelector.lockDownNodes();
     }
 
     @Override
@@ -95,11 +96,8 @@ public class SplitCacheAwareNodeSelector
     public int selectableNodeCount()
     {
         NodeMap map = nodeMap.get().get();
-        if (includeCoordinator) {
-            return map.getNodesByHostAndPort().size();
-        }
         return (int) map.getNodesByHostAndPort().values().stream()
-                .filter(node -> !map.getCoordinatorNodeIds().contains(node.getNodeIdentifier()))
+                .filter(InternalNode::isWorker)
                 .count();
     }
 

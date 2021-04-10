@@ -23,7 +23,6 @@ import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
-import io.prestosql.SystemSessionProperties;
 import io.prestosql.datacenter.DataCenterStatementResource;
 import io.prestosql.dispatcher.DispatchManager;
 import io.prestosql.dispatcher.DispatchQuery;
@@ -260,9 +259,6 @@ public class AutoVacuumScanner
         ExchangeClient exchangeClient = this.exchangeClientSupplier.get(
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(),
                         DataCenterStatementResource.class.getSimpleName()));
-        if (SystemSessionProperties.isSnapshotEnabled(session)) {
-            exchangeClient.setSnapshotEnabled();
-        }
         return Query.create(session, slug, queryManager, exchangeClient, directExecutor(), timeoutExecutor,
                 blockEncodingSerde);
     }

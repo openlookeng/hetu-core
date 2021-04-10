@@ -102,7 +102,7 @@ import static io.prestosql.execution.StageState.RESUMABLE_FAILURE;
 import static io.prestosql.execution.StageState.RUNNING;
 import static io.prestosql.execution.StageState.SCHEDULED;
 import static io.prestosql.execution.scheduler.SourcePartitionedScheduler.newSourcePartitionedSchedulerAsStageScheduler;
-import static io.prestosql.snapshot.SnapshotConfig.MAX_NODE_ALLOCATION;
+import static io.prestosql.snapshot.SnapshotConfig.calculateTaskCount;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static io.prestosql.spi.connector.CatalogName.isInternalSystemConnector;
@@ -143,6 +143,8 @@ public class SqlQueryScheduler
 
     private final Set<PlanFragmentId> visitedPlanFrags = new HashSet<>();
     private int currentTimerLevel;
+
+    private final QuerySnapshotManager snapshotManager;
 
     public static SqlQueryScheduler createSqlQueryScheduler(
             QueryStateMachine queryStateMachine,
@@ -220,6 +222,7 @@ public class SqlQueryScheduler
         this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
         this.summarizeTaskInfo = summarizeTaskInfo;
 
+        this.snapshotManager = snapshotManager;
         if (SystemSessionProperties.isSnapshotEnabled(session)) {
             snapshotManager.setRescheduler(this::cancelToResume);
         }
@@ -305,6 +308,13 @@ public class SqlQueryScheduler
         SqlStageExecution rootStage = stages.get(rootStageId);
         rootStage.addStateChangeListener(state -> {
             if (state == FINISHED) {
+                if (SystemSessionProperties.isSnapshotEnabled(session) && snapshotManager.hasPendingResume()) {
+                    // Snapshot: query finished but restore wasn't successful. Final result is likely wrong.
+                    // Ideally we should rollback all changes and retry, but it's not easy to revert already committed changes.
+                    // Fail the query instead.
+                    queryStateMachine.transitionToFailed(new PrestoException(GENERIC_INTERNAL_ERROR, "Unsuccessful query retry"));
+                    return;
+                }
                 queryStateMachine.transitionToFinishing();
                 cleanupReuseExchangeMappingIdStatus(rootStage);
             }
@@ -416,6 +426,11 @@ public class SqlQueryScheduler
                 catalogName = null;
             }
             NodeSelector nodeSelector = nodeScheduler.createNodeSelector(catalogName);
+            if (isSnapshotEnabled) {
+                // When snapshot is enabled, then no task can be added after the query started running,
+                // otherwise assumptions about how many "input channels" may be broken.
+                nodeSelector.lockDownNodes();
+            }
             SplitPlacementPolicy placementPolicy = new DynamicSplitPlacementPolicy(nodeSelector, stage::getAllTasks);
 
             checkArgument(!plan.getFragment().getStageExecutionDescriptor().isStageGroupedExecution());
@@ -458,9 +473,8 @@ public class SqlQueryScheduler
                         }
                         else {
                             // Scheduling: reserve some nodes for resuming
-                            nodeCount = (int) (nodeSelector.selectableNodeCount() * MAX_NODE_ALLOCATION);
+                            nodeCount = calculateTaskCount(nodeSelector.selectableNodeCount());
                         }
-                        checkCondition(nodeCount > 0, NO_NODES_AVAILABLE, "Snapshot: at least 2 worker nodes are required");
                         stageNodeList = new ArrayList<>(nodeSelector.selectRandomNodes(nodeCount));
                         checkCondition(stageNodeList.size() == nodeCount, NO_NODES_AVAILABLE, "Snapshot: not enough worker nodes to resume expected number of tasks: " + nodeCount);
                         // Make sure bucketNodeMap uses the same node list
@@ -483,7 +497,7 @@ public class SqlQueryScheduler
 
                     // remote source requires nodePartitionMap
                     NodePartitionMap nodePartitionMap = partitioningCache.apply(plan.getFragment().getPartitioning(),
-                            stageTaskCounts == null ? null : stageTaskCounts.get(stageId));
+                                stageTaskCounts == null ? null : stageTaskCounts.get(stageId));
                     if (groupedExecutionForStage) {
                         checkState(connectorPartitionHandles.size() == nodePartitionMap.getBucketToPartition().length);
                     }
@@ -509,7 +523,7 @@ public class SqlQueryScheduler
             else {
                 // all sources are remote
                 NodePartitionMap nodePartitionMap = partitioningCache.apply(plan.getFragment().getPartitioning(),
-                        stageTaskCounts == null ? null : stageTaskCounts.get(stageId));
+                            stageTaskCounts == null ? null : stageTaskCounts.get(stageId));
                 List<InternalNode> partitionToNode = nodePartitionMap.getPartitionToNode();
                 // todo this should asynchronously wait a standard timeout period before failing
                 checkCondition(!partitionToNode.isEmpty(), NO_NODES_AVAILABLE, "No worker nodes available");
@@ -576,14 +590,14 @@ public class SqlQueryScheduler
                     .collect(toList());
 
             ScaledWriterScheduler scheduler = new ScaledWriterScheduler(
-                    stage,
-                    sourceTasksProvider,
-                    writerTasksProvider,
-                    nodeScheduler.createNodeSelector(null),
-                    schedulerExecutor,
-                    getWriterMinSize(session),
-                    isSnapshotEnabled,
-                    stageTaskCounts != null ? stageTaskCounts.get(stageId) : null);
+                        stage,
+                        sourceTasksProvider,
+                        writerTasksProvider,
+                        nodeScheduler.createNodeSelector(null),
+                        schedulerExecutor,
+                        getWriterMinSize(session),
+                        isSnapshotEnabled,
+                        stageTaskCounts != null ? stageTaskCounts.get(stageId) : null);
             whenAllStages(childStages, StageState::isDone)
                     .addListener(scheduler::finish, directExecutor());
             stageSchedulers.put(stageId, scheduler);

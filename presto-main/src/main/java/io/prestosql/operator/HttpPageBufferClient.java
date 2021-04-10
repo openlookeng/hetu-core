@@ -33,6 +33,7 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.server.remotetask.Backoff;
+import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.PrestoException;
 import org.joda.time.DateTime;
 
@@ -144,6 +145,8 @@ public final class HttpPageBufferClient
 
     private final Executor pageBufferClientCallbackExecutor;
 
+    private final QuerySnapshotManager querySnapshotManager;
+
     public HttpPageBufferClient(
             HttpClient httpClient,
             DataSize maxResponseSize,
@@ -152,9 +155,10 @@ public final class HttpPageBufferClient
             URI location,
             ClientCallback clientCallback,
             ScheduledExecutorService scheduler,
-            Executor pageBufferClientCallbackExecutor)
+            Executor pageBufferClientCallbackExecutor,
+            QuerySnapshotManager querySnapshotManager)
     {
-        this(httpClient, maxResponseSize, maxErrorDuration, acknowledgePages, location, clientCallback, scheduler, Ticker.systemTicker(), pageBufferClientCallbackExecutor);
+        this(httpClient, maxResponseSize, maxErrorDuration, acknowledgePages, location, clientCallback, scheduler, Ticker.systemTicker(), pageBufferClientCallbackExecutor, querySnapshotManager);
     }
 
     public HttpPageBufferClient(
@@ -166,7 +170,8 @@ public final class HttpPageBufferClient
             ClientCallback clientCallback,
             ScheduledExecutorService scheduler,
             Ticker ticker,
-            Executor pageBufferClientCallbackExecutor)
+            Executor pageBufferClientCallbackExecutor,
+            QuerySnapshotManager querySnapshotManager)
     {
         this.httpClient = requireNonNull(httpClient, "httpClient is null");
         this.maxResponseSize = requireNonNull(maxResponseSize, "maxResponseSize is null");
@@ -178,6 +183,7 @@ public final class HttpPageBufferClient
         requireNonNull(maxErrorDuration, "maxErrorDuration is null");
         requireNonNull(ticker, "ticker is null");
         this.backoff = new Backoff(maxErrorDuration, ticker);
+        this.querySnapshotManager = querySnapshotManager;
     }
 
     public synchronized PageBufferClientStatus getStatus()
@@ -311,7 +317,7 @@ public final class HttpPageBufferClient
                 addInstanceIdHeader(prepareGet())
                         .setHeader(PRESTO_MAX_SIZE, maxResponseSize.toString())
                         .setUri(uri).build(),
-                new PageResponseHandler());
+                new PageResponseHandler(querySnapshotManager));
 
         future = resultFuture;
         Futures.addCallback(resultFuture, new FutureCallback<PagesResponse>()
@@ -549,6 +555,13 @@ public final class HttpPageBufferClient
     public static class PageResponseHandler
             implements ResponseHandler<PagesResponse, RuntimeException>
     {
+        private final QuerySnapshotManager querySnapshotManager;
+
+        private PageResponseHandler(QuerySnapshotManager querySnapshotManager)
+        {
+            this.querySnapshotManager = querySnapshotManager;
+        }
+
         @Override
         public PagesResponse handleException(Request request, Exception exception)
         {
@@ -581,6 +594,15 @@ public final class HttpPageBufferClient
                     }
                     catch (RuntimeException | IOException e) {
                         // Ignored. Just return whatever message we were able to decode
+                    }
+                    if (querySnapshotManager != null) {
+                        // Snapshot: for internal server errors on the worker, treat as resumable error.
+                        if (querySnapshotManager.isCoordinator() && response.getStatusCode() >= 500) {
+                            log.debug("Expected response code to be 200, but was %s:%n%s", response.getStatusCode(), body.toString());
+                            if (querySnapshotManager.cancelToResume()) {
+                                return createEmptyPagesResponse(getTaskInstanceId(response), getToken(response), getNextToken(response), getComplete(response));
+                            }
+                        }
                     }
                     throw new PageTransportErrorException(format("Expected response code to be 200, but was %s:%n%s", response.getStatusCode(), body.toString()));
                 }
