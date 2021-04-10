@@ -561,6 +561,11 @@ class StatementAnalyzer
                 throw new SemanticException(NOT_SUPPORTED, node, "Deleting from views is not supported");
             }
 
+            Optional<CubeMetaStore> optionalCubeMetaStore = cubeManager.getMetaStore(STAR_TREE);
+            if (optionalCubeMetaStore.isPresent() && optionalCubeMetaStore.get().getMetadataFromCubeName(tableName.toString()).isPresent()) {
+                throw new SemanticException(NOT_SUPPORTED, node, "%s is a star-tree cube, DELETE is not supported", tableName);
+            }
+
             // Analyzer checks for select permissions but DELETE has a separate permission, so disable access checks
             // TODO: we shouldn't need to create a new analyzer. The access control should be carried in the context object
             StatementAnalyzer analyzer = new StatementAnalyzer(
@@ -588,6 +593,11 @@ class StatementAnalyzer
             QualifiedObjectName tableName = createQualifiedObjectName(session, table, table.getName());
             if (metadata.getView(session, tableName).isPresent()) {
                 throw new SemanticException(NOT_SUPPORTED, node, "Updating view is not supported");
+            }
+
+            Optional<CubeMetaStore> optionalCubeMetaStore = cubeManager.getMetaStore(STAR_TREE);
+            if (optionalCubeMetaStore.isPresent() && optionalCubeMetaStore.get().getMetadataFromCubeName(tableName.toString()).isPresent()) {
+                throw new SemanticException(NOT_SUPPORTED, node, "%s is a star-tree cube, UPDATE is not supported", tableName);
             }
 
             // verify the existing of table
@@ -716,6 +726,14 @@ class StatementAnalyzer
         protected Scope visitCreateCube(CreateCube node, Optional<Scope> scope)
         {
             QualifiedObjectName targetCube = createQualifiedObjectName(session, node, node.getCubeName());
+
+            List<Property> properties = node.getProperties();
+            for (Property property : properties) {
+                if (property.getName().getValue().equalsIgnoreCase("transactional") && property.getValue().toString().equalsIgnoreCase("true")) {
+                    throw new SemanticException(NOT_SUPPORTED, node, "%s is a star-tree cube with transactional = true is not supported", node.getCubeName());
+                }
+            }
+
             CatalogName catalogName = metadata.getCatalogHandle(session, targetCube.getCatalogName())
                     .orElseThrow(() -> new PrestoException(NOT_FOUND, "Catalog not found: " + targetCube.getCatalogName()));
             if (!metadata.isPreAggregationSupported(session, catalogName)) {
