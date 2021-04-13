@@ -304,6 +304,9 @@ public class SliceDictionarySelectiveColumnReader
 
         if (nullsAllowed) {
             outputPositionCount = positionCount;
+            if (outputPositions != positions) {
+                System.arraycopy(positions, 0, outputPositions, 0, outputPositionCount);
+            }
         }
         else {
             outputPositionCount = 0;
