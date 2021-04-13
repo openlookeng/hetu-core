@@ -447,7 +447,7 @@ public class InternalResourceGroup
             if (subGroups.isEmpty()) {
                 cachedMemoryUsageBytes = 0;
                 for (ManagedQueryExecution query : runningQueries) {
-                    cachedMemoryUsageBytes += query.getCurrentUserMemory();
+                    cachedMemoryUsageBytes += query.getTotalMemoryReservation().toBytes();
                 }
             }
             else {
@@ -516,9 +516,9 @@ public class InternalResourceGroup
                     double absQueryProgressMargin = 1 - (double) queryProgressMarginPercent / 100;
 
                     sortedQueryList = runningQueries.stream().sorted((o1, o2) -> {
-                        if (o1.getCurrentUserMemory() < o2.getCurrentUserMemory() * absMemoryMargin
-                                || o2.getCurrentUserMemory() < o1.getCurrentUserMemory() * absMemoryMargin) {
-                            return ((Long) o2.getCurrentUserMemory()).compareTo(o1.getCurrentUserMemory());
+                        if (o1.getTotalMemoryReservation().toBytes() < o2.getTotalMemoryReservation().toBytes() * absMemoryMargin
+                                || o2.getTotalMemoryReservation().toBytes() < o1.getTotalMemoryReservation().toBytes() * absMemoryMargin) {
+                            return ((Long) o2.getTotalMemoryReservation().toBytes()).compareTo(o1.getTotalMemoryReservation().toBytes());
                         }
 
                         // if memory usage within 10%, then sort based on % of query completion.
@@ -528,7 +528,7 @@ public class InternalResourceGroup
                             return ((Double) o1.getQueryProgress().orElse(0)).compareTo((o2.getQueryProgress().orElse(0)));
                         }
 
-                        return ((Long) o2.getCurrentUserMemory()).compareTo(o1.getCurrentUserMemory());
+                        return ((Long) o2.getTotalMemoryReservation().toBytes()).compareTo(o1.getTotalMemoryReservation().toBytes());
                     }).collect(Collectors.toList());
                     break;
                 case OLDEST_QUERIES:
@@ -551,7 +551,7 @@ public class InternalResourceGroup
                 LOG.info("Query " + query.getBasicQueryInfo().getQueryId() + " is getting killed for resource group " + this + " query will be killed with policy " + killPolicy);
                 query.fail(new PrestoException(GENERIC_INSUFFICIENT_RESOURCES, "Memory consumption " + tempCacheMemoryUsageBytes + " exceed the limit " + softMemoryLimitBytes + "for resource group " + this));
                 queryFinished(query);
-                tempCacheMemoryUsageBytes -= query.getCurrentUserMemory();
+                tempCacheMemoryUsageBytes -= query.getTotalMemoryReservation().toBytes();
                 if (tempCacheMemoryUsageBytes <= softMemoryLimitBytes) {
                     break;
                 }

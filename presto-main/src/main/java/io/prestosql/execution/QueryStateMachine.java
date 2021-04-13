@@ -221,11 +221,6 @@ public class QueryStateMachine
                 warningCollector);
     }
 
-    public long getCurrentUserMemory()
-    {
-        return currentUserMemory.get();
-    }
-
     static QueryStateMachine beginWithTicker(
             String query,
             Optional<String> preparedQuery,

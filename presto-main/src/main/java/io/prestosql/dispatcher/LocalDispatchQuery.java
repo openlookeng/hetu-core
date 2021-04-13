@@ -120,12 +120,6 @@ public class LocalDispatchQuery
     }
 
     @Override
-    public long getCurrentUserMemory()
-    {
-        return stateMachine.getCurrentUserMemory();
-    }
-
-    @Override
     public void recordHeartbeat()
     {
         stateMachine.recordHeartbeat();

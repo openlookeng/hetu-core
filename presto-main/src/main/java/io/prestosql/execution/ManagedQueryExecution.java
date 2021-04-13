@@ -54,11 +54,6 @@ public interface ManagedQueryExecution
      */
     Optional<ErrorCode> getErrorCode();
 
-    default long getCurrentUserMemory()
-    {
-        return getUserMemoryReservation().toBytes();
-    }
-
     default Optional<DateTime> getQueryExecutionStartTime()
     {
         return Optional.empty();

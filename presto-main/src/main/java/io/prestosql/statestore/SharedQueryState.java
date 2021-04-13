@@ -78,7 +78,7 @@ public class SharedQueryState
         return new SharedQueryState(
                 query.getBasicQueryInfo(),
                 query.getErrorCode(),
-                new DataSize(query.getCurrentUserMemory(), DataSize.Unit.BYTE),
+                query.getUserMemoryReservation(),
                 query.getTotalMemoryReservation(),
                 query.getTotalCpuTime(),
                 new DateTime(DateTimeZone.UTC),
