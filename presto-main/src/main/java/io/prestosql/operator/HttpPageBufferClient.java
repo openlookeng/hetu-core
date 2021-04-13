@@ -433,6 +433,12 @@ public final class HttpPageBufferClient
 
     private synchronized void sendDelete()
     {
+        if (querySnapshotManager != null && taskInstanceId == null) {
+            // Snapshot: Never called remote task successfully. Trying to cancel the task result without a taskInstanceId is dangerous.
+            // If the task had already been cancelled, this would create a new task with "aborted" state.
+            // That prevents scheduling the task on the worker again.
+            return;
+        }
         HttpResponseFuture<StatusResponse> resultFuture = httpClient.executeAsync(addInstanceIdHeader(prepareDelete()).setUri(location).build(), createStatusResponseHandler());
         future = resultFuture;
         Futures.addCallback(resultFuture, new FutureCallback<StatusResponse>()

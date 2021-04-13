@@ -966,7 +966,7 @@ public interface ConnectorMetadata
     /**
      * Snapshot: Remove any previous changes from previous execution attempt, to prepare for query resume
      */
-    default void resetInsertForRerun(ConnectorSession session, ConnectorInsertTableHandle tableHandle)
+    default void resetInsertForRerun(ConnectorSession session, ConnectorInsertTableHandle tableHandle, OptionalLong snapshotId)
     {
         throw new UnsupportedOperationException("This connector does not support query resuming");
     }
@@ -974,7 +974,7 @@ public interface ConnectorMetadata
     /**
      * Snapshot: Remove any previous changes from previous execution attempt, to prepare for query resume
      */
-    default void resetCreateForRerun(ConnectorSession session, ConnectorOutputTableHandle tableHandle)
+    default void resetCreateForRerun(ConnectorSession session, ConnectorOutputTableHandle tableHandle, OptionalLong snapshotId)
     {
         throw new UnsupportedOperationException("This connector does not support query resuming");
     }

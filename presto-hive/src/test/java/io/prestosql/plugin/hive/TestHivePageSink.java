@@ -378,10 +378,6 @@ public class TestHivePageSink
             assertEquals(((List) invocation.getArguments()[0]).size(), maxIndex[0] + 1);
             return null;
         }).when(writerFactory).mergeSubFiles(anyObject());
-        doAnswer(invocation -> {
-            assertEquals(((List) invocation.getArguments()[0]).size(), maxIndex[0] + 1);
-            return null;
-        }).when(writerFactory).removeAllSubFiles(anyObject());
 
         return new HivePageSink(
                 writerFactory,

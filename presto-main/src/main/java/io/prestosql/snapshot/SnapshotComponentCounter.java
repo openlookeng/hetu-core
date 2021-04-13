@@ -14,12 +14,13 @@
  */
 package io.prestosql.snapshot;
 
+import io.airlift.log.Logger;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
-
-import static com.google.common.base.Preconditions.checkState;
+import java.util.stream.Collectors;
 
 /**
  * A task uses this to keep track of capture/restore status of its components (e.g. operators) for a given snapshot id.
@@ -27,6 +28,8 @@ import static com.google.common.base.Preconditions.checkState;
  */
 public class SnapshotComponentCounter<T>
 {
+    private static final Logger log = Logger.get(SnapshotComponentCounter.class);
+
     // Function to verify if snapshot is complete for query components
     private final Function<Set<T>, Boolean> checkComplete;
     // Total number of components needs to be captured/restored, used when the above function is not present,
@@ -73,8 +76,13 @@ public class SnapshotComponentCounter<T>
             }
         }
         else {
-            checkState(componentMap.size() <= totalComponentCount, String.format("Too many operators for %s. Expecting %d; see %d.", stateId, totalComponentCount, componentMap.size()));
             if (componentMap.size() == totalComponentCount) {
+                doneResult();
+            }
+            else if (componentMap.size() > totalComponentCount) {
+                String keys = componentMap.keySet().stream().map(Object::toString).collect(Collectors.joining("  \n"));
+                log.warn("BUG: Too many operators for %s. Expecting %d; see %d.\n  %s", stateId, totalComponentCount, componentMap.size(), keys);
+                snapshotResult = SnapshotResult.FAILED;
                 doneResult();
             }
         }

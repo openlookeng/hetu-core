@@ -783,14 +783,14 @@ public class ClassLoaderSafeConnectorMetadata
     }
 
     @Override
-    public void resetInsertForRerun(ConnectorSession session, ConnectorInsertTableHandle tableHandle)
+    public void resetInsertForRerun(ConnectorSession session, ConnectorInsertTableHandle tableHandle, OptionalLong snapshotId)
     {
-        delegate.resetInsertForRerun(session, tableHandle);
+        delegate.resetInsertForRerun(session, tableHandle, snapshotId);
     }
 
     @Override
-    public void resetCreateForRerun(ConnectorSession session, ConnectorOutputTableHandle tableHandle)
+    public void resetCreateForRerun(ConnectorSession session, ConnectorOutputTableHandle tableHandle, OptionalLong snapshotId)
     {
-        delegate.resetCreateForRerun(session, tableHandle);
+        delegate.resetCreateForRerun(session, tableHandle, snapshotId);
     }
 }

@@ -55,7 +55,6 @@ import org.apache.hadoop.hive.ql.io.AcidOutputFormat.Options;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.io.AcidUtils.ParsedDelta;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
@@ -363,20 +362,10 @@ public class HivePageSink
     {
         // Must be wrapped in doAs entirely
         // Implicit FileSystem initializations are possible in HiveRecordWriter#rollback -> RecordWriter#close
-        hdfsEnvironment.doAs(session.getUser(), this::doCancelToResume);
+        hdfsEnvironment.doAs(session.getUser(), this::doAbort);
     }
 
     private void doAbort()
-    {
-        doCancel(false);
-    }
-
-    private void doCancelToResume()
-    {
-        doCancel(true);
-    }
-
-    private void doCancel(boolean resuming)
     {
         Optional<Exception> rollbackException = Optional.empty();
         for (HiveWriter writer : writers) {
@@ -392,25 +381,6 @@ public class HivePageSink
             }
         }
         writers.clear();
-
-        if (session.isSnapshotEnabled() && !resuming) {
-            try {
-                // Remove all sub files
-                List<String> paths = writerParams.stream()
-                        // writerParams may also contain nulls
-                        .filter(Objects::nonNull)
-                        .map(param -> param.filePath)
-                        .collect(toList());
-                writerFactory.removeAllSubFiles(paths);
-            }
-            catch (FileNotFoundException e) {
-                // Ignore. Containing staging folder may have been deleted.
-            }
-            catch (IOException e) {
-                log.debug(e, "exception while aborting all subfiles");
-                rollbackException = Optional.of(e);
-            }
-        }
 
         if (rollbackException.isPresent()) {
             throw new PrestoException(HIVE_WRITER_CLOSE_ERROR, "Error rolling back write to Hive", rollbackException.get());
@@ -1075,17 +1045,6 @@ public class HivePageSink
         writtenBytes = (Long) state.get("writtenBytes");
         systemMemoryUsage = (Long) state.get("systemMemoryUsage");
         validationCpuNanos = (Long) state.get("validationCpuNanos");
-
-        // Remove files created after the snapshot
-        hdfsEnvironment.doAs(session.getUser(), () -> {
-            try {
-                writerFactory.removeAdditionalSubFiles(writerParams.stream().map(param -> param.filePath).collect(toList()));
-            }
-            catch (IOException e) {
-                log.warn("exception '%s' while removing additional subfile", e);
-                throw new RuntimeException(e);
-            }
-        });
     }
 
     private static class State

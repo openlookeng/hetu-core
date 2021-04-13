@@ -888,8 +888,24 @@ public class HiveWriterFactory
 
     static boolean isSnapshotSubFile(String fileName, String queryId)
     {
+        return getSnapshotSubFileIndex(fileName, queryId) >= 0;
+    }
+
+    static long getSnapshotSubFileIndex(String fileName, String queryId)
+    {
         String identifier = "_snapshot_" + queryId;
-        return fileName.contains(identifier) && !fileName.endsWith(identifier);
+        int index = fileName.indexOf(identifier);
+        if (index < 0) {
+            // Not a snapshot file
+            return index;
+        }
+        index += identifier.length();
+        if (index == fileName.length()) {
+            // Doesn't have a suffix
+            return -1;
+        }
+        String suffix = fileName.substring(index + 1); // Skip over '.'
+        return Long.valueOf(suffix);
     }
 
     static String removeSnapshotFileName(String fileName, String queryId)
@@ -954,52 +970,6 @@ public class HiveWriterFactory
                         }
                     }
                     // DO NOT delete the sub file, in case we need to resume. Delete them when the query finishes.
-                }
-            }
-        }
-    }
-
-    public void removeAllSubFiles(List<String> paths)
-            throws IOException
-    {
-        log.debug("Removing all sub files:\n  %s", String.join("  \n", paths));
-        removeSubFiles(0, paths);
-    }
-
-    public void removeAdditionalSubFiles(List<String> paths)
-            throws IOException
-    {
-        log.debug("Removing additional sub files after %d:\n  %s", snapshotSuffix, String.join("  \n", paths));
-        removeSubFiles(snapshotSuffix, paths);
-    }
-
-    private void removeSubFiles(int startSuffix, List<String> paths)
-            throws IOException
-    {
-        if (paths.isEmpty()) {
-            return;
-        }
-
-        FileSystem fileSystem = hdfsEnvironment.getFileSystem(session.getUser(), new Path(paths.get(0)), conf);
-
-        for (String path : paths) {
-            Path apath = new Path(path);
-            logContainingFolderInfo(fileSystem, apath, "Removing sub files after %d for: %s", startSuffix, path);
-
-            String filePath = removeSnapshotSuffix(path);
-            // Loop through all files in the containing folder,
-            // and remove those with a suffix that exceeds the starting index.
-            Path folder = new Path(filePath).getParent();
-            // Staging folder may have been deleted
-            if (fileSystem.exists(folder)) {
-                for (FileStatus status : fileSystem.listStatus(folder)) {
-                    String file = status.getPath().toString();
-                    if (file.startsWith(filePath)) {
-                        int index = Integer.valueOf(file.substring(filePath.length()));
-                        if (index >= startSuffix) {
-                            fileSystem.delete(status.getPath());
-                        }
-                    }
                 }
             }
         }

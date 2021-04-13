@@ -160,13 +160,6 @@ public class SqlTask
                     return;
                 }
 
-                // Snapshot: For tasks finished in other ways, they are then transitioned to ABORTED.
-                // For tasks canceled to resume, there will be no further communication with this task,
-                // so need to transition to ABORTED manually.
-                if (newState == CANCELED_TO_RESUME) {
-                    taskStateMachine.cancel(ABORTED);
-                }
-
                 // Update failed tasks counter
                 if (newState == FAILED) {
                     failedTasks.update(1);
@@ -186,7 +179,7 @@ public class SqlTask
                 }
 
                 // make sure buffers are cleaned up
-                if (newState == FAILED || newState == ABORTED) {
+                if (newState == FAILED || newState == ABORTED || newState == CANCELED_TO_RESUME) {
                     // don't close buffers for a failed query
                     // closed buffers signal to upstream tasks that everything finished cleanly
                     outputBuffer.fail();

@@ -550,8 +550,6 @@ public class SqlQueryExecution
                 // Not enough worker to resume all tasks. Retrying from any saves snapshot likely wont' work either.
                 // Clear ongoing and existing snapshots and restart.
                 snapshotManager.invalidateAllSnapshots();
-                // Clear any temporary content written in to the table
-                resetOutputData(plan);
                 scheduler = createResumeScheduler(plan, rootOutputBuffers);
             }
             else {
@@ -572,6 +570,8 @@ public class SqlQueryExecution
         OptionalLong snapshotId = snapshotManager.getResumeSnapshotId();
         MarkerAnnouncer announcer = splitManager.getMarkerAnnouncer(stateMachine.getSession());
         announcer.resumeSnapshot(snapshotId.orElse(0));
+        // Clear any temporary content that's not part of the snapshot
+        resetOutputData(plan, snapshotId);
 
         // Create a new scheduler, to schedule new stages and tasks
         DistributedExecutionPlanner distributedExecutionPlanner = new DistributedExecutionPlanner(splitManager, metadata);
@@ -603,7 +603,7 @@ public class SqlQueryExecution
                 snapshotId.isPresent() ? queryScheduler.get().getStageTaskCounts() : null);
     }
 
-    private void resetOutputData(PlanRoot plan)
+    private void resetOutputData(PlanRoot plan, OptionalLong snapshotId)
     {
         plan.getRoot().getFragment().getRoot().accept(new SimplePlanVisitor<Void>()
         {
@@ -614,10 +614,10 @@ public class SqlQueryExecution
 
                 // Find table-finish-node, which contains handle to the table
                 if (analysis.getStatement() instanceof CreateTableAsSelect) {
-                    metadata.resetCreateForRerun(getSession(), ((TableWriterNode.CreateTarget) node.getTarget()).getHandle());
+                    metadata.resetCreateForRerun(getSession(), ((TableWriterNode.CreateTarget) node.getTarget()).getHandle(), snapshotId);
                 }
                 else {
-                    metadata.resetInsertForRerun(getSession(), ((TableWriterNode.InsertTarget) node.getTarget()).getHandle());
+                    metadata.resetInsertForRerun(getSession(), ((TableWriterNode.InsertTarget) node.getTarget()).getHandle(), snapshotId);
                 }
                 return null;
             }

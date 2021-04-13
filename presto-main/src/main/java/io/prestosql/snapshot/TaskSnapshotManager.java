@@ -271,8 +271,6 @@ public class TaskSnapshotManager
 
     public void updateFinishedComponents(Collection<Operator> finishedOperators)
     {
-        checkState(totalComponents > 0);
-
         synchronized (captureComponentCounters) {
             // Update ongoing snapshots
             for (Long snapshotId : captureComponentCounters.keySet()) {
@@ -291,6 +289,8 @@ public class TaskSnapshotManager
             // Updated expected total count for future snapshots
             totalComponents -= finishedOperators.size();
         }
+
+        checkState(totalComponents >= 0);
     }
 
     @Override
