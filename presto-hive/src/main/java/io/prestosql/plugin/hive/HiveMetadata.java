@@ -129,6 +129,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -1313,10 +1314,6 @@ public class HiveMetadata
     {
         HiveOutputTableHandle handle = (HiveOutputTableHandle) tableHandle;
 
-        if (session.isSnapshotEnabled()) {
-            updateSnapshotFiles(session, handle, false, OptionalLong.empty());
-        }
-
         List<PartitionUpdate> partitionUpdates = fragments.stream()
                 .map(Slice::getBytes)
                 .map(partitionUpdateCodec::fromJson)
@@ -1340,6 +1337,12 @@ public class HiveMetadata
         PrincipalPrivileges principalPrivileges = MetastoreUtil.buildInitialPrivilegeSet(handle.getTableOwner());
 
         partitionUpdates = PartitionUpdate.mergePartitionUpdates(partitionUpdates);
+
+        if (session.isSnapshotEnabled()) {
+            updateSnapshotFiles(session, handle, false, OptionalLong.empty());
+            // Remove suffix from file names in partition updates
+            partitionUpdates = updateSnapshotFileNames(partitionUpdates, session.getQueryId());
+        }
 
         if (handle.getBucketProperty().isPresent() && HiveSessionProperties.isCreateEmptyBucketFiles(session)) {
             List<PartitionUpdate> partitionUpdatesForMissingBuckets = computePartitionUpdatesForMissingBuckets(session, handle, table, partitionUpdates);
@@ -1612,10 +1615,6 @@ public class HiveMetadata
     {
         HiveInsertTableHandle handle = (HiveInsertTableHandle) insertHandle;
 
-        if (session.isSnapshotEnabled()) {
-            updateSnapshotFiles(session, handle, false, OptionalLong.empty());
-        }
-
         List<PartitionUpdate> partitionUpdates = fragments.stream()
                 .map(Slice::getBytes)
                 .map(partitionUpdateCodec::fromJson)
@@ -1624,6 +1623,12 @@ public class HiveMetadata
 
         HiveStorageFormat tableStorageFormat = handle.getTableStorageFormat();
         partitionUpdates = PartitionUpdate.mergePartitionUpdates(partitionUpdates);
+
+        if (session.isSnapshotEnabled()) {
+            updateSnapshotFiles(session, handle, false, OptionalLong.empty());
+            // Remove suffix from file names in partition updates
+            partitionUpdates = updateSnapshotFileNames(partitionUpdates, session.getQueryId());
+        }
 
         Table table = metastore.getTable(new HiveIdentity(session), handle.getSchemaName(), handle.getTableName())
                 .orElseThrow(() -> new TableNotFoundException(handle.getSchemaTableName()));
@@ -2985,6 +2990,29 @@ public class HiveMetadata
                 }
             }
         }
+    }
+
+    private List<PartitionUpdate> updateSnapshotFileNames(List<PartitionUpdate> partitionUpdates, String queryId)
+    {
+        ImmutableList.Builder<PartitionUpdate> builder = ImmutableList.builder();
+        for (PartitionUpdate partitionUpdate : partitionUpdates) {
+            builder.add(new PartitionUpdate(
+                    partitionUpdate.getName(),
+                    partitionUpdate.getUpdateMode(),
+                    partitionUpdate.getWritePath(),
+                    partitionUpdate.getTargetPath(),
+                    updateSnapshotFileName(partitionUpdate.getFileNames(), queryId),
+                    partitionUpdate.getRowCount(),
+                    partitionUpdate.getInMemoryDataSizeInBytes(),
+                    partitionUpdate.getOnDiskDataSizeInBytes(),
+                    partitionUpdate.getMiscData()));
+        }
+        return builder.build();
+    }
+
+    private List<String> updateSnapshotFileName(List<String> fileNames, String queryId)
+    {
+        return fileNames.stream().map(name -> HiveWriterFactory.removeSnapshotFileName(name, queryId)).collect(Collectors.toList());
     }
 
     protected void finishInsertOverwrite(ConnectorSession session, HiveInsertTableHandle handle, Table table, PartitionUpdate partitionUpdate, PartitionStatistics partitionStatistics)
