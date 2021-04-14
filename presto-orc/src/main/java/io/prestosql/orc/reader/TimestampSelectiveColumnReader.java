@@ -294,6 +294,9 @@ public class TimestampSelectiveColumnReader
         presentStream.skip(positions[positionCount - 1]);
         if (nullsAllowed) {
             outputPositionCount = positionCount;
+            if (outputPositions != positions) {
+                System.arraycopy(positions, 0, outputPositions, 0, outputPositionCount);
+            }
             allNulls = true;
         }
         else {

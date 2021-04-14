@@ -5389,6 +5389,9 @@ public class TestHiveIntegrationSmokeTest
             queries.add("SELECT a FROM test_predicate_or_NULL WHERE c IN (0,2,4) ORDER BY 1");
             queries.add("SELECT a FROM test_predicate_or_NULL WHERE c IS NULL ORDER BY 1");
 
+            queries.add("SELECT a FROM test_predicate_or_NULL WHERE b IS NULL ORDER BY 1");
+            queries.add("SELECT a,c FROM test_predicate_or_NULL WHERE b IS NULL ORDER BY 1,2");
+
             queries.add("SELECT b FROM test_predicate_or_NULL WHERE c = 2 ORDER BY 1");
             queries.add("SELECT b FROM test_predicate_or_NULL WHERE c >= 1 and c <= 3 ORDER BY 1");
             queries.add("SELECT b FROM test_predicate_or_NULL WHERE c IN (1,3,5) ORDER BY 1");
