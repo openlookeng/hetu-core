@@ -226,8 +226,7 @@ public class IndexCache
                     }
                 }, loadDelay, TimeUnit.MILLISECONDS);
             }
-
-            if (indexOfThisType != null) {
+            else {
                 // if key was present in cache, we still need to check if the index is validate based on the lastModifiedTime
                 // the index is only valid if the lastModifiedTime of the split matches the index's lastModifiedTime
                 for (IndexMetadata index : indexOfThisType) {
