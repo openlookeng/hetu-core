@@ -38,8 +38,6 @@
 
 协调节点与远程任务之间的通信长时间失败时，将触发错误恢复，由[`query.remote-task.max-error-duration`](properties.md#queryremote-taskmax-error-duration)配置控制。
 
-另一个相关配置为[`exchange.max-error-duration`](properties.md#exchangemax-error-duration)，其影响任务间通信错误。建议将此属性配置为大于[`query.remote-task.max-error-duration`](properties.md#queryremote-taskmax-error-duration)的时长，以提高工作节点故障恢复的可能性。
-
 ## 存储注意事项
 
 从保存的快照恢复查询执行时，任务可能会在与保存快照时不同的工作节点上调度。这意味着所有工作节点都必须能够访问保存的快照数据。

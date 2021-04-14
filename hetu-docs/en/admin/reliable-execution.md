@@ -38,8 +38,6 @@ When a query that does not meet the above requirements is submitted with distrib
 
 Error recovery is triggered when communication between the coordinator and a remote task fails for an extended period of time, as controlled by the [`query.remote-task.max-error-duration`](properties.md#queryremote-taskmax-error-duration) configuration.
 
-Another relevant configuration is [`exchange.max-error-duration`](properties.md#exchangemax-error-duration), which affects inter-task communication errors. It is recommended that this property is configured with a duration longer than [`query.remote-task.max-error-duration`](properties.md#queryremote-taskmax-error-duration), to increase the chance of worker failure recovery.
-
 ## Storage Considerations
 
 When query execution is resumed from a saved snapshot, tasks are likely scheduled on different workers than when the snapshot was taken. This means saved snapshot data must be accessible by all workers.
