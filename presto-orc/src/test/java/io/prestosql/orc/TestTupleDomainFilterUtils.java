@@ -49,8 +49,8 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
-import static io.prestosql.orc.TupleDomainFilter.IS_NOT_NULL;
-import static io.prestosql.orc.TupleDomainFilter.IS_NULL;
+import static io.prestosql.orc.TupleDomainFilterUtils.IS_NOT_NULL;
+import static io.prestosql.orc.TupleDomainFilterUtils.IS_NULL;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.CharType.createCharType;

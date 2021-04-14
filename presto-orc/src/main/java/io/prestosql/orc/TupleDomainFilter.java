@@ -30,10 +30,6 @@ import static java.util.Objects.requireNonNull;
  */
 public interface TupleDomainFilter
 {
-    TupleDomainFilter ALWAYS_FALSE = new AlwaysFalse();
-    TupleDomainFilter IS_NULL = new IsNull();
-    TupleDomainFilter IS_NOT_NULL = new IsNotNull();
-
     boolean testNull();
 
     boolean testLong(long value);
@@ -111,7 +107,7 @@ public interface TupleDomainFilter
     class AlwaysFalse
             extends AbstractTupleDomainFilter
     {
-        private AlwaysFalse()
+        public AlwaysFalse()
         {
             super(false);
         }
@@ -168,7 +164,7 @@ public interface TupleDomainFilter
     class IsNull
             extends AbstractTupleDomainFilter
     {
-        private IsNull()
+        public IsNull()
         {
             super(true);
         }
@@ -225,7 +221,7 @@ public interface TupleDomainFilter
     class IsNotNull
             extends AbstractTupleDomainFilter
     {
-        private IsNotNull()
+        public IsNotNull()
         {
             super(false);
         }

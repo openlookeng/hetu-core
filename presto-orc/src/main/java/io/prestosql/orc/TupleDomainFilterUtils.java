@@ -32,9 +32,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.airlift.slice.SizeOf.SIZE_OF_LONG;
-import static io.prestosql.orc.TupleDomainFilter.ALWAYS_FALSE;
-import static io.prestosql.orc.TupleDomainFilter.IS_NOT_NULL;
-import static io.prestosql.orc.TupleDomainFilter.IS_NULL;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.DateType.DATE;
@@ -51,6 +48,10 @@ import static java.lang.Math.toIntExact;
 
 public class TupleDomainFilterUtils
 {
+    static final TupleDomainFilter ALWAYS_FALSE = new TupleDomainFilter.AlwaysFalse();
+    static final TupleDomainFilter IS_NULL = new TupleDomainFilter.IsNull();
+    static final TupleDomainFilter IS_NOT_NULL = new TupleDomainFilter.IsNotNull();
+
     private TupleDomainFilterUtils() {}
 
     public static TupleDomainFilter toFilter(Domain domain)
