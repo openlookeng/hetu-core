@@ -367,7 +367,7 @@ public class DistributedResourceGroup
                 resourceGroupState.ifPresent(state -> this.lastExecutionTime = state.getLastExecutionTime());
                 Set<SharedQueryState> runningQueries = resourceGroupState.get().getRunningQueries();
                 for (SharedQueryState state : runningQueries) {
-                    cachedMemoryUsageBytes += state.getUserMemoryReservation().toBytes();
+                    cachedMemoryUsageBytes += state.getTotalMemoryReservation().toBytes();
                 }
 
                 // get cpuUsageMillis from resourceGroupState
@@ -389,7 +389,7 @@ public class DistributedResourceGroup
                     tempDescendantRunningQueries += state.getRunningQueries().size();
                     tempDescendantQueuedQueries += state.getQueuedQueries().size();
                     tempCachedMemoryUsageBytes += state.getRunningQueries().stream()
-                            .mapToLong(query -> query.getUserMemoryReservation().toBytes())
+                            .mapToLong(query -> query.getTotalMemoryReservation().toBytes())
                             .reduce(0, (memoryUsage1, memoryUsage2) -> memoryUsage1 + memoryUsage2);
                 }
 
@@ -439,9 +439,9 @@ public class DistributedResourceGroup
                             double absQueryProgressMargin = 1 - (double) queryProgressMarginPercent / 100;
 
                             sortedQueryList = globalRunningQueries.stream().sorted((o1, o2) -> {
-                                if (o1.getUserMemoryReservation().toBytes() < o2.getUserMemoryReservation().toBytes() * absMemoryMargin
-                                        || o2.getUserMemoryReservation().toBytes() < o1.getUserMemoryReservation().toBytes() * absMemoryMargin) {
-                                    return ((Long) o2.getUserMemoryReservation().toBytes()).compareTo(o1.getUserMemoryReservation().toBytes());
+                                if (o1.getTotalMemoryReservation().toBytes() < o2.getTotalMemoryReservation().toBytes() * absMemoryMargin
+                                        || o2.getTotalMemoryReservation().toBytes() < o1.getTotalMemoryReservation().toBytes() * absMemoryMargin) {
+                                    return ((Long) o2.getTotalMemoryReservation().toBytes()).compareTo(o1.getTotalMemoryReservation().toBytes());
                                 }
 
                                 // if memory usage within 10%, then sort based on % of query completion.
@@ -451,7 +451,7 @@ public class DistributedResourceGroup
                                     return ((Double) o1.getQueryProgress().orElse(0)).compareTo((o2.getQueryProgress().orElse(0)));
                                 }
 
-                                return ((Long) o2.getUserMemoryReservation().toBytes()).compareTo(o1.getUserMemoryReservation().toBytes());
+                                return ((Long) o2.getTotalMemoryReservation().toBytes()).compareTo(o1.getTotalMemoryReservation().toBytes());
                             }).collect(Collectors.toList());
                             break;
                         case OLDEST_QUERIES:
@@ -484,12 +484,12 @@ public class DistributedResourceGroup
                                 LOG.info("Query " + localQuery.getBasicQueryInfo().getQueryId() + " is getting killed for resource group " + this + " query will be killed with policy " + killPolicy);
                                 localQuery.fail(new PrestoException(GENERIC_INSUFFICIENT_RESOURCES, "Memory consumption " + tempLocalCachedMemoryUsage + " exceed the limit " + softMemoryLimitBytes + "for resource group " + this));
                                 queryFinished(localQuery);
-                                tempLocalCachedMemoryUsage -= query.getUserMemoryReservation().toBytes();
+                                tempLocalCachedMemoryUsage -= query.getTotalMemoryReservation().toBytes();
                                 break;
                             }
                         }
 
-                        tempGlobalCachedMemoryUsage -= query.getUserMemoryReservation().toBytes();
+                        tempGlobalCachedMemoryUsage -= query.getTotalMemoryReservation().toBytes();
                         if (tempGlobalCachedMemoryUsage <= softMemoryLimitBytes) {
                             break;
                         }
@@ -627,7 +627,7 @@ public class DistributedResourceGroup
                 for (DistributedResourceGroup group : (Collection<DistributedResourceGroup>) parent.get().subGroups()) {
                     Optional<SharedResourceGroupState> peerGroupState = group.getSharedResourceGroupState();
                     long peerGroupUsage = peerGroupState.isPresent() ? peerGroupState.get().getRunningQueries().stream()
-                            .mapToLong(query -> query.getUserMemoryReservation().toBytes())
+                            .mapToLong(query -> query.getTotalMemoryReservation().toBytes())
                             .reduce(0, (memoryUsage1, memoryUsage2) -> memoryUsage1 + memoryUsage2)
                             : group.cachedMemoryUsageBytes;
                     peerGroupTotalUsage += Math.max(peerGroupUsage, group.softReservedMemory);
