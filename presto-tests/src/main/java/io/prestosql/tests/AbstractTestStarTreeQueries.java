@@ -280,6 +280,53 @@ public abstract class AbstractTestStarTreeQueries
     }
 
     @Test
+    public void testCreateCubeTransactional()
+    {
+        computeActual("CREATE TABLE nation_table_cube_create_transactional_test_1 AS SELECT * FROM nation");
+        assertQueryFails("CREATE CUBE nation_create_transactional_cube_1 ON nation_table_cube_create_transactional_test_1 " +
+                "WITH (AGGREGATIONS=(count(*), COUNT(distinct nationkey), count(distinct regionkey), avg(nationkey), count(regionkey), sum(regionkey)," +
+                " min(regionkey), max(regionkey), max(nationkey), min(nationkey))," +
+                " group=(nationkey), transactional=true)", "line 1:1: nation_create_transactional_cube_1 is a star-tree cube with transactional = true is not supported");
+
+        assertQueryFails("CREATE CUBE nation_create_transactional_cube_2 ON nation_table_cube_create_transactional_test_1 " +
+                "WITH (AGGREGATIONS=(count(*), COUNT(distinct nationkey), count(distinct regionkey), avg(nationkey), count(regionkey), sum(regionkey)," +
+                " min(regionkey), max(regionkey), max(nationkey), min(nationkey))," +
+                " group=(nationkey), format= 'orc', partitioned_by = ARRAY['nationkey'], transactional=true)", "line 1:1: nation_create_transactional_cube_2 is a star-tree cube with transactional = true is not supported");
+
+        assertUpdate("DROP TABLE nation_table_cube_create_transactional_test_1");
+    }
+
+    @Test
+    public void testDeleteFromCube()
+    {
+        computeActual("CREATE TABLE nation_table_delete_from_cube_test_1 AS SELECT * FROM nation");
+        assertUpdate("CREATE CUBE nation_delete_from_cube_1 ON nation_table_delete_from_cube_test_1 " +
+                "WITH (AGGREGATIONS=(count(*), COUNT(distinct nationkey), count(distinct regionkey), avg(nationkey), count(regionkey), sum(regionkey)," +
+                " min(regionkey), max(regionkey), max(nationkey), min(nationkey))," +
+                " group=(nationkey), format= 'orc', partitioned_by = ARRAY['nationkey'])");
+        assertUpdate("INSERT INTO CUBE nation_delete_from_cube_1 where nationkey > 5", 19);
+        assertQueryFails("DELETE FROM nation_delete_from_cube_1 where nationkey > 5", "line 1:1: hive.tpch.nation_delete_from_cube_1 is a star-tree cube, DELETE is not supported");
+
+        assertUpdate("DROP CUBE nation_delete_from_cube_1");
+        assertUpdate("DROP TABLE nation_table_delete_from_cube_test_1");
+    }
+
+    @Test
+    public void testUpdateCube()
+    {
+        computeActual("CREATE TABLE nation_table_update_cube_test_1 AS SELECT * FROM nation");
+        assertUpdate("CREATE CUBE nation_update_cube_1 ON nation_table_update_cube_test_1 " +
+                "WITH (AGGREGATIONS=(count(*), COUNT(distinct nationkey), count(distinct regionkey), avg(nationkey), count(regionkey), sum(regionkey)," +
+                " min(regionkey), max(regionkey), max(nationkey), min(nationkey))," +
+                " group=(nationkey), format= 'orc', partitioned_by = ARRAY['nationkey'])");
+        assertUpdate("INSERT INTO CUBE nation_update_cube_1 where nationkey > 5", 19);
+        assertQueryFails("UPDATE nation_update_cube_1 set regionkey = 10 where nationkey > 5", "line 1:1: hive.tpch.nation_update_cube_1 is a star-tree cube, UPDATE is not supported");
+
+        assertUpdate("DROP CUBE nation_update_cube_1");
+        assertUpdate("DROP TABLE nation_table_update_cube_test_1");
+    }
+
+    @Test
     public void testCubeStatusChange()
     {
         computeActual("CREATE TABLE nation_table_status_test AS SELECT * FROM nation");
