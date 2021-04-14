@@ -11,18 +11,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.memory;
+package io.prestosql.plugin.memory.data;
 
 import com.google.common.collect.ImmutableList;
+import io.prestosql.plugin.memory.ColumnInfo;
+import io.prestosql.plugin.memory.MemoryConfig;
+import io.prestosql.plugin.memory.SortingColumn;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.predicate.TupleDomain;
 
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -31,32 +36,38 @@ import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.OptionalLong;
 import java.util.Set;
-import java.util.concurrent.ThreadLocalRandom;
 
 import static io.prestosql.plugin.memory.MemoryErrorCode.MEMORY_LIMIT_EXCEEDED;
 import static io.prestosql.plugin.memory.MemoryErrorCode.MISSING_DATA;
 import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 
 @ThreadSafe
 public class MemoryPagesStore
 {
     private final long maxBytes;
-
+    private final int splitsPerNode;
+    private final PageSorter pageSorter;
+    private final MemoryConfig config;
     @GuardedBy("this")
     private long currentBytes;
 
     private final Map<Long, TableData> tables = new HashMap<>();
 
     @Inject
-    public MemoryPagesStore(MemoryConfig config)
+    public MemoryPagesStore(MemoryConfig config, PageSorter pageSorter)
     {
+        requireNonNull(pageSorter, "config is null");
+        this.pageSorter = requireNonNull(pageSorter, "pageSorter is null");
+        this.config = requireNonNull(config, "config is null");
+        this.splitsPerNode = config.getSplitsPerNode();
         this.maxBytes = config.getMaxDataPerNode().toBytes();
     }
 
-    public synchronized void initialize(long tableId)
+    public synchronized void initialize(long tableId, List<ColumnInfo> columns, List<SortingColumn> sortedBy, List<String> indexColumns)
     {
         if (!tables.containsKey(tableId)) {
-            tables.put(tableId, new TableData());
+            tables.put(tableId, new TableData(tableId, columns, sortedBy, indexColumns, pageSorter, config));
         }
     }
 
@@ -78,7 +89,7 @@ public class MemoryPagesStore
         tableData.add(page);
     }
 
-    public synchronized List<Page> getPages(
+    public List<Page> getPages(
             Long tableId,
             int partNumber,
             int totalParts,
@@ -86,6 +97,19 @@ public class MemoryPagesStore
             long expectedRows,
             OptionalLong limit,
             OptionalDouble sampleRatio)
+    {
+        return getPages(tableId, partNumber, totalParts, columnIndexes, expectedRows, limit, sampleRatio, TupleDomain.all());
+    }
+
+    public List<Page> getPages(
+            Long tableId,
+            int partNumber,
+            int totalParts,
+            List<Integer> columnIndexes,
+            long expectedRows,
+            OptionalLong limit,
+            OptionalDouble sampleRatio,
+            TupleDomain<ColumnHandle> predicate)
     {
         if (!contains(tableId)) {
             throw new PrestoException(MISSING_DATA, "Failed to find table on a worker.");
@@ -96,28 +120,43 @@ public class MemoryPagesStore
                     format("Expected to find [%s] rows on a worker, but found [%s].", expectedRows, tableData.getRows()));
         }
 
-        ImmutableList.Builder<Page> partitionedPages = ImmutableList.builder();
+        ImmutableList.Builder<Page> projectedPages = ImmutableList.builder();
 
-        boolean done = false;
-        long totalRows = 0;
-        for (int i = partNumber; i < tableData.getPages().size() && !done; i += totalParts) {
-            if (sampleRatio.isPresent() && ThreadLocalRandom.current().nextDouble() >= sampleRatio.getAsDouble()) {
-                continue;
-            }
+        int splitNumber = partNumber % splitsPerNode;
 
-            Page page = tableData.getPages().get(i);
-            totalRows += page.getPositionCount();
-            if (limit.isPresent() && totalRows > limit.getAsLong()) {
-                page = page.getRegion(0, (int) (page.getPositionCount() - (totalRows - limit.getAsLong())));
-                done = true;
-            }
-            partitionedPages.add(getColumns(page, columnIndexes));
+        List<Page> pages;
+        if (predicate.isAll()) {
+            pages = tableData.getPages(splitNumber);
+        }
+        else {
+            pages = tableData.getPages(splitNumber, predicate);
         }
 
-        return partitionedPages.build();
+        for (int i = 0; i < pages.size(); i++) {
+            projectedPages.add(getColumns(pages.get(i), columnIndexes));
+        }
+
+        // TODO: disabling limit and sample pushdown for now
+//        boolean done = false;
+//        long totalRows = 0;
+//        for (int i = partNumber; i < pages.size() && !done; i += totalParts) {
+//            if (sampleRatio.isPresent() && ThreadLocalRandom.current().nextDouble() >= sampleRatio.getAsDouble()) {
+//                continue;
+//            }
+//
+//            Page page = pages.get(i);
+//            totalRows += page.getPositionCount();
+//            if (limit.isPresent() && totalRows > limit.getAsLong()) {
+//                page = page.getRegion(0, (int) (page.getPositionCount() - (totalRows - limit.getAsLong())));
+//                done = true;
+//            }
+//            partitionedPages.add(getColumns(page, columnIndexes));
+//        }
+
+        return projectedPages.build();
     }
 
-    public synchronized boolean contains(Long tableId)
+    public boolean contains(Long tableId)
     {
         return tables.containsKey(tableId);
     }
@@ -159,27 +198,5 @@ public class MemoryPagesStore
         }
 
         return new Page(page.getPositionCount(), outputBlocks);
-    }
-
-    private static final class TableData
-    {
-        private final List<Page> pages = new ArrayList<>();
-        private long rows;
-
-        public void add(Page page)
-        {
-            pages.add(page);
-            rows += page.getPositionCount();
-        }
-
-        private List<Page> getPages()
-        {
-            return pages;
-        }
-
-        private long getRows()
-        {
-            return rows;
-        }
     }
 }

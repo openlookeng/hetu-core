@@ -15,14 +15,20 @@ package io.prestosql.plugin.memory;
 
 import io.airlift.configuration.Config;
 import io.airlift.units.DataSize;
+import io.airlift.units.MaxDataSize;
+import io.airlift.units.MinDataSize;
 import io.prestosql.spi.function.Mandatory;
 
 import javax.validation.constraints.NotNull;
+
+import static io.airlift.units.DataSize.Unit.MEGABYTE;
 
 public class MemoryConfig
 {
     private int splitsPerNode = Runtime.getRuntime().availableProcessors();
     private DataSize maxDataPerNode = new DataSize(128, DataSize.Unit.MEGABYTE);
+    private DataSize maxLogicalPartSize = new DataSize(256, MEGABYTE);
+    private int processingThreads = Runtime.getRuntime().availableProcessors();
 
     @NotNull
     public int getSplitsPerNode()
@@ -51,6 +57,20 @@ public class MemoryConfig
     public MemoryConfig setMaxDataPerNode(DataSize maxDataPerNode)
     {
         this.maxDataPerNode = maxDataPerNode;
+        return this;
+    }
+
+    @MinDataSize("32MB")
+    @MaxDataSize("1GB")
+    public DataSize getMaxLogicalPartSize()
+    {
+        return maxLogicalPartSize;
+    }
+
+    @Config("memory.max-logical-part-size")
+    public MemoryConfig setMaxLogicalPartSize(DataSize maxLogicalPartSize)
+    {
+        this.maxLogicalPartSize = maxLogicalPartSize;
         return this;
     }
 }

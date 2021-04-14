@@ -16,10 +16,16 @@ package io.prestosql.plugin.memory;
 import com.google.inject.Injector;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.json.JsonModule;
+import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorContext;
 import io.prestosql.spi.connector.ConnectorFactory;
 import io.prestosql.spi.connector.ConnectorHandleResolver;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.StandardFunctionResolution;
+import io.prestosql.spi.relation.DeterminismEvaluator;
+import io.prestosql.spi.relation.RowExpressionService;
+import io.prestosql.spi.type.TypeManager;
 
 import java.util.Map;
 
@@ -48,6 +54,14 @@ public class MemoryConnectorFactory
         try {
             // A plugin is not required to use Guice; it is just very convenient
             Bootstrap app = new Bootstrap(
+                    binder -> {
+                        binder.bind(PageSorter.class).toInstance(context.getPageSorter());
+                        binder.bind(FunctionMetadataManager.class).toInstance(context.getFunctionMetadataManager());
+                        binder.bind(StandardFunctionResolution.class).toInstance(context.getStandardFunctionResolution());
+                        binder.bind(TypeManager.class).toInstance(context.getTypeManager());
+                        binder.bind(RowExpressionService.class).toInstance(context.getRowExpressionService());
+                        binder.bind(DeterminismEvaluator.class).toInstance(context.getRowExpressionService().getDeterminismEvaluator());
+                    },
                     new JsonModule(),
                     new MemoryModule(context.getTypeManager(), context.getNodeManager()));
 

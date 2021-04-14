@@ -13,15 +13,25 @@
  */
 package io.prestosql.plugin.memory;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import io.prestosql.spi.ConnectorPlanOptimizer;
 import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorMetadata;
 import io.prestosql.spi.connector.ConnectorPageSinkProvider;
 import io.prestosql.spi.connector.ConnectorPageSourceProvider;
+import io.prestosql.spi.connector.ConnectorPlanOptimizerProvider;
 import io.prestosql.spi.connector.ConnectorSplitManager;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
+import io.prestosql.spi.session.PropertyMetadata;
 import io.prestosql.spi.transaction.IsolationLevel;
 
 import javax.inject.Inject;
+
+import java.util.List;
+import java.util.Set;
+
+import static java.util.Objects.requireNonNull;
 
 public class MemoryConnector
         implements Connector
@@ -30,24 +40,48 @@ public class MemoryConnector
     private final MemorySplitManager splitManager;
     private final MemoryPageSourceProvider pageSourceProvider;
     private final MemoryPageSinkProvider pageSinkProvider;
+    private final List<PropertyMetadata<?>> tableProperties;
+    private final ConnectorPlanOptimizer planOptimizer;
 
     @Inject
     public MemoryConnector(
             MemoryMetadata metadata,
             MemorySplitManager splitManager,
             MemoryPageSourceProvider pageSourceProvider,
-            MemoryPageSinkProvider pageSinkProvider)
+            MemoryPageSinkProvider pageSinkProvider,
+            MemoryTableProperties tableProperties,
+            MemoryPlanOptimizer planOptimizer)
     {
         this.metadata = metadata;
         this.splitManager = splitManager;
         this.pageSourceProvider = pageSourceProvider;
         this.pageSinkProvider = pageSinkProvider;
+        this.tableProperties = ImmutableList.copyOf(requireNonNull(tableProperties, "tableProperties is null").getTableProperties());
+        this.planOptimizer = planOptimizer;
     }
 
     @Override
     public ConnectorTransactionHandle beginTransaction(IsolationLevel isolationLevel, boolean readOnly)
     {
         return MemoryTransactionHandle.INSTANCE;
+    }
+
+    @Override
+    public ConnectorPlanOptimizerProvider getConnectorPlanOptimizerProvider()
+    {
+        return new ConnectorPlanOptimizerProvider() {
+            @Override
+            public Set<ConnectorPlanOptimizer> getLogicalPlanOptimizers()
+            {
+                return ImmutableSet.of(planOptimizer);
+            }
+
+            @Override
+            public Set<ConnectorPlanOptimizer> getPhysicalPlanOptimizers()
+            {
+                return ImmutableSet.of();
+            }
+        };
     }
 
     @Override
@@ -72,5 +106,11 @@ public class MemoryConnector
     public ConnectorPageSinkProvider getPageSinkProvider()
     {
         return pageSinkProvider;
+    }
+
+    @Override
+    public List<PropertyMetadata<?>> getTableProperties()
+    {
+        return tableProperties;
     }
 }

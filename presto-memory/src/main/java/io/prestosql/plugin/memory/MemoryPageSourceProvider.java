@@ -13,6 +13,7 @@
  */
 package io.prestosql.plugin.memory;
 
+import io.prestosql.plugin.memory.data.MemoryPagesStore;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
@@ -24,6 +25,7 @@ import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.FixedPageSource;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
+import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeUtils;
 
@@ -76,11 +78,12 @@ public final class MemoryPageSourceProvider
         MemoryTableHandle memoryTable = (MemoryTableHandle) table;
         OptionalDouble sampleRatio = memoryTable.getSampleRatio();
 
+        TupleDomain<ColumnHandle> predicate = memoryTable.getPredicate();
         // Commenting for Dynamic filter changes
 
         List<Integer> columnIndexes = columns.stream()
-                                             .map(MemoryColumnHandle.class::cast)
-                                             .map(MemoryColumnHandle::getColumnIndex).collect(toList());
+                .map(MemoryColumnHandle.class::cast)
+                .map(MemoryColumnHandle::getColumnIndex).collect(toList());
         List<Page> pages = pagesStore.getPages(
                 tableId,
                 partNumber,
@@ -88,10 +91,17 @@ public final class MemoryPageSourceProvider
                 columnIndexes,
                 expectedRows,
                 memorySplit.getLimit(),
-                sampleRatio);
-        return new FixedPageSource(pages.stream()
-                                        .map(page -> applyFilter(page, dynamicFilterSupplier, columns))
-                                        .collect(toList()));
+                sampleRatio,
+                predicate);
+
+        if (dynamicFilterSupplier.isPresent()) {
+            return new FixedPageSource(pages.stream()
+                    .map(page -> applyFilter(page, dynamicFilterSupplier, columns))
+                    .collect(toList()));
+        }
+        else {
+            return new FixedPageSource(pages);
+        }
     }
 
     private Page applyFilter(Page page, Optional<DynamicFilterSupplier> dynamicFilters, List<ColumnHandle> columns)

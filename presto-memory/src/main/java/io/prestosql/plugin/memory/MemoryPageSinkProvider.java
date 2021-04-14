@@ -16,6 +16,7 @@ package io.prestosql.plugin.memory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
+import io.prestosql.plugin.memory.data.MemoryPagesStore;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.NodeManager;
 import io.prestosql.spi.Page;
@@ -29,6 +30,7 @@ import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import javax.inject.Inject;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 
 import static com.google.common.base.Preconditions.checkState;
@@ -62,7 +64,7 @@ public class MemoryPageSinkProvider
         checkState(memoryOutputTableHandle.getActiveTableIds().contains(tableId));
 
         pagesStore.cleanUp(memoryOutputTableHandle.getActiveTableIds());
-        pagesStore.initialize(tableId);
+        pagesStore.initialize(tableId, memoryOutputTableHandle.getColumns(), memoryOutputTableHandle.getSortedBy(), memoryOutputTableHandle.getIndexColumns());
         return new MemoryPageSink(pagesStore, currentHostAddress, tableId);
     }
 
@@ -74,7 +76,7 @@ public class MemoryPageSinkProvider
         checkState(memoryInsertTableHandle.getActiveTableIds().contains(tableId));
 
         pagesStore.cleanUp(memoryInsertTableHandle.getActiveTableIds());
-        pagesStore.initialize(tableId);
+        pagesStore.initialize(tableId, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
         return new MemoryPageSink(pagesStore, currentHostAddress, tableId);
     }
 

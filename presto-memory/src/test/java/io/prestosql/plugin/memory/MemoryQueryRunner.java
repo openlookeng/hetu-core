@@ -32,7 +32,9 @@ public final class MemoryQueryRunner
 {
     private static final String CATALOG = "memory";
 
-    private MemoryQueryRunner() {}
+    private MemoryQueryRunner()
+    {
+    }
 
     public static DistributedQueryRunner createQueryRunner()
             throws Exception
@@ -52,7 +54,7 @@ public final class MemoryQueryRunner
 
         try {
             queryRunner.installPlugin(new MemoryPlugin());
-            queryRunner.createCatalog(CATALOG, "memory", ImmutableMap.of());
+            queryRunner.createCatalog(CATALOG, "memory", ImmutableMap.of("memory.max-data-per-node", "1GB"));
 
             queryRunner.installPlugin(new TpchPlugin());
             queryRunner.createCatalog("tpch", "tpch", ImmutableMap.of());

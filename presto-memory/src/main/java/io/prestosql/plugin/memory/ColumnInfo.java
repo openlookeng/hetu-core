@@ -13,6 +13,8 @@
  */
 package io.prestosql.plugin.memory;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.type.Type;
@@ -25,26 +27,43 @@ public class ColumnInfo
     private final String name;
     private final Type type;
 
-    public ColumnInfo(ColumnHandle handle, String name, Type type)
+    @JsonCreator
+    public ColumnInfo(
+            @JsonProperty("handle") ColumnHandle handle,
+            @JsonProperty("name") String name,
+            @JsonProperty("type") Type type)
     {
         this.handle = requireNonNull(handle, "handle is null");
         this.name = requireNonNull(name, "name is null");
         this.type = requireNonNull(type, "type is null");
     }
 
+    @JsonProperty
     public ColumnHandle getHandle()
     {
         return handle;
     }
 
+    @JsonProperty
     public String getName()
     {
         return name;
     }
 
+    @JsonProperty
+    public Type getType()
+    {
+        return type;
+    }
+
     public ColumnMetadata getMetadata()
     {
         return new ColumnMetadata(name, type);
+    }
+
+    public int getIndex()
+    {
+        return ((MemoryColumnHandle) handle).getColumnIndex();
     }
 
     @Override

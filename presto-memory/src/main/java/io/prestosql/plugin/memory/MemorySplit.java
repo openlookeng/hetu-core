@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 
-import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
@@ -136,10 +135,10 @@ public class MemorySplit
     @Override
     public String toString()
     {
-        return toStringHelper(this)
-                .add("tableHandle", table)
-                .add("partNumber", partNumber)
-                .add("totalPartsPerWorker", totalPartsPerWorker)
-                .toString();
+        return "MemorySplit{" +
+                "table=" + table +
+                ", totalPartsPerWorker=" + totalPartsPerWorker +
+                ", partNumber=" + partNumber +
+                '}';
     }
 }

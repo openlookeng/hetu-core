@@ -34,8 +34,8 @@ import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.ConnectorTableProperties;
 import io.prestosql.spi.connector.ConnectorViewDefinition;
-import io.prestosql.spi.connector.LimitApplicationResult;
-import io.prestosql.spi.connector.SampleType;
+import io.prestosql.spi.connector.Constraint;
+import io.prestosql.spi.connector.ConstraintApplicationResult;
 import io.prestosql.spi.connector.SchemaNotFoundException;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SchemaTablePrefix;
@@ -47,22 +47,23 @@ import javax.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalDouble;
-import java.util.OptionalLong;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.spi.StandardErrorCode.ALREADY_EXISTS;
+import static io.prestosql.spi.StandardErrorCode.INVALID_TABLE_PROPERTY;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.SCHEMA_NOT_EMPTY;
-import static io.prestosql.spi.connector.SampleType.SYSTEM;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
@@ -77,9 +78,9 @@ public class MemoryMetadata
     private final NodeManager nodeManager;
     private final List<String> schemas = new ArrayList<>();
     private final AtomicLong nextTableId = new AtomicLong();
-    private final Map<SchemaTableName, Long> tableIds = new HashMap<>();
-    private final Map<Long, TableInfo> tables = new HashMap<>();
-    private final Map<SchemaTableName, ConnectorViewDefinition> views = new HashMap<>();
+    private final Map<SchemaTableName, Long> tableIds = new ConcurrentHashMap<>();
+    private final Map<Long, TableInfo> tables = new ConcurrentHashMap<>();
+    private final Map<SchemaTableName, ConnectorViewDefinition> views = new ConcurrentHashMap<>();
 
     @Inject
     public MemoryMetadata(NodeManager nodeManager)
@@ -121,7 +122,7 @@ public class MemoryMetadata
     }
 
     @Override
-    public synchronized ConnectorTableHandle getTableHandle(ConnectorSession session, SchemaTableName schemaTableName)
+    public ConnectorTableHandle getTableHandle(ConnectorSession session, SchemaTableName schemaTableName)
     {
         Long id = tableIds.get(schemaTableName);
         if (id == null) {
@@ -132,7 +133,7 @@ public class MemoryMetadata
     }
 
     @Override
-    public synchronized ConnectorTableMetadata getTableMetadata(ConnectorSession session, ConnectorTableHandle tableHandle)
+    public ConnectorTableMetadata getTableMetadata(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         MemoryTableHandle handle = (MemoryTableHandle) tableHandle;
         return tables.get(handle.getId()).getMetadata();
@@ -148,7 +149,7 @@ public class MemoryMetadata
     }
 
     @Override
-    public synchronized Map<String, ColumnHandle> getColumnHandles(ConnectorSession session, ConnectorTableHandle tableHandle)
+    public Map<String, ColumnHandle> getColumnHandles(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         MemoryTableHandle handle = (MemoryTableHandle) tableHandle;
         return tables.get(handle.getId())
@@ -157,7 +158,7 @@ public class MemoryMetadata
     }
 
     @Override
-    public synchronized ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle)
+    public ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle)
     {
         MemoryTableHandle handle = (MemoryTableHandle) tableHandle;
         return tables.get(handle.getId())
@@ -166,7 +167,7 @@ public class MemoryMetadata
     }
 
     @Override
-    public synchronized Map<SchemaTableName, List<ColumnMetadata>> listTableColumns(ConnectorSession session, SchemaTablePrefix prefix)
+    public Map<SchemaTableName, List<ColumnMetadata>> listTableColumns(ConnectorSession session, SchemaTablePrefix prefix)
     {
         return tables.values().stream()
                 .filter(table -> prefix.matches(table.getSchemaTableName()))
@@ -174,7 +175,7 @@ public class MemoryMetadata
     }
 
     @Override
-    public synchronized void dropTable(ConnectorSession session, ConnectorTableHandle tableHandle)
+    public void dropTable(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         MemoryTableHandle handle = (MemoryTableHandle) tableHandle;
         TableInfo info = tables.remove(handle.getId());
@@ -184,7 +185,7 @@ public class MemoryMetadata
     }
 
     @Override
-    public synchronized void renameTable(ConnectorSession session, ConnectorTableHandle tableHandle, SchemaTableName newTableName)
+    public void renameTable(ConnectorSession session, ConnectorTableHandle tableHandle, SchemaTableName newTableName)
     {
         checkSchemaExists(newTableName.getSchemaName());
         checkTableNotExists(newTableName);
@@ -200,38 +201,85 @@ public class MemoryMetadata
     }
 
     @Override
-    public synchronized void createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, boolean ignoreExisting)
+    public void createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, boolean ignoreExisting)
     {
+        tableMetadata.getProperties();
         ConnectorOutputTableHandle outputTableHandle = beginCreateTable(session, tableMetadata, Optional.empty());
         finishCreateTable(session, outputTableHandle, ImmutableList.of(), ImmutableList.of());
     }
 
     @Override
-    public synchronized MemoryOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout)
+    public MemoryOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout)
     {
         checkSchemaExists(tableMetadata.getTable().getSchemaName());
         checkTableNotExists(tableMetadata.getTable());
+
+        List<SortingColumn> sortedBy = MemoryTableProperties.getSortedBy(tableMetadata.getProperties());
+        if (sortedBy == null) {
+            sortedBy = Collections.emptyList();
+        }
+
+        if (sortedBy.size() > 1) {
+            throw new PrestoException(INVALID_TABLE_PROPERTY, "sort_by property currently only supports one column");
+        }
+
+        Set<String> sortedByColumnNames = new HashSet<>();
+        for (SortingColumn s : sortedBy) {
+            if (!sortedByColumnNames.add(s.getColumnName())) {
+                throw new PrestoException(INVALID_TABLE_PROPERTY, "duplicate column(s) in sort_by property");
+            }
+        }
+
+        List<String> indexColumns = MemoryTableProperties.getIndexedColumns(tableMetadata.getProperties());
+        if (indexColumns == null) {
+            indexColumns = Collections.emptyList();
+        }
+
+        Set<String> indexColumnNames = new HashSet<>();
+        for (String c : indexColumns) {
+            if (!indexColumnNames.add(c)) {
+                throw new PrestoException(INVALID_TABLE_PROPERTY, "duplicate column(s) in index_columns property");
+            }
+
+            if (sortedByColumnNames.contains(c)) {
+                throw new PrestoException(INVALID_TABLE_PROPERTY, "duplicate column(s) in sort_by and index_columns, sort_by columns are automatically indexed");
+            }
+        }
+
+        ImmutableList.Builder<ColumnInfo> columns = ImmutableList.builder();
+        Set<String> columnNames = new HashSet<>();
+        for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
+            ColumnMetadata column = tableMetadata.getColumns().get(i);
+            columns.add(new ColumnInfo(new MemoryColumnHandle(i, column.getType()), column.getName(), column.getType()));
+            columnNames.add(column.getName());
+        }
+
+        sortedByColumnNames.removeAll(columnNames);
+        if (!sortedByColumnNames.isEmpty()) {
+            throw new PrestoException(INVALID_TABLE_PROPERTY, "invalid column(s) in sort_by");
+        }
+
+        indexColumnNames.removeAll(columnNames);
+        if (!indexColumnNames.isEmpty()) {
+            throw new PrestoException(INVALID_TABLE_PROPERTY, "invalid column(s) in index_columns");
+        }
+
         long nextId = nextTableId.getAndIncrement();
         Set<Node> nodes = nodeManager.getRequiredWorkerNodes();
         checkState(!nodes.isEmpty(), "No Memory nodes available");
 
         long tableId = nextId;
 
-        ImmutableList.Builder<ColumnInfo> columns = ImmutableList.builder();
-        for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
-            ColumnMetadata column = tableMetadata.getColumns().get(i);
-            columns.add(new ColumnInfo(new MemoryColumnHandle(i, column.getType()), column.getName(), column.getType()));
-        }
-
+        List<ColumnInfo> columnInfos = columns.build();
         tableIds.put(tableMetadata.getTable(), tableId);
         tables.put(tableId, new TableInfo(
                 tableId,
                 tableMetadata.getTable().getSchemaName(),
                 tableMetadata.getTable().getTableName(),
-                columns.build(),
+                columnInfos,
                 new HashMap<>()));
 
-        return new MemoryOutputTableHandle(tableId, ImmutableSet.copyOf(tableIds.values()));
+        return new MemoryOutputTableHandle(tableId, ImmutableSet.copyOf(tableIds.values()), columnInfos, sortedBy, indexColumns);
     }
 
     private void checkSchemaExists(String schemaName)
@@ -252,7 +300,7 @@ public class MemoryMetadata
     }
 
     @Override
-    public synchronized Optional<ConnectorOutputMetadata> finishCreateTable(ConnectorSession session, ConnectorOutputTableHandle tableHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
+    public Optional<ConnectorOutputMetadata> finishCreateTable(ConnectorSession session, ConnectorOutputTableHandle tableHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
     {
         requireNonNull(tableHandle, "tableHandle is null");
         MemoryOutputTableHandle memoryOutputHandle = (MemoryOutputTableHandle) tableHandle;
@@ -262,14 +310,14 @@ public class MemoryMetadata
     }
 
     @Override
-    public synchronized MemoryInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
+    public MemoryInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         MemoryTableHandle memoryTableHandle = (MemoryTableHandle) tableHandle;
         return new MemoryInsertTableHandle(memoryTableHandle.getId(), ImmutableSet.copyOf(tableIds.values()));
     }
 
     @Override
-    public synchronized Optional<ConnectorOutputMetadata> finishInsert(ConnectorSession session, ConnectorInsertTableHandle insertHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
+    public Optional<ConnectorOutputMetadata> finishInsert(ConnectorSession session, ConnectorInsertTableHandle insertHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
     {
         requireNonNull(insertHandle, "insertHandle is null");
         MemoryInsertTableHandle memoryInsertHandle = (MemoryInsertTableHandle) insertHandle;
@@ -279,7 +327,7 @@ public class MemoryMetadata
     }
 
     @Override
-    public synchronized void createView(ConnectorSession session, SchemaTableName viewName, ConnectorViewDefinition definition, boolean replace)
+    public void createView(ConnectorSession session, SchemaTableName viewName, ConnectorViewDefinition definition, boolean replace)
     {
         checkSchemaExists(viewName.getSchemaName());
         if (tableIds.containsKey(viewName)) {
@@ -295,7 +343,7 @@ public class MemoryMetadata
     }
 
     @Override
-    public synchronized void dropView(ConnectorSession session, SchemaTableName viewName)
+    public void dropView(ConnectorSession session, SchemaTableName viewName)
     {
         if (views.remove(viewName) == null) {
             throw new ViewNotFoundException(viewName);
@@ -303,7 +351,7 @@ public class MemoryMetadata
     }
 
     @Override
-    public synchronized List<SchemaTableName> listViews(ConnectorSession session, Optional<String> schemaName)
+    public List<SchemaTableName> listViews(ConnectorSession session, Optional<String> schemaName)
     {
         return views.keySet().stream()
                 .filter(viewName -> schemaName.map(viewName.getSchemaName()::equals).orElse(true))
@@ -311,14 +359,14 @@ public class MemoryMetadata
     }
 
     @Override
-    public synchronized Map<SchemaTableName, ConnectorViewDefinition> getViews(ConnectorSession session, Optional<String> schemaName)
+    public Map<SchemaTableName, ConnectorViewDefinition> getViews(ConnectorSession session, Optional<String> schemaName)
     {
         SchemaTablePrefix prefix = schemaName.map(SchemaTablePrefix::new).orElseGet(SchemaTablePrefix::new);
         return ImmutableMap.copyOf(Maps.filterKeys(views, prefix::matches));
     }
 
     @Override
-    public synchronized Optional<ConnectorViewDefinition> getView(ConnectorSession session, SchemaTableName viewName)
+    public Optional<ConnectorViewDefinition> getView(ConnectorSession session, SchemaTableName viewName)
     {
         return Optional.ofNullable(views.get(viewName));
     }
@@ -358,29 +406,49 @@ public class MemoryMetadata
         return ImmutableList.copyOf(tables.get(tableId).getDataFragments().values());
     }
 
-    @Override
-    public Optional<LimitApplicationResult<ConnectorTableHandle>> applyLimit(ConnectorSession session, ConnectorTableHandle handle, long limit)
-    {
-        MemoryTableHandle table = (MemoryTableHandle) handle;
+    // TODO: disabled for now
+//    @Override
+//    public Optional<LimitApplicationResult<ConnectorTableHandle>> applyLimit(ConnectorSession session, ConnectorTableHandle handle, long limit)
+//    {
+//        MemoryTableHandle table = (MemoryTableHandle) handle;
+//
+//        if (table.getLimit().isPresent() && table.getLimit().getAsLong() <= limit) {
+//            return Optional.empty();
+//        }
+//
+//        return Optional.of(new LimitApplicationResult<>(
+//                new MemoryTableHandle(table.getId(), OptionalLong.of(limit), OptionalDouble.empty(), table.getPredicate()),
+//                true));
+//    }
 
-        if (table.getLimit().isPresent() && table.getLimit().getAsLong() <= limit) {
+    // TODO: disabled for now
+//    @Override
+//    public Optional<ConnectorTableHandle> applySample(ConnectorSession session, ConnectorTableHandle handle, SampleType sampleType, double sampleRatio)
+//    {
+//        MemoryTableHandle table = (MemoryTableHandle) handle;
+//
+//        if ((table.getSampleRatio().isPresent() && table.getSampleRatio().getAsDouble() == sampleRatio) || sampleType != SYSTEM || table.getLimit().isPresent()) {
+//            return Optional.empty();
+//        }
+//
+//        return Optional.of(new MemoryTableHandle(table.getId(), table.getLimit(), OptionalDouble.of(table.getSampleRatio().orElse(1) * sampleRatio), table.getPredicate()));
+//    }
+
+    @Override
+    public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle handle, Constraint constraint)
+    {
+        if (constraint.getSummary().isAll()) {
             return Optional.empty();
         }
 
-        return Optional.of(new LimitApplicationResult<>(
-                new MemoryTableHandle(table.getId(), OptionalLong.of(limit), OptionalDouble.empty(), table.getPredicate()),
-                true));
-    }
+        MemoryTableHandle memoryTableHandle = (MemoryTableHandle) handle;
 
-    @Override
-    public Optional<ConnectorTableHandle> applySample(ConnectorSession session, ConnectorTableHandle handle, SampleType sampleType, double sampleRatio)
-    {
-        MemoryTableHandle table = (MemoryTableHandle) handle;
+        MemoryTableHandle newMemoryTableHandle = new MemoryTableHandle(
+                memoryTableHandle.getId(),
+                memoryTableHandle.getLimit(),
+                memoryTableHandle.getSampleRatio(),
+                constraint.getSummary());
 
-        if ((table.getSampleRatio().isPresent() && table.getSampleRatio().getAsDouble() == sampleRatio) || sampleType != SYSTEM || table.getLimit().isPresent()) {
-            return Optional.empty();
-        }
-
-        return Optional.of(new MemoryTableHandle(table.getId(), table.getLimit(), OptionalDouble.of(table.getSampleRatio().orElse(1) * sampleRatio), table.getPredicate()));
+        return Optional.of(new ConstraintApplicationResult<>(newMemoryTableHandle, constraint.getSummary()));
     }
 }

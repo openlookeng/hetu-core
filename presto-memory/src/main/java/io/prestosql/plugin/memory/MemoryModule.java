@@ -16,6 +16,7 @@ package io.prestosql.plugin.memory;
 import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
+import io.prestosql.plugin.memory.data.MemoryPagesStore;
 import io.prestosql.spi.NodeManager;
 import io.prestosql.spi.type.TypeManager;
 
@@ -40,12 +41,14 @@ public class MemoryModule
         binder.bind(TypeManager.class).toInstance(typeManager);
         binder.bind(NodeManager.class).toInstance(nodeManager);
 
-        binder.bind(MemoryConnector.class).in(Scopes.SINGLETON);
         binder.bind(MemoryMetadata.class).in(Scopes.SINGLETON);
         binder.bind(MemorySplitManager.class).in(Scopes.SINGLETON);
         binder.bind(MemoryPagesStore.class).in(Scopes.SINGLETON);
         binder.bind(MemoryPageSourceProvider.class).in(Scopes.SINGLETON);
         binder.bind(MemoryPageSinkProvider.class).in(Scopes.SINGLETON);
+        binder.bind(MemoryTableProperties.class).in(Scopes.SINGLETON);
+        binder.bind(MemoryPlanOptimizer.class).in(Scopes.SINGLETON);
+        binder.bind(MemoryConnector.class).in(Scopes.SINGLETON);
         configBinder(binder).bindConfig(MemoryConfig.class);
     }
 }

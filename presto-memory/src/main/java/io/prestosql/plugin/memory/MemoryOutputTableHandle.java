@@ -17,6 +17,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.prestosql.spi.connector.ConnectorOutputTableHandle;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -27,14 +29,28 @@ public final class MemoryOutputTableHandle
 {
     private final long table;
     private final Set<Long> activeTableIds;
+    private final List<ColumnInfo> columns;
+    private final List<SortingColumn> sortedBy;
+    private final List<String> indexColumns;
 
     @JsonCreator
     public MemoryOutputTableHandle(
             @JsonProperty("table") long table,
-            @JsonProperty("activeTableIds") Set<Long> activeTableIds)
+            @JsonProperty("activeTableIds") Set<Long> activeTableIds,
+            @JsonProperty("columns") List<ColumnInfo> columns,
+            @JsonProperty("sortedBy") List<SortingColumn> sortedBy,
+            @JsonProperty("indexColumns") List<String> indexColumns)
     {
         this.table = requireNonNull(table, "table is null");
         this.activeTableIds = requireNonNull(activeTableIds, "activeTableIds is null");
+        this.columns = requireNonNull(columns, "columns is null");
+        this.sortedBy = requireNonNull(sortedBy, "sortedBy is null");
+        this.indexColumns = requireNonNull(indexColumns, "indexColumns is null");
+    }
+
+    public MemoryOutputTableHandle(long table, Set<Long> activeTableIds)
+    {
+        this(table, activeTableIds, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     }
 
     @JsonProperty
@@ -49,12 +65,32 @@ public final class MemoryOutputTableHandle
         return activeTableIds;
     }
 
+    @JsonProperty
+    public List<SortingColumn> getSortedBy()
+    {
+        return sortedBy;
+    }
+
+    @JsonProperty
+    public List<ColumnInfo> getColumns()
+    {
+        return columns;
+    }
+
+    @JsonProperty
+    public List<String> getIndexColumns()
+    {
+        return indexColumns;
+    }
+
     @Override
     public String toString()
     {
         return toStringHelper(this)
                 .add("table", table)
                 .add("activeTableIds", activeTableIds)
+                .add("sortedBy", sortedBy)
+                .add("indexColumns", indexColumns)
                 .toString();
     }
 }
