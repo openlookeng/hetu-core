@@ -69,12 +69,12 @@ public class TestIndexCache
         Lifespan lifespan = mock(Lifespan.class);
         split = new Split(catalogName, connectorSplit, lifespan);
         when(connectorSplit.getFilePath()).thenReturn(testPath);
+        when(connectorSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
     }
 
     @Test
     public void testIndexCacheGetIndices() throws Exception
     {
-        when(connectorSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
         IndexMetadata indexMetadata = mock(IndexMetadata.class);
         when(indexMetadata.getLastModifiedTime()).thenReturn(testLastModifiedTime);
         Index index = mock(Index.class);
@@ -99,7 +99,6 @@ public class TestIndexCache
     @Test
     public void testIndexCacheThrowsExecutionException() throws Exception
     {
-        when(connectorSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
         IndexMetadata indexMetadata = mock(IndexMetadata.class);
         when(indexMetadata.getLastModifiedTime()).then(new Returns(testLastModifiedTime));
 
@@ -120,7 +119,6 @@ public class TestIndexCache
     @Test
     public void testExpiredCacheIndices() throws Exception
     {
-        when(connectorSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
         IndexMetadata indexMetadata = mock(IndexMetadata.class);
         when(indexMetadata.getLastModifiedTime()).thenReturn(testLastModifiedTime);
         Index index = mock(Index.class);
@@ -149,20 +147,19 @@ public class TestIndexCache
     @Test
     public void testIndexCacheEviction() throws Exception
     {
-        when(connectorSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
         IndexCacheLoader indexCacheLoader = mock(IndexCacheLoader.class);
         IndexCache indexCache = new IndexCache(indexCacheLoader, new NoOpIndexClient());
 
-        //get index for split1
+        // get index for split1
         IndexMetadata indexMetadata1 = mock(IndexMetadata.class);
         when(indexMetadata1.getLastModifiedTime()).thenReturn(testLastModifiedTime);
         Index index1 = mock(Index.class);
         when(indexMetadata1.getIndex()).thenReturn(index1);
         when(index1.getMemoryUsage()).thenReturn(new DataSize(2, KILOBYTE).toBytes());
 
-        List<IndexMetadata> expectedIndices = new LinkedList<>();
-        expectedIndices.add(indexMetadata1);
-        when(indexCacheLoader.load(any())).then(new Returns(expectedIndices));
+        List<IndexMetadata> expectedIndices1 = new LinkedList<>();
+        expectedIndices1.add(indexMetadata1);
+        when(indexCacheLoader.load(any())).then(new Returns(expectedIndices1));
 
         // each index is has memory usage of 2, and limit is 2*types of idx, so all should be loaded
         List<IndexMetadata> actualSplitIndex = indexCache.getIndices(table, column, split);
@@ -173,7 +170,7 @@ public class TestIndexCache
         assertEquals(actualSplitIndex.get(0), indexMetadata1);
         assertEquals(indexCache.getCacheSize(), numberOfIndexTypes);
 
-        //get index for split2
+        // get index for split2
         when(connectorSplit.getFilePath()).thenReturn(testPath2);
         IndexMetadata indexMetadata2 = mock(IndexMetadata.class);
         when(indexMetadata2.getLastModifiedTime()).thenReturn(testLastModifiedTime);
@@ -185,6 +182,7 @@ public class TestIndexCache
         List<IndexMetadata> expectedIndices2 = new LinkedList<>();
         expectedIndices2.add(indexMetadata2);
         when(indexCacheLoader.load(any())).then(new Returns(expectedIndices2));
+
         actualSplitIndex = indexCache.getIndices(table, column, split);
         assertEquals(actualSplitIndex.size(), 0);
         assertEquals(indexCache.getCacheSize(), numberOfIndexTypes);
@@ -194,7 +192,7 @@ public class TestIndexCache
         assertEquals(actualSplitIndex.get(0), indexMetadata2);
         assertEquals(indexCache.getCacheSize(), numberOfIndexTypes);
 
-        //get index for split1
+        // get index for split1
         when(connectorSplit.getFilePath()).thenReturn(testPath);
         actualSplitIndex = indexCache.getIndices(table, column, split);
         assertEquals(actualSplitIndex.size(), 0);
