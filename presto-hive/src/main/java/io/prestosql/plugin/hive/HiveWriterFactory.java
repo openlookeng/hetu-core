@@ -353,7 +353,7 @@ public class HiveWriterFactory
         else {
             // Snapshot: don't use UUID. File name needs to be deterministic.
             if (isSnapshotEnabled) {
-                fileName = String.format("%s_%d_%d", queryId, session.getTaskId().getAsInt(), session.getDriverId().getAsInt());
+                fileName = String.format("%s_%d_%d_%d", queryId, session.getTaskId().getAsInt(), session.getPipelineId().getAsInt(), session.getDriverId().getAsInt());
             }
             else {
                 fileName = queryId + "_" + randomUUID();

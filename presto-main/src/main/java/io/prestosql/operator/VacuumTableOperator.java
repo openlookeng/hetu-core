@@ -22,7 +22,7 @@ import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.slice.Slice;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
-import io.prestosql.execution.DriverTaskId;
+import io.prestosql.execution.DriverPipelineTaskId;
 import io.prestosql.execution.TaskId;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.metadata.Split;
@@ -154,7 +154,7 @@ public class VacuumTableOperator
 
         private ConnectorPageSink createPageSink(DriverContext driverContext)
         {
-            Optional<DriverTaskId> driverTaskId = Optional.of(new DriverTaskId(taskId, driverContext.getDriverId()));
+            Optional<DriverPipelineTaskId> driverTaskId = Optional.of(new DriverPipelineTaskId(taskId, driverContext.getPipelineContext().getPipelineId(), driverContext.getDriverId()));
             if (writerTarget instanceof TableWriterNode.VacuumTarget) {
                 return pageSinkManager.createPageSink(session, driverTaskId, ((TableWriterNode.VacuumTarget) writerTarget).getHandle());
             }

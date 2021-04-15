@@ -61,6 +61,9 @@ public class MarkerSplitSource
     private boolean sourceExhausted;
     private final List<Split> splitBuffer = new ArrayList<>();
     private int bufferPosition;
+    // not the first actual marker, the initial marker is sent at first with snapshotId 0 for every
+    // split source to trigger creation of tasks so stages enter SCHEDULING_SPLITS state.
+    private boolean sentInitialMarker;
     private boolean sentFinalMarker;
 
     // Keep track of how many splits are before each snapshot. Key is snapshotId.
@@ -104,16 +107,26 @@ public class MarkerSplitSource
         checkArgument(maxSize > 0, "Cannot fetch a batch of zero size");
 
         if (resumingSnapshotId.isPresent()) {
-            long snapshotId = resumingSnapshotId.getAsLong();
-            resumingSnapshotId = OptionalLong.empty();
-            Split marker = new Split(getCatalogName(), MarkerSplit.resumeSplit(getCatalogName(), snapshotId), lifespan);
-            List<Split> splits = Collections.singletonList(marker);
+            sentInitialMarker = true;
             boolean lastBatch = sourceExhausted && bufferPosition == splitBuffer.size();
             if (lastBatch) {
                 sentFinalMarker = true;
             }
+
+            long snapshotId = resumingSnapshotId.getAsLong();
+            resumingSnapshotId = OptionalLong.empty();
+            Split marker = new Split(getCatalogName(), MarkerSplit.resumeSplit(getCatalogName(), snapshotId), lifespan);
+            List<Split> splits = Collections.singletonList(marker);
             LOG.debug("Sending out resuming marker %d after %d splits for source: %s (%s)", snapshotId, bufferPosition, getCatalogName(), toString());
             return Futures.immediateFuture(new SplitBatch(splits, lastBatch));
+        }
+
+        if (!sentInitialMarker) {
+            sentInitialMarker = true;
+            // Send initial empty marker, to trigger creation of tasks. This marker is ignored by SqlTaskExecution.
+            Split marker = new Split(getCatalogName(), MarkerSplit.snapshotSplit(getCatalogName(), 0), lifespan);
+            SplitBatch batch = new SplitBatch(Collections.singletonList(marker), false);
+            return Futures.immediateFuture(batch);
         }
 
         if (sourceExhausted && bufferPosition == splitBuffer.size()) {

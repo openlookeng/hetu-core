@@ -14,7 +14,7 @@
 package io.prestosql.split;
 
 import io.prestosql.Session;
-import io.prestosql.execution.DriverTaskId;
+import io.prestosql.execution.DriverPipelineTaskId;
 import io.prestosql.metadata.DeletesAsInsertTableHandle;
 import io.prestosql.metadata.InsertTableHandle;
 import io.prestosql.metadata.OutputTableHandle;
@@ -51,7 +51,7 @@ public class PageSinkManager
     }
 
     @Override
-    public ConnectorPageSink createPageSink(Session session, Optional<DriverTaskId> taskId, OutputTableHandle tableHandle)
+    public ConnectorPageSink createPageSink(Session session, Optional<DriverPipelineTaskId> taskId, OutputTableHandle tableHandle)
     {
         // assumes connectorId and catalog are the same
         ConnectorSession connectorSession = session.toPerTaskConnectorSession(tableHandle.getCatalogName(), taskId);
@@ -59,7 +59,7 @@ public class PageSinkManager
     }
 
     @Override
-    public ConnectorPageSink createPageSink(Session session, Optional<DriverTaskId> taskId, InsertTableHandle tableHandle)
+    public ConnectorPageSink createPageSink(Session session, Optional<DriverPipelineTaskId> taskId, InsertTableHandle tableHandle)
     {
         // assumes connectorId and catalog are the same
         ConnectorSession connectorSession = session.toPerTaskConnectorSession(tableHandle.getCatalogName(), taskId);
@@ -67,7 +67,7 @@ public class PageSinkManager
     }
 
     @Override
-    public ConnectorPageSink createPageSink(Session session, Optional<DriverTaskId> taskId, UpdateTableHandle tableHandle)
+    public ConnectorPageSink createPageSink(Session session, Optional<DriverPipelineTaskId> taskId, UpdateTableHandle tableHandle)
     {
         // assumes connectorId and catalog are the same
         ConnectorSession connectorSession = session.toPerTaskConnectorSession(tableHandle.getCatalogName(), taskId);
@@ -75,7 +75,7 @@ public class PageSinkManager
     }
 
     @Override
-    public ConnectorPageSink createPageSink(Session session, Optional<DriverTaskId> taskId, DeletesAsInsertTableHandle tableHandle)
+    public ConnectorPageSink createPageSink(Session session, Optional<DriverPipelineTaskId> taskId, DeletesAsInsertTableHandle tableHandle)
     {
         // assumes connectorId and catalog are the same
         ConnectorSession connectorSession = session.toPerTaskConnectorSession(tableHandle.getCatalogName(), taskId);
@@ -83,7 +83,7 @@ public class PageSinkManager
     }
 
     @Override
-    public ConnectorPageSink createPageSink(Session session, Optional<DriverTaskId> taskId, VacuumTableHandle tableHandle)
+    public ConnectorPageSink createPageSink(Session session, Optional<DriverPipelineTaskId> taskId, VacuumTableHandle tableHandle)
     {
         // assumes connectorId and catalog are the same
         ConnectorSession connectorSession = session.toPerTaskConnectorSession(tableHandle.getCatalogName(), taskId);
