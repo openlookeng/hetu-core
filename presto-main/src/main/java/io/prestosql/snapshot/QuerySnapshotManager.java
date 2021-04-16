@@ -50,7 +50,6 @@ import static java.util.Objects.requireNonNull;
 public class QuerySnapshotManager
 {
     private static final Logger LOG = Logger.get(QuerySnapshotManager.class);
-    private static final Runnable NO_OP = () -> {};
 
     private final QueryId queryId;
     private final SnapshotUtils snapshotUtils;
@@ -72,7 +71,7 @@ public class QuerySnapshotManager
     private Optional<Timer> retryTimer = Optional.empty();
     // How many numbers resume has been attempted for this query
     private long retryCount;
-    private Runnable rescheduler = NO_OP; // No-op by default. SqlQueryScheduler will set it.
+    private Runnable rescheduler; // SqlQueryScheduler will set it.
 
     public QuerySnapshotManager(QueryId queryId, SnapshotUtils snapshotUtils, Session session)
     {
@@ -220,7 +219,7 @@ public class QuerySnapshotManager
         }
         else {
             LOG.warn("Failed to restore snapshot for %s, snapshot %d", queryId.getId(), restoreResult.getSnapshotId());
-            rescheduler.run();
+            cancelToResume();
         }
     }
 
@@ -246,7 +245,7 @@ public class QuerySnapshotManager
                         return;
                     }
                 }
-                rescheduler.run();
+                cancelToResume();
             }
         };
         Timer timer = new Timer();
@@ -453,12 +452,12 @@ public class QuerySnapshotManager
     }
 
     // Returns true if cancel-to-resume is triggered; returns false if this was a no-op
-    public boolean cancelToResume()
+    public synchronized void cancelToResume()
     {
-        if (rescheduler == NO_OP) {
-            return false;
+        // If rescheduler is null, then the query must be in the process o being (re)scheduled
+        if (rescheduler != null) {
+            rescheduler.run();
+            rescheduler = null;
         }
-        rescheduler.run();
-        return true;
     }
 }

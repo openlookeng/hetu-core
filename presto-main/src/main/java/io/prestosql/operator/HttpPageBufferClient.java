@@ -424,6 +424,13 @@ public final class HttpPageBufferClient
                             backoff.getFailureCount(),
                             backoff.getFailureDuration().convertTo(SECONDS),
                             backoff.getFailureRequestTimeTotal().convertTo(SECONDS));
+                    if (querySnapshotManager != null) {
+                        // Snapshot: recover from remote server errors
+                        log.debug(t, "Snapshot: remote task failed with resumable error: %s", message);
+                        querySnapshotManager.cancelToResume();
+                        handleFailure(t, resultFuture);
+                        return;
+                    }
                     t = new PageTransportTimeoutException(fromUri(uri), message, t);
                 }
                 handleFailure(t, resultFuture);
@@ -605,9 +612,8 @@ public final class HttpPageBufferClient
                         // Snapshot: for internal server errors on the worker, treat as resumable error.
                         if (querySnapshotManager.isCoordinator() && response.getStatusCode() >= 500) {
                             log.debug("Expected response code to be 200, but was %s:%n%s", response.getStatusCode(), body.toString());
-                            if (querySnapshotManager.cancelToResume()) {
-                                return createEmptyPagesResponse(getTaskInstanceId(response), getToken(response), getNextToken(response), getComplete(response));
-                            }
+                            querySnapshotManager.cancelToResume();
+                            return createEmptyPagesResponse(getTaskInstanceId(response), getToken(response), getNextToken(response), getComplete(response));
                         }
                     }
                     throw new PageTransportErrorException(format("Expected response code to be 200, but was %s:%n%s", response.getStatusCode(), body.toString()));

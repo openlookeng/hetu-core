@@ -66,6 +66,7 @@ import io.prestosql.operator.JoinOperatorFactory;
 import io.prestosql.operator.JoinOperatorFactory.OuterOperatorFactoryResult;
 import io.prestosql.operator.LimitOperator.LimitOperatorFactory;
 import io.prestosql.operator.LocalPlannerAware;
+import io.prestosql.operator.LookupJoinOperatorFactory;
 import io.prestosql.operator.LookupJoinOperators;
 import io.prestosql.operator.LookupOuterOperator.LookupOuterOperatorFactory;
 import io.prestosql.operator.LookupSourceFactory;
@@ -3115,7 +3116,13 @@ public class LocalExecutionPlanner
                         operatorFactories,
                         subContext.getDriverInstanceCount(),
                         exchangeSourcePipelineExecutionStrategy);
+
+                // Snapshot: total number of sinks are the expected number of input channels for local-exchange source
                 totalSinkCount += subContext.getDriverInstanceCount().orElse(1);
+                // For each outer-join, also need to include the lookup-outer driver as a sink
+                totalSinkCount += operatorFactories.stream()
+                        .filter(factory -> factory instanceof LookupJoinOperatorFactory && ((LookupJoinOperatorFactory) factory).createOuterOperatorFactory().isPresent())
+                        .count();
             }
 
             // the main driver is not an input... the exchange sources are the input for the plan
