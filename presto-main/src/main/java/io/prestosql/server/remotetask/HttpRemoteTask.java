@@ -723,7 +723,7 @@ public final class HttpRemoteTask
                 }
                 finally {
                     if (!getTaskInfo().getTaskStatus().getState().isDone()) {
-                        cleanUpLocally(null);
+                        cleanUpLocally();
                     }
                 }
             }
@@ -733,20 +733,20 @@ public final class HttpRemoteTask
             {
                 if (cancelledToResume.get()) {
                     // Remote worker is probably unreachable. Don't make additional attempts.
-                    cleanUpLocally(CANCELED_TO_RESUME);
+                    cleanUpLocally();
                     return;
                 }
 
                 if (t instanceof RejectedExecutionException && httpClient.isClosed()) {
                     logError(t, "Unable to %s task at %s. HTTP client is closed.", action, request.getUri());
-                    cleanUpLocally(null);
+                    cleanUpLocally();
                     return;
                 }
 
                 // record failure
                 if (cleanupBackoff.failure()) {
                     logError(t, "Unable to %s task at %s. Back off depleted.", action, request.getUri());
-                    cleanUpLocally(null);
+                    cleanUpLocally();
                     return;
                 }
 
@@ -760,7 +760,7 @@ public final class HttpRemoteTask
                 }
             }
 
-            private void cleanUpLocally(TaskState failState)
+            private void cleanUpLocally()
             {
                 // Update the taskInfo with the new taskStatus.
 
@@ -780,8 +780,10 @@ public final class HttpRemoteTask
                 // indicating that the stats may not reflect the final stats on the worker.
 
                 TaskStatus taskStatus = getTaskStatus();
-                if (failState != null) {
-                    taskStatus = TaskStatus.failWith(taskStatus, failState, ImmutableList.of());
+                if (cancelledToResume.get()) {
+                    // When the task is cancelled to resume, then make sure it gets the new state, so query can start resuming.
+                    // Check for task state is in QueryInfo#areAllStagesDone.
+                    taskStatus = TaskStatus.failWith(taskStatus, CANCELED_TO_RESUME, ImmutableList.of());
                 }
                 updateTaskInfo(getTaskInfo().withTaskStatus(taskStatus));
             }

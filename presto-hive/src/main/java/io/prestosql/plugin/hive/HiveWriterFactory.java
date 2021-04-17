@@ -911,7 +911,8 @@ public class HiveWriterFactory
     static String removeSnapshotFileName(String fileName, String queryId)
     {
         String identifier = "_snapshot_" + queryId;
-        return fileName.substring(0, fileName.indexOf(identifier));
+        int index = fileName.indexOf(identifier);
+        return index > 0 ? fileName.substring(0, index) : fileName;
     }
 
     private String toSnapshotSubFile(String path)
