@@ -21,7 +21,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.slice.Slice;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
-import io.prestosql.execution.DriverTaskId;
+import io.prestosql.execution.DriverPipelineTaskId;
 import io.prestosql.execution.TaskId;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.OperationTimer.OperationTiming;
@@ -122,7 +122,7 @@ public class TableWriterOperator
 
         private ConnectorPageSink createPageSink(DriverContext driverContext)
         {
-            Optional<DriverTaskId> driverTaskId = Optional.of(new DriverTaskId(taskId, driverContext.getDriverId()));
+            Optional<DriverPipelineTaskId> driverTaskId = Optional.of(new DriverPipelineTaskId(taskId, driverContext.getPipelineContext().getPipelineId(), driverContext.getDriverId()));
             if (target instanceof CreateTarget) {
                 return pageSinkManager.createPageSink(session, driverTaskId, ((CreateTarget) target).getHandle());
             }

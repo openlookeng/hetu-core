@@ -14,7 +14,7 @@
 package io.prestosql.split;
 
 import io.prestosql.Session;
-import io.prestosql.execution.DriverTaskId;
+import io.prestosql.execution.DriverPipelineTaskId;
 import io.prestosql.metadata.DeletesAsInsertTableHandle;
 import io.prestosql.metadata.InsertTableHandle;
 import io.prestosql.metadata.OutputTableHandle;
@@ -26,13 +26,13 @@ import java.util.Optional;
 
 public interface PageSinkProvider
 {
-    ConnectorPageSink createPageSink(Session session, Optional<DriverTaskId> taskId, OutputTableHandle tableHandle);
+    ConnectorPageSink createPageSink(Session session, Optional<DriverPipelineTaskId> taskId, OutputTableHandle tableHandle);
 
-    ConnectorPageSink createPageSink(Session session, Optional<DriverTaskId> taskId, InsertTableHandle tableHandle);
+    ConnectorPageSink createPageSink(Session session, Optional<DriverPipelineTaskId> taskId, InsertTableHandle tableHandle);
 
-    ConnectorPageSink createPageSink(Session session, Optional<DriverTaskId> taskId, DeletesAsInsertTableHandle tableHandle);
+    ConnectorPageSink createPageSink(Session session, Optional<DriverPipelineTaskId> taskId, DeletesAsInsertTableHandle tableHandle);
 
-    ConnectorPageSink createPageSink(Session session, Optional<DriverTaskId> taskId, UpdateTableHandle tableHandle);
+    ConnectorPageSink createPageSink(Session session, Optional<DriverPipelineTaskId> taskId, UpdateTableHandle tableHandle);
 
-    ConnectorPageSink createPageSink(Session session, Optional<DriverTaskId> taskId, VacuumTableHandle tableHandle);
+    ConnectorPageSink createPageSink(Session session, Optional<DriverPipelineTaskId> taskId, VacuumTableHandle tableHandle);
 }

@@ -574,9 +574,10 @@ public class SqlQueryExecution
         resetOutputData(plan, snapshotId);
 
         // Create a new scheduler, to schedule new stages and tasks
+        Map<Integer, Integer> parallelSources = new HashMap<>();
         DistributedExecutionPlanner distributedExecutionPlanner = new DistributedExecutionPlanner(splitManager, metadata);
         StageExecutionPlan executionPlan = distributedExecutionPlanner.plan(plan.getRoot(), stateMachine.getSession(),
-                RESUME, snapshotId.isPresent() ? snapshotId.getAsLong() : null, announcer.currentSnapshotId());
+                RESUME, snapshotId.isPresent() ? snapshotId.getAsLong() : null, announcer.currentSnapshotId(), parallelSources);
 
         // build the stage execution objects (this doesn't schedule execution)
         return createSqlQueryScheduler(
@@ -600,7 +601,8 @@ public class SqlQueryExecution
                 heuristicIndexerManager,
                 snapshotManager,
                 // Require same number of tasks to be scheduled, but do not require it if starting from beginning
-                snapshotId.isPresent() ? queryScheduler.get().getStageTaskCounts() : null);
+                snapshotId.isPresent() ? queryScheduler.get().getStageTaskCounts() : null,
+                parallelSources);
     }
 
     private void resetOutputData(PlanRoot plan, OptionalLong snapshotId)
@@ -801,14 +803,22 @@ public class SqlQueryExecution
         DistributedExecutionPlanner distributedPlanner = new DistributedExecutionPlanner(splitManager, metadata);
         StageExecutionPlan outputStageExecutionPlan;
         Session session = stateMachine.getSession();
+        Map<Integer, Integer> parallelSources;
         if (SystemSessionProperties.isSnapshotEnabled(session)) {
+            // Snapshot: UNION statement creates situation where multiple table scan stages communicate with the
+            // same ExchangeOperator, we need to be aware of that in order to adjust the taskCount on Markers coming from
+            // those table scan stages to have successful snapshots.
+            // The key represents the table scan stage's stageId and value represents how many table scan stages
+            // are in parallel in total.
+            parallelSources = new HashMap<>();
             // Snapshot: need to plan different when snapshot is enabled.
             // See the "plan" method for difference between the different modes.
             MarkerAnnouncer announcer = splitManager.getMarkerAnnouncer(session);
-            outputStageExecutionPlan = distributedPlanner.plan(plan.getRoot(), session, SNAPSHOT, null, announcer.currentSnapshotId());
+            outputStageExecutionPlan = distributedPlanner.plan(plan.getRoot(), session, SNAPSHOT, null, announcer.currentSnapshotId(), parallelSources);
         }
         else {
-            outputStageExecutionPlan = distributedPlanner.plan(plan.getRoot(), session, NORMAL, null, 0);
+            parallelSources = null;
+            outputStageExecutionPlan = distributedPlanner.plan(plan.getRoot(), session, NORMAL, null, 0, null);
         }
         stateMachine.endDistributedPlanning();
 
@@ -853,7 +863,8 @@ public class SqlQueryExecution
                 dynamicFilterService,
                 heuristicIndexerManager,
                 snapshotManager,
-                null);
+                null,
+                parallelSources);
 
         queryScheduler.set(scheduler);
 

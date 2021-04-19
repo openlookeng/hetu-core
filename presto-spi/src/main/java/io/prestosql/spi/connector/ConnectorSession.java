@@ -57,6 +57,11 @@ public interface ConnectorSession
         return OptionalInt.empty();
     }
 
+    default OptionalInt getPipelineId()
+    {
+        return OptionalInt.empty();
+    }
+
     //for hive supporting ACID tables.
     default OptionalInt getDriverId()
     {

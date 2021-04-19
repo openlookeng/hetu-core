@@ -443,9 +443,13 @@ public class SqlTaskExecution
         for (ScheduledSplit split : readySplits) {
             if (split.getSplit().getConnectorSplit() instanceof MarkerSplit) {
                 MarkerSplit marker = (MarkerSplit) split.getSplit().getConnectorSplit();
-                // All previous sources have been processed fully. Broadcast the marker.
-                DriverSplitRunnerFactory partitionedDriverRunnerFactory = driverRunnerFactoriesWithSplitLifeCycle.get(source.getPlanNodeId());
-                partitionedDriverRunnerFactory.broadcastMarker(split.getSplit().getLifespan(), marker.toMarkerPage());
+                // If snapshot id is 0, then it's the initial marker to trigger task creation.
+                // It is not meant to be used to capture snapshots. Ignore it.
+                if (marker.getSnapshotId() != 0) {
+                    // All previous sources have been processed fully. Broadcast the marker.
+                    DriverSplitRunnerFactory partitionedDriverRunnerFactory = driverRunnerFactoriesWithSplitLifeCycle.get(source.getPlanNodeId());
+                    partitionedDriverRunnerFactory.broadcastMarker(split.getSplit().getLifespan(), marker.toMarkerPage());
+                }
             }
             else {
                 dataSplits.add(split);

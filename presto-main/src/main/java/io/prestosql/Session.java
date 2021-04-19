@@ -19,7 +19,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
-import io.prestosql.execution.DriverTaskId;
+import io.prestosql.execution.DriverPipelineTaskId;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.PrestoException;
@@ -472,7 +472,7 @@ public final class Session
                 sessionPropertyManager);
     }
 
-    public ConnectorSession toPerTaskConnectorSession(CatalogName catalogName, Optional<DriverTaskId> driverTaskId)
+    public ConnectorSession toPerTaskConnectorSession(CatalogName catalogName, Optional<DriverPipelineTaskId> driverTaskId)
     {
         requireNonNull(catalogName, "catalogName is null");
 

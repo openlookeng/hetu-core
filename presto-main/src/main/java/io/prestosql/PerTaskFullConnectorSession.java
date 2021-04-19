@@ -14,7 +14,7 @@
  */
 package io.prestosql;
 
-import io.prestosql.execution.DriverTaskId;
+import io.prestosql.execution.DriverPipelineTaskId;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.security.ConnectorIdentity;
@@ -29,7 +29,7 @@ import java.util.OptionalInt;
 public class PerTaskFullConnectorSession
         extends FullConnectorSession
 {
-    private final Optional<DriverTaskId> driverTaskId;
+    private final Optional<DriverPipelineTaskId> driverPipelineTaskId;
 
     public PerTaskFullConnectorSession(Session session,
                                        ConnectorIdentity identity,
@@ -37,16 +37,25 @@ public class PerTaskFullConnectorSession
                                        CatalogName catalogName,
                                        String catalog,
                                        SessionPropertyManager sessionPropertyManager,
-                                       Optional<DriverTaskId> taskId)
+                                       Optional<DriverPipelineTaskId> taskId)
     {
         super(session, identity, properties, catalogName, catalog, sessionPropertyManager);
-        this.driverTaskId = taskId;
+        this.driverPipelineTaskId = taskId;
     }
 
     public OptionalInt getTaskId()
     {
-        if (driverTaskId.isPresent() && driverTaskId.get().getTaskId().isPresent()) {
-            return OptionalInt.of(driverTaskId.get().getTaskId().get().getId());
+        if (driverPipelineTaskId.isPresent() && driverPipelineTaskId.get().getTaskId().isPresent()) {
+            return OptionalInt.of(driverPipelineTaskId.get().getTaskId().get().getId());
+        }
+        return OptionalInt.empty();
+    }
+
+    @Override
+    public OptionalInt getPipelineId()
+    {
+        if (driverPipelineTaskId.isPresent()) {
+            return OptionalInt.of(driverPipelineTaskId.get().getPipelineId());
         }
         return OptionalInt.empty();
     }
@@ -54,8 +63,8 @@ public class PerTaskFullConnectorSession
     @Override
     public OptionalInt getDriverId()
     {
-        if (driverTaskId.isPresent()) {
-            return OptionalInt.of(driverTaskId.get().getDriverId());
+        if (driverPipelineTaskId.isPresent()) {
+            return OptionalInt.of(driverPipelineTaskId.get().getDriverId());
         }
         return OptionalInt.empty();
     }

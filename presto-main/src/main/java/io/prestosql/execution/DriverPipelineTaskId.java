@@ -16,15 +16,17 @@ package io.prestosql.execution;
 
 import java.util.Optional;
 
-public class DriverTaskId
+public class DriverPipelineTaskId
 {
     private final Optional<TaskId> taskId;
     private final int driverId;
+    private final int pipelineId;
 
-    public DriverTaskId(Optional<TaskId> taskId, int driverId)
+    public DriverPipelineTaskId(Optional<TaskId> taskId, int pipelineId, int driverId)
     {
         this.taskId = taskId;
         this.driverId = driverId;
+        this.pipelineId = pipelineId;
     }
 
     public Optional<TaskId> getTaskId()
@@ -35,5 +37,10 @@ public class DriverTaskId
     public int getDriverId()
     {
         return driverId;
+    }
+
+    public int getPipelineId()
+    {
+        return pipelineId;
     }
 }
