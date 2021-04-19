@@ -14,11 +14,27 @@
  */
 package io.prestosql.plugin.hive;
 
+import com.google.common.collect.ImmutableList;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
+import io.prestosql.spi.function.FunctionKind;
+import io.prestosql.spi.function.Signature;
+import io.prestosql.spi.predicate.Domain;
+import io.prestosql.spi.predicate.ValueSet;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.spi.type.TypeSignature;
 import org.eclipse.jetty.util.URIUtil;
 import org.testng.annotations.Test;
 
 import java.net.URI;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Optional;
 
+import static io.prestosql.plugin.hive.HivePageSourceProvider.modifyDomain;
+import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static org.testng.Assert.assertEquals;
 
 public class TestHivePageSourceProvider
@@ -92,5 +108,73 @@ public class TestHivePageSourceProvider
         assertEquals("/user/hive/warehouse/part=part_1/20200405~12345~abcdefgh", splitUri31.getRawPath());
         URI splitUri32 = URI.create(URIUtil.encodePath("hdfs://localhost:9000/user/hive/warehouse/part=part_1/20200405`12345`abcdefgh"));
         assertEquals("/user/hive/warehouse/part=part_1/20200405%6012345%60abcdefgh", splitUri32.getRawPath());
+    }
+
+    @Test
+    public void testModifyDomainGreaterThanOrEqual()
+    {
+        Collection<Object> valueSet = new HashSet<>();
+        valueSet.add(Long.valueOf(40));
+        VariableReferenceExpression argument1 = new VariableReferenceExpression("arg_1", BIGINT);
+        VariableReferenceExpression argument2 = new VariableReferenceExpression("arg_2", BIGINT);
+        QualifiedObjectName objectName = new QualifiedObjectName("presto", "default", "$operator$greater_than_or_equal");
+
+        BuiltInFunctionHandle functionHandle = new BuiltInFunctionHandle(new Signature(objectName, FunctionKind.SCALAR, ImmutableList.of(), ImmutableList.of(), new TypeSignature("boolean"), ImmutableList.of(new TypeSignature("bigint"), new TypeSignature("bigint")), false));
+        CallExpression filter = new CallExpression("GREATER_THAN_OR_EQUAL", functionHandle, BOOLEAN, ImmutableList.of(argument1, argument2));
+        Domain domain = Domain.create(ValueSet.copyOf(BIGINT, valueSet), false);
+        domain = modifyDomain(domain, Optional.of(filter));
+        assertEquals(domain.getValues().getRanges().getSpan().getHigh().getValueBlock(), Optional.empty());
+        assertEquals(domain.getValues().getRanges().getSpan().getLow().getValue(), Long.valueOf(40));
+    }
+
+    @Test
+    public void testModifyDomainGreaterThan()
+    {
+        Collection<Object> valueSet = new HashSet<>();
+        valueSet.add(Long.valueOf(40));
+        VariableReferenceExpression argument1 = new VariableReferenceExpression("arg_1", BIGINT);
+        VariableReferenceExpression argument2 = new VariableReferenceExpression("arg_2", BIGINT);
+        QualifiedObjectName objectName = new QualifiedObjectName("presto", "default", "$operator$greater_than");
+
+        BuiltInFunctionHandle functionHandle = new BuiltInFunctionHandle(new Signature(objectName, FunctionKind.SCALAR, ImmutableList.of(), ImmutableList.of(), new TypeSignature("boolean"), ImmutableList.of(new TypeSignature("bigint"), new TypeSignature("bigint")), false));
+        CallExpression filter = new CallExpression("GREATER_THAN", functionHandle, BOOLEAN, ImmutableList.of(argument1, argument2));
+        Domain domain = Domain.create(ValueSet.copyOf(BIGINT, valueSet), false);
+        domain = modifyDomain(domain, Optional.of(filter));
+        assertEquals(domain.getValues().getRanges().getSpan().getHigh().getValueBlock(), Optional.empty());
+        assertEquals(domain.getValues().getRanges().getSpan().getLow().getValue(), Long.valueOf(40));
+    }
+
+    @Test
+    public void testModifyDomainLessThanOrEqual()
+    {
+        Collection<Object> valueSet = new HashSet<>();
+        valueSet.add(Long.valueOf(40));
+        VariableReferenceExpression argument1 = new VariableReferenceExpression("arg_1", BIGINT);
+        VariableReferenceExpression argument2 = new VariableReferenceExpression("arg_2", BIGINT);
+        QualifiedObjectName objectName = new QualifiedObjectName("presto", "default", "$operator$less_than_or_equal");
+
+        BuiltInFunctionHandle functionHandle = new BuiltInFunctionHandle(new Signature(objectName, FunctionKind.SCALAR, ImmutableList.of(), ImmutableList.of(), new TypeSignature("boolean"), ImmutableList.of(new TypeSignature("bigint"), new TypeSignature("bigint")), false));
+        CallExpression filter = new CallExpression("LESS_THAN", functionHandle, BOOLEAN, ImmutableList.of(argument1, argument2));
+        Domain domain = Domain.create(ValueSet.copyOf(BIGINT, valueSet), false);
+        domain = modifyDomain(domain, Optional.of(filter));
+        assertEquals(domain.getValues().getRanges().getSpan().getHigh().getValue(), Long.valueOf(40));
+        assertEquals(domain.getValues().getRanges().getSpan().getLow().getValueBlock(), Optional.empty());
+    }
+
+    @Test
+    public void testModifyDomainLessThan()
+    {
+        Collection<Object> valueSet = new HashSet<>();
+        valueSet.add(Long.valueOf(40));
+        VariableReferenceExpression argument1 = new VariableReferenceExpression("arg_1", BIGINT);
+        VariableReferenceExpression argument2 = new VariableReferenceExpression("arg_2", BIGINT);
+        QualifiedObjectName objectName = new QualifiedObjectName("presto", "default", "$operator$less_than");
+
+        BuiltInFunctionHandle functionHandle = new BuiltInFunctionHandle(new Signature(objectName, FunctionKind.SCALAR, ImmutableList.of(), ImmutableList.of(), new TypeSignature("boolean"), ImmutableList.of(new TypeSignature("bigint"), new TypeSignature("bigint")), false));
+        CallExpression filter = new CallExpression("LESS_THAN_OR_EQUAL", functionHandle, BOOLEAN, ImmutableList.of(argument1, argument2));
+        Domain domain = Domain.create(ValueSet.copyOf(BIGINT, valueSet), false);
+        domain = modifyDomain(domain, Optional.of(filter));
+        assertEquals(domain.getValues().getRanges().getSpan().getHigh().getValue(), Long.valueOf(40));
+        assertEquals(domain.getValues().getRanges().getSpan().getLow().getValueBlock(), Optional.empty());
     }
 }

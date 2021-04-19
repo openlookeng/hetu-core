@@ -14,6 +14,7 @@
 package io.prestosql.plugin.hive;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
@@ -31,11 +32,20 @@ import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.FixedPageSource;
 import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.connector.RecordPageSource;
+import io.prestosql.spi.dynamicfilter.CombinedDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
+import io.prestosql.spi.dynamicfilter.FilteredDynamicFilter;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
+import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.SplitMetadata;
+import io.prestosql.spi.predicate.Domain;
+import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.predicate.ValueSet;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import org.apache.hadoop.conf.Configuration;
@@ -176,6 +186,17 @@ public class HivePageSourceProvider
         URI splitUri = URI.create(URIUtil.encodePath(hiveSplit.getPath()));
         SplitMetadata splitMetadata = new SplitMetadata(splitUri.getRawPath(), hiveSplit.getLastModifiedTime());
 
+        TupleDomain<HiveColumnHandle> predicate = TupleDomain.all();
+        if (dynamicFilterSupplier.isPresent() && dynamicFilters != null && !dynamicFilters.isEmpty()) {
+            List<HiveColumnHandle> filteredHiveColumnHandles = hiveColumns.stream().filter(column -> dynamicFilters.containsKey(column)).collect(toList());
+            HiveColumnHandle hiveColumnHandle = filteredHiveColumnHandles.get(0);
+            Type type = hiveColumnHandle.getColumnMetadata(typeManager).getType();
+            predicate = getPredicate(dynamicFilters.get(hiveColumnHandle), type, hiveColumnHandle);
+            if (predicate.isNone()) {
+                predicate = TupleDomain.all();
+            }
+        }
+
         /**
          * This is main logical division point to process filter pushdown enabled case (aka as selective read flow).
          * If user configuration orc_predicate_pushdown_enabled is true and if all clause of query can be handled by hive
@@ -207,7 +228,7 @@ public class HivePageSourceProvider
                 hiveSplit.getLength(),
                 hiveSplit.getFileSize(),
                 hiveSplit.getSchema(),
-                hiveTable.getCompactEffectivePredicate(),
+                hiveTable.getCompactEffectivePredicate().intersect(predicate),
                 hiveColumns,
                 hiveSplit.getPartitionKeys(),
                 hiveStorageTimeZone,
@@ -699,6 +720,51 @@ public class HivePageSourceProvider
             return Slices.utf8Slice(partitionValue);
         }
         return partitionValue;
+    }
+
+    protected static Domain modifyDomain(Domain domain, Optional<RowExpression> filter)
+    {
+        Range range = domain.getValues().getRanges().getSpan();
+        if (filter.isPresent() && filter.get() instanceof CallExpression) {
+            CallExpression call = (CallExpression) filter.get();
+            BuiltInFunctionHandle builtInFunctionHandle = (BuiltInFunctionHandle) call.getFunctionHandle();
+            String name = builtInFunctionHandle.getSignature().getNameSuffix();
+            if (name.contains("$operator$") && Signature.unmangleOperator(name).isComparisonOperator()) {
+                switch (Signature.unmangleOperator(name)) {
+                    case LESS_THAN:
+                        range = Range.lessThan(domain.getType(), range.getHigh().getValue());
+                        break;
+                    case GREATER_THAN:
+                        range = Range.greaterThan(domain.getType(), range.getLow().getValue());
+                        break;
+                    case LESS_THAN_OR_EQUAL:
+                        range = Range.lessThanOrEqual(domain.getType(), range.getHigh().getValue());
+                        break;
+                    case GREATER_THAN_OR_EQUAL:
+                        range = Range.greaterThanOrEqual(domain.getType(), range.getLow().getValue());
+                        break;
+                    default:
+                        return domain;
+                }
+                domain = Domain.create(ValueSet.ofRanges(range), false);
+            }
+        }
+        return domain;
+    }
+
+    private static TupleDomain<HiveColumnHandle> getPredicate(DynamicFilter dynamicFilter, Type type, HiveColumnHandle hiveColumnHandle)
+    {
+        if (dynamicFilter instanceof CombinedDynamicFilter) {
+            List<DynamicFilter> filters = ((CombinedDynamicFilter) dynamicFilter).getFilters();
+            List<TupleDomain<HiveColumnHandle>> predicates = filters.stream().map(filter -> getPredicate(filter, type, hiveColumnHandle)).collect(toList());
+            return predicates.stream().reduce(TupleDomain.all(), TupleDomain::intersect);
+        }
+        if (dynamicFilter instanceof FilteredDynamicFilter && !((FilteredDynamicFilter) dynamicFilter).getSetValues().isEmpty()) {
+            Domain domain = Domain.create(ValueSet.copyOf(type, ((FilteredDynamicFilter) dynamicFilter).getSetValues()), false);
+            domain = modifyDomain(domain, ((FilteredDynamicFilter) dynamicFilter).getFilterExpression());
+            return TupleDomain.withColumnDomains(ImmutableMap.of(hiveColumnHandle, domain));
+        }
+        return TupleDomain.all();
     }
 
     public enum ColumnMappingKind

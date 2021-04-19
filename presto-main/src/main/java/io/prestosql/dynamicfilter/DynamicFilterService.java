@@ -195,7 +195,7 @@ public class DynamicFilterService
                     }
                     else if (filterDataType == HASHSET) {
                         Set mergedSet = mergeHashSets(results);
-                        mergedFilter = DynamicFilterFactory.create(filterKey, null, mergedSet, filterType, dfFilter);
+                        mergedFilter = DynamicFilterFactory.create(filterKey, null, mergedSet, filterType, dfFilter, Optional.empty());
 
                         if (filterType == GLOBAL) {
                             mergedDynamicFilters.put(filterKey, mergedSet);

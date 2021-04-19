@@ -167,7 +167,7 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
         }
 
         try {
-            ConnectorPageSource result = provider.createPageSource(transaction, session, split, table, ImmutableList.of(testColumnHandle3), dynamicFilterSupplier4);
+            ConnectorPageSource result = provider.createPageSource(transaction, session, split, table, ImmutableList.of(testColumnHandle4), dynamicFilterSupplier4);
             assertFalse(result instanceof FixedPageSource);
         }
         catch (Exception e) {

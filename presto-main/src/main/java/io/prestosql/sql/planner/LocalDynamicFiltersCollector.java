@@ -163,7 +163,7 @@ public class LocalDynamicFiltersCollector
                 if (predicates.containsKey(filterId)) {
                     Optional<RowExpression> filter = context.getFilter(filterId);
                     Optional<Predicate<List>> filterPredicate = DynamicFilters.createDynamicFilterPredicate(filter);
-                    DynamicFilter dynamicFilter = DynamicFilterFactory.create(filterId, columnHandle, predicates.get(filterId), LOCAL, filterPredicate);
+                    DynamicFilter dynamicFilter = DynamicFilterFactory.create(filterId, columnHandle, predicates.get(filterId), LOCAL, filterPredicate, filter);
                     cachedDynamicFilters.put(filterId, dynamicFilter);
                     result.put(columnHandle, dynamicFilter);
                 }
