@@ -783,7 +783,8 @@ public class SqlQueryScheduler
 
             for (SqlStageExecution stage : stages.values()) {
                 StageState state = stage.getState();
-                if (state != SCHEDULED && state != RUNNING && !state.isDone()) {
+                // Snapshot: if state is resumable_failure, then state of stage and query will change soon again. Don't treat as an error.
+                if (state != SCHEDULED && state != RUNNING && !state.isDone() && state != RESUMABLE_FAILURE) {
                     throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Scheduling is complete, but stage %s is in state %s", stage.getStageId(), state));
                 }
             }
