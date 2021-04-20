@@ -264,6 +264,31 @@ public class HetuMetastoreCache
     }
 
     @Override
+    public void alterCatalogParameter(String catalogName, String key, String value)
+    {
+        try {
+            delegate.alterCatalogParameter(catalogName, key, value);
+        }
+        finally {
+            catalogCache.invalidate(catalogName);
+            catalogsCache.invalidateAll();
+        }
+    }
+
+    @Override
+    public void alterDatabaseParameter(String catalogName, String databaseName, String key, String value)
+    {
+        try {
+            delegate.alterDatabaseParameter(catalogName, databaseName, key, value);
+        }
+        finally {
+            String databaseKey = catalogName + '.' + databaseName;
+            databaseCache.invalidate(databaseKey);
+            databasesCache.invalidate(catalogName);
+        }
+    }
+
+    @Override
     public void alterTableParameter(String catalogName, String databaseName, String tableName, String key, String value)
     {
         try {
