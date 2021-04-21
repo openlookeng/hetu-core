@@ -298,6 +298,12 @@ public class TestStarTreeMetaStore
         }
 
         @Override
+        public void alterCatalogParameter(String catalogName, String key, String value) {}
+
+        @Override
+        public void alterDatabaseParameter(String catalogName, String databaseName, String key, String value) {}
+
+        @Override
         public void alterTableParameter(String catalogName, String databaseName, String tableName, String key, String value) {}
     }
 }

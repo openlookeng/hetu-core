@@ -697,6 +697,71 @@ public class HetuFsMetastore
     }
 
     @Override
+    public void alterCatalogParameter(String catalogName, String key, String value)
+    {
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+        runTransaction(() -> {
+            assertCatalogExist(catalogName);
+
+            try {
+                Path catalogMetadataPath = getCatalogMetadataPath(catalogName);
+                CatalogEntity catalogEntity;
+                try (InputStream inputStream = client.newInputStream(catalogMetadataPath)) {
+                    String catalogJson = CharStreams.toString(new InputStreamReader(inputStream, UTF_8));
+                    catalogEntity = CATALOG_CODEC.fromJson(catalogJson);
+                }
+
+                if (value == null) {
+                    catalogEntity.getParameters().remove(key);
+                }
+                else {
+                    catalogEntity.getParameters().put(key, value);
+                }
+                try (OutputStream outputStream = client.newOutputStream(catalogMetadataPath)) {
+                    outputStream.write(CATALOG_CODEC.toJsonBytes(catalogEntity));
+                }
+            }
+            catch (IOException e) {
+                throw new PrestoException(HETU_METASTORE_CODE, e);
+            }
+        });
+    }
+
+    @Override
+    public void alterDatabaseParameter(String catalogName, String databaseName, String key, String value)
+    {
+        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+        checkArgument(databaseName.matches("[\\p{Alnum}_]+"), "Invalid database name");
+
+        runTransaction(() -> {
+            assertCatalogExist(catalogName);
+            assertDatabaseExist(catalogName, databaseName);
+
+            try {
+                Path databaseMetadataPath = getDatabaseMetadataPath(catalogName, databaseName);
+                DatabaseEntity databaseEntity;
+                try (InputStream inputStream = client.newInputStream(databaseMetadataPath)) {
+                    String tableJson = CharStreams.toString(new InputStreamReader(inputStream, UTF_8));
+                    databaseEntity = DATABASE_CODEC.fromJson(tableJson);
+                }
+
+                if (value == null) {
+                    databaseEntity.getParameters().remove(key);
+                }
+                else {
+                    databaseEntity.getParameters().put(key, value);
+                }
+                try (OutputStream outputStream = client.newOutputStream(databaseMetadataPath)) {
+                    outputStream.write(DATABASE_CODEC.toJsonBytes(databaseEntity));
+                }
+            }
+            catch (IOException e) {
+                throw new PrestoException(HETU_METASTORE_CODE, e);
+            }
+        });
+    }
+
+    @Override
     public void alterTableParameter(String catalogName, String databaseName, String tableName, String key, String value)
     {
         checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
@@ -709,9 +774,9 @@ public class HetuFsMetastore
             assertTableExist(catalogName, databaseName, tableName);
 
             try {
-                Path tablePath = getTableMetadataPath(catalogName, databaseName, tableName);
+                Path tableMetadataPath = getTableMetadataPath(catalogName, databaseName, tableName);
                 TableEntity tableEntity;
-                try (InputStream inputStream = client.newInputStream(tablePath)) {
+                try (InputStream inputStream = client.newInputStream(tableMetadataPath)) {
                     String tableJson = CharStreams.toString(new InputStreamReader(inputStream, UTF_8));
                     tableEntity = TABLE_CODEC.fromJson(tableJson);
                 }
@@ -722,7 +787,7 @@ public class HetuFsMetastore
                 else {
                     tableEntity.getParameters().put(key, value);
                 }
-                try (OutputStream outputStream = client.newOutputStream(tablePath)) {
+                try (OutputStream outputStream = client.newOutputStream(tableMetadataPath)) {
                     outputStream.write(TABLE_CODEC.toJsonBytes(tableEntity));
                 }
             }

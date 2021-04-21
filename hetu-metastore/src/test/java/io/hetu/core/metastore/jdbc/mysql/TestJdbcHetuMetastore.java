@@ -1128,6 +1128,73 @@ public class TestJdbcHetuMetastore
     }
 
     @Test
+    public void testAlterCatalogParametersParallel()
+            throws InterruptedException
+    {
+        String catalogName = "catalog2000";
+        metastore.createCatalog(CatalogEntity.builder()
+                .setCatalogName(catalogName)
+                .build());
+
+        int num = 100;
+        Thread[] threads = new Thread[num];
+        for (int i = 0; i < num; i++) {
+            int finalI = i;
+            threads[i] = new Thread(() -> {
+                try {
+                    metastore.alterCatalogParameter(catalogName, String.valueOf(finalI), String.valueOf(finalI));
+                }
+                catch (Exception e) {
+                    testResult = false;
+                }
+            });
+            threads[i].start();
+        }
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        Map<String, String> res = metastore.getCatalog(catalogName).get().getParameters();
+        assertEquals(num, res.size());
+
+        metastore.dropCatalog(catalogName);
+    }
+
+    @Test
+    public void testAlterDatabaseParametersParallel()
+            throws InterruptedException
+    {
+        String databaseName = "database2000";
+        metastore.createDatabase(DatabaseEntity.builder()
+                .setCatalogName(defaultCatalog.getName())
+                .setDatabaseName(databaseName)
+                .build());
+
+        int num = 100;
+        Thread[] threads = new Thread[num];
+        for (int i = 0; i < num; i++) {
+            int finalI = i;
+            threads[i] = new Thread(() -> {
+                try {
+                    metastore.alterDatabaseParameter(defaultCatalog.getName(), databaseName, String.valueOf(finalI), String.valueOf(finalI));
+                }
+                catch (Exception e) {
+                    testResult = false;
+                }
+            });
+            threads[i].start();
+        }
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        Map<String, String> res = metastore.getDatabase(defaultCatalog.getName(), databaseName).get().getParameters();
+        assertEquals(num, res.size());
+
+        metastore.dropDatabase(defaultCatalog.getName(), databaseName);
+    }
+
+    @Test
     public void testAlterTableParametersParallel()
             throws InterruptedException
     {

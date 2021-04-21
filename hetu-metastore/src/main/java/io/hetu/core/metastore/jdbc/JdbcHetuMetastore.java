@@ -16,6 +16,8 @@ package io.hetu.core.metastore.jdbc;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.connector.CatalogNotFoundException;
+import io.prestosql.spi.connector.SchemaNotFoundException;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.TableNotFoundException;
 import io.prestosql.spi.metastore.HetuMetastore;
@@ -352,6 +354,54 @@ public class JdbcHetuMetastore
             getTableColumns(entries, tables, transactionDao);
         });
         return tables.build().stream().collect(toImmutableList());
+    }
+
+    @Override
+    public void alterCatalogParameter(String catalogName, String key, String value)
+    {
+        runTransactionWithLock(jdbi, handle -> {
+            JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
+
+            // get catalog id and catalog entity
+            long catalogId = transactionDao.getCatalogId(catalogName);
+            CatalogEntity catalogEntity = transactionDao.getCatalog(catalogName).orElseThrow(() -> new CatalogNotFoundException(catalogName));
+
+            // drop table property
+            transactionDao.dropCatalogProperty(catalogId);
+
+            if (value == null) {
+                catalogEntity.getParameters().remove(key);
+            }
+            else {
+                catalogEntity.getParameters().put(key, value);
+            }
+            Optional<List<PropertyEntity>> catalogProps = mapToList(catalogEntity.getParameters());
+            catalogProps.ifPresent(props -> transactionDao.insertCatalogProperty(catalogId, props));
+        });
+    }
+
+    @Override
+    public void alterDatabaseParameter(String catalogName, String databaseName, String key, String value)
+    {
+        runTransactionWithLock(jdbi, handle -> {
+            JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
+
+            // get catalog id and catalog entity
+            long databaseId = transactionDao.getDatabaseId(catalogName, databaseName);
+            DatabaseEntity databaseEntity = transactionDao.getDatabase(catalogName, databaseName).orElseThrow(() -> new SchemaNotFoundException(catalogName + "." + databaseName));
+
+            // drop table property
+            transactionDao.dropDatabaseProperty(databaseId);
+
+            if (value == null) {
+                databaseEntity.getParameters().remove(key);
+            }
+            else {
+                databaseEntity.getParameters().put(key, value);
+            }
+            Optional<List<PropertyEntity>> databaseProps = mapToList(databaseEntity.getParameters());
+            databaseProps.ifPresent(props -> transactionDao.insertDatabaseProperty(databaseId, props));
+        });
     }
 
     @Override

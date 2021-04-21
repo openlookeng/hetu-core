@@ -170,14 +170,33 @@ public interface HetuMetastore
     /**
      * get all table
      *
-     * @param catalogName  catalog name
+     * @param catalogName catalog name
      * @param databaseName database name
      * @return tables
      */
     List<TableEntity> getAllTables(String catalogName, String databaseName);
 
     /**
-     * alter table parameters in hetu metastore,
+     * alter catalog parameters in hetu metastore
+     *
+     * @param catalogName catalog name
+     * @param key parameter key to change
+     * @param value parameter value to put. If value is {@code null}, the given key will be removed from parameter list
+     */
+    void alterCatalogParameter(String catalogName, String key, String value);
+
+    /**
+     * alter database parameters in hetu metastore
+     *
+     * @param catalogName catalog name
+     * @param databaseName database name
+     * @param key parameter key to change
+     * @param value parameter value to put. If value is {@code null}, the given key will be removed from parameter list
+     */
+    void alterDatabaseParameter(String catalogName, String databaseName, String key, String value);
+
+    /**
+     * alter table parameters in hetu metastore
      *
      * @param catalogName catalog name
      * @param databaseName database name
