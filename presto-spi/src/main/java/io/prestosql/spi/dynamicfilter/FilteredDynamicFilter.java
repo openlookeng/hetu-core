@@ -16,6 +16,7 @@ package io.prestosql.spi.dynamicfilter;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.relation.RowExpression;
 
 import java.util.List;
 import java.util.Optional;
@@ -28,11 +29,18 @@ public class FilteredDynamicFilter
         extends HashSetDynamicFilter
 {
     private final Optional<Predicate<List>> filter;
+    private final Optional<RowExpression> filterExpression;
 
-    public FilteredDynamicFilter(String filterId, ColumnHandle columnHandle, Set valueSet, Type type, Optional<Predicate<List>> filter)
+    public FilteredDynamicFilter(String filterId, ColumnHandle columnHandle, Set valueSet, Type type, Optional<Predicate<List>> filter, Optional<RowExpression> filterExpression)
     {
         super(filterId, columnHandle, valueSet, type);
         this.filter = requireNonNull(filter, "filter is null");
+        this.filterExpression = requireNonNull(filterExpression, "filterExpression is null");
+    }
+
+    public Optional<RowExpression> getFilterExpression()
+    {
+        return filterExpression;
     }
 
     @Override
@@ -52,7 +60,7 @@ public class FilteredDynamicFilter
     @Override
     public DynamicFilter clone()
     {
-        FilteredDynamicFilter filteredDynamicFilter = new FilteredDynamicFilter(filterId, columnHandle, valueSet, type, filter);
+        FilteredDynamicFilter filteredDynamicFilter = new FilteredDynamicFilter(filterId, columnHandle, valueSet, type, filter, filterExpression);
         filteredDynamicFilter.setMin(min);
         filteredDynamicFilter.setMax(max);
         return filteredDynamicFilter;
