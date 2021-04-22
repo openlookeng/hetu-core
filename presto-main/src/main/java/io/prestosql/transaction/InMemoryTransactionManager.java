@@ -197,7 +197,7 @@ public class InMemoryTransactionManager
     }
 
     @Override
-    public TransactionId beginTransaction(IsolationLevel isolationLevel, boolean readOnly, boolean autoCommitContext)
+    public synchronized TransactionId beginTransaction(IsolationLevel isolationLevel, boolean readOnly, boolean autoCommitContext)
     {
         TransactionId transactionId = TransactionId.create();
         BoundedExecutor executor = new BoundedExecutor(finishingExecutor, maxFinishingConcurrency);
@@ -305,7 +305,7 @@ public class InMemoryTransactionManager
         tryGetTransactionMetadata(transactionId).ifPresent(TransactionMetadata::setInactive);
     }
 
-    private TransactionMetadata getTransactionMetadata(TransactionId transactionId)
+    private synchronized TransactionMetadata getTransactionMetadata(TransactionId transactionId)
     {
         TransactionMetadata transactionMetadata = transactions.get(transactionId);
         if (transactionMetadata == null) {
@@ -326,10 +326,11 @@ public class InMemoryTransactionManager
         return Optional.ofNullable(transactions.get(transactionId));
     }
 
-    private ListenableFuture<TransactionMetadata> removeTransactionMetadataAsFuture(TransactionId transactionId)
+    private synchronized ListenableFuture<TransactionMetadata> removeTransactionMetadataAsFuture(TransactionId transactionId)
     {
         TransactionMetadata transactionMetadata = transactions.remove(transactionId);
         removeStateStoreTransaction(transactionId);
+
         if (transactionMetadata == null) {
             return immediateFailedFuture(new NotInTransactionException(transactionId));
         }
