@@ -555,8 +555,15 @@ public class PlanPrinter
                 key = node.getGroupingKeys().toString();
             }
 
-            NodeRepresentation nodeOutput = addNode(node,
-                    format("Aggregate%s%s%s", type, key, formatHash(node.getHashSymbol())));
+            NodeRepresentation nodeOutput;
+            if (node.getAggregationType().equals(AggregationNode.AggregationType.SORT_BASED)) {
+                nodeOutput = addNode(node,
+                        format("SortAggregate%s%s%s", type, key, formatHash(node.getHashSymbol())));
+            }
+            else {
+                nodeOutput = addNode(node,
+                        format("Aggregate%s%s%s", type, key, formatHash(node.getHashSymbol())));
+            }
 
             node.getAggregations().forEach((symbol, aggregation) -> nodeOutput.appendDetailsLine("%s := %s", symbol, formatAggregation(aggregation)));
 

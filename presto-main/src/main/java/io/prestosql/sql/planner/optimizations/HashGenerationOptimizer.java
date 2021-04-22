@@ -206,7 +206,6 @@ public class HashGenerationOptimizer
             PlanWithProperties child = planAndEnforce(node.getSource(), requiredHashes, false, requiredHashes);
 
             Optional<Symbol> hashSymbol = groupByHash.map(child::getRequiredHashSymbol);
-
             return new PlanWithProperties(
                     new AggregationNode(
                             node.getId(),
@@ -216,7 +215,9 @@ public class HashGenerationOptimizer
                             node.getPreGroupedSymbols(),
                             node.getStep(),
                             hashSymbol,
-                            node.getGroupIdSymbol()),
+                            node.getGroupIdSymbol(),
+                            node.getAggregationType(),
+                            node.getFinalizeSymbol()),
                     hashSymbol.isPresent() ? ImmutableMap.of(groupByHash.get(), hashSymbol.get()) : ImmutableMap.of());
         }
 
@@ -596,7 +597,8 @@ public class HashGenerationOptimizer
                             partitioningScheme,
                             newSources.build(),
                             newInputs.build(),
-                            node.getOrderingScheme()),
+                            node.getOrderingScheme(),
+                            node.getAggregationType()),
                     newHashSymbols);
         }
 
@@ -619,7 +621,8 @@ public class HashGenerationOptimizer
                     node.getPartitioningScheme(),
                     ImmutableList.of(child.getNode()),
                     node.getInputs(),
-                    node.getOrderingScheme());
+                    node.getOrderingScheme(),
+                    node.getAggregationType());
             return new PlanWithProperties(new ProjectNode(idAllocator.getNextId(),
                     exchangeNode,
                     assignments.build()),

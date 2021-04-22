@@ -1,0 +1,9 @@
+remote exchange (GATHER, SINGLE, [])
+    final aggregation over (sr_customer_sk, sr_item_sk)
+        local exchange (GATHER, SINGLE, [])
+            partial aggregation over (sr_customer_sk, sr_item_sk)
+                join (RIGHT, PARTITIONED):
+                    scan store_sales_customer_item
+                    local exchange (GATHER, SINGLE, [])
+                        remote exchange (REPARTITION, hive:buckets=1, hiveTypes=[bigint], ["sr_customer_sk"])
+                            scan store_returns

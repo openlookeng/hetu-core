@@ -3102,4 +3102,30 @@ public class HiveMetadata
         }
         return null;
     }
+
+    @Override
+    public List<String> getTableSortedColumns(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        ConnectorTableMetadata connectorTableMetadata = getTableMetadata(session, ((HiveTableHandle) tableHandle).getSchemaTableName());
+        List<SortingColumn> sortingColumn = (List<SortingColumn>) connectorTableMetadata.getProperties().get("sorted_by");
+        if ((null == sortingColumn) || (sortingColumn.size() == 0)) {
+            return null;
+        }
+        List<String> columnNames = sortingColumn.stream().map(column -> column.getColumnName()).collect(Collectors.toList());
+        return columnNames;
+    }
+
+    @Override
+    public List<String> getTableBucketedBy(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        ConnectorTableMetadata connectorTableMetadata = getTableMetadata(session, ((HiveTableHandle) tableHandle).getSchemaTableName());
+        return (List<String>) connectorTableMetadata.getProperties().get(HiveTableProperties.BUCKETED_BY_PROPERTY);
+    }
+
+    @Override
+    public int getTableBucketedCount(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        ConnectorTableMetadata connectorTableMetadata = getTableMetadata(session, ((HiveTableHandle) tableHandle).getSchemaTableName());
+        return (int) connectorTableMetadata.getProperties().get(HiveTableProperties.BUCKET_COUNT_PROPERTY);
+    }
 }

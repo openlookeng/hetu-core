@@ -132,4 +132,10 @@ public interface ConnectorTableHandle
     {
         return false;
     }
+
+    /* This method checks if Sort Based Aggregation can be used*/
+    default boolean isSortBasedAggregationSupported()
+    {
+        return false;
+    }
 }

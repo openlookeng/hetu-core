@@ -205,6 +205,8 @@ public class TestTypeValidator
                 ImmutableList.of(),
                 SINGLE,
                 Optional.empty(),
+                Optional.empty(),
+                AggregationNode.AggregationType.HASH,
                 Optional.empty());
 
         assertTypesValid(node);
@@ -263,6 +265,8 @@ public class TestTypeValidator
                 ImmutableList.of(),
                 SINGLE,
                 Optional.empty(),
+                Optional.empty(),
+                AggregationNode.AggregationType.HASH,
                 Optional.empty());
 
         assertTypesValid(node);
@@ -291,6 +295,8 @@ public class TestTypeValidator
                 ImmutableList.of(),
                 SINGLE,
                 Optional.empty(),
+                Optional.empty(),
+                AggregationNode.AggregationType.HASH,
                 Optional.empty());
 
         assertTypesValid(node);

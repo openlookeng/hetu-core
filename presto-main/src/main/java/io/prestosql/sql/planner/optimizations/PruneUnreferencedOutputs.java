@@ -184,7 +184,8 @@ public class PruneUnreferencedOutputs
                     partitioningScheme,
                     rewrittenSources.build(),
                     inputsBySource,
-                    node.getOrderingScheme());
+                    node.getOrderingScheme(),
+                    node.getAggregationType());
         }
 
         @Override
@@ -385,7 +386,9 @@ public class PruneUnreferencedOutputs
                     ImmutableList.of(),
                     node.getStep(),
                     node.getHashSymbol(),
-                    node.getGroupIdSymbol());
+                    node.getGroupIdSymbol(),
+                    node.getAggregationType(),
+                    node.getFinalizeSymbol());
         }
 
         @Override

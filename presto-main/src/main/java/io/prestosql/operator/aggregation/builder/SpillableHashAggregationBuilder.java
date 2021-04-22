@@ -47,7 +47,7 @@ import static java.lang.Math.max;
 //TODO-cp-I39B76 should be covered in supporting spill, unsupported for now
 @RestorableConfig(unsupported = true)
 public class SpillableHashAggregationBuilder
-        implements HashAggregationBuilder
+        implements AggregationBuilder
 {
     private InMemoryHashAggregationBuilder hashAggregationBuilder;
     private final SpillerFactory spillerFactory;

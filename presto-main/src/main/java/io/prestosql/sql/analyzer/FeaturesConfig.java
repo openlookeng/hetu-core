@@ -167,6 +167,8 @@ public class FeaturesConfig
     private boolean enableStarTreeIndex;
     private long cubeMetadataCacheSize = 5;
     private Duration cubeMetadataCacheTtl = new Duration(1, HOURS);
+    private boolean sortBasedAggregationEnabled;
+    private int prcntDriversForPartialAggr = 5;
 
     public enum JoinReorderingStrategy
     {
@@ -1357,6 +1359,31 @@ public class FeaturesConfig
     public FeaturesConfig setListBuiltInFunctionsOnly(boolean listBuiltInFunctionsOnly)
     {
         this.listBuiltInFunctionsOnly = listBuiltInFunctionsOnly;
+        return this;
+    }
+
+    public boolean isSortBasedAggregationEnabled()
+    {
+        return sortBasedAggregationEnabled;
+    }
+
+    @Config("sort-based-aggregation-enabled")
+    public FeaturesConfig setSortBasedAggregationEnabled(boolean sortBasedAggregationEnabled)
+    {
+        this.sortBasedAggregationEnabled = sortBasedAggregationEnabled;
+        return this;
+    }
+
+    public int getPrcntDriversForPartialAggr()
+    {
+        return this.prcntDriversForPartialAggr;
+    }
+
+    @Config("prcnt-drivers-for-partial-aggr")
+    @ConfigDescription("sort based aggre percentage of number of drivers that are used for unfinalized/partial values")
+    public FeaturesConfig setPrcntDriversForPartialAggr(int prcntDriversForPartialAggr)
+    {
+        this.prcntDriversForPartialAggr = prcntDriversForPartialAggr;
         return this;
     }
 }

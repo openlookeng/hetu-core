@@ -58,7 +58,7 @@ public class LocalExchangeSourceOperator
         {
             checkState(!closed, "Factory is already closed");
 
-            LocalExchange inMemoryExchange = localExchangeFactory.getLocalExchange(driverContext.getLifespan());
+            LocalExchange inMemoryExchange = localExchangeFactory.getLocalExchange(driverContext.getLifespan(), driverContext.getPipelineContext().getTaskContext());
 
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, LocalExchangeSourceOperator.class.getSimpleName());
             LocalExchangeSource source = inMemoryExchange.getNextSource();

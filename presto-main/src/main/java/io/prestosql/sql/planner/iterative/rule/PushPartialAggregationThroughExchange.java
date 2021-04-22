@@ -203,7 +203,8 @@ public class PushPartialAggregationThroughExchange
                 partitioning,
                 partials,
                 ImmutableList.copyOf(Collections.nCopies(partials.size(), aggregation.getOutputSymbols())),
-                Optional.empty());
+                Optional.empty(),
+                aggregation.getAggregationType());
     }
 
     private PlanNode split(AggregationNode node, Context context)
@@ -272,7 +273,9 @@ public class PushPartialAggregationThroughExchange
                 ImmutableList.of(),
                 PARTIAL,
                 node.getHashSymbol(),
-                node.getGroupIdSymbol());
+                node.getGroupIdSymbol(),
+                node.getAggregationType(),
+                node.getFinalizeSymbol());
 
         return new AggregationNode(
                 node.getId(),
@@ -284,7 +287,9 @@ public class PushPartialAggregationThroughExchange
                 ImmutableList.of(),
                 FINAL,
                 node.getHashSymbol(),
-                node.getGroupIdSymbol());
+                node.getGroupIdSymbol(),
+                node.getAggregationType(),
+                node.getFinalizeSymbol());
     }
 
     private static boolean isLambda(RowExpression rowExpression)

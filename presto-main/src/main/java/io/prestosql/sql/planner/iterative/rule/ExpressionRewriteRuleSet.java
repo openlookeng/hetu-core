@@ -199,7 +199,9 @@ public class ExpressionRewriteRuleSet
                         aggregationNode.getPreGroupedSymbols(),
                         aggregationNode.getStep(),
                         aggregationNode.getHashSymbol(),
-                        aggregationNode.getGroupIdSymbol()));
+                        aggregationNode.getGroupIdSymbol(),
+                        aggregationNode.getAggregationType(),
+                        aggregationNode.getFinalizeSymbol()));
             }
             return Result.empty();
         }

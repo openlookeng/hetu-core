@@ -152,6 +152,8 @@ public final class SystemSessionProperties
     public static final String REUSE_TABLE_SCAN = "reuse_table_scan";
     public static final String SPILL_REUSE_TABLESCAN = "spill_reuse_tablescan";
     public static final String SPILL_THRESHOLD_REUSE_TABLESCAN = "spill_threshold_reuse_tablescan";
+    public static final String SORT_BASED_AGGREGATION_ENABLED = "sort_based_aggregation_enabled";
+    public static final String PRCNT_DRIVERS_FOR_PARTIAL_AGGR = "prcnt_drivers_for_partial_aggr";
     // CTE Optimization configurations
     public static final String CTE_REUSE_ENABLED = "cte_reuse_enabled";
     public static final String CTE_MAX_QUEUE_SIZE = "cte_max_queue_size";
@@ -762,6 +764,16 @@ public final class SystemSessionProperties
                         SNAPSHOT_RETRY_TIMEOUT,
                         "Snapshot retry timeout",
                         snapshotConfig.getSnapshotRetryTimeout(),
+                        false),
+                booleanProperty(
+                        SORT_BASED_AGGREGATION_ENABLED,
+                        "Enable sort based aggregation",
+                        featuresConfig.isSortBasedAggregationEnabled(),
+                        false),
+                integerProperty(
+                        PRCNT_DRIVERS_FOR_PARTIAL_AGGR,
+                        "Sort based aggr, percentage of number of drivers that are used for not finalized values",
+                        featuresConfig.getPrcntDriversForPartialAggr(),
                         false));
     }
 
@@ -1339,5 +1351,15 @@ public final class SystemSessionProperties
     public static Duration getSnapshotRetryTimeout(Session session)
     {
         return session.getSystemProperty(SNAPSHOT_RETRY_TIMEOUT, Duration.class);
+    }
+
+    public static boolean isSortBasedAggregationEnabled(Session session)
+    {
+        return session.getSystemProperty(SORT_BASED_AGGREGATION_ENABLED, Boolean.class);
+    }
+
+    public static int getPrcntDriversForPartialAggr(Session session)
+    {
+        return session.getSystemProperty(PRCNT_DRIVERS_FOR_PARTIAL_AGGR, Integer.class);
     }
 }

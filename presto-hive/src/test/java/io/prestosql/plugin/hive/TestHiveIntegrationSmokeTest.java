@@ -5655,6 +5655,417 @@ public class TestHiveIntegrationSmokeTest
         assertEquals(false, true);
     }
 
+    @Test
+    public void sortAggSingleSort()
+    {
+        assertUpdate("drop table if exists unsorttable");
+        assertUpdate("drop table if exists sorttable");
+        computeActual("create table unsorttable (orderkey int, year int) WITH (transactional = true , " +
+                "format = 'ORC', partitioned_by = ARRAY[ 'year' ] )");
+        assertUpdate("insert into unsorttable values (1,2011)", 1);
+        assertUpdate("insert into unsorttable values (2,2012)", 1);
+        assertUpdate("insert into unsorttable values (2,2012)", 1);
+        assertUpdate("insert into unsorttable values (2,2012)", 1);
+        assertUpdate("insert into unsorttable values (3,2013)", 1);
+        assertUpdate("insert into unsorttable values (3,2013)", 1);
+        assertUpdate("insert into unsorttable values (3,2014)", 1);
+
+        computeActual("create table sorttable  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['year'], bucket_count=1, sorted_by = ARRAY['year'])  as select * from unsorttable order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+
+        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable  group by year order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=false");
+
+        MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable  group by year order by year");
+
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("DROP TABLE sorttable");
+        assertUpdate("DROP TABLE unsorttable");
+    }
+
+    @Test
+    public void sortAggSingleSortNoAggregation()
+    {
+        assertUpdate("drop table if exists unsorttable1");
+        assertUpdate("drop table if exists sorttable1");
+        computeActual("create table unsorttable1 (orderkey int, year bigint) WITH (transactional = true , " +
+                "format = 'ORC', partitioned_by = ARRAY[ 'year'] )");
+        assertUpdate("insert into unsorttable1 values (1,2011)", 1);
+        assertUpdate("insert into unsorttable1 values (2,2012)", 1);
+        assertUpdate("insert into unsorttable1 values (2,2012)", 1);
+        assertUpdate("insert into unsorttable1 values (2,2012)", 1);
+        assertUpdate("insert into unsorttable1 values (3,2013)", 1);
+        assertUpdate("insert into unsorttable1 values (3,2013)", 1);
+        assertUpdate("insert into unsorttable1 values (3,2014)", 1);
+
+        computeActual("create table sorttable1  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['year'], bucket_count=1, sorted_by = ARRAY['year'])  as select * from unsorttable1 order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+
+        MaterializedResult sortResult = computeActual("select year from sorttable1 group by year order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=false");
+
+        MaterializedResult hashResult = computeActual("select year from sorttable1 group by year order by year");
+
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("DROP TABLE sorttable1");
+        assertUpdate("DROP TABLE unsorttable1");
+    }
+
+    @Test
+    public void sortAggBigint()
+    {
+        assertUpdate("drop table if exists unsorttable2");
+        assertUpdate("drop table if exists sorttable2");
+        computeActual("create table unsorttable2 (orderkey int, year bigint) WITH (transactional = true , " +
+                "format = 'ORC', partitioned_by = ARRAY[ 'year'] )");
+        assertUpdate("insert into unsorttable2 values (1,null)", 1);
+        assertUpdate("insert into unsorttable2 values (2,null)", 1);
+        assertUpdate("insert into unsorttable2 values (2,2012)", 1);
+        assertUpdate("insert into unsorttable2 values (2,2012)", 1);
+        assertUpdate("insert into unsorttable2 values (3,2013)", 1);
+        assertUpdate("insert into unsorttable2 values (3,2013)", 1);
+        assertUpdate("insert into unsorttable2 values (3,2014)", 1);
+
+        computeActual("create table sorttable2  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['year'], bucket_count=10, sorted_by = ARRAY['year'])  as select * from unsorttable2 order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+
+        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year), year from sorttable2 group by year order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=false");
+
+        MaterializedResult hashResult = computeActual("select avg(orderkey), count(year), year from sorttable2 group by year order by year");
+
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("DROP TABLE sorttable2");
+        assertUpdate("DROP TABLE unsorttable2");
+    }
+
+    @Test
+    public void sortAggMultipleSort()
+    {
+        assertUpdate("drop table if exists unsorttable3");
+        assertUpdate("drop table if exists sorttable3");
+        computeActual("create table unsorttable3 (number int, orderkey double, year double) WITH (transactional = true , " +
+                "format = 'ORC')");
+        assertUpdate("insert into unsorttable3 values (1,11,2011)", 1);
+        assertUpdate("insert into unsorttable3 values (2,22,2012)", 1);
+        assertUpdate("insert into unsorttable3 values (3,33,2012)", 1);
+        assertUpdate("insert into unsorttable3 values (4,33,2012)", 1);
+        assertUpdate("insert into unsorttable3 values (4,44,2012)", 1);
+        assertUpdate("insert into unsorttable3 values (5,55,2013)", 1);
+        assertUpdate("insert into unsorttable3 values (6,66,2013)", 1);
+        assertUpdate("insert into unsorttable3 values (7,77,2014)", 1);
+
+        computeActual("create table sorttable3  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['orderkey', 'year'], bucket_count=2, sorted_by = ARRAY['orderkey', 'year'])  as select * from unsorttable3 order by orderkey,year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+
+        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable3  group by orderkey,year order by orderkey,year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=false");
+
+        MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable3  group by orderkey,year order by orderkey,year");
+
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        // with  group by year
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+
+        sortResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable3 group by year order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=false");
+
+        hashResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable3 group by year order by year");
+
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("DROP TABLE sorttable3");
+        assertUpdate("DROP TABLE unsorttable3");
+    }
+
+    @Test
+    public void sortAggDateType()
+    {
+        assertUpdate("drop table if exists unsorttable4");
+        assertUpdate("drop table if exists sorttable4");
+        computeActual("create table unsorttable4 (number int, orderkey decimal(10,4), year date) WITH (transactional = true , " +
+                "format = 'ORC')");
+        assertUpdate("insert into unsorttable4 values (1,11.1,date '2011-07-20')", 1);
+        assertUpdate("insert into unsorttable4 values (2,22.2,date '2012-07-20')", 1);
+        assertUpdate("insert into unsorttable4 values (3,33.3,date '2013-07-20')", 1);
+        assertUpdate("insert into unsorttable4 values (4,33.3,date '2013-07-20')", 1);
+        assertUpdate("insert into unsorttable4 values (5,55.5,date '2013-07-20')", 1);
+        assertUpdate("insert into unsorttable4 values (6,66.6,date '2014-07-20')", 1);
+        assertUpdate("insert into unsorttable4 values (7,77.7,date '2015-07-20')", 1);
+
+        computeActual("create table sorttable4  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['year'], bucket_count=2, sorted_by = ARRAY['year'])  as select * from unsorttable4 order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+
+        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable4  group by year order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=false");
+
+        MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable4  group by year order by year");
+
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("DROP TABLE sorttable4");
+        assertUpdate("DROP TABLE unsorttable4");
+    }
+
+    @Test
+    public void sortAggVarchar()
+    {
+        assertUpdate("drop table if exists unsorttable5");
+        assertUpdate("drop table if exists sorttable5");
+        computeActual("create table unsorttable5 (number int, orderkey decimal(10,4), year varchar) WITH (transactional = true , " +
+                "format = 'ORC')");
+        assertUpdate("insert into unsorttable5 values (1,11.1, '2011-07-20')", 1);
+        assertUpdate("insert into unsorttable5 values (2,22.2, '2012-07-20')", 1);
+        assertUpdate("insert into unsorttable5 values (3,33.3, '2013-07-20')", 1);
+        assertUpdate("insert into unsorttable5 values (4,33.3, '2013-07-20')", 1);
+        assertUpdate("insert into unsorttable5 values (5,55.5, '2013-07-20')", 1);
+        assertUpdate("insert into unsorttable5 values (6,66.6, '2014-07-20')", 1);
+        assertUpdate("insert into unsorttable5 values (7,77.7, '2015-07-20')", 1);
+
+        computeActual("create table sorttable5  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['year'], bucket_count=2, sorted_by = ARRAY['year'])  as select * from unsorttable5 order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+
+        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable5  group by year order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=false");
+
+        MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable5  group by year order by year");
+
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("DROP TABLE sorttable5");
+        assertUpdate("DROP TABLE unsorttable5");
+    }
+
+    @Test
+    public void sortAggSmallint()
+    {
+        assertUpdate("drop table if exists unsorttable6");
+        assertUpdate("drop table if exists sorttable6");
+        computeActual("create table unsorttable6 (orderkey int, year smallint) WITH (transactional = true , " +
+                "format = 'ORC', partitioned_by = ARRAY[ 'year' ] )");
+        assertUpdate("insert into unsorttable6 values (1,smallint '2011')", 1);
+        assertUpdate("insert into unsorttable6 values (2,smallint '2012')", 1);
+        assertUpdate("insert into unsorttable6 values (2,smallint '2012')", 1);
+        assertUpdate("insert into unsorttable6 values (2,smallint '2012')", 1);
+        assertUpdate("insert into unsorttable6 values (3,smallint '2013')", 1);
+        assertUpdate("insert into unsorttable6 values (3,smallint '2014')", 1);
+        assertUpdate("insert into unsorttable6 values (3,smallint '2015')", 1);
+
+        computeActual("create table sorttable6  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['year'], bucket_count=1, sorted_by = ARRAY['year'])  as select * from unsorttable6 order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+
+        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable6  group by year order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=false");
+
+        MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable6  group by year order by year");
+
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("DROP TABLE sorttable6");
+        assertUpdate("DROP TABLE unsorttable6");
+    }
+
+    @Test
+    public void sortAggBoolean()
+    {
+        assertUpdate("drop table if exists unsorttable7");
+        assertUpdate("drop table if exists sorttable7");
+        computeActual("create table unsorttable7 (orderkey int, year int, iscurrentemployee boolean ) WITH (transactional = true , " +
+                "format = 'ORC')");
+        assertUpdate("insert into unsorttable7 values (1,2011, true)", 1);
+        assertUpdate("insert into unsorttable7 values (2,2012, true)", 1);
+        assertUpdate("insert into unsorttable7 values (2,2012, true)", 1);
+        assertUpdate("insert into unsorttable7 values (2,2012, false)", 1);
+        assertUpdate("insert into unsorttable7 values (3,2013, false)", 1);
+        assertUpdate("insert into unsorttable7 values (3,2013, true)", 1);
+        assertUpdate("insert into unsorttable7 values (3,2014, false)", 1);
+
+        computeActual("create table sorttable7  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['iscurrentemployee'], bucket_count=1, sorted_by = ARRAY['iscurrentemployee'])" +
+                "  as select * from unsorttable7 order by iscurrentemployee");
+
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+
+        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
+                "iscurrentemployee from sorttable7  group by iscurrentemployee order by iscurrentemployee");
+
+        assertUpdate("set session sort_based_aggregation_enabled=false");
+
+        MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
+                "iscurrentemployee from sorttable7  group by iscurrentemployee order by iscurrentemployee");
+
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("DROP TABLE sorttable7");
+        assertUpdate("DROP TABLE unsorttable7");
+    }
+
+    @Test
+    public void sortAggSplitWithMultiplePagesBigint()
+    {
+        // this Test case we will insert many rows , so that single split will yield many pages, groub & sort by bigint
+
+        assertUpdate("drop table if exists unsorttable8");
+        assertUpdate("drop table if exists sorttable8");
+        computeActual("create table unsorttable8 (orderkey int, year bigint) WITH (transactional = false , " +
+                "format = 'ORC')");
+
+        String str = generateNumberOfRowsForTwoColumns(2500);
+
+        assertUpdate("insert into unsorttable8 values " + str, 2500);
+
+        computeActual("create table sorttable8  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['year'], bucket_count=1, sorted_by = ARRAY['year'])  as select * from unsorttable8 order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+
+        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable8  group by year order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=false");
+
+        MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable8  group by year order by year");
+
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("DROP TABLE sorttable8");
+        assertUpdate("DROP TABLE unsorttable8");
+    }
+
+    @Test
+    public void sortAggSplitWithMultiplePagesBigintMultiSort()
+    {
+        // this Test case we will insert many rows , so that single split will yield many pages, groub & sort by bigint
+        assertUpdate("drop table if exists unsorttable9");
+        assertUpdate("drop table if exists sorttable9");
+        computeActual("create table unsorttable9 (code int, orderkey int, year bigint) WITH (transactional = false , " +
+                "format = 'ORC')");
+
+        String str = generateNumberOfRowsForThreeColumns(2500);
+
+        assertUpdate("insert into unsorttable9 values " + str, 5000);
+
+        computeActual("create table sorttable9  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['year'], bucket_count=10, sorted_by = ARRAY['year', 'orderkey'])  as select * from unsorttable9");
+
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+
+        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable9  group by year order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=false");
+
+        MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable9  group by year order by year");
+
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("DROP TABLE sorttable9");
+        assertUpdate("DROP TABLE unsorttable9");
+    }
+
+    @Test
+    public void sortAggSplitWithMultiplePagesInt()
+    {
+        // this Test case we will insert many rows , so that single split will yield many pages, groub & sort by int
+        assertUpdate("drop table if exists unsorttable10");
+        assertUpdate("drop table if exists sorttable10");
+        computeActual("create table unsorttable10 (orderkey int, year int) WITH (transactional = false , " +
+                "format = 'ORC')");
+
+        String str = generateNumberOfRowsForTwoColumns(2500);
+
+        assertUpdate("insert into unsorttable10 values " + str, 2500);
+
+        computeActual("create table sorttable10  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['year'], bucket_count=1, sorted_by = ARRAY['year'])  as select * from unsorttable10 order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+
+        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable10  group by year order by year");
+
+        assertUpdate("set session sort_based_aggregation_enabled=false");
+
+        MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable10  group by year order by year");
+
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("DROP TABLE sorttable10");
+        assertUpdate("DROP TABLE unsorttable10");
+    }
+
+    private String generateNumberOfRowsForTwoColumns(int numberOfRows)
+    {
+        String str = "";
+        String str1;
+        for (int i = 0; i < numberOfRows; i++) {
+            str1 = " ( " + (i + 200) + " , " + i + " ) ";
+            str = str.concat(str1);
+            if (i != numberOfRows - 1) {
+                str = str.concat(",");
+            }
+        }
+        return str;
+    }
+
+    private String generateNumberOfRowsForThreeColumns(int numberOfRows)
+    {
+        String str = "";
+        String str1;
+        for (int i = 0; i < numberOfRows; i++) {
+            //str1 = " ( " + (i + 200) + " , " + i + " ) ";
+            str1 = " ( " + (i + 300) + " , " + (i + 200) + " , " + i + " ), ";
+            str = str.concat(str1);
+            str1 = " ( " + (i + 600) + " , " + (i + 500) + " , " + i + " ) ";
+            str = str.concat(str1);
+            if (i != numberOfRows - 1) {
+                str = str.concat(",");
+            }
+        }
+        return str;
+    }
+
     private Set<Split> createAndGetSplits(long start)
     {
         HiveConfig config = new HiveConfig();

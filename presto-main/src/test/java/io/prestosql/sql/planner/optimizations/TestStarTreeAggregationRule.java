@@ -455,6 +455,8 @@ public class TestStarTreeAggregationRule
                 ImmutableList.of(),
                 SINGLE,
                 Optional.empty(),
+                Optional.empty(),
+                AggregationNode.AggregationType.HASH,
                 Optional.empty());
         assertTrue(StarTreeAggregationRule.isSupportedAggregation(countAgg));
 
@@ -476,6 +478,8 @@ public class TestStarTreeAggregationRule
                 ImmutableList.of(),
                 SINGLE,
                 Optional.empty(),
+                Optional.empty(),
+                AggregationNode.AggregationType.HASH,
                 Optional.empty());
         assertTrue(StarTreeAggregationRule.isSupportedAggregation(countDistinctNode));
 
@@ -497,6 +501,8 @@ public class TestStarTreeAggregationRule
                 ImmutableList.of(),
                 SINGLE,
                 Optional.empty(),
+                Optional.empty(),
+                AggregationNode.AggregationType.HASH,
                 Optional.empty());
         assertFalse(StarTreeAggregationRule.isSupportedAggregation(sumAgg));
 
@@ -518,6 +524,8 @@ public class TestStarTreeAggregationRule
                 ImmutableList.of(),
                 SINGLE,
                 Optional.empty(),
+                Optional.empty(),
+                AggregationNode.AggregationType.HASH,
                 Optional.empty());
         assertFalse(StarTreeAggregationRule.isSupportedAggregation(avgAgg));
 
@@ -539,6 +547,8 @@ public class TestStarTreeAggregationRule
                 ImmutableList.of(),
                 SINGLE,
                 Optional.empty(),
+                Optional.empty(),
+                AggregationNode.AggregationType.HASH,
                 Optional.empty());
         assertTrue(StarTreeAggregationRule.isSupportedAggregation(minAgg));
 
@@ -560,6 +570,8 @@ public class TestStarTreeAggregationRule
                 ImmutableList.of(),
                 SINGLE,
                 Optional.empty(),
+                Optional.empty(),
+                AggregationNode.AggregationType.HASH,
                 Optional.empty());
         assertTrue(StarTreeAggregationRule.isSupportedAggregation(maxAgg));
 
@@ -582,6 +594,8 @@ public class TestStarTreeAggregationRule
                 ImmutableList.of(),
                 SINGLE,
                 Optional.empty(),
+                Optional.empty(),
+                AggregationNode.AggregationType.HASH,
                 Optional.empty());
         assertFalse(StarTreeAggregationRule.isSupportedAggregation(lagAgg));
 
@@ -620,6 +634,8 @@ public class TestStarTreeAggregationRule
                 ImmutableList.of(),
                 SINGLE,
                 Optional.empty(),
+                Optional.empty(),
+                AggregationNode.AggregationType.HASH,
                 Optional.empty());
         Map<String, Object> columnMapping = StarTreeAggregationRule.buildSymbolMappings(countAggNode, projectNodes, Optional.of(filterNode), baseTableScan);
         assertEquals(columnMapping.size(), 4);

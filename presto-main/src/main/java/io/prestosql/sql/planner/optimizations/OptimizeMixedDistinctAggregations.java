@@ -225,7 +225,9 @@ public class OptimizeMixedDistinctAggregations
                     ImmutableList.of(),
                     node.getStep(),
                     Optional.empty(),
-                    node.getGroupIdSymbol());
+                    node.getGroupIdSymbol(),
+                    node.getAggregationType(),
+                    node.getFinalizeSymbol());
 
             if (coalesceSymbols.isEmpty()) {
                 return aggregationNode;
@@ -504,6 +506,8 @@ public class OptimizeMixedDistinctAggregations
                     ImmutableList.of(),
                     SINGLE,
                     originalNode.getHashSymbol(),
+                    Optional.empty(),
+                    AggregationNode.AggregationType.HASH,
                     Optional.empty());
         }
 

@@ -924,7 +924,6 @@ class QueryPlanner
                 .distinct()
                 .forEach(groupingKeys::add);
         groupIdSymbol.ifPresent(groupingKeys::add);
-
         AggregationNode aggregationNode = new AggregationNode(
                 idAllocator.getNextId(),
                 subPlan.getRoot(),
@@ -936,7 +935,9 @@ class QueryPlanner
                 ImmutableList.of(),
                 AggregationNode.Step.SINGLE,
                 Optional.empty(),
-                groupIdSymbol);
+                groupIdSymbol,
+                AggregationNode.AggregationType.HASH,
+                Optional.empty());
 
         subPlan = new PlanBuilder(aggregationTranslations, aggregationNode, analysis.getParameters());
 
@@ -1211,6 +1212,8 @@ class QueryPlanner
                             ImmutableList.of(),
                             AggregationNode.Step.SINGLE,
                             Optional.empty(),
+                            Optional.empty(),
+                            AggregationNode.AggregationType.HASH,
                             Optional.empty()));
         }
 

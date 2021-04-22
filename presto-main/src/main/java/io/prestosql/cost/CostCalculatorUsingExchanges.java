@@ -214,7 +214,21 @@ public class CostCalculatorUsingExchanges
             PlanNodeStatsEstimate aggregationStats = getStats(node);
             PlanNodeStatsEstimate sourceStats = getStats(node.getSource());
             double cpuCost = sourceStats.getOutputSizeInBytes(node.getSource().getOutputSymbols(), types);
-            double memoryCost = aggregationStats.getOutputSizeInBytes(node.getOutputSymbols(), types);
+            double hashTableCost = 0;
+            double maxDistinctValuesCount = 0;
+            if (!node.getAggregationType().equals(AggregationNode.AggregationType.SORT_BASED)) {
+                double values;
+                for (Symbol groupingKeys : node.getGroupingKeys()) {
+                    values = aggregationStats.getSymbolStatistics(groupingKeys).getDistinctValuesCount();
+                    if (Double.isNaN(values)) {
+                        continue;
+                    }
+                    maxDistinctValuesCount = max(maxDistinctValuesCount, values);
+                }
+                /*the hash table type is long and it will store distinct values so distinct values * hash size(long) */
+                hashTableCost = maxDistinctValuesCount * Long.BYTES;
+            }
+            double memoryCost = aggregationStats.getOutputSizeInBytes(node.getOutputSymbols(), types) + hashTableCost;
             LocalCostEstimate localCost = LocalCostEstimate.of(cpuCost, memoryCost, 0);
             return costForAccumulation(node, localCost);
         }

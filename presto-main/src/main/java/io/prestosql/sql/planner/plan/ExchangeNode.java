@@ -17,6 +17,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.OrderingScheme;
 import io.prestosql.spi.plan.PlanNode;
@@ -71,6 +72,7 @@ public class ExchangeNode
     private final List<List<Symbol>> inputs;
 
     private final Optional<OrderingScheme> orderingScheme;
+    private final AggregationNode.AggregationType aggregationType;
 
     @JsonCreator
     public ExchangeNode(
@@ -80,7 +82,8 @@ public class ExchangeNode
             @JsonProperty("partitioningScheme") PartitioningScheme partitioningScheme,
             @JsonProperty("sources") List<PlanNode> sources,
             @JsonProperty("inputs") List<List<Symbol>> inputs,
-            @JsonProperty("orderingScheme") Optional<OrderingScheme> orderingScheme)
+            @JsonProperty("orderingScheme") Optional<OrderingScheme> orderingScheme,
+            @JsonProperty("aggregationType") AggregationNode.AggregationType aggregationType)
     {
         super(id);
 
@@ -115,14 +118,20 @@ public class ExchangeNode
         this.partitioningScheme = partitioningScheme;
         this.inputs = listOfListsCopy(inputs);
         this.orderingScheme = orderingScheme;
+        this.aggregationType = aggregationType;
     }
 
     public static ExchangeNode partitionedExchange(PlanNodeId id, Scope scope, PlanNode child, List<Symbol> partitioningColumns, Optional<Symbol> hashColumns)
     {
-        return partitionedExchange(id, scope, child, partitioningColumns, hashColumns, false);
+        return partitionedExchange(id, scope, child, partitioningColumns, hashColumns, false, AggregationNode.AggregationType.HASH);
     }
 
     public static ExchangeNode partitionedExchange(PlanNodeId id, Scope scope, PlanNode child, List<Symbol> partitioningColumns, Optional<Symbol> hashColumns, boolean replicateNullsAndAny)
+    {
+        return partitionedExchange(id, scope, child, partitioningColumns, hashColumns, replicateNullsAndAny, AggregationNode.AggregationType.HASH);
+    }
+
+    public static ExchangeNode partitionedExchange(PlanNodeId id, Scope scope, PlanNode child, List<Symbol> partitioningColumns, Optional<Symbol> hashColumns, boolean replicateNullsAndAny, AggregationNode.AggregationType aggregationType)
     {
         return partitionedExchange(
                 id,
@@ -133,10 +142,16 @@ public class ExchangeNode
                         child.getOutputSymbols(),
                         hashColumns,
                         replicateNullsAndAny,
-                        Optional.empty()));
+                        Optional.empty()),
+                aggregationType);
     }
 
     public static ExchangeNode partitionedExchange(PlanNodeId id, Scope scope, PlanNode child, PartitioningScheme partitioningScheme)
+    {
+        return partitionedExchange(id, scope, child, partitioningScheme, AggregationNode.AggregationType.HASH);
+    }
+
+    public static ExchangeNode partitionedExchange(PlanNodeId id, Scope scope, PlanNode child, PartitioningScheme partitioningScheme, AggregationNode.AggregationType aggregationType)
     {
         if (partitioningScheme.getPartitioning().getHandle().isSingleNode()) {
             return gatheringExchange(id, scope, child);
@@ -157,7 +172,8 @@ public class ExchangeNode
                 partitioningScheme,
                 ImmutableList.of(child),
                 ImmutableList.of(partitioningScheme.getOutputLayout()).asList(),
-                Optional.empty());
+                Optional.empty(),
+                aggregationType);
     }
 
     public static ExchangeNode replicatedExchange(PlanNodeId id, Scope scope, PlanNode child)
@@ -175,7 +191,8 @@ public class ExchangeNode
                 new PartitioningScheme(Partitioning.create(FIXED_BROADCAST_DISTRIBUTION, ImmutableList.of()), child.getOutputSymbols()),
                 ImmutableList.of(child),
                 ImmutableList.of(child.getOutputSymbols()),
-                Optional.empty());
+                Optional.empty(),
+                AggregationNode.AggregationType.HASH);
     }
 
     public static ExchangeNode gatheringExchange(PlanNodeId id, Scope scope, PlanNode child)
@@ -193,7 +210,8 @@ public class ExchangeNode
                 new PartitioningScheme(Partitioning.create(SINGLE_DISTRIBUTION, ImmutableList.of()), child.getOutputSymbols()),
                 ImmutableList.of(child),
                 ImmutableList.of(child.getOutputSymbols()),
-                Optional.empty());
+                Optional.empty(),
+                AggregationNode.AggregationType.HASH);
     }
 
     public static ExchangeNode roundRobinExchange(PlanNodeId id, Scope scope, PlanNode child)
@@ -221,7 +239,8 @@ public class ExchangeNode
                 new PartitioningScheme(Partitioning.create(partitioningHandle, ImmutableList.of()), child.getOutputSymbols()),
                 ImmutableList.of(child),
                 ImmutableList.of(child.getOutputSymbols()),
-                Optional.of(orderingScheme));
+                Optional.of(orderingScheme),
+                AggregationNode.AggregationType.HASH);
     }
 
     @JsonProperty
@@ -267,6 +286,12 @@ public class ExchangeNode
         return inputs;
     }
 
+    @JsonProperty("aggregationType")
+    public AggregationNode.AggregationType getAggregationType()
+    {
+        return aggregationType;
+    }
+
     @Override
     public <R, C> R accept(InternalPlanVisitor<R, C> visitor, C context)
     {
@@ -276,6 +301,6 @@ public class ExchangeNode
     @Override
     public PlanNode replaceChildren(List<PlanNode> newChildren)
     {
-        return new ExchangeNode(getId(), type, scope, partitioningScheme, newChildren, inputs, orderingScheme);
+        return new ExchangeNode(getId(), type, scope, partitioningScheme, newChildren, inputs, orderingScheme, aggregationType);
     }
 }

@@ -183,6 +183,8 @@ public class TransformExistsApplyToLateralNode
                                 ImmutableList.of(),
                                 AggregationNode.Step.SINGLE,
                                 Optional.empty(),
+                                Optional.empty(),
+                                AggregationNode.AggregationType.HASH,
                                 Optional.empty()),
                         Assignments.of(exists, castToRowExpression(new ComparisonExpression(GREATER_THAN, toSymbolReference(count), new Cast(new LongLiteral("0"), BIGINT.toString()))))),
                 parent.getCorrelation(),

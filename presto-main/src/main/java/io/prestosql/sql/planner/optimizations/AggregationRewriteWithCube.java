@@ -155,6 +155,8 @@ public class AggregationRewriteWithCube
                 ImmutableList.of(),
                 AggregationNode.Step.SINGLE,
                 Optional.empty(),
+                Optional.empty(),
+                AggregationNode.AggregationType.HASH,
                 Optional.empty());
 
         // If there was an AVG aggregation, map it to AVG = SUM/COUNT

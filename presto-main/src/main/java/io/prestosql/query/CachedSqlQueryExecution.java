@@ -457,7 +457,8 @@ public class CachedSqlQueryExecution
                         partitioningScheme,
                         children,
                         node.getInputs(),
-                        node.getOrderingScheme());
+                        node.getOrderingScheme(),
+                        node.getAggregationType());
             }
             else {
                 return super.visitExchange(node, context);

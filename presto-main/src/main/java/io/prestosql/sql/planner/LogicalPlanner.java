@@ -333,6 +333,8 @@ public class LogicalPlanner
                         ImmutableList.of(),
                         AggregationNode.Step.SINGLE,
                         Optional.empty(),
+                        Optional.empty(),
+                        AggregationNode.AggregationType.HASH,
                         Optional.empty()),
                 new StatisticsWriterNode.WriteStatisticsReference(targetTable),
                 planSymbolAllocator.newSymbol("rows", BIGINT),

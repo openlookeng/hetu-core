@@ -18,14 +18,20 @@ import io.prestosql.operator.HashCollisionsCounter;
 import io.prestosql.operator.Work;
 import io.prestosql.operator.WorkProcessor;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.snapshot.Restorable;
 
-public interface HashAggregationBuilder
+public interface AggregationBuilder
         extends AutoCloseable, Restorable
 {
     Work<?> processPage(Page page);
 
     WorkProcessor<Page> buildResult();
+
+    default WorkProcessor<Page> buildResult(AggregationNode.Step step)
+    {
+        return buildResult();
+    }
 
     boolean isFull();
 

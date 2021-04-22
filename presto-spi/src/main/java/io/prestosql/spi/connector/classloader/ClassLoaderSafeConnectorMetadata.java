@@ -793,4 +793,28 @@ public class ClassLoaderSafeConnectorMetadata
     {
         delegate.resetCreateForRerun(session, tableHandle, snapshotIndex);
     }
+
+    @Override
+    public List<String> getTableSortedColumns(ConnectorSession session, ConnectorTableHandle table)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.getTableSortedColumns(session, table);
+        }
+    }
+
+    @Override
+    public List<String> getTableBucketedBy(ConnectorSession session, ConnectorTableHandle table)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.getTableBucketedBy(session, table);
+        }
+    }
+
+    @Override
+    public int getTableBucketedCount(ConnectorSession session, ConnectorTableHandle table)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.getTableBucketedCount(session, table);
+        }
+    }
 }
