@@ -157,4 +157,9 @@ public class ServerInfoResource
     {
         checkState(startupComplete.compareAndSet(false, true), "Server startup already marked as complete");
     }
+
+    public boolean isStartupComplete()
+    {
+        return startupComplete.get();
+    }
 }
