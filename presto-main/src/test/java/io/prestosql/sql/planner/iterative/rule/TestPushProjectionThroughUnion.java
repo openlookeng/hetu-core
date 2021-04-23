@@ -19,16 +19,19 @@ import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.plan.Assignments;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.iterative.rule.test.BaseRuleTest;
+import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.sql.relational.OriginalExpressionUtils;
-import io.prestosql.sql.tree.ArithmeticBinaryExpression;
 import io.prestosql.sql.tree.LongLiteral;
 import org.testng.annotations.Test;
 
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+import static io.prestosql.spi.function.OperatorType.MULTIPLY;
+import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.expression;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.project;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.union;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
+import static io.prestosql.sql.relational.Expressions.call;
+import static io.prestosql.sql.relational.Expressions.constant;
 
 public class TestPushProjectionThroughUnion
         extends BaseRuleTest
@@ -70,6 +73,7 @@ public class TestPushProjectionThroughUnion
     @Test
     public void test()
     {
+        FunctionResolution functionResolution = new FunctionResolution(tester().getMetadata().getFunctionAndTypeManager());
         tester().assertThat(new PushProjectionThroughUnion())
                 .on(p -> {
                     Symbol a = p.symbol("a");
@@ -77,7 +81,7 @@ public class TestPushProjectionThroughUnion
                     Symbol c = p.symbol("c");
                     Symbol cTimes3 = p.symbol("c_times_3");
                     return p.project(
-                            Assignments.of(cTimes3, OriginalExpressionUtils.castToRowExpression(new ArithmeticBinaryExpression(ArithmeticBinaryExpression.Operator.MULTIPLY, toSymbolReference(c), new LongLiteral("3")))),
+                            Assignments.of(cTimes3, call("c * 3", functionResolution.arithmeticFunction(MULTIPLY, BIGINT, BIGINT), BIGINT, p.variable("c"), constant(3L, BIGINT))),
                             p.union(
                                     ImmutableListMultimap.<Symbol, Symbol>builder()
                                             .put(c, a)

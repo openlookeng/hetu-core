@@ -98,4 +98,14 @@ public class MySqlRowExpressionConverter
 
         return super.visitCall(call, context);
     }
+
+    @Override
+    public String visitConstant(ConstantExpression literal, JdbcConverterContext context)
+    {
+        if (literal.getValue() == null) {
+            return getCastExpression("null", literal.getType());
+        }
+
+        return super.visitConstant(literal, context);
+    }
 }

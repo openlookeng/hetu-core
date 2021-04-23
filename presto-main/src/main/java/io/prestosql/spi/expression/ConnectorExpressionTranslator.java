@@ -13,35 +13,26 @@
  */
 package io.prestosql.spi.expression;
 
-import io.prestosql.Session;
 import io.prestosql.spi.plan.Symbol;
-import io.prestosql.spi.type.Decimals;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.ConstantExpression;
+import io.prestosql.spi.relation.InputReferenceExpression;
+import io.prestosql.spi.relation.LambdaDefinitionExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.RowExpressionVisitor;
+import io.prestosql.spi.relation.SpecialForm;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.RowType;
-import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.LiteralEncoder;
-import io.prestosql.sql.planner.TypeAnalyzer;
-import io.prestosql.sql.planner.TypeProvider;
-import io.prestosql.sql.tree.AstVisitor;
-import io.prestosql.sql.tree.BinaryLiteral;
-import io.prestosql.sql.tree.BooleanLiteral;
-import io.prestosql.sql.tree.CharLiteral;
-import io.prestosql.sql.tree.DecimalLiteral;
-import io.prestosql.sql.tree.DereferenceExpression;
-import io.prestosql.sql.tree.DoubleLiteral;
-import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.Identifier;
-import io.prestosql.sql.tree.LongLiteral;
-import io.prestosql.sql.tree.NodeRef;
-import io.prestosql.sql.tree.NullLiteral;
-import io.prestosql.sql.tree.StringLiteral;
-import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.List;
 import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+import static io.prestosql.spi.type.IntegerType.INTEGER;
+import static io.prestosql.sql.relational.Expressions.constant;
 import static java.util.Objects.requireNonNull;
 
 public final class ConnectorExpressionTranslator
@@ -50,15 +41,14 @@ public final class ConnectorExpressionTranslator
     {
     }
 
-    public static Expression translate(ConnectorExpression expression, Map<String, Symbol> variableMappings, LiteralEncoder literalEncoder)
+    public static RowExpression translate(ConnectorExpression expression, Map<String, Symbol> variableMappings, LiteralEncoder literalEncoder)
     {
         return new ConnectorToSqlExpressionTranslator(variableMappings, literalEncoder).translate(expression);
     }
 
-    public static ConnectorExpression translate(Session session, Expression expression, TypeAnalyzer types, TypeProvider inputTypes)
+    public static ConnectorExpression translate(RowExpression expression)
     {
-        return new SqlToConnectorExpressionTranslator(types.getTypes(session, inputTypes, expression))
-                .process(expression);
+        return expression.accept(new SqlToConnectorExpressionTranslator(), null);
     }
 
     private static class ConnectorToSqlExpressionTranslator
@@ -72,14 +62,14 @@ public final class ConnectorExpressionTranslator
             this.literalEncoder = requireNonNull(literalEncoder, "literalEncoder is null");
         }
 
-        public Expression translate(ConnectorExpression expression)
+        public RowExpression translate(ConnectorExpression expression)
         {
             if (expression instanceof Variable) {
-                return toSymbolReference(variableMappings.get(((Variable) expression).getName()));
+                return new VariableReferenceExpression(variableMappings.get(((Variable) expression).getName()).getName(), expression.getType());
             }
 
             if (expression instanceof Constant) {
-                return literalEncoder.toExpression(((Constant) expression).getValue(), expression.getType());
+                return literalEncoder.toRowExpression(((Constant) expression).getValue(), expression.getType());
             }
 
             if (expression instanceof FieldDereference) {
@@ -87,7 +77,17 @@ public final class ConnectorExpressionTranslator
 
                 RowType type = (RowType) expression.getType();
                 String name = type.getFields().get(dereference.getField()).getName().get();
-                return new DereferenceExpression(translate(dereference.getTarget()), new Identifier(name));
+                List<RowType.Field> fields = type.getFields();
+                int index = -1;
+                for (int i = 0; i < fields.size(); i++) {
+                    RowType.Field field = fields.get(i);
+                    if (field.getName().isPresent() && field.getName().get().equalsIgnoreCase(name)) {
+                        checkArgument(index < 0, "Ambiguous field %s in type %s", field, type.getDisplayName());
+                        index = i;
+                    }
+                }
+                checkState(index >= 0, "could not find field name:%s", new Identifier(name));
+                return new SpecialForm(SpecialForm.Form.DEREFERENCE, type.getFields().get(index).getType(), translate(dereference.getTarget()), constant(index, INTEGER));
             }
 
             throw new UnsupportedOperationException("Expression type not supported: " + expression.getClass().getName());
@@ -95,98 +95,63 @@ public final class ConnectorExpressionTranslator
     }
 
     private static class SqlToConnectorExpressionTranslator
-            extends AstVisitor<ConnectorExpression, Void>
+            implements RowExpressionVisitor<ConnectorExpression, Void>
     {
-        private final Map<NodeRef<Expression>, Type> types;
-
-        private SqlToConnectorExpressionTranslator(Map<NodeRef<Expression>, Type> types)
+        private SqlToConnectorExpressionTranslator()
         {
-            this.types = requireNonNull(types, "types is null");
         }
 
         @Override
-        protected ConnectorExpression visitSymbolReference(SymbolReference node, Void context)
+        public ConnectorExpression visitConstant(ConstantExpression node, Void context)
         {
-            return new Variable(node.getName(), typeOf(node));
+            return new Constant(node.getValue(), node.getType());
         }
 
         @Override
-        protected ConnectorExpression visitBooleanLiteral(BooleanLiteral node, Void context)
+        public ConnectorExpression visitVariableReference(VariableReferenceExpression node, Void context)
         {
-            return new Constant(node.getValue(), typeOf(node));
+            return new Variable(node.getName(), node.getType());
         }
 
         @Override
-        protected ConnectorExpression visitStringLiteral(StringLiteral node, Void context)
+        public ConnectorExpression visitSpecialForm(SpecialForm node, Void context)
         {
-            return new Constant(node.getSlice(), typeOf(node));
-        }
+            switch (node.getForm()) {
+                case DEREFERENCE: {
+                    checkArgument(node.getArguments().size() == 2);
 
-        @Override
-        protected ConnectorExpression visitDoubleLiteral(DoubleLiteral node, Void context)
-        {
-            return new Constant(node.getValue(), typeOf(node));
-        }
+                    ConnectorExpression base = node.getArguments().get(0).accept(this, context);
+                    checkArgument(node.getArguments().get(1) instanceof ConstantExpression);
+                    int index = ((Number) ((ConstantExpression) node.getArguments().get(1)).getValue()).intValue();
 
-        @Override
-        protected ConnectorExpression visitDecimalLiteral(DecimalLiteral node, Void context)
-        {
-            return new Constant(Decimals.parse(node.getValue()).getObject(), typeOf(node));
-        }
+                    // if the base part is evaluated to be null, the dereference expression should also be null
+                    if (base == null) {
+                        return null;
+                    }
 
-        @Override
-        protected ConnectorExpression visitCharLiteral(CharLiteral node, Void context)
-        {
-            return new Constant(node.getSlice(), typeOf(node));
-        }
-
-        @Override
-        protected ConnectorExpression visitBinaryLiteral(BinaryLiteral node, Void context)
-        {
-            return new Constant(node.getValue(), typeOf(node));
-        }
-
-        @Override
-        protected ConnectorExpression visitLongLiteral(LongLiteral node, Void context)
-        {
-            return new Constant(node.getValue(), typeOf(node));
-        }
-
-        @Override
-        protected ConnectorExpression visitNullLiteral(NullLiteral node, Void context)
-        {
-            return new Constant(null, typeOf(node));
-        }
-
-        @Override
-        protected ConnectorExpression visitDereferenceExpression(DereferenceExpression node, Void context)
-        {
-            RowType rowType = (RowType) typeOf(node.getBase());
-            String fieldName = node.getField().getValue();
-            List<RowType.Field> fields = rowType.getFields();
-            int index = -1;
-            for (int i = 0; i < fields.size(); i++) {
-                RowType.Field field = fields.get(i);
-                if (field.getName().isPresent() && field.getName().get().equalsIgnoreCase(fieldName)) {
-                    checkArgument(index < 0, "Ambiguous field %s in type %s", field, rowType.getDisplayName());
-                    index = i;
+                    return new FieldDereference(node.getType(), base, index);
                 }
+                default:
+                    throw new UnsupportedOperationException("not yet implemented: expression translator for " + node.getClass().getName());
             }
-
-            checkState(index >= 0, "could not find field name: %s", node.getField());
-
-            return new FieldDereference(typeOf(node), process(node.getBase()), index);
         }
 
         @Override
-        protected ConnectorExpression visitExpression(Expression node, Void context)
+        public ConnectorExpression visitCall(CallExpression node, Void context)
         {
             throw new UnsupportedOperationException("not yet implemented: expression translator for " + node.getClass().getName());
         }
 
-        private Type typeOf(Expression node)
+        @Override
+        public ConnectorExpression visitInputReference(InputReferenceExpression node, Void context)
         {
-            return types.get(NodeRef.of(node));
+            throw new UnsupportedOperationException("not yet implemented: expression translator for " + node.getClass().getName());
+        }
+
+        @Override
+        public ConnectorExpression visitLambda(LambdaDefinitionExpression node, Void context)
+        {
+            throw new UnsupportedOperationException("not yet implemented: expression translator for " + node.getClass().getName());
         }
     }
 }

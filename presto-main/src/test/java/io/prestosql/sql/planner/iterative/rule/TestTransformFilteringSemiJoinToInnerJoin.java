@@ -25,13 +25,13 @@ import java.util.Optional;
 import static io.prestosql.SystemSessionProperties.FILTERING_SEMI_JOIN_TO_INNER;
 import static io.prestosql.spi.plan.AggregationNode.Step.SINGLE;
 import static io.prestosql.spi.plan.JoinNode.Type.INNER;
+import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.aggregation;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.equiJoinClause;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.join;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.project;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.singleGroupingSet;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
-import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expression;
 
 public class TestTransformFilteringSemiJoinToInnerJoin
         extends BaseRuleTest
@@ -39,14 +39,14 @@ public class TestTransformFilteringSemiJoinToInnerJoin
     @Test
     public void testTransformSemiJoinToInnerJoin()
     {
-        tester().assertThat(new TransformFilteringSemiJoinToInnerJoin())
+        tester().assertThat(new TransformFilteringSemiJoinToInnerJoin(getMetadata()))
                 .setSystemProperty(FILTERING_SEMI_JOIN_TO_INNER, "true")
                 .on(p -> {
                     Symbol a = p.symbol("a");
                     Symbol b = p.symbol("b");
-                    Symbol aInB = p.symbol("a_in_b");
+                    Symbol aInB = p.symbol("a_in_b", BOOLEAN);
                     return p.filter(
-                            expression("a_in_b AND a > 5"),
+                            p.rowExpression("a_in_b AND a > 5"),
                             p.semiJoin(
                                     p.values(a),
                                     p.values(b),
@@ -76,14 +76,14 @@ public class TestTransformFilteringSemiJoinToInnerJoin
     @Test
     public void testRemoveRedundantFilter()
     {
-        tester().assertThat(new TransformFilteringSemiJoinToInnerJoin())
+        tester().assertThat(new TransformFilteringSemiJoinToInnerJoin(getMetadata()))
                 .setSystemProperty(FILTERING_SEMI_JOIN_TO_INNER, "true")
                 .on(p -> {
                     Symbol a = p.symbol("a");
                     Symbol b = p.symbol("b");
                     Symbol aInB = p.symbol("a_in_b");
                     return p.filter(
-                            expression("a_in_b"),
+                            p.rowExpression("a_in_b"),
                             p.semiJoin(
                                     p.values(a),
                                     p.values(b),
@@ -113,14 +113,14 @@ public class TestTransformFilteringSemiJoinToInnerJoin
     @Test
     public void testFilterNotMatching()
     {
-        tester().assertThat(new TransformFilteringSemiJoinToInnerJoin())
+        tester().assertThat(new TransformFilteringSemiJoinToInnerJoin(getMetadata()))
                 .setSystemProperty(FILTERING_SEMI_JOIN_TO_INNER, "true")
                 .on(p -> {
                     Symbol a = p.symbol("a");
                     Symbol b = p.symbol("b");
                     Symbol aInB = p.symbol("a_in_b");
                     return p.filter(
-                            expression("a > 5"),
+                            p.rowExpression("a > 5"),
                             p.semiJoin(
                                     p.values(a),
                                     p.values(b),

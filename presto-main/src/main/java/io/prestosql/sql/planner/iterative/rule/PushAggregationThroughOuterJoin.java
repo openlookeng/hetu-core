@@ -29,16 +29,13 @@ import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.SpecialForm;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
-import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
-import io.prestosql.sql.tree.CoalesceExpression;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.NullLiteral;
-import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.HashSet;
 import java.util.List;
@@ -52,13 +49,13 @@ import static io.prestosql.SystemSessionProperties.shouldPushAggregationThroughJ
 import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.spi.plan.AggregationNode.globalAggregation;
 import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
-import static io.prestosql.sql.planner.ExpressionSymbolInliner.inlineSymbols;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+import static io.prestosql.spi.relation.SpecialForm.Form.COALESCE;
+import static io.prestosql.sql.planner.RowExpressionVariableInliner.inlineVariables;
+import static io.prestosql.sql.planner.VariableReferenceSymbolConverter.toVariableReference;
 import static io.prestosql.sql.planner.optimizations.DistinctOutputQueryUtil.isDistinct;
 import static io.prestosql.sql.planner.plan.Patterns.aggregation;
 import static io.prestosql.sql.planner.plan.Patterns.join;
 import static io.prestosql.sql.planner.plan.Patterns.source;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 
 /**
  * This optimizer pushes aggregations below outer joins when: the aggregation
@@ -265,11 +262,13 @@ public class PushAggregationThroughOuterJoin
         Assignments.Builder assignmentsBuilder = Assignments.builder();
         for (Symbol symbol : outerJoin.getOutputSymbols()) {
             if (aggregationNode.getAggregations().containsKey(symbol)) {
-                assignmentsBuilder.put(symbol, castToRowExpression(
-                        new CoalesceExpression(toSymbolReference(symbol), toSymbolReference(sourceAggregationToOverNullMapping.get(symbol)))));
+                assignmentsBuilder.put(symbol, new SpecialForm(COALESCE,
+                        planSymbolAllocator.getTypes().get(symbol),
+                        ImmutableList.of(toVariableReference(symbol, planSymbolAllocator.getTypes()),
+                                toVariableReference(sourceAggregationToOverNullMapping.get(symbol), planSymbolAllocator.getTypes()))));
             }
             else {
-                assignmentsBuilder.put(symbol, castToRowExpression(toSymbolReference(symbol)));
+                assignmentsBuilder.put(symbol, toVariableReference(symbol, planSymbolAllocator.getTypes()));
             }
         }
         return Optional.of(new ProjectNode(idAllocator.getNextId(), crossJoin, assignmentsBuilder.build()));
@@ -280,21 +279,22 @@ public class PushAggregationThroughOuterJoin
         // Create a values node that consists of a single row of nulls.
         // Map the output symbols from the referenceAggregation's source
         // to symbol references for the new values node.
-        NullLiteral nullLiteral = new NullLiteral();
         ImmutableList.Builder<Symbol> nullSymbols = ImmutableList.builder();
         ImmutableList.Builder<RowExpression> nullLiterals = ImmutableList.builder();
-        ImmutableMap.Builder<Symbol, SymbolReference> sourcesSymbolMappingBuilder = ImmutableMap.builder();
+        ImmutableMap.Builder<VariableReferenceExpression, VariableReferenceExpression> sourcesSymbolMappingBuilder = ImmutableMap.builder();
         for (Symbol sourceSymbol : referenceAggregation.getSource().getOutputSymbols()) {
-            nullLiterals.add(castToRowExpression(nullLiteral));
-            Symbol nullSymbol = planSymbolAllocator.newSymbol(nullLiteral, planSymbolAllocator.getTypes().get(sourceSymbol));
+            RowExpression nullLiteral = new ConstantExpression(null, planSymbolAllocator.getTypes().get(sourceSymbol));
+            nullLiterals.add(nullLiteral);
+            Symbol nullSymbol = planSymbolAllocator.newSymbol(nullLiteral);
             nullSymbols.add(nullSymbol);
-            sourcesSymbolMappingBuilder.put(sourceSymbol, toSymbolReference(nullSymbol));
+            sourcesSymbolMappingBuilder.put(toVariableReference(sourceSymbol, planSymbolAllocator.getTypes().get(sourceSymbol)),
+                    toVariableReference(nullSymbol, nullLiteral.getType()));
         }
         ValuesNode nullRow = new ValuesNode(
                 idAllocator.getNextId(),
                 nullSymbols.build(),
                 ImmutableList.of(nullLiterals.build()));
-        Map<Symbol, SymbolReference> sourcesSymbolMapping = sourcesSymbolMappingBuilder.build();
+        Map<VariableReferenceExpression, VariableReferenceExpression> sourcesSymbolMapping = sourcesSymbolMappingBuilder.build();
 
         // For each aggregation function in the reference node, create a corresponding aggregation function
         // that points to the nullRow. Map the symbols from the aggregations in referenceAggregation to the
@@ -305,7 +305,7 @@ public class PushAggregationThroughOuterJoin
             Symbol aggregationSymbol = entry.getKey();
             AggregationNode.Aggregation aggregation = entry.getValue();
 
-            if (!isUsingSymbols(aggregation, sourcesSymbolMapping.keySet())) {
+            if (!isUsingVariables(aggregation, sourcesSymbolMapping.keySet())) {
                 return Optional.empty();
             }
 
@@ -315,15 +315,11 @@ public class PushAggregationThroughOuterJoin
                             aggregation.getFunctionCall().getFunctionHandle(),
                             aggregation.getFunctionCall().getType(),
                             aggregation.getArguments().stream()
-                                    .map(OriginalExpressionUtils::castToExpression)
-                                    .map(argument -> inlineSymbols(sourcesSymbolMapping, argument))
-                                    .map(OriginalExpressionUtils::castToRowExpression)
+                                    .map(argument -> inlineVariables(sourcesSymbolMapping, argument))
                                     .collect(toImmutableList()),
                             Optional.empty()),
                     aggregation.getArguments().stream()
-                            .map(OriginalExpressionUtils::castToExpression)
-                            .map(argument -> inlineSymbols(sourcesSymbolMapping, argument))
-                            .map(OriginalExpressionUtils::castToRowExpression)
+                            .map(argument -> inlineVariables(sourcesSymbolMapping, argument))
                             .collect(toImmutableList()),
                     aggregation.isDistinct(),
                     aggregation.getFilter(),
@@ -351,12 +347,16 @@ public class PushAggregationThroughOuterJoin
         return Optional.of(new MappedAggregationInfo(aggregationOverNullRow, aggregationsSymbolMapping));
     }
 
-    private static boolean isUsingSymbols(AggregationNode.Aggregation aggregation, Set<Symbol> sourceSymbols)
+    private static boolean isUsingVariables(AggregationNode.Aggregation aggregation, Set<VariableReferenceExpression> sourceVariables)
     {
-        List<Expression> functionArguments = aggregation.getArguments().stream().map(OriginalExpressionUtils::castToExpression).collect(toImmutableList());
-        return sourceSymbols.stream()
-                .map(SymbolUtils::toSymbolReference)
-                .anyMatch(functionArguments::contains);
+        Set<VariableReferenceExpression> inputVariables = new HashSet<>();
+        for (RowExpression argument : aggregation.getArguments()) {
+            if (argument instanceof VariableReferenceExpression) {
+                inputVariables.add((VariableReferenceExpression) argument);
+            }
+        }
+        return sourceVariables.stream()
+                .anyMatch(inputVariables::contains);
     }
 
     private static class MappedAggregationInfo

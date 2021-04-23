@@ -46,8 +46,6 @@ import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.analyzer.FeaturesConfig.RedistributeWritesType;
-import io.prestosql.sql.planner.ExpressionDomainTranslator;
-import io.prestosql.sql.planner.LiteralEncoder;
 import io.prestosql.sql.planner.Partitioning;
 import io.prestosql.sql.planner.PartitioningScheme;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
@@ -78,6 +76,7 @@ import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
+import io.prestosql.sql.relational.RowExpressionDomainTranslator;
 import io.prestosql.utils.WriteExchangePartitioner;
 
 import java.util.ArrayList;
@@ -122,13 +121,11 @@ public class AddExchanges
 {
     private final TypeAnalyzer typeAnalyzer;
     private final Metadata metadata;
-    private final ExpressionDomainTranslator domainTranslator;
     private final boolean pushdownPartitionsOnly;
 
     public AddExchanges(Metadata metadata, TypeAnalyzer typeAnalyzer, boolean pushdownPartitionsOnly)
     {
         this.metadata = metadata;
-        this.domainTranslator = new ExpressionDomainTranslator(new LiteralEncoder(metadata));
         this.typeAnalyzer = typeAnalyzer;
         this.pushdownPartitionsOnly = pushdownPartitionsOnly;
     }
@@ -577,7 +574,7 @@ public class AddExchanges
 
         private Optional<PlanWithProperties> planTableScan(TableScanNode node, RowExpression predicate)
         {
-            return PushPredicateIntoTableScan.pushPredicateIntoTableScan(node, predicate, true, session, types, idAllocator, planSymbolAllocator, metadata, typeAnalyzer, domainTranslator, pushdownPartitionsOnly)
+            return PushPredicateIntoTableScan.pushPredicateIntoTableScan(node, predicate, true, session, idAllocator, planSymbolAllocator, metadata, new RowExpressionDomainTranslator(metadata), pushdownPartitionsOnly)
                     .map(plan -> new PlanWithProperties(plan, derivePropertiesRecursively(plan)));
         }
 

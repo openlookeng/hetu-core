@@ -3,8 +3,8 @@ local exchange (GATHER, SINGLE, [])
         final aggregation over (d_qoy_176, d_year_175, expr_173, expr_174, i_category_177)
             local exchange (REPARTITION, HASH, ["d_qoy_176", "d_year_175", "expr_173", "expr_174", "i_category_177"])
                 local exchange (REPARTITION, ROUND_ROBIN, [])
-                    remote exchange (REPARTITION, HASH, ["d_qoy", "d_year", "expr_225", "expr_226", "i_category"])
-                        partial aggregation over (d_qoy, d_year, expr_225, expr_226, i_category)
+                    remote exchange (REPARTITION, HASH, ["cast", "d_qoy", "d_year", "expr_225", "i_category"])
+                        partial aggregation over (cast, d_qoy, d_year, expr_225, i_category)
                             join (INNER, PARTITIONED):
                                 remote exchange (REPARTITION, HASH, ["ss_item_sk"])
                                     join (INNER, PARTITIONED):
@@ -16,8 +16,8 @@ local exchange (GATHER, SINGLE, [])
                                 local exchange (GATHER, SINGLE, [])
                                     remote exchange (REPARTITION, HASH, ["i_item_sk"])
                                         scan item
-                    remote exchange (REPARTITION, HASH, ["d_qoy_53", "d_year_49", "expr_231", "expr_232", "i_category_32"])
-                        partial aggregation over (d_qoy_53, d_year_49, expr_231, expr_232, i_category_32)
+                    remote exchange (REPARTITION, HASH, ["cast_230", "d_qoy_53", "d_year_49", "expr_231", "i_category_32"])
+                        partial aggregation over (cast_230, d_qoy_53, d_year_49, expr_231, i_category_32)
                             join (INNER, REPLICATED):
                                 scan item
                                 local exchange (GATHER, SINGLE, [])

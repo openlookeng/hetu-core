@@ -213,10 +213,7 @@ import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
-import io.prestosql.sql.relational.SqlToRowExpressionTranslator;
 import io.prestosql.sql.relational.VariableToChannelTranslator;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.statestore.listener.StateStoreListenerManager;
@@ -289,7 +286,6 @@ import static io.prestosql.operator.TableWriterOperator.TableWriterOperatorFacto
 import static io.prestosql.operator.WindowFunctionDefinition.window;
 import static io.prestosql.operator.unnest.UnnestOperator.UnnestOperatorFactory;
 import static io.prestosql.spi.StandardErrorCode.COMPILER_ERROR;
-import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.function.OperatorType.LESS_THAN;
 import static io.prestosql.spi.function.OperatorType.LESS_THAN_OR_EQUAL;
 import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT;
@@ -322,8 +318,6 @@ import static io.prestosql.sql.planner.plan.TableWriterNode.UpdateTarget;
 import static io.prestosql.sql.planner.plan.TableWriterNode.VacuumTarget;
 import static io.prestosql.sql.planner.plan.TableWriterNode.WriterTarget;
 import static io.prestosql.sql.relational.Expressions.constant;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 import static io.prestosql.util.SpatialJoinUtils.ST_CONTAINS;
 import static io.prestosql.util.SpatialJoinUtils.ST_DISTANCE;
 import static io.prestosql.util.SpatialJoinUtils.ST_INTERSECTS;
@@ -1436,7 +1430,7 @@ public class LocalExecutionPlanner
             RowExpression filterExpression = node.getPredicate();
             List<Symbol> outputSymbols = node.getOutputSymbols();
 
-            return visitScanFilterAndProject(context, node.getId(), sourceNode, Optional.of(filterExpression), AssignmentUtils.identityAsSymbolReferences(outputSymbols), outputSymbols);
+            return visitScanFilterAndProject(context, node.getId(), sourceNode, Optional.of(filterExpression), AssignmentUtils.identityAssignments(context.getTypes(), outputSymbols), outputSymbols);
         }
 
         @Override
@@ -1550,15 +1544,7 @@ public class LocalExecutionPlanner
             }
 
             List<RowExpression> translatedProjections = projections.stream()
-                    .map(expression -> {
-                        if (isExpression(expression)) {
-                            Map<NodeRef<Expression>, Type> expressionTypes = typeAnalyzer.getTypes(context.getSession(), context.getTypes(), castToExpression(expression));
-                            return toRowExpression(castToExpression(expression), expressionTypes, sourceLayout);
-                        }
-                        else {
-                            return bindChannels(expression, sourceLayout, context.getTypes());
-                        }
-                    })
+                    .map(expression -> bindChannels(expression, sourceLayout, context.getTypes()))
                     .collect(toImmutableList());
 
             try {
@@ -1580,14 +1566,7 @@ public class LocalExecutionPlanner
                             table,
                             columns,
                             dynamicFilter,
-                            projections.stream().map(expression -> {
-                                if (isExpression(expression)) {
-                                    return typeAnalyzer.getTypes(context.getSession(), context.getTypes(), castToExpression(expression)).get(NodeRef.of(castToExpression(expression)));
-                                }
-                                else {
-                                    return expression.getType();
-                                }
-                            }).collect(toImmutableList()),
+                            projections.stream().map(expression -> expression.getType()).collect(toImmutableList()),
                             stateStoreProvider,
                             metadata,
                             dynamicFilterCacheManager,
@@ -1604,14 +1583,7 @@ public class LocalExecutionPlanner
                             context.getNextOperatorId(),
                             planNodeId,
                             pageProcessor,
-                            projections.stream().map(expression -> {
-                                if (isExpression(expression)) {
-                                    return typeAnalyzer.getTypes(context.getSession(), context.getTypes(), castToExpression(expression)).get(NodeRef.of(castToExpression(expression)));
-                                }
-                                else {
-                                    return expression.getType();
-                                }
-                            }).collect(toImmutableList()),
+                            projections.stream().map(expression -> expression.getType()).collect(toImmutableList()),
                             getFilterAndProjectMinOutputPageSize(session),
                             getFilterAndProjectMinOutputPageRowCount(session));
 
@@ -1646,11 +1618,6 @@ public class LocalExecutionPlanner
                 }
             }
             return null;
-        }
-
-        private RowExpression toRowExpression(Expression expression, Map<NodeRef<Expression>, Type> types, Map<Symbol, Integer> layout)
-        {
-            return SqlToRowExpressionTranslator.translate(expression, SCALAR, types, layout, metadata.getFunctionAndTypeManager(), session, true);
         }
 
         private RowExpression bindChannels(RowExpression expression, Map<Symbol, Integer> sourceLayout, TypeProvider types)
@@ -3364,14 +3331,6 @@ public class LocalExecutionPlanner
                         useSystemMemory);
             }
         }
-    }
-
-    private static List<Type> getTypes(List<Expression> expressions, Map<NodeRef<Expression>, Type> expressionTypes)
-    {
-        return expressions.stream()
-                .map(NodeRef::of)
-                .map(expressionTypes::get)
-                .collect(toImmutableList());
     }
 
     private static TableFinisher createTableFinisher(Session session, TableFinishNode node, Metadata metadata)

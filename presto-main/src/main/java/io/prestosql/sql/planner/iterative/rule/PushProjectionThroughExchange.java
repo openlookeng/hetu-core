@@ -40,13 +40,12 @@ import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.matching.Capture.newCapture;
-import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
+import static io.prestosql.sql.planner.VariableReferenceSymbolConverter.toVariableReference;
 import static io.prestosql.sql.planner.iterative.rule.Util.restrictOutputs;
 import static io.prestosql.sql.planner.plan.Patterns.exchange;
 import static io.prestosql.sql.planner.plan.Patterns.project;
 import static io.prestosql.sql.planner.plan.Patterns.source;
 import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
 
 /**
@@ -111,7 +110,8 @@ public class PushProjectionThroughExchange
 
             if (exchange.getPartitioningScheme().getHashColumn().isPresent()) {
                 // Need to retain the hash symbol for the exchange
-                projections.put(exchange.getPartitioningScheme().getHashColumn().get(), castToRowExpression(toSymbolReference(exchange.getPartitioningScheme().getHashColumn().get())));
+                projections.put(exchange.getPartitioningScheme().getHashColumn().get(),
+                        toVariableReference(exchange.getPartitioningScheme().getHashColumn().get(), context.getSymbolAllocator().getTypes()));
                 inputs.add(exchange.getPartitioningScheme().getHashColumn().get());
             }
 
@@ -174,7 +174,11 @@ public class PushProjectionThroughExchange
                 exchange.getOrderingScheme());
 
         // we need to strip unnecessary symbols (hash, partitioning columns).
-        return Result.ofPlanNode(restrictOutputs(context.getIdAllocator(), result, ImmutableSet.copyOf(project.getOutputSymbols())).orElse(result));
+        return Result.ofPlanNode(restrictOutputs(context.getIdAllocator(),
+                                                result,
+                                                ImmutableSet.copyOf(project.getOutputSymbols()),
+                                                true,
+                                                context.getSymbolAllocator().getTypes()).orElse(result));
     }
 
     private static boolean isSymbolToSymbolProjection(ProjectNode project)

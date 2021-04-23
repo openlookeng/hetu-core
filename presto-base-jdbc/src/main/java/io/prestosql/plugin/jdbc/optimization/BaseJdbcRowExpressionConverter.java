@@ -38,10 +38,12 @@ import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.IntegerType;
 import io.prestosql.spi.type.RealType;
 import io.prestosql.spi.type.SmallintType;
+import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.TimestampType;
 import io.prestosql.spi.type.TinyintType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
+import io.prestosql.sql.ExpressionFormatter;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -56,7 +58,9 @@ import java.util.stream.IntStream;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
+import static io.prestosql.spi.type.DateType.DATE;
 import static io.prestosql.spi.type.Decimals.decodeUnscaledValue;
+import static io.prestosql.spi.util.DateTimeUtils.printDate;
 import static io.prestosql.sql.builder.functioncall.BaseFunctionUtil.isDefaultFunction;
 import static java.lang.Float.intBitsToFloat;
 import static java.lang.String.format;
@@ -241,6 +245,10 @@ public class BaseJdbcRowExpressionConverter
         }
         if (type instanceof VarcharType || type instanceof CharType) {
             return "'" + ((Slice) literal.getValue()).toStringUtf8() + "'";
+        }
+        if (type.equals(DATE)) {
+            String date = printDate(Integer.parseInt(String.valueOf(literal.getValue())));
+            return StandardTypes.DATE + " " + ExpressionFormatter.formatStringLiteral(date);
         }
         if (type instanceof TimestampType) {
             Long time = (Long) literal.getValue();

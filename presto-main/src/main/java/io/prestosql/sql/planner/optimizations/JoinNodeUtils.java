@@ -13,10 +13,19 @@
  */
 package io.prestosql.sql.planner.optimizations;
 
+import io.prestosql.spi.function.BuiltInFunctionHandle;
+import io.prestosql.spi.function.OperatorType;
+import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.SymbolReference;
 
+import static io.prestosql.spi.function.Signature.internalOperator;
+import static io.prestosql.spi.type.BooleanType.BOOLEAN;
+import static io.prestosql.sql.planner.VariableReferenceSymbolConverter.toVariableReference;
+import static io.prestosql.sql.relational.Expressions.call;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.EQUAL;
 
 public final class JoinNodeUtils
@@ -26,5 +35,18 @@ public final class JoinNodeUtils
     public static ComparisonExpression toExpression(JoinNode.EquiJoinClause clause)
     {
         return new ComparisonExpression(EQUAL, new SymbolReference(clause.getLeft().getName()), new SymbolReference(clause.getRight().getName()));
+    }
+
+    public static RowExpression toRowExpression(JoinNode.EquiJoinClause clause, TypeProvider types)
+    {
+        Signature signature = internalOperator(OperatorType.EQUAL,
+                BOOLEAN.getTypeSignature(),
+                types.get(clause.getLeft()).getTypeSignature(),
+                types.get(clause.getRight()).getTypeSignature());
+        return call(OperatorType.EQUAL.getFunctionName().toString(),
+                    new BuiltInFunctionHandle(signature),
+                    BOOLEAN,
+                    toVariableReference(clause.getLeft(), types),
+                    toVariableReference(clause.getRight(), types));
     }
 }

@@ -281,7 +281,7 @@ public class TestSpatialJoinPlanning
     {
         // broadcast
         assertPlan("SELECT b.name, a.name " +
-                        "FROM (VALUES (2.1, 2.1, 'x')) AS a (lng, lat, name), (VALUES (2.1, 2.1, 'x')) AS b (lng, lat, name) " +
+                        "FROM (VALUES (2.1, 2.1, 'x'), (3.1, 4.1, 'y')) AS a (lng, lat, name), (VALUES (2.1, 2.1, 'x'), (3.1, 4.1, 'y')) AS b (lng, lat, name) " +
                         "WHERE ST_Distance(ST_Point(a.lng, a.lat), ST_Point(b.lng, b.lat)) <= 3.1",
                 anyTree(
                         spatialJoin("st_distance(st_point_a, st_point_b) <= radius",
@@ -294,7 +294,7 @@ public class TestSpatialJoinPlanning
                                                         values(ImmutableMap.of("b_lng", 0, "b_lat", 1))))))));
 
         assertPlan("SELECT b.name, a.name " +
-                        "FROM (VALUES (2.1, 2.1, 'x')) AS a (lng, lat, name), (VALUES (2.1, 2.1, 'x')) AS b (lng, lat, name) " +
+                        "FROM (VALUES (2.1, 2.1, 'x'), (3.1, 4.1, 'y')) AS a (lng, lat, name), (VALUES (2.1, 2.1, 'x'), (3.1, 4.1, 'y')) AS b (lng, lat, name) " +
                         "WHERE ST_Distance(ST_Point(a.lng, a.lat), ST_Point(b.lng, b.lat)) <= 300 / (cos(radians(b.lat)) * 111321)",
                 anyTree(
                         spatialJoin("st_distance(st_point_a, st_point_b) <= radius",
@@ -308,7 +308,7 @@ public class TestSpatialJoinPlanning
 
         // distributed
         assertDistributedPlan("SELECT b.name, a.name " +
-                        "FROM (VALUES (2.1, 2.1, 'x')) AS a (lng, lat, name), (VALUES (2.1, 2.1, 'x')) AS b (lng, lat, name) " +
+                        "FROM (VALUES (2.1, 2.1, 'x'), (3.1, 4.1, 'y')) AS a (lng, lat, name), (VALUES (2.1, 2.1, 'x'), (3.1, 4.1, 'y')) AS b (lng, lat, name) " +
                         "WHERE ST_Distance(ST_Point(a.lng, a.lat), ST_Point(b.lng, b.lat)) <= 3.1",
                 withSpatialPartitioning("memory.default.kdb_tree"),
                 anyTree(

@@ -24,13 +24,11 @@ import io.prestosql.spi.plan.Assignments;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.relation.CallExpression;
-import io.prestosql.sql.planner.SymbolUtils;
+import io.prestosql.spi.relation.ConstantExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.relational.FunctionResolution;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.Literal;
-import io.prestosql.sql.tree.NullLiteral;
-import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -42,7 +40,7 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.planner.plan.Patterns.aggregation;
 import static io.prestosql.sql.planner.plan.Patterns.project;
 import static io.prestosql.sql.planner.plan.Patterns.source;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
+import static io.prestosql.sql.relational.Expressions.isNull;
 import static java.util.Objects.requireNonNull;
 
 public class SimplifyCountOverConstant
@@ -117,11 +115,11 @@ public class SimplifyCountOverConstant
             return false;
         }
 
-        Expression argument = castToExpression(aggregation.getArguments().get(0));
-        if (argument instanceof SymbolReference) {
-            argument = castToExpression(inputs.get(SymbolUtils.from(argument)));
+        RowExpression argument = aggregation.getArguments().get(0);
+        if (argument instanceof VariableReferenceExpression) {
+            argument = inputs.get(new Symbol(((VariableReferenceExpression) argument).getName()));
         }
 
-        return argument instanceof Literal && !(argument instanceof NullLiteral);
+        return argument instanceof ConstantExpression && !isNull(argument);
     }
 }

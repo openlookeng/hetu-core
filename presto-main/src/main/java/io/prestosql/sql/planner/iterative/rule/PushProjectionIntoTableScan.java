@@ -26,10 +26,10 @@ import io.prestosql.spi.plan.Assignments;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.sql.planner.LiteralEncoder;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.tree.Expression;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,8 +43,6 @@ import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.sql.planner.plan.Patterns.project;
 import static io.prestosql.sql.planner.plan.Patterns.source;
 import static io.prestosql.sql.planner.plan.Patterns.tableScan;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 
 public class PushProjectionIntoTableScan
         implements Rule<ProjectNode>
@@ -77,11 +75,7 @@ public class PushProjectionIntoTableScan
         try {
             projections = project.getAssignments()
                     .getExpressions().stream()
-                    .map(expression -> ConnectorExpressionTranslator.translate(
-                            context.getSession(),
-                            castToExpression(expression),
-                            typeAnalyzer,
-                            context.getSymbolAllocator().getTypes()))
+                    .map(expression -> ConnectorExpressionTranslator.translate(expression))
                     .collect(toImmutableList());
         }
         catch (UnsupportedOperationException e) {
@@ -117,13 +111,13 @@ public class PushProjectionIntoTableScan
 
         // TODO: ensure newProjections.size == original projections.size
 
-        List<Expression> newProjections = result.get().getProjections().stream()
+        List<RowExpression> newProjections = result.get().getProjections().stream()
                 .map(expression -> ConnectorExpressionTranslator.translate(expression, variableMappings, new LiteralEncoder(metadata)))
                 .collect(toImmutableList());
 
         Assignments.Builder newProjectionAssignments = Assignments.builder();
         for (int i = 0; i < project.getOutputSymbols().size(); i++) {
-            newProjectionAssignments.put(project.getOutputSymbols().get(i), castToRowExpression(newProjections.get(i)));
+            newProjectionAssignments.put(project.getOutputSymbols().get(i), newProjections.get(i));
         }
 
         return Result.ofPlanNode(

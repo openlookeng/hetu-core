@@ -28,11 +28,13 @@ import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.sql.planner.SymbolsExtractor;
+import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.VariablesExtractor;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.plan.AssignmentUtils;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +49,7 @@ import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.sql.planner.iterative.rule.Util.restrictOutputs;
 import static io.prestosql.sql.planner.iterative.rule.Util.transpose;
 import static io.prestosql.sql.planner.optimizations.WindowNodeUtil.dependsOn;
+import static io.prestosql.sql.planner.plan.AssignmentUtils.identityAssignments;
 import static io.prestosql.sql.planner.plan.AssignmentUtils.isIdentity;
 import static io.prestosql.sql.planner.plan.Patterns.project;
 import static io.prestosql.sql.planner.plan.Patterns.source;
@@ -106,7 +109,7 @@ public class GatherAndMergeWindows
                     .map(captures::get)
                     .collect(toImmutableList());
 
-            return pullWindowNodeAboveProjects(captures.get(childCapture), projects)
+            return pullWindowNodeAboveProjects(captures.get(childCapture), projects, context.getSymbolAllocator().getTypes())
                     .flatMap(newChild -> manipulateAdjacentWindowNodes(parent, newChild, context))
                     .map(Result::ofPlanNode)
                     .orElse(Result.empty());
@@ -123,7 +126,8 @@ public class GatherAndMergeWindows
          */
         protected static Optional<WindowNode> pullWindowNodeAboveProjects(
                 WindowNode target,
-                List<ProjectNode> projects)
+                List<ProjectNode> projects,
+                TypeProvider types)
         {
             if (projects.isEmpty()) {
                 return Optional.of(target);
@@ -152,10 +156,10 @@ public class GatherAndMergeWindows
 
                 Assignments newAssignments = Assignments.builder()
                         .putAll(assignmentsWithoutTargetOutputIdentities)
-                        .putAll(AssignmentUtils.identityAsSymbolReferences(targetInputs))
+                        .putAll(identityAssignments(types, targetInputs))
                         .build();
 
-                if (!newTargetChildOutputs.containsAll(SymbolsExtractor.extractUnique(newAssignments.getExpressions().stream().map(OriginalExpressionUtils::castToExpression).collect(toImmutableList())))) {
+                if (!newTargetChildOutputs.containsAll(extractUnique(newAssignments))) {
                     // Projection uses an output of the target -- can't move the target above this projection.
                     return Optional.empty();
                 }
@@ -202,7 +206,7 @@ public class GatherAndMergeWindows
                     parent.getPreSortedOrderPrefix());
 
             return Optional.of(
-                    restrictOutputs(context.getIdAllocator(), mergedWindowNode, ImmutableSet.copyOf(parent.getOutputSymbols()))
+                    restrictOutputs(context.getIdAllocator(), mergedWindowNode, ImmutableSet.copyOf(parent.getOutputSymbols()), true, context.getSymbolAllocator().getTypes())
                             .orElse(mergedWindowNode));
         }
     }
@@ -221,7 +225,7 @@ public class GatherAndMergeWindows
             if ((compare(parent, child) < 0) && (!dependsOn(parent, child))) {
                 PlanNode transposedWindows = transpose(parent, child);
                 return Optional.of(
-                        restrictOutputs(context.getIdAllocator(), transposedWindows, ImmutableSet.copyOf(parent.getOutputSymbols()))
+                        restrictOutputs(context.getIdAllocator(), transposedWindows, ImmutableSet.copyOf(parent.getOutputSymbols()), true, context.getSymbolAllocator().getTypes())
                                 .orElse(transposedWindows));
             }
             else {
@@ -310,5 +314,16 @@ public class GatherAndMergeWindows
             }
             return 0;
         }
+    }
+
+    private static Set<Symbol> extractUnique(Assignments assignments)
+    {
+        Collection<RowExpression> expressions = assignments.getExpressions();
+        Set<VariableReferenceExpression> variables = VariablesExtractor.extractUnique(expressions);
+        Set<Symbol> symbols = new HashSet<>();
+        for (VariableReferenceExpression variable : variables) {
+            symbols.add(new Symbol(variable.getName()));
+        }
+        return symbols;
     }
 }

@@ -31,6 +31,7 @@ import io.prestosql.spi.relation.RowExpressionVisitor;
 import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.VarcharType;
 import io.prestosql.sql.analyzer.ExpressionAnalyzer;
 import io.prestosql.sql.analyzer.Scope;
 import io.prestosql.sql.planner.ExpressionInterpreter;
@@ -593,7 +594,7 @@ public class FilterStatsCalculator
                 else {
                     leftSymbol = Optional.empty();
                 }
-                if (right instanceof ConstantExpression) {
+                if (right instanceof ConstantExpression && !right.getType().equals(VarcharType.VARCHAR)) {
                     Object rightValue = ((ConstantExpression) right).getValue();
                     if (rightValue == null) {
                         return visitConstant(constantNull(BOOLEAN), null);

@@ -43,11 +43,10 @@ import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.sql.expression.QualifiedName;
-import io.prestosql.spi.type.StandardTypes;
+import io.prestosql.spi.type.SqlVarbinary;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
 import io.prestosql.spi.util.DateTimeUtils;
-import io.prestosql.sql.ExpressionFormatter;
 import io.prestosql.sql.builder.functioncall.FunctionWriterManager;
 import io.prestosql.sql.builder.functioncall.FunctionWriterManagerGroup;
 import io.prestosql.sql.builder.functioncall.functions.FunctionCallRewriter;
@@ -67,11 +66,8 @@ import java.util.stream.Stream;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.prestosql.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
-import static io.prestosql.spi.type.DateType.DATE;
 import static io.prestosql.spi.type.TimeType.TIME;
-import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
-import static io.prestosql.spi.util.DateTimeUtils.printDate;
 import static java.lang.String.format;
 import static java.util.Locale.ENGLISH;
 
@@ -292,21 +288,13 @@ public class HanaRowExpressionConverter
     {
         Type type = literal.getType();
 
-        if (type.equals(DATE)) {
-            String date = printDate((int) literal.getValue());
-            return StandardTypes.DATE + " " + ExpressionFormatter.formatStringLiteral(date);
-        }
         if (type.equals(VARBINARY)) {
-            String hexValue = ((Slice) literal.getValue()).toStringUtf8();
-            return format("X'%s'", hexValue);
+            Object hexValue = new SqlVarbinary(((Slice) literal.getValue()).getBytes());
+            return format("X'%s'", hexValue.toString().replaceAll(" ", ""));
         }
         if (type.equals(TIME)) {
             String time = DateTimeUtils.printTimeWithoutTimeZone((long) literal.getValue());
             return format("time'%s'", time);
-        }
-        if (type.equals(TIMESTAMP)) {
-            String timestamp = DateTimeUtils.printTimeWithoutTimeZone((long) literal.getValue());
-            return format("timestamp'%s'", timestamp);
         }
 
         return super.visitConstant(literal, context);

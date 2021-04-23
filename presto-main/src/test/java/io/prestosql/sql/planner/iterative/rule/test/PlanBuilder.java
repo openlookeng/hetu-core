@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
 import io.prestosql.Session;
+import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.IndexHandle;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.block.SortOrder;
@@ -59,6 +60,7 @@ import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.ExpressionUtils;
+import io.prestosql.sql.analyzer.ExpressionAnalyzer;
 import io.prestosql.sql.analyzer.TypeSignatureProvider;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.planner.OrderingSchemeUtils;
@@ -90,8 +92,10 @@ import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.DeleteTarget;
 import io.prestosql.sql.relational.OriginalExpressionUtils;
+import io.prestosql.sql.relational.SqlToRowExpressionTranslator;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.FunctionCall;
+import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.sql.tree.NullLiteral;
 import io.prestosql.testing.TestingHandle;
 import io.prestosql.testing.TestingMetadata.TestingTableHandle;
@@ -111,7 +115,9 @@ import java.util.stream.Stream;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.SessionTestUtils.TEST_SESSION;
 import static io.prestosql.metadata.FunctionAndTypeManager.qualifyObjectName;
+import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
@@ -965,6 +971,29 @@ public class PlanBuilder
     public RemoteSourceNode remoteSourceNode(List<PlanFragmentId> fragmentIds, List<Symbol> symbols, ExchangeNode.Type exchangeType)
     {
         return new RemoteSourceNode(idAllocator.getNextId(), fragmentIds, symbols, Optional.empty(), exchangeType);
+    }
+
+    public RowExpression rowExpression(String sql)
+    {
+        Expression expression = expression(sql);
+        Map<NodeRef<Expression>, Type> expressionTypes = ExpressionAnalyzer.analyzeExpressions(
+                TEST_SESSION,
+                metadata,
+                new SqlParser(),
+                getTypes(),
+                ImmutableList.of(expression),
+                ImmutableList.of(),
+                WarningCollector.NOOP,
+                false
+        ).getExpressionTypes();
+        return SqlToRowExpressionTranslator.translate(
+                expression,
+                SCALAR,
+                expressionTypes,
+                ImmutableMap.of(),
+                metadata.getFunctionAndTypeManager(),
+                TEST_SESSION,
+                false);
     }
 
     public static RowExpression castToRowExpression(String sql)
