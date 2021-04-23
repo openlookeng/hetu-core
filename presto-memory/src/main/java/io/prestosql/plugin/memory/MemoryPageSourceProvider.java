@@ -42,12 +42,14 @@ import static java.util.stream.Collectors.toList;
 public final class MemoryPageSourceProvider
         implements ConnectorPageSourceProvider
 {
+    private final TypeManager typeManager;
     private final MemoryPagesStore pagesStore;
 
     @Inject
     public MemoryPageSourceProvider(MemoryPagesStore pagesStore, TypeManager typeManager, MemoryMetadata memoryMetadata)
     {
         this.pagesStore = requireNonNull(pagesStore, "pagesStore is null");
+        this.typeManager = requireNonNull(typeManager, "typeManager is null");
     }
 
     @Override

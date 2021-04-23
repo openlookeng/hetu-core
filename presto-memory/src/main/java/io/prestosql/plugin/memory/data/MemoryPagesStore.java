@@ -23,6 +23,7 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.type.TypeManager;
 
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
@@ -49,25 +50,27 @@ public class MemoryPagesStore
     private final int splitsPerNode;
     private final PageSorter pageSorter;
     private final MemoryConfig config;
+    private final TypeManager typeManager;
     @GuardedBy("this")
     private long currentBytes;
 
     private final Map<Long, TableData> tables = new HashMap<>();
 
     @Inject
-    public MemoryPagesStore(MemoryConfig config, PageSorter pageSorter)
+    public MemoryPagesStore(MemoryConfig config, PageSorter pageSorter, TypeManager typeManager)
     {
         requireNonNull(pageSorter, "config is null");
         this.pageSorter = requireNonNull(pageSorter, "pageSorter is null");
         this.config = requireNonNull(config, "config is null");
         this.splitsPerNode = config.getSplitsPerNode();
         this.maxBytes = config.getMaxDataPerNode().toBytes();
+        this.typeManager = requireNonNull(typeManager, "typeManager is null");
     }
 
     public synchronized void initialize(long tableId, List<ColumnInfo> columns, List<SortingColumn> sortedBy, List<String> indexColumns)
     {
         if (!tables.containsKey(tableId)) {
-            tables.put(tableId, new TableData(tableId, columns, sortedBy, indexColumns, pageSorter, config));
+            tables.put(tableId, new TableData(tableId, columns, sortedBy, indexColumns, pageSorter, config, typeManager));
         }
     }
 

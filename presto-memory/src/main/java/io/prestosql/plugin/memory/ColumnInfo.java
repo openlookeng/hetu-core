@@ -15,31 +15,28 @@ package io.prestosql.plugin.memory;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeManager;
 
 import static java.util.Objects.requireNonNull;
 
 public class ColumnInfo
 {
-    private final ColumnHandle handle;
+    private final MemoryColumnHandle handle;
     private final String name;
-    private final Type type;
 
     @JsonCreator
     public ColumnInfo(
-            @JsonProperty("handle") ColumnHandle handle,
-            @JsonProperty("name") String name,
-            @JsonProperty("type") Type type)
+            @JsonProperty("handle") MemoryColumnHandle handle,
+            @JsonProperty("name") String name)
     {
         this.handle = requireNonNull(handle, "handle is null");
         this.name = requireNonNull(name, "name is null");
-        this.type = requireNonNull(type, "type is null");
     }
 
     @JsonProperty
-    public ColumnHandle getHandle()
+    public MemoryColumnHandle getHandle()
     {
         return handle;
     }
@@ -50,25 +47,24 @@ public class ColumnInfo
         return name;
     }
 
-    @JsonProperty
-    public Type getType()
+    public Type getType(TypeManager typeManager)
     {
-        return type;
+        return handle.getType(typeManager);
     }
 
-    public ColumnMetadata getMetadata()
+    public ColumnMetadata getMetadata(TypeManager typeManager)
     {
-        return new ColumnMetadata(name, type);
+        return new ColumnMetadata(name, getType(typeManager));
     }
 
     public int getIndex()
     {
-        return ((MemoryColumnHandle) handle).getColumnIndex();
+        return handle.getColumnIndex();
     }
 
     @Override
     public String toString()
     {
-        return name + "::" + type;
+        return name + "::" + handle.getTypeSignature();
     }
 }

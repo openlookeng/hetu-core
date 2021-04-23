@@ -23,6 +23,7 @@ import io.prestosql.spi.connector.ConnectorFactory;
 import io.prestosql.spi.connector.ConnectorHandleResolver;
 import io.prestosql.spi.function.FunctionMetadataManager;
 import io.prestosql.spi.function.StandardFunctionResolution;
+import io.prestosql.spi.metastore.HetuMetastore;
 import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.type.TypeManager;
@@ -61,6 +62,7 @@ public class MemoryConnectorFactory
                         binder.bind(TypeManager.class).toInstance(context.getTypeManager());
                         binder.bind(RowExpressionService.class).toInstance(context.getRowExpressionService());
                         binder.bind(DeterminismEvaluator.class).toInstance(context.getRowExpressionService().getDeterminismEvaluator());
+                        binder.bind(HetuMetastore.class).toInstance(context.getHetuMetastore());
                     },
                     new JsonModule(),
                     new MemoryModule(context.getTypeManager(), context.getNodeManager()));

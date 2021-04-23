@@ -23,6 +23,7 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.type.TypeManager;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -55,10 +56,11 @@ public class TableData
     private final PageSorter pageSorter;
     private final long maxLogicalPartBytes;
     private final MemoryConfig config;
+    private final TypeManager typeManager;
     private long lastModified = System.currentTimeMillis();
 
     public TableData(long id, List<ColumnInfo> columns, List<SortingColumn> sortedBy,
-                     List<String> indexColumns, PageSorter pageSorter, MemoryConfig config)
+            List<String> indexColumns, PageSorter pageSorter, MemoryConfig config, TypeManager typeManager)
     {
         this.id = requireNonNull(id, "id is null");
         this.config = requireNonNull(config, "config is null");
@@ -68,6 +70,7 @@ public class TableData
         this.sortedBy = requireNonNull(sortedBy, "sortedBy is null");
         this.indexColumns = requireNonNull(indexColumns, "indexColumns is null");
         this.pageSorter = requireNonNull(pageSorter, "pageSorter is null");
+        this.typeManager = requireNonNull(typeManager, "typeManager is null");
 
         this.splits = new ArrayList[totalSplits];
         for (int i = 0; i < totalSplits; i++) {
@@ -111,7 +114,7 @@ public class TableData
     {
         List<LogicalPart> splitParts = splits[nextSplit.getAndIncrement() % totalSplits];
         if (splitParts.isEmpty() || !splitParts.get(splitParts.size() - 1).canAdd()) {
-            splitParts.add(new LogicalPart(columns, sortedBy, indexColumns, pageSorter, maxLogicalPartBytes));
+            splitParts.add(new LogicalPart(columns, sortedBy, indexColumns, pageSorter, maxLogicalPartBytes, typeManager));
         }
 
         LogicalPart currentSplitPart = splitParts.get(splitParts.size() - 1);

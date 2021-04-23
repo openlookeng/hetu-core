@@ -30,6 +30,7 @@ import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.predicate.SortedRangeSet;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeUtils;
 import io.prestosql.spi.util.BloomFilter;
 
@@ -75,7 +76,7 @@ public class LogicalPart
     private final Map<Integer, BloomFilter> indexChannelFilters = new HashMap<>();
     private final Map<Integer, Map.Entry<Comparable, Comparable>> columnMinMax = new HashMap<>();
 
-    public LogicalPart(List<ColumnInfo> columns, List<SortingColumn> sortedBy, List<String> indexColumns, PageSorter pageSorter, long maxLogicalPartBytes)
+    public LogicalPart(List<ColumnInfo> columns, List<SortingColumn> sortedBy, List<String> indexColumns, PageSorter pageSorter, long maxLogicalPartBytes, TypeManager typeManager)
     {
         requireNonNull(columns, "columns is null");
         requireNonNull(sortedBy, "sortedBy is null");
@@ -85,7 +86,7 @@ public class LogicalPart
 
         types = new ArrayList<>();
         for (ColumnInfo column : columns) {
-            types.add(column.getType());
+            types.add(column.getType(typeManager));
         }
 
         sortChannels = new ArrayList<>();

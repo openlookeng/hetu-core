@@ -17,6 +17,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeManager;
+import io.prestosql.spi.type.TypeSignature;
 
 import java.util.Objects;
 
@@ -24,14 +26,15 @@ public final class MemoryColumnHandle
         implements ColumnHandle
 {
     private final int columnIndex;
-    private final Type type;
+    private final TypeSignature typeSignature;
+    private Type typeCache;
 
     @JsonCreator
     public MemoryColumnHandle(@JsonProperty("columnIndex") int columnIndex,
-                              @JsonProperty("type") Type type)
+            @JsonProperty("typeSignature") TypeSignature typeSignature)
     {
         this.columnIndex = columnIndex;
-        this.type = type;
+        this.typeSignature = typeSignature;
     }
 
     @JsonProperty
@@ -41,9 +44,17 @@ public final class MemoryColumnHandle
     }
 
     @JsonProperty
-    public Type getType()
+    public TypeSignature getTypeSignature()
     {
-        return type;
+        return typeSignature;
+    }
+
+    public Type getType(TypeManager typeManager)
+    {
+        if (typeCache == null) {
+            typeCache = typeManager.getType(getTypeSignature());
+        }
+        return typeCache;
     }
 
     @Override
