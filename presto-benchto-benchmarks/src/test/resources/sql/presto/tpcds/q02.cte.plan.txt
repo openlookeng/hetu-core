@@ -27,7 +27,7 @@ remote exchange (GATHER, SINGLE, [])
                                 Filter
                                     scan date_dim
                 local exchange (GATHER, SINGLE, [])
-                    remote exchange (REPARTITION, HASH, ["expr_395"])
+                    remote exchange (REPARTITION, HASH, ["subtract"])
                         join (INNER, REPLICATED):
                             remote exchange (REPARTITION, HASH, ["d_week_seq_232", "sum_265", "sum_266", "sum_267", "sum_268", "sum_269", "sum_270", "sum_271"])
                                 cte wswscs

@@ -29,6 +29,7 @@ import io.prestosql.sql.planner.iterative.IterativeOptimizer;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.iterative.rule.GatherAndMergeWindows;
 import io.prestosql.sql.planner.iterative.rule.RemoveRedundantIdentityProjections;
+import io.prestosql.sql.planner.iterative.rule.TranslateExpressions;
 import io.prestosql.sql.tree.FrameBound;
 import io.prestosql.sql.tree.WindowFrame;
 import org.intellij.lang.annotations.Language;
@@ -556,6 +557,11 @@ public class TestMergeWindows
     {
         List<PlanOptimizer> optimizers = ImmutableList.of(
                 new UnaliasSymbolReferences(getQueryRunner().getMetadata()),
+                new IterativeOptimizer(
+                        new RuleStatsRecorder(),
+                        getQueryRunner().getStatsCalculator(),
+                        getQueryRunner().getCostCalculator(),
+                        new TranslateExpressions(getMetadata(), getQueryRunner().getSqlParser()).rules(getMetadata())),
                 new IterativeOptimizer(
                         new RuleStatsRecorder(),
                         getQueryRunner().getStatsCalculator(),

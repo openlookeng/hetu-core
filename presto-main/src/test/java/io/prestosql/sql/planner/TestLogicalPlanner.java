@@ -772,7 +772,7 @@ public class TestLogicalPlanner
                                 anyTree(
                                         node(TableScanNode.class)),
                                 anyTree(
-                                        exchange(REMOTE, ExchangeNode.Type.REPLICATE,
+                                        exchange(REMOTE, REPLICATE,
                                                 anyTree(
                                                         node(TableScanNode.class))))));
 
@@ -853,7 +853,7 @@ public class TestLogicalPlanner
                                 anyTree(
                                         exchange(REMOTE, GATHER,
                                                 anyTree(
-                                                        node(TableScanNode.class)))))));
+                                                    node(TableScanNode.class)))))));
 
         // replicated join is preserved if there are no equality criteria
         assertPlanWithSession(

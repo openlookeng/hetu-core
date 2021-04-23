@@ -39,8 +39,8 @@ public class PruneCrossJoinColumns
     @Override
     protected Optional<PlanNode> pushDownProjectOff(PlanNodeIdAllocator idAllocator, JoinNode joinNode, Set<Symbol> referencedOutputs)
     {
-        Optional<PlanNode> newLeft = restrictOutputs(idAllocator, joinNode.getLeft(), referencedOutputs);
-        Optional<PlanNode> newRight = restrictOutputs(idAllocator, joinNode.getRight(), referencedOutputs);
+        Optional<PlanNode> newLeft = restrictOutputs(idAllocator, joinNode.getLeft(), referencedOutputs, false, null);
+        Optional<PlanNode> newRight = restrictOutputs(idAllocator, joinNode.getRight(), referencedOutputs, false, null);
 
         if (!newLeft.isPresent() && !newRight.isPresent()) {
             return Optional.empty();

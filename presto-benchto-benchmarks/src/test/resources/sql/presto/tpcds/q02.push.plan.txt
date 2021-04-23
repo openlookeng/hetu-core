@@ -19,7 +19,7 @@ remote exchange (GATHER, SINGLE, [])
                         remote exchange (REPARTITION, HASH, ["d_week_seq_85"])
                             scan date_dim (pushdown = true)
                 local exchange (GATHER, SINGLE, [])
-                    remote exchange (REPARTITION, HASH, ["expr_402"])
+                    remote exchange (REPARTITION, HASH, ["subtract"])
                         join (INNER, PARTITIONED):
                             final aggregation over (d_week_seq_237)
                                 local exchange (GATHER, SINGLE, [])

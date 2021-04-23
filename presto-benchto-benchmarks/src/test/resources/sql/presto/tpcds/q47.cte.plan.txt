@@ -2,7 +2,7 @@ local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
         join (INNER, PARTITIONED):
             join (INNER, PARTITIONED):
-                remote exchange (REPARTITION, HASH, ["expr_502", "i_brand_73", "i_category_77", "s_company_name_155", "s_store_name_143"])
+                remote exchange (REPARTITION, HASH, ["add", "i_brand_73", "i_category_77", "s_company_name_155", "s_store_name_143"])
                     remote exchange (REPARTITION, HASH, ["avg_189", "d_moy_118", "d_year_116", "i_brand_73", "i_category_77", "rank_196", "s_company_name_155", "s_store_name_143", "sum_182"])
                         cte v1
                             local exchange (GATHER, SINGLE, [])
@@ -22,10 +22,12 @@ local exchange (GATHER, SINGLE, [])
                                                                             scan date_dim
                                                             local exchange (GATHER, SINGLE, [])
                                                                 remote exchange (REPLICATE, BROADCAST, [])
-                                                                    scan item
+                                                                    Filter
+                                                                        scan item
                                                         local exchange (GATHER, SINGLE, [])
                                                             remote exchange (REPLICATE, BROADCAST, [])
-                                                                scan store
+                                                                Filter
+                                                                    scan store
                 local exchange (GATHER, SINGLE, [])
                     remote exchange (REPARTITION, HASH, ["i_brand", "i_category", "rank", "s_company_name", "s_store_name"])
                         remote exchange (REPARTITION, HASH, ["avg", "d_moy", "d_year", "i_brand", "i_category", "rank", "s_company_name", "s_store_name", "sum_8"])
@@ -54,7 +56,7 @@ local exchange (GATHER, SINGLE, [])
                                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                                             scan store
             local exchange (GATHER, SINGLE, [])
-                remote exchange (REPARTITION, HASH, ["expr_501", "i_brand_250", "i_category_254", "s_company_name_332", "s_store_name_320"])
+                remote exchange (REPARTITION, HASH, ["i_brand_250", "i_category_254", "s_company_name_332", "s_store_name_320", "subtract"])
                     remote exchange (REPARTITION, HASH, ["avg_366", "d_moy_295", "d_year_293", "i_brand_250", "i_category_254", "rank_373", "s_company_name_332", "s_store_name_320", "sum_359"])
                         cte v1
                             local exchange (GATHER, SINGLE, [])

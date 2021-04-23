@@ -41,9 +41,9 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.specification
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.strictProject;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.window;
-import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.castToRowExpression;
 import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expression;
 import static io.prestosql.sql.relational.Expressions.call;
+import static io.prestosql.sql.relational.Expressions.constant;
 
 public class TestMergeAdjacentWindows
         extends BaseRuleTest
@@ -182,7 +182,7 @@ public class TestMergeAdjacentWindows
                                 ImmutableMap.of(p.symbol("lagOutput"), newWindowNodeFunction("lag", LAG_FUNCTION_HANDLE, "a", "one")),
                                 p.project(
                                         Assignments.builder()
-                                                .put(p.symbol("one"), castToRowExpression("CAST(1 AS bigint)"))
+                                                .put(p.symbol("one"), constant(1L, BIGINT))
                                                 .put(p.symbol("a"), p.variable("a"))
                                                 .put(p.symbol("avgOutput"), p.variable("avgOutput"))
                                                 .build(),

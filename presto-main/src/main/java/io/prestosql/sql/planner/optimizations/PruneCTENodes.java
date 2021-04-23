@@ -25,6 +25,7 @@ import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.TypeProvider;
@@ -179,6 +180,9 @@ public class PruneCTENodes
                     SymbolReference symbol = (SymbolReference) expression;
                     return isSymbolBaseColumn(symbol.getName());
                 }
+            }
+            if (rowExpression instanceof VariableReferenceExpression) {
+                return isSymbolBaseColumn(((VariableReferenceExpression) rowExpression).getName());
             }
 
             return false;

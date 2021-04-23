@@ -16,6 +16,8 @@ package io.prestosql.sql.relational;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.PeekingIterator;
+import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 import io.prestosql.expressions.LogicalRowExpressions;
 import io.prestosql.metadata.CastType;
 import io.prestosql.metadata.FunctionAndTypeManager;
@@ -49,9 +51,11 @@ import io.prestosql.spi.relation.RowExpressionVisitor;
 import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.VarcharType;
 import io.prestosql.sql.InterpretedFunctionInvoker;
 import io.prestosql.sql.planner.RowExpressionInterpreter;
 import io.prestosql.type.InternalTypeManager;
+import io.prestosql.type.LikeFunctions;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -66,11 +70,14 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Iterators.peekingIterator;
+import static io.airlift.slice.SliceUtf8.countCodePoints;
+import static io.airlift.slice.SliceUtf8.getCodePointAt;
+import static io.airlift.slice.SliceUtf8.lengthOfCodePoint;
+import static io.airlift.slice.SliceUtf8.setCodePointAt;
 import static io.prestosql.expressions.LogicalRowExpressions.FALSE_CONSTANT;
 import static io.prestosql.expressions.LogicalRowExpressions.TRUE_CONSTANT;
 import static io.prestosql.expressions.LogicalRowExpressions.and;
 import static io.prestosql.expressions.LogicalRowExpressions.or;
-import static io.prestosql.spi.function.OperatorType.BETWEEN;
 import static io.prestosql.spi.function.OperatorType.EQUAL;
 import static io.prestosql.spi.function.OperatorType.GREATER_THAN;
 import static io.prestosql.spi.function.OperatorType.GREATER_THAN_OR_EQUAL;
@@ -179,13 +186,11 @@ public final class RowExpressionDomainTranslator
 
         if (isBetween(range)) {
             // specialize the range with BETWEEN expression if possible b/c it is currently more efficient
-            return call(
-                    BETWEEN.name(),
-                    metadata.getFunctionAndTypeManager().resolveOperatorFunctionHandle(BETWEEN, fromTypes(reference.getType(), type, type)),
-                    BOOLEAN,
-                    reference,
-                    toRowExpression(range.getLow().getValue(), type),
-                    toRowExpression(range.getHigh().getValue(), type));
+            return new SpecialForm(SpecialForm.Form.BETWEEN,
+                                    BOOLEAN,
+                                    reference,
+                                    toRowExpression(range.getLow().getValue(), type),
+                                    toRowExpression(range.getHigh().getValue(), type));
         }
 
         List<RowExpression> rangeConjuncts = new ArrayList<>();
@@ -422,6 +427,13 @@ public final class RowExpressionDomainTranslator
                         binaryOperator(LESS_THAN_OR_EQUAL, node.getArguments().get(0), node.getArguments().get(2))).accept(this, complement);
             }
 
+            if (resolution.isLikeFunction(node.getFunctionHandle())) {
+                Optional<ExtractionResult> result = tryVisitLikePredicate(node, complement);
+                if (result.isPresent()) {
+                    return result.get();
+                }
+                return visitRowExpression(node, complement);
+            }
             FunctionMetadata functionMetadata = metadata.getFunctionAndTypeManager().getFunctionMetadata(node.getFunctionHandle());
             if (functionMetadata.getOperatorType().map(OperatorType::isComparisonOperator).orElse(false)) {
                 Optional<NormalizedSimpleComparison> optionalNormalized = toNormalizedSimpleComparison(functionMetadata.getOperatorType().get(), node.getArguments().get(0), node.getArguments().get(1));
@@ -484,6 +496,93 @@ public final class RowExpressionDomainTranslator
             }
 
             return visitRowExpression(node, complement);
+        }
+
+        private Optional<ExtractionResult> tryVisitLikePredicate(CallExpression node, Boolean complement)
+        {
+            if (node.getArguments().size() != 2
+                    || !(node.getArguments().get(0) instanceof VariableReferenceExpression)
+                    || !(node.getArguments().get(0).getType() instanceof VarcharType)
+                    || !(node.getArguments().get(1) instanceof CallExpression)) {
+                // LIKE not on a VariableReferenceExpression
+                return Optional.empty();
+            }
+
+            CallExpression call = (CallExpression) node.getArguments().get(1);
+            if (!call.getDisplayName().equals("LIKE_PATTERN") && !resolution.isCastFunction(call.getFunctionHandle())) {
+                return Optional.empty();
+            }
+
+            if (call.getDisplayName().equals("LIKE_PATTERN")
+                    && call.getArguments().size() != 2
+                    && !(call.getArguments().get(0) instanceof ConstantExpression)
+                    && !(call.getArguments().get(0).getType() instanceof VarcharType)
+                    && !(call.getArguments().get(1) instanceof ConstantExpression)
+                    && !(call.getArguments().get(1).getType() instanceof VarcharType)) {
+                // dynamic escape
+                return Optional.empty();
+            }
+            else if (resolution.isCastFunction(call.getFunctionHandle())
+                    && call.getArguments().size() != 1
+                    && !(call.getArguments().get(0) instanceof ConstantExpression)
+                    && !(call.getArguments().get(0).getType() instanceof VarcharType)) {
+                // dynamic pattern
+                return Optional.empty();
+            }
+
+            VariableReferenceExpression variable = (VariableReferenceExpression) node.getArguments().get(0);
+            VarcharType varcharType = (VarcharType) variable.getType();
+
+            Slice pattern = (Slice) ((ConstantExpression) call.getArguments().get(0)).getValue();
+            Optional<Slice> escape = Optional.empty();
+            if (call.getDisplayName().equals("LIKE_PATTERN")) {
+                escape = Optional.of((Slice) ((ConstantExpression) call.getArguments().get(1)).getValue());
+            }
+
+            int patternConstantPrefixBytes = LikeFunctions.patternConstantPrefixBytes(pattern, escape);
+            if (patternConstantPrefixBytes == pattern.length()) {
+                // This should not actually happen, constant LIKE pattern should be converted to equality predicate before DomainTranslator is invoked.
+
+                Slice literal = LikeFunctions.unescapeLiteralLikePattern(pattern, escape);
+                ValueSet valueSet;
+                if (varcharType.isUnbounded() || countCodePoints(literal) <= varcharType.getBoundedLength()) {
+                    valueSet = ValueSet.of(varcharType, literal);
+                }
+                else {
+                    // impossible to satisfy
+                    valueSet = ValueSet.none(varcharType);
+                }
+                Domain domain = Domain.create(complementIfNecessary(valueSet, complement), false);
+                return Optional.of(new ExtractionResult(TupleDomain.withColumnDomains(ImmutableMap.of(variable, domain)), TRUE_CONSTANT));
+            }
+
+            if (complement || patternConstantPrefixBytes == 0) {
+                // TODO
+                return Optional.empty();
+            }
+
+            Slice constantPrefix = LikeFunctions.unescapeLiteralLikePattern(pattern.slice(0, patternConstantPrefixBytes), escape);
+
+            int lastIncrementable = -1;
+            for (int position = 0; position < constantPrefix.length(); position += lengthOfCodePoint(constantPrefix, position)) {
+                // Get last ASCII character to increment, so that character length in bytes does not change.
+                // Also prefer not to produce non-ASCII if input is all-ASCII, to be on the safe side with connectors.
+                // TODO remove those limitations
+                if (getCodePointAt(constantPrefix, position) < 127) {
+                    lastIncrementable = position;
+                }
+            }
+
+            if (lastIncrementable == -1) {
+                return Optional.empty();
+            }
+
+            Slice lowerBound = constantPrefix;
+            Slice upperBound = Slices.copyOf(constantPrefix.slice(0, lastIncrementable + lengthOfCodePoint(constantPrefix, lastIncrementable)));
+            setCodePointAt(getCodePointAt(constantPrefix, lastIncrementable) + 1, upperBound, lastIncrementable);
+
+            Domain domain = Domain.create(ValueSet.ofRanges(Range.range(varcharType, lowerBound, true, upperBound, false)), false);
+            return Optional.of(new ExtractionResult(TupleDomain.withColumnDomains(ImmutableMap.of(variable, domain)), node));
         }
 
         @Override

@@ -192,6 +192,10 @@ public class PushPartialAggregationThroughJoin
                 child.getDistributionType(),
                 child.isSpillable(),
                 child.getDynamicFilters());
-        return restrictOutputs(context.getIdAllocator(), joinNode, ImmutableSet.copyOf(aggregation.getOutputSymbols())).orElse(joinNode);
+        return restrictOutputs(context.getIdAllocator(),
+                                joinNode,
+                                ImmutableSet.copyOf(aggregation.getOutputSymbols()),
+                                true,
+                                context.getSymbolAllocator().getTypes()).orElse(joinNode);
     }
 }

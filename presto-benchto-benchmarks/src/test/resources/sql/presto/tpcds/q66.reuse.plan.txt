@@ -26,7 +26,7 @@ local exchange (GATHER, SINGLE, [])
                                         local exchange (GATHER, SINGLE, [])
                                             remote exchange (REPLICATE, BROADCAST, [])
                                                 scan warehouse
-                partial aggregation over (concat_656, d_year_142, w_city_129, w_country_133, w_county_130, w_state_131, w_warehouse_name_123, w_warehouse_sq_ft_124)
+                partial aggregation over (concat_655, d_year_142, w_city_129, w_country_133, w_county_130, w_state_131, w_warehouse_name_123, w_warehouse_sq_ft_124)
                     final aggregation over (d_year_142, w_city_129, w_country_133, w_county_130, w_state_131, w_warehouse_name_123, w_warehouse_sq_ft_124)
                         local exchange (GATHER, SINGLE, [])
                             remote exchange (REPARTITION, HASH, ["d_year_142", "w_city_129", "w_country_133", "w_county_130", "w_state_131", "w_warehouse_name_123", "w_warehouse_sq_ft_124"])

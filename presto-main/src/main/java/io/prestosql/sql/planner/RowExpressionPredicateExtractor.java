@@ -17,6 +17,7 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.LinkedHashMultimap;
@@ -37,11 +38,14 @@ import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.plan.TopNNode;
 import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
@@ -229,9 +233,6 @@ public class RowExpressionPredicateExtractor
         @Override
         public RowExpression visitTableScan(TableScanNode node, Void context)
         {
-//            Map<ColumnHandle, VariableReferenceExpression> assignments = ImmutableBiMap.copyOf(node.getAssignments()).inverse();
-//            return domainTranslator.toPredicate(node.getCurrentConstraint().simplify().transform(column -> assignments.containsKey(column) ? assignments.get(column) : null));
-
             Map<ColumnHandle, Symbol> assignments = ImmutableBiMap.copyOf(node.getAssignments()).inverse();
             Map<ColumnHandle, VariableReferenceExpression> variableAssignments = new LinkedHashMap<>();
             assignments.forEach((key, value) -> variableAssignments.put(key, toVariableReference(value, planSymbolAllocator.getTypes())));
@@ -254,6 +255,70 @@ public class RowExpressionPredicateExtractor
         public RowExpression visitWindow(WindowNode node, Void context)
         {
             return node.getSource().accept(this, context);
+        }
+
+        @Override
+        public RowExpression visitValues(ValuesNode node, Void context)
+        {
+            if (node.getOutputSymbols().isEmpty()) {
+                return TRUE_CONSTANT;
+            }
+
+            ImmutableMap.Builder<VariableReferenceExpression, Domain> domains = ImmutableMap.builder();
+
+            for (int column = 0; column < node.getOutputSymbols().size(); column++) {
+                Symbol symbol = node.getOutputSymbols().get(column);
+                Type type = planSymbolAllocator.getTypes().get(symbol);
+
+                ImmutableList.Builder<Object> builder = ImmutableList.builder();
+                boolean hasNull = false;
+                boolean nonDeterministic = false;
+                for (int row = 0; row < node.getRows().size(); row++) {
+                    RowExpression value = node.getRows().get(row).get(column);
+
+                    if (!logicalRowExpressions.isDeterministic(new RowExpressionDeterminismEvaluator(metadata), value)) {
+                        nonDeterministic = true;
+                        break;
+                    }
+
+                    RowExpressionInterpreter interpreter = RowExpressionInterpreter.rowExpressionInterpreter(value, metadata, session.toConnectorSession());
+                    Object evaluated = interpreter.evaluate();
+
+                    if (evaluated instanceof RowExpressionInterpreter) {
+                        return TRUE_CONSTANT;
+                    }
+
+                    if (evaluated == null) {
+                        hasNull = true;
+                    }
+                    else {
+                        builder.add(evaluated);
+                    }
+                }
+
+                if (nonDeterministic) {
+                    // We can't describe a predicate for this column because at least
+                    // one cell is non-deterministic, so skip it.
+                    continue;
+                }
+
+                List<Object> values = builder.build();
+
+                Domain domain = Domain.none(type);
+
+                if (!values.isEmpty()) {
+                    domain = domain.union(Domain.multipleValues(type, values));
+                }
+
+                if (hasNull) {
+                    domain = domain.union(Domain.onlyNull(type));
+                }
+
+                domains.put(new VariableReferenceExpression(symbol.getName(), type), domain);
+            }
+
+            // simplify to avoid a large expression if there are many rows in ValuesNode
+            return domainTranslator.toPredicate(TupleDomain.withColumnDomains(domains.build()).simplify());
         }
 
         private Multimap<VariableReferenceExpression, VariableReferenceExpression> outputMap(UnionNode node, int sourceIndex)

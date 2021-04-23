@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -29,8 +30,12 @@ import io.prestosql.cost.CostProvider;
 import io.prestosql.cost.PlanCostEstimate;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.expressions.LogicalRowExpressions;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
+import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.function.FunctionMetadata;
+import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.JoinNode.DistributionType;
@@ -39,28 +44,29 @@ import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.DeterminismEvaluator;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
-import io.prestosql.sql.planner.EqualityInference;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.RowExpressionEqualityInference;
 import io.prestosql.sql.planner.RuleStatsRecorder;
-import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.IterativeOptimizer;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.optimizations.JoinNodeUtils;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
-import io.prestosql.sql.tree.ComparisonExpression;
-import io.prestosql.sql.tree.Expression;
-import io.prestosql.sql.tree.SymbolReference;
+import io.prestosql.sql.relational.FunctionResolution;
+import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +75,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -78,29 +85,22 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Sets.powerSet;
-import static com.google.common.collect.Streams.stream;
 import static io.prestosql.SystemSessionProperties.getJoinDistributionType;
 import static io.prestosql.SystemSessionProperties.getJoinReorderingStrategy;
 import static io.prestosql.SystemSessionProperties.getMaxReorderedJoins;
+import static io.prestosql.expressions.LogicalRowExpressions.TRUE_CONSTANT;
 import static io.prestosql.spi.plan.JoinNode.DistributionType.PARTITIONED;
 import static io.prestosql.spi.plan.JoinNode.DistributionType.REPLICATED;
 import static io.prestosql.spi.plan.JoinNode.Type.INNER;
-import static io.prestosql.sql.ExpressionUtils.and;
-import static io.prestosql.sql.ExpressionUtils.combineConjuncts;
-import static io.prestosql.sql.ExpressionUtils.extractConjuncts;
-import static io.prestosql.sql.planner.EqualityInference.createEqualityInference;
-import static io.prestosql.sql.planner.EqualityInference.nonInferrableConjuncts;
-import static io.prestosql.sql.planner.ExpressionDeterminismEvaluator.isDeterministic;
+import static io.prestosql.sql.planner.RowExpressionEqualityInference.createEqualityInference;
 import static io.prestosql.sql.planner.iterative.rule.DetermineJoinDistributionType.canReplicate;
 import static io.prestosql.sql.planner.iterative.rule.HintedReorderJoins.HintedReorderJoinsRule.JoinEnumerationResult.INFINITE_COST_RESULT;
 import static io.prestosql.sql.planner.iterative.rule.HintedReorderJoins.HintedReorderJoinsRule.JoinEnumerationResult.UNKNOWN_COST_RESULT;
 import static io.prestosql.sql.planner.iterative.rule.HintedReorderJoins.HintedReorderJoinsRule.MultiJoinNode.toMultiJoinNode;
+import static io.prestosql.sql.planner.optimizations.JoinNodeUtils.toRowExpression;
 import static io.prestosql.sql.planner.optimizations.QueryCardinalityUtil.isAtMostScalar;
 import static io.prestosql.sql.planner.plan.ChildReplacer.replaceChildren;
 import static io.prestosql.sql.planner.plan.Patterns.join;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
-import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
-import static io.prestosql.sql.tree.ComparisonExpression.Operator.EQUAL;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toCollection;
 
@@ -112,19 +112,21 @@ public class HintedReorderJoins
     private final StatsCalculator statsCalculator;
     private final CostCalculator costCalculator;
     private final CostComparator costComparator;
+    private final Metadata metadata;
 
-    public HintedReorderJoins(RuleStatsRecorder stats, StatsCalculator statsCalculator, CostCalculator costCalculator, CostComparator costComparator)
+    public HintedReorderJoins(RuleStatsRecorder stats, StatsCalculator statsCalculator, CostCalculator costCalculator, CostComparator costComparator, Metadata metadata)
     {
         this.stats = stats;
         this.statsCalculator = statsCalculator;
         this.costCalculator = costCalculator;
         this.costComparator = costComparator;
+        this.metadata = metadata;
     }
 
     @Override
     public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
-        return SimplePlanRewriter.rewriteWith(new PreRuleOptimizer(session, types, planSymbolAllocator, idAllocator, warningCollector),
+        return SimplePlanRewriter.rewriteWith(new PreRuleOptimizer(session, types, planSymbolAllocator, idAllocator, warningCollector, metadata),
                 plan);
     }
 
@@ -137,14 +139,20 @@ public class HintedReorderJoins
         private final PlanNodeIdAllocator idAllocator;
         private final WarningCollector warningCollector;
         private Set<PlanNode> optimizableSources;
+        private final Metadata metadata;
+        private final LogicalRowExpressions logicalRowExpressions;
 
-        private PreRuleOptimizer(Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+        private PreRuleOptimizer(Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector, Metadata metadata)
         {
             this.session = session;
             this.types = types;
             this.planSymbolAllocator = planSymbolAllocator;
             this.idAllocator = idAllocator;
             this.warningCollector = warningCollector;
+            this.metadata = metadata;
+            this.logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata),
+                                                                    new FunctionResolution(metadata.getFunctionAndTypeManager()),
+                                                                    metadata.getFunctionAndTypeManager());
         }
 
         @Override
@@ -162,7 +170,7 @@ public class HintedReorderJoins
         {
             if (optimizableSources == null) {
                 // The highest level join
-                ReorderJoins.MultiJoinNode multiJoinNode = JoinNodeCandidatesExtractor.toMultiJoinNode(node, getMaxReorderedJoins(session));
+                ReorderJoins.MultiJoinNode multiJoinNode = JoinNodeCandidatesExtractor.toMultiJoinNode(node, getMaxReorderedJoins(session), types, logicalRowExpressions);
                 optimizableSources = multiJoinNode.getSources();
                 PlanNode left = context.rewrite(node.getLeft(), context.get());
                 PlanNode right = context.rewrite(node.getRight(), context.get());
@@ -178,28 +186,32 @@ public class HintedReorderJoins
             return new IterativeOptimizer(stats,
                     statsCalculator,
                     costCalculator,
-                    ImmutableSet.of(new HintedReorderJoinsRule(costComparator))).optimize(planNode, session, types, planSymbolAllocator, idAllocator, warningCollector);
+                    ImmutableSet.of(new HintedReorderJoinsRule(costComparator, metadata, logicalRowExpressions))).optimize(planNode, session, types, planSymbolAllocator, idAllocator, warningCollector);
         }
     }
 
     private static class JoinNodeCandidatesExtractor
     {
         private final LinkedHashSet<PlanNode> sources = new LinkedHashSet<>();
-        private final List<Expression> filters = new ArrayList<>();
+        private final List<RowExpression> filters = new ArrayList<>();
         private final List<Symbol> outputSymbols;
+        private final TypeProvider types;
+        private final LogicalRowExpressions logicalRowExpressions;
 
-        JoinNodeCandidatesExtractor(JoinNode node, int sourceLimit)
+        JoinNodeCandidatesExtractor(JoinNode node, int sourceLimit, TypeProvider types, LogicalRowExpressions logicalRowExpressions)
         {
             requireNonNull(node, "node is null");
             checkState(node.getType() == INNER, "join type must be INNER");
             this.outputSymbols = node.getOutputSymbols();
+            this.types = types;
+            this.logicalRowExpressions = logicalRowExpressions;
             flattenNode(node, sourceLimit);
         }
 
-        static ReorderJoins.MultiJoinNode toMultiJoinNode(JoinNode joinNode, int joinLimit)
+        static ReorderJoins.MultiJoinNode toMultiJoinNode(JoinNode joinNode, int joinLimit, TypeProvider types, LogicalRowExpressions logicalRowExpressions)
         {
             // the number of sources is the number of joins + 1
-            return new JoinNodeCandidatesExtractor(joinNode, joinLimit + 1).toMultiJoinNode();
+            return new JoinNodeCandidatesExtractor(joinNode, joinLimit + 1, types, logicalRowExpressions).toMultiJoinNode();
         }
 
         private void flattenNode(PlanNode node, int limit)
@@ -212,7 +224,7 @@ public class HintedReorderJoins
 
             JoinNode joinNode = (JoinNode) node;
             if (joinNode.getType() != INNER
-                    || !isDeterministic(joinNode.getFilter().map(OriginalExpressionUtils::castToExpression).orElse(TRUE_LITERAL))
+                    || !logicalRowExpressions.isDeterministic(joinNode.getFilter().orElse(TRUE_CONSTANT))
                     || joinNode.getDistributionType().isPresent()) {
                 sources.add(node);
                 return;
@@ -222,13 +234,13 @@ public class HintedReorderJoins
             flattenNode(joinNode.getLeft(), limit - 1);
             flattenNode(joinNode.getRight(), limit);
             joinNode.getCriteria().stream()
-                    .map(JoinNodeUtils::toExpression)
+                    .map(criteria -> toRowExpression(criteria, types))
                     .forEach(filters::add);
         }
 
         ReorderJoins.MultiJoinNode toMultiJoinNode()
         {
-            return new ReorderJoins.MultiJoinNode(sources, and(filters), outputSymbols);
+            return new ReorderJoins.MultiJoinNode(sources, logicalRowExpressions.and(filters), outputSymbols, logicalRowExpressions);
         }
     }
 
@@ -239,22 +251,32 @@ public class HintedReorderJoins
 
         // We check that join distribution type is absent because we only want
         // to do this transformation once (reordered joins will have distribution type already set).
-        private static final Pattern<JoinNode> PATTERN = join().matching(
-                joinNode -> !joinNode.getDistributionType().isPresent()
-                        && joinNode.getType() == INNER
-                        && isDeterministic(joinNode.getFilter().map(OriginalExpressionUtils::castToExpression).orElse(TRUE_LITERAL)));
+        private final Pattern<JoinNode> joinNodePattern;
 
         private final CostComparator costComparator;
 
-        public HintedReorderJoinsRule(CostComparator costComparator)
+        private final Metadata metadata;
+
+        private final DeterminismEvaluator determinismEvaluator;
+
+        private final LogicalRowExpressions logicalRowExpressions;
+
+        public HintedReorderJoinsRule(CostComparator costComparator, Metadata metadata, LogicalRowExpressions logicalRowExpressions)
         {
             this.costComparator = requireNonNull(costComparator, "costComparator is null");
+            this.metadata = requireNonNull(metadata, "metadata is null");
+            this.determinismEvaluator = new RowExpressionDeterminismEvaluator(metadata);
+            this.joinNodePattern = join().matching(
+                    joinNode -> !joinNode.getDistributionType().isPresent()
+                            && joinNode.getType() == INNER
+                            && determinismEvaluator.isDeterministic(joinNode.getFilter().orElse(TRUE_CONSTANT)));
+            this.logicalRowExpressions = logicalRowExpressions;
         }
 
         @Override
         public Pattern<JoinNode> getPattern()
         {
-            return PATTERN;
+            return joinNodePattern;
         }
 
         @Override
@@ -270,11 +292,18 @@ public class HintedReorderJoins
         @Override
         public Result apply(JoinNode joinNode, Captures captures, Context context)
         {
-            MultiJoinNode multiJoinNode = toMultiJoinNode(joinNode, context.getLookup(), getMaxReorderedJoins(context.getSession()));
+            MultiJoinNode multiJoinNode = toMultiJoinNode(joinNode,
+                    context.getLookup(),
+                    getMaxReorderedJoins(context.getSession()),
+                    determinismEvaluator,
+                    context.getSymbolAllocator().getTypes(),
+                    logicalRowExpressions);
             JoinEnumerator joinEnumerator = new JoinEnumerator(
                     costComparator,
                     multiJoinNode.getFilter(),
-                    context);
+                    context,
+                    metadata,
+                    logicalRowExpressions);
             String tablePriority = "";
             String joinOrder = SystemSessionProperties.getJoinOrder(context.getSession());
             if (joinOrder != null && !"".equals(joinOrder.trim())) {
@@ -301,15 +330,17 @@ public class HintedReorderJoins
             // Using Ordering to facilitate rule determinism
             private final Ordering<JoinEnumerationResult> resultComparator;
             private final PlanNodeIdAllocator idAllocator;
-            private final Expression allFilter;
-            private final EqualityInference allFilterInference;
+            private final RowExpression allFilter;
+            private final RowExpressionEqualityInference allFilterInference;
             private final Lookup lookup;
             private final Context context;
+            private final Metadata metadata;
+            private final LogicalRowExpressions logicalRowExpressions;
 
             private final Map<Set<PlanNode>, JoinEnumerationResult> memo = new HashMap<>();
 
             @VisibleForTesting
-            JoinEnumerator(CostComparator costComparator, Expression filter, Context context)
+            JoinEnumerator(CostComparator costComparator, RowExpression filter, Context context, Metadata metadata, LogicalRowExpressions logicalRowExpressions)
             {
                 this.context = requireNonNull(context);
                 this.session = requireNonNull(context.getSession(), "session is null");
@@ -317,7 +348,9 @@ public class HintedReorderJoins
                 this.resultComparator = costComparator.forSession(session).onResultOf(result -> result.cost);
                 this.idAllocator = requireNonNull(context.getIdAllocator(), "idAllocator is null");
                 this.allFilter = requireNonNull(filter, "filter is null");
-                this.allFilterInference = createEqualityInference(filter);
+                this.metadata = requireNonNull(metadata, "metadata is null");
+                this.logicalRowExpressions = requireNonNull(logicalRowExpressions, "logicalRowExpressions is null");
+                this.allFilterInference = createEqualityInference(metadata, filter);
                 this.lookup = requireNonNull(context.getLookup(), "lookup is null");
             }
 
@@ -426,21 +459,22 @@ public class HintedReorderJoins
                         .flatMap(node -> node.getOutputSymbols().stream())
                         .collect(toImmutableSet());
 
-                List<Expression> joinPredicates = getJoinPredicates(leftSymbols, rightSymbols);
+                List<RowExpression> joinPredicates = getJoinPredicates(getVariables(leftSymbols, context.getSymbolAllocator().getTypes()),
+                        getVariables(rightSymbols, context.getSymbolAllocator().getTypes()));
                 List<EquiJoinClause> joinConditions = joinPredicates.stream()
-                        .filter(JoinEnumerator::isJoinEqualityCondition)
-                        .map(predicate -> toEquiJoinClause((ComparisonExpression) predicate, leftSymbols))
+                        .filter(rowExpression -> isJoinEqualityCondition(rowExpression))
+                        .map(predicate -> toEquiJoinClause((CallExpression) predicate, leftSymbols))
                         .collect(toImmutableList());
                 if (joinConditions.isEmpty()) {
                     return INFINITE_COST_RESULT;
                 }
-                List<Expression> joinFilters = joinPredicates.stream()
+                List<RowExpression> joinFilters = joinPredicates.stream()
                         .filter(predicate -> !isJoinEqualityCondition(predicate))
                         .collect(toImmutableList());
 
                 Set<Symbol> requiredJoinSymbols = ImmutableSet.<Symbol>builder()
                         .addAll(outputSymbols)
-                        .addAll(SymbolsExtractor.extractUnique(joinPredicates))
+                        .addAll(SymbolsExtractor.extractUnique(joinPredicates, null))
                         .build();
 
                 JoinEnumerationResult leftResult = getJoinSource(
@@ -485,7 +519,7 @@ public class HintedReorderJoins
                                 right,
                                 joinConditions,
                                 sortedOutputSymbols,
-                                joinFilters.isEmpty() ? Optional.empty() : Optional.of(and(joinFilters)).map(OriginalExpressionUtils::castToRowExpression),
+                                joinFilters.isEmpty() ? Optional.empty() : Optional.of(logicalRowExpressions.and(joinFilters)),
                                 Optional.empty(),
                                 Optional.empty(),
                                 Optional.empty(),
@@ -494,26 +528,36 @@ public class HintedReorderJoins
                         expectedPattern);
             }
 
-            private List<Expression> getJoinPredicates(Set<Symbol> leftSymbols, Set<Symbol> rightSymbols)
+            private Set<VariableReferenceExpression> getVariables(Set<Symbol> symbols, TypeProvider types)
             {
-                ImmutableList.Builder<Expression> joinPredicatesBuilder = ImmutableList.builder();
+                Set<VariableReferenceExpression> variables = new HashSet<>();
+                for (Symbol symbol : symbols) {
+                    variables.add(new VariableReferenceExpression(symbol.getName(), types.get(symbol)));
+                }
+                return variables;
+            }
+
+            private List<RowExpression> getJoinPredicates(Set<VariableReferenceExpression> leftVariables, Set<VariableReferenceExpression> rightVariables)
+            {
+                ImmutableList.Builder<RowExpression> joinPredicatesBuilder = ImmutableList.builder();
 
                 // This takes all conjuncts that were part of allFilters that
                 // could not be used for equality inference.
                 // If they use both the left and right symbols, we add them to the list of joinPredicates
-                stream(nonInferrableConjuncts(allFilter))
-                        .map(conjunct -> allFilterInference.rewriteExpression(conjunct, symbol -> leftSymbols.contains(symbol) || rightSymbols.contains(symbol)))
+                RowExpressionEqualityInference.Builder builder = new RowExpressionEqualityInference.Builder(metadata);
+                StreamSupport.stream(builder.nonInferrableConjuncts(allFilter).spliterator(), false)
+                        .map(conjunct -> allFilterInference.rewriteExpression(conjunct, variable -> leftVariables.contains(variable) || rightVariables.contains(variable)))
                         .filter(Objects::nonNull)
                         // filter expressions that contain only left or right symbols
-                        .filter(conjunct -> allFilterInference.rewriteExpression(conjunct, leftSymbols::contains) == null)
-                        .filter(conjunct -> allFilterInference.rewriteExpression(conjunct, rightSymbols::contains) == null)
+                        .filter(conjunct -> allFilterInference.rewriteExpression(conjunct, leftVariables::contains) == null)
+                        .filter(conjunct -> allFilterInference.rewriteExpression(conjunct, rightVariables::contains) == null)
                         .forEach(joinPredicatesBuilder::add);
 
                 // create equality inference on available symbols
                 // TODO: make generateEqualitiesPartitionedBy take left and right scope
-                List<Expression> joinEqualities = allFilterInference.generateEqualitiesPartitionedBy(symbol -> leftSymbols.contains(symbol) || rightSymbols.contains(symbol)).getScopeEqualities();
-                EqualityInference joinInference = createEqualityInference(joinEqualities.toArray(new Expression[0]));
-                joinPredicatesBuilder.addAll(joinInference.generateEqualitiesPartitionedBy(in(leftSymbols)).getScopeStraddlingEqualities());
+                List<RowExpression> joinEqualities = allFilterInference.generateEqualitiesPartitionedBy(variable -> leftVariables.contains(variable) || rightVariables.contains(variable)).getScopeEqualities();
+                RowExpressionEqualityInference joinInference = createEqualityInference(metadata, joinEqualities.toArray(new RowExpression[0]));
+                joinPredicatesBuilder.addAll(joinInference.generateEqualitiesPartitionedBy(in(leftVariables)).getScopeStraddlingEqualities());
 
                 return joinPredicatesBuilder.build();
             }
@@ -522,34 +566,43 @@ public class HintedReorderJoins
             {
                 if (nodes.size() == 1) {
                     PlanNode planNode = getOnlyElement(nodes);
-                    ImmutableList.Builder<Expression> predicates = ImmutableList.builder();
+                    ImmutableList.Builder<RowExpression> predicates = ImmutableList.builder();
                     predicates.addAll(allFilterInference.generateEqualitiesPartitionedBy(outputSymbols::contains).getScopeEqualities());
-                    stream(nonInferrableConjuncts(allFilter))
+                    RowExpressionEqualityInference.Builder builder = new RowExpressionEqualityInference.Builder(metadata);
+                    StreamSupport.stream(builder.nonInferrableConjuncts(allFilter).spliterator(), false)
                             .map(conjunct -> allFilterInference.rewriteExpression(conjunct, outputSymbols::contains))
                             .filter(Objects::nonNull)
                             .forEach(predicates::add);
-                    Expression filter = combineConjuncts(predicates.build());
-                    if (!TRUE_LITERAL.equals(filter)) {
-                        planNode = new FilterNode(idAllocator.getNextId(), planNode, castToRowExpression(filter));
+                    RowExpression filter = logicalRowExpressions.combineConjuncts(predicates.build());
+                    if (!TRUE_CONSTANT.equals(filter)) {
+                        planNode = new FilterNode(idAllocator.getNextId(), planNode, filter);
                     }
                     return createJoinEnumerationResult(planNode);
                 }
                 return chooseJoinOrder(nodes, outputSymbols, expectedPattern);
             }
 
-            private static boolean isJoinEqualityCondition(Expression expression)
+            private boolean isJoinEqualityCondition(RowExpression expression)
             {
-                return expression instanceof ComparisonExpression
-                        && ((ComparisonExpression) expression).getOperator() == EQUAL
-                        && ((ComparisonExpression) expression).getLeft() instanceof SymbolReference
-                        && ((ComparisonExpression) expression).getRight() instanceof SymbolReference;
+                if (expression instanceof CallExpression) {
+                    CallExpression call = (CallExpression) expression;
+                    FunctionMetadata functionMetadata = metadata.getFunctionAndTypeManager().getFunctionMetadata(call.getFunctionHandle());
+                    return functionMetadata.getOperatorType().isPresent()
+                            && functionMetadata.getOperatorType().get().equals(OperatorType.EQUAL)
+                            && call.getArguments().size() == 2
+                            && call.getArguments().get(0) instanceof VariableReferenceExpression
+                            && call.getArguments().get(1) instanceof VariableReferenceExpression;
+                }
+                return false;
             }
 
-            private static EquiJoinClause toEquiJoinClause(ComparisonExpression equality, Set<Symbol> leftSymbols)
+            private static EquiJoinClause toEquiJoinClause(CallExpression equality, Set<Symbol> leftSymbols)
             {
-                Symbol leftSymbol = SymbolUtils.from(equality.getLeft());
-                Symbol rightSymbol = SymbolUtils.from(equality.getRight());
-                EquiJoinClause equiJoinClause = new EquiJoinClause(leftSymbol, rightSymbol);
+                checkArgument(equality.getArguments().size() == 2, "Unexpected number of arguments in binary operator equals");
+                VariableReferenceExpression leftVariable = (VariableReferenceExpression) equality.getArguments().get(0);
+                VariableReferenceExpression rightVariable = (VariableReferenceExpression) equality.getArguments().get(1);
+                Symbol leftSymbol = new Symbol(leftVariable.getName());
+                EquiJoinClause equiJoinClause = new EquiJoinClause(leftSymbol, new Symbol(rightVariable.getName()));
                 return leftSymbols.contains(leftSymbol) ? equiJoinClause : equiJoinClause.flip();
             }
 
@@ -623,25 +676,28 @@ public class HintedReorderJoins
         {
             // Use a linked hash set to ensure optimizer is deterministic
             private final LinkedHashSet<PlanNode> sources;
-            private final Expression filter;
+            private final RowExpression filter;
             private final List<Symbol> outputSymbols;
+            private final LogicalRowExpressions logicalRowExpressions;
 
-            public MultiJoinNode(LinkedHashSet<PlanNode> sources, Expression filter, List<Symbol> outputSymbols)
+            public MultiJoinNode(LinkedHashSet<PlanNode> sources, RowExpression filter, List<Symbol> outputSymbols, LogicalRowExpressions logicalRowExpressions)
             {
                 requireNonNull(sources, "sources is null");
                 checkArgument(sources.size() > 1, "sources size is <= 1");
                 requireNonNull(filter, "filter is null");
                 requireNonNull(outputSymbols, "outputSymbols is null");
+                requireNonNull(logicalRowExpressions, "logicalRowExpressions is null");
 
                 this.sources = sources;
                 this.filter = filter;
                 this.outputSymbols = ImmutableList.copyOf(outputSymbols);
+                this.logicalRowExpressions = logicalRowExpressions;
 
                 List<Symbol> inputSymbols = sources.stream().flatMap(source -> source.getOutputSymbols().stream()).collect(toImmutableList());
                 checkArgument(inputSymbols.containsAll(outputSymbols), "inputs do not contain all output symbols");
             }
 
-            public Expression getFilter()
+            public RowExpression getFilter()
             {
                 return filter;
             }
@@ -664,7 +720,7 @@ public class HintedReorderJoins
             @Override
             public int hashCode()
             {
-                return Objects.hash(sources, ImmutableSet.copyOf(extractConjuncts(filter)), outputSymbols);
+                return Objects.hash(sources, ImmutableSet.copyOf(logicalRowExpressions.extractConjuncts(filter)), outputSymbols);
             }
 
             @Override
@@ -676,29 +732,35 @@ public class HintedReorderJoins
 
                 MultiJoinNode other = (MultiJoinNode) obj;
                 return this.sources.equals(other.sources)
-                        && ImmutableSet.copyOf(extractConjuncts(this.filter)).equals(ImmutableSet.copyOf(extractConjuncts(other.filter)))
+                        && ImmutableSet.copyOf(logicalRowExpressions.extractConjuncts(this.filter)).equals(ImmutableSet.copyOf(logicalRowExpressions.extractConjuncts(other.filter)))
                         && this.outputSymbols.equals(other.outputSymbols);
             }
 
-            static MultiJoinNode toMultiJoinNode(JoinNode joinNode, Lookup lookup, int joinLimit)
+            static MultiJoinNode toMultiJoinNode(JoinNode joinNode, Lookup lookup, int joinLimit, DeterminismEvaluator determinismEvaluator, TypeProvider types, LogicalRowExpressions logicalRowExpressions)
             {
                 // the number of sources is the number of joins + 1
-                return new JoinNodeFlattener(joinNode, lookup, joinLimit + 1).toMultiJoinNode();
+                return new JoinNodeFlattener(joinNode, lookup, joinLimit + 1, determinismEvaluator, types, logicalRowExpressions).toMultiJoinNode();
             }
 
             private static class JoinNodeFlattener
             {
                 private final LinkedHashSet<PlanNode> sources = new LinkedHashSet<>();
-                private final List<Expression> filters = new ArrayList<>();
+                private final List<RowExpression> filters = new ArrayList<>();
                 private final List<Symbol> outputSymbols;
                 private final Lookup lookup;
+                private final DeterminismEvaluator determinismEvaluator;
+                private final TypeProvider types;
+                private final LogicalRowExpressions logicalRowExpressions;
 
-                JoinNodeFlattener(JoinNode node, Lookup lookup, int sourceLimit)
+                JoinNodeFlattener(JoinNode node, Lookup lookup, int sourceLimit, DeterminismEvaluator determinismEvaluator, TypeProvider types, LogicalRowExpressions logicalRowExpressions)
                 {
                     requireNonNull(node, "node is null");
                     checkState(node.getType() == INNER, "join type must be INNER");
                     this.outputSymbols = node.getOutputSymbols();
                     this.lookup = requireNonNull(lookup, "lookup is null");
+                    this.determinismEvaluator = requireNonNull(determinismEvaluator, "determinismEvaluator is null");
+                    this.types = requireNonNull(types, "types is null");
+                    this.logicalRowExpressions = requireNonNull(logicalRowExpressions, "logicalRowExpressions is null");
                     flattenNode(node, sourceLimit);
                 }
 
@@ -714,7 +776,7 @@ public class HintedReorderJoins
 
                     JoinNode joinNode = (JoinNode) resolved;
                     if (joinNode.getType() != INNER
-                            || !isDeterministic(joinNode.getFilter().map(OriginalExpressionUtils::castToExpression).orElse(TRUE_LITERAL))
+                            || !determinismEvaluator.isDeterministic(joinNode.getFilter().orElse(TRUE_CONSTANT))
                             || joinNode.getDistributionType().isPresent()) {
                         sources.add(node);
                         return;
@@ -724,22 +786,23 @@ public class HintedReorderJoins
                     flattenNode(joinNode.getLeft(), limit - 1);
                     flattenNode(joinNode.getRight(), limit);
                     joinNode.getCriteria().stream()
-                            .map(JoinNodeUtils::toExpression)
+                            .map(criteria -> toRowExpression(criteria, types))
                             .forEach(filters::add);
-                    joinNode.getFilter().map(OriginalExpressionUtils::castToExpression).ifPresent(filters::add);
+                    joinNode.getFilter().ifPresent(filters::add);
                 }
 
                 MultiJoinNode toMultiJoinNode()
                 {
-                    return new MultiJoinNode(sources, and(filters), outputSymbols);
+                    return new MultiJoinNode(sources, logicalRowExpressions.and(filters), outputSymbols, logicalRowExpressions);
                 }
             }
 
             static class Builder
             {
                 private List<PlanNode> sources;
-                private Expression filter;
+                private RowExpression filter;
                 private List<Symbol> outputSymbols;
+                private LogicalRowExpressions logicalRowExpressions;
 
                 public Builder setSources(PlanNode... sources)
                 {
@@ -747,7 +810,7 @@ public class HintedReorderJoins
                     return this;
                 }
 
-                public Builder setFilter(Expression filter)
+                public Builder setFilter(RowExpression filter)
                 {
                     this.filter = filter;
                     return this;
@@ -759,9 +822,15 @@ public class HintedReorderJoins
                     return this;
                 }
 
+                public Builder setLogicalRowExpressions(LogicalRowExpressions logicalRowExpressions)
+                {
+                    this.logicalRowExpressions = logicalRowExpressions;
+                    return this;
+                }
+
                 public MultiJoinNode build()
                 {
-                    return new MultiJoinNode(new LinkedHashSet<>(sources), filter, outputSymbols);
+                    return new MultiJoinNode(new LinkedHashSet<>(sources), filter, outputSymbols, logicalRowExpressions);
                 }
             }
         }

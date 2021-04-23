@@ -41,7 +41,6 @@ import static io.prestosql.spi.type.VarcharType.createVarcharType;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.constrainedTableScanWithTableLayout;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.filter;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
-import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expression;
 
 public class TestPushPredicateIntoTableScan
         extends BaseRuleTest
@@ -85,11 +84,14 @@ public class TestPushPredicateIntoTableScan
     public void eliminateTableScanWhenNoLayoutExist()
     {
         tester().assertThat(pushPredicateIntoTableScan)
-                .on(p -> p.filter(expression("orderstatus = 'G'"),
-                        p.tableScan(
-                                ordersTableHandle,
-                                ImmutableList.of(p.symbol("orderstatus", createVarcharType(1))),
-                                ImmutableMap.of(p.symbol("orderstatus", createVarcharType(1)), new TpchColumnHandle("orderstatus", createVarcharType(1))))))
+                .on(p -> {
+                    p.symbol("orderstatus", createVarcharType(1));
+                    return p.filter(p.rowExpression("orderstatus = 'G'"),
+                            p.tableScan(
+                                    ordersTableHandle,
+                                    ImmutableList.of(p.symbol("orderstatus", createVarcharType(1))),
+                                    ImmutableMap.of(p.symbol("orderstatus", createVarcharType(1)), new TpchColumnHandle("orderstatus", createVarcharType(1)))));
+                })
                 .matches(values("A"));
     }
 
@@ -98,12 +100,15 @@ public class TestPushPredicateIntoTableScan
     {
         ColumnHandle columnHandle = new TpchColumnHandle("nationkey", BIGINT);
         tester().assertThat(pushPredicateIntoTableScan)
-                .on(p -> p.filter(expression("nationkey = BIGINT '44'"),
-                        p.tableScan(
-                                nationTableHandle,
-                                ImmutableList.of(p.symbol("nationkey", BIGINT)),
-                                ImmutableMap.of(p.symbol("nationkey", BIGINT), columnHandle),
-                                TupleDomain.none())))
+                .on(p -> {
+                    p.symbol("nationkey", BIGINT);
+                    return p.filter(p.rowExpression("nationkey = BIGINT '44'"),
+                            p.tableScan(
+                                    nationTableHandle,
+                                    ImmutableList.of(p.symbol("nationkey", BIGINT)),
+                                    ImmutableMap.of(p.symbol("nationkey", BIGINT), columnHandle),
+                                    TupleDomain.none()));
+                })
                 .matches(values("A"));
     }
 
@@ -111,12 +116,15 @@ public class TestPushPredicateIntoTableScan
     public void doesNotFireIfRuleNotChangePlan()
     {
         tester().assertThat(pushPredicateIntoTableScan)
-                .on(p -> p.filter(expression("nationkey % 17 =  BIGINT '44' AND nationkey % 15 =  BIGINT '43'"),
-                        p.tableScan(
-                                nationTableHandle,
-                                ImmutableList.of(p.symbol("nationkey", BIGINT)),
-                                ImmutableMap.of(p.symbol("nationkey", BIGINT), new TpchColumnHandle("nationkey", BIGINT)),
-                                TupleDomain.all())))
+                .on(p -> {
+                    p.symbol("nationkey", BIGINT);
+                    return p.filter(p.rowExpression("nationkey % 17 =  BIGINT '44' AND nationkey % 15 =  BIGINT '43'"),
+                            p.tableScan(
+                                    nationTableHandle,
+                                    ImmutableList.of(p.symbol("nationkey", BIGINT)),
+                                    ImmutableMap.of(p.symbol("nationkey", BIGINT), new TpchColumnHandle("nationkey", BIGINT)),
+                                    TupleDomain.all()));
+                })
                 .doesNotFire();
     }
 
@@ -127,11 +135,14 @@ public class TestPushPredicateIntoTableScan
                 .put("orderstatus", singleValue(createVarcharType(1), utf8Slice("F")))
                 .build();
         tester().assertThat(pushPredicateIntoTableScan)
-                .on(p -> p.filter(expression("orderstatus = CAST ('F' AS VARCHAR(1))"),
-                        p.tableScan(
-                                ordersTableHandle,
-                                ImmutableList.of(p.symbol("orderstatus", createVarcharType(1))),
-                                ImmutableMap.of(p.symbol("orderstatus", createVarcharType(1)), new TpchColumnHandle("orderstatus", createVarcharType(1))))))
+                .on(p -> {
+                    p.symbol("orderstatus", createVarcharType(1));
+                    return p.filter(p.rowExpression("orderstatus = CAST ('F' AS VARCHAR(1))"),
+                            p.tableScan(
+                                    ordersTableHandle,
+                                    ImmutableList.of(p.symbol("orderstatus", createVarcharType(1))),
+                                    ImmutableMap.of(p.symbol("orderstatus", createVarcharType(1)), new TpchColumnHandle("orderstatus", createVarcharType(1)))));
+                })
                 .matches(
                         constrainedTableScanWithTableLayout("orders", filterConstraint, ImmutableMap.of("orderstatus", "orderstatus")));
     }
@@ -140,11 +151,14 @@ public class TestPushPredicateIntoTableScan
     public void ruleAddedNewTableLayoutIfTableScanHasEmptyConstraint()
     {
         tester().assertThat(pushPredicateIntoTableScan)
-                .on(p -> p.filter(expression("orderstatus = 'F'"),
-                        p.tableScan(
-                                ordersTableHandle,
-                                ImmutableList.of(p.symbol("orderstatus", createVarcharType(1))),
-                                ImmutableMap.of(p.symbol("orderstatus", createVarcharType(1)), new TpchColumnHandle("orderstatus", createVarcharType(1))))))
+                .on(p -> {
+                    p.symbol("orderstatus", createVarcharType(1));
+                    return p.filter(p.rowExpression("orderstatus = 'F'"),
+                            p.tableScan(
+                                    ordersTableHandle,
+                                    ImmutableList.of(p.symbol("orderstatus", createVarcharType(1))),
+                                    ImmutableMap.of(p.symbol("orderstatus", createVarcharType(1)), new TpchColumnHandle("orderstatus", createVarcharType(1)))));
+                })
                 .matches(
                         constrainedTableScanWithTableLayout(
                                 "orders",
@@ -157,11 +171,14 @@ public class TestPushPredicateIntoTableScan
     {
         Type orderStatusType = createVarcharType(1);
         tester().assertThat(pushPredicateIntoTableScan)
-                .on(p -> p.filter(expression("orderstatus = 'O'"),
-                        p.tableScan(
-                                ordersTableHandle,
-                                ImmutableList.of(p.symbol("orderstatus", orderStatusType)),
-                                ImmutableMap.of(p.symbol("orderstatus", orderStatusType), new TpchColumnHandle("orderstatus", orderStatusType)))))
+                .on(p -> {
+                    p.symbol("orderstatus", orderStatusType);
+                    return p.filter(p.rowExpression("orderstatus = 'O'"),
+                            p.tableScan(
+                                    ordersTableHandle,
+                                    ImmutableList.of(p.symbol("orderstatus", orderStatusType)),
+                                    ImmutableMap.of(p.symbol("orderstatus", orderStatusType), new TpchColumnHandle("orderstatus", orderStatusType))));
+                })
                 .matches(constrainedTableScanWithTableLayout(
                         "orders",
                         ImmutableMap.of("orderstatus", singleValue(orderStatusType, utf8Slice("O"))),
@@ -173,11 +190,14 @@ public class TestPushPredicateIntoTableScan
     {
         Type orderStatusType = createVarcharType(1);
         tester().assertThat(pushPredicateIntoTableScan)
-                .on(p -> p.filter(expression("orderstatus = 'O' AND rand() = 0"),
-                        p.tableScan(
-                                ordersTableHandle,
-                                ImmutableList.of(p.symbol("orderstatus", orderStatusType)),
-                                ImmutableMap.of(p.symbol("orderstatus", orderStatusType), new TpchColumnHandle("orderstatus", orderStatusType)))))
+                .on(p -> {
+                    p.symbol("orderstatus", orderStatusType);
+                    return p.filter(p.rowExpression("orderstatus = 'O' AND rand() = 0"),
+                            p.tableScan(
+                                    ordersTableHandle,
+                                    ImmutableList.of(p.symbol("orderstatus", orderStatusType)),
+                                    ImmutableMap.of(p.symbol("orderstatus", orderStatusType), new TpchColumnHandle("orderstatus", orderStatusType))));
+                })
                 .matches(
                         filter("rand() = 0",
                                 constrainedTableScanWithTableLayout(

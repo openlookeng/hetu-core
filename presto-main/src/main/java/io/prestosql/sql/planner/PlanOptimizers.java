@@ -156,7 +156,6 @@ import io.prestosql.sql.planner.optimizations.PredicatePushDown;
 import io.prestosql.sql.planner.optimizations.PruneCTENodes;
 import io.prestosql.sql.planner.optimizations.PruneUnreferencedOutputs;
 import io.prestosql.sql.planner.optimizations.ReplicateSemiJoinInDelete;
-import io.prestosql.sql.planner.optimizations.RowExpressionPredicatePushDown;
 import io.prestosql.sql.planner.optimizations.SetFlatteningOptimizer;
 import io.prestosql.sql.planner.optimizations.StarTreeAggregationRule;
 import io.prestosql.sql.planner.optimizations.StatsRecordingPlanOptimizer;
@@ -297,14 +296,6 @@ public class PlanOptimizers
                 estimatedExchangesCostCalculator,
                 projectionPushdownRules);
 
-        IterativeOptimizer projectionRowExpressionPushDown = new IterativeOptimizer(
-                ruleStats,
-                statsCalculator,
-                estimatedExchangesCostCalculator,
-                ImmutableSet.of(
-                        new PushProjectionThroughUnion(),
-                        new PushProjectionThroughExchange()));
-
         IterativeOptimizer simplifyOptimizer = new IterativeOptimizer(
                 ruleStats,
                 statsCalculator,
@@ -373,6 +364,7 @@ public class PlanOptimizers
                                         new StarTreeAggregationRule(cubeManager, metadata),
                                         new SingleDistinctAggregationToGroupBy(),
                                         new MultipleDistinctAggregationToMarkDistinct(),
+                                        new ImplementBernoulliSampleAsFilter(metadata),
                                         new MergeLimitWithDistinct(),
                                         new PruneCountAggregationOverScalar(metadata.getFunctionAndTypeManager()),
                                         new PruneOrderByInAggregation(metadata),
@@ -445,15 +437,22 @@ public class PlanOptimizers
                                 new RemoveRedundantIdentityProjections(),
                                 new TransformCorrelatedSingleRowSubqueryToProject(),
                                 new RemoveAggregationInSemiJoin())),
-                new CheckSubqueryNodesAreRewritten(),
-                new StatsRecordingPlanOptimizer(
+                new CheckSubqueryNodesAreRewritten());
+
+        builder.add(new IterativeOptimizer(
+                ruleStats,
+                statsCalculator,
+                costCalculator,
+                new TranslateExpressions(metadata, new SqlParser()).rules(metadata)));
+
+        builder.add(new StatsRecordingPlanOptimizer(
                         optimizerStats,
                         new PredicatePushDown(metadata, typeAnalyzer, false, false)),
                 new IterativeOptimizer(
                         ruleStats,
                         statsCalculator,
                         estimatedExchangesCostCalculator,
-                        ImmutableSet.of(new TransformFilteringSemiJoinToInnerJoin())), // must run after PredicatePushDown
+                        ImmutableSet.of(new TransformFilteringSemiJoinToInnerJoin(metadata))), // must run after PredicatePushDown
                 new PruneUnreferencedOutputs(),
                 inlineProjections,
                 new IterativeOptimizer(
@@ -477,13 +476,6 @@ public class PlanOptimizers
                         statsCalculator,
                         costCalculator,
                         ImmutableSet.of(new PushDeleteAsInsertIntoConnector(metadata, false))),
-                new IterativeOptimizer(
-                        ruleStats,
-                        statsCalculator,
-                        estimatedExchangesCostCalculator,
-                        // Temporary hack: separate optimizer step to avoid the sample node being replaced by filter before pushing
-                        // it to table scan node
-                        ImmutableSet.of(new ImplementBernoulliSampleAsFilter(metadata))),
                 new PruneUnreferencedOutputs(),
                 new IterativeOptimizer(
                         ruleStats,
@@ -493,7 +485,7 @@ public class PlanOptimizers
                                 new RemoveRedundantIdentityProjections(),
                                 new PushAggregationThroughOuterJoin())),
                 inlineProjections,
-                simplifyOptimizer, // Re-run the SimplifyExpressions to simplify any recomposed expressions from other optimizations
+                simplifyRowExpressionOptimizer, // Re-run the SimplifyExpressions to simplify any recomposed expressions from other optimizations
                 projectionPushDown,
                 new UnaliasSymbolReferences(metadata), // Run again because predicate pushdown and projection pushdown might add more projections
                 new PruneUnreferencedOutputs(), // Make sure to run this before index join. Filtered projections may not have all the columns.
@@ -529,7 +521,7 @@ public class PlanOptimizers
                         estimatedExchangesCostCalculator,
                         ImmutableSet.of(new EliminateCrossJoins())), // This can pull up Filter and Project nodes from between Joins, so we need to push them down again
                 new StatsRecordingPlanOptimizer(optimizerStats, new PredicatePushDown(metadata, typeAnalyzer, true, false)),
-                simplifyOptimizer, // Should be always run after PredicatePushDown
+                simplifyRowExpressionOptimizer, // Should be always run after PredicatePushDown
                 new IterativeOptimizer(
                         ruleStats,
                         statsCalculator,
@@ -556,21 +548,16 @@ public class PlanOptimizers
                         ruleStats,
                         statsCalculator,
                         estimatedExchangesCostCalculator,
-                        ImmutableSet.of(new ReorderJoins(costComparator))),
+                        ImmutableSet.of(new ReorderJoins(costComparator, metadata))),
                 new HintedReorderJoins(ruleStats,
                         statsCalculator,
                         estimatedExchangesCostCalculator,
-                        costComparator));
-
-        builder.add(new IterativeOptimizer(
-                ruleStats,
-                statsCalculator,
-                costCalculator,
-                new TranslateExpressions(metadata, new SqlParser()).rules(metadata)));
+                        costComparator,
+                        metadata));
 
         builder.add(
                 new ApplyConnectorOptimization(() -> planOptimizerManager.getOptimizers(LOGICAL)),
-                projectionRowExpressionPushDown,
+                projectionPushDown,
                 new PruneUnreferencedOutputs());
 
         builder.add(new OptimizeMixedDistinctAggregations(metadata));
@@ -641,7 +628,7 @@ public class PlanOptimizers
                         costCalculator,
                         ImmutableSet.of(new RemoveEmptyDelete()))); // Run RemoveEmptyDelete after table scan is removed by PickTableLayout/AddExchanges
 
-        builder.add(new StatsRecordingPlanOptimizer(optimizerStats, new RowExpressionPredicatePushDown(metadata, typeAnalyzer, true, true))); // Run predicate push down one more time in case we can leverage new information from layouts' effective predicate
+        builder.add(new StatsRecordingPlanOptimizer(optimizerStats, new PredicatePushDown(metadata, typeAnalyzer, true, true))); // Run predicate push down one more time in case we can leverage new information from layouts' effective predicate
         builder.add(new RemoveUnsupportedDynamicFilters(metadata, statsCalculator));
         builder.add(new PruneCTENodes(false, false, true));
         builder.add(simplifyRowExpressionOptimizer); // Should be always run after PredicatePushDown
@@ -650,7 +637,7 @@ public class PlanOptimizers
                 statsCalculator,
                 costCalculator,
                 ImmutableSet.of(new AddExchangeAboveCTENode())));
-        builder.add(projectionRowExpressionPushDown);
+        builder.add(projectionPushDown);
         builder.add(inlineProjections);
         builder.add(new UnaliasSymbolReferences(metadata)); // Run unalias after merging projections to simplify projections more efficiently
         builder.add(new PruneUnreferencedOutputs());

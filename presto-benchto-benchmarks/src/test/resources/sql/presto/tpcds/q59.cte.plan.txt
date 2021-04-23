@@ -25,7 +25,7 @@ local exchange (GATHER, SINGLE, [])
                             Filter
                                 scan store
             local exchange (GATHER, SINGLE, [])
-                remote exchange (REPARTITION, HASH, ["expr_361", "s_store_id_235"])
+                remote exchange (REPARTITION, HASH, ["s_store_id_235", "subtract"])
                     join (INNER, REPLICATED):
                         join (INNER, REPLICATED):
                             remote exchange (REPARTITION, HASH, ["d_week_seq_147", "ss_store_sk_127", "sum_182", "sum_183", "sum_184", "sum_185", "sum_186", "sum_187", "sum_188"])
