@@ -16,6 +16,7 @@ package io.prestosql.sql.planner.optimizations;
 
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
@@ -23,11 +24,16 @@ import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.plan.WindowNode;
+import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.SymbolsExtractor;
+import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
@@ -43,6 +49,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
+import static io.prestosql.sql.DynamicFilters.extractDynamicFilters;
 import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
 import static java.util.Objects.requireNonNull;
 
@@ -52,12 +59,16 @@ import static java.util.Objects.requireNonNull;
 public class PruneCTENodes
         implements PlanOptimizer
 {
+    private final Metadata metadata;
+    private final TypeAnalyzer typeAnalyzer;
     private final boolean pruneCTEWithFilter;
     private final boolean pruneCTEWithCrossJoin;
     private final boolean pruneCTEWithDynFilter;
 
-    public PruneCTENodes(boolean pruneCTEWithFilter, boolean pruneCTEWithCrossJoin, boolean pruneCTEWithDynFilter)
+    public PruneCTENodes(Metadata metadata, TypeAnalyzer typeAnalyzer, boolean pruneCTEWithFilter, boolean pruneCTEWithCrossJoin, boolean pruneCTEWithDynFilter)
     {
+        this.metadata = metadata;
+        this.typeAnalyzer = typeAnalyzer;
         this.pruneCTEWithFilter = pruneCTEWithFilter;
         this.pruneCTEWithCrossJoin = pruneCTEWithCrossJoin;
         this.pruneCTEWithDynFilter = pruneCTEWithDynFilter;
@@ -65,7 +76,7 @@ public class PruneCTENodes
 
     @Override
     public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator symbolAllocator,
-                             PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+            PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
         requireNonNull(plan, "plan is null");
         requireNonNull(session, "session is null");
@@ -77,7 +88,7 @@ public class PruneCTENodes
             return plan;
         }
         else {
-            OptimizedPlanRewriter optimizedPlanRewriter = new OptimizedPlanRewriter(false, pruneCTEWithFilter, pruneCTEWithCrossJoin, pruneCTEWithDynFilter);
+            OptimizedPlanRewriter optimizedPlanRewriter = new OptimizedPlanRewriter(metadata, typeAnalyzer, false, pruneCTEWithFilter, pruneCTEWithCrossJoin, pruneCTEWithDynFilter);
             PlanNode newNode = SimplePlanRewriter.rewriteWith(optimizedPlanRewriter, plan);
             if (optimizedPlanRewriter.isSecondTraverseRequired()) {
                 return SimplePlanRewriter.rewriteWith(optimizedPlanRewriter, newNode);
@@ -90,6 +101,8 @@ public class PruneCTENodes
     private static class OptimizedPlanRewriter
             extends SimplePlanRewriter<ExpressionDetails>
     {
+        private final Metadata metadata;
+        private final TypeAnalyzer typeAnalyzer;
         private boolean isNodeAlreadyVisited;
         private final boolean pruneCTEWithFilter;
         private final boolean pruneCTEWithCrossJoin;
@@ -98,23 +111,29 @@ public class PruneCTENodes
 
         private final Map<Integer, Integer> cteUsageMap;
         private final Map<Integer, Integer> cteJoinDynMap;
+        private final Map<Integer, Set<String>> cteJoinOuterDynMap;
         private final Set<Integer> cteToPrune; //because of dynamic filter not matching
+        private final Map<String, RowExpression> dynFilterToPredicateMap;
 
-        private OptimizedPlanRewriter(Boolean isNodeAlreadyVisited, boolean pruneCTEWithFilter, boolean pruneCTEWithCrossJoin, boolean pruneCTEWithDynFilter)
+        private OptimizedPlanRewriter(Metadata metadata, TypeAnalyzer typeAnalyzer, Boolean isNodeAlreadyVisited, boolean pruneCTEWithFilter, boolean pruneCTEWithCrossJoin, boolean pruneCTEWithDynFilter)
         {
+            this.metadata = metadata;
+            this.typeAnalyzer = typeAnalyzer;
             this.isNodeAlreadyVisited = isNodeAlreadyVisited;
             this.cteUsageMap = new HashMap<>();
             this.pruneCTEWithFilter = pruneCTEWithFilter;
             this.pruneCTEWithCrossJoin = pruneCTEWithCrossJoin;
             this.pruneCTEWithDynFilter = pruneCTEWithDynFilter;
             cteJoinDynMap = new HashMap<>();
+            cteJoinOuterDynMap = new HashMap<>();
             cteToPrune = new HashSet<>();
+            dynFilterToPredicateMap = new HashMap<>();
         }
 
         @Override
         public PlanNode visitFilter(FilterNode node, RewriteContext<ExpressionDetails> context)
         {
-            return context.defaultRewrite(node, new ExpressionDetails(context.get() != null ? context.get().getDynFilCount() : 0, node.getPredicate()));
+            return context.defaultRewrite(node, new ExpressionDetails(context.get() != null ? context.get().getDynFilCount() : 0, node.getPredicate(), context.get() != null ? context.get().getOuterDynamicFilterIds() : null));
         }
 
         @Override
@@ -142,8 +161,30 @@ public class PruneCTENodes
                     }
                 }
             }
+            Set<String> dynamicFilterIds = context.get() != null && context.get().getOuterDynamicFilterIds() != null ? context.get().getOuterDynamicFilterIds() : new HashSet<>();
+            dynamicFilterIds.addAll(node.getDynamicFilters().keySet());
+            populatePredicatesForDynFilters(node, node.getDynamicFilters().keySet(), context);
             return context.defaultRewrite(node, new ExpressionDetails(currentCount + node.getDynamicFilters().size(),
-                                                                        context.get() != null ? context.get().getPredicate() : null));
+                    context.get() != null ? context.get().getPredicate() : null, dynamicFilterIds));
+        }
+
+        private void populatePredicatesForDynFilters(PlanNode node, Set<String> dynamicFilterIds, RewriteContext<ExpressionDetails> context)
+        {
+            if (node instanceof TableScanNode) {
+                return;
+            }
+            if (pruneCTEWithDynFilter) {
+                if (node instanceof JoinNode) {
+                    node = ((JoinNode) node).getRight();
+                }
+                if (node instanceof FilterNode && ((FilterNode) node).getSource() instanceof TableScanNode) {
+                    FilterNode filterNode = (FilterNode) node;
+                    if (!dynamicFilterIds.isEmpty()) {
+                        dynamicFilterIds.stream().forEach(filter -> dynFilterToPredicateMap.putIfAbsent(filter, filterNode.getPredicate()));
+                    }
+                }
+                node.getSources().stream().forEach(planNode -> populatePredicatesForDynFilters(planNode, dynamicFilterIds, context));
+            }
         }
 
         private Integer getChildCTERefNum(PlanNode node)
@@ -163,10 +204,24 @@ public class PruneCTENodes
             return null;
         }
 
+        /**
+         * Function to fetch all dynamic filter ids from the sub-tree
+         */
+        private Set<String> getDynFilterIdsFromChild(PlanNode node)
+        {
+            Set<String> filterIds = new HashSet<>();
+            if (node instanceof FilterNode) {
+                DynamicFilters.ExtractResult extractResult = extractDynamicFilters(((FilterNode) node).getPredicate());
+                filterIds.addAll(extractResult.getDynamicConjuncts().stream().map(descriptor -> descriptor.getId()).collect(Collectors.toSet()));
+            }
+            node.getSources().stream().forEach(planNode -> filterIds.addAll(getDynFilterIdsFromChild(planNode)));
+            return filterIds;
+        }
+
         private static boolean isSymbolBaseColumn(String name)
         {
             return !(name.startsWith("sum") || name.startsWith("avg") || name.startsWith("count")
-                        || name.startsWith("max") || name.startsWith("min"));
+                    || name.startsWith("max") || name.startsWith("min"));
         }
 
         private static boolean isExprBaseColumn(RowExpression rowExpression)
@@ -192,6 +247,25 @@ public class PruneCTENodes
         public PlanNode visitCTEScan(CTEScanNode node, RewriteContext<ExpressionDetails> context)
         {
             Integer commonCTERefNum = node.getCommonCTERefNum();
+            Set<String> requiredOuterFilters;
+            Set<String> filterIdsFromChild = getDynFilterIdsFromChild(node);
+            if (context.get() != null && context.get().getOuterDynamicFilterIds() != null) {
+                if (!cteJoinOuterDynMap.containsKey(commonCTERefNum)) {
+                    //add filters as required filters for the first CTE node
+                    requiredOuterFilters = filterIdsFromChild.stream().filter(id -> context.get().getOuterDynamicFilterIds().contains(id)).collect(Collectors.toSet());
+                    cteJoinOuterDynMap.put(commonCTERefNum, requiredOuterFilters);
+                }
+                else {
+                    Set<String> outerFilters = filterIdsFromChild.stream().filter(id -> context.get().getOuterDynamicFilterIds().contains(id)).collect(Collectors.toSet());
+                    //check if all required filters are present in the other CTE nodes else prune the CTE
+                    requiredOuterFilters = cteJoinOuterDynMap.get(commonCTERefNum);
+                    if (!outerFilters.isEmpty() && !outerFilters.containsAll(requiredOuterFilters)) {
+                        if (!isPredicatesOnDynFilterNotMatching(outerFilters, requiredOuterFilters)) {
+                            cteToPrune.add(commonCTERefNum);
+                        }
+                    }
+                }
+            }
             if (pruneCTEWithCrossJoin) {
                 if (cTEWithCrossJoinList.contains(commonCTERefNum)) {
                     node = (CTEScanNode) visitPlan(node, context);
@@ -236,20 +310,83 @@ public class PruneCTENodes
         // If only there was any CTE with just one usage, we need to traverse again to remove CTE node otherwise no need.
         private boolean isSecondTraverseRequired()
         {
-            isNodeAlreadyVisited = cteUsageMap.size() != 0 && cteUsageMap.values().stream().filter(x -> x <= 1).count() > 0 || cteToPrune.size() > 0;
+            isNodeAlreadyVisited = cteUsageMap.size() != 0 && cteUsageMap.values().stream().filter(x -> x <= 1).count() > 0
+                                    || cteToPrune.size() > 0 || cteJoinOuterDynMap.size() > 0;
             return isNodeAlreadyVisited;
+        }
+
+        private boolean isPredicatesOnDynFilterNotMatching(Set<String> requiredOuterFilters, Set<String> outerFilters)
+        {
+            outerFilters.removeAll(requiredOuterFilters);
+            Set<String> extraFilters = new HashSet<>();
+            extraFilters.addAll(outerFilters);
+            for (String filter : outerFilters) {
+                for (String requiredFilter : requiredOuterFilters) {
+                    ExpressionEquivalence expressionEquivalence = new ExpressionEquivalence(metadata, typeAnalyzer);
+                    if (dynFilterToPredicateMap.containsKey(filter) && dynFilterToPredicateMap.containsKey(requiredFilter) &&
+                            expressionEquivalence.areExpressionsEquivalent(getExpressionWithActualColNames(dynFilterToPredicateMap.get(filter)),
+                                    getExpressionWithActualColNames(dynFilterToPredicateMap.get(requiredFilter)))) {
+                        extraFilters.remove(filter);
+                    }
+                }
+            }
+            if (extraFilters.isEmpty()) {
+                return true;
+            }
+            return false;
+        }
+
+        private RowExpression getExpressionWithActualColNames(RowExpression rowExpression)
+        {
+            if (rowExpression instanceof VariableReferenceExpression) {
+                return new VariableReferenceExpression(getActualColName(((VariableReferenceExpression) rowExpression).getName()), rowExpression.getType());
+            }
+            if (rowExpression instanceof CallExpression) {
+                return new CallExpression(((CallExpression) rowExpression).getDisplayName(), ((CallExpression) rowExpression).getFunctionHandle(), rowExpression.getType(),
+                        ((CallExpression) rowExpression).getArguments().stream().map(exp -> getExpressionWithActualColNames(exp)).collect(Collectors.toList()));
+            }
+            if (rowExpression instanceof SpecialForm) {
+                return new SpecialForm(((SpecialForm) rowExpression).getForm(), rowExpression.getType(),
+                        ((SpecialForm) rowExpression).getArguments().stream().map(exp -> getExpressionWithActualColNames(exp)).collect(Collectors.toList()));
+            }
+            return rowExpression;
+        }
+
+        private String getActualColName(String var)
+        {
+            int index = var.lastIndexOf("_");
+            if (index == -1 || isInteger(var.substring(index + 1)) == false) {
+                return var;
+            }
+            else {
+                return var.substring(0, index);
+            }
+        }
+
+        private boolean isInteger(String st)
+        {
+            try {
+                Integer.parseInt(st);
+            }
+            catch (NumberFormatException ex) {
+                return false;
+            }
+
+            return true;
         }
     }
 
     public static class ExpressionDetails
     {
         int dynFilCount;
+        Set<String> outerDynamicFilterIds;
         RowExpression predicate;
 
-        public ExpressionDetails(int dynFilCount, RowExpression predicate)
+        public ExpressionDetails(int dynFilCount, RowExpression predicate, Set<String> outerDynamicFilterIds)
         {
             this.dynFilCount = dynFilCount;
             this.predicate = predicate;
+            this.outerDynamicFilterIds = outerDynamicFilterIds;
         }
 
         public int getDynFilCount()
@@ -260,6 +397,11 @@ public class PruneCTENodes
         public RowExpression getPredicate()
         {
             return predicate;
+        }
+
+        public Set<String> getOuterDynamicFilterIds()
+        {
+            return outerDynamicFilterIds;
         }
     }
 }
