@@ -69,6 +69,7 @@ import io.prestosql.security.PasswordSecurityModule;
 import io.prestosql.server.NodeStateChangeHandler;
 import io.prestosql.server.PluginManager;
 import io.prestosql.server.ServerConfig;
+import io.prestosql.server.ServerInfoResource;
 import io.prestosql.server.ServerMainModule;
 import io.prestosql.server.ShutdownAction;
 import io.prestosql.server.security.ServerSecurityModule;
@@ -336,6 +337,7 @@ public class TestingPrestoServer
         shutdownAction = injector.getInstance(ShutdownAction.class);
         announcer = injector.getInstance(Announcer.class);
 
+        injector.getInstance(ServerInfoResource.class).startupComplete();
         announcer.forceAnnounce();
 
         refreshNodes();

@@ -21,6 +21,7 @@ import com.google.inject.Scopes;
 import io.airlift.concurrent.BoundedExecutor;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
 import io.airlift.http.server.HttpServerConfig;
+import io.airlift.http.server.TheServlet;
 import io.airlift.slice.Slice;
 import io.airlift.stats.GcMonitor;
 import io.airlift.stats.JmxGcMonitor;
@@ -164,6 +165,7 @@ import io.prestosql.version.EmbedVersion;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.servlet.Filter;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -292,6 +294,9 @@ public class ServerMainModule
 
         // analyze properties
         binder.bind(AnalyzePropertyManager.class).in(Scopes.SINGLETON);
+
+        newSetBinder(binder, Filter.class, TheServlet.class).addBinding()
+                .to(HttpServerAvailableCheckFilter.class).in(Scopes.SINGLETON);
 
         // node manager
         discoveryBinder(binder).bindSelector("presto");
