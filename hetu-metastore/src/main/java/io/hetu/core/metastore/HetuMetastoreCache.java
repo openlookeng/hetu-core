@@ -60,6 +60,7 @@ public class HetuMetastoreCache
         }
         finally {
             catalogsCache.invalidateAll();
+            catalogCache.invalidate(catalog.getName());
         }
     }
 
@@ -71,6 +72,7 @@ public class HetuMetastoreCache
         }
         finally {
             catalogsCache.invalidateAll();
+            catalogCache.invalidate(catalog.getName());
         }
     }
 
@@ -82,6 +84,7 @@ public class HetuMetastoreCache
         }
         finally {
             catalogCache.invalidate(catalogName);
+            catalogCache.invalidate(newCatalog.getName());
             catalogsCache.invalidateAll();
         }
     }
@@ -136,6 +139,7 @@ public class HetuMetastoreCache
         }
         finally {
             databasesCache.invalidate(database.getCatalogName());
+            databaseCache.invalidate(database.getCatalogName() + "." + database.getName());
         }
     }
 
@@ -147,6 +151,7 @@ public class HetuMetastoreCache
         }
         finally {
             databasesCache.invalidate(database.getCatalogName());
+            databaseCache.invalidate(database.getCatalogName() + "." + database.getName());
         }
     }
 
@@ -158,7 +163,9 @@ public class HetuMetastoreCache
         }
         finally {
             String key = catalogName + "." + databaseName;
+            String newKey = catalogName + "." + newDatabase.getName();
             databaseCache.invalidate(key);
+            databaseCache.invalidate(newKey);
             databasesCache.invalidate(catalogName);
         }
     }
@@ -257,8 +264,10 @@ public class HetuMetastoreCache
         }
         finally {
             String databaseKey = catalogName + '.' + databaseName;
-            String tableKey = catalogName + "." + databaseName + "." + oldTableName;
+            String tableKey = databaseKey + "." + oldTableName;
+            String newTableKey = databaseKey + "." + newTable.getName();
             tableCache.invalidate(tableKey);
+            tableCache.invalidate(newTableKey);
             tablesCache.invalidate(databaseKey);
         }
     }
