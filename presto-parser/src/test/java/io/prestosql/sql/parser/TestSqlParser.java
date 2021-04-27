@@ -1643,7 +1643,7 @@ public class TestSqlParser
     @Test
     public void testCreateCube()
     {
-        assertStatement("CREATE CUBE foo ON bar WITH (AGGREGATIONS=(count(c)), GROUP = (a, b))",
+        assertStatement("CREATE CUBE foo ON bar WITH (AGGREGATIONS=(count(c)), GROUP = (a, b)) WHERE d1 > 10",
                 new CreateCube(QualifiedName.of("foo"),
                         QualifiedName.of("bar"),
                         ImmutableList.of(
@@ -1652,9 +1652,9 @@ public class TestSqlParser
                         ImmutableSet.of(
                                 new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("c")))),
                         false,
-                        ImmutableList.of()));
+                        ImmutableList.of(), Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10")))));
 
-        assertStatement("CREATE CUBE foo ON bar WITH (AGGREGATIONS=(count(c), sum(d), avg(e)), GROUP = (a, b))",
+        assertStatement("CREATE CUBE foo ON bar WITH (AGGREGATIONS=(count(c), sum(d), avg(e)), GROUP = (a, b)) WHERE d1 > 10",
                 new CreateCube(QualifiedName.of("foo"),
                         QualifiedName.of("bar"),
                         ImmutableList.of(
@@ -1666,9 +1666,9 @@ public class TestSqlParser
                                 new FunctionCall(QualifiedName.of("sum"), ImmutableList.of(new Identifier("e"))),
                                 new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("e")))),
                         false,
-                        ImmutableList.of()));
+                        ImmutableList.of(), Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10")))));
 
-        assertStatement("CREATE CUBE c1.s1.foo ON c2.s2.bar WITH (AGGREGATIONS=(count(c)), GROUP = (a, b))",
+        assertStatement("CREATE CUBE c1.s1.foo ON c2.s2.bar WITH (AGGREGATIONS=(count(c)), GROUP = (a, b)) WHERE d1 > 10",
                 new CreateCube(QualifiedName.of("c1", "s1", "foo"),
                         QualifiedName.of("c2", "s2", "bar"),
                         ImmutableList.of(
@@ -1677,9 +1677,9 @@ public class TestSqlParser
                         ImmutableSet.of(
                                 new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("c")))),
                         false,
-                        ImmutableList.of()));
+                        ImmutableList.of(), Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10")))));
 
-        assertStatement("CREATE CUBE IF NOT EXISTS foo ON bar WITH (AGGREGATIONS=(count(c)), GROUP = (a, b))",
+        assertStatement("CREATE CUBE IF NOT EXISTS foo ON bar WITH (AGGREGATIONS=(count(c)), GROUP = (a, b)) WHERE d1 > 10",
                 new CreateCube(QualifiedName.of("foo"),
                         QualifiedName.of("bar"),
                         ImmutableList.of(
@@ -1688,9 +1688,9 @@ public class TestSqlParser
                         ImmutableSet.of(
                                 new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("c")))),
                         true,
-                        ImmutableList.of()));
+                        ImmutableList.of(), Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10")))));
 
-        assertStatement("CREATE CUBE IF NOT EXISTS foo ON bar WITH (AGGREGATIONS=(count(c)), GROUP = (a, b), format = 'ORC', partitioned_by = ARRAY[ 'd' ])",
+        assertStatement("CREATE CUBE IF NOT EXISTS foo ON bar WITH (AGGREGATIONS=(count(c)), GROUP = (a, b), format = 'ORC', partitioned_by = ARRAY[ 'd' ]) WHERE d1 > 10",
                 new CreateCube(QualifiedName.of("foo"),
                         QualifiedName.of("bar"),
                         ImmutableList.of(
@@ -1699,7 +1699,8 @@ public class TestSqlParser
                         ImmutableSet.of(
                                 new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("c")))),
                         true,
-                        ImmutableList.of(new Property(new Identifier("format"), new StringLiteral("ORC")), new Property(new Identifier("partitioned_by"), new ArrayConstructor(ImmutableList.of(new StringLiteral("d")))))));
+                        ImmutableList.of(new Property(new Identifier("format"), new StringLiteral("ORC")), new Property(new Identifier("partitioned_by"),
+                                new ArrayConstructor(ImmutableList.of(new StringLiteral("d"))))), Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10")))));
     }
 
     @Test
