@@ -458,6 +458,8 @@
 > - **默认值**：`false`
 >
 > 如果查询包含的表或公用表表达式（CTE）出现多次且具有相同的投影和过滤器，则使用Reuse Exchange来将数据缓存在内存中。启用此功能将通过将数据缓存在内存中并避免多次从磁盘读取来减少执行查询所需的时间。也可以使用`reuse_table_scan`会话属性在每个查询基础上指定。
+>
+> 注意：当启用`cte_reuse_enabled`或`optimizer.cte-reuse-enabled`时，重用交换将被禁用。
 
 ### `optimizer.cte-reuse-enabled`
 
