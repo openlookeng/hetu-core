@@ -124,6 +124,8 @@ public class SqlQueryScheduler
 {
     private static final Logger log = Logger.get(SqlQueryScheduler.class);
     private static final int[] THROTTLE_SLEEP_TIMER = {5, 10, 15}; //seconds
+    private static final long MIN_RESUME_INTERVAL = 5000; // milliseconds
+
     private final QueryStateMachine queryStateMachine;
     private final ExecutionPolicy executionPolicy;
     private final Map<StageId, SqlStageExecution> stages;
@@ -140,6 +142,12 @@ public class SqlQueryScheduler
     // Snapshot: determine when scheduler finishes scheduling.
     // Only start to reschedule after the previous scheduler finishes
     private final SettableFuture<?> schedulingFuture = SettableFuture.create();
+    // Snapshot: when the scheduled is created. This along with the MIN_RESUME_INTERVAL const determines
+    // the earliest time resume can be triggered by this scheduler.
+    // If resumes are too close to the start of the scheduler, old and new tasks may have unexpected interactions.
+    private final long createdAt = System.currentTimeMillis();
+    // Make sure we only try to resume at most once for each scheduling attempt
+    private boolean resumed;
 
     private final Set<PlanFragmentId> visitedPlanFrags = new HashSet<>();
     private int currentTimerLevel;
@@ -298,11 +306,27 @@ public class SqlQueryScheduler
 
     // Snapshot: called when we need to cancel the current query execution to prepare for a resume,
     // either as a result of a task failure, or a failed attempt to resume the query
-    public void cancelToResume()
+    public synchronized void cancelToResume()
     {
-        queryStateMachine.transitionToRescheduling();
-        for (SqlStageExecution stageExecution : stages.values()) {
-            stageExecution.cancelToResume();
+        if (!resumed) {
+            // Resume at most once for each scheduler
+            resumed = true;
+            new Thread(() -> {
+                // Avoid too frequent resumes. Wait at least MIN_RESUME_INTERVAL from scheduler start.
+                long wait = createdAt + MIN_RESUME_INTERVAL - System.currentTimeMillis();
+                if (wait > 0) {
+                    try {
+                        Thread.sleep(wait);
+                    }
+                    catch (InterruptedException e) {
+                    }
+                }
+
+                queryStateMachine.transitionToRescheduling();
+                for (SqlStageExecution stageExecution : stages.values()) {
+                    stageExecution.cancelToResume();
+                }
+            }).start();
         }
     }
 
@@ -312,12 +336,22 @@ public class SqlQueryScheduler
         SqlStageExecution rootStage = stages.get(rootStageId);
         rootStage.addStateChangeListener(state -> {
             if (state == FINISHED) {
-                if (SystemSessionProperties.isSnapshotEnabled(session) && snapshotManager.hasPendingResume()) {
-                    // Snapshot: query finished but restore wasn't successful. Final result is likely wrong.
-                    // Ideally we should rollback all changes and retry, but it's not easy to revert already committed changes.
-                    // Fail the query instead.
-                    queryStateMachine.transitionToFailed(new PrestoException(GENERIC_INTERNAL_ERROR, "Unsuccessful query retry"));
-                    return;
+                if (SystemSessionProperties.isSnapshotEnabled(session)) {
+                    if (snapshotManager.hasPendingResume()) {
+                        // Snapshot: query finished but restore wasn't successful. Final result is likely wrong.
+                        // Ideally we should rollback all changes and retry, but it's not easy to revert already committed changes.
+                        // Fail the query instead.
+                        queryStateMachine.transitionToFailed(new PrestoException(GENERIC_INTERNAL_ERROR, "Unsuccessful query retry"));
+                        return;
+                    }
+                    for (SqlStageExecution stage : stages.values()) {
+                        StageState stageState = stage.getState();
+                        // Snapshot: in case root stage finished but some stages didn't
+                        if (stageState != FINISHED) {
+                            queryStateMachine.transitionToFailed(new PrestoException(GENERIC_INTERNAL_ERROR, format("Root stage has finished, but stage %s is in state %s", stage.getStageId(), stageState)));
+                            return;
+                        }
+                    }
                 }
                 queryStateMachine.transitionToFinishing();
                 cleanupReuseExchangeMappingIdStatus(rootStage);

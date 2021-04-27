@@ -287,11 +287,6 @@ public class MergeOperator
     public ListenableFuture<?> isBlocked()
     {
         if (!blockedOnSplits.isDone()) {
-            if (snapshotState != null) {
-                // So markers can be received and returned before all remote tasks are known
-                // TODO-cp-I3AJIP: this may unblock too often
-                return NOT_BLOCKED;
-            }
             return blockedOnSplits;
         }
 

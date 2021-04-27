@@ -14,6 +14,7 @@
  */
 package io.prestosql.snapshot;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.log.Logger;
@@ -24,6 +25,7 @@ import io.prestosql.spi.connector.ConnectorPartitionHandle;
 import io.prestosql.split.SplitSource;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -51,6 +53,16 @@ public class MarkerSplitSource
     private final Set<MarkerSplitSource> allDependencies;
     // When a dependency finishes, then remove it from the "remaining" set. Only send data splits when this set becomes empty.
     private final Set<MarkerSplitSource> remainingDependencies;
+    // These sources are part of a "union". They eventually reach the same "union" point (e.g. an ExchangeOperator).
+    // For snapshot to work, all sources must produce the same number of markers, otherwise the union point
+    // will not receive markers from all input channels, causing corresponding snapshots to be incomplete.
+    // Adding all these sources as "union dependencies" for each other, to make sure they produce the same set of markers.
+    private final Set<MarkerSplitSource> unionSources;
+    // When a union source finishes, then remove it from the "remaining" set. Only send "last batch" marker when this set becomes empty.
+    private final Set<MarkerSplitSource> remainingUnionSources;
+    // The last snapshot id sent by the last source in from the group of union sources.
+    // Other sources from the same group should send markers up until this snapshot id.
+    private OptionalLong lastMarkerForUnion;
 
     // When resuming from a snapshot, the first split sent from a source is a resume marker split
     private OptionalLong resumingSnapshotId = OptionalLong.empty();
@@ -79,6 +91,8 @@ public class MarkerSplitSource
         this.announcer = announcer;
         allDependencies = new HashSet<>();
         remainingDependencies = new HashSet<>();
+        unionSources = new HashSet<>();
+        remainingUnionSources = new HashSet<>();
         // Snapshot 0 indicates the beginning of the query.
         // In case there are no complete snapshot to restore to, then go back to the very beginning.
         snapshotBufferPositions.put(0L, 0);
@@ -101,6 +115,18 @@ public class MarkerSplitSource
         remainingDependencies.remove(dependency);
     }
 
+    public void addUnionSources(Collection<MarkerSplitSource> sources)
+    {
+        unionSources.addAll(sources);
+        remainingUnionSources.addAll(sources);
+    }
+
+    public void finishUnionSource(MarkerSplitSource unionSource, OptionalLong lastMarker)
+    {
+        remainingUnionSources.remove(unionSource);
+        lastMarkerForUnion = lastMarker;
+    }
+
     @Override
     public ListenableFuture<SplitBatch> getNextBatch(ConnectorPartitionHandle partitionHandle, Lifespan lifespan, int maxSize)
     {
@@ -109,16 +135,9 @@ public class MarkerSplitSource
         if (resumingSnapshotId.isPresent()) {
             sentInitialMarker = true;
             boolean lastBatch = sourceExhausted && bufferPosition == splitBuffer.size();
-            if (lastBatch) {
-                sentFinalMarker = true;
-            }
-
-            long snapshotId = resumingSnapshotId.getAsLong();
+            SplitBatch batch = recordSnapshot(lifespan, true, resumingSnapshotId.getAsLong(), lastBatch);
             resumingSnapshotId = OptionalLong.empty();
-            Split marker = new Split(getCatalogName(), MarkerSplit.resumeSplit(getCatalogName(), snapshotId), lifespan);
-            List<Split> splits = Collections.singletonList(marker);
-            LOG.debug("Sending out resuming marker %d after %d splits for source: %s (%s)", snapshotId, bufferPosition, getCatalogName(), toString());
-            return Futures.immediateFuture(new SplitBatch(splits, lastBatch));
+            return Futures.immediateFuture(batch);
         }
 
         if (!sentInitialMarker) {
@@ -130,15 +149,30 @@ public class MarkerSplitSource
         }
 
         if (sourceExhausted && bufferPosition == splitBuffer.size()) {
+            if (!unionSources.isEmpty() && !remainingUnionSources.contains(this)) {
+                boolean lastBatch = remainingUnionSources.isEmpty();
+                OptionalLong snapshotId = announcer.shouldGenerateMarker(this);
+                if (snapshotId.isPresent() && (!lastMarkerForUnion.isPresent() || snapshotId.getAsLong() <= lastMarkerForUnion.getAsLong())) {
+                    SplitBatch batch = recordSnapshot(lifespan, false, snapshotId.getAsLong(), lastBatch);
+                    return Futures.immediateFuture(batch);
+                }
+                if (lastBatch) {
+                    sentFinalMarker = true;
+                    deactivate();
+                }
+                SplitBatch batch = new SplitBatch(ImmutableList.of(), lastBatch);
+                return Futures.immediateFuture(batch);
+            }
+
             // Force send last-batch marker
             long sid = announcer.forceGenerateMarker(this);
-            SplitBatch batch = recordSnapshot(lifespan, sid, true);
+            SplitBatch batch = recordSnapshot(lifespan, false, sid, true);
             return Futures.immediateFuture(batch);
         }
 
         OptionalLong snapshotId = announcer.shouldGenerateMarker(this);
         if (snapshotId.isPresent()) {
-            SplitBatch batch = recordSnapshot(lifespan, snapshotId.getAsLong(), false);
+            SplitBatch batch = recordSnapshot(lifespan, false, snapshotId.getAsLong(), false);
             return Futures.immediateFuture(batch);
         }
 
@@ -161,7 +195,7 @@ public class MarkerSplitSource
                     if (splits.size() == 0) {
                         // Force generate a marker for last batch. Marker can't be mixed with data splits.
                         long sid = announcer.forceGenerateMarker(this);
-                        batch = recordSnapshot(lifespan, sid, true);
+                        batch = recordSnapshot(lifespan, false, sid, true);
                     }
                     else {
                         // Don't send last-batch signal yet. Next call will generate a marker with last-batch.
@@ -221,22 +255,43 @@ public class MarkerSplitSource
         }, directExecutor());
     }
 
-    private SplitBatch recordSnapshot(Lifespan lifespan, long snapshotId, boolean lastBatch)
+    private SplitBatch recordSnapshot(Lifespan lifespan, boolean resuming, long snapshotId, boolean lastBatch)
     {
-        if (!firstSnapshot.isPresent()) {
-            firstSnapshot = OptionalLong.of(snapshotId);
+        lastBatch = updateUnionsources(snapshotId, lastBatch);
+
+        if (!resuming) {
+            if (!firstSnapshot.isPresent()) {
+                firstSnapshot = OptionalLong.of(snapshotId);
+            }
+            snapshotBufferPositions.put(snapshotId, bufferPosition);
         }
-        snapshotBufferPositions.put(snapshotId, bufferPosition);
 
-        LOG.debug("Generating snapshot %d after %d splits for source: %s (%s)", snapshotId, bufferPosition, source.getCatalogName(), source.toString());
+        LOG.debug("Generating snapshot %d (resuming=%b) after %d splits for source: %s (%s)", snapshotId, resuming, bufferPosition, source.getCatalogName(), source.toString());
 
-        Split marker = new Split(getCatalogName(), MarkerSplit.snapshotSplit(getCatalogName(), snapshotId), lifespan);
+        MarkerSplit split = resuming ? MarkerSplit.resumeSplit(getCatalogName(), snapshotId) : MarkerSplit.snapshotSplit(getCatalogName(), snapshotId);
+        Split marker = new Split(getCatalogName(), split, lifespan);
         SplitBatch batch = new SplitBatch(Collections.singletonList(marker), lastBatch);
         if (lastBatch) {
             sentFinalMarker = true;
             deactivate();
         }
         return batch;
+    }
+
+    private boolean updateUnionsources(long snapshotId, boolean lastBatch)
+    {
+        if (lastBatch && !unionSources.isEmpty()) {
+            if (remainingUnionSources.contains(this)) {
+                OptionalLong lastMarker = remainingUnionSources.size() == 1 ? OptionalLong.of(snapshotId) : OptionalLong.empty();
+                for (MarkerSplitSource source : unionSources) {
+                    source.finishUnionSource(this, lastMarker);
+                }
+            }
+            if (!remainingUnionSources.isEmpty()) {
+                lastBatch = false;
+            }
+        }
+        return lastBatch;
     }
 
     public void resumeSnapshot(long snapshotId)
@@ -266,8 +321,8 @@ public class MarkerSplitSource
         resumingSnapshotId = snapshotId == 0 ? OptionalLong.empty() : OptionalLong.of(snapshotId);
 
         sentFinalMarker = false;
-        remainingDependencies.clear();
         remainingDependencies.addAll(allDependencies);
+        remainingUnionSources.addAll(unionSources);
     }
 
     private void incrementSplitCount(int count)

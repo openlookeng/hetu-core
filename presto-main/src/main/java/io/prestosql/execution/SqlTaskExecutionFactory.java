@@ -70,10 +70,11 @@ public class SqlTaskExecutionFactory
         this.metadata = metadata;
     }
 
-    public SqlTaskExecution create(Session session, QueryContext queryContext, TaskStateMachine taskStateMachine, OutputBuffer outputBuffer, PlanFragment fragment, List<TaskSource> sources, OptionalInt totalPartitions, Optional<PlanNodeId> consumer,
-                                        Map<String, CommonTableExecutionContext> cteCtx)
+    public SqlTaskExecution create(String taskInstanceId, Session session, QueryContext queryContext, TaskStateMachine taskStateMachine, OutputBuffer outputBuffer, PlanFragment fragment, List<TaskSource> sources, OptionalInt totalPartitions, Optional<PlanNodeId> consumer,
+            Map<String, CommonTableExecutionContext> cteCtx)
     {
         TaskContext taskContext = queryContext.addTaskContext(
+                taskInstanceId,
                 taskStateMachine,
                 session,
                 perOperatorCpuTimerEnabled,

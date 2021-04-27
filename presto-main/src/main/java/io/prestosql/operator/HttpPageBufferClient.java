@@ -13,6 +13,7 @@
  */
 package io.prestosql.operator;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ticker;
 import com.google.common.collect.ImmutableList;
 import com.google.common.net.MediaType;
@@ -145,6 +146,7 @@ public final class HttpPageBufferClient
 
     private final Executor pageBufferClientCallbackExecutor;
 
+    private final boolean isSnapshotEnabled;
     private final QuerySnapshotManager querySnapshotManager;
 
     public HttpPageBufferClient(
@@ -156,12 +158,14 @@ public final class HttpPageBufferClient
             ClientCallback clientCallback,
             ScheduledExecutorService scheduler,
             Executor pageBufferClientCallbackExecutor,
+            boolean isSnapshotEnabled,
             QuerySnapshotManager querySnapshotManager)
     {
-        this(httpClient, maxResponseSize, maxErrorDuration, acknowledgePages, location, clientCallback, scheduler, Ticker.systemTicker(), pageBufferClientCallbackExecutor, querySnapshotManager);
+        this(httpClient, maxResponseSize, maxErrorDuration, acknowledgePages, location, clientCallback, scheduler, Ticker.systemTicker(), pageBufferClientCallbackExecutor, isSnapshotEnabled, querySnapshotManager);
     }
 
-    public HttpPageBufferClient(
+    @VisibleForTesting
+    HttpPageBufferClient(
             HttpClient httpClient,
             DataSize maxResponseSize,
             Duration maxErrorDuration,
@@ -171,6 +175,7 @@ public final class HttpPageBufferClient
             ScheduledExecutorService scheduler,
             Ticker ticker,
             Executor pageBufferClientCallbackExecutor,
+            boolean isSnapshotEnabled,
             QuerySnapshotManager querySnapshotManager)
     {
         this.httpClient = requireNonNull(httpClient, "httpClient is null");
@@ -183,6 +188,7 @@ public final class HttpPageBufferClient
         requireNonNull(maxErrorDuration, "maxErrorDuration is null");
         requireNonNull(ticker, "ticker is null");
         this.backoff = new Backoff(maxErrorDuration, ticker);
+        this.isSnapshotEnabled = isSnapshotEnabled;
         this.querySnapshotManager = querySnapshotManager;
     }
 
@@ -440,7 +446,7 @@ public final class HttpPageBufferClient
 
     private synchronized void sendDelete()
     {
-        if (querySnapshotManager != null && taskInstanceId == null) {
+        if (isSnapshotEnabled && taskInstanceId == null) {
             // Snapshot: Never called remote task successfully. Trying to cancel the task result without a taskInstanceId is dangerous.
             // If the task had already been cancelled, this would create a new task with "aborted" state.
             // That prevents scheduling the task on the worker again.

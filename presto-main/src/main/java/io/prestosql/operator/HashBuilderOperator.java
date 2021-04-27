@@ -478,7 +478,8 @@ public class HashBuilderOperator
             // so no snapshot wil be marked complete. In this case there's no need to produce the final snapshot.
             if (lastMarker.isResuming()) {
                 // If it was a resume marker, then we don't know what the "next" snapshot should be.
-                // Not able to produce a final snapshot makes the resume snapshot unusable.
+                // This means we can't use the resumed snapshot for "backtrack". Although not ideal (because this snapshot is complete),
+                // the easiest way to achieve that is to mark the resumed snapshot as "failed".
                 TaskSnapshotManager snapshotManager = operatorContext.getDriverContext().getPipelineContext().getTaskContext().getSnapshotManager();
                 snapshotManager.failedToCapture(SnapshotStateId.forOperator(lastMarker.getSnapshotId(), operatorContext));
             }

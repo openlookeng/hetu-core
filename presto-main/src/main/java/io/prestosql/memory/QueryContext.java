@@ -19,7 +19,6 @@ import io.airlift.stats.GcMonitor;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.Session;
-import io.prestosql.execution.TaskId;
 import io.prestosql.execution.TaskStateMachine;
 import io.prestosql.memory.context.MemoryReservationHandler;
 import io.prestosql.memory.context.MemoryTrackingContext;
@@ -39,6 +38,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
@@ -72,7 +72,8 @@ public class QueryContext
     private final ScheduledExecutorService yieldExecutor;
     private final long maxSpill;
     private final SpillSpaceTracker spillSpaceTracker;
-    private final Map<TaskId, TaskContext> taskContexts = new ConcurrentHashMap<>();
+    // Snapshot: Use taskInstanceId as key, instead of taskId, to avoid interference between rescheduled and old tasks.
+    private final Map<String, TaskContext> taskContexts = new ConcurrentHashMap<>();
 
     // TODO: This field should be final. However, due to the way QueryContext is constructed the memory limit is not known in advance
     @GuardedBy("this")
@@ -254,7 +255,14 @@ public class QueryContext
         return memoryPool;
     }
 
+    @VisibleForTesting
     public TaskContext addTaskContext(TaskStateMachine taskStateMachine, Session session, boolean perOperatorCpuTimerEnabled, boolean cpuTimerEnabled, OptionalInt totalPartitions, Optional<PlanNodeId> parent, PagesSerdeFactory serdeFactory)
+    {
+        // Use a random instance id for tests
+        return addTaskContext(UUID.randomUUID().toString(), taskStateMachine, session, perOperatorCpuTimerEnabled, cpuTimerEnabled, totalPartitions, parent, serdeFactory);
+    }
+
+    public TaskContext addTaskContext(String taskInstanceId, TaskStateMachine taskStateMachine, Session session, boolean perOperatorCpuTimerEnabled, boolean cpuTimerEnabled, OptionalInt totalPartitions, Optional<PlanNodeId> parent, PagesSerdeFactory serdeFactory)
     {
         TaskContext taskContext = TaskContext.createTaskContext(
                 this,
@@ -270,13 +278,13 @@ public class QueryContext
                 parent.orElse(null),
                 serdeFactory,
                 new TaskSnapshotManager(taskStateMachine.getTaskId(), snapshotUtils));
-        taskContexts.put(taskStateMachine.getTaskId(), taskContext);
+        taskContexts.put(taskInstanceId, taskContext);
         return taskContext;
     }
 
-    public void removeTaskContext(TaskId taskId)
+    public void removeTaskContext(String taskInstanceId)
     {
-        taskContexts.remove(taskId);
+        taskContexts.remove(taskInstanceId);
     }
 
     public <C, R> R accept(QueryContextVisitor<C, R> visitor, C context)
@@ -292,9 +300,9 @@ public class QueryContext
                 .collect(toList());
     }
 
-    public TaskContext getTaskContextByTaskId(TaskId taskId)
+    public TaskContext getTaskContext(String taskInstanceId)
     {
-        TaskContext taskContext = taskContexts.get(taskId);
+        TaskContext taskContext = taskContexts.get(taskInstanceId);
         verify(taskContext != null, "task does not exist");
         return taskContext;
     }

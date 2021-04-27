@@ -123,7 +123,7 @@ public class SqlTaskManager
 
     private final CounterStat failedTasks = new CounterStat();
 
-    private static Map<String, CommonTableExecutionContext> cteCtx = new ConcurrentHashMap<>();
+    private static final Map<String, CommonTableExecutionContext> cteCtx = new ConcurrentHashMap<>();
 
     @Inject
     public SqlTaskManager(
@@ -516,16 +516,16 @@ public class SqlTaskManager
 
         log.debug("Cancelling task %s. Old state: %s; new state: %s", taskId, oldState, targetState);
         if (targetState == TaskState.CANCELED_TO_RESUME) {
-            cleanupTaskToResume(taskId);
+            cleanupTaskToResume(taskId, sqlTask.getTaskInstanceId());
         }
         return result;
     }
 
-    private void cleanupTaskToResume(TaskId taskId)
+    private void cleanupTaskToResume(TaskId taskId, String taskInstanceId)
     {
         try {
             // Remove old task context, so that memory-context is not reused by newly scheduled tasks
-            queryContexts.get(taskId.getQueryId()).removeTaskContext(taskId);
+            queryContexts.get(taskId.getQueryId()).removeTaskContext(taskInstanceId);
             // So new SqlTask object is created with new everything
             SqlTask task = tasks.asMap().remove(taskId);
             if (task != null) {

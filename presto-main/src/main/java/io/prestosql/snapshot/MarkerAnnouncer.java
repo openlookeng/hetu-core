@@ -58,6 +58,12 @@ public class MarkerAnnouncer
     //this method of recording slow/blocked split source is chosen.
     private final Map<MarkerSplitSource, LinkedList<Long>> pendingSnapshot;
 
+    // Whenever MarkerAnnouncer decides to initiate a new snapshot, it needs to inform the QuerySnapshotManager about its action.
+    // QuerySnapshotManager will keep track of all snapshots because snapshotId won't be able to tell us the absolute index after
+    // restore. (eg. have completed snapshot 1-10, restored to 1, snapshot 11 that's generated after restore is actually 2nd snapshot)
+    // It is important for the management of snapshot sub-files written by TableWriterOperator.
+    private QuerySnapshotManager snapshotManager;
+
     public MarkerAnnouncer(Duration timeInterval)
     {
         this(SnapshotConfig.IntervalType.TIME, 0L, timeInterval);
@@ -81,6 +87,16 @@ public class MarkerAnnouncer
         this.activeSplitSources = new ArrayList<>();
         this.markerSplitSent = new ArrayList<>();
         this.pendingSnapshot = new HashMap<>();
+    }
+
+    public void setSnapshotManager(QuerySnapshotManager snapshotManager)
+    {
+        this.snapshotManager = snapshotManager;
+    }
+
+    public void informSnapshotInitiation(long snapshotId)
+    {
+        snapshotManager.snapshotInitiated(snapshotId);
     }
 
     public MarkerSplitSource createMarkerSplitSource(SplitSource splitSource, PlanNodeId nodeId)
@@ -166,7 +182,9 @@ public class MarkerAnnouncer
             return OptionalLong.empty();
         }
 
-        return OptionalLong.of(generateMarker(source));
+        long upcomingSnapshotId = generateMarker(source);
+        informSnapshotInitiation(upcomingSnapshotId);
+        return OptionalLong.of(upcomingSnapshotId);
     }
 
     // Generate a new marker for this source, e.g. after the source has sent all its data splits.
@@ -181,7 +199,9 @@ public class MarkerAnnouncer
             recordUncompletedSplitSource();
             setupNewSnapshotId();
         }
-        return generateMarker(source);
+        long upcomingSnapshotId = generateMarker(source);
+        informSnapshotInitiation(upcomingSnapshotId);
+        return upcomingSnapshotId;
     }
 
     private void recordUncompletedSplitSource()

@@ -163,7 +163,8 @@ public class LocalExchangeSinkOperator
 
         if (snapshotState != null) {
             if (snapshotState.processPage(page)) {
-                page = snapshotState.nextMarker();
+                // Make a clone of the page, because the marker may have been passed to multiple drivers.
+                page = snapshotState.nextMarker().clone();
             }
         }
 

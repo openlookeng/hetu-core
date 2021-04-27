@@ -13,7 +13,9 @@
  */
 package io.prestosql.operator;
 
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.metadata.Split;
 import io.prestosql.snapshot.MultiInputRestorable;
@@ -36,7 +38,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(uncapturedFields = {"sourceId", "exchangeClient", "snapshotState", "noMoreSplits", "inputChannels"})
+@RestorableConfig(uncapturedFields = {"sourceId", "exchangeClient", "snapshotState", "blockedOnSplits", "inputChannels"})
 public class ExchangeOperator
         implements SourceOperator, MultiInputRestorable, Closeable
 {
@@ -105,8 +107,9 @@ public class ExchangeOperator
     private final ExchangeClient exchangeClient;
 
     private final MultiInputSnapshotState snapshotState;
-    private boolean noMoreSplits;
     private Optional<Set<String>> inputChannels = Optional.empty();
+
+    private final SettableFuture<Void> blockedOnSplits = SettableFuture.create();
 
     public ExchangeOperator(
             String id,
@@ -151,8 +154,8 @@ public class ExchangeOperator
     @Override
     public void noMoreSplits()
     {
-        noMoreSplits = true;
         exchangeClient.noMoreLocations();
+        blockedOnSplits.set(null);
     }
 
     @Override
@@ -181,6 +184,17 @@ public class ExchangeOperator
     @Override
     public ListenableFuture<?> isBlocked()
     {
+        if (snapshotState != null) {
+            if (!blockedOnSplits.isDone()) {
+                // Snapshot: wait for all source tasks to be added, so we have the complete list of input channels when markers are received
+                return blockedOnSplits;
+            }
+            if (snapshotState.hasPendingDataPages()) {
+                // Snapshot: there are pending restored pages.
+                return Futures.immediateFuture(true);
+            }
+        }
+
         ListenableFuture<?> blocked = exchangeClient.isBlocked();
         if (blocked.isDone()) {
             return NOT_BLOCKED;
@@ -229,23 +243,10 @@ public class ExchangeOperator
             return inputChannels;
         }
 
-        if (expectedChannelCount == 0 && !noMoreSplits) {
-            // Need to wait for all splits/locations/channels to be added
-            return Optional.empty();
-        }
-
+        // Exchange Operator is blocked until noMoreSplits is set, so we can safely get all clients from exchangeClient.
         Set<String> channels = exchangeClient.getAllClients();
-
-        if (expectedChannelCount == 0 || channels.size() == expectedChannelCount) {
-            // All channels have been added (i.e. noMoreSplits is true) or have received expected number of input channels.
-            // Because markers are sent to all potential table-scan tasks, expectedChannelCount should be the same as the final count,
-            // so the input channel list won't change again, and can be cached.
-            inputChannels = Optional.of(channels);
-            return inputChannels;
-        }
-        else {
-            return Optional.empty();
-        }
+        inputChannels = Optional.of(channels);
+        return inputChannels;
     }
 
     @Override

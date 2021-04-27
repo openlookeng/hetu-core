@@ -1118,20 +1118,20 @@ public final class MetadataManager
      * Snapshot: Remove any previous changes from previous execution attempt, to prepare for query resume
      */
     @Override
-    public void resetInsertForRerun(Session session, InsertTableHandle tableHandle, OptionalLong snapshotId)
+    public void resetInsertForRerun(Session session, InsertTableHandle tableHandle, OptionalLong snapshotIndex)
     {
         ConnectorMetadata metadata = getMetadata(session, tableHandle.getCatalogName());
-        metadata.resetInsertForRerun(session.toConnectorSession(tableHandle.getCatalogName()), tableHandle.getConnectorHandle(), snapshotId);
+        metadata.resetInsertForRerun(session.toConnectorSession(tableHandle.getCatalogName()), tableHandle.getConnectorHandle(), snapshotIndex);
     }
 
     /**
      * Snapshot: Remove any previous changes from previous execution attempt, to prepare for query resume
      */
     @Override
-    public void resetCreateForRerun(Session session, OutputTableHandle tableHandle, OptionalLong snapshotId)
+    public void resetCreateForRerun(Session session, OutputTableHandle tableHandle, OptionalLong snapshotIndex)
     {
         ConnectorMetadata metadata = getMetadata(session, tableHandle.getCatalogName());
-        metadata.resetCreateForRerun(session.toConnectorSession(tableHandle.getCatalogName()), tableHandle.getConnectorHandle(), snapshotId);
+        metadata.resetCreateForRerun(session.toConnectorSession(tableHandle.getCatalogName()), tableHandle.getConnectorHandle(), snapshotIndex);
     }
 
     @Override

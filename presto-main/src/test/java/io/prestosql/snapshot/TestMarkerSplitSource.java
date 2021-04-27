@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.OptionalLong;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import static org.mockito.Matchers.anyInt;
@@ -458,5 +459,90 @@ public class TestMarkerSplitSource
         assertTrue(splits.get(0).getConnectorSplit() instanceof MarkerSplit);
         // Confirm what's returned is the snapshot marker (as opposed to the resume marker for snapshot id 7)
         assertFalse(((MarkerSplit) splits.get(0).getConnectorSplit()).isResuming());
+    }
+
+    @Test
+    public void testUnionSourcesEarly()
+            throws ExecutionException, InterruptedException
+    {
+        MarkerSplitSource other = mock(MarkerSplitSource.class);
+        markerSource.addUnionSources(ImmutableList.of(markerSource, other));
+
+        when(splitSource.getNextBatch(anyObject(), anyObject(), anyInt())).thenReturn(Futures.immediateFuture(lastBatch));
+        when(announcer.shouldGenerateMarker(anyObject())).thenReturn(OptionalLong.empty());
+        when(announcer.forceGenerateMarker(anyObject())).thenReturn(1L);
+
+        SplitBatch batch = getNextBatchIgnoreMarkerZero(null, lifespan, 3).get();
+        assertEquals(batch.getSplits().size(), 3);
+        batch = getNextBatchIgnoreMarkerZero(null, lifespan, 3).get();
+        assertFalse(batch.isLastBatch());
+        assertEquals(batch.getSplits().size(), 1);
+        assertTrue(batch.getSplits().get(0).getConnectorSplit() instanceof MarkerSplit);
+        assertEquals(((MarkerSplit) batch.getSplits().get(0).getConnectorSplit()).getSnapshotId(), 1);
+        verify(other).finishUnionSource(markerSource, OptionalLong.empty());
+
+        batch = getNextBatchIgnoreMarkerZero(null, lifespan, 3).get();
+        assertFalse(batch.isLastBatch());
+        assertEquals(batch.getSplits().size(), 0);
+
+        when(announcer.shouldGenerateMarker(anyObject())).thenReturn(OptionalLong.of(2));
+        batch = getNextBatchIgnoreMarkerZero(null, lifespan, 3).get();
+        assertFalse(batch.isLastBatch());
+        assertEquals(batch.getSplits().size(), 1);
+        assertTrue(batch.getSplits().get(0).getConnectorSplit() instanceof MarkerSplit);
+        assertEquals(((MarkerSplit) batch.getSplits().get(0).getConnectorSplit()).getSnapshotId(), 2);
+
+        markerSource.finishUnionSource(other, OptionalLong.of(3));
+        when(announcer.shouldGenerateMarker(anyObject())).thenReturn(OptionalLong.of(3));
+        batch = getNextBatchIgnoreMarkerZero(null, lifespan, 3).get();
+        assertTrue(batch.isLastBatch());
+        assertEquals(batch.getSplits().size(), 1);
+        assertTrue(batch.getSplits().get(0).getConnectorSplit() instanceof MarkerSplit);
+        assertEquals(((MarkerSplit) batch.getSplits().get(0).getConnectorSplit()).getSnapshotId(), 3);
+    }
+
+    @Test
+    public void testUnionSourcesSame()
+            throws ExecutionException, InterruptedException
+    {
+        MarkerSplitSource other = mock(MarkerSplitSource.class);
+        markerSource.addUnionSources(ImmutableList.of(markerSource, other));
+
+        when(splitSource.getNextBatch(anyObject(), anyObject(), anyInt())).thenReturn(Futures.immediateFuture(lastBatch));
+        when(announcer.shouldGenerateMarker(anyObject())).thenReturn(OptionalLong.empty());
+        when(announcer.forceGenerateMarker(anyObject())).thenReturn(1L);
+
+        getNextBatchIgnoreMarkerZero(null, lifespan, 3).get();
+
+        when(announcer.shouldGenerateMarker(anyObject())).thenReturn(OptionalLong.of(2));
+        getNextBatchIgnoreMarkerZero(null, lifespan, 3).get();
+
+        markerSource.finishUnionSource(other, OptionalLong.of(2));
+        when(announcer.shouldGenerateMarker(anyObject())).thenReturn(OptionalLong.of(3));
+        SplitBatch batch = getNextBatchIgnoreMarkerZero(null, lifespan, 3).get();
+        assertTrue(batch.isLastBatch());
+        assertEquals(batch.getSplits().size(), 0);
+    }
+
+    @Test
+    public void testUnionSourcesLate()
+            throws ExecutionException, InterruptedException
+    {
+        MarkerSplitSource other = mock(MarkerSplitSource.class);
+        markerSource.addUnionSources(ImmutableList.of(markerSource, other));
+
+        when(splitSource.getNextBatch(anyObject(), anyObject(), anyInt())).thenReturn(Futures.immediateFuture(lastBatch));
+        when(announcer.shouldGenerateMarker(anyObject())).thenReturn(OptionalLong.empty());
+        when(announcer.forceGenerateMarker(anyObject())).thenReturn(1L);
+
+        getNextBatchIgnoreMarkerZero(null, lifespan, 3).get();
+
+        markerSource.finishUnionSource(other, OptionalLong.empty());
+        SplitBatch batch = getNextBatchIgnoreMarkerZero(null, lifespan, 3).get();
+        assertTrue(batch.isLastBatch());
+        assertEquals(batch.getSplits().size(), 1);
+        assertTrue(batch.getSplits().get(0).getConnectorSplit() instanceof MarkerSplit);
+        assertEquals(((MarkerSplit) batch.getSplits().get(0).getConnectorSplit()).getSnapshotId(), 1);
+        verify(other).finishUnionSource(markerSource, OptionalLong.of(1));
     }
 }
