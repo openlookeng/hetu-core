@@ -14,9 +14,16 @@
  */
 package io.prestosql.plugin.memory.data;
 
+import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
+import io.airlift.slice.InputStreamSliceInput;
+import io.airlift.slice.OutputStreamSliceOutput;
 import io.airlift.slice.Slice;
+import io.airlift.slice.SliceInput;
+import io.airlift.slice.SliceOutput;
 import io.airlift.units.DataSize;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.hetu.core.transport.execution.buffer.PagesSerdeUtil;
 import io.prestosql.plugin.memory.ColumnInfo;
 import io.prestosql.plugin.memory.MemoryColumnHandle;
 import io.prestosql.plugin.memory.SortingColumn;
@@ -31,9 +38,18 @@ import io.prestosql.spi.predicate.SortedRangeSet;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
+import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.TypeUtils;
 import io.prestosql.spi.util.BloomFilter;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
+import java.io.Serializable;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,44 +61,72 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import static java.util.Objects.requireNonNull;
 
 public class LogicalPart
+        implements Serializable
 {
+    private static final long serialVersionUID = -8601397465573888504L;
     private static final Logger LOG = Logger.get(LogicalPart.class);
+    private static final JsonCodec<TypeSignature> TYPE_SIGNATURE_JSON_CODEC = JsonCodec.jsonCodec(TypeSignature.class);
+    private static final String TABLE_DATA_FOLDER = "data";
 
     enum ProcessingState
     {
         NOT_STARTED, IN_PROGRESS, COMPLETE
     }
 
-    private final AtomicReference<ProcessingState> processingState = new AtomicReference<>(ProcessingState.NOT_STARTED);
-
     private long rows;
     private long byteSize;
-    private List<Page> pages = new ArrayList<>();
 
-    private final List<Type> types;
+    private final AtomicReference<ProcessingState> processingState = new AtomicReference<>(ProcessingState.NOT_STARTED);
     private final List<Integer> sortChannels;
     private final List<SortOrder> sortOrders;
-    private final List<String> indexColumns;
     private final List<Integer> indexChannels;
-    private final PageSorter pageSorter;
     private final long maxLogicalPartBytes;
+    private final int splitNum;
+    private final int logicalPartNum;
+    private final boolean compressionEnabled;
 
     // indexes
-    private final TreeMap<Object, List<Page>> indexedPagesMap = new TreeMap<>();
+    private final TreeMap<Object, List<Integer>> indexedPagesMap = new TreeMap<>();
     private final Map<Integer, BloomFilter> indexChannelFilters = new HashMap<>();
     private final Map<Integer, Map.Entry<Comparable, Comparable>> columnMinMax = new HashMap<>();
 
-    public LogicalPart(List<ColumnInfo> columns, List<SortingColumn> sortedBy, List<String> indexColumns, PageSorter pageSorter, long maxLogicalPartBytes, TypeManager typeManager)
+    private transient Path tableDataRoot;
+    private transient PagesSerde pagesSerde;
+    private transient PageSorter pageSorter;
+    private transient List<TypeSignature> typeSignatures;
+    private transient List<Type> types;
+    private transient List<Page> pages;
+
+    public LogicalPart(
+            List<ColumnInfo> columns,
+            List<SortingColumn> sortedBy,
+            List<String> indexColumns,
+            Path tableDataRoot,
+            PageSorter pageSorter,
+            long maxLogicalPartBytes,
+            TypeManager typeManager,
+            PagesSerde pagesSerde,
+            int splitNum,
+            int logicalPartNum,
+            boolean compressionEnabled)
     {
+        this.tableDataRoot = tableDataRoot;
+        this.splitNum = splitNum;
+        this.logicalPartNum = logicalPartNum;
+        this.pages = new ArrayList<>();
+        this.maxLogicalPartBytes = maxLogicalPartBytes;
+        this.compressionEnabled = compressionEnabled;
+        this.pagesSerde = requireNonNull(pagesSerde, "pagesSerde is null");
+        this.pageSorter = requireNonNull(pageSorter, "pageSorter is null");
         requireNonNull(columns, "columns is null");
         requireNonNull(sortedBy, "sortedBy is null");
-        this.indexColumns = requireNonNull(indexColumns, "indexColumns is null");
-        this.pageSorter = requireNonNull(pageSorter, "pageSorter is null");
-        this.maxLogicalPartBytes = requireNonNull(maxLogicalPartBytes, "maxLogicalPartBytes is null");
 
         types = new ArrayList<>();
         for (ColumnInfo column : columns) {
@@ -116,6 +160,17 @@ public class LogicalPart
         this.processingState.set(ProcessingState.NOT_STARTED);
     }
 
+    public void restoreTransientObjects(PageSorter pageSorter, TypeManager typeManager, PagesSerde pagesSerde, Path tableDataRoot)
+    {
+        this.pageSorter = pageSorter;
+        this.types = new ArrayList<>(typeSignatures.size());
+        this.pagesSerde = pagesSerde;
+        this.tableDataRoot = tableDataRoot;
+        for (TypeSignature signature : typeSignatures) {
+            types.add(typeManager.getType(signature));
+        }
+    }
+
     void add(Page page)
     {
         if (!canAdd()) {
@@ -127,8 +182,17 @@ public class LogicalPart
         byteSize += page.getRetainedSizeInBytes();
     }
 
-    List<Page> getPages()
+    public List<Page> getPages()
     {
+        if (pages == null) {
+            try {
+                readPages();
+            }
+            catch (Exception e) {
+                LOG.error("Failed to load pages from " + getPageFileName(), e);
+//                throw new UncheckedIOException("Unable to load pages from disk", e);
+            }
+        }
         return pages;
     }
 
@@ -154,7 +218,7 @@ public class LogicalPart
     List<Page> getPages(TupleDomain<ColumnHandle> predicate)
     {
         if (processingState.get() != ProcessingState.COMPLETE) {
-            return pages;
+            return getPages();
         }
 
         Map<Integer, Domain> allIdxChannelsToDomainMap = new HashMap<>();
@@ -175,7 +239,7 @@ public class LogicalPart
         }
 
         if (bloomIdxChannelsToDomainMap.isEmpty() && sparseIdxChannelsToDomainMap.isEmpty()) {
-            return pages;
+            return getPages();
         }
 
         // check minmax filter
@@ -252,17 +316,17 @@ public class LogicalPart
             // however, there is also a "b" in the last page of "a" list
             // this must be returned also
             Object lookupValue = getNativeValue(ranges.get(0).getSingleValue());
-            List<Page> result = indexedPagesMap.getOrDefault(lookupValue, new ArrayList<>());
+            List<Integer> result = indexedPagesMap.getOrDefault(lookupValue, new ArrayList<>());
 
-            Map.Entry<Object, List<Page>> lowerEntry = indexedPagesMap.lowerEntry(lookupValue);
+            Map.Entry<Object, List<Integer>> lowerEntry = indexedPagesMap.lowerEntry(lookupValue);
 
             if (lowerEntry == null) {
-                return result;
+                return result.stream().map(i -> getPages().get(i)).collect(Collectors.toList());
             }
 
             // determine if the last page of the lower entry should be included
-            List<Page> lowerEntryPages = lowerEntry.getValue();
-            Page lastPage = lowerEntryPages.get(lowerEntryPages.size() - 1);
+            List<Integer> lowerEntryPages = lowerEntry.getValue();
+            Page lastPage = getPages().get(lowerEntryPages.get(lowerEntryPages.size() - 1));
             Object lastPageLastValue = getNativeValue(types.get(sortChannels.get(0)), lastPage.getBlock(sortChannels.get(0)), lastPage.getPositionCount() - 1);
 
             if (lastPageLastValue instanceof Comparable && lookupValue instanceof Comparable) {
@@ -279,10 +343,10 @@ public class LogicalPart
                 result.add(lowerEntryPages.get(lowerEntryPages.size() - 1));
             }
 
-            return result;
+            return result.stream().map(i -> getPages().get(i)).collect(Collectors.toList());
         }
 
-        return pages;
+        return getPages();
     }
 
     long getRows()
@@ -313,12 +377,13 @@ public class LogicalPart
             // create index
             int newRowCount = 0;
             long newByteSize = 0;
-            for (Page page : sortedPages) {
+            for (int i = 0; i < sortedPages.size(); i++) {
+                Page page = sortedPages.get(i);
                 newByteSize += page.getRetainedSizeInBytes();
                 newRowCount += page.getPositionCount();
                 Object value = getNativeValue(types.get(sortChannels.get(0)), page.getBlock(sortChannels.get(0)), 0);
                 if (value != null) {
-                    indexedPagesMap.computeIfAbsent(value, e -> new LinkedList<>()).add(page);
+                    indexedPagesMap.computeIfAbsent(value, e -> new LinkedList<>()).add(i);
                 }
             }
 
@@ -338,6 +403,7 @@ public class LogicalPart
             }
 
             this.byteSize = newByteSize;
+            this.pages.clear(); // help triggering GC of old pages
             this.pages = sortedPages;
         }
 
@@ -384,7 +450,56 @@ public class LogicalPart
             indexChannelFilters.put(indexChannel, filter);
         }
 
+        try {
+            writePages();
+        }
+        catch (Exception e) {
+            LOG.error("Error spilling LogicalPart " + getPageFileName() + " to disk. Restoring will be unavailable.", e);
+        }
         this.processingState.set(ProcessingState.COMPLETE);
+    }
+
+    private String getPageFileName()
+    {
+        return "split" + splitNum + "lp" + logicalPartNum;
+    }
+
+    private synchronized void readPages()
+            throws IOException
+    {
+        if (pages != null) {
+            return;
+        }
+        long start = System.currentTimeMillis();
+        Path pagesFile = tableDataRoot.resolve(TABLE_DATA_FOLDER).resolve(getPageFileName());
+        try (InputStream inputStream = Files.newInputStream(pagesFile)) {
+            try (InputStream inputStreamToUse = compressionEnabled ? new GZIPInputStream(inputStream) : inputStream) {
+                SliceInput sliceInput = new InputStreamSliceInput(inputStreamToUse);
+                pages = new ArrayList<>();
+                PagesSerdeUtil.readPages(pagesSerde, sliceInput).forEachRemaining(pages::add);
+            }
+        }
+        long dur = System.currentTimeMillis() - start;
+        LOG.debug("[Load] " + pagesFile + " completed. Time elapsed: " + dur + "ms");
+    }
+
+    public synchronized void writePages()
+            throws IOException
+    {
+        long start = System.currentTimeMillis();
+        Path pagesFile = tableDataRoot.resolve(TABLE_DATA_FOLDER).resolve(getPageFileName());
+        if (!Files.exists(pagesFile.getParent())) {
+            Files.createDirectories(pagesFile.getParent());
+        }
+        try (OutputStream outputStream = Files.newOutputStream(pagesFile)) {
+            try (OutputStream outputStreamToUse = compressionEnabled ? new GZIPOutputStream(outputStream) : outputStream) {
+                SliceOutput sliceOutput = new OutputStreamSliceOutput(outputStreamToUse);
+                PagesSerdeUtil.writePages(pagesSerde, sliceOutput, pages.iterator());
+                sliceOutput.flush();
+            }
+        }
+        long dur = System.currentTimeMillis() - start;
+        LOG.debug("[Spill] " + pagesFile + " completed. Time elapsed: " + dur + "ms");
     }
 
     private Comparable min(Comparable c1, Comparable c2)
@@ -512,5 +627,26 @@ public class LogicalPart
         }
 
         return obj;
+    }
+
+    private void readObject(ObjectInputStream in)
+            throws ClassNotFoundException, IOException
+    {
+        in.defaultReadObject();
+        int typeSize = in.readInt();
+        this.typeSignatures = new ArrayList<>(typeSize);
+        for (int i = 0; i < typeSize; i++) {
+            typeSignatures.add(TYPE_SIGNATURE_JSON_CODEC.fromJson(in.readUTF()));
+        }
+    }
+
+    private void writeObject(ObjectOutputStream out)
+            throws IOException
+    {
+        out.defaultWriteObject();
+        out.writeInt(types.size());
+        for (Type type : types) {
+            out.writeUTF(TYPE_SIGNATURE_JSON_CODEC.toJson(type.getTypeSignature()));
+        }
     }
 }

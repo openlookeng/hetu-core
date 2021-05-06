@@ -14,6 +14,8 @@
 package io.prestosql.plugin.memory.data;
 
 import com.google.common.collect.ImmutableList;
+import io.airlift.log.Logger;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.prestosql.plugin.memory.ColumnInfo;
 import io.prestosql.plugin.memory.MemoryConfig;
 import io.prestosql.plugin.memory.SortingColumn;
@@ -29,6 +31,14 @@ import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -37,6 +47,10 @@ import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import static io.prestosql.plugin.memory.MemoryErrorCode.MEMORY_LIMIT_EXCEEDED;
 import static io.prestosql.plugin.memory.MemoryErrorCode.MISSING_DATA;
@@ -44,33 +58,63 @@ import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 @ThreadSafe
-public class MemoryPagesStore
+public class MemoryTableManager
 {
+    private static final Logger LOG = Logger.get(MemoryTableManager.class);
+    private static final String TABLE_METADATA_SUFFIX = "_tabledata";
+    private static final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+
+    private final Path spillRoot;
     private final long maxBytes;
     private final int splitsPerNode;
     private final PageSorter pageSorter;
     private final MemoryConfig config;
     private final TypeManager typeManager;
+    private final PagesSerde pagesSerde;
+
     @GuardedBy("this")
     private long currentBytes;
-
     private final Map<Long, TableData> tables = new HashMap<>();
 
     @Inject
-    public MemoryPagesStore(MemoryConfig config, PageSorter pageSorter, TypeManager typeManager)
+    public MemoryTableManager(MemoryConfig config, PageSorter pageSorter, TypeManager typeManager, PagesSerde pagesSerde)
     {
-        requireNonNull(pageSorter, "config is null");
         this.pageSorter = requireNonNull(pageSorter, "pageSorter is null");
         this.config = requireNonNull(config, "config is null");
         this.splitsPerNode = config.getSplitsPerNode();
         this.maxBytes = config.getMaxDataPerNode().toBytes();
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
+        this.spillRoot = config.getSpillRoot();
+        this.pagesSerde = requireNonNull(pagesSerde, "pagesSerde is null");
     }
 
-    public synchronized void initialize(long tableId, List<ColumnInfo> columns, List<SortingColumn> sortedBy, List<String> indexColumns)
+    public void finishCreateTable(long id)
+    {
+        Timer timer = new Timer(true);
+        timer.scheduleAtFixedRate(new TimerTask()
+        {
+            @Override
+            public void run()
+            {
+                if (tables.get(id).allProcessed()) {
+                    try {
+                        if (tables.get(id).isSpilled()) {
+                            timer.cancel();
+                        }
+                        spillTable(id);
+                    }
+                    catch (Exception e) {
+                        LOG.error("Failed to serialize table " + id, e);
+                    }
+                }
+            }
+        }, 0, 3000);
+    }
+
+    public synchronized void initialize(long tableId, boolean compressionEnabled, List<ColumnInfo> columns, List<SortingColumn> sortedBy, List<String> indexColumns)
     {
         if (!tables.containsKey(tableId)) {
-            tables.put(tableId, new TableData(tableId, columns, sortedBy, indexColumns, pageSorter, config, typeManager));
+            tables.put(tableId, new TableData(tableId, compressionEnabled, spillRoot.resolve(String.valueOf(tableId)), columns, sortedBy, indexColumns, pageSorter, config, typeManager, pagesSerde));
         }
     }
 
@@ -115,7 +159,12 @@ public class MemoryPagesStore
             TupleDomain<ColumnHandle> predicate)
     {
         if (!contains(tableId)) {
-            throw new PrestoException(MISSING_DATA, "Failed to find table on a worker.");
+            try {
+                restoreTable(tableId);
+            }
+            catch (Exception e) {
+                throw new PrestoException(MISSING_DATA, "Failed to find/restore table on a worker.");
+            }
         }
         TableData tableData = tables.get(tableId);
         if (tableData.getRows() < expectedRows) {
@@ -155,7 +204,6 @@ public class MemoryPagesStore
 //            }
 //            partitionedPages.add(getColumns(page, columnIndexes));
 //        }
-
         return projectedPages.build();
     }
 
@@ -201,5 +249,49 @@ public class MemoryPagesStore
         }
 
         return new Page(page.getPositionCount(), outputBlocks);
+    }
+
+    private synchronized void spillTable(long id)
+            throws IOException
+    {
+        TableData tableData = tables.get(id);
+        if (tableData.isSpilled()) {
+            return;
+        }
+        LOG.debug("[Spill] serializing metadata of table " + id);
+        long start = System.currentTimeMillis();
+        Path tablePath = spillRoot.resolve(String.valueOf(id));
+        if (!Files.exists(tablePath)) {
+            Files.createDirectories(tablePath);
+        }
+        try (OutputStream outputStream = Files.newOutputStream(tablePath.resolve(TABLE_METADATA_SUFFIX))) {
+            ObjectOutputStream oos = new ObjectOutputStream(outputStream);
+            oos.writeObject(tableData);
+        }
+        tableData.finishSpilling();
+        long dur = System.currentTimeMillis() - start;
+        LOG.debug("[Spill] Table " + id + " has been serialized to disk . Time elapsed: " + dur + "ms");
+    }
+
+    private synchronized void restoreTable(long id)
+            throws IOException, ClassNotFoundException
+    {
+        if (tables.containsKey(id)) {
+            return;
+        }
+        LOG.debug("[Load] Loading metadata of table " + id);
+        long start = System.currentTimeMillis();
+        Path tablePath = spillRoot.resolve(String.valueOf(id));
+        if (!Files.exists(tablePath)) {
+            throw new FileNotFoundException("No spill data found for table id " + id);
+        }
+        try (InputStream inputStream = Files.newInputStream(tablePath.resolve(TABLE_METADATA_SUFFIX))) {
+            ObjectInputStream ois = new ObjectInputStream(inputStream);
+            TableData tableData = (TableData) ois.readObject();
+            tableData.restoreTransientObjects(pageSorter, typeManager, pagesSerde, tablePath);
+            tables.put(id, tableData);
+        }
+        long dur = System.currentTimeMillis() - start;
+        LOG.debug("[Load] Table " + id + " has been restored. Time elapsed: " + dur + "ms");
     }
 }

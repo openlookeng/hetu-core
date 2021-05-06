@@ -16,6 +16,7 @@ package io.prestosql.plugin.memory;
 import com.google.inject.Injector;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.json.JsonModule;
+import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorContext;
@@ -65,7 +66,9 @@ public class MemoryConnectorFactory
                         binder.bind(HetuMetastore.class).toInstance(context.getHetuMetastore());
                     },
                     new JsonModule(),
-                    new MemoryModule(context.getTypeManager(), context.getNodeManager()));
+                    new MemoryModule(context.getTypeManager(),
+                            context.getNodeManager(),
+                            new PagesSerdeFactory(context.getBlockEncodingSerde(), false).createPagesSerde()));
 
             Injector injector = app
                     .strictConfig()

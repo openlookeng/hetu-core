@@ -452,7 +452,8 @@ public class ConnectorManager
                 heuristicIndexerManager.getIndexClient(),
                 new ConnectorRowExpressionService(domainTranslator, determinismEvaluator),
                 metadataManager.getFunctionAndTypeManager(),
-                new FunctionResolution(metadataManager.getFunctionAndTypeManager()));
+                new FunctionResolution(metadataManager.getFunctionAndTypeManager()),
+                metadataManager.getFunctionAndTypeManager().getBlockEncodingSerde());
 
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(factory.getClass().getClassLoader())) {
             Connector connector = factory.create(catalogName.getCatalogName(), properties, context);

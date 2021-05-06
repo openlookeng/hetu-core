@@ -22,12 +22,14 @@ import java.util.List;
 import java.util.Set;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
+import static io.prestosql.plugin.memory.MemoryTableProperties.SPILL_COMPRESSION_DEFAULT_VALUE;
 import static java.util.Objects.requireNonNull;
 
 public final class MemoryOutputTableHandle
         implements ConnectorOutputTableHandle
 {
     private final long table;
+    private final boolean compressionEnabled;
     private final Set<Long> activeTableIds;
     private final List<ColumnInfo> columns;
     private final List<SortingColumn> sortedBy;
@@ -36,12 +38,14 @@ public final class MemoryOutputTableHandle
     @JsonCreator
     public MemoryOutputTableHandle(
             @JsonProperty("table") long table,
+            @JsonProperty("compressEnabled") boolean compressionEnabled,
             @JsonProperty("activeTableIds") Set<Long> activeTableIds,
             @JsonProperty("columns") List<ColumnInfo> columns,
             @JsonProperty("sortedBy") List<SortingColumn> sortedBy,
             @JsonProperty("indexColumns") List<String> indexColumns)
     {
-        this.table = requireNonNull(table, "table is null");
+        this.table = table;
+        this.compressionEnabled = compressionEnabled;
         this.activeTableIds = requireNonNull(activeTableIds, "activeTableIds is null");
         this.columns = requireNonNull(columns, "columns is null");
         this.sortedBy = requireNonNull(sortedBy, "sortedBy is null");
@@ -50,13 +54,19 @@ public final class MemoryOutputTableHandle
 
     public MemoryOutputTableHandle(long table, Set<Long> activeTableIds)
     {
-        this(table, activeTableIds, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+        this(table, SPILL_COMPRESSION_DEFAULT_VALUE, activeTableIds, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     }
 
     @JsonProperty
     public long getTable()
     {
         return table;
+    }
+
+    @JsonProperty
+    public boolean isCompressionEnabled()
+    {
+        return compressionEnabled;
     }
 
     @JsonProperty

@@ -21,6 +21,9 @@ import io.prestosql.spi.function.Mandatory;
 
 import javax.validation.constraints.NotNull;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 
 public class MemoryConfig
@@ -28,6 +31,7 @@ public class MemoryConfig
     private int splitsPerNode = Runtime.getRuntime().availableProcessors();
     private DataSize maxDataPerNode = new DataSize(128, DataSize.Unit.MEGABYTE);
     private DataSize maxLogicalPartSize = new DataSize(256, MEGABYTE);
+    private Path spillRoot;
     private int processingThreads = Runtime.getRuntime().availableProcessors();
 
     @NotNull
@@ -40,6 +44,22 @@ public class MemoryConfig
     public MemoryConfig setSplitsPerNode(int splitsPerNode)
     {
         this.splitsPerNode = splitsPerNode;
+        return this;
+    }
+
+    @NotNull
+    public Path getSpillRoot()
+    {
+        return spillRoot;
+    }
+
+    @Mandatory(name = "memory.spill-path",
+            description = "Specify the directory where memory data will get spilled to",
+            required = true)
+    @Config("memory.spill-path")
+    public MemoryConfig setSpillRoot(String spillRoot)
+    {
+        this.spillRoot = Paths.get(spillRoot);
         return this;
     }
 

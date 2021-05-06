@@ -15,16 +15,25 @@ package io.prestosql.plugin.memory;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.airlift.json.JsonCodec;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+
 import static java.util.Objects.requireNonNull;
 
 public class ColumnInfo
+        implements Serializable
 {
-    private final MemoryColumnHandle handle;
-    private final String name;
+    private static final long serialVersionUID = 7527394454813793397L;
+    private static final JsonCodec<MemoryColumnHandle> MEMORY_COLUMN_HANDLE_JSON_CODEC = JsonCodec.jsonCodec(MemoryColumnHandle.class);
+    private MemoryColumnHandle handle;
+    private String name;
 
     @JsonCreator
     public ColumnInfo(
@@ -60,6 +69,20 @@ public class ColumnInfo
     public int getIndex()
     {
         return handle.getColumnIndex();
+    }
+
+    private void readObject(ObjectInputStream in)
+            throws ClassNotFoundException, IOException
+    {
+        this.handle = MEMORY_COLUMN_HANDLE_JSON_CODEC.fromJson(in.readUTF());
+        this.name = in.readUTF();
+    }
+
+    private void writeObject(ObjectOutputStream out)
+            throws IOException
+    {
+        out.writeUTF(MEMORY_COLUMN_HANDLE_JSON_CODEC.toJson(handle));
+        out.writeUTF(name);
     }
 
     @Override

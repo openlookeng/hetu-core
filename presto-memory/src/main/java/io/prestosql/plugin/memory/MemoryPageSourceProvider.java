@@ -13,7 +13,7 @@
  */
 package io.prestosql.plugin.memory;
 
-import io.prestosql.plugin.memory.data.MemoryPagesStore;
+import io.prestosql.plugin.memory.data.MemoryTableManager;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
@@ -43,10 +43,10 @@ public final class MemoryPageSourceProvider
         implements ConnectorPageSourceProvider
 {
     private final TypeManager typeManager;
-    private final MemoryPagesStore pagesStore;
+    private final MemoryTableManager pagesStore;
 
     @Inject
-    public MemoryPageSourceProvider(MemoryPagesStore pagesStore, TypeManager typeManager, MemoryMetadata memoryMetadata)
+    public MemoryPageSourceProvider(MemoryTableManager pagesStore, TypeManager typeManager, MemoryMetadata memoryMetadata)
     {
         this.pagesStore = requireNonNull(pagesStore, "pagesStore is null");
         this.typeManager = requireNonNull(typeManager, "typeManager is null");

@@ -18,7 +18,7 @@ import com.google.common.collect.ImmutableSet;
 import io.airlift.units.DataSize;
 import io.prestosql.PagesIndexPageSorter;
 import io.prestosql.operator.PagesIndex;
-import io.prestosql.plugin.memory.data.MemoryPagesStore;
+import io.prestosql.plugin.memory.data.MemoryTableManager;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
@@ -29,6 +29,7 @@ import io.prestosql.spi.connector.ConnectorPageSink;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.type.testing.TestingTypeManager;
 import io.prestosql.testing.TestingConnectorSession;
+import io.prestosql.testing.TestingPagesSerdeFactory;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -41,19 +42,23 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 @Test(singleThreaded = true)
-public class TestMemoryPagesStore
+public class TestMemoryTableManager
 {
     private static final PagesIndexPageSorter sorter = new PagesIndexPageSorter(new PagesIndex.TestingFactory(false));
     public static final ConnectorSession SESSION = new TestingConnectorSession(ImmutableList.of());
     private static final int POSITIONS_PER_PAGE = 0;
 
-    private MemoryPagesStore pagesStore;
+    private MemoryTableManager pagesStore;
     private MemoryPageSinkProvider pageSinkProvider;
 
     @BeforeMethod
     public void setUp()
     {
-        pagesStore = new MemoryPagesStore(new MemoryConfig().setMaxDataPerNode(new DataSize(1, DataSize.Unit.MEGABYTE)), sorter, new TestingTypeManager());
+        pagesStore = new MemoryTableManager(
+                new MemoryConfig().setMaxDataPerNode(new DataSize(1, DataSize.Unit.MEGABYTE)),
+                sorter,
+                new TestingTypeManager(),
+                new TestingPagesSerdeFactory().createPagesSerde());
         pageSinkProvider = new MemoryPageSinkProvider(pagesStore, HostAddress.fromString("localhost:8080"));
     }
 

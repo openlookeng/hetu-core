@@ -16,6 +16,7 @@ package io.prestosql.plugin.memory;
 import com.google.common.collect.ImmutableList;
 import io.airlift.json.JsonCodec;
 import io.airlift.slice.Slice;
+import io.prestosql.plugin.memory.data.MemoryTableManager;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.Node;
 import io.prestosql.spi.NodeManager;
@@ -91,7 +92,7 @@ public class MemoryMetadata
     private final HetuMetastore metastore;
 
     @Inject
-    public MemoryMetadata(TypeManager typeManager, NodeManager nodeManager, HetuMetastore metastore)
+    public MemoryMetadata(TypeManager typeManager, NodeManager nodeManager, HetuMetastore metastore, MemoryTableManager tableManager)
     {
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
@@ -327,7 +328,9 @@ public class MemoryMetadata
                 columnInfos,
                 new HashMap<>()));
 
-        return new MemoryOutputTableHandle(tableId, getTableIdSet(), columnInfos, sortedBy, indexColumns);
+        boolean spillCompressionEnabled = MemoryTableProperties.getSpillCompressionEnabled(tableMetadata.getProperties());
+
+        return new MemoryOutputTableHandle(tableId, spillCompressionEnabled, getTableIdSet(), columnInfos, sortedBy, indexColumns);
     }
 
     private void checkSchemaNotExists(String schemaName)

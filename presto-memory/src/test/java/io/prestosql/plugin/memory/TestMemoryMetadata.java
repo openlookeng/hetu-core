@@ -65,7 +65,7 @@ public class TestMemoryMetadata
         Runtime.getRuntime().addShutdownHook(new Thread(tmp::close));
         metadata = new MemoryMetadata(new TestingTypeManager(), new TestingNodeManager(),
                 new HetuFsMetastore(new HetuFsMetastoreConfig().setHetuFileSystemMetastorePath(tmp.getRoot().getCanonicalPath()),
-                        new HetuLocalFileSystemClient(new LocalConfig(null), Paths.get(tmp.getRoot().getCanonicalPath()))));
+                        new HetuLocalFileSystemClient(new LocalConfig(null), Paths.get(tmp.getRoot().getCanonicalPath()))), null);
     }
 
     @Test

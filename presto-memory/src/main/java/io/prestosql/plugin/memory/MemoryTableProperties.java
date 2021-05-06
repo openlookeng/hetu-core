@@ -31,6 +31,8 @@ import static java.util.Locale.ENGLISH;
 
 public class MemoryTableProperties
 {
+    public static final String SPILL_COMPRESSION_PROPERTY = "spill_compression";
+    public static final boolean SPILL_COMPRESSION_DEFAULT_VALUE = false;
     public static final String PARTITIONED_BY_PROPERTY = "partitioned_by";
     public static final String SORTED_BY_PROPERTY = "sorted_by";
     public static final String INDEX_COLUMNS_PROPERTY = "index_columns";
@@ -78,7 +80,12 @@ public class MemoryTableProperties
                         value -> ((Collection<?>) value).stream()
                                 .map(SortingColumn.class::cast)
                                 .map(MemoryTableProperties::sortingColumnToString)
-                                .collect(toImmutableList())));
+                                .collect(toImmutableList())),
+                PropertyMetadata.booleanProperty(
+                        SPILL_COMPRESSION_PROPERTY,
+                        "Whether to enable page compression during spilling",
+                        SPILL_COMPRESSION_DEFAULT_VALUE,
+                        false));
     }
 
     public List<PropertyMetadata<?>> getTableProperties()
@@ -104,6 +111,12 @@ public class MemoryTableProperties
     public static List<SortingColumn> getSortedBy(Map<String, Object> tableProperties)
     {
         return (List<SortingColumn>) tableProperties.get(SORTED_BY_PROPERTY);
+    }
+
+    public static boolean getSpillCompressionEnabled(Map<String, Object> tableProperties)
+    {
+        Boolean spillCompressionEnabled = (Boolean) tableProperties.get(SPILL_COMPRESSION_PROPERTY);
+        return spillCompressionEnabled == null ? SPILL_COMPRESSION_DEFAULT_VALUE : spillCompressionEnabled;
     }
 
     private static SortingColumn sortingColumnFromString(String name)

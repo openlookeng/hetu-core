@@ -14,10 +14,11 @@
  */
 package io.prestosql.plugin.memory.data;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.airlift.log.Logger;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.prestosql.plugin.memory.ColumnInfo;
 import io.prestosql.plugin.memory.MemoryConfig;
+import io.prestosql.plugin.memory.MemoryThreadManager;
 import io.prestosql.plugin.memory.SortingColumn;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageSorter;
@@ -25,56 +26,60 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.TypeManager;
 
+import java.io.Serializable;
+import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
 public class TableData
+        implements Serializable
 {
+    private static final long serialVersionUID = 588783549296983464L;
     private static final Logger LOG = Logger.get(TableData.class);
-
     private static final Long PROCESSING_DELAY = 5000L; // 5s
-    private static final ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("MemoryConnector-pool-%d").setDaemon(true).build();
-    private static final ScheduledExecutorService executor = Executors.newScheduledThreadPool(Math.max((Runtime.getRuntime().availableProcessors() / 2), 2), threadFactory);
+    private static final ScheduledExecutorService executor = MemoryThreadManager.getSharedThreadPool();
 
-    private final long id;
     private final int totalSplits;
-    private final List<LogicalPart>[] splits;
     private final AtomicInteger nextSplit;
     private final List<ColumnInfo> columns;
     private final List<SortingColumn> sortedBy;
     private final List<String> indexColumns;
-    private final PageSorter pageSorter;
     private final long maxLogicalPartBytes;
-    private final MemoryConfig config;
-    private final TypeManager typeManager;
+    private final List<List<LogicalPart>> splits;
+    private final boolean compressionEnabled;
+    private boolean isOnDisk;
     private long lastModified = System.currentTimeMillis();
 
-    public TableData(long id, List<ColumnInfo> columns, List<SortingColumn> sortedBy,
-            List<String> indexColumns, PageSorter pageSorter, MemoryConfig config, TypeManager typeManager)
+    private transient Path tableDataRoot;
+    private transient PagesSerde pagesSerde;
+    private transient PageSorter pageSorter;
+    private transient TypeManager typeManager;
+
+    public TableData(long id, boolean compressionEnabled, Path tableDataRoot, List<ColumnInfo> columns, List<SortingColumn> sortedBy,
+            List<String> indexColumns, PageSorter pageSorter, MemoryConfig config, TypeManager typeManager, PagesSerde pagesSerde)
     {
-        this.id = requireNonNull(id, "id is null");
-        this.config = requireNonNull(config, "config is null");
+        this.tableDataRoot = tableDataRoot;
         this.totalSplits = config.getSplitsPerNode();
         this.maxLogicalPartBytes = config.getMaxLogicalPartSize().toBytes();
+        this.compressionEnabled = compressionEnabled;
         this.columns = requireNonNull(columns, "columns is null");
         this.sortedBy = requireNonNull(sortedBy, "sortedBy is null");
         this.indexColumns = requireNonNull(indexColumns, "indexColumns is null");
         this.pageSorter = requireNonNull(pageSorter, "pageSorter is null");
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
+        this.pagesSerde = requireNonNull(pagesSerde, "pagesSerde is null");
 
-        this.splits = new ArrayList[totalSplits];
+        this.splits = new ArrayList<>(totalSplits);
         for (int i = 0; i < totalSplits; i++) {
-            this.splits[i] = new ArrayList<>();
+            this.splits.add(new ArrayList<>());
         }
         this.nextSplit = new AtomicInteger(0);
 
@@ -85,22 +90,22 @@ public class TableData
             public void run()
             {
                 if ((System.currentTimeMillis() - lastModified) > PROCESSING_DELAY) {
-                    for (int i = 0; i < splits.length; i++) {
-                        List<LogicalPart> split = splits[i];
+                    for (int i = 0; i < splits.size(); i++) {
+                        List<LogicalPart> split = splits.get(i);
                         for (int j = 0; j < split.size(); j++) {
                             LogicalPart logicalPart = split.get(j);
                             if (logicalPart.getProcessingState().get() == LogicalPart.ProcessingState.NOT_STARTED) {
                                 int finalI = i;
                                 int finalJ = j;
                                 executor.execute(() -> {
-                                    LOG.info("Processing Table %d :: Split %d/%d :: LogicalPart %d/%d", id, finalI + 1, splits.length, finalJ + 1, split.size());
+                                    LOG.info("Processing Table %d :: Split %d/%d :: LogicalPart %d/%d", id, finalI + 1, splits.size(), finalJ + 1, split.size());
                                     try {
                                         logicalPart.process();
                                     }
                                     catch (Exception e) {
-                                        LOG.warn("Failed to process Table %d :: Split %d/%d :: LogicalPart %d/%d", id, finalI + 1, splits.length, finalJ + 1, split.size());
+                                        LOG.warn("Failed to process Table %d :: Split %d/%d :: LogicalPart %d/%d", id, finalI + 1, splits.size(), finalJ + 1, split.size());
                                     }
-                                    LOG.info("Processed Table %d :: Split %d/%d :: LogicalPart %d/%d", id, finalI + 1, splits.length, finalJ + 1, split.size());
+                                    LOG.info("Processed Table %d :: Split %d/%d :: LogicalPart %d/%d", id, finalI + 1, splits.size(), finalJ + 1, split.size());
                                 });
                             }
                         }
@@ -110,11 +115,27 @@ public class TableData
         }, 1000, 5000);
     }
 
+    // used for deserialization
+    public void restoreTransientObjects(PageSorter pageSorter, TypeManager typeManager, PagesSerde pagesSerde, Path tableDataRoot)
+    {
+        this.pageSorter = pageSorter;
+        this.typeManager = typeManager;
+        this.pagesSerde = pagesSerde;
+        this.tableDataRoot = tableDataRoot;
+        for (List<LogicalPart> split : splits) {
+            for (LogicalPart lp : split) {
+                lp.restoreTransientObjects(pageSorter, typeManager, pagesSerde, tableDataRoot);
+            }
+        }
+    }
+
     public void add(Page page)
     {
-        List<LogicalPart> splitParts = splits[nextSplit.getAndIncrement() % totalSplits];
+        int splitNum = nextSplit.getAndIncrement() % totalSplits;
+        List<LogicalPart> splitParts = splits.get(splitNum);
         if (splitParts.isEmpty() || !splitParts.get(splitParts.size() - 1).canAdd()) {
-            splitParts.add(new LogicalPart(columns, sortedBy, indexColumns, pageSorter, maxLogicalPartBytes, typeManager));
+            int logicalPartNum = splitParts.size();
+            splitParts.add(new LogicalPart(columns, sortedBy, indexColumns, tableDataRoot, pageSorter, maxLogicalPartBytes, typeManager, pagesSerde, splitNum, logicalPartNum, compressionEnabled));
         }
 
         LogicalPart currentSplitPart = splitParts.get(splitParts.size() - 1);
@@ -123,14 +144,36 @@ public class TableData
         lastModified = System.currentTimeMillis();
     }
 
+    public boolean allProcessed()
+    {
+        for (List<LogicalPart> split : splits) {
+            for (LogicalPart logicalPart : split) {
+                if (logicalPart.getProcessingState().get() != LogicalPart.ProcessingState.COMPLETE) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    public boolean isSpilled()
+    {
+        return isOnDisk;
+    }
+
+    public void finishSpilling()
+    {
+        isOnDisk = true;
+    }
+
     protected List<Page> getPages()
     {
-        return Arrays.stream(splits).flatMap(l -> l.stream()).flatMap(lp -> lp.getPages().stream()).collect(Collectors.toList());
+        return splits.stream().flatMap(Collection::stream).flatMap(lp -> lp.getPages().stream()).collect(Collectors.toList());
     }
 
     protected List<Page> getPages(int split)
     {
-        return splits[split].parallelStream().flatMap(lp -> lp.getPages().stream()).collect(Collectors.toList());
+        return splits.get(split).parallelStream().flatMap(lp -> lp.getPages().stream()).collect(Collectors.toList());
     }
 
     protected List<Page> getPages(int split, TupleDomain<ColumnHandle> predicate)
@@ -139,14 +182,14 @@ public class TableData
             return getPages(split);
         }
 
-        return splits[split].parallelStream().flatMap(lp -> lp.getPages(predicate).stream()).collect(Collectors.toList());
+        return splits.get(split).parallelStream().flatMap(lp -> lp.getPages(predicate).stream()).collect(Collectors.toList());
     }
 
     protected long getRows()
     {
         int total = 0;
-        for (int i = 0; i < splits.length; i++) {
-            for (LogicalPart logiPart : splits[i]) {
+        for (List<LogicalPart> split : splits) {
+            for (LogicalPart logiPart : split) {
                 total += logiPart.getRows();
             }
         }

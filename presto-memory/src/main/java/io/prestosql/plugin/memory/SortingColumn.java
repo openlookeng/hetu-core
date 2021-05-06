@@ -19,6 +19,7 @@ import io.prestosql.spi.block.SortOrder;
 
 import javax.annotation.concurrent.Immutable;
 
+import java.io.Serializable;
 import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -26,7 +27,9 @@ import static java.util.Objects.requireNonNull;
 
 @Immutable
 public class SortingColumn
+        implements Serializable
 {
+    private static final long serialVersionUID = -5788899318458356130L;
     private final String columnName;
     private final SortOrder order;
 

@@ -27,7 +27,7 @@ public final class MemoryColumnHandle
 {
     private final int columnIndex;
     private final TypeSignature typeSignature;
-    private Type typeCache;
+    private transient Type typeCache;
 
     @JsonCreator
     public MemoryColumnHandle(@JsonProperty("columnIndex") int columnIndex,
