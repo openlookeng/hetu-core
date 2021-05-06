@@ -225,9 +225,15 @@ public class JdbcRecordCursor
         closed = true;
 
         // use try with resources to close everything properly
-        try (Connection connection = this.connection;
-                Statement statement = this.statement;
+        try (Statement statement = this.statement;
                 ResultSet resultSet = this.resultSet) {
+            checkState(closed, "just for check style handle");
+        }
+        catch (SQLException e) {
+            // ignore exception from close
+        }
+
+        try (Connection connection = this.connection) {
             if (connection != null) {
                 jdbcClient.abortReadConnection(connection);
             }
