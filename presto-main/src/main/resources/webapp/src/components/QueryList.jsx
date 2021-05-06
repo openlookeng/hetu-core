@@ -92,7 +92,7 @@ export class QueryListItem extends React.Component {
 
         const timingDetails = (
             <div className="col-xs-12 tinystat-row">
-                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Wall time spent executing the query (not including queued time)">
+                <span className="tinystat" data-toggle="tooltip" data-placement="right" title="Wall time spent executing the query (not including queued time)">
                     <span className="glyphicon glyphicon-hourglass" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
                     {query.queryStats.executionTime}
                 </span>
@@ -108,7 +108,7 @@ export class QueryListItem extends React.Component {
 
         const memoryDetails = (
             <div className="col-xs-12 tinystat-row">
-                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Current total reserved memory">
+                <span className="tinystat" data-toggle="tooltip" data-placement="right" title="Current total reserved memory">
                     <span className="glyphicon glyphicon-scale" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
                     {query.queryStats.totalMemoryReservation}
                 </span>
@@ -508,7 +508,6 @@ export class QueryList extends React.Component {
                                 <div className="input-group input-group-sm">
                                     <input type="text" className="form-control form-control-small search-bar" placeholder="User, source, query ID, resource group, or query text"
                                         onChange={this.handleSearchStringChange} value={this.state.searchString} />
-                                    <span className="input-group-addon filter-addon">State:</span>
                                     <div className="input-group-btn">
                                         <button type="button" className="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                             State <span className="caret" />
