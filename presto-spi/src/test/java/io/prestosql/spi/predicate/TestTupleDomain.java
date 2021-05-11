@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.json.ObjectMapperProvider;
+import io.airlift.slice.Slices;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.TestingBlockEncodingSerde;
 import io.prestosql.spi.block.TestingBlockJsonSerde;
@@ -437,6 +438,38 @@ public class TestTupleDomain
                         Domain.create(
                                 ValueSet.ofRanges(Range.range(BIGINT, 5L, true, 18L, true)),
                                 false))));
+    }
+
+    @Test
+    public void testRangeContains()
+    {
+        assertTrue(contains(
+                ImmutableMap.of(A,
+                        Domain.create(
+                                ValueSet.ofRanges(Range.range(VARCHAR, Slices.utf8Slice("App01"), true, Slices.utf8Slice("App10"), false)),
+                                false)),
+                ImmutableMap.of(A,
+                        Domain.create(
+                                ValueSet.ofRanges(Range.range(VARCHAR, Slices.utf8Slice("App05"), true, Slices.utf8Slice("App08"), true)),
+                                false))));
+
+        assertTrue(contains(ImmutableMap.of(A,
+                        Domain.create(
+                        ValueSet.ofRanges(Range.range(VARCHAR, Slices.utf8Slice("App01"), true, Slices.utf8Slice("App10"), false)),
+                        false)),
+                ImmutableMap.of(A,
+                        Domain.singleValue(VARCHAR, Slices.utf8Slice("App09")))));
+
+        ValueSet combined = ValueSet.ofRanges(
+                Range.range(VARCHAR, Slices.utf8Slice("App01"), true, Slices.utf8Slice("App10"), false),
+                Range.range(VARCHAR, Slices.utf8Slice("App10"), true, Slices.utf8Slice("App20"), false),
+                Range.equal(VARCHAR, Slices.utf8Slice("App20")));
+
+        assertTrue(combined.contains(
+                ValueSet.ofRanges(Range.range(VARCHAR, Slices.utf8Slice("App17"), true, Slices.utf8Slice("App20"), true))));
+
+        assertFalse(combined.contains(
+                ValueSet.ofRanges(Range.range(VARCHAR, Slices.utf8Slice("App15"), true, Slices.utf8Slice("App21"), true))));
     }
 
     @Test

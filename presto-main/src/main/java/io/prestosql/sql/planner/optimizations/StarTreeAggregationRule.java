@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.CubeStatement;
+import io.hetu.core.spi.cube.aggregator.AggregationSignature;
 import io.hetu.core.spi.cube.io.CubeMetaStore;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
@@ -260,6 +261,13 @@ public class StarTreeAggregationRule
 
         // Don't use star-tree for non-aggregate queries
         if (statement.getAggregations().isEmpty()) {
+            return Result.empty();
+        }
+        boolean hasDistinct = statement.getAggregations().stream().anyMatch(AggregationSignature::isDistinct);
+        // Do not use cube for queries that contains only count distinct aggregation and no group by clause
+        // Example: SELECT COUNT(DISTINCT userid) FROM usage_history WHERE day BETWEEN 1 AND 7
+        // Since cube is pre-aggregated, utilising it for such queries could return incorrect result
+        if (aggregationNode.hasEmptyGroupingSet() && hasDistinct) {
             return Result.empty();
         }
 

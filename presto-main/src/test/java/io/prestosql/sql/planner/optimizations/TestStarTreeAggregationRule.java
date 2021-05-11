@@ -52,7 +52,6 @@ import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.relation.InputReferenceExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
-import io.prestosql.spi.type.IntegerType;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.util.DateTimeUtils;
 import io.prestosql.sql.analyzer.FeaturesConfig;
@@ -89,6 +88,7 @@ import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DateType.DATE;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
+import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.planner.iterative.rule.test.PlanBuilder.expression;
 import static org.mockito.Matchers.any;
@@ -410,7 +410,7 @@ public class TestStarTreeAggregationRule
 
         //expression not instance of Cast
         Assignments assignment2 = Assignments.builder()
-                .put(columnCustkey, new InputReferenceExpression(1, IntegerType.INTEGER))
+                .put(columnCustkey, new InputReferenceExpression(1, INTEGER))
                 .build();
         Optional<PlanNode> planNode3 = Optional.of(new ProjectNode(
                 newId(),

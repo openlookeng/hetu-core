@@ -21,10 +21,12 @@ import io.prestosql.spi.cube.CubeUpdateMetadata;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.type.Type;
 
 import javax.annotation.concurrent.Immutable;
 
 import java.util.List;
+import java.util.Map;
 
 @Immutable
 public class CubeFinishNode
@@ -33,18 +35,21 @@ public class CubeFinishNode
     private final PlanNode source;
     private final Symbol rowCountSymbol;
     private final CubeUpdateMetadata metadata;
+    private final Map<Symbol, Type> predicateColumnsType;
 
     @JsonCreator
     public CubeFinishNode(
             @JsonProperty("id") PlanNodeId id,
             @JsonProperty("source") PlanNode source,
             @JsonProperty("rowCountSymbol") Symbol rowCountSymbol,
-            @JsonProperty("metadata") CubeUpdateMetadata metadata)
+            @JsonProperty("metadata") CubeUpdateMetadata metadata,
+            @JsonProperty("predicateColumnsType") Map<Symbol, Type> predicateColumnsType)
     {
         super(id);
         this.source = source;
         this.rowCountSymbol = rowCountSymbol;
         this.metadata = metadata;
+        this.predicateColumnsType = predicateColumnsType;
     }
 
     @JsonProperty
@@ -77,6 +82,12 @@ public class CubeFinishNode
         return ImmutableList.of(rowCountSymbol);
     }
 
+    @JsonProperty
+    public Map<Symbol, Type> getPredicateColumnsType()
+    {
+        return this.predicateColumnsType;
+    }
+
     @Override
     public <R, C> R accept(InternalPlanVisitor<R, C> visitor, C context)
     {
@@ -90,6 +101,7 @@ public class CubeFinishNode
                 getId(),
                 Iterables.getOnlyElement(newChildren),
                 rowCountSymbol,
-                metadata);
+                metadata,
+                predicateColumnsType);
     }
 }

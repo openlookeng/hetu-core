@@ -18,6 +18,7 @@ import io.hetu.core.spi.cube.CubeMetadataBuilder;
 import io.hetu.core.spi.cube.io.CubeMetaStore;
 import io.prestosql.Session;
 import io.prestosql.cube.CubeManager;
+import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.cube.CubeUpdateMetadata;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -26,6 +27,7 @@ import io.prestosql.sql.ExpressionFormatter;
 import io.prestosql.sql.ExpressionUtils;
 import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.parser.SqlParser;
+import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.tree.Expression;
 
 import java.util.Optional;
@@ -47,21 +49,27 @@ public class CubeFinishOperator
         private final PlanNodeId planNodeId;
         private final Session session;
         private final CubeManager cubeManager;
-        private final CubeUpdateMetadata metadata;
+        private final CubeUpdateMetadata cubeUpdateMetadata;
+        private final Metadata metadata;
+        private final TypeProvider types;
         private boolean closed;
 
         public CubeFinishOperatorFactory(
                 int operatorId,
                 PlanNodeId planNodeId,
                 Session session,
+                Metadata metadata,
+                TypeProvider types,
                 CubeManager cubeManager,
-                CubeUpdateMetadata metadata)
+                CubeUpdateMetadata cubeUpdateMetadata)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.session = requireNonNull(session, "session is null");
-            this.cubeManager = requireNonNull(cubeManager, "cubeManager is null");
             this.metadata = requireNonNull(metadata, "metadata is null");
+            this.types = requireNonNull(types, "types is null");
+            this.cubeManager = requireNonNull(cubeManager, "cubeManager is null");
+            this.cubeUpdateMetadata = requireNonNull(cubeUpdateMetadata, "cubeUpdateMetadata is null");
         }
 
         @Override
@@ -69,7 +77,7 @@ public class CubeFinishOperator
         {
             checkState(!closed, "Factory is already closed");
             OperatorContext context = driverContext.addOperatorContext(operatorId, planNodeId, CubeFinishOperator.class.getSimpleName());
-            return new CubeFinishOperator(context, cubeManager, metadata);
+            return new CubeFinishOperator(context, cubeManager, cubeUpdateMetadata, types, metadata, session);
         }
 
         @Override
@@ -81,7 +89,7 @@ public class CubeFinishOperator
         @Override
         public OperatorFactory duplicate()
         {
-            return new CubeFinishOperatorFactory(operatorId, planNodeId, session, cubeManager, metadata);
+            return new CubeFinishOperatorFactory(operatorId, planNodeId, session, metadata, types, cubeManager, cubeUpdateMetadata);
         }
     }
 
@@ -95,17 +103,26 @@ public class CubeFinishOperator
     private final OperatorContext operatorContext;
     private final CubeMetaStore cubeMetastore;
     private final CubeUpdateMetadata updateMetadata;
+    private final TypeProvider types;
+    private final Metadata metadata;
+    private final Session session;
     private State state = State.NEEDS_INPUT;
     private Page page;
 
     public CubeFinishOperator(
             OperatorContext operatorContext,
             CubeManager cubeManager,
-            CubeUpdateMetadata updateMetadata)
+            CubeUpdateMetadata updateMetadata,
+            TypeProvider types,
+            Metadata metadata,
+            Session session)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.cubeMetastore = cubeManager.getMetaStore(STAR_TREE).get();
         this.updateMetadata = updateMetadata;
+        this.types = types;
+        this.metadata = metadata;
+        this.session = session;
     }
 
     @Override
@@ -148,7 +165,8 @@ public class CubeFinishOperator
                 Expression existing = new SqlParser().createExpression(cubeMetadata.getPredicateString(), new ParsingOptions());
                 updatable = ExpressionUtils.or(existing, updatable);
             }
-            //TODO: Add Logic to simplify expression. Check if Two between predicates can be merged into one
+            CubeRangeCanonicalizer canonicalizer = new CubeRangeCanonicalizer(metadata, session, types);
+            updatable = canonicalizer.mergePredicates(updatable);
             builder.withPredicate(ExpressionFormatter.formatExpression(updatable, Optional.empty()));
         }
         builder.setTableLastUpdatedTime(updateMetadata.getTableLastUpdatedTime());
