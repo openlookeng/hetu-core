@@ -396,8 +396,10 @@ public class Driver
                 Operator next = activeOperators.get(i + 1);
 
                 if (log.isDebugEnabled()) {
-                    log.debug("Blocking info next=%s: getBlockedFuture(next)=%b; current.isFinished=%b; getBlockedFuture(next)=%b; next.needsInput=%b",
-                            next.getOperatorContext().getUniqueId(), getBlockedFuture(current).isPresent(), current.isFinished(), getBlockedFuture(next).isPresent(), next.needsInput());
+                    if (getBlockedFuture(current).isPresent() || current.isFinished() || getBlockedFuture(next).isPresent() || !next.needsInput()) {
+                        log.debug("Blocking info next=%s: getBlockedFuture(current)=%b; current.isFinished=%b; getBlockedFuture(next)=%b; next.needsInput=%b",
+                                next.getOperatorContext().getUniqueId(), getBlockedFuture(current).isPresent(), current.isFinished(), getBlockedFuture(next).isPresent(), next.needsInput());
+                    }
                 }
 
                 // skip blocked operator

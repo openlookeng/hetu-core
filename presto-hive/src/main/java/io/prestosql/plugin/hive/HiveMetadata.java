@@ -2932,46 +2932,46 @@ public class HiveMetadata
     }
 
     @Override
-    public void resetInsertForRerun(ConnectorSession session, ConnectorInsertTableHandle tableHandle, OptionalLong snapshotId)
+    public void resetInsertForRerun(ConnectorSession session, ConnectorInsertTableHandle tableHandle, OptionalLong snapshotIndex)
     {
-        updateSnapshotFiles(session, (HiveWritableTableHandle) tableHandle, true, snapshotId);
+        updateSnapshotFiles(session, (HiveWritableTableHandle) tableHandle, true, snapshotIndex);
     }
 
     @Override
-    public void resetCreateForRerun(ConnectorSession session, ConnectorOutputTableHandle tableHandle, OptionalLong snapshotId)
+    public void resetCreateForRerun(ConnectorSession session, ConnectorOutputTableHandle tableHandle, OptionalLong snapshotIndex)
     {
-        updateSnapshotFiles(session, (HiveWritableTableHandle) tableHandle, true, snapshotId);
+        updateSnapshotFiles(session, (HiveWritableTableHandle) tableHandle, true, snapshotIndex);
     }
 
     // Visit table writePath recursively.
     // resume=true:  (for rerun) remove all files with snapshot identifier
     // resume=false: (for finish) remove sub-files; rename merged-files
-    private void updateSnapshotFiles(ConnectorSession session, HiveWritableTableHandle tableHandle, boolean resume, OptionalLong snapshotId)
+    private void updateSnapshotFiles(ConnectorSession session, HiveWritableTableHandle tableHandle, boolean resume, OptionalLong snapshotIndex)
     {
         try {
             FileSystem fileSystem = hdfsEnvironment.getFileSystem(
                     new HdfsContext(session, tableHandle.getSchemaName(), tableHandle.getTableName()),
                     tableHandle.getLocationHandle().getWritePath());
-            updatePreviousFiles(fileSystem, tableHandle.getLocationHandle().getWritePath(), session.getQueryId(), resume, snapshotId.orElse(0));
+            updatePreviousFiles(fileSystem, tableHandle.getLocationHandle().getWritePath(), session.getQueryId(), resume, snapshotIndex.orElse(0));
         }
         catch (IOException e) {
             throw new PrestoException(HIVE_FILESYSTEM_ERROR, "Failed to update Hive files for " + tableHandle.getSchemaName() + "." + tableHandle.getTableName(), e);
         }
     }
 
-    private void updatePreviousFiles(FileSystem fileSystem, Path folder, String queryId, boolean resume, long snapshotId)
+    private void updatePreviousFiles(FileSystem fileSystem, Path folder, String queryId, boolean resume, long snapshotIndex)
             throws IOException
     {
         if (fileSystem.exists(folder)) {
             for (FileStatus status : fileSystem.listStatus(folder)) {
                 if (status.isDirectory()) {
-                    updatePreviousFiles(fileSystem, status.getPath(), queryId, resume, snapshotId);
+                    updatePreviousFiles(fileSystem, status.getPath(), queryId, resume, snapshotIndex);
                 }
                 else if (isSnapshotFile(status.getPath().getName(), queryId)) {
                     if (resume) {
                         long subFileIndex = getSnapshotSubFileIndex(status.getPath().getName(), queryId);
                         // Remove any merged files and subfiles that are after the snapshot being resumed to
-                        if (subFileIndex < 0 || subFileIndex >= snapshotId) {
+                        if (subFileIndex < 0 || subFileIndex >= snapshotIndex) {
                             log.debug("Deleting file resume=true: %s", status.getPath().getName());
                             fileSystem.delete(status.getPath());
                         }

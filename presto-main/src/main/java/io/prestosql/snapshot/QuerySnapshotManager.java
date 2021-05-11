@@ -73,6 +73,13 @@ public class QuerySnapshotManager
     private long retryCount;
     private Runnable rescheduler; // SqlQueryScheduler will set it.
 
+    // Keeps track of relevant snapshotIds.
+    // Whenever MarkerAnnouncer decides to initiate a new snapshot, it needs to inform the QuerySnapshotManager about its action.
+    // QuerySnapshotManager will keep track of all snapshots because snapshotId won't be able to tell us the absolute index after
+    // restore. (eg. have completed snapshot 1-10, restored to 1, snapshot 11 that's generated after restore is actually 2nd snapshot)
+    // It is important for the management of snapshot sub-files written by TableWriterOperator.
+    private List<Long> initiatedSnapshotId;
+
     public QuerySnapshotManager(QueryId queryId, SnapshotUtils snapshotUtils, Session session)
     {
         this.queryId = requireNonNull(queryId);
@@ -85,6 +92,8 @@ public class QuerySnapshotManager
             this.maxRetry = SystemSessionProperties.getSnapshotMaxRetries(session);
             this.retryTimeout = SystemSessionProperties.getSnapshotRetryTimeout(session).toMillis();
         }
+        this.initiatedSnapshotId = Collections.synchronizedList(new ArrayList<>());
+        initiatedSnapshotId.add(0L);
     }
 
     public void setRescheduler(Runnable rescheduler)
@@ -102,6 +111,12 @@ public class QuerySnapshotManager
     public void addNewTask(TaskId taskId)
     {
         unfinishedTasks.add(taskId);
+    }
+
+    public void snapshotInitiated(long snapshotId)
+    {
+        captureResults.put(snapshotId, SnapshotResult.IN_PROGRESS);
+        initiatedSnapshotId.add(snapshotId);
     }
 
     /**
@@ -127,6 +142,16 @@ public class QuerySnapshotManager
         unfinishedTasks.clear();
         captureComponentCounters.clear();
         restoreComponentCounters.clear();
+
+        if (!lastTriedId.isPresent()) {
+            // resume to 0, all current snapshotIds are invalidated
+            initiatedSnapshotId.clear();
+            initiatedSnapshotId.add(0L);
+        }
+        else {
+            // all snapshotIds including lastTriedId can be reused.
+            initiatedSnapshotId = initiatedSnapshotId.subList(0, initiatedSnapshotId.indexOf(lastTriedId.getAsLong()) + 1);
+        }
 
         return lastTriedId;
     }
@@ -409,6 +434,16 @@ public class QuerySnapshotManager
                     queryRestoreComplete(restoreResult);
                 }
             }
+        }
+    }
+
+    public int computeSnapshotIndex(OptionalLong snapshotId)
+    {
+        if (!snapshotId.isPresent()) {
+            return 0;
+        }
+        else {
+            return initiatedSnapshotId.indexOf(snapshotId.getAsLong());
         }
     }
 

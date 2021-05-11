@@ -173,6 +173,13 @@ public class DistributedExecutionPlanner
             for (PlanFragmentId id : fragments) {
                 sources.addAll(collectSources(leftmostSources, leftmostSources.get(id)));
             }
+            // These sources are part of a "union". They eventually reach the same "union" point (e.g. an ExchangeOperator).
+            // For snapshot to work, all sources must produce the same number of markers, otherwise the union point
+            // will not receive markers from all input channels, causing corresponding snapshots to be incomplete.
+            // Adding all these sources as "union dependencies" for each other, to make sure they produce the same set of markers.
+            for (MarkerSplitSource unionSource : sources) {
+                unionSource.addUnionSources(sources);
+            }
             return sources;
         }
 

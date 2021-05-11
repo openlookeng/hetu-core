@@ -616,10 +616,10 @@ public class SqlQueryExecution
 
                 // Find table-finish-node, which contains handle to the table
                 if (analysis.getStatement() instanceof CreateTableAsSelect) {
-                    metadata.resetCreateForRerun(getSession(), ((TableWriterNode.CreateTarget) node.getTarget()).getHandle(), snapshotId);
+                    metadata.resetCreateForRerun(getSession(), ((TableWriterNode.CreateTarget) node.getTarget()).getHandle(), OptionalLong.of(snapshotManager.computeSnapshotIndex(snapshotId)));
                 }
                 else {
-                    metadata.resetInsertForRerun(getSession(), ((TableWriterNode.InsertTarget) node.getTarget()).getHandle(), snapshotId);
+                    metadata.resetInsertForRerun(getSession(), ((TableWriterNode.InsertTarget) node.getTarget()).getHandle(), OptionalLong.of(snapshotManager.computeSnapshotIndex(snapshotId)));
                 }
                 return null;
             }
@@ -814,6 +814,7 @@ public class SqlQueryExecution
             // Snapshot: need to plan different when snapshot is enabled.
             // See the "plan" method for difference between the different modes.
             MarkerAnnouncer announcer = splitManager.getMarkerAnnouncer(session);
+            announcer.setSnapshotManager(snapshotManager);
             outputStageExecutionPlan = distributedPlanner.plan(plan.getRoot(), session, SNAPSHOT, null, announcer.currentSnapshotId(), parallelSources);
         }
         else {

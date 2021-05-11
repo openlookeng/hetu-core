@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -147,31 +148,40 @@ public class TestExchangeOperator
 
     @Test
     public void testGetInputChannels()
+            throws ExecutionException, InterruptedException
     {
-        ExchangeOperator operator = (ExchangeOperator) createExchangeOperator();
+        ExchangeOperator operator = (ExchangeOperator) createExchangeOperator(TEST_SNAPSHOT_SESSION);
 
         // Not enough channels are known
-        assertFalse(operator.getInputChannels(1).isPresent());
+        assertFalse(operator.isBlocked().isDone());
 
         operator.addSplit(newRemoteSplit(TASK_1_ID));
         // Not all channels are known
-        assertFalse(operator.getInputChannels(0).isPresent());
+        assertFalse(operator.isBlocked().isDone());
         // Not enough channels are known
-        assertFalse(operator.getInputChannels(2).isPresent());
+        assertFalse(operator.isBlocked().isDone());
+        taskBuffers.getUnchecked(TASK_1_ID).addPages(1, true);
 
         operator.addSplit(newRemoteSplit(TASK_2_ID));
         // Not all channels are known
-        assertFalse(operator.getInputChannels(0).isPresent());
+        assertFalse(operator.isBlocked().isDone());
         // At least expected channels are known
-        assertTrue(operator.getInputChannels(2).isPresent());
+        assertFalse(operator.isBlocked().isDone());
+        taskBuffers.getUnchecked(TASK_2_ID).addPages(1, true);
 
         operator.noMoreSplits();
+        operator.isBlocked().get();
         Optional<Set<String>> channels = operator.getInputChannels(0);
         assertTrue(channels.isPresent());
         assertEquals(channels.get().size(), 2);
 
         Optional<Set<String>> channels1 = operator.getInputChannels(0);
         assertTrue(channels == channels1);
+
+        // read the pages
+        waitForPages(operator, 2);
+        // wait for finished
+        waitForFinished(operator);
     }
 
     @Test

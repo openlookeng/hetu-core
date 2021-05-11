@@ -529,12 +529,12 @@ public interface Metadata
     /**
      * Snapshot: Remove any previous changes from previous execution attempt, to prepare for query resume
      */
-    void resetInsertForRerun(Session session, InsertTableHandle tableHandle, OptionalLong snapshotId);
+    void resetInsertForRerun(Session session, InsertTableHandle tableHandle, OptionalLong snapshotIndex);
 
     /**
      * Snapshot: Remove any previous changes from previous execution attempt, to prepare for query resume
      */
-    void resetCreateForRerun(Session session, OutputTableHandle tableHandle, OptionalLong snapshotId);
+    void resetCreateForRerun(Session session, OutputTableHandle tableHandle, OptionalLong snapshotIndex);
 
     /**
      * Cube pre-aggregation is applicable only for supported connectors.

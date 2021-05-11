@@ -449,7 +449,7 @@ public class SourcePartitionedScheduler
 
         if (anyNotBlocked) {
             if (initialMarker) {
-                overallNewTasks.addAll(finalizeTaskCreationIfNecessary());
+                stage.transitionToSchedulingSplits();
             }
             return new ScheduleResult(false, overallNewTasks.build(), overallSplitAssignmentCount);
         }

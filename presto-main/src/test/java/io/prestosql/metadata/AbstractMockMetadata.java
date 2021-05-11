@@ -664,12 +664,12 @@ public abstract class AbstractMockMetadata
     }
 
     @Override
-    public void resetInsertForRerun(Session session, InsertTableHandle tableHandle, OptionalLong snapshotId)
+    public void resetInsertForRerun(Session session, InsertTableHandle tableHandle, OptionalLong snapshotIndex)
     {
     }
 
     @Override
-    public void resetCreateForRerun(Session session, OutputTableHandle tableHandle, OptionalLong snapshotId)
+    public void resetCreateForRerun(Session session, OutputTableHandle tableHandle, OptionalLong snapshotIndex)
     {
     }
 }

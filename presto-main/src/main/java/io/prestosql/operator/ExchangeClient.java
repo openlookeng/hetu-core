@@ -236,6 +236,7 @@ public class ExchangeClient
                 new ExchangeClientCallback(location),
                 scheduler,
                 pageBufferClientCallbackExecutor,
+                snapshotEnabled,
                 querySnapshotManager);
         allClients.put(location, client);
         queuedClients.add(client);
