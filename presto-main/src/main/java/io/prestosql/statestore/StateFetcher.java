@@ -262,16 +262,18 @@ public class StateFetcher
                 StateCollection stateCollection = stateStore.getStateCollection(OOM_QUERY_STATE_COLLECTION_NAME);
                 removeState(stateCollection, Optional.of(state.getBasicQueryInfo().getQueryId()), LOG);
 
-                // update query to failed in stateCollection if exists
-                stateCollection = stateStore.getStateCollection(FINISHED_QUERY_STATE_COLLECTION_NAME);
+                // update query to failed in QUERY_STATE_COLLECTION_NAME if exists
+                stateCollection = stateStore.getStateCollection(QUERY_STATE_COLLECTION_NAME);
+                StateCollection finishStateCollection = stateStore.getStateCollection(FINISHED_QUERY_STATE_COLLECTION_NAME);
                 if (stateCollection != null && stateCollection.getType().equals(StateCollection.Type.MAP)) {
-                    Map<String, String> queryStateMap = ((StateMap<String, String>) stateCollection).getAll();
-                    if (queryStateMap.get(state.getBasicQueryInfo().getQueryId().getId()) != null) {
+                    String queryState = ((StateMap<String, String>) stateCollection).get(state.getBasicQueryInfo().getQueryId().getId());
+                    if (queryState != null) {
                         BasicQueryInfo oldQueryInfo = state.getBasicQueryInfo();
                         SharedQueryState newState = createNewState(oldQueryInfo, state);
 
                         String stateJson = MAPPER.writeValueAsString(newState);
-                        ((StateMap) stateCollection).put(newState.getBasicQueryInfo().getQueryId().getId(), stateJson);
+                        ((StateMap) finishStateCollection).put(newState.getBasicQueryInfo().getQueryId().getId(), stateJson);
+                        removeState(stateCollection, Optional.of(state.getBasicQueryInfo().getQueryId()), LOG);
                     }
                 }
             }
