@@ -14,11 +14,13 @@
 package io.prestosql.sql;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.ExpressionDeterminismEvaluator;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.tree.ComparisonExpression;
+import io.prestosql.sql.tree.DefaultExpressionTraversalVisitor;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.ExpressionRewriter;
 import io.prestosql.sql.tree.ExpressionTreeRewriter;
@@ -338,5 +340,19 @@ public final class ExpressionUtils
                 return new LambdaExpression(node.getArguments(), treeRewriter.rewrite(node.getBody(), context));
             }
         }, expression);
+    }
+
+    public static Set<Identifier> getIdentifiers(Expression expression)
+    {
+        ImmutableSet.Builder<Identifier> identifierBuilder = new ImmutableSet.Builder<>();
+        new DefaultExpressionTraversalVisitor<Void, ImmutableSet.Builder<Identifier>>() {
+            @Override
+            protected Void visitIdentifier(Identifier node, ImmutableSet.Builder<Identifier> builder)
+            {
+                builder.add(node);
+                return null;
+            }
+        }.process(expression, identifierBuilder);
+        return identifierBuilder.build();
     }
 }

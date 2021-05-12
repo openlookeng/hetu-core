@@ -30,6 +30,7 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.sql.ExpressionFormatter;
+import io.prestosql.sql.ExpressionUtils;
 import io.prestosql.sql.analyzer.QueryExplainer;
 import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.parser.SqlParser;
@@ -104,11 +105,8 @@ public class InsertCubeRewrite
             CubeMetaStore cubeMetaStore = optionalCubeMetaStore.orElseThrow(() -> new PrestoException(StandardErrorCode.CUBE_ERROR, "Hetu metastore must be initialized."));
             CubeMetadata cubeMetadata = cubeMetaStore.getMetadataFromCubeName(targetCube.toString()).orElseThrow(() -> new PrestoException(StandardErrorCode.CUBE_ERROR, String.format("Cube not found '%s'", targetCube.toString())));
             Set<String> group = cubeMetadata.getGroup();
-            ImmutableList.Builder<Identifier> builder = ImmutableList.builder();
-            ImmutableList.Builder<Identifier> cubeMetadataPredicateBuilder = ImmutableList.builder();
             if (node.getWhere().isPresent()) {
-                new IdentifierBuilderVisitor().process(node.getWhere().get(), builder);
-                Set<String> whereColumns = builder.build()
+                Set<String> whereColumns = ExpressionUtils.getIdentifiers(node.getWhere().get())
                         .stream()
                         .map(Identifier::getValue)
                         .collect(Collectors.toCollection(() -> new TreeSet<>(String.CASE_INSENSITIVE_ORDER)));
@@ -121,9 +119,7 @@ public class InsertCubeRewrite
                 }
                 if (cubeMetadata.getPredicateString() != null) {
                     Expression cubePredicateAsExpr = sqlParser.createExpression(cubeMetadata.getPredicateString(), new ParsingOptions());
-
-                    new IdentifierBuilderVisitor().process(cubePredicateAsExpr, cubeMetadataPredicateBuilder);
-                    Set<String> metadataWhereColumns = cubeMetadataPredicateBuilder.build()
+                    Set<String> metadataWhereColumns = ExpressionUtils.getIdentifiers(cubePredicateAsExpr)
                             .stream()
                             .map(Identifier::getValue)
                             .collect(Collectors.toCollection(() -> new TreeSet<>(String.CASE_INSENSITIVE_ORDER)));

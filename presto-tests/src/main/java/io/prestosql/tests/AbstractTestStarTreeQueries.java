@@ -480,21 +480,21 @@ public abstract class AbstractTestStarTreeQueries
     {
         List<Session> sessions = ImmutableList.of(
                 Session.builder(getSession())
-                .setSystemProperty(SystemSessionProperties.ENABLE_STAR_TREE_INDEX, "true")
-                .setSystemProperty(SystemSessionProperties.ENABLE_EXECUTION_PLAN_CACHE, "true")
-                .build(),
+                        .setSystemProperty(SystemSessionProperties.ENABLE_STAR_TREE_INDEX, "true")
+                        .setSystemProperty(SystemSessionProperties.ENABLE_EXECUTION_PLAN_CACHE, "true")
+                        .build(),
                 Session.builder(getSession())
-                .setSystemProperty(SystemSessionProperties.ENABLE_STAR_TREE_INDEX, "false")
-                .setSystemProperty(SystemSessionProperties.ENABLE_EXECUTION_PLAN_CACHE, "true")
-                .build(),
+                        .setSystemProperty(SystemSessionProperties.ENABLE_STAR_TREE_INDEX, "false")
+                        .setSystemProperty(SystemSessionProperties.ENABLE_EXECUTION_PLAN_CACHE, "true")
+                        .build(),
                 Session.builder(getSession())
-                .setSystemProperty(SystemSessionProperties.ENABLE_STAR_TREE_INDEX, "true")
-                .setSystemProperty(SystemSessionProperties.ENABLE_EXECUTION_PLAN_CACHE, "false")
-                .build(),
+                        .setSystemProperty(SystemSessionProperties.ENABLE_STAR_TREE_INDEX, "true")
+                        .setSystemProperty(SystemSessionProperties.ENABLE_EXECUTION_PLAN_CACHE, "false")
+                        .build(),
                 Session.builder(getSession())
-                .setSystemProperty(SystemSessionProperties.ENABLE_STAR_TREE_INDEX, "false")
-                .setSystemProperty(SystemSessionProperties.ENABLE_EXECUTION_PLAN_CACHE, "false")
-                .build());
+                        .setSystemProperty(SystemSessionProperties.ENABLE_STAR_TREE_INDEX, "false")
+                        .setSystemProperty(SystemSessionProperties.ENABLE_EXECUTION_PLAN_CACHE, "false")
+                        .build());
         for (Session session : sessions) {
             assertQuery(session,
                     "WITH temp_table as(SELECT nationkey, count(*) AS count FROM nation WHERE nationkey > 10 GROUP BY nationkey) SELECT nationkey, count FROM temp_table");
@@ -507,6 +507,46 @@ public abstract class AbstractTestStarTreeQueries
             assertQuerySucceeds(session,
                     "select sum(l.extendedprice) / 7.0 as avg_yearly from lineitem l, part p where p.partkey = l.partkey and p.brand = 'Brand#33' and p.container = 'WRAP PACK' and l.quantity < (select 0.2 * avg(l2.quantity) from lineitem l2 where l2.partkey = p.partkey)");
         }
+    }
+
+    @Test
+    public void testCubeRangeMerge()
+    {
+        computeActual("CREATE TABLE nation_table_range_merge_test_1 AS SELECT * FROM nation");
+        assertUpdate("CREATE CUBE nation_cube_range_merge_1 ON nation_table_range_merge_test_1 WITH (AGGREGATIONS=(count(*)), GROUP=(nationkey))");
+        assertUpdate("INSERT INTO CUBE nation_cube_range_merge_1 WHERE nationkey = 1", 1);
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_range_merge_test_1 WHERE nationkey = 1",
+                "SELECT count(*) FROM nation WHERE nationkey = 1",
+                assertTableScan("nation_cube_range_merge_1"));
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_range_merge_test_1 WHERE nationkey BETWEEN 1 AND 2",
+                "SELECT count(*) FROM nation WHERE nationkey BETWEEN 1 AND 2",
+                assertTableScan("nation_table_range_merge_test_1"));
+        assertUpdate("INSERT INTO CUBE nation_cube_range_merge_1 WHERE nationkey = 2", 1);
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_range_merge_test_1 WHERE nationkey BETWEEN 1 AND 2",
+                "SELECT count(*) FROM nation WHERE nationkey BETWEEN 1 AND 2",
+                assertTableScan("nation_cube_range_merge_1"));
+        assertUpdate("DROP CUBE nation_cube_range_merge_1");
+        assertUpdate("DROP TABLE nation_table_range_merge_test_1");
+    }
+
+    @Test
+    public void testCountDistinct()
+    {
+        computeActual("CREATE TABLE orders_count_distinct AS SELECT * FROM orders");
+        computeActual("CREATE CUBE orders_count_distinct_cube ON orders_count_distinct WITH (AGGREGATIONS = (count(distinct custkey)), GROUP = (orderdate))");
+        assertQuerySucceeds("INSERT INTO CUBE orders_count_distinct_cube");
+        assertQuery(sessionStarTree,
+                "SELECT count(distinct custkey) FROM orders_count_distinct WHERE orderdate BETWEEN date '1992-01-01' AND date '1992-01-10'",
+                "SELECT count(distinct custkey) FROM orders WHERE orderdate BETWEEN '1992-01-01' AND '1992-01-10'",
+                assertTableScan("orders_count_distinct"));
+        assertQuery(sessionStarTree,
+                "SELECT orderdate, count(distinct custkey) FROM orders_count_distinct WHERE orderdate BETWEEN date '1992-01-01' AND date '1992-01-10' GROUP BY orderdate ORDER BY orderdate",
+                "SELECT orderdate, count(distinct custkey) FROM orders WHERE orderdate BETWEEN '1992-01-01' AND '1992-01-10' GROUP BY orderdate ORDER BY orderdate",
+                assertTableScan("orders_count_distinct_cube"));
+        assertQuerySucceeds("DROP TABLE orders_count_distinct");
     }
 
     private Consumer<Plan> assertInTableScans(String tableName)

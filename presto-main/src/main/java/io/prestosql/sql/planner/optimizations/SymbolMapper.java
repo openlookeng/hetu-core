@@ -253,7 +253,8 @@ public class SymbolMapper
                 node.getId(),
                 source,
                 map(node.getRowCountSymbol()),
-                node.getMetadata());
+                node.getMetadata(),
+                node.getPredicateColumnsType());
     }
 
     private PartitioningScheme canonicalize(PartitioningScheme scheme, PlanNode source)

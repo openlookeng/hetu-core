@@ -108,12 +108,15 @@ import io.prestosql.utils.OptimizerUtils;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
@@ -486,9 +489,11 @@ public class LogicalPlanner
                 statisticsMetadata);
         Expression cubeWhere = analysis.getWhere((QuerySpecification) (insertCubeStatement.getQuery().getQueryBody()));
         Expression rewritten = null;
+        Set<Identifier> predicateColumns = new HashSet<>();
         if (cubeWhere != null) {
             rewritten = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session, namedSubPlan, uniqueIdAllocator)
                     .rewriteExpression(tableWriterPlan, cubeWhere, analysis, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator));
+            predicateColumns.addAll(ExpressionUtils.getIdentifiers(rewritten));
         }
         CubeMetadata cubeMetadata = insert.getMetadata();
         if (!insertCubeStatement.isOverwrite() && !insertCubeStatement.getWhere().isPresent() && cubeMetadata.getCubeStatus() != CubeStatus.INACTIVE) {
@@ -503,6 +508,9 @@ public class LogicalPlanner
         //so insert into cube should be allowed
         LongSupplier tableLastModifiedTimeSupplier = metadata.getTableLastModifiedTimeSupplier(session, sourceTableHandle);
         checkState(tableLastModifiedTimeSupplier != null, "Table last modified time is null");
+        Map<Symbol, Type> predicateColumnsType = predicateColumns.stream()
+                .map(identifier -> new Symbol(identifier.getValue()))
+                .collect(Collectors.toMap(Function.identity(), symbol -> planSymbolAllocator.getTypes().get(symbol), (key1, ignored) -> key1));
         CubeFinishNode cubeFinishNode = new CubeFinishNode(
                 idAllocator.getNextId(),
                 tableWriterPlan.getRoot(),
@@ -511,7 +519,8 @@ public class LogicalPlanner
                         tableMetadata.getQualifiedName().toString(),
                         tableLastModifiedTimeSupplier.getAsLong(),
                         cubeWhere != null ? ExpressionFormatter.formatExpression(rewritten, Optional.empty()) : null,
-                        insertCubeStatement.isOverwrite()));
+                        insertCubeStatement.isOverwrite()),
+                        predicateColumnsType);
         return new RelationPlan(cubeFinishNode, analysis.getScope(insertCubeStatement), cubeFinishNode.getOutputSymbols());
     }
 

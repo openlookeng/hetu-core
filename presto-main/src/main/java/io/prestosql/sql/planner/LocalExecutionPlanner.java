@@ -2888,6 +2888,8 @@ public class LocalExecutionPlanner
                     context.getNextOperatorId(),
                     node.getId(),
                     session,
+                    metadata,
+                    TypeProvider.viewOf(node.getPredicateColumnsType()),
                     cubeManager,
                     node.getMetadata());
             Map<Symbol, Integer> layout = ImmutableMap.of(node.getOutputSymbols().get(0), 0);
