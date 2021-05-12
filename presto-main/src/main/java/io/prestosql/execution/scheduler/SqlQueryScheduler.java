@@ -346,8 +346,9 @@ public class SqlQueryScheduler
                     }
                     for (SqlStageExecution stage : stages.values()) {
                         StageState stageState = stage.getState();
-                        // Snapshot: in case root stage finished but some stages didn't
-                        if (stageState != FINISHED) {
+                        // Snapshot: in case root stage finished but some stages didn't.
+                        // Child stage could be "canceled", if its "finished" signal is received after the parent stage.
+                        if (stageState != FINISHED && stageState != CANCELED) {
                             queryStateMachine.transitionToFailed(new PrestoException(GENERIC_INTERNAL_ERROR, format("Root stage has finished, but stage %s is in state %s", stage.getStageId(), stageState)));
                             return;
                         }
