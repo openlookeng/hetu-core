@@ -714,10 +714,18 @@ public class SqlQueryExecution
         // Only support create-table-as-select and insert statements
         Statement statement = analysis.getStatement();
         if (statement instanceof CreateTableAsSelect) {
-            // Ask catalog if new table supports snapshot
-            Map<String, Object> tableProperties = analysis.getCreateTableMetadata().getProperties();
-            if (!metadata.isSnapshotSupportedAsNewTable(session, analysis.getTarget().get().getCatalogName(), tableProperties)) {
-                reasons.add("Only support creating tables in Hive with ORC format");
+            if (analysis.isCreateTableAsSelectNoOp()) {
+                // Table already exists. Ask catalog if target table supports snapshot
+                if (!metadata.isSnapshotSupportedAsOutput(session, analysis.getCreateTableAsSelectNoOpTarget())) {
+                    reasons.add("Only support inserting into tables in Hive with ORC format");
+                }
+            }
+            else {
+                // Ask catalog if new table supports snapshot
+                Map<String, Object> tableProperties = analysis.getCreateTableMetadata().getProperties();
+                if (!metadata.isSnapshotSupportedAsNewTable(session, analysis.getTarget().get().getCatalogName(), tableProperties)) {
+                    reasons.add("Only support creating tables in Hive with ORC format");
+                }
             }
         }
         else if (statement instanceof Insert) {
