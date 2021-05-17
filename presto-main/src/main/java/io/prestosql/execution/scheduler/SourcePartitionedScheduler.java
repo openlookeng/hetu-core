@@ -115,13 +115,6 @@ public class SourcePartitionedScheduler
     private SettableFuture<?> whenFinishedOrNewLifespanAdded = SettableFuture.create();
     private int throttledSplitsCount;
 
-    // Snapshot: UNION statement can result in multiple table scan stages communicating with the same
-    // ExchangeOperator in their parent stage. This field indicates how many of them are there in parallel.
-    // MultiInputSnapshotState needs a correct taskCount from the Markers in order to store snapshots correctly,
-    // this field will help calculate the correct taskCount, taking the possibility of parallel sources into
-    // consideration.
-    private final int parallelSourceCount;
-
     private SourcePartitionedScheduler(
             SqlStageExecution stage,
             PlanNodeId partitionedNode,
@@ -130,8 +123,7 @@ public class SourcePartitionedScheduler
             int splitBatchSize,
             boolean groupedExecution,
             Session session,
-            HeuristicIndexerManager heuristicIndexerManager,
-            int parallelSourceCount)
+            HeuristicIndexerManager heuristicIndexerManager)
     {
         this.stage = requireNonNull(stage, "stage is null");
         this.partitionedNode = requireNonNull(partitionedNode, "partitionedNode is null");
@@ -144,7 +136,6 @@ public class SourcePartitionedScheduler
         this.splitBatchSize = splitBatchSize;
         this.groupedExecution = groupedExecution;
         this.throttledSplitsCount = 0;
-        this.parallelSourceCount = parallelSourceCount;
     }
 
     public PlanNodeId getPlanNodeId()
@@ -166,12 +157,10 @@ public class SourcePartitionedScheduler
             SplitPlacementPolicy splitPlacementPolicy,
             int splitBatchSize,
             Session session,
-            HeuristicIndexerManager heuristicIndexerManager,
-            Map<Integer, Integer> parallelSources)
+            HeuristicIndexerManager heuristicIndexerManager)
     {
         SourcePartitionedScheduler sourcePartitionedScheduler = new SourcePartitionedScheduler(stage, partitionedNode, splitSource,
-                splitPlacementPolicy, splitBatchSize, false, session, heuristicIndexerManager,
-                parallelSources == null ? 1 : parallelSources.getOrDefault(stage.getStageId().getId(), 1));
+                splitPlacementPolicy, splitBatchSize, false, session, heuristicIndexerManager);
         sourcePartitionedScheduler.startLifespan(Lifespan.taskWide(), NOT_PARTITIONED);
         sourcePartitionedScheduler.noMoreLifespans();
 
@@ -215,7 +204,7 @@ public class SourcePartitionedScheduler
             HeuristicIndexerManager heuristicIndexerManager)
     {
         return new SourcePartitionedScheduler(stage, partitionedNode, splitSource, splitPlacementPolicy,
-                splitBatchSize, groupedExecution, session, heuristicIndexerManager, 1);
+                splitBatchSize, groupedExecution, session, heuristicIndexerManager);
     }
 
     @Override
@@ -362,8 +351,6 @@ public class SourcePartitionedScheduler
                             splitAssignment.put(node, firstSplit);
                         }
                         MarkerSplit markerSplit = (MarkerSplit) firstSplit.getConnectorSplit();
-                        // Remember how many tasks will receive this marker
-                        markerSplit.setTaskCount(allNodes.size() * parallelSourceCount);
                         // If stage P (probe) has table-scan that depends on stage B (build), then splits for P are not scheduled
                         // until all splits for stage B are scheduled. This also causes the deadlock situation describe below
                         // (where finalizeTaskCreationIfNecessary() is called).

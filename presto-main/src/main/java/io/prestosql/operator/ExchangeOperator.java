@@ -237,7 +237,7 @@ public class ExchangeOperator
     }
 
     @Override
-    public Optional<Set<String>> getInputChannels(int expectedChannelCount)
+    public Optional<Set<String>> getInputChannels()
     {
         if (inputChannels.isPresent()) {
             return inputChannels;

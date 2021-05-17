@@ -654,7 +654,7 @@ public class ArbitraryOutputBuffer
     }
 
     @Override
-    public Optional<Set<String>> getInputChannels(int expectedChannelCount)
+    public Optional<Set<String>> getInputChannels()
     {
         return noMoreInputChannels ? Optional.of(Collections.unmodifiableSet(inputChannels)) : Optional.empty();
     }

@@ -35,31 +35,26 @@ public class MarkerSplit
     private final CatalogName catalogName;
     private final long snapshotId;
     private final boolean isResuming;
-    // When the source MarkerSplit is generated, the number of tasks already scheduled for the stage that handles spits from the same source.
-    // This helps determine if marker pages from all those tasks have been received by the ExchangeClient.
-    private int taskCount;
 
     public static MarkerSplit snapshotSplit(CatalogName catalogName, long snapshotId)
     {
-        return new MarkerSplit(catalogName, snapshotId, false, 0);
+        return new MarkerSplit(catalogName, snapshotId, false);
     }
 
     public static MarkerSplit resumeSplit(CatalogName catalogName, long snapshotId)
     {
-        return new MarkerSplit(catalogName, snapshotId, true, 0);
+        return new MarkerSplit(catalogName, snapshotId, true);
     }
 
     @JsonCreator
     public MarkerSplit(
             @JsonProperty("catalogName") CatalogName catalogName,
             @JsonProperty("snapshotId") long snapshotId,
-            @JsonProperty("isResuming") boolean isResuming,
-            @JsonProperty("taskCount") int taskCount)
+            @JsonProperty("isResuming") boolean isResuming)
     {
         this.catalogName = requireNonNull(catalogName, "catalogName is null");
         this.snapshotId = snapshotId;
         this.isResuming = isResuming;
-        this.taskCount = taskCount;
     }
 
     @Override
@@ -104,19 +99,8 @@ public class MarkerSplit
         return isResuming;
     }
 
-    public void setTaskCount(int taskCount)
-    {
-        this.taskCount = taskCount;
-    }
-
-    @JsonProperty("taskCount")
-    public int getTaskCount()
-    {
-        return taskCount;
-    }
-
     public MarkerPage toMarkerPage()
     {
-        return new MarkerPage(snapshotId, isResuming, taskCount);
+        return new MarkerPage(snapshotId, isResuming);
     }
 }

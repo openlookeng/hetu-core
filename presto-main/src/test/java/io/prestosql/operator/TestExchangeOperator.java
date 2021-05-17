@@ -171,11 +171,11 @@ public class TestExchangeOperator
 
         operator.noMoreSplits();
         operator.isBlocked().get();
-        Optional<Set<String>> channels = operator.getInputChannels(0);
+        Optional<Set<String>> channels = operator.getInputChannels();
         assertTrue(channels.isPresent());
         assertEquals(channels.get().size(), 2);
 
-        Optional<Set<String>> channels1 = operator.getInputChannels(0);
+        Optional<Set<String>> channels1 = operator.getInputChannels();
         assertTrue(channels == channels1);
 
         // read the pages

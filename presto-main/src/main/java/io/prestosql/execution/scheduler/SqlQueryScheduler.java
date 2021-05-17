@@ -174,8 +174,7 @@ public class SqlQueryScheduler
             DynamicFilterService dynamicFilterService,
             HeuristicIndexerManager heuristicIndexerManager,
             QuerySnapshotManager snapshotManager,
-            Map<StageId, Integer> stageTaskCounts,
-            Map<Integer, Integer> parallelSources)
+            Map<StageId, Integer> stageTaskCounts)
     {
         SqlQueryScheduler sqlQueryScheduler = new SqlQueryScheduler(
                 queryStateMachine,
@@ -197,8 +196,7 @@ public class SqlQueryScheduler
                 dynamicFilterService,
                 heuristicIndexerManager,
                 snapshotManager,
-                stageTaskCounts,
-                parallelSources);
+                stageTaskCounts);
         sqlQueryScheduler.initialize();
         return sqlQueryScheduler;
     }
@@ -223,8 +221,7 @@ public class SqlQueryScheduler
             DynamicFilterService dynamicFilterService,
             HeuristicIndexerManager heuristicIndexerManager,
             QuerySnapshotManager snapshotManager,
-            Map<StageId, Integer> stageTaskCounts,
-            Map<Integer, Integer> parallelSources)
+            Map<StageId, Integer> stageTaskCounts)
     {
         this.queryStateMachine = requireNonNull(queryStateMachine, "queryStateMachine is null");
         this.executionPolicy = requireNonNull(executionPolicy, "schedulerPolicyFactory is null");
@@ -267,8 +264,7 @@ public class SqlQueryScheduler
                 stageLinkages,
                 isSnapshotEnabled,
                 snapshotManager,
-                stageTaskCounts,
-                parallelSources);
+                stageTaskCounts);
 
         SqlStageExecution rootStage = stages.get(0);
         rootStage.setOutputBuffers(rootOutputBuffers);
@@ -431,8 +427,7 @@ public class SqlQueryScheduler
             ImmutableMap.Builder<StageId, StageLinkage> stageLinkages,
             boolean isSnapshotEnabled,
             QuerySnapshotManager snapshotManager,
-            Map<StageId, Integer> stageTaskCounts,
-            Map<Integer, Integer> parallelSources)
+            Map<StageId, Integer> stageTaskCounts)
     {
         ImmutableList.Builder<SqlStageExecution> stages = ImmutableList.builder();
 
@@ -476,7 +471,7 @@ public class SqlQueryScheduler
             checkArgument(!plan.getFragment().getStageExecutionDescriptor().isStageGroupedExecution());
 
             stageSchedulers.put(stageId, newSourcePartitionedSchedulerAsStageScheduler(stage, planNodeId, splitSource,
-                    placementPolicy, splitBatchSize, session, heuristicIndexerManager, parallelSources));
+                    placementPolicy, splitBatchSize, session, heuristicIndexerManager));
 
             bucketToPartition = Optional.of(new int[1]);
         }
@@ -598,8 +593,7 @@ public class SqlQueryScheduler
                     stageLinkages,
                     isSnapshotEnabled,
                     snapshotManager,
-                    stageTaskCounts,
-                    parallelSources);
+                    stageTaskCounts);
             stages.addAll(subTree);
 
             SqlStageExecution childStage = subTree.get(0);

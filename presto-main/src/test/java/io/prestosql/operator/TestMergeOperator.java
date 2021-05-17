@@ -383,26 +383,24 @@ public class TestMergeOperator
         MergeOperator operator = createMergeOperator(types, ImmutableList.of(0), ImmutableList.of(0), ImmutableList.of(ASC_NULLS_FIRST));
 
         // Not enough channels are known
-        assertFalse(operator.getInputChannels(1).isPresent());
+        assertFalse(operator.getInputChannels().isPresent());
 
         operator.addSplit(createRemoteSplit(TASK_1_ID));
         // Not all channels are known
-        assertFalse(operator.getInputChannels(0).isPresent());
+        assertFalse(operator.getInputChannels().isPresent());
         // Not enough channels are known
-        assertFalse(operator.getInputChannels(2).isPresent());
+        assertFalse(operator.getInputChannels().isPresent());
 
         operator.addSplit(createRemoteSplit(TASK_2_ID));
         // Not all channels are known
-        assertFalse(operator.getInputChannels(0).isPresent());
-        // At least expected channels are known
-        assertTrue(operator.getInputChannels(2).isPresent());
+        assertFalse(operator.getInputChannels().isPresent());
 
         operator.noMoreSplits();
-        Optional<Set<String>> channels = operator.getInputChannels(0);
+        Optional<Set<String>> channels = operator.getInputChannels();
         assertTrue(channels.isPresent());
         assertEquals(channels.get().size(), 2);
 
-        Optional<Set<String>> channels1 = operator.getInputChannels(0);
+        Optional<Set<String>> channels1 = operator.getInputChannels();
         assertTrue(channels == channels1);
     }
 }

@@ -358,12 +358,7 @@ public class MultiInputSnapshotState
             LOG.error(message);
         }
 
-        inputChannels = restorable.getInputChannels(marker.getTaskCount());
-        // Only need to use the channel count when the marker is received for the first time,
-        // which corresponds to Merge or Exchange operator receiving from a table-scan stage.
-        // For all other cases, either the channel count is known (local exchange/merge), or
-        // no-more-splits can be used to determine if all remote channels are known.
-        marker.setTaskCount(0);
+        inputChannels = restorable.getInputChannels();
         if (inputChannels.isPresent()) {
             checkState(inputChannels.get().containsAll(snapshot.markedChannels));
             if (inputChannels.get().size() == snapshot.markedChannels.size()) {
@@ -407,12 +402,7 @@ public class MultiInputSnapshotState
             return true;
         }
 
-        inputChannels = restorable.getInputChannels(marker.getTaskCount());
-        // Only need to use the channel count when the marker is received for the first time,
-        // which corresponds to Merge or Exchange operator receiving from a table-scan stage.
-        // For all other cases, either the channel count is known (local exchange/merge), or
-        // no-more-splits can be used to determine if all remote channels are known.
-        marker.setTaskCount(0);
+        inputChannels = restorable.getInputChannels();
         if (inputChannels.isPresent()) {
             checkState(inputChannels.get().containsAll(snapshot.markedChannels));
             if (inputChannels.get().size() == snapshot.markedChannels.size()) {
