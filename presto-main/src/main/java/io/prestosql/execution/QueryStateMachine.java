@@ -106,6 +106,7 @@ public class QueryStateMachine
     private final URI self;
     private final ResourceGroupId resourceGroup;
     private final ResourceGroupManager resourceGroupManager;
+    private boolean throttlingEnabled;
     private final TransactionManager transactionManager;
     private final Metadata metadata;
     private final QueryOutputManager outputManager;
@@ -178,6 +179,8 @@ public class QueryStateMachine
         this.self = requireNonNull(self, "self is null");
         this.resourceGroup = requireNonNull(resourceGroup, "resourceGroup is null");
         this.resourceGroupManager = resourceGroupManager;
+        this.throttlingEnabled = resourceGroupManager.isGroupRegistered(resourceGroup)
+                                    && resourceGroupManager.getSoftReservedMemory(resourceGroup) != Long.MAX_VALUE;
         this.transactionManager = requireNonNull(transactionManager, "transactionManager is null");
         this.queryStateTimer = new QueryStateTimer(ticker);
         this.metadata = requireNonNull(metadata, "metadata is null");
@@ -273,6 +276,11 @@ public class QueryStateMachine
     public ResourceGroupManager getResourceGroupManager()
     {
         return resourceGroupManager;
+    }
+
+    public boolean isThrottlingEnabled()
+    {
+        return throttlingEnabled;
     }
 
     public Session getSession()
@@ -562,6 +570,8 @@ public class QueryStateMachine
                 queryStateTimer.getAnalysisTime(),
                 queryStateTimer.getDistributedPlanningTime(),
                 queryStateTimer.getPlanningTime(),
+                queryStateTimer.getLogicalPlanningTime(),
+                queryStateTimer.getSyntaxAnalysisTime(),
                 queryStateTimer.getFinishingTime(),
 
                 totalTasks,
@@ -968,6 +978,16 @@ public class QueryStateMachine
         queryStateTimer.recordHeartbeat();
     }
 
+    public void beginSyntaxAnalysis()
+    {
+        queryStateTimer.beginSyntaxAnalysis();
+    }
+
+    public void endSyntaxAnalysis()
+    {
+        queryStateTimer.endSyntaxAnalysis();
+    }
+
     public void beginAnalysis()
     {
         queryStateTimer.beginAnalyzing();
@@ -976,6 +996,16 @@ public class QueryStateMachine
     public void endAnalysis()
     {
         queryStateTimer.endAnalysis();
+    }
+
+    public void beginLogicalPlan()
+    {
+        queryStateTimer.beginLogicalPlan();
+    }
+
+    public void endLogicalPlan()
+    {
+        queryStateTimer.endLogicalPlan();
     }
 
     public void beginDistributedPlanning()
@@ -1127,6 +1157,8 @@ public class QueryStateMachine
                 queryStats.getAnalysisTime(),
                 queryStats.getDistributedPlanningTime(),
                 queryStats.getTotalPlanningTime(),
+                queryStats.getTotalLogicalPlanningTime(),
+                queryStats.getTotalSyntaxAnalysisTime(),
                 queryStats.getFinishingTime(),
                 queryStats.getTotalTasks(),
                 queryStats.getRunningTasks(),

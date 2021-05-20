@@ -329,18 +329,18 @@ public class CachedConnectorMetadata
 
     @Override
     public TableStatistics getTableStatistics(ConnectorSession session, ConnectorTableHandle tableHandle,
-            Constraint constraint)
+            Constraint constraint, boolean includeColumnStatistics)
     {
         Optional<MetadataCache> cacheOpt = getOrCreateCache(session);
 
         if (!cacheOpt.isPresent()) {
-            return logAndDelegate("getTableStatistics", () -> delegate.getTableStatistics(session, tableHandle, constraint));
+            return logAndDelegate("getTableStatistics", () -> delegate.getTableStatistics(session, tableHandle, constraint, includeColumnStatistics));
         }
 
         try {
             return cacheOpt.get().getTableStatistics().get(tableHandle.getSchemaPrefixedTableName(), () -> {
                 TableStatistics tableStatistics =
-                        logAndDelegate("getTableStatistics", () -> delegate.getTableStatistics(session, tableHandle, constraint));
+                        logAndDelegate("getTableStatistics", () -> delegate.getTableStatistics(session, tableHandle, constraint, includeColumnStatistics));
 
                 if (tableStatistics == null) {
                     throw new Exception();
@@ -350,7 +350,7 @@ public class CachedConnectorMetadata
             });
         }
         catch (Exception e) {
-            return logAndDelegate("getTableStatistics", () -> delegate.getTableStatistics(session, tableHandle, constraint));
+            return logAndDelegate("getTableStatistics", () -> delegate.getTableStatistics(session, tableHandle, constraint, includeColumnStatistics));
         }
     }
 

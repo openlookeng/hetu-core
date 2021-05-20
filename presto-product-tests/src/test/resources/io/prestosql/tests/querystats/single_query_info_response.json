@@ -34,6 +34,8 @@
     "analysisTime": "7.47ms",
     "distributedPlanningTime": "311.77us",
     "totalPlanningTime": "9.99ms",
+    "totalLogicalPlanningTime": "3.33ms",
+    "totalSyntaxAnalysisTime": "1.11ms",
     "finishingTime": "17.00ms",
     "totalTasks": 1,
     "runningTasks": 0,

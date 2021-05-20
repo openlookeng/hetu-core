@@ -308,7 +308,7 @@ public class RemoveUnsupportedDynamicFilters
                     return true;
                 }
 
-                Estimate totalRowCount = metadata.getTableStatistics(session, ((TableScanNode) buildSideTableScanNode.get()).getTable(), Constraint.alwaysTrue()).getRowCount();
+                Estimate totalRowCount = metadata.getTableStatistics(session, ((TableScanNode) buildSideTableScanNode.get()).getTable(), Constraint.alwaysTrue(), true).getRowCount();
                 PlanNodeStatsEstimate filteredStats = statsProvider.getStats(node);
 
                 if (!filteredStats.isOutputRowCountUnknown() && !totalRowCount.isUnknown()) {
@@ -328,7 +328,7 @@ public class RemoveUnsupportedDynamicFilters
 
         private boolean highSelectivity(FilterNode node)
         {
-            Estimate totalRowCount = metadata.getTableStatistics(session, ((TableScanNode) node.getSource()).getTable(), Constraint.alwaysTrue()).getRowCount();
+            Estimate totalRowCount = metadata.getTableStatistics(session, ((TableScanNode) node.getSource()).getTable(), Constraint.alwaysTrue(), true).getRowCount();
             PlanNodeStatsEstimate filteredStats = statsProvider.getStats(node);
 
             if (!filteredStats.isOutputRowCountUnknown() && !totalRowCount.isUnknown()) {

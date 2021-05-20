@@ -394,4 +394,16 @@ public final class InternalResourceGroupManager<C>
     {
         return groups.get(resourceGroupId).getCachedMemoryUsageBytes();
     }
+
+    @Override
+    public long getSoftReservedMemory(ResourceGroupId resourceGroupId)
+    {
+        return groups.get(resourceGroupId).getSoftReservedMemory().toBytes();
+    }
+
+    @Override
+    public boolean isGroupRegistered(ResourceGroupId resourceGroupId)
+    {
+        return groups.containsKey(resourceGroupId);
+    }
 }

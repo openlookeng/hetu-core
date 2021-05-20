@@ -720,7 +720,7 @@ public class SqlQueryScheduler
     private boolean canScheduleMoreSplits()
     {
         long cachedMemoryUsage = queryStateMachine.getResourceGroupManager().getCachedMemoryUsage(queryStateMachine.getResourceGroup());
-        long softReservedMemory = queryStateMachine.getResourceGroupManager().getResourceGroupInfo(queryStateMachine.getResourceGroup()).getSoftReservedMemory().toBytes();
+        long softReservedMemory = queryStateMachine.getResourceGroupManager().getSoftReservedMemory(queryStateMachine.getResourceGroup());
         if (cachedMemoryUsage < softReservedMemory) {
             return true;
         }
@@ -747,7 +747,7 @@ public class SqlQueryScheduler
                     // configured limit. If yes throttle further split scheduling.
                     // Throttle Logic: Wait for x seconds (Wait time will increase till max as per THROTTLE_SLEEP_TIMER)
                     // and then let it schedule 10% of splits.
-                    if (!canScheduleMoreSplits()) {
+                    if (queryStateMachine.isThrottlingEnabled() && !canScheduleMoreSplits()) {
                         try {
                             SECONDS.sleep(THROTTLE_SLEEP_TIMER[currentTimerLevel]);
                         }

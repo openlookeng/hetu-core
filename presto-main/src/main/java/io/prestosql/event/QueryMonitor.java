@@ -402,6 +402,10 @@ public class QueryMonitor
 
             // planning duration -- start to end of planning
             long planning = queryStats.getTotalPlanningTime().toMillis();
+            long logicalPlanning = queryStats.getTotalLogicalPlanningTime().toMillis();
+            long distributedPlanning = queryStats.getDistributedPlanningTime().toMillis();
+            long physicalPlanning = queryStats.getAnalysisTime().toMillis() - logicalPlanning;
+            long syntaxAnalysisTime = queryStats.getTotalSyntaxAnalysisTime().toMillis();
 
             // Time spent waiting for required no. of worker nodes to be present
             long waiting = queryStats.getResourceWaitingTime().toMillis();
@@ -446,7 +450,11 @@ public class QueryMonitor
                     queryInfo.getQueryId(),
                     queryInfo.getSession().getTransactionId().map(TransactionId::toString).orElse(""),
                     elapsed,
+                    syntaxAnalysisTime,
                     planning,
+                    logicalPlanning,
+                    physicalPlanning,
+                    distributedPlanning,
                     waiting,
                     scheduling,
                     running,
@@ -475,7 +483,11 @@ public class QueryMonitor
                 queryInfo.getQueryId(),
                 queryInfo.getSession().getTransactionId().map(TransactionId::toString).orElse(""),
                 elapsed,
+                0,
                 elapsed,
+                0,
+                0,
+                0,
                 0,
                 0,
                 0,
@@ -488,7 +500,11 @@ public class QueryMonitor
             QueryId queryId,
             String transactionId,
             long elapsedMillis,
+            long syntaxAnalysisTime,
             long planningMillis,
+            long logicalPlanningMillis,
+            long physicalPlanningMillis,
+            long distributedPlanningMillis,
             long waitingMillis,
             long schedulingMillis,
             long runningMillis,
@@ -496,13 +512,17 @@ public class QueryMonitor
             DateTime queryStartTime,
             DateTime queryEndTime)
     {
-        log.info("TIMELINE: Query %s :: Transaction:[%s] :: elapsed %sms :: planning %sms :: waiting %sms :: scheduling %sms :: running %sms :: finishing %sms :: begin %s :: end %s",
+        log.info("TIMELINE: Query %s :: Transaction:[%s] :: elapsed %sms :: syntaxAnalysisTime %sms :: planning %sms :: logicalPlanningMillis %sms :: physicalPlanningMillis %sms :: distributionPlanTime %sms :: waiting %sms :: scheduling %sms :: running %sms :: finishing %sms :: begin %s :: end %s",
                 queryId,
                 transactionId,
                 elapsedMillis,
+                syntaxAnalysisTime,
                 planningMillis,
-                waitingMillis,
-                schedulingMillis,
+                logicalPlanningMillis,
+                physicalPlanningMillis,
+                distributedPlanningMillis,
+                (waitingMillis - syntaxAnalysisTime) < 0 ? 0 : waitingMillis - syntaxAnalysisTime,
+                schedulingMillis - waitingMillis,
                 runningMillis,
                 finishingMillis,
                 queryStartTime,

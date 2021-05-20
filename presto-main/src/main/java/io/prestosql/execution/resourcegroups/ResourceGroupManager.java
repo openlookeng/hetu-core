@@ -49,4 +49,14 @@ public interface ResourceGroupManager<C>
     {
         return 0;
     }
+
+    default long getSoftReservedMemory(ResourceGroupId resourceGroupId)
+    {
+        return Long.MAX_VALUE;
+    }
+
+    default boolean isGroupRegistered(ResourceGroupId resourceGroupId)
+    {
+        return false;
+    }
 }

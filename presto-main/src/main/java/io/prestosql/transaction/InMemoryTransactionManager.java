@@ -197,17 +197,19 @@ public class InMemoryTransactionManager
     }
 
     @Override
-    public synchronized TransactionId beginTransaction(IsolationLevel isolationLevel, boolean readOnly, boolean autoCommitContext)
+    public TransactionId beginTransaction(IsolationLevel isolationLevel, boolean readOnly, boolean autoCommitContext)
     {
         TransactionId transactionId = TransactionId.create();
         BoundedExecutor executor = new BoundedExecutor(finishingExecutor, maxFinishingConcurrency);
         TransactionMetadata transactionMetadata = new TransactionMetadata(transactionId, isolationLevel, readOnly, autoCommitContext, catalogManager, executor, functionNamespaceManagers);
-        checkState(transactions.put(transactionId, transactionMetadata) == null, "Duplicate transaction ID: %s", transactionId);
-        //add transactionId to state store
-        if (stateStoreProvider != null && stateStoreProvider.getStateStore() != null) {
-            StateMap stateMap = (StateMap<String, String>) stateStoreProvider.getStateStore().getStateCollection(StateStoreConstants.TRANSACTION_STATE_COLLECTION_NAME);
-            if (stateMap != null) {
-                stateMap.put(transactionId.toString(), transactionId.toString());
+        synchronized (this) {
+            checkState(transactions.put(transactionId, transactionMetadata) == null, "Duplicate transaction ID: %s", transactionId);
+            //add transactionId to state store
+            if (stateStoreProvider != null && stateStoreProvider.getStateStore() != null) {
+                StateMap stateMap = (StateMap<String, String>) stateStoreProvider.getStateStore().getStateCollection(StateStoreConstants.TRANSACTION_STATE_COLLECTION_NAME);
+                if (stateMap != null) {
+                    stateMap.put(transactionId.toString(), transactionId.toString());
+                }
             }
         }
         return transactionId;
@@ -305,15 +307,17 @@ public class InMemoryTransactionManager
         tryGetTransactionMetadata(transactionId).ifPresent(TransactionMetadata::setInactive);
     }
 
-    private synchronized TransactionMetadata getTransactionMetadata(TransactionId transactionId)
+    private TransactionMetadata getTransactionMetadata(TransactionId transactionId)
     {
         TransactionMetadata transactionMetadata = transactions.get(transactionId);
         if (transactionMetadata == null) {
             // For HA use case
             if (stateStoreProvider != null && stateStoreProvider.getStateStore() != null) {
-                StateMap stateMap = (StateMap<String, String>) stateStoreProvider.getStateStore().getStateCollection(StateStoreConstants.TRANSACTION_STATE_COLLECTION_NAME);
-                if (stateMap != null && stateMap.get(transactionId.toString()) != null) {
-                    throw new NotInLocalTransactionException(transactionId);
+                synchronized (this) {
+                    StateMap stateMap = (StateMap<String, String>) stateStoreProvider.getStateStore().getStateCollection(StateStoreConstants.TRANSACTION_STATE_COLLECTION_NAME);
+                    if (stateMap != null && stateMap.get(transactionId.toString()) != null) {
+                        throw new NotInLocalTransactionException(transactionId);
+                    }
                 }
             }
             throw new NotInTransactionException(transactionId);

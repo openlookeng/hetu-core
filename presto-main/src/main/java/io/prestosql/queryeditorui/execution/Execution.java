@@ -332,6 +332,8 @@ public class Execution
                 zeroDuration,
                 zeroDuration,
                 zeroDuration,
+                zeroDuration,
+                zeroDuration,
                 0,
                 0,
                 0,

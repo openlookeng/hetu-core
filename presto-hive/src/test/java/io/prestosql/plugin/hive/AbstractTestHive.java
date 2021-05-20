@@ -1302,7 +1302,7 @@ public abstract class AbstractTestHive
             ConnectorMetadata metadata = transaction.getMetadata();
             ConnectorSession session = newSession();
             ConnectorTableHandle tableHandle = getTableHandle(metadata, tableName);
-            TableStatistics tableStatistics = metadata.getTableStatistics(session, tableHandle, Constraint.alwaysTrue());
+            TableStatistics tableStatistics = metadata.getTableStatistics(session, tableHandle, Constraint.alwaysTrue(), true);
 
             assertFalse(tableStatistics.getRowCount().isUnknown(), "row count is unknown");
 
@@ -3075,8 +3075,8 @@ public abstract class AbstractTestHive
                 ConnectorMetadata metadata = transaction.getMetadata();
 
                 ConnectorTableHandle tableHandle = metadata.getTableHandle(session, tableName);
-                TableStatistics unsampledStatistics = metadata.getTableStatistics(sampleSize(2), tableHandle, Constraint.alwaysTrue());
-                TableStatistics sampledStatistics = metadata.getTableStatistics(sampleSize(1), tableHandle, Constraint.alwaysTrue());
+                TableStatistics unsampledStatistics = metadata.getTableStatistics(sampleSize(2), tableHandle, Constraint.alwaysTrue(), true);
+                TableStatistics sampledStatistics = metadata.getTableStatistics(sampleSize(1), tableHandle, Constraint.alwaysTrue(), true);
                 assertEquals(sampledStatistics, unsampledStatistics);
             }
         }
@@ -3923,9 +3923,10 @@ public abstract class AbstractTestHive
 
     private static HiveBasicStatistics getBasicStatisticsForPartition(ConnectorSession session, Transaction transaction, SchemaTableName table, String partitionName)
     {
+        HiveIdentity identity = new HiveIdentity(session);
         return transaction
                 .getMetastore(table.getSchemaName())
-                .getPartitionStatistics(new HiveIdentity(session), table.getSchemaName(), table.getTableName(), ImmutableSet.of(partitionName))
+                .getPartitionStatistics(identity, table.getSchemaName(), table.getTableName(), ImmutableSet.of(partitionName), transaction.getMetastore(table.getSchemaName()).getTable(identity, table.getSchemaName(), table.getTableName()))
                 .get(partitionName)
                 .getBasicStatistics();
     }

@@ -224,7 +224,7 @@ public interface ConnectorMetadata
     /**
      * Get statistics for table for given filtering constraint.
      */
-    default TableStatistics getTableStatistics(ConnectorSession session, ConnectorTableHandle tableHandle, Constraint constraint)
+    default TableStatistics getTableStatistics(ConnectorSession session, ConnectorTableHandle tableHandle, Constraint constraint, boolean includeColumnStatistics)
     {
         return TableStatistics.empty();
     }

@@ -213,9 +213,14 @@ public class CachedSqlQueryExecution
                 cachedPlan.getStatement().equals(statement) && session.getTransactionId().isPresent() && cachedPlan.getIdentity().getUser().equals(session.getIdentity().getUser())) { // TODO: traverse the statement and accept partial match
             root = plan.getRoot();
             try {
-                if (!cachedPlan.getTableStatistics().equals(tableStatistics)) {
-                    // TableStatistics have changed, therefore the cached plan may no longer be applicable
-                    throw new NoSuchElementException();
+                if (!isEqualBasicStatistics(cachedPlan.getTableStatistics(), tableStatistics, tableNames)) {
+                    for (TableHandle tableHandle : analysis.getTables()) {
+                        tableStatistics.replace(tableHandle.getFullyQualifiedName(), metadata.getTableStatistics(session, tableHandle, Constraint.alwaysTrue(), true));
+                    }
+                    if (!cachedPlan.getTableStatistics().equals(tableStatistics)) {
+                        // TableStatistics have changed, therefore the cached plan may no longer be applicable
+                        throw new NoSuchElementException();
+                    }
                 }
                 // TableScanNode may contain the old transaction id.
                 // The following logic rewrites the logical plan by replacing the TableScanNode with a new TableScanNode which
@@ -233,6 +238,9 @@ public class CachedSqlQueryExecution
         }
         else {
             // Build a new plan
+            for (TableHandle tableHandle : analysis.getTables()) {
+                tableStatistics.replace(tableHandle.getFullyQualifiedName(), metadata.getTableStatistics(session, tableHandle, Constraint.alwaysTrue(), true));
+            }
             plan = createAndCachePlan(key, logicalPlanner, statement, tableNames, tableStatistics, optimizers, analysis, columnTypes, systemSessionProperties);
             root = plan.getRoot();
         }
@@ -278,7 +286,8 @@ public class CachedSqlQueryExecution
             try {
                 if (metadata.isExecutionPlanCacheSupported(session, tableHandle)) {
                     tables.add(tableHandle.getFullyQualifiedName());
-                    tableStatistics.put(tableHandle.getFullyQualifiedName(), metadata.getTableStatistics(session, tableHandle, Constraint.alwaysTrue())); // TODO: Find a way to get constraints instead of reading all table statistics
+                    // includeColumnStatistics is passed as false, so that calculation of columnStatistics are skipped
+                    tableStatistics.put(tableHandle.getFullyQualifiedName(), metadata.getTableStatistics(session, tableHandle, Constraint.alwaysTrue(), false)); // TODO: Find a way to get constraints instead of reading all table statistics
 
                     Map<String, ColumnHandle> columnHandles = metadata.getColumnHandles(session, tableHandle);
                     for (ColumnHandle columnHandle : columnHandles.values()) {
@@ -292,6 +301,22 @@ public class CachedSqlQueryExecution
             }
             catch (PrestoException e) {
                 // TableStatistics constraint -- cannot query more than 1000 hive partitions
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean isEqualBasicStatistics(Map<String, TableStatistics> cacheTableStatistics, Map<String, TableStatistics> tableStatistics, List<String> tableNames)
+    {
+        for (String tableName : tableNames) {
+            TableStatistics cacheTableStatisticsTemp = cacheTableStatistics.get(tableName);
+            TableStatistics tableStatisticsTemp = tableStatistics.get(tableName);
+            if (cacheTableStatisticsTemp == null ||
+                    tableStatisticsTemp == null ||
+                    cacheTableStatisticsTemp.getFileCount() != tableStatisticsTemp.getFileCount() ||
+                    !cacheTableStatisticsTemp.getRowCount().equals(tableStatisticsTemp.getRowCount()) ||
+                    cacheTableStatisticsTemp.getOnDiskDataSizeInBytes() != tableStatisticsTemp.getOnDiskDataSizeInBytes()) {
                 return false;
             }
         }
