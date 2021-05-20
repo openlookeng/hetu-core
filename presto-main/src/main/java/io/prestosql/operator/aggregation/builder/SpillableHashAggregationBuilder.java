@@ -26,6 +26,8 @@ import io.prestosql.operator.WorkProcessor;
 import io.prestosql.operator.aggregation.AccumulatorFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.Spiller;
@@ -33,6 +35,7 @@ import io.prestosql.spiller.SpillerFactory;
 import io.prestosql.sql.gen.JoinCompiler;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,10 +47,13 @@ import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static io.prestosql.operator.Operator.NOT_BLOCKED;
 import static java.lang.Math.max;
 
-//TODO-cp-I39B76 should be covered in supporting spill, unsupported for now
-@RestorableConfig(unsupported = true)
+// - merger: this variable is used after created from either captured fields or final fields, so no need to capture.
+// - mergeHashSort: this variable is used after created from operatorContext. amd operatorContext is captured, so no need to capture.
+// - spillInProgress: must be "done" when markers are received.
+@RestorableConfig(uncapturedFields = {"spillerFactory", "accumulatorFactories", "groupByTypes", "groupByChannels",
+        "hashChannel", "merger", "mergeHashSort", "spillInProgress", "joinCompiler"})
 public class SpillableHashAggregationBuilder
-        implements AggregationBuilder
+        implements AggregationBuilder, Restorable
 {
     private InMemoryHashAggregationBuilder hashAggregationBuilder;
     private final SpillerFactory spillerFactory;
@@ -274,7 +280,6 @@ public class SpillableHashAggregationBuilder
         WorkProcessor<Page> mergedSpilledPages = mergeHashSort.get().merge(
                 groupByTypes,
                 hashAggregationBuilder.buildIntermediateTypes(),
-                //TODO-cp-I39B76 need snapshot support for the iterator?
                 ImmutableList.<WorkProcessor<Page>>builder()
                         .addAll(spiller.get().getSpills().stream()
                                 .map(WorkProcessor::fromIterator)
@@ -295,7 +300,6 @@ public class SpillableHashAggregationBuilder
         WorkProcessor<Page> mergedSpilledPages = mergeHashSort.get().merge(
                 groupByTypes,
                 hashAggregationBuilder.buildIntermediateTypes(),
-                //TODO-cp-I39B76 need snapshot support for the iterator?
                 spiller.get().getSpills().stream()
                         .map(WorkProcessor::fromIterator)
                         .collect(toImmutableList()),
@@ -346,5 +350,63 @@ public class SpillableHashAggregationBuilder
                     return true;
                 });
         emptyHashAggregationBuilderSize = hashAggregationBuilder.getSizeInMemory();
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        SpillableHashAggregationBuilderState myState = new SpillableHashAggregationBuilderState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+
+        myState.hashAggregationBuilder = hashAggregationBuilder.capture(serdeProvider);
+        myState.localUserMemoryContext = localUserMemoryContext.getBytes();
+        myState.localRevocableMemoryContext = localRevocableMemoryContext.getBytes();
+        myState.emptyHashAggregationBuilderSize = emptyHashAggregationBuilderSize;
+        myState.hashCollisions = hashCollisions;
+        myState.expectedHashCollisions = expectedHashCollisions;
+        myState.producingOutput = producingOutput;
+
+        if (spiller.isPresent()) {
+            myState.spiller = spiller.get().capture(serdeProvider);
+        }
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        SpillableHashAggregationBuilderState myState = (SpillableHashAggregationBuilderState) state;
+        operatorContext.restore(myState.operatorContext, serdeProvider);
+        hashAggregationBuilder.restore(myState.hashAggregationBuilder, serdeProvider);
+        emptyHashAggregationBuilderSize = myState.emptyHashAggregationBuilderSize;
+        hashCollisions = myState.hashCollisions;
+        expectedHashCollisions = myState.expectedHashCollisions;
+        producingOutput = myState.producingOutput;
+        localRevocableMemoryContext.setBytes(myState.localRevocableMemoryContext);
+        localUserMemoryContext.setBytes(myState.localUserMemoryContext);
+
+        if (myState.spiller != null) {
+            if (!spiller.isPresent()) {
+                spiller = Optional.of(spillerFactory.create(
+                        hashAggregationBuilder.buildTypes(),
+                        operatorContext.getSpillContext(),
+                        operatorContext.newAggregateSystemMemoryContext()));
+            }
+            this.spiller.get().restore(myState.spiller, serdeProvider);
+        }
+    }
+
+    private static class SpillableHashAggregationBuilderState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private Object hashAggregationBuilder;
+        private long localRevocableMemoryContext;
+        private long localUserMemoryContext;
+        private long emptyHashAggregationBuilderSize;
+        private long hashCollisions;
+        private double expectedHashCollisions;
+        private boolean producingOutput;
+        private Object spiller;
     }
 }

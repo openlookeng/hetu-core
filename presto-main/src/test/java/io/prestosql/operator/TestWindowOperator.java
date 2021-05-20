@@ -14,11 +14,16 @@
 package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.Files;
 import com.google.common.primitives.Ints;
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
+import io.hetu.core.filesystem.HetuLocalFileSystemClient;
+import io.hetu.core.filesystem.LocalConfig;
 import io.prestosql.ExceededMemoryLimitException;
 import io.prestosql.Session;
+import io.prestosql.filesystem.FileSystemClientManager;
+import io.prestosql.metadata.InMemoryNodeManager;
 import io.prestosql.operator.WindowOperator.WindowOperatorFactory;
 import io.prestosql.operator.window.FirstValueFunction;
 import io.prestosql.operator.window.FrameInfo;
@@ -28,30 +33,43 @@ import io.prestosql.operator.window.LeadFunction;
 import io.prestosql.operator.window.NthValueFunction;
 import io.prestosql.operator.window.ReflectionWindowFunctionSupplier;
 import io.prestosql.operator.window.RowNumberFunction;
+import io.prestosql.snapshot.SnapshotConfig;
 import io.prestosql.snapshot.SnapshotUtils;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spiller.FileSingleStreamSpillerFactory;
+import io.prestosql.spiller.GenericSpillerFactory;
 import io.prestosql.spiller.SpillerFactory;
+import io.prestosql.spiller.SpillerStats;
 import io.prestosql.sql.gen.OrderingCompiler;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.TestingTaskContext;
+import io.prestosql.testing.assertions.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.testing.Assertions.assertGreaterThan;
 import static io.airlift.units.DataSize.succinctBytes;
 import static io.prestosql.RowPagesBuilder.rowPagesBuilder;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
+import static io.prestosql.SessionTestUtils.TEST_SNAPSHOT_SESSION;
+import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.operator.OperatorAssertion.assertOperatorEquals;
 import static io.prestosql.operator.OperatorAssertion.assertOperatorEqualsIgnoreOrder;
 import static io.prestosql.operator.OperatorAssertion.assertOperatorEqualsIgnoreOrderWithRestoreToNewOperator;
@@ -73,6 +91,9 @@ import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static java.lang.String.format;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -102,7 +123,7 @@ public class TestWindowOperator
     private ExecutorService executor;
     private ScheduledExecutorService scheduledExecutor;
     private DummySpillerFactory spillerFactory;
-    private final SnapshotUtils snapshotUtils = NOOP_SNAPSHOT_UTILS;
+    private SnapshotUtils snapshotUtils = NOOP_SNAPSHOT_UTILS;
 
     @BeforeMethod
     public void setUp()
@@ -1141,5 +1162,249 @@ public class TestWindowOperator
                 .build()
                 .addPipelineContext(0, true, true, false)
                 .addDriverContext();
+    }
+
+    private static GenericSpillerFactory createGenericSpillerFactory(Path spillPath)
+    {
+        FileSingleStreamSpillerFactory streamSpillerFactory = new FileSingleStreamSpillerFactory(
+                listeningDecorator(newCachedThreadPool()),
+                createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(),
+                new SpillerStats(),
+                ImmutableList.of(spillPath),
+                1.0, false, false);
+        return new GenericSpillerFactory(streamSpillerFactory);
+    }
+
+    @Test
+    public void testCaptureRestoreWithSpill()
+            throws Exception
+    {
+        // Initialization
+        Path spillPath = Files.createTempDir().toPath();
+        GenericSpillerFactory spillerFactory = createGenericSpillerFactory(spillPath);
+        FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
+        when(fileSystemClientManager.getFileSystemClient(any(Path.class))).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/tmp/hetu/snapshot/")));
+        SnapshotConfig snapshotConfig = new SnapshotConfig();
+        snapshotUtils = new SnapshotUtils(fileSystemClientManager, snapshotConfig, new InMemoryNodeManager());
+        snapshotUtils.initialize();
+        ImmutableList.Builder<Page> outputPages = ImmutableList.builder();
+
+        List<Page> input1 = rowPagesBuilder(VARCHAR, BIGINT, DOUBLE, BOOLEAN)
+                .row("b", -1L, -0.1, true)
+                .row("a", 2L, 0.3, false)
+                .row("a", 4L, 0.2, true)
+                .pageBreak()
+                .row("b", 5L, 0.4, false)
+                .row("a", 6L, 0.1, true)
+                .build();
+
+        List<Page> input2 = rowPagesBuilder(VARCHAR, BIGINT, DOUBLE, BOOLEAN)
+                .row("c", -1L, -0.1, true)
+                .row("d", 2L, 0.3, false)
+                .row("c", 4L, 0.2, true)
+                .pageBreak()
+                .row("d", 5L, 0.4, false)
+                .build();
+
+        WindowOperatorFactory operatorFactory = new WindowOperatorFactory(
+                0,
+                new PlanNodeId("test"),
+                ImmutableList.of(VARCHAR, BIGINT, DOUBLE, BOOLEAN),
+                Ints.asList(0, 1, 2, 3),
+                ROW_NUMBER,
+                Ints.asList(0),
+                ImmutableList.of(),
+                Ints.asList(1),
+                ImmutableList.copyOf(new SortOrder[] {SortOrder.ASC_NULLS_LAST}),
+                0,
+                10,
+                new PagesIndex.TestingFactory(false),
+                true,
+                spillerFactory,
+                new OrderingCompiler());
+
+        DriverContext driverContext = createDriverContext(0, TEST_SNAPSHOT_SESSION);
+        WindowOperator windowOperator = (WindowOperator) operatorFactory.createOperator(driverContext);
+
+        // Step1: add the first 2 pages
+        for (Page page : input1) {
+            windowOperator.addInput(page);
+            windowOperator.getOutput();
+        }
+        // Step2: spilling happened here
+        getFutureValue(windowOperator.startMemoryRevoke());
+        windowOperator.finishMemoryRevoke();
+
+        // Step3: add a marker page to make 'capture1' happened
+        MarkerPage marker = MarkerPage.snapshotPage(1);
+        windowOperator.addInput(marker);
+        windowOperator.getOutput();
+
+        // Step4: add another 2 pages
+        for (Page page : input2) {
+            windowOperator.addInput(page);
+            windowOperator.getOutput();
+        }
+
+        // Step5: assume the task is rescheduled due to failure and everything is re-constructed
+
+        driverContext = createDriverContext(8, TEST_SNAPSHOT_SESSION);
+        operatorFactory = new WindowOperatorFactory(
+                0,
+                new PlanNodeId("test"),
+                ImmutableList.of(VARCHAR, BIGINT, DOUBLE, BOOLEAN),
+                Ints.asList(0, 1, 2, 3),
+                ROW_NUMBER,
+                Ints.asList(0),
+                ImmutableList.of(),
+                Ints.asList(1),
+                ImmutableList.copyOf(new SortOrder[] {SortOrder.ASC_NULLS_LAST}),
+                0,
+                10,
+                new PagesIndex.TestingFactory(false),
+                true,
+                spillerFactory,
+                new OrderingCompiler());
+        windowOperator = (WindowOperator) operatorFactory.createOperator(driverContext);
+
+        // Step6: restore to 'capture1', the spiller should contains the reference of the first 2 pages for now.
+        MarkerPage resumeMarker = MarkerPage.resumePage(1);
+        windowOperator.addInput(resumeMarker);
+        windowOperator.getOutput();
+
+        // Step7: continue to add another 2 pages
+        for (Page page : input2) {
+            windowOperator.addInput(page);
+            windowOperator.getOutput();
+        }
+        windowOperator.finish();
+
+        // Compare the results
+        MaterializedResult expected = resultBuilder(driverContext.getSession(), VARCHAR, BIGINT, DOUBLE, BOOLEAN, BIGINT)
+                .row("a", 2L, 0.3, false, 1L)
+                .row("a", 4L, 0.2, true, 2L)
+                .row("a", 6L, 0.1, true, 3L)
+                .row("b", -1L, -0.1, true, 1L)
+                .row("b", 5L, 0.4, false, 2L)
+                .row("c", -1L, -0.1, true, 1L)
+                .row("c", 4L, 0.2, true, 2L)
+                .row("d", 2L, 0.3, false, 1L)
+                .row("d", 5L, 0.4, false, 2L)
+                .build();
+
+        Page p = windowOperator.getOutput();
+        while (p == null) {
+            p = windowOperator.getOutput();
+        }
+
+        outputPages.add(p);
+        MaterializedResult actual = toMaterializedResult(driverContext.getSession(), expected.getTypes(), outputPages.build());
+
+        Assert.assertEquals(actual, expected);
+    }
+
+    @Test
+    public void testCaptureRestoreWithoutSpill()
+            throws Exception
+    {
+        FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
+        when(fileSystemClientManager.getFileSystemClient(any(Path.class))).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/tmp/hetu/snapshot/")));
+        SnapshotConfig snapshotConfig = new SnapshotConfig();
+        snapshotUtils = new SnapshotUtils(fileSystemClientManager, snapshotConfig, new InMemoryNodeManager());
+        snapshotUtils.initialize();
+        ImmutableList.Builder<Page> outputPages = ImmutableList.builder();
+
+        List<Page> input1 = rowPagesBuilder(VARCHAR, BIGINT, DOUBLE, BOOLEAN)
+                .row("b", -1L, -0.1, true)
+                .row("a", 2L, 0.3, false)
+                .row("a", 4L, 0.2, true)
+                .pageBreak()
+                .row("b", 5L, 0.4, false)
+                .row("a", 6L, 0.1, true)
+                .build();
+
+        List<Page> input2 = rowPagesBuilder(VARCHAR, BIGINT, DOUBLE, BOOLEAN)
+                .row("c", -1L, -0.1, true)
+                .row("d", 2L, 0.3, false)
+                .row("c", 4L, 0.2, true)
+                .pageBreak()
+                .row("d", 5L, 0.4, false)
+                .build();
+
+        WindowOperatorFactory operatorFactory = createFactoryUnbounded(
+                ImmutableList.of(VARCHAR, BIGINT, DOUBLE, BOOLEAN),
+                Ints.asList(0, 1, 2, 3),
+                ROW_NUMBER,
+                Ints.asList(0),
+                Ints.asList(1),
+                ImmutableList.copyOf(new SortOrder[] {SortOrder.ASC_NULLS_LAST}),
+                false);
+
+        DriverContext driverContext = createDriverContext(0, TEST_SNAPSHOT_SESSION);
+        WindowOperator windowOperator = (WindowOperator) operatorFactory.createOperator(driverContext);
+
+        // Step1: add the first 2 pages
+        for (Page page : input1) {
+            windowOperator.addInput(page);
+            windowOperator.getOutput();
+        }
+
+        // Step2: add a marker page to make 'capture1' happened
+        MarkerPage marker = MarkerPage.snapshotPage(1);
+        windowOperator.addInput(marker);
+        windowOperator.getOutput();
+
+        // Step3: add another 2 pages
+        for (Page page : input2) {
+            windowOperator.addInput(page);
+            windowOperator.getOutput();
+        }
+
+        // Step4: assume the task is rescheduled due to failure and everything is re-constructed
+        driverContext = createDriverContext(8, TEST_SNAPSHOT_SESSION);
+        operatorFactory = createFactoryUnbounded(
+                ImmutableList.of(VARCHAR, BIGINT, DOUBLE, BOOLEAN),
+                Ints.asList(0, 1, 2, 3),
+                ROW_NUMBER,
+                Ints.asList(0),
+                Ints.asList(1),
+                ImmutableList.copyOf(new SortOrder[] {SortOrder.ASC_NULLS_LAST}),
+                false);
+        windowOperator = (WindowOperator) operatorFactory.createOperator(driverContext);
+
+        // Step5: restore to 'capture1'
+        MarkerPage resumeMarker = MarkerPage.resumePage(1);
+        windowOperator.addInput(resumeMarker);
+        windowOperator.getOutput();
+
+        // Step6: continue to add another 2 pages
+        for (Page page : input2) {
+            windowOperator.addInput(page);
+            windowOperator.getOutput();
+        }
+        windowOperator.finish();
+
+        // Compare the results
+        MaterializedResult expected = resultBuilder(driverContext.getSession(), VARCHAR, BIGINT, DOUBLE, BOOLEAN, BIGINT)
+                .row("a", 2L, 0.3, false, 1L)
+                .row("a", 4L, 0.2, true, 2L)
+                .row("a", 6L, 0.1, true, 3L)
+                .row("b", -1L, -0.1, true, 1L)
+                .row("b", 5L, 0.4, false, 2L)
+                .row("c", -1L, -0.1, true, 1L)
+                .row("c", 4L, 0.2, true, 2L)
+                .row("d", 2L, 0.3, false, 1L)
+                .row("d", 5L, 0.4, false, 2L)
+                .build();
+
+        Page p = windowOperator.getOutput();
+        while (p == null) {
+            p = windowOperator.getOutput();
+        }
+
+        outputPages.add(p);
+        MaterializedResult actual = toMaterializedResult(driverContext.getSession(), expected.getTypes(), outputPages.build());
+
+        Assert.assertEquals(actual, expected);
     }
 }

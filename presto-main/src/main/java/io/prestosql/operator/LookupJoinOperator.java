@@ -16,6 +16,8 @@ package io.prestosql.operator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.operator.JoinProbe.JoinProbeFactory;
 import io.prestosql.operator.LookupJoinOperators.JoinType;
 import io.prestosql.operator.LookupSourceProvider.LookupSourceLease;
@@ -25,6 +27,7 @@ import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.MarkerPage;
+import io.prestosql.spi.snapshot.Restorable;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.PartitioningSpiller;
@@ -57,9 +60,19 @@ import static java.util.Collections.emptyIterator;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
+// Snapshot: Most of these fields are immutable objects, excpet for:
+// - lookupSourceProvider: will be established after restore when build side finishes
+// - probe: must be null when addInput is called
+// - outputPage: must be null when addInput is called
+// - partitionGenerator: stateless
+// - spillInProgress: must be "done" when markers are received (see needsInput)
+// - unspilling: can only be true after finishing becomes true
+// - currentPartition: only set after finishing becomes true (when unspilling is true)
+// - unspilledLookupSource: only set after finishing becomes true (when unspilling is true)
+// - unspilledInputPages: only set after finishing becomes true (when unspilling is true)
 @RestorableConfig(uncapturedFields = {"probeTypes", "joinProbeFactory", "afterClose", "hashGenerator", "lookupSourceFactory",
-        "partitioningSpillerFactory", "lookupSourceProviderFuture", "lookupSourceProvider", "probe", "outputPage", "spiller",
-        "partitionGenerator", "spillInProgress", "savedRows", "unspilling", "currentPartition",
+        "partitioningSpillerFactory", "lookupSourceProviderFuture", "lookupSourceProvider", "probe", "outputPage",
+        "partitionGenerator", "spillInProgress", "unspilling", "currentPartition",
         "unspilledLookupSource", "unspilledInputPages", "snapshotState"})
 public class LookupJoinOperator
         implements Operator
@@ -253,12 +266,6 @@ public class LookupJoinOperator
     private void addInput(Page page, SpillInfoSnapshot spillInfoSnapshot)
     {
         requireNonNull(spillInfoSnapshot, "spillInfoSnapshot is null");
-
-        if (snapshotState != null) {
-            if (snapshotState.processPage(page)) {
-                return;
-            }
-        }
 
         if (spillInfoSnapshot.hasSpilled()) {
             page = spillAndMaskSpilledPositions(page, spillInfoSnapshot.getSpillMask());
@@ -693,6 +700,7 @@ public class LookupJoinOperator
 
     // This class must be public because LookupJoinOperator is isolated.
     public static class SavedRow
+            implements Restorable
     {
         /**
          * A page with exactly one {@link Page#getPositionCount}, representing saved row.
@@ -717,11 +725,47 @@ public class LookupJoinOperator
 
         public SavedRow(Page page, int position, long joinPositionWithinPartition, boolean currentProbePositionProducedRow, int joinSourcePositions)
         {
-            this.row = page.getSingleValuePage(position);
+            this(page.getSingleValuePage(position), joinPositionWithinPartition, currentProbePositionProducedRow, joinSourcePositions);
+        }
 
+        public SavedRow(Page row, long joinPositionWithinPartition, boolean currentProbePositionProducedRow, int joinSourcePositions)
+        {
+            this.row = row;
             this.joinPositionWithinPartition = joinPositionWithinPartition;
             this.currentProbePositionProducedRow = currentProbePositionProducedRow;
             this.joinSourcePositions = joinSourcePositions;
+        }
+
+        @Override
+        public Object capture(BlockEncodingSerdeProvider serdeProvider)
+        {
+            SavedRowState myState = new SavedRowState();
+            PagesSerde serde = (PagesSerde) serdeProvider;
+            myState.row = serde.serialize(row).capture(serdeProvider);
+            myState.currentProbePositionProducedRow = currentProbePositionProducedRow;
+            myState.joinPositionWithinPartition = joinPositionWithinPartition;
+            myState.joinSourcePositions = joinSourcePositions;
+            return myState;
+        }
+
+        private static SavedRow restoreSavedRow(Object state, BlockEncodingSerdeProvider serdeProvider)
+        {
+            SavedRowState savedRowsState = (SavedRowState) state;
+            PagesSerde serde = (PagesSerde) serdeProvider;
+            SerializedPage sp = SerializedPage.restoreSerializedPage(savedRowsState.row);
+            return new SavedRow(serde.deserialize(sp),
+                    savedRowsState.joinPositionWithinPartition,
+                    savedRowsState.currentProbePositionProducedRow,
+                    savedRowsState.joinSourcePositions);
+        }
+
+        private static class SavedRowState
+                implements Serializable
+        {
+            private Object row;
+            private long joinPositionWithinPartition;
+            private boolean currentProbePositionProducedRow;
+            private int joinSourcePositions;
         }
     }
 
@@ -770,6 +814,13 @@ public class LookupJoinOperator
         myState.currentProbePositionProducedRow = currentProbePositionProducedRow;
         myState.partitionedConsumption = partitionedConsumption != null ? true : false;
         myState.lookupPartitions = lookupPartitions != null ? true : false;
+        if (spiller.isPresent()) {
+            myState.spiller = spiller.get().capture(serdeProvider);
+        }
+        myState.savedRows = new HashMap<>();
+        for (Map.Entry<Integer, SavedRow> entry : savedRows.entrySet()) {
+            myState.savedRows.put(entry.getKey(), entry.getValue().capture(serdeProvider));
+        }
         return myState;
     }
 
@@ -807,12 +858,28 @@ public class LookupJoinOperator
         else {
             this.lookupPartitions = null;
         }
+
+        if (myState.spiller != null) {
+            if (!spiller.isPresent()) {
+                spiller = Optional.of(partitioningSpillerFactory.create(
+                        probeTypes,
+                        getPartitionGenerator(),
+                        operatorContext.getSpillContext().newLocalSpillContext(),
+                        operatorContext.newAggregateSystemMemoryContext()));
+            }
+            this.spiller.get().restore(myState.spiller, serdeProvider);
+        }
+
+        this.savedRows.clear();
+        for (Map.Entry<Integer, Object> entry : myState.savedRows.entrySet()) {
+            SavedRow savedRow = SavedRow.restoreSavedRow(entry.getValue(), serdeProvider);
+            this.savedRows.put(entry.getKey(), savedRow);
+        }
     }
 
     private static class LookupJoinOperatorState
             implements Serializable
     {
-        //TODO-cp-I2EATR: Work to be done for spilled situations
         private Object operatorContext;
         private Object statisticsCounter;
         private Object pageBuilder;
@@ -828,5 +895,8 @@ public class LookupJoinOperator
         private boolean partitionedConsumption;
 
         private boolean lookupPartitions;
+
+        private Object spiller;
+        private Map<Integer, Object> savedRows;
     }
 }

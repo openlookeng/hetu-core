@@ -21,6 +21,7 @@ import io.prestosql.execution.Lifespan;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.snapshot.SnapshotStateId;
+import io.prestosql.snapshot.Spillable;
 import io.prestosql.snapshot.TaskSnapshotManager;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -36,6 +37,7 @@ import javax.annotation.concurrent.ThreadSafe;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.List;
@@ -54,13 +56,20 @@ import static io.airlift.concurrent.MoreFutures.getDone;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
+// Snapshot: Most of these fields are immutable objects, excpet for:
+// - spilledLookupSourceHandle: content is only changed after index is fully built
+// - spillInProgress: must be "done" when markers are received (see needsInput)
+// - unspillInProgress: unspill can only happen after "finish", so no marker can be received after that
+// - lookupSourceSupplier: only becomes non-null after "finish"
+// - lookupSourceChecksum: only used when unspilling lookupSourceSupplier
+// - finishMemoryRevoke: must be empty, because new input (including markers) can't be added until finishMemoryRevoke is called
 @ThreadSafe
 @RestorableConfig(uncapturedFields = {"lookupSourceFactory", "lookupSourceFactoryDestroyed", "outputChannels",
         "hashChannels", "filterFunctionFactory", "sortChannel", "searchFunctionFactories", "singleStreamSpillerFactory",
-        "lookupSourceNotNeeded", "spilledLookupSourceHandle", "spiller", "spillInProgress", "unspillInProgress", "lookupSourceSupplier", "lookupSourceChecksum",
+        "lookupSourceNotNeeded", "spilledLookupSourceHandle", "spillInProgress", "unspillInProgress", "lookupSourceSupplier", "lookupSourceChecksum",
         "finishMemoryRevoke", "snapshotState", "lastMarker"})
 public class HashBuilderOperator
-        implements SinkOperator
+        implements SinkOperator, Spillable
 {
     public static class HashBuilderOperatorFactory
             implements OperatorFactory
@@ -699,6 +708,21 @@ public class HashBuilderOperator
     }
 
     @Override
+    public boolean isSpilled()
+    {
+        return state == State.SPILLING_INPUT || state == State.INPUT_SPILLED || state == State.INPUT_UNSPILLING;
+    }
+
+    @Override
+    public List<Path> getSpilledFilePaths()
+    {
+        if (isSpilled()) {
+            return ImmutableList.of(spiller.get().getFile());
+        }
+        return ImmutableList.of();
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         HashBuilderOperatorState myState = new HashBuilderOperatorState();
@@ -709,6 +733,11 @@ public class HashBuilderOperator
         myState.hashCollisionsCounter = hashCollisionsCounter.capture(serdeProvider);
         myState.state = state.toString();
         myState.alreadyFinished = alreadyFinished;
+
+        // Capture spill related to spill
+        if (spiller.isPresent()) {
+            myState.spiller = spiller.get().capture(serdeProvider);
+        }
         return myState;
     }
 
@@ -723,8 +752,23 @@ public class HashBuilderOperator
         this.index.restore(myState.index, serdeProvider);
 
         this.hashCollisionsCounter.restore(myState.hashCollisionsCounter, serdeProvider);
+        State oldState = this.state;
         this.state = State.valueOf(myState.state);
         this.alreadyFinished = myState.alreadyFinished;
+
+        // Restore spill related fields
+        if (myState.spiller != null) {
+            if (!spiller.isPresent()) {
+                spiller = Optional.of(singleStreamSpillerFactory.create(
+                        index.getTypes(),
+                        operatorContext.getSpillContext().newLocalSpillContext(),
+                        operatorContext.newLocalSystemMemoryContext(HashBuilderOperator.class.getSimpleName())));
+            }
+            this.spiller.get().restore(myState.spiller, serdeProvider);
+        }
+        if (oldState == State.CONSUMING_INPUT && this.state == State.SPILLING_INPUT) {
+            lookupSourceFactory.setPartitionSpilledLookupSourceHandle(partitionIndex, spilledLookupSourceHandle);
+        }
     }
 
     private static class HashBuilderOperatorState
@@ -739,5 +783,6 @@ public class HashBuilderOperator
         private Object hashCollisionsCounter;
         private String state;
         private boolean alreadyFinished;
+        private Object spiller;
     }
 }
