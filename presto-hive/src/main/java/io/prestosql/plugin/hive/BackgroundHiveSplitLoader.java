@@ -133,6 +133,7 @@ public class BackgroundHiveSplitLoader
     private final Deque<Iterator<InternalHiveSplit>> fileIterators = new ConcurrentLinkedDeque<>();
     private final Optional<ValidWriteIdList> validWriteIds;
     private final Supplier<Set<DynamicFilter>> dynamicFilterSupplier;
+    private final Configuration configuration;
 
     // Purpose of this lock:
     // * Write lock: when you need a consistent view across partitions, fileIterators, and hiveSplitSource.
@@ -156,6 +157,7 @@ public class BackgroundHiveSplitLoader
     private Optional<QueryType> queryType;
     private Map<String, Object> queryInfo;
     private TypeManager typeManager;
+    private JobConf jobConf;
 
     private final Map<ColumnHandle, DynamicFilter> cachedDynamicFilters = new ConcurrentHashMap<>();
 
@@ -194,6 +196,9 @@ public class BackgroundHiveSplitLoader
         this.queryType = requireNonNull(queryType, "queryType is null");
         this.queryInfo = requireNonNull(queryInfo, "queryproperties is null");
         this.partitions = new ConcurrentLazyQueue<>(getPrunedPartitions(partitions));
+        Path path = new Path(getPartitionLocation(table, getPrunedPartitions(partitions).iterator().next().getPartition()));
+        configuration = hdfsEnvironment.getConfiguration(hdfsContext, path);
+        jobConf = ConfigurationUtils.toJobConf(configuration);
     }
 
     /**
@@ -353,8 +358,7 @@ public class BackgroundHiveSplitLoader
         }
 
         Path path = new Path(getPartitionLocation(table, partition.getPartition()));
-        Configuration configuration = hdfsEnvironment.getConfiguration(hdfsContext, path);
-        InputFormat<?, ?> inputFormat = getInputFormat(configuration, schema, false);
+        InputFormat<?, ?> inputFormat = getInputFormat(configuration, schema, false, jobConf);
         FileSystem fs = hdfsEnvironment.getFileSystem(hdfsContext, path);
         boolean s3SelectPushdownEnabled = shouldEnablePushdownForTable(session, table, path.toString(), partition.getPartition());
 
@@ -371,11 +375,10 @@ public class BackgroundHiveSplitLoader
                 // the splits must be generated using the file system for the target path
                 // get the configuration for the target path -- it may be a different hdfs instance
                 FileSystem targetFilesystem = hdfsEnvironment.getFileSystem(hdfsContext, targetPath);
-                JobConf targetJob = ConfigurationUtils.toJobConf(targetFilesystem.getConf());
-                targetJob.setInputFormat(TextInputFormat.class);
-                targetInputFormat.configure(targetJob);
-                FileInputFormat.setInputPaths(targetJob, targetPath);
-                InputSplit[] targetSplits = targetInputFormat.getSplits(targetJob, 0);
+                jobConf.setInputFormat(TextInputFormat.class);
+                targetInputFormat.configure(jobConf);
+                FileInputFormat.setInputPaths(jobConf, targetPath);
+                InputSplit[] targetSplits = targetInputFormat.getSplits(jobConf, 0);
 
                 InternalHiveSplitFactory splitFactory = new InternalHiveSplitFactory(
                         targetFilesystem,
@@ -437,7 +440,6 @@ public class BackgroundHiveSplitLoader
                 throw new PrestoException(NOT_SUPPORTED, "Hive transactional tables in an input format with UseFileSplitsFromInputFormat annotation are not supported: " + inputFormat.getClass().getSimpleName());
             }
 
-            JobConf jobConf = ConfigurationUtils.toJobConf(configuration);
             FileInputFormat.setInputPaths(jobConf, path);
             InputSplit[] splits = inputFormat.getSplits(jobConf, 0);
 

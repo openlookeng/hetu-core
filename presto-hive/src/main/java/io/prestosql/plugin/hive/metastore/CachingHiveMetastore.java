@@ -128,13 +128,14 @@ public class CachingHiveMetastore
 
     public static CachingHiveMetastore memoizeMetastore(HiveMetastore delegate, long maximumSize)
     {
+        // If delegate is instance of CachingHiveMetastore, we are bypassing directly to second layer of cache, to get cached values.
         return new CachingHiveMetastore(
                 delegate,
                 newDirectExecutorService(),
                 OptionalLong.empty(),
                 OptionalLong.empty(),
                 maximumSize,
-                false);
+                false || delegate instanceof CachingHiveMetastore);
     }
 
     private CachingHiveMetastore(HiveMetastore delegate, Executor executor, OptionalLong expiresAfterWriteMillis, OptionalLong refreshMills, long maximumSize, boolean skipCache)
@@ -142,7 +143,8 @@ public class CachingHiveMetastore
         this.delegate = requireNonNull(delegate, "delegate is null");
         requireNonNull(executor, "executor is null");
 
-        this.skipCache = skipCache;
+        // if refreshMills is present and is 0 , keeps cache unrefreshed.
+        this.skipCache = skipCache || (refreshMills.isPresent() && refreshMills.getAsLong() == 0);
 
         databaseNamesCache = newCacheBuilder(expiresAfterWriteMillis, refreshMills, maximumSize)
                 .build(asyncReloading(CacheLoader.from(this::loadAllDatabases), executor));
@@ -351,9 +353,8 @@ public class CachingHiveMetastore
                 .collect(toImmutableList());
 
         if (skipCache) {
-            return loadPartitionColumnStatistics(partitions).entrySet()
-                    .stream()
-                    .collect(toImmutableMap(entry -> entry.getKey().getKey().getPartitionName().get(), Entry::getValue));
+            HiveIdentity identity1 = updateIdentity(identity);
+            return delegate.getPartitionStatistics(identity1, table, partitionNames);
         }
 
         Map<WithIdentity<HivePartitionName>, PartitionStatistics> statistics = getAll(partitionStatisticsCache, partitions);

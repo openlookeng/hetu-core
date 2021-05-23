@@ -227,7 +227,7 @@ public class CarbondataMetadataFactory
                 this.segmentInfoCodec,
                 this.typeTranslator,
                 this.hetuVersion,
-                new MetastoreHiveStatisticsProvider(metastore),
+                new MetastoreHiveStatisticsProvider(metastore, statsCache, samplePartitionCache),
                 this.accessControlMetadataFactory.create(metastore),
                 carbondataTableReader,
                 this.carbondataTableStore,

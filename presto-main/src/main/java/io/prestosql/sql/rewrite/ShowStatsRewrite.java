@@ -176,7 +176,7 @@ public class ShowStatsRewrite
         private Node rewriteShowStats(ShowStats node, Table table, Constraint constraint)
         {
             TableHandle tableHandle = getTableHandle(node, table.getName());
-            TableStatistics tableStatistics = metadata.getTableStatistics(session, tableHandle, constraint);
+            TableStatistics tableStatistics = metadata.getTableStatistics(session, tableHandle, constraint, true);
             List<String> statsColumnNames = buildColumnsNames();
             List<SelectItem> selectItems = buildSelectItems(statsColumnNames);
             TableMetadata tableMetadata = metadata.getTableMetadata(session, tableHandle);

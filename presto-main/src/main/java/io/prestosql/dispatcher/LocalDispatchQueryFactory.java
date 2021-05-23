@@ -113,12 +113,15 @@ public class LocalDispatchQueryFactory
         queryMonitor.queryCreatedEvent(stateMachine.getBasicQueryInfo(Optional.empty()));
 
         ListenableFuture<QueryExecution> queryExecutionFuture = executor.submit(() -> {
+            stateMachine.beginSyntaxAnalysis();
             QueryExecutionFactory<?> queryExecutionFactory = executionFactories.get(preparedQuery.getStatement().getClass());
             if (queryExecutionFactory == null) {
                 throw new PrestoException(NOT_SUPPORTED, "Unsupported statement type: " + preparedQuery.getStatement().getClass().getSimpleName());
             }
 
-            return queryExecutionFactory.createQueryExecution(preparedQuery, stateMachine, slug, warningCollector);
+            QueryExecution queryExecution = queryExecutionFactory.createQueryExecution(preparedQuery, stateMachine, slug, warningCollector);
+            stateMachine.endSyntaxAnalysis();
+            return queryExecution;
         });
 
         return new LocalDispatchQuery(

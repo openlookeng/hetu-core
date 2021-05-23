@@ -35,6 +35,7 @@ import io.prestosql.plugin.hive.metastore.DoubleStatistics;
 import io.prestosql.plugin.hive.metastore.HiveColumnStatistics;
 import io.prestosql.plugin.hive.metastore.IntegerStatistics;
 import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
+import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
@@ -96,11 +97,15 @@ public class MetastoreHiveStatisticsProvider
     private static final Logger log = Logger.get(MetastoreHiveStatisticsProvider.class);
 
     private final PartitionsStatisticsProvider statisticsProvider;
+    private static Map<String, TableColumnStatistics> statsCache;
+    private static Map<String, List<HivePartition>> samplePartitionCache;
 
-    public MetastoreHiveStatisticsProvider(SemiTransactionalHiveMetastore metastore)
+    public MetastoreHiveStatisticsProvider(SemiTransactionalHiveMetastore metastore, Map<String, TableColumnStatistics> statsCache, Map<String, List<HivePartition>> samplePartitionCache)
     {
         requireNonNull(metastore, "metastore is null");
-        this.statisticsProvider = (session, table, hivePartitions) -> getPartitionsStatistics(session, metastore, table, hivePartitions);
+        this.statsCache = requireNonNull(statsCache, "statsCache is null");
+        this.samplePartitionCache = requireNonNull(samplePartitionCache, "samplePartitionCache is null");
+        this.statisticsProvider = (session, schemaTableName, hivePartitions, table) -> getPartitionsStatistics(session, metastore, schemaTableName, hivePartitions, table);
     }
 
     @VisibleForTesting
@@ -109,7 +114,7 @@ public class MetastoreHiveStatisticsProvider
         this.statisticsProvider = requireNonNull(statisticsProvider, "statisticsProvider is null");
     }
 
-    private static Map<String, PartitionStatistics> getPartitionsStatistics(ConnectorSession session, SemiTransactionalHiveMetastore metastore, SchemaTableName table, List<HivePartition> hivePartitions)
+    private static Map<String, PartitionStatistics> getPartitionsStatistics(ConnectorSession session, SemiTransactionalHiveMetastore metastore, SchemaTableName schemaTableName, List<HivePartition> hivePartitions, Table table)
     {
         if (hivePartitions.isEmpty()) {
             return ImmutableMap.of();
@@ -117,21 +122,23 @@ public class MetastoreHiveStatisticsProvider
         boolean unpartitioned = hivePartitions.stream().anyMatch(partition -> partition.getPartitionId().equals(UNPARTITIONED_ID));
         if (unpartitioned) {
             checkArgument(hivePartitions.size() == 1, "expected only one hive partition");
-            return ImmutableMap.of(UNPARTITIONED_ID, metastore.getTableStatistics(new HiveIdentity(session), table.getSchemaName(), table.getTableName()));
+            return ImmutableMap.of(UNPARTITIONED_ID, metastore.getTableStatistics(new HiveIdentity(session), schemaTableName.getSchemaName(), schemaTableName.getTableName()));
         }
         Set<String> partitionNames = hivePartitions.stream()
                 .map(HivePartition::getPartitionId)
                 .collect(toImmutableSet());
-        return metastore.getPartitionStatistics(new HiveIdentity(session), table.getSchemaName(), table.getTableName(), partitionNames);
+        return metastore.getPartitionStatistics(new HiveIdentity(session), schemaTableName.getSchemaName(), schemaTableName.getTableName(), partitionNames, Optional.of(table));
     }
 
     @Override
     public TableStatistics getTableStatistics(
             ConnectorSession session,
-            SchemaTableName table,
+            SchemaTableName schemaTableName,
             Map<String, ColumnHandle> columns,
             Map<String, Type> columnTypes,
-            List<HivePartition> partitions)
+            List<HivePartition> partitions,
+            boolean includeColumnStatistics,
+            Table table)
     {
         if (!isStatisticsEnabled(session)) {
             return TableStatistics.empty();
@@ -140,11 +147,25 @@ public class MetastoreHiveStatisticsProvider
             return createZeroStatistics(columns, columnTypes);
         }
         int sampleSize = getPartitionStatisticsSampleSize(session);
-        List<HivePartition> partitionsSample = getPartitionsSample(partitions, sampleSize);
+        List<HivePartition> partitionsSample = samplePartitionCache.get(schemaTableName.getTableName());
+        if (includeColumnStatistics || partitionsSample == null) {
+            partitionsSample = getPartitionsSample(partitions, sampleSize);
+            samplePartitionCache.put(schemaTableName.getTableName(), partitionsSample);
+        }
         try {
-            Map<String, PartitionStatistics> statisticsSample = statisticsProvider.getPartitionsStatistics(session, table, partitionsSample);
-            validatePartitionStatistics(table, statisticsSample);
-            return getTableStatistics(columns, columnTypes, partitions, statisticsSample);
+            Map<String, PartitionStatistics> statisticsSample = statisticsProvider.getPartitionsStatistics(session, schemaTableName, partitionsSample, table);
+            if (!includeColumnStatistics) {
+                OptionalDouble averageRows = calculateAverageRowsPerPartition(statisticsSample.values());
+                TableStatistics.Builder result = TableStatistics.builder();
+                result.setRowCount(Estimate.of(averageRows.getAsDouble() * partitions.size()));
+                result.setFileCount(calulateFileCount(statisticsSample.values()));
+                result.setOnDiskDataSizeInBytes(calculateTotalOnDiskSizeInBytes(statisticsSample.values()));
+                return result.build();
+            }
+            else {
+                validatePartitionStatistics(schemaTableName, statisticsSample);
+                return getTableStatistics(columns, columnTypes, partitions, statisticsSample);
+            }
         }
         catch (PrestoException e) {
             if (e.getErrorCode().equals(HiveErrorCode.HIVE_CORRUPTED_COLUMN_STATISTICS.toErrorCode()) && isIgnoreCorruptedStatistics(session)) {
@@ -404,14 +425,28 @@ public class MetastoreHiveStatisticsProvider
         double rowCount = averageRowsPerPartition * queriedPartitionsCount;
 
         TableStatistics.Builder result = TableStatistics.builder();
+        long fileCount = calulateFileCount(statistics.values());
+        long totalOnDiskSize = calculateTotalOnDiskSizeInBytes(statistics.values());
         result.setRowCount(Estimate.of(rowCount));
+        result.setFileCount(fileCount);
+        result.setOnDiskDataSizeInBytes(totalOnDiskSize);
         for (Map.Entry<String, ColumnHandle> column : columns.entrySet()) {
             String columnName = column.getKey();
             HiveColumnHandle columnHandle = (HiveColumnHandle) column.getValue();
             Type columnType = columnTypes.get(columnName);
             ColumnStatistics columnStatistics;
+            TableColumnStatistics tableColumnStatistics;
             if (columnHandle.isPartitionKey()) {
-                columnStatistics = createPartitionColumnStatistics(columnHandle, columnType, partitions, statistics, averageRowsPerPartition, rowCount);
+                tableColumnStatistics = statsCache.get(partitions.get(0).getTableName().getTableName() + columnName);
+                if (tableColumnStatistics == null || invalidateStatsCache(partitions.get(0).getTableName().getTableName() + columnName, Estimate.of(rowCount), fileCount, totalOnDiskSize)) {
+                    columnStatistics = createPartitionColumnStatistics(columnHandle, columnType, partitions, statistics, averageRowsPerPartition, rowCount);
+                    TableStatistics tableStatistics = new TableStatistics(Estimate.of(rowCount), fileCount, totalOnDiskSize, ImmutableMap.of());
+                    tableColumnStatistics = new TableColumnStatistics(tableStatistics, columnStatistics);
+                    statsCache.put(partitions.get(0).getTableName().getTableName() + columnName, tableColumnStatistics);
+                }
+                else {
+                    columnStatistics = tableColumnStatistics.columnStatistics;
+                }
             }
             else {
                 columnStatistics = createDataColumnStatistics(columnName, columnType, rowCount, statistics.values());
@@ -419,6 +454,16 @@ public class MetastoreHiveStatisticsProvider
             result.setColumnStatistics(columnHandle, columnStatistics);
         }
         return result.build();
+    }
+
+    private static boolean invalidateStatsCache(String tableNameColumName, Estimate rowCount, long fileCount, long totalOnDisk)
+    {
+        if (statsCache.get(tableNameColumName).tableStatistics.getOnDiskDataSizeInBytes() != totalOnDisk
+                || statsCache.get(tableNameColumName).tableStatistics.getFileCount() != fileCount
+                || !statsCache.get(tableNameColumName).tableStatistics.getRowCount().equals(rowCount)) {
+            return true;
+        }
+        return false;
     }
 
     @VisibleForTesting
@@ -431,6 +476,26 @@ public class MetastoreHiveStatisticsProvider
                 .mapToLong(OptionalLong::getAsLong)
                 .peek(count -> verify(count >= 0, "count must be greater than or equal to zero"))
                 .average();
+    }
+
+    static long calulateFileCount(Collection<PartitionStatistics> statistics)
+    {
+        return statistics.stream()
+                .map(PartitionStatistics::getBasicStatistics)
+                .map(HiveBasicStatistics::getFileCount)
+                .filter(OptionalLong::isPresent)
+                .mapToLong(OptionalLong::getAsLong)
+                .sum();
+    }
+
+    static long calculateTotalOnDiskSizeInBytes(Collection<PartitionStatistics> statistics)
+    {
+        return statistics.stream()
+                .map(PartitionStatistics::getBasicStatistics)
+                .map(HiveBasicStatistics::getOnDiskDataSizeInBytes)
+                .filter(OptionalLong::isPresent)
+                .mapToLong(OptionalLong::getAsLong)
+                .sum();
     }
 
     private static ColumnStatistics createPartitionColumnStatistics(
@@ -847,6 +912,6 @@ public class MetastoreHiveStatisticsProvider
     @VisibleForTesting
     interface PartitionsStatisticsProvider
     {
-        Map<String, PartitionStatistics> getPartitionsStatistics(ConnectorSession session, SchemaTableName table, List<HivePartition> hivePartitions);
+        Map<String, PartitionStatistics> getPartitionsStatistics(ConnectorSession session, SchemaTableName schemaTableName, List<HivePartition> hivePartitions, Table table);
     }
 }

@@ -22,12 +22,16 @@ import io.prestosql.plugin.hive.metastore.HiveMetastore;
 import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
 import io.prestosql.plugin.hive.security.AccessControlMetadataFactory;
 import io.prestosql.plugin.hive.statistics.MetastoreHiveStatisticsProvider;
+import io.prestosql.plugin.hive.statistics.TableColumnStatistics;
 import io.prestosql.spi.type.TypeManager;
 import org.joda.time.DateTimeZone;
 
 import javax.inject.Inject;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Supplier;
@@ -38,6 +42,9 @@ public class HiveMetadataFactory
         implements Supplier<TransactionalMetadata>
 {
     private static final Logger log = Logger.get(HiveMetadataFactory.class);
+
+    protected final Map<String, TableColumnStatistics> statsCache = new ConcurrentHashMap();
+    protected final Map<String, List<HivePartition>> samplePartitionCache = new ConcurrentHashMap();
 
     private final boolean allowCorruptWritesForTesting;
     private final boolean skipDeletionForAlter;
@@ -213,7 +220,7 @@ public class HiveMetadataFactory
                 partitionUpdateCodec,
                 typeTranslator,
                 prestoVersion,
-                new MetastoreHiveStatisticsProvider(metastore),
+                new MetastoreHiveStatisticsProvider(metastore, statsCache, samplePartitionCache),
                 accessControlMetadataFactory.create(metastore),
                 autoVacuumEnabled,
                 vacuumDeltaNumThreshold,

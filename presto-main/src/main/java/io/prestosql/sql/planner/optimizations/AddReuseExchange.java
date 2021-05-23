@@ -216,7 +216,7 @@ public class AddReuseExchange
         private void visitTableScanInternal(TableScanNode node, TupleDomain<ColumnHandle> newDomain)
         {
             if (!isNodeAlreadyVisited && node.getTable().getConnectorHandle().isReuseTableScanSupported()) {
-                TableStatistics stats = metadata.getTableStatistics(session, node.getTable(), (newDomain != null) ? new Constraint(newDomain) : Constraint.alwaysTrue());
+                TableStatistics stats = metadata.getTableStatistics(session, node.getTable(), (newDomain != null) ? new Constraint(newDomain) : Constraint.alwaysTrue(), true);
                 if (isMaxTableSizeGreaterThanSpillThreshold(node, stats)) {
                     planNodeListHashMap.remove(WrapperScanNode.of(node));
                 }

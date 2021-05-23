@@ -73,7 +73,7 @@ public class TableScanStatsRule
         TupleDomain<ColumnHandle> predicate = metadata.getTableProperties(session, node.getTable()).getPredicate();
         Constraint constraint = new Constraint(predicate);
 
-        TableStatistics tableStatistics = metadata.getTableStatistics(session, node.getTable(), constraint);
+        TableStatistics tableStatistics = metadata.getTableStatistics(session, node.getTable(), constraint, true);
         verify(tableStatistics != null, "tableStatistics is null for %s", node);
 
         Map<Symbol, SymbolStatsEstimate> outputSymbolStats = new HashMap<>();

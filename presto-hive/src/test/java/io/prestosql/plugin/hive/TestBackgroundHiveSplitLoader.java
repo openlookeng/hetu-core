@@ -308,6 +308,7 @@ public class TestBackgroundHiveSplitLoader
     public void testPropagateException(boolean error, int threads)
     {
         AtomicBoolean iteratorUsedAfterException = new AtomicBoolean();
+        AtomicBoolean isFirstTime = new AtomicBoolean(true);
 
         BackgroundHiveSplitLoader backgroundHiveSplitLoader = new BackgroundHiveSplitLoader(
                 SIMPLE_TABLE,
@@ -325,12 +326,19 @@ public class TestBackgroundHiveSplitLoader
                     @Override
                     public HivePartitionMetadata next()
                     {
-                        iteratorUsedAfterException.compareAndSet(false, threw);
-                        threw = true;
-                        if (error) {
-                            throw new Error("loading error occurred");
+                        // isFirstTime variable is used to skip throwing exception from next method called in BackgroundHiveSplitLoader constructor
+                        if (!isFirstTime.compareAndSet(true, false)) {
+                            iteratorUsedAfterException.compareAndSet(false, threw);
+                            threw = true;
+                            if (error) {
+                                throw new Error("loading error occurred");
+                            }
+                            throw new RuntimeException("loading error occurred");
                         }
-                        throw new RuntimeException("loading error occurred");
+                        return new HivePartitionMetadata(
+                                new HivePartition(new SchemaTableName("testSchema", "table_name")),
+                                Optional.empty(),
+                                ImmutableMap.of());
                     }
                 },
                 TupleDomain.all(),

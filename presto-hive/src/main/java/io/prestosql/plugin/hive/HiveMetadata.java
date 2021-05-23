@@ -405,6 +405,11 @@ public class HiveMetadata
             return Optional.empty();
         }
 
+        SchemaTableName schemaTableName = sourceTableHandle.getSchemaTableName();
+
+        Table table = metastore.getTable(new HiveIdentity(session), schemaTableName.getSchemaName(), schemaTableName.getTableName())
+                .orElseThrow(() -> new TableNotFoundException(schemaTableName));
+
         List<HiveColumnHandle> partitionColumns = sourceTableHandle.getPartitionColumns();
         if (partitionColumns.isEmpty()) {
             return Optional.empty();
@@ -435,7 +440,7 @@ public class HiveMetadata
                     Predicate<Map<ColumnHandle, NullableValue>> targetPredicate = convertToPredicate(targetTupleDomain);
                     Constraint targetConstraint = new Constraint(targetTupleDomain, targetPredicate);
                     Iterable<List<Object>> records = () ->
-                            stream(partitionManager.getPartitions(metastore, new HiveIdentity(session), sourceTableHandle, targetConstraint).getPartitions())
+                            stream(partitionManager.getPartitions(metastore, new HiveIdentity(session), sourceTableHandle, targetConstraint, table).getPartitions())
                                     .map(hivePartition ->
                                             IntStream.range(0, partitionColumns.size())
                                                     .mapToObj(fieldIdToColumnHandle::get)
@@ -647,6 +652,12 @@ public class HiveMetadata
                 .collect(toImmutableMap(HiveColumnHandle::getName, identity()));
     }
 
+    private Map<String, ColumnHandle> getColumnHandles(Table table)
+    {
+        return hiveColumnHandles(table).stream()
+                .collect(toImmutableMap(HiveColumnHandle::getName, identity()));
+    }
+
     @Override
     public long getTableModificationTime(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
@@ -687,20 +698,23 @@ public class HiveMetadata
     }
 
     @Override
-    public TableStatistics getTableStatistics(ConnectorSession session, ConnectorTableHandle tableHandle, Constraint constraint)
+    public TableStatistics getTableStatistics(ConnectorSession session, ConnectorTableHandle tableHandle, Constraint constraint, boolean includeColumnStatistics)
     {
         if (!HiveSessionProperties.isStatisticsEnabled(session)) {
             return TableStatistics.empty();
         }
-        Map<String, ColumnHandle> columns = getColumnHandles(session, tableHandle)
+        SchemaTableName tableName = ((HiveTableHandle) tableHandle).getSchemaTableName();
+        Table table = metastore.getTable(new HiveIdentity(session), tableName.getSchemaName(), tableName.getTableName())
+                .orElseThrow(() -> new TableNotFoundException(tableName));
+        Map<String, ColumnHandle> columns = getColumnHandles(table)
                 .entrySet().stream()
                 .filter(entry -> !((HiveColumnHandle) entry.getValue()).isHidden())
                 .collect(toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
         Map<String, Type> columnTypes = columns.entrySet().stream()
                 .collect(toImmutableMap(Map.Entry::getKey, entry -> getColumnMetadata(session, tableHandle, entry.getValue()).getType()));
-        HivePartitionResult partitionResult = partitionManager.getPartitions(metastore, new HiveIdentity(session), tableHandle, constraint);
+        HivePartitionResult partitionResult = partitionManager.getPartitions(metastore, new HiveIdentity(session), tableHandle, constraint, table);
         List<HivePartition> partitions = partitionManager.getPartitionsAsList(partitionResult);
-        return hiveStatisticsProvider.getTableStatistics(session, ((HiveTableHandle) tableHandle).getSchemaTableName(), columns, columnTypes, partitions);
+        return hiveStatisticsProvider.getTableStatistics(session, ((HiveTableHandle) tableHandle).getSchemaTableName(), columns, columnTypes, partitions, includeColumnStatistics, table);
     }
 
     private List<SchemaTableName> listTables(ConnectorSession session, SchemaTablePrefix prefix)
@@ -2037,8 +2051,11 @@ public class HiveMetadata
         if (constraint == null) {
             return Optional.of(handle);
         }
+        SchemaTableName tableName = hiveTableHandle.getSchemaTableName();
+        Table table = metastore.getTable(new HiveIdentity(session), tableName.getSchemaName(), tableName.getTableName())
+                .orElseThrow(() -> new TableNotFoundException(tableName));
         HiveIdentity identity = new HiveIdentity(session);
-        HivePartitionResult partitionResult = partitionManager.getPartitions(metastore, identity, handle, constraint);
+        HivePartitionResult partitionResult = partitionManager.getPartitions(metastore, identity, handle, constraint, table);
         HiveTableHandle newHandle = partitionManager.applyPartitionResult(hiveTableHandle, partitionResult);
         return Optional.of(newHandle);
     }
@@ -2058,7 +2075,7 @@ public class HiveMetadata
             metastore.truncateUnpartitionedTable(session, handle.getSchemaName(), handle.getTableName());
         }
         else {
-            for (HivePartition hivePartition : partitionManager.getOrLoadPartitions(metastore, identity, handle)) {
+            for (HivePartition hivePartition : partitionManager.getOrLoadPartitions(session, metastore, identity, handle)) {
                 metastore.dropPartition(session, handle.getSchemaName(), handle.getTableName(), toPartitionValues(hivePartition.getPartitionId()));
             }
         }
@@ -2085,7 +2102,7 @@ public class HiveMetadata
         HiveTableHandle hiveTable = (HiveTableHandle) table;
 
         List<ColumnHandle> partitionColumns = ImmutableList.copyOf(hiveTable.getPartitionColumns());
-        List<HivePartition> partitions = partitionManager.getOrLoadPartitions(metastore, identity, hiveTable);
+        List<HivePartition> partitions = partitionManager.getOrLoadPartitions(session, metastore, identity, hiveTable);
 
         TupleDomain<ColumnHandle> predicate = createPredicate(partitionColumns, partitions);
 
@@ -2148,7 +2165,11 @@ public class HiveMetadata
         HiveTableHandle handle = (HiveTableHandle) tableHandle;
         checkArgument(!handle.getAnalyzePartitionValues().isPresent() || constraint.getSummary().isAll(), "Analyze should not have a constraint");
 
-        HivePartitionResult partitionResult = partitionManager.getPartitions(metastore, identity, handle, constraint);
+        SchemaTableName tableName = handle.getSchemaTableName();
+        Table table = metastore.getTable(new HiveIdentity(session), tableName.getSchemaName(), tableName.getTableName())
+                .orElseThrow(() -> new TableNotFoundException(tableName));
+
+        HivePartitionResult partitionResult = partitionManager.getPartitions(metastore, identity, handle, constraint, table);
 
         HiveTableHandle newHandle = partitionManager.applyPartitionResult(handle, partitionResult);
 
@@ -2204,7 +2225,7 @@ public class HiveMetadata
         }
 
         // Get column handle
-        Map<String, ColumnHandle> columnHandles = getColumnHandles(session, handle);
+        Map<String, ColumnHandle> columnHandles = getColumnHandles(table);
 
         // map predicate columns to hive column handles
         Map<String, HiveColumnHandle> predicateColumns = predicateColumnNames.stream()
@@ -2235,8 +2256,6 @@ public class HiveMetadata
         }
 
         if (!pushPartitionsOnly && isSuitableToPush) {
-            Table table = metastore.getTable(identity, handle.getSchemaName(), handle.getTableName())
-                    .orElseThrow(() -> new TableNotFoundException(handle.getSchemaTableName()));
             return Optional.of(new ConstraintApplicationResult<>(newHandle, TupleDomain.all()));
         }
 

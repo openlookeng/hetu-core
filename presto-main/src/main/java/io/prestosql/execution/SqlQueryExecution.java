@@ -660,6 +660,7 @@ public class SqlQueryExecution
     {
         // time analysis phase
         stateMachine.beginAnalysis();
+        stateMachine.beginLogicalPlan();
 
         // plan query
         PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
@@ -672,6 +673,7 @@ public class SqlQueryExecution
 
         // extract output
         stateMachine.setOutput(analysis.getTarget());
+        stateMachine.endLogicalPlan();
 
         // fragment the plan
         SubPlan fragmentedPlan = planFragmenter.createSubPlans(stateMachine.getSession(), plan, false, stateMachine.getWarningCollector());

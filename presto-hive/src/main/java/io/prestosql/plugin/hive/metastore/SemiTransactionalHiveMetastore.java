@@ -260,10 +260,9 @@ public class SemiTransactionalHiveMetastore
         }
     }
 
-    public synchronized Map<String, PartitionStatistics> getPartitionStatistics(HiveIdentity identity, String databaseName, String tableName, Set<String> partitionNames)
+    public synchronized Map<String, PartitionStatistics> getPartitionStatistics(HiveIdentity identity, String databaseName, String tableName, Set<String> partitionNames, Optional<Table> table)
     {
         checkReadable();
-        Optional<Table> table = getTable(identity, databaseName, tableName);
         if (!table.isPresent()) {
             return ImmutableMap.of();
         }
@@ -606,21 +605,21 @@ public class SemiTransactionalHiveMetastore
 
     public synchronized Optional<List<String>> getPartitionNames(HiveIdentity identity, String databaseName, String tableName)
     {
-        return doGetPartitionNames(identity, databaseName, tableName, Optional.empty());
+        Optional<Table> table = getTable(identity, databaseName, tableName);
+        return doGetPartitionNames(identity, databaseName, tableName, Optional.empty(), table);
     }
 
-    public synchronized Optional<List<String>> getPartitionNamesByParts(HiveIdentity identity, String databaseName, String tableName, List<String> parts)
+    public synchronized Optional<List<String>> getPartitionNamesByParts(HiveIdentity identity, String databaseName, String tableName, List<String> parts, Table table)
     {
-        return doGetPartitionNames(identity, databaseName, tableName, Optional.of(parts));
+        return doGetPartitionNames(identity, databaseName, tableName, Optional.of(parts), Optional.of(table));
     }
 
     @GuardedBy("this")
-    private Optional<List<String>> doGetPartitionNames(HiveIdentity identity, String databaseName, String tableName, Optional<List<String>> parts)
+    private Optional<List<String>> doGetPartitionNames(HiveIdentity identity, String databaseName, String tableName, Optional<List<String>> parts, Optional<Table> table)
     {
         checkHoldsLock();
 
         checkReadable();
-        Optional<Table> table = getTable(identity, databaseName, tableName);
         if (!table.isPresent()) {
             return Optional.empty();
         }

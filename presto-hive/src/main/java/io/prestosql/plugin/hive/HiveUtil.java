@@ -225,8 +225,8 @@ public final class HiveUtil
         // Tell hive the columns we would like to read, this lets hive optimize reading column oriented files
         setReadColumns(configuration, readHiveColumnIndexes);
 
-        InputFormat<?, ?> inputFormat = getInputFormat(configuration, schema, true);
         JobConf jobConf = ConfigurationUtils.toJobConf(configuration);
+        InputFormat<?, ?> inputFormat = getInputFormat(configuration, schema, true, jobConf);
         FileSplit fileSplit = new FileSplit(path, start, length, (String[]) null);
 
         // propagate serialization configuration to getRecordReader
@@ -298,12 +298,10 @@ public final class HiveUtil
         return Optional.ofNullable(compressionCodecFactory.getCodec(file));
     }
 
-    static InputFormat<?, ?> getInputFormat(Configuration configuration, Properties schema, boolean symlinkTarget)
+    static InputFormat<?, ?> getInputFormat(Configuration configuration, Properties schema, boolean symlinkTarget, JobConf jobConf)
     {
         String inputFormatName = getInputFormatName(schema);
         try {
-            JobConf jobConf = ConfigurationUtils.toJobConf(configuration);
-
             Class<? extends InputFormat<?, ?>> inputFormatClass = getInputFormatClass(jobConf, inputFormatName);
             if (symlinkTarget && (inputFormatClass == SymlinkTextInputFormat.class)) {
                 // symlink targets are always TextInputFormat

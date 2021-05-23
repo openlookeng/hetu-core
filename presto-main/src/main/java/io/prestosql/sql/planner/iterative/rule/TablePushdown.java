@@ -226,7 +226,7 @@ public class TablePushdown
     private boolean isTableWithUniqueColumns(TableScanNode tableNode)
     {
         TableHandle tableHandle = tableNode.getTable();
-        TableStatistics tableStatistics = metadata.getTableStatistics(ruleContext.getSession(), tableHandle, Constraint.alwaysTrue());
+        TableStatistics tableStatistics = metadata.getTableStatistics(ruleContext.getSession(), tableHandle, Constraint.alwaysTrue(), true);
 
         /*
          * We check here if tablestats is null or not.
