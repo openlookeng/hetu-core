@@ -1667,7 +1667,7 @@ public class SemiTransactionalHiveMetastore
 
             if (pathExists(hdfsContext, hdfsEnvironment, currentPath)) {
                 if (!targetPath.equals(currentPath)) {
-                    renameNewPartitionDirectory(
+                    renamePartitionDirectory(
                             hdfsContext,
                             hdfsEnvironment,
                             currentPath,
@@ -2264,6 +2264,22 @@ public class SemiTransactionalHiveMetastore
         }
     }
 
+    private static void renamePartitionDirectory(HdfsContext context,
+            HdfsEnvironment hdfsEnvironment,
+            Path source,
+            Path target,
+            List<DirectoryCleanUpTask> cleanUpTasksForAbort)
+    {
+        try {
+            if (hdfsEnvironment.getFileSystem(context, source).rename(source, target)) {
+                cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, target, true));
+            }
+        }
+        catch (IOException e) {
+            renameNewPartitionDirectory(context, hdfsEnvironment, source, target, cleanUpTasksForAbort);
+        }
+    }
+
     private static void renameDirectory(HdfsEnvironment.HdfsContext context, HdfsEnvironment hdfsEnvironment, Path source, Path target, Runnable runWhenRenameSuccess)
     {
         if (pathExists(context, hdfsEnvironment, target)) {
@@ -2310,6 +2326,12 @@ public class SemiTransactionalHiveMetastore
         // don't delete hidden presto directories
         if (directory.getName().startsWith(".presto")) {
             return new RecursiveDeleteResult(false, ImmutableList.of());
+        }
+
+        if (directory.getName().startsWith(".staging")) {
+            if (deleteIfExists(fileSystem, directory, true)) {
+                return new RecursiveDeleteResult(true, ImmutableList.of());
+            }
         }
 
         FileStatus[] allFiles;
