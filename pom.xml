@@ -151,6 +151,7 @@
         <module>hetu-hazelcast</module>
         <module>hetu-function-namespace-managers</module>
         <module>hetu-greenplum</module>
+        <module>hetu-clickhouse</module>
     </modules>
 
     <dependencyManagement>

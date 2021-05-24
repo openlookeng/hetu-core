@@ -313,4 +313,10 @@
             <unpack />
         </artifact>
     </artifactSet>
+
+    <artifactSet to="plugin/clickhouse">
+        <artifact id="${project.groupId}:hetu-clickhouse:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
 </runtime>
