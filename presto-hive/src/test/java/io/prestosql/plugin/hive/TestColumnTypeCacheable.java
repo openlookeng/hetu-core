@@ -750,7 +750,8 @@ public class TestColumnTypeCacheable
                     Optional.empty(),
                     false,
                     Optional.empty(),
-                    Optional.empty());
+                    Optional.empty(),
+                    ImmutableMap.of());
         }
 
         private static Properties properties(String key, String value)

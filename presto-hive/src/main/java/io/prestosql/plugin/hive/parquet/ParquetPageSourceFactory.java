@@ -79,6 +79,7 @@ import static io.prestosql.plugin.hive.HiveSessionProperties.getParquetMaxReadBl
 import static io.prestosql.plugin.hive.HiveSessionProperties.isFailOnCorruptedParquetStatistics;
 import static io.prestosql.plugin.hive.HiveSessionProperties.isUseParquetColumnNames;
 import static io.prestosql.plugin.hive.HiveUtil.getDeserializerClassName;
+import static io.prestosql.plugin.hive.HiveUtil.shouldUseRecordReaderFromInputFormat;
 import static io.prestosql.plugin.hive.parquet.HdfsParquetDataSource.buildHdfsParquetDataSource;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -125,7 +126,7 @@ public class ParquetPageSourceFactory
             boolean splitCacheable,
             long dataSourceLastModifiedTime)
     {
-        if (!PARQUET_SERDE_CLASS_NAMES.contains(getDeserializerClassName(schema))) {
+        if (!PARQUET_SERDE_CLASS_NAMES.contains(getDeserializerClassName(schema)) || shouldUseRecordReaderFromInputFormat(configuration, schema)) {
             return Optional.empty();
         }
 

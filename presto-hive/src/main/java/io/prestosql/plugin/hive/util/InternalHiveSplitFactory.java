@@ -14,6 +14,7 @@
 package io.prestosql.plugin.hive.util;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import io.prestosql.plugin.hive.DeleteDeltaLocations;
 import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.plugin.hive.HivePartitionKey;
@@ -47,6 +48,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.plugin.hive.HiveColumnHandle.isPathColumnHandle;
 import static io.prestosql.plugin.hive.HiveUtil.isSplittable;
+import static io.prestosql.plugin.hive.util.CustomSplitConversionUtils.extractCustomSplitInfo;
 import static java.util.Objects.requireNonNull;
 
 public class InternalHiveSplitFactory
@@ -114,13 +116,15 @@ public class InternalHiveSplitFactory
                 bucketNumber,
                 splittable,
                 deleteDeltaLocations,
-                startRowOffsetOfFile);
+                startRowOffsetOfFile,
+                ImmutableMap.of());
     }
 
     public Optional<InternalHiveSplit> createInternalHiveSplit(FileSplit split)
             throws IOException
     {
         FileStatus file = fileSystem.getFileStatus(split.getPath());
+        Map<String, String> customSplitInfo = extractCustomSplitInfo(split);
         return createInternalHiveSplit(
                 split.getPath(),
                 fileSystem.getFileBlockLocations(file, split.getStart(), split.getLength()),
@@ -131,7 +135,8 @@ public class InternalHiveSplitFactory
                 OptionalInt.empty(),
                 false,
                 Optional.empty(),
-                Optional.empty());
+                Optional.empty(),
+                customSplitInfo);
     }
 
     private Optional<InternalHiveSplit> createInternalHiveSplit(
@@ -144,7 +149,8 @@ public class InternalHiveSplitFactory
             OptionalInt bucketNumber,
             boolean splittable,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
-            Optional<Long> startRowOffsetOfFile)
+            Optional<Long> startRowOffsetOfFile,
+            Map<String, String> customSplitInfo)
     {
         String pathString = path.toString();
         if (!pathMatchesPredicate(pathDomain, pathString)) {
@@ -202,7 +208,8 @@ public class InternalHiveSplitFactory
                 bucketConversion,
                 s3SelectPushdownEnabled && S3SelectPushdown.isCompressionCodecSupported(inputFormat, path),
                 deleteDeltaLocations,
-                startRowOffsetOfFile));
+                startRowOffsetOfFile,
+                customSplitInfo));
     }
 
     private static void checkBlocks(List<InternalHiveSplit.InternalHiveBlock> blocks, long start, long length)

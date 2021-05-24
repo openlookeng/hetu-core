@@ -115,7 +115,7 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
 
         ImmutableList<HivePartitionKey> partitionKeys = ImmutableList.of(new HivePartitionKey("p1", "100"), new HivePartitionKey("p2", "101"), new HivePartitionKey("p3", "__HIVE_DEFAULT_PARTITION__"));
 
-        HiveSplitWrapper split = HiveSplitWrapper.wrap(new HiveSplit("db", "table", "partitionId", "path", 0, 50, 50, 0, schema, partitionKeys, ImmutableList.of(), OptionalInt.empty(), false, ImmutableMap.of(), Optional.empty(), false, Optional.empty(), Optional.empty(), false));
+        HiveSplitWrapper split = HiveSplitWrapper.wrap(new HiveSplit("db", "table", "partitionId", "path", 0, 50, 50, 0, schema, partitionKeys, ImmutableList.of(), OptionalInt.empty(), false, ImmutableMap.of(), Optional.empty(), false, Optional.empty(), Optional.empty(), false, ImmutableMap.of()));
 
         List<Long> filterValues = ImmutableList.of(1L, 50L, 100L);
 

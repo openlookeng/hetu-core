@@ -52,6 +52,7 @@ public class HiveSplit
     private final Optional<DeleteDeltaLocations> deleteDeltaLocations;
     private final Optional<Long> startRowOffsetOfFile;
     private final boolean cacheable;
+    private final Map<String, String> customSplitInfo;
 
     @JsonCreator
     public HiveSplit(
@@ -73,7 +74,8 @@ public class HiveSplit
             @JsonProperty("s3SelectPushdownEnabled") boolean s3SelectPushdownEnabled,
             @JsonProperty("deleteDeltaLocations") Optional<DeleteDeltaLocations> deleteDeltaLocations,
             @JsonProperty("validWriteIdList") Optional<Long> startRowOffsetOfFile,
-            @JsonProperty("cacheable") boolean cacheable)
+            @JsonProperty("cacheable") boolean cacheable,
+            @JsonProperty("customSplitInfo") Map<String, String> customSplitInfo)
     {
         checkArgument(start >= 0, "start must be positive");
         checkArgument(length >= 0, "length must be positive");
@@ -110,6 +112,7 @@ public class HiveSplit
         this.deleteDeltaLocations = deleteDeltaLocations;
         this.startRowOffsetOfFile = startRowOffsetOfFile;
         this.cacheable = cacheable;
+        this.customSplitInfo = ImmutableMap.copyOf(requireNonNull(customSplitInfo, "customSplitInfo is null"));
     }
 
     @JsonProperty
@@ -239,6 +242,12 @@ public class HiveSplit
     public boolean isCacheable()
     {
         return cacheable;
+    }
+
+    @JsonProperty
+    public Map<String, String> getCustomSplitInfo()
+    {
+        return customSplitInfo;
     }
 
     public Object getInfo()

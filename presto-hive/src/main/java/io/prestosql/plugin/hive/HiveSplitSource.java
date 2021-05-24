@@ -423,7 +423,8 @@ class HiveSplitSource
                         internalSplit.isS3SelectPushdownEnabled(),
                         internalSplit.getDeleteDeltaLocations(),
                         internalSplit.getStartRowOffsetOfFile(),
-                        splitCacheable)));
+                        splitCacheable,
+                        internalSplit.getCustomSplitInfo())));
 
                 internalSplit.increaseStart(splitBytes);
 

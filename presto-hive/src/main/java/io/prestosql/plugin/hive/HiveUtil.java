@@ -15,6 +15,7 @@ package io.prestosql.plugin.hive;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
+import com.google.common.base.Predicate;
 import com.google.common.base.Splitter;
 import com.google.common.base.VerifyException;
 import com.google.common.collect.AbstractIterator;
@@ -35,6 +36,7 @@ import io.prestosql.plugin.hive.metastore.SortingColumn;
 import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.plugin.hive.util.ConfigurationUtils;
 import io.prestosql.plugin.hive.util.FooterAwareRecordReader;
+import io.prestosql.plugin.hive.util.HudiRealtimeSplitConverter;
 import io.prestosql.plugin.hive.util.MergingPageIterator;
 import io.prestosql.spi.ErrorCodeSupplier;
 import io.prestosql.spi.Page;
@@ -82,6 +84,7 @@ import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.TextInputFormat;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hudi.hadoop.realtime.HoodieRealtimeFileSplit;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
@@ -93,11 +96,13 @@ import org.joda.time.format.ISODateTimeFormat;
 import javax.annotation.Nullable;
 
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -120,6 +125,7 @@ import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Lists.transform;
 import static io.prestosql.plugin.hive.HiveBucketing.containsTimestampBucketedV2;
 import static io.prestosql.plugin.hive.HiveColumnHandle.bucketColumnHandle;
+import static io.prestosql.plugin.hive.util.CustomSplitConversionUtils.recreateSplitWithCustomInfo;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -156,6 +162,7 @@ import static org.apache.hadoop.hive.serde.serdeConstants.DECIMAL_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
 import static org.apache.hadoop.hive.serde2.ColumnProjectionUtils.READ_ALL_COLUMNS;
 import static org.apache.hadoop.hive.serde2.ColumnProjectionUtils.READ_COLUMN_IDS_CONF_STR;
+import static org.apache.hadoop.hive.serde2.ColumnProjectionUtils.READ_COLUMN_NAMES_CONF_STR;
 import static org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 
 public final class HiveUtil
@@ -216,7 +223,7 @@ public final class HiveUtil
     {
     }
 
-    public static RecordReader<?, ?> createRecordReader(Configuration configuration, Path path, long start, long length, Properties schema, List<HiveColumnHandle> columns)
+    public static RecordReader<?, ?> createRecordReader(Configuration configuration, Path path, long start, long length, Properties schema, List<HiveColumnHandle> columns, Map<String, String> customSplitInfo)
     {
         // determine which hive columns we will read
         List<HiveColumnHandle> readColumns = ImmutableList.copyOf(filter(columns, column -> column.getColumnType() == HiveColumnHandle.ColumnType.REGULAR));
@@ -225,13 +232,26 @@ public final class HiveUtil
         // Tell hive the columns we would like to read, this lets hive optimize reading column oriented files
         setReadColumns(configuration, readHiveColumnIndexes);
 
+        // Only propagate serialization schema configs by default
+        Predicate<String> schemaFilter = schemaProperty -> schemaProperty.startsWith("serialization.");
+
         JobConf jobConf = ConfigurationUtils.toJobConf(configuration);
         InputFormat<?, ?> inputFormat = getInputFormat(configuration, schema, true, jobConf);
         FileSplit fileSplit = new FileSplit(path, start, length, (String[]) null);
 
-        // propagate serialization configuration to getRecordReader
+        if (!customSplitInfo.isEmpty() && isHudiRealtimeSplit(customSplitInfo)) {
+            fileSplit = recreateSplitWithCustomInfo(fileSplit, customSplitInfo);
+
+            // Add additional column information for record reader
+            List<String> readHiveColumnNames = ImmutableList.copyOf(transform(readColumns, HiveColumnHandle::getName));
+            jobConf.set(READ_COLUMN_NAMES_CONF_STR, Joiner.on(',').join(readHiveColumnNames));
+
+            // Remove filter when using customSplitInfo as the record reader requires complete schema configs
+            schemaFilter = schemaProperty -> true;
+        }
+
         schema.stringPropertyNames().stream()
-                .filter(name -> name.startsWith("serialization."))
+                .filter(schemaFilter)
                 .forEach(name -> jobConf.set(name, schema.getProperty(name)));
 
         // add Airlift LZO and LZOP to head of codecs list so as to not override existing entries
@@ -274,6 +294,12 @@ public final class HiveUtil
         }
     }
 
+    private static boolean isHudiRealtimeSplit(Map<String, String> customSplitInfo)
+    {
+        String customSplitClass = customSplitInfo.get(HudiRealtimeSplitConverter.CUSTOM_SPLIT_CLASS_KEY);
+        return HoodieRealtimeFileSplit.class.getName().equals(customSplitClass);
+    }
+
     public static void setReadColumns(Configuration configuration, List<Integer> readHiveColumnIndexes)
     {
         configuration.set(READ_COLUMN_IDS_CONF_STR, Joiner.on(',').join(readHiveColumnIndexes));
@@ -313,6 +339,16 @@ public final class HiveUtil
         catch (ClassNotFoundException | RuntimeException e) {
             throw new PrestoException(HiveErrorCode.HIVE_UNSUPPORTED_FORMAT, "Unable to create input format " + inputFormatName, e);
         }
+    }
+
+    public static boolean shouldUseRecordReaderFromInputFormat(Configuration configuration, Properties schema)
+    {
+        JobConf jobConf = ConfigurationUtils.toJobConf(configuration);
+        InputFormat<?, ?> inputFormat = HiveUtil.getInputFormat(configuration, schema, false, jobConf);
+        return Arrays.stream(inputFormat.getClass().getAnnotations())
+                .map(Annotation::annotationType)
+                .map(Class::getSimpleName)
+                .anyMatch(name -> name.equals("UseRecordReaderFromInputFormat"));
     }
 
     @SuppressWarnings({"unchecked", "RedundantCast"})
