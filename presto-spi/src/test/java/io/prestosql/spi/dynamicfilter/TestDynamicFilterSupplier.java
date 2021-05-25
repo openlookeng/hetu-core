@@ -37,9 +37,9 @@ public class TestDynamicFilterSupplier
     @Test(description = "get dynamic-filter when supplier is null")
     void testNullDynamicFilter()
     {
-        Supplier<Map<ColumnHandle, DynamicFilter>> supplier = null;
+        Supplier<List<Map<ColumnHandle, DynamicFilter>>> supplier = null;
         DynamicFilterSupplier theSupplier = new DynamicFilterSupplier(supplier, System.currentTimeMillis(), 10000);
-        assertEquals(theSupplier.getDynamicFilters(), ImmutableMap.of());
+        assertEquals(theSupplier.getDynamicFilters(), ImmutableList.of());
     }
 
     @Test(description = "get dynamic-filter when supplier is not null")
@@ -57,7 +57,7 @@ public class TestDynamicFilterSupplier
         filter.writeTo(out);
         DynamicFilter dynamicFilter = DynamicFilterFactory.create("testFilter", testColumnHandle, out.toByteArray(), DynamicFilter.Type.GLOBAL);
 
-        Supplier<Map<ColumnHandle, DynamicFilter>> supplier = () -> ImmutableMap.of(testColumnHandle, dynamicFilter);
+        Supplier<List<Map<ColumnHandle, DynamicFilter>>> supplier = () -> ImmutableList.of(ImmutableMap.of(testColumnHandle, dynamicFilter));
         DynamicFilterSupplier theSupplier = new DynamicFilterSupplier(supplier, System.currentTimeMillis(), 10000);
         assertEquals(theSupplier.getDynamicFilters(), supplier.get());
     }
@@ -65,7 +65,7 @@ public class TestDynamicFilterSupplier
     @Test(description = "is blocked")
     void testIsBlocked()
     {
-        Supplier<Map<ColumnHandle, DynamicFilter>> supplier = null;
+        Supplier<List<Map<ColumnHandle, DynamicFilter>>> supplier = null;
         DynamicFilterSupplier theSupplier = new DynamicFilterSupplier(supplier, System.currentTimeMillis(), 10000);
         assertTrue(theSupplier.isBlocked());
     }
@@ -73,7 +73,7 @@ public class TestDynamicFilterSupplier
     @Test(description = "is not blocked")
     void testIsNotBlocked()
     {
-        Supplier<Map<ColumnHandle, DynamicFilter>> supplier = null;
+        Supplier<List<Map<ColumnHandle, DynamicFilter>>> supplier = null;
         DynamicFilterSupplier theSupplier = new DynamicFilterSupplier(supplier, System.currentTimeMillis(), 0);
         assertFalse(theSupplier.isBlocked());
     }

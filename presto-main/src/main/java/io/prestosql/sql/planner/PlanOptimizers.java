@@ -31,7 +31,6 @@ import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.planner.iterative.IterativeOptimizer;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.planner.iterative.rule.AddExchangeAboveCTENode;
 import io.prestosql.sql.planner.iterative.rule.AddExchangesBelowPartialAggregationOverGroupIdRuleSet;
 import io.prestosql.sql.planner.iterative.rule.AddIntermediateAggregations;
 import io.prestosql.sql.planner.iterative.rule.CanonicalizeExpressions;
@@ -139,6 +138,7 @@ import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedInPredicateS
 import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedLateralToJoin;
 import io.prestosql.sql.planner.iterative.rule.TranslateExpressions;
 import io.prestosql.sql.planner.iterative.rule.UnwrapCastInComparison;
+import io.prestosql.sql.planner.optimizations.AddExchangeAboveCTENode;
 import io.prestosql.sql.planner.optimizations.AddExchanges;
 import io.prestosql.sql.planner.optimizations.AddLocalExchanges;
 import io.prestosql.sql.planner.optimizations.AddReuseExchange;
@@ -251,8 +251,9 @@ public class PlanOptimizers
     {
         this.exporter = exporter;
         ImmutableList.Builder<PlanOptimizer> builder = ImmutableList.builder();
+        CostCalculationHandle costCalculationHandle = new CostCalculationHandle(statsCalculator, costCalculator, costComparator);
 
-        builder.add(new PruneCTENodes(metadata, typeAnalyzer, false, false, false));
+        builder.add(new PruneCTENodes(metadata, typeAnalyzer, false));
         Set<Rule<?>> predicatePushDownRules = ImmutableSet.of(
                 new MergeFilters());
 
@@ -447,7 +448,7 @@ public class PlanOptimizers
 
         builder.add(new StatsRecordingPlanOptimizer(
                         optimizerStats,
-                        new PredicatePushDown(metadata, typeAnalyzer, false, false)),
+                        new PredicatePushDown(metadata, typeAnalyzer, costCalculationHandle, false, false, false)),
                 new IterativeOptimizer(
                         ruleStats,
                         statsCalculator,
@@ -514,13 +515,13 @@ public class PlanOptimizers
                         estimatedExchangesCostCalculator,
                         ImmutableSet.of(new RemoveRedundantIdentityProjections())),
                 new MetadataQueryOptimizer(metadata),
-                new PruneCTENodes(metadata, typeAnalyzer, true, true, false),
+                new PruneCTENodes(metadata, typeAnalyzer, true),
                 new IterativeOptimizer(
                         ruleStats,
                         statsCalculator,
                         estimatedExchangesCostCalculator,
                         ImmutableSet.of(new EliminateCrossJoins())), // This can pull up Filter and Project nodes from between Joins, so we need to push them down again
-                new StatsRecordingPlanOptimizer(optimizerStats, new PredicatePushDown(metadata, typeAnalyzer, true, false)),
+                new StatsRecordingPlanOptimizer(optimizerStats, new PredicatePushDown(metadata, typeAnalyzer, costCalculationHandle, true, false, true)),
                 simplifyRowExpressionOptimizer, // Should be always run after PredicatePushDown
                 new IterativeOptimizer(
                         ruleStats,
@@ -628,15 +629,9 @@ public class PlanOptimizers
                         costCalculator,
                         ImmutableSet.of(new RemoveEmptyDelete()))); // Run RemoveEmptyDelete after table scan is removed by PickTableLayout/AddExchanges
 
-        builder.add(new StatsRecordingPlanOptimizer(optimizerStats, new PredicatePushDown(metadata, typeAnalyzer, true, true))); // Run predicate push down one more time in case we can leverage new information from layouts' effective predicate
+        builder.add(new StatsRecordingPlanOptimizer(optimizerStats, new PredicatePushDown(metadata, typeAnalyzer, costCalculationHandle, true, true, true))); // Run predicate push down one more time in case we can leverage new information from layouts' effective predicate
         builder.add(new RemoveUnsupportedDynamicFilters(metadata, statsCalculator));
-        builder.add(new PruneCTENodes(metadata, typeAnalyzer, false, false, true));
         builder.add(simplifyRowExpressionOptimizer); // Should be always run after PredicatePushDown
-        builder.add(new IterativeOptimizer(
-                ruleStats,
-                statsCalculator,
-                costCalculator,
-                ImmutableSet.of(new AddExchangeAboveCTENode())));
         builder.add(projectionPushDown);
         builder.add(inlineProjections);
         builder.add(new UnaliasSymbolReferences(metadata)); // Run unalias after merging projections to simplify projections more efficiently
@@ -657,6 +652,7 @@ public class PlanOptimizers
 
         // Optimizers above this don't understand local exchanges, so be careful moving this.
         builder.add(new AddLocalExchanges(metadata, typeAnalyzer));
+        builder.add(new AddExchangeAboveCTENode());
 
         // Optimizers above this do not need to care about aggregations with the type other than SINGLE
         // This optimizer must be run after all exchange-related optimizers
@@ -710,5 +706,34 @@ public class PlanOptimizers
     public List<PlanOptimizer> get()
     {
         return optimizers;
+    }
+
+    public static class CostCalculationHandle
+    {
+        StatsCalculator statsCalculator;
+        CostCalculator costCalculator;
+        CostComparator costComparator;
+
+        public CostCalculationHandle(StatsCalculator statsCalculator, CostCalculator costCalculator, CostComparator costComparator)
+        {
+            this.statsCalculator = statsCalculator;
+            this.costCalculator = costCalculator;
+            this.costComparator = costComparator;
+        }
+
+        public StatsCalculator getStatsCalculator()
+        {
+            return statsCalculator;
+        }
+
+        public CostCalculator getCostCalculator()
+        {
+            return costCalculator;
+        }
+
+        public CostComparator getCostComparator()
+        {
+            return costComparator;
+        }
     }
 }

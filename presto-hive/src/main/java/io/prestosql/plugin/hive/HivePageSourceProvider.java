@@ -64,6 +64,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Properties;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -125,7 +126,7 @@ public class HivePageSourceProvider
             ConnectorSplit split, ConnectorTableHandle table, List<ColumnHandle> columns,
             Optional<DynamicFilterSupplier> dynamicFilterSupplier)
     {
-        Map<ColumnHandle, DynamicFilter> dynamicFilters = null;
+        List<Map<ColumnHandle, DynamicFilter>> dynamicFilters = null;
         if (dynamicFilterSupplier.isPresent()) {
             dynamicFilters = dynamicFilterSupplier.get().getDynamicFilters();
         }
@@ -141,7 +142,7 @@ public class HivePageSourceProvider
             HiveSplit hiveSplit = hiveSplits.get(0);
             return createPageSourceInternal(session, dynamicFilterSupplier, dynamicFilters, hiveTable, hiveColumns, hiveSplit);
         }
-        Map<ColumnHandle, DynamicFilter> finalDynamicFilters = dynamicFilters;
+        List<Map<ColumnHandle, DynamicFilter>> finalDynamicFilters = dynamicFilters;
         List<ConnectorPageSource> pageSources = hiveSplits.stream()
                 .map(hiveSplit -> createPageSourceInternal(session, dynamicFilterSupplier, finalDynamicFilters, hiveTable, hiveColumns, hiveSplit))
                 .collect(toList());
@@ -150,15 +151,22 @@ public class HivePageSourceProvider
 
     private ConnectorPageSource createPageSourceInternal(ConnectorSession session,
             Optional<DynamicFilterSupplier> dynamicFilterSupplier,
-            Map<ColumnHandle, DynamicFilter> dynamicFilters,
+            List<Map<ColumnHandle, DynamicFilter>> dynamicFilters,
             HiveTableHandle hiveTable,
             List<HiveColumnHandle> hiveColumns,
             HiveSplit hiveSplit)
     {
         Path path = new Path(hiveSplit.getPath());
 
+        List<Set<DynamicFilter>> dynamicFilterList = new ArrayList();
+        if (dynamicFilters != null) {
+            for (Map<ColumnHandle, DynamicFilter> df : dynamicFilters) {
+                Set<DynamicFilter> values = df.values().stream().collect(Collectors.toSet());
+                dynamicFilterList.add(values);
+            }
+        }
         // Filter out splits using partition values and dynamic filters
-        if (dynamicFilters != null && !dynamicFilters.isEmpty() && isPartitionFiltered(hiveSplit.getPartitionKeys(), new HashSet(dynamicFilters.values()), typeManager)) {
+        if (dynamicFilters != null && !dynamicFilters.isEmpty() && isPartitionFiltered(hiveSplit.getPartitionKeys(), dynamicFilterList, typeManager)) {
             return new FixedPageSource(ImmutableList.of());
         }
 
@@ -188,12 +196,14 @@ public class HivePageSourceProvider
 
         TupleDomain<HiveColumnHandle> predicate = TupleDomain.all();
         if (dynamicFilterSupplier.isPresent() && dynamicFilters != null && !dynamicFilters.isEmpty()) {
-            List<HiveColumnHandle> filteredHiveColumnHandles = hiveColumns.stream().filter(column -> dynamicFilters.containsKey(column)).collect(toList());
-            HiveColumnHandle hiveColumnHandle = filteredHiveColumnHandles.get(0);
-            Type type = hiveColumnHandle.getColumnMetadata(typeManager).getType();
-            predicate = getPredicate(dynamicFilters.get(hiveColumnHandle), type, hiveColumnHandle);
-            if (predicate.isNone()) {
-                predicate = TupleDomain.all();
+            if (dynamicFilters.size() == 1) {
+                List<HiveColumnHandle> filteredHiveColumnHandles = hiveColumns.stream().filter(column -> dynamicFilters.get(0).containsKey(column)).collect(toList());
+                HiveColumnHandle hiveColumnHandle = filteredHiveColumnHandles.get(0);
+                Type type = hiveColumnHandle.getColumnMetadata(typeManager).getType();
+                predicate = getPredicate(dynamicFilters.get(0).get(hiveColumnHandle), type, hiveColumnHandle);
+                if (predicate.isNone()) {
+                    predicate = TupleDomain.all();
+                }
             }
         }
 

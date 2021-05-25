@@ -236,9 +236,9 @@ public final class HiveTestUtils
         }
     }
 
-    public static Supplier<Set<DynamicFilter>> createTestDynamicFilterSupplier(String filterKey, List<Long> filterValues)
+    public static Supplier<List<Set<DynamicFilter>>> createTestDynamicFilterSupplier(String filterKey, List<Long> filterValues)
     {
-        Supplier<Set<DynamicFilter>> dynamicFilterSupplier = () -> {
+        Supplier<List<Set<DynamicFilter>>> dynamicFilterSupplier = () -> {
             Set<DynamicFilter> dynamicFilters = new HashSet<>();
             ColumnHandle columnHandle = new HiveColumnHandle(filterKey, HIVE_LONG, parseTypeSignature(StandardTypes.BIGINT), 0, PARTITION_KEY, Optional.empty());
             BloomFilter filter = new BloomFilter(1024 * 1024, 0.01);
@@ -251,7 +251,7 @@ public final class HiveTestUtils
             catch (IOException e) {
             }
 
-            return dynamicFilters;
+            return ImmutableList.of(dynamicFilters);
         };
 
         return dynamicFilterSupplier;

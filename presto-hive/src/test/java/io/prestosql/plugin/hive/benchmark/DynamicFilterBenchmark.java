@@ -14,6 +14,7 @@
  */
 package io.prestosql.plugin.hive.benchmark;
 
+import com.google.common.collect.ImmutableList;
 import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.plugin.hive.HivePageSource;
 import io.prestosql.plugin.hive.HivePartitionKey;
@@ -116,22 +117,24 @@ public class DynamicFilterBenchmark
             return partitions;
         }
 
-        public Map<Integer, ColumnHandle> getEligibleColumns()
+        public List<Map<Integer, ColumnHandle>> getEligibleColumns()
         {
-            return eligibleColumns;
+            return ImmutableList.of(eligibleColumns);
         }
     }
 
     @Benchmark
     public void testFilterRows(BenchmarkData data)
     {
-        Page filteredPage = HivePageSource.filter(data.getDynamicFilters(), data.getPage(), data.getEligibleColumns(), new Type[] {BIGINT, BIGINT});
+        List<Map<ColumnHandle, DynamicFilter>> dynamicFilters = new ArrayList<>();
+        dynamicFilters.add(data.getDynamicFilters());
+        Page filteredPage = HivePageSource.filter(dynamicFilters, data.getPage(), data.getEligibleColumns(), new Type[] {BIGINT, BIGINT});
     }
 
     @Benchmark
     public void testIsPartitionFiltered(BenchmarkData data)
     {
-        isPartitionFiltered(data.getPartitions(), new HashSet(data.getDynamicFilters().values()), null);
+        isPartitionFiltered(data.getPartitions(), ImmutableList.of(new HashSet<>(data.getDynamicFilters().values())), null);
     }
 
     public static void main(String[] args)

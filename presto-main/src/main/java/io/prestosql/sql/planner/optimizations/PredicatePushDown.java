@@ -18,7 +18,14 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import io.airlift.log.Logger;
 import io.prestosql.Session;
+import io.prestosql.cost.CachingCostProvider;
+import io.prestosql.cost.CachingStatsProvider;
+import io.prestosql.cost.CostComparator;
+import io.prestosql.cost.CostProvider;
+import io.prestosql.cost.PlanCostEstimate;
+import io.prestosql.cost.StatsProvider;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.expressions.LogicalRowExpressions;
 import io.prestosql.expressions.RowExpressionNodeInliner;
@@ -44,6 +51,7 @@ import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
@@ -56,6 +64,8 @@ import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.VariablesExtractor;
+import io.prestosql.sql.planner.iterative.Lookup;
+import io.prestosql.sql.planner.iterative.Memo;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.SampleNode;
@@ -81,6 +91,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -88,10 +99,13 @@ import static com.google.common.base.Predicates.in;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Iterables.filter;
+import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
 import static io.prestosql.expressions.LogicalRowExpressions.FALSE_CONSTANT;
 import static io.prestosql.expressions.LogicalRowExpressions.TRUE_CONSTANT;
+import static io.prestosql.expressions.LogicalRowExpressions.extractAllPredicates;
 import static io.prestosql.expressions.LogicalRowExpressions.extractConjuncts;
+import static io.prestosql.expressions.LogicalRowExpressions.extractDisjuncts;
 import static io.prestosql.spi.function.OperatorType.EQUAL;
 import static io.prestosql.spi.plan.JoinNode.DistributionType.PARTITIONED;
 import static io.prestosql.spi.plan.JoinNode.DistributionType.REPLICATED;
@@ -99,11 +113,15 @@ import static io.prestosql.spi.plan.JoinNode.Type.FULL;
 import static io.prestosql.spi.plan.JoinNode.Type.INNER;
 import static io.prestosql.spi.plan.JoinNode.Type.LEFT;
 import static io.prestosql.spi.plan.JoinNode.Type.RIGHT;
+import static io.prestosql.spi.relation.SpecialForm.Form.OR;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.sql.DynamicFilters.createDynamicFilterRowExpression;
-import static io.prestosql.sql.DynamicFilters.extractDynamicFilters;
+import static io.prestosql.sql.DynamicFilters.extractDynamicFilterExpression;
+import static io.prestosql.sql.DynamicFilters.extractStaticFilters;
+import static io.prestosql.sql.DynamicFilters.getDescriptor;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
+import static io.prestosql.sql.planner.PlanOptimizers.CostCalculationHandle;
 import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.VariableReferenceSymbolConverter.toSymbol;
 import static io.prestosql.sql.planner.VariableReferenceSymbolConverter.toVariableReference;
@@ -114,6 +132,7 @@ import static io.prestosql.sql.relational.Expressions.call;
 import static io.prestosql.sql.relational.Expressions.constant;
 import static io.prestosql.sql.relational.Expressions.constantNull;
 import static io.prestosql.sql.relational.Expressions.uniqueSubExpressions;
+import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 import static java.util.function.Function.identity;
 
@@ -122,15 +141,19 @@ public class PredicatePushDown
 {
     private final Metadata metadata;
     private final TypeAnalyzer typeAnalyzer;
+    private final CostCalculationHandle costCalculationHandle;
     private final boolean useTableProperties;
     private final boolean dynamicFiltering;
+    private final boolean pushdownForCTE;
 
-    public PredicatePushDown(Metadata metadata, TypeAnalyzer typeAnalyzer, boolean useTableProperties, boolean dynamicFiltering)
+    public PredicatePushDown(Metadata metadata, TypeAnalyzer typeAnalyzer, CostCalculationHandle costCalculationHandle, boolean useTableProperties, boolean dynamicFiltering, boolean pushdownForCTE)
     {
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.typeAnalyzer = requireNonNull(typeAnalyzer, "typeAnalyzer is null");
+        this.costCalculationHandle = costCalculationHandle;
         this.useTableProperties = useTableProperties;
         this.dynamicFiltering = dynamicFiltering;
+        this.pushdownForCTE = pushdownForCTE;
     }
 
     @Override
@@ -142,16 +165,26 @@ public class PredicatePushDown
         requireNonNull(idAllocator, "idAllocator is null");
 
         RowExpressionPredicateExtractor predicateExtractor = new RowExpressionPredicateExtractor(new RowExpressionDomainTranslator(metadata), metadata, planSymbolAllocator, useTableProperties);
+        Memo memo = new Memo(idAllocator, plan);
+        Lookup lookup = Lookup.from(planNode -> Stream.of(memo.resolve(planNode)));
 
-        return SimplePlanRewriter.rewriteWith(
-                new Rewriter(planSymbolAllocator, idAllocator, metadata, predicateExtractor, typeAnalyzer, session, dynamicFiltering),
-                plan,
-                TRUE_CONSTANT);
+        StatsProvider statsProvider = new CachingStatsProvider(costCalculationHandle.getStatsCalculator(), Optional.of(memo), lookup, session, planSymbolAllocator.getTypes());
+        CostProvider costProvider = new CachingCostProvider(costCalculationHandle.getCostCalculator(), statsProvider, Optional.of(memo), session, planSymbolAllocator.getTypes());
+        FilterPushdownForCTEHandler filterPushdownForCTEHandler = new FilterPushdownForCTEHandler(pushdownForCTE, costProvider, costCalculationHandle.getCostComparator());
+        Rewriter rewriter = new Rewriter(planSymbolAllocator, idAllocator, metadata, predicateExtractor, typeAnalyzer, session, dynamicFiltering, filterPushdownForCTEHandler);
+        PlanNode rewrittenNode = SimplePlanRewriter.rewriteWith(rewriter, plan, TRUE_CONSTANT);
+        if (rewriter.isSecondTraverseRequired()) {
+            return SimplePlanRewriter.rewriteWith(rewriter, rewrittenNode, TRUE_CONSTANT);
+        }
+
+        return rewrittenNode;
     }
 
     private static class Rewriter
             extends SimplePlanRewriter<RowExpression>
     {
+        private static final Logger LOG = Logger.get(PredicatePushDown.Rewriter.class);
+
         private final PlanSymbolAllocator planSymbolAllocator;
         private final PlanNodeIdAllocator idAllocator;
         private final Metadata metadata;
@@ -162,6 +195,14 @@ public class PredicatePushDown
         private final LogicalRowExpressions logicalRowExpressions;
         private final TypeManager typeManager;
         private final boolean dynamicFiltering;
+        private final boolean pushdownForCTE;
+        private boolean isCteNodeAlreadyVisited;
+        private final CostProvider costProvider;
+        private final CostComparator costComparator;
+        private final Map<Integer, List<RowExpression>> cteFilterMap;
+        private final Map<Integer, List<Symbol>> cteExprMap;
+        private final Map<Integer, PlanCostEstimate> cteCostMap;
+        private final Double pushdownCostScaleFactor = 1.5;
 
         private Rewriter(
                 PlanSymbolAllocator planSymbolAllocator,
@@ -170,7 +211,7 @@ public class PredicatePushDown
                 RowExpressionPredicateExtractor effectivePredicateExtractor,
                 TypeAnalyzer typeAnalyzer,
                 Session session,
-                boolean dynamicFiltering)
+                boolean dynamicFiltering, FilterPushdownForCTEHandler filterPushdownForCTEHandler)
         {
             this.planSymbolAllocator = requireNonNull(planSymbolAllocator, "variableAllocator is null");
             this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
@@ -182,6 +223,12 @@ public class PredicatePushDown
             this.logicalRowExpressions = new LogicalRowExpressions(determinismEvaluator, new FunctionResolution(metadata.getFunctionAndTypeManager()), metadata.getFunctionAndTypeManager());
             this.typeManager = new InternalTypeManager(metadata.getFunctionAndTypeManager());
             this.dynamicFiltering = dynamicFiltering;
+            this.pushdownForCTE = filterPushdownForCTEHandler.isPushdownForCTE();
+            this.costProvider = filterPushdownForCTEHandler.getCostProvider();
+            this.costComparator = filterPushdownForCTEHandler.getCostComparator();
+            this.cteFilterMap = new HashMap<>();
+            this.cteExprMap = new HashMap<>();
+            this.cteCostMap = new HashMap<>();
         }
 
         @Override
@@ -198,13 +245,78 @@ public class PredicatePushDown
         @Override
         public PlanNode visitCTEScan(CTEScanNode node, RewriteContext<RowExpression> context)
         {
-            if (dynamicFiltering && extractDynamicFilters(context.get()).getStaticConjuncts().size() == 0) {
-                //Currently we pushdown only if dynamic filter expression there.
-                return context.defaultRewrite(node, context.get());
-            }
-            else {
+            if (!pushdownForCTE) {
                 return visitPlan(node, context);
             }
+            Integer commonCTERefNum = node.getCommonCTERefNum();
+            //collect static filters in a map in first traversal for pushing down later
+            if (!isCteNodeAlreadyVisited) {
+                if (context.get() == null) {
+                    return context.defaultRewrite(node, context.get());
+                }
+                RowExpression expression = context.get();
+                CTEScanNode rewrittenPlan = node;
+                if (!dynamicFiltering) {
+                    rewrittenPlan = (CTEScanNode) context.defaultRewrite(node, context.get());
+                }
+                RowExpression dynamicConjuncts = logicalRowExpressions.filterConjuncts(context.get(), s -> getDescriptor(s).isPresent());
+                if (cteFilterMap.get(commonCTERefNum) == null) {
+                    List<RowExpression> expressions = new ArrayList<>();
+                    cteExprMap.put(commonCTERefNum, node.getOutputSymbols());
+                    if (dynamicFiltering) {
+                        expressions.add(dynamicConjuncts);
+                        cteFilterMap.put(commonCTERefNum, expressions);
+                    }
+                    else {
+                        expressions.add(expression);
+                        cteFilterMap.put(commonCTERefNum, expressions);
+                        cteCostMap.put(commonCTERefNum, getCostForSubtree(rewrittenPlan.getSource()));
+                    }
+                }
+                else {
+                    if (dynamicFiltering) {
+                        List<RowExpression> existing = cteFilterMap.get(commonCTERefNum);
+                        // store the union of filter for pushdown later
+                        existing.add(rewriteExpression(node, dynamicConjuncts));
+                        cteFilterMap.put(commonCTERefNum, existing);
+                    }
+                    else {
+                        List<RowExpression> existing = cteFilterMap.get(commonCTERefNum);
+                        // store the union of filter for pushdown later
+                        existing.add(rewriteExpression(node, expression));
+                        cteFilterMap.put(commonCTERefNum, existing);
+
+                        PlanCostEstimate existingCost = cteCostMap.get(commonCTERefNum);
+                        PlanCostEstimate currentCost = getCostForSubtree(rewrittenPlan);
+                        computeTotalCost(existingCost, currentCost, node);
+                    }
+                }
+                PlanNode filterNode = new FilterNode(idAllocator.getNextId(), node, context.get());
+                return filterNode;
+            }
+            // add a filter node above cte node for static conjuncts on second traversal and pushdown their union
+            if (cteFilterMap.get(node.getCommonCTERefNum()) != null) {
+                RowExpression rewrittenExpression = rewriteExpression(node, logicalRowExpressions.combineDisjuncts(cteFilterMap.get(commonCTERefNum)));
+                CTEScanNode rewrittenNode = (CTEScanNode) context.defaultRewrite(node, rewrittenExpression);
+                if (dynamicFiltering) {
+                    rewrittenNode = new CTEScanNode(rewrittenNode.getId(), rewrittenNode.getSource(), rewrittenNode.getOutputSymbols(), Optional.of(rewrittenExpression),
+                                        rewrittenNode.getCteRefName(), rewrittenNode.getConsumerPlans(), rewrittenNode.getCommonCTERefNum());
+                    RowExpression staticConjuncts = logicalRowExpressions.filterConjuncts(context.get(), s -> !getDescriptor(s).isPresent());
+                    PlanNode filterNode = new FilterNode(idAllocator.getNextId(), rewrittenNode, staticConjuncts);
+                    return filterNode;
+                }
+                PlanNode filterNode = new FilterNode(idAllocator.getNextId(), rewrittenNode, context.get());
+                //pushdown disjuncts if cost is better
+                if (cteFilterMap.get(node.getCommonCTERefNum()).contains(TRUE_CONSTANT) || !compareCosts(cteCostMap.get(node.getCommonCTERefNum()), getCostForSubtree(rewrittenNode.getSource()), node)) {
+                    return filterNode;
+                }
+                else {
+                    // remove CTE node if cost is not optimal
+                    rewrittenNode = ((CTEScanNode) context.defaultRewrite(node, context.get()));
+                    return rewrittenNode.getSource();
+                }
+            }
+            return context.defaultRewrite(node, context.get());
         }
 
         @Override
@@ -308,6 +420,9 @@ public class PredicatePushDown
 
         private boolean isInliningCandidate(RowExpression expression, ProjectNode node)
         {
+            if (isCteNodeAlreadyVisited) {
+                return true;
+            }
             // TryExpressions should not be pushed down. However they are now being handled as lambda
             // passed to a FunctionCall now and should not affect predicate push down. So we want to make
             // sure the conjuncts are not TryExpressions.
@@ -403,6 +518,10 @@ public class PredicatePushDown
         public PlanNode visitFilter(FilterNode node, RewriteContext<RowExpression> context)
         {
             PlanNode rewrittenPlan = context.rewrite(node.getSource(), logicalRowExpressions.combineConjuncts(node.getPredicate(), context.get()));
+            // handles CTEScanNode rewrite before exchanges are added
+            if (node.getSource() instanceof CTEScanNode) {
+                return rewrittenPlan;
+            }
             if (!(rewrittenPlan instanceof FilterNode)) {
                 return rewrittenPlan;
             }
@@ -438,7 +557,8 @@ public class PredicatePushDown
 
             switch (node.getType()) {
                 case INNER:
-                    InnerJoinPushDownResult innerJoinPushDownResult = processInnerJoin(inheritedPredicate,
+                    InnerJoinPushDownResult innerJoinPushDownResult = processInnerJoin(node,
+                            inheritedPredicate,
                             leftEffectivePredicate,
                             rightEffectivePredicate,
                             joinPredicate,
@@ -528,10 +648,18 @@ public class PredicatePushDown
 
             //extract expression to be pushed down to tablescan and leverage dynamic filter for filtering
             DynamicFiltersResult dynamicFiltersResult = createDynamicFilters(node, equiJoinClauses, newJoinFilter, session, idAllocator);
-            Map<String, Symbol> dynamicFilters = dynamicFiltersResult.getDynamicFilters();
-
-            //the result leftPredicate will have the dynamic filter predicate 'AND' to it.
-            leftPredicate = logicalRowExpressions.combineConjuncts(leftPredicate, logicalRowExpressions.combineConjuncts(dynamicFiltersResult.getPredicates()));
+            Map<String, Symbol> dynamicFilters;
+            if (isCteNodeAlreadyVisited && !node.getDynamicFilters().isEmpty()) {
+                dynamicFilters = node.getDynamicFilters();
+                List<RowExpression> predicates = getDynFilterPredicatesFromProbeSide(node.getLeft(), dynamicFilters);
+                //the result leftPredicate will have the dynamic filter predicate 'AND' to it.
+                leftPredicate = logicalRowExpressions.combineConjuncts(leftPredicate, logicalRowExpressions.combineConjuncts(predicates));
+            }
+            else {
+                dynamicFilters = dynamicFiltersResult.getDynamicFilters();
+                //the result leftPredicate will have the dynamic filter predicate 'AND' to it.
+                leftPredicate = logicalRowExpressions.combineConjuncts(leftPredicate, logicalRowExpressions.combineConjuncts(dynamicFiltersResult.getPredicates()));
+            }
 
             PlanNode leftSource;
             PlanNode rightSource;
@@ -753,7 +881,7 @@ public class PredicatePushDown
 
             switch (node.getType()) {
                 case INNER:
-                    InnerJoinPushDownResult innerJoinPushDownResult = processInnerJoin(
+                    InnerJoinPushDownResult innerJoinPushDownResult = processInnerJoin(node,
                             inheritedPredicate,
                             leftEffectivePredicate,
                             rightEffectivePredicate,
@@ -951,7 +1079,7 @@ public class PredicatePushDown
             }
         }
 
-        private InnerJoinPushDownResult processInnerJoin(RowExpression inheritedPredicate, RowExpression leftEffectivePredicate, RowExpression rightEffectivePredicate, RowExpression joinPredicate, Collection<VariableReferenceExpression> leftVariables)
+        private InnerJoinPushDownResult processInnerJoin(PlanNode node, RowExpression inheritedPredicate, RowExpression leftEffectivePredicate, RowExpression rightEffectivePredicate, RowExpression joinPredicate, Collection<VariableReferenceExpression> leftVariables)
         {
             checkArgument(Iterables.all(VariablesExtractor.extractUnique(leftEffectivePredicate), in(leftVariables)), "leftEffectivePredicate must only contain variables from leftVariables");
             checkArgument(Iterables.all(VariablesExtractor.extractUnique(rightEffectivePredicate), not(in(leftVariables))), "rightEffectivePredicate must not contain variables from leftVariables");
@@ -981,21 +1109,55 @@ public class PredicatePushDown
                     .addEqualityInference(inheritedPredicate, leftEffectivePredicate, joinPredicate)
                     .build();
 
-            // Sort through conjuncts in inheritedPredicate that were not used for inference
-            for (RowExpression conjunct : new RowExpressionEqualityInference.Builder(metadata, typeManager).nonInferrableConjuncts(inheritedPredicate)) {
-                RowExpression leftRewrittenConjunct = allInference.rewriteExpression(conjunct, in(leftVariables));
-                if (leftRewrittenConjunct != null) {
-                    leftPushDownConjuncts.add(leftRewrittenConjunct);
-                }
+            List<RowExpression> disjuncts = extractDisjuncts(inheritedPredicate);
+            if (isCTEReuseEnabled(session) && isUnionofDynamicFilters(inheritedPredicate)) {
+                RowExpression combinedLeftPushDownDisjuncts = FALSE_CONSTANT;
+                RowExpression combinedRightPushDownDisjuncts = FALSE_CONSTANT;
+                for (RowExpression disjunct : disjuncts) {
+                    List<RowExpression> leftPushDownDisjuncts = new ArrayList<>();
+                    List<RowExpression> rightPushDownDisjuncts = new ArrayList<>();
 
-                RowExpression rightRewrittenConjunct = allInference.rewriteExpression(conjunct, not(in(leftVariables)));
-                if (rightRewrittenConjunct != null) {
-                    rightPushDownConjuncts.add(rightRewrittenConjunct);
-                }
+                    // Sort through conjuncts in inheritedPredicate that were not used for inference
+                    for (RowExpression conjunct : new RowExpressionEqualityInference.Builder(metadata, typeManager).nonInferrableConjuncts(disjunct)) {
+                        RowExpression leftRewrittenConjunct = allInference.rewriteExpression(conjunct, in(leftVariables));
+                        if (leftRewrittenConjunct != null) {
+                            leftPushDownDisjuncts.add(leftRewrittenConjunct);
+                        }
 
-                // Drop predicate after join only if unable to push down to either side
-                if (leftRewrittenConjunct == null && rightRewrittenConjunct == null) {
-                    joinConjuncts.add(conjunct);
+                        RowExpression rightRewrittenConjunct = allInference.rewriteExpression(conjunct, not(in(leftVariables)));
+                        if (rightRewrittenConjunct != null) {
+                            rightPushDownDisjuncts.add(rightRewrittenConjunct);
+                        }
+
+                        // Drop predicate after join only if unable to push down to either side
+                        if (leftRewrittenConjunct == null && rightRewrittenConjunct == null) {
+                            joinConjuncts.add(conjunct);
+                        }
+                    }
+                    combinedLeftPushDownDisjuncts = logicalRowExpressions.combineDisjuncts(asList(combinedLeftPushDownDisjuncts, logicalRowExpressions.combineConjuncts(leftPushDownDisjuncts)));
+                    combinedRightPushDownDisjuncts = logicalRowExpressions.combineDisjuncts(asList(combinedRightPushDownDisjuncts, logicalRowExpressions.combineConjuncts(rightPushDownDisjuncts)));
+                }
+                leftPushDownConjuncts.add(combinedLeftPushDownDisjuncts);
+                rightPushDownConjuncts.add(combinedRightPushDownDisjuncts);
+            }
+
+            else {
+                // Sort through conjuncts in inheritedPredicate that were not used for inference
+                for (RowExpression conjunct : new RowExpressionEqualityInference.Builder(metadata, typeManager).nonInferrableConjuncts(inheritedPredicate)) {
+                    RowExpression leftRewrittenConjunct = allInference.rewriteExpression(conjunct, in(leftVariables));
+                    if (leftRewrittenConjunct != null) {
+                        leftPushDownConjuncts.add(leftRewrittenConjunct);
+                    }
+
+                    RowExpression rightRewrittenConjunct = allInference.rewriteExpression(conjunct, not(in(leftVariables)));
+                    if (rightRewrittenConjunct != null) {
+                        rightPushDownConjuncts.add(rightRewrittenConjunct);
+                    }
+
+                    // Drop predicate after join only if unable to push down to either side
+                    if (leftRewrittenConjunct == null && rightRewrittenConjunct == null) {
+                        joinConjuncts.add(conjunct);
+                    }
                 }
             }
 
@@ -1009,9 +1171,12 @@ public class PredicatePushDown
 
             // See if we can push the left effective predicate to the right side
             for (RowExpression conjunct : new RowExpressionEqualityInference.Builder(metadata, typeManager).nonInferrableConjuncts(leftEffectivePredicate)) {
-                RowExpression rewritten = allInference.rewriteExpression(conjunct, not(in(leftVariables)));
-                if (rewritten != null) {
-                    rightPushDownConjuncts.add(rewritten);
+                // do not push down dynamic filters here
+                if (!(node instanceof JoinNode && getDescriptor(conjunct).isPresent() && ((JoinNode) node).getDynamicFilters().keySet().contains(getDescriptor(conjunct).get().getId()))) {
+                    RowExpression rewritten = allInference.rewriteExpression(conjunct, not(in(leftVariables)));
+                    if (rewritten != null) {
+                        rightPushDownConjuncts.add(rewritten);
+                    }
                 }
             }
 
@@ -1493,6 +1658,9 @@ public class PredicatePushDown
         public PlanNode visitTableScan(TableScanNode node, RewriteContext<RowExpression> context)
         {
             RowExpression predicate = simplifyExpression(context.get());
+            if (isCteNodeAlreadyVisited) {
+                predicate = rewriteExpressionForDynamicFilterUnion(predicate);
+            }
 
             if (!TRUE_CONSTANT.equals(predicate)) {
                 return new FilterNode(idAllocator.getNextId(), node, predicate);
@@ -1512,6 +1680,161 @@ public class PredicatePushDown
         private static CallExpression buildEqualsExpression(FunctionAndTypeManager functionAndTypeManager, RowExpression left, RowExpression right)
         {
             return call(EQUAL.name(), functionAndTypeManager.resolveOperatorFunctionHandle(EQUAL, fromTypes(left.getType(), right.getType())), BOOLEAN, left, right);
+        }
+
+        private boolean isSecondTraverseRequired()
+        {
+            isCteNodeAlreadyVisited = !cteFilterMap.isEmpty();
+            return isCteNodeAlreadyVisited;
+        }
+
+        private PlanCostEstimate getCostForSubtree(PlanNode subTree)
+        {
+            return costProvider.getCost(subTree);
+        }
+
+        private void computeTotalCost(PlanCostEstimate existing, PlanCostEstimate current, CTEScanNode node)
+        {
+            try {
+                if (costComparator.compare(session, existing, current) > 0) {
+                    cteCostMap.put(node.getCommonCTERefNum(), current);
+                }
+            }
+            catch (IllegalArgumentException e) {
+                LOG.info("Cannot compare unknown costs");
+            }
+        }
+
+        private boolean compareCosts(PlanCostEstimate left, PlanCostEstimate right, CTEScanNode node)
+        {
+            if (left == null) {
+                return true;
+            }
+            try {
+                return left.getCpuCost() < (right.getCpuCost() * pushdownCostScaleFactor / (cteFilterMap.get(node.getCommonCTERefNum()).size()));
+            }
+            catch (IllegalArgumentException e) {
+                System.out.println(e.getMessage());
+            }
+            return true;
+        }
+
+        private RowExpression rewriteExpression(PlanNode node, RowExpression expression)
+        {
+            if (expression instanceof VariableReferenceExpression) {
+                return new VariableReferenceExpression(getOriginalSymbolRefFromChild(node, ((VariableReferenceExpression) expression).getName()), expression.getType());
+            }
+            else if (expression instanceof SpecialForm) {
+                return new SpecialForm(((SpecialForm) expression).getForm(), expression.getType(), ((SpecialForm) expression).getArguments().stream().map(exp ->
+                        rewriteExpression(node, exp)).collect(Collectors.toList()));
+            }
+            else if (expression instanceof CallExpression) {
+                return new CallExpression(((CallExpression) expression).getDisplayName(), ((CallExpression) expression).getFunctionHandle(), expression.getType(), ((CallExpression) expression).getArguments().stream().map(exp ->
+                        rewriteExpression(node, exp)).collect(Collectors.toList()));
+            }
+            return expression;
+        }
+
+        private String getOriginalSymbolRefFromChild(PlanNode node, String columnName)
+        {
+            if (isCteNodeAlreadyVisited) {
+                int symbolIndex = cteExprMap.get(((CTEScanNode) node).getCommonCTERefNum()).indexOf(new Symbol(columnName));
+                return node.getOutputSymbols().get(symbolIndex).getName();
+            }
+            else {
+                int symbolIndex = node.getOutputSymbols().indexOf(new Symbol(columnName));
+                return cteExprMap.get(((CTEScanNode) node).getCommonCTERefNum()).get(symbolIndex).getName();
+            }
+        }
+
+        private boolean isUnionofDynamicFilters(RowExpression expression)
+        {
+            if (expression instanceof SpecialForm && ((SpecialForm) expression).getForm().equals(OR)) {
+                for (RowExpression argument : ((SpecialForm) expression).getArguments()) {
+                    List<RowExpression> conjuncts = extractConjuncts(argument);
+                    return conjuncts.stream().anyMatch(exp -> getDescriptor(exp).isPresent());
+                }
+            }
+            return false;
+        }
+
+        private List<RowExpression> getDynFilterPredicatesFromProbeSide(PlanNode node, Map<String, Symbol> dynamicFilters)
+        {
+            List<RowExpression> dynamicFilterPredicates = new ArrayList<>();
+            if (node instanceof FilterNode) {
+                for (Map.Entry<String, Symbol> dynamicFilter : dynamicFilters.entrySet()) {
+                    List<RowExpression> predicates = extractAllPredicates(((FilterNode) node).getPredicate()).stream().filter(exp -> getDescriptor(exp).isPresent() &&
+                            getDescriptor(exp).get().getId().equals(dynamicFilter.getKey())).collect(Collectors.toList());
+                    dynamicFilterPredicates.addAll(predicates);
+                }
+                return dynamicFilterPredicates;
+            }
+            else {
+                node.getSources().stream().forEach(source -> dynamicFilterPredicates.addAll(getDynFilterPredicatesFromProbeSide(source, dynamicFilters)));
+            }
+            return dynamicFilterPredicates;
+        }
+
+        private RowExpression rewriteExpressionForDynamicFilterUnion(RowExpression expression)
+        {
+            Optional<RowExpression> staticFilterExpression = extractStaticFilters(Optional.of(expression), metadata);
+            RowExpression dynamicFilterExpression = extractDynamicFilterExpression(expression, metadata);
+            List<RowExpression> conjuncts = extractConjuncts(dynamicFilterExpression);
+            if (!(dynamicFilterExpression instanceof SpecialForm) || ((SpecialForm) dynamicFilterExpression).getForm() != OR) {
+                RowExpression unionSubtree = null;
+                RowExpression finalUnionTree = FALSE_CONSTANT;
+                List<RowExpression> conjunctsSubtree = new ArrayList<>();
+                for (RowExpression conjunct : conjuncts) {
+                    if (conjunct instanceof SpecialForm && ((SpecialForm) conjunct).getForm() == OR) {
+                        unionSubtree = conjunct;
+                    }
+                    else {
+                        conjunctsSubtree.add(conjunct);
+                    }
+                }
+                if (unionSubtree != null) {
+                    for (RowExpression disjunct : extractDisjuncts(unionSubtree)) {
+                        RowExpression rewrittenDisjunct = logicalRowExpressions.combineConjuncts(disjunct, logicalRowExpressions.combineConjuncts(conjunctsSubtree));
+                        finalUnionTree = logicalRowExpressions.combineDisjuncts(asList(rewrittenDisjunct, finalUnionTree));
+                    }
+                    if (staticFilterExpression.isPresent()) {
+                        return logicalRowExpressions.combineConjuncts(asList(staticFilterExpression.get(), finalUnionTree));
+                    }
+                    else {
+                        return finalUnionTree;
+                    }
+                }
+            }
+            return expression;
+        }
+    }
+
+    private class FilterPushdownForCTEHandler
+    {
+        private final boolean pushdownForCTE;
+        private final CostProvider costProvider;
+        private final CostComparator costComparator;
+
+        public FilterPushdownForCTEHandler(boolean pushdownForCTE, CostProvider costProvider, CostComparator costComparator)
+        {
+            this.pushdownForCTE = pushdownForCTE;
+            this.costProvider = costProvider;
+            this.costComparator = costComparator;
+        }
+
+        public boolean isPushdownForCTE()
+        {
+            return pushdownForCTE;
+        }
+
+        public CostProvider getCostProvider()
+        {
+            return costProvider;
+        }
+
+        public CostComparator getCostComparator()
+        {
+            return costComparator;
         }
     }
 }

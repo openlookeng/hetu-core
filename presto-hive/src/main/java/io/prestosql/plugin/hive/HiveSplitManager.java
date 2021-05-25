@@ -190,7 +190,7 @@ public class HiveSplitManager
             ConnectorSession session,
             ConnectorTableHandle tableHandle,
             SplitSchedulingStrategy splitSchedulingStrategy,
-            Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
+            Supplier<List<Set<DynamicFilter>>> dynamicFilterSupplier,
             Optional<QueryType> queryType,
             Map<String, Object> queryInfo,
             Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates,

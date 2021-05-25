@@ -389,37 +389,47 @@ public class DynamicFilterService
      * dynamic filter can be available at any time
      *
      * @param queryId query id of the query
-     * @param dynamicFilters dynamic filter descriptors from logical plan
+     * @param dynamicFilterList dynamic filter descriptors from logical plan
      * @param columnHandles column handles of the table to be scanned
      * @return supplier that may contain a set of dynamic filters
      */
-    public static Supplier<Set<DynamicFilter>> getDynamicFilterSupplier(QueryId queryId, List<DynamicFilters.Descriptor> dynamicFilters, Map<Symbol, ColumnHandle> columnHandles)
+    public static Supplier<List<Set<DynamicFilter>>> getDynamicFilterSupplier(QueryId queryId, List<List<DynamicFilters.Descriptor>> dynamicFilterList, Map<Symbol, ColumnHandle> columnHandles)
     {
-        Map<String, ColumnHandle> sourceColumnHandles = extractSourceExpressionSymbols(dynamicFilters)
-                .entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, entry -> columnHandles.get(entry.getValue())));
+        List<Map<String, ColumnHandle>> sourceColumnHandlesList = new ArrayList<>();
+        for (List<DynamicFilters.Descriptor> dynamicFilters : dynamicFilterList) {
+            Map<String, ColumnHandle> sourceColumnHandles = extractSourceExpressionSymbols(dynamicFilters)
+                    .entrySet().stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, entry -> columnHandles.get(entry.getValue())));
+            sourceColumnHandlesList.add(sourceColumnHandles);
+        }
         return () -> {
-            ImmutableSet.Builder<DynamicFilter> builder = ImmutableSet.builder();
+            List<Set<DynamicFilter>> supplier = new ArrayList<>();
+            for (int i = 0; i < dynamicFilterList.size(); i++) {
+                ImmutableSet.Builder<DynamicFilter> builder = ImmutableSet.builder();
 
-            if (sourceColumnHandles.isEmpty() || !cachedDynamicFilters.containsKey(queryId.getId())) {
-                return builder.build();
-            }
+                if (sourceColumnHandlesList.get(i).isEmpty() || !cachedDynamicFilters.containsKey(queryId.getId())) {
+                    continue;
+                }
 
-            Map<String, DynamicFilter> cachedDynamicFiltersForQuery = cachedDynamicFilters.get(queryId.getId());
-            if (cachedDynamicFiltersForQuery.isEmpty()) {
-                return builder.build();
-            }
-
-            for (DynamicFilters.Descriptor dynamicFilterDescriptor : dynamicFilters) {
-                String filterId = dynamicFilterDescriptor.getId();
-                if (cachedDynamicFiltersForQuery.containsKey(filterId) && sourceColumnHandles.containsKey(filterId)) {
-                    ColumnHandle column = sourceColumnHandles.get(filterId);
-                    DynamicFilter df = cachedDynamicFiltersForQuery.get(filterId).clone();
-                    df.setColumnHandle(column);
-                    builder.add(df);
+                Map<String, DynamicFilter> cachedDynamicFiltersForQuery = cachedDynamicFilters.get(queryId.getId());
+                if (cachedDynamicFiltersForQuery.isEmpty()) {
+                    continue;
+                }
+                for (DynamicFilters.Descriptor dynamicFilterDescriptor : dynamicFilterList.get(i)) {
+                    String filterId = dynamicFilterDescriptor.getId();
+                    if (cachedDynamicFiltersForQuery.containsKey(filterId) && sourceColumnHandlesList.get(i).containsKey(filterId)) {
+                        ColumnHandle column = sourceColumnHandlesList.get(i).get(filterId);
+                        DynamicFilter df = cachedDynamicFiltersForQuery.get(filterId).clone();
+                        df.setColumnHandle(column);
+                        builder.add(df);
+                    }
+                }
+                Set<DynamicFilter> dynamicFilters = builder.build();
+                if (!dynamicFilters.isEmpty()) {
+                    supplier.add(dynamicFilters);
                 }
             }
-            return builder.build();
+            return supplier;
         };
     }
 

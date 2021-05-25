@@ -16,6 +16,7 @@ package io.prestosql.sql;
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 import io.prestosql.Session;
+import io.prestosql.expressions.LogicalRowExpressions;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.QualifiedObjectName;
@@ -28,26 +29,37 @@ import io.prestosql.spi.function.TypeParameter;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.VarcharType;
 import io.prestosql.sql.planner.FunctionCallBuilder;
+import io.prestosql.sql.relational.FunctionResolution;
+import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.SymbolReference;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.slice.Slices.utf8Slice;
+import static io.prestosql.expressions.LogicalRowExpressions.TRUE_CONSTANT;
+import static io.prestosql.expressions.LogicalRowExpressions.extractAllPredicates;
 import static io.prestosql.expressions.LogicalRowExpressions.extractConjuncts;
+import static io.prestosql.expressions.LogicalRowExpressions.extractDisjuncts;
+import static io.prestosql.expressions.LogicalRowExpressions.extractPredicates;
+import static io.prestosql.spi.relation.SpecialForm.Form.AND;
+import static io.prestosql.spi.relation.SpecialForm.Form.OR;
 import static io.prestosql.spi.type.StandardTypes.BOOLEAN;
 import static io.prestosql.spi.type.StandardTypes.VARCHAR;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
@@ -99,6 +111,81 @@ public final class DynamicFilters
         }
 
         return new ExtractResult(staticConjuncts.build(), dynamicConjuncts.build());
+    }
+
+    public static RowExpression extractDynamicFilterExpression(RowExpression expression, Metadata metadata)
+    {
+        LogicalRowExpressions logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata),
+                new FunctionResolution(metadata.getFunctionAndTypeManager()), metadata.getFunctionAndTypeManager());
+        if (expression instanceof SpecialForm) {
+            switch (((SpecialForm) expression).getForm()) {
+                case AND:
+                    return logicalRowExpressions.combineConjuncts((extractPredicates(AND, expression)
+                            .stream()
+                            .map(exp -> extractDynamicFilterExpression(exp, metadata))
+                            .collect(Collectors.toList())));
+                case OR:
+                    return logicalRowExpressions.combineDisjuncts((extractPredicates(OR, expression)
+                            .stream()
+                            .map(exp -> extractDynamicFilterExpression(exp, metadata))
+                            .collect(Collectors.toList())));
+                default:
+                    return TRUE_CONSTANT;
+            }
+        }
+        else if (expression instanceof CallExpression) {
+            if (getDescriptor(expression).isPresent()) {
+                return expression;
+            }
+        }
+        return TRUE_CONSTANT;
+    }
+
+    public static Optional<RowExpression> extractStaticFilters(Optional<RowExpression> expression, Metadata metadata)
+    {
+        LogicalRowExpressions logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata),
+                new FunctionResolution(metadata.getFunctionAndTypeManager()), metadata.getFunctionAndTypeManager());
+        if (expression.isPresent()) {
+            List<RowExpression> filters = extractConjuncts(expression.get());
+            RowExpression staticFilters = TRUE_CONSTANT;
+            for (RowExpression filter : filters) {
+                List<RowExpression> predicates = extractAllPredicates(filter);
+                for (RowExpression predicate : predicates) {
+                    if (!getDescriptor(predicate).isPresent()) {
+                        staticFilters = logicalRowExpressions.combineConjuncts(staticFilters, filter);
+                    }
+                }
+            }
+            return staticFilters.equals(TRUE_CONSTANT) ? Optional.empty() : Optional.of(staticFilters);
+        }
+        else {
+            return Optional.empty();
+        }
+    }
+
+    public static List<List<Descriptor>> extractDynamicFiltersAsUnion(Optional<RowExpression> filterExpression, Metadata metadata)
+    {
+        if (!filterExpression.isPresent()) {
+            return ImmutableList.of();
+        }
+        RowExpression expression = extractDynamicFilterExpression(filterExpression.get(), metadata);
+        List<List<Descriptor>> dynamicFilterList = new ArrayList<>();
+        List<RowExpression> predicates = extractDisjuncts(expression);
+
+        for (RowExpression predicate : predicates) {
+            List<Descriptor> dynamicFilters = new ArrayList<>();
+            List<RowExpression> conjuncts = extractConjuncts(predicate);
+            for (RowExpression conjunct : conjuncts) {
+                Optional<Descriptor> descriptor = getDescriptor(conjunct);
+                if (descriptor.isPresent()) {
+                    dynamicFilters.add(descriptor.get());
+                }
+            }
+            if (!dynamicFilters.isEmpty()) {
+                dynamicFilterList.add(dynamicFilters);
+            }
+        }
+        return dynamicFilterList;
     }
 
     public static boolean isDynamicFilter(RowExpression expression)

@@ -35,7 +35,7 @@ public class CTEScanNode
 {
     private PlanNode source;
     private List<Symbol> outputSymbols;
-    private final Optional<RowExpression> predicate;
+    private Optional<RowExpression> predicate;
     private Set<PlanNodeId> consumerPlans;
     private final String cteRefName;
     private final Integer commonCTERefNum;
@@ -86,6 +86,12 @@ public class CTEScanNode
     public Optional<RowExpression> getPredicate()
     {
         return predicate;
+    }
+
+    @JsonProperty
+    public void setPredicate(Optional<RowExpression> predicate)
+    {
+        this.predicate = predicate;
     }
 
     @JsonProperty

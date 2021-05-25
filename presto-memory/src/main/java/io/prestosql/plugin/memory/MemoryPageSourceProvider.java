@@ -102,16 +102,20 @@ public final class MemoryPageSourceProvider
         int[] positions = new int[page.getPositionCount()];
         int length = 0;
         for (int i = 0; i < page.getPositionCount(); ++i) {
-            boolean match = true;
-            for (Map.Entry<ColumnHandle, DynamicFilter> entry : dynamicFilters.get().getDynamicFilters().entrySet()) {
-                MemoryColumnHandle columnHandle = (MemoryColumnHandle) entry.getKey();
-                DynamicFilter dynamicFilter = entry.getValue();
-                Object value = TypeUtils.readNativeValue(columnHandle.getType(), page.getBlock(columns.indexOf(columnHandle)), i);
-                if (!dynamicFilter.contains(value)) {
-                    match = false;
+            boolean union = false;
+            for (Map<ColumnHandle, DynamicFilter> filter : dynamicFilters.get().getDynamicFilters()) {
+                boolean match = true;
+                for (Map.Entry<ColumnHandle, DynamicFilter> entry : filter.entrySet()) {
+                    MemoryColumnHandle columnHandle = (MemoryColumnHandle) entry.getKey();
+                    DynamicFilter dynamicFilter = entry.getValue();
+                    Object value = TypeUtils.readNativeValue(columnHandle.getType(), page.getBlock(columns.indexOf(columnHandle)), i);
+                    if (!dynamicFilter.contains(value)) {
+                        match = false;
+                    }
                 }
+                union = union || match;
             }
-            if (match) {
+            if (union) {
                 positions[length++] = i;
             }
         }

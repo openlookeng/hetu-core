@@ -120,19 +120,19 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
         List<Long> filterValues = ImmutableList.of(1L, 50L, 100L);
 
         HiveColumnHandle testColumnHandle = new HiveColumnHandle("p1", HIVE_INT, parseTypeSignature(StandardTypes.INTEGER), 0, PARTITION_KEY, Optional.empty());
-        Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter = createDynamicFilterSupplier(filterValues, testColumnHandle, "filter1");
+        Supplier<List<Map<ColumnHandle, DynamicFilter>>> dynamicFilter = createDynamicFilterSupplier(filterValues, testColumnHandle, "filter1");
         Optional<DynamicFilterSupplier> dynamicFilterSupplier = Optional.of(new DynamicFilterSupplier(dynamicFilter, System.currentTimeMillis(), 10000));
 
         HiveColumnHandle testColumnHandle2 = new HiveColumnHandle("p2", HIVE_INT, parseTypeSignature(StandardTypes.INTEGER), 0, PARTITION_KEY, Optional.empty());
-        Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter2 = createDynamicFilterSupplier(filterValues, testColumnHandle2, "filter2");
+        Supplier<List<Map<ColumnHandle, DynamicFilter>>> dynamicFilter2 = createDynamicFilterSupplier(filterValues, testColumnHandle2, "filter2");
         Optional<DynamicFilterSupplier> dynamicFilterSupplier2 = Optional.of(new DynamicFilterSupplier(dynamicFilter2, System.currentTimeMillis(), 10000));
 
         HiveColumnHandle testColumnHandle3 = new HiveColumnHandle("p3", HIVE_INT, parseTypeSignature(StandardTypes.INTEGER), 0, PARTITION_KEY, Optional.empty());
-        Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter3 = createDynamicFilterSupplier(filterValues, testColumnHandle3, "filter3");
+        Supplier<List<Map<ColumnHandle, DynamicFilter>>> dynamicFilter3 = createDynamicFilterSupplier(filterValues, testColumnHandle3, "filter3");
         Optional<DynamicFilterSupplier> dynamicFilterSupplier3 = Optional.of(new DynamicFilterSupplier(dynamicFilter3, System.currentTimeMillis(), 10000));
 
         HiveColumnHandle testColumnHandle4 = new HiveColumnHandle("p4", HIVE_INT, parseTypeSignature(StandardTypes.INTEGER), 0, PARTITION_KEY, Optional.empty());
-        Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilter4 = createDynamicFilterSupplier(filterValues, testColumnHandle4, "filter3");
+        Supplier<List<Map<ColumnHandle, DynamicFilter>>> dynamicFilter4 = createDynamicFilterSupplier(filterValues, testColumnHandle4, "filter3");
         Optional<DynamicFilterSupplier> dynamicFilterSupplier4 = Optional.of(new DynamicFilterSupplier(dynamicFilter4, System.currentTimeMillis(), 0));
 
         HiveConfig config = new HiveConfig();
@@ -224,7 +224,7 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
         return (Long) result.getOnlyValue();
     }
 
-    private Supplier<Map<ColumnHandle, DynamicFilter>> createDynamicFilterSupplier(List<Long> values, ColumnHandle columnHandle, String filterId)
+    private Supplier<List<Map<ColumnHandle, DynamicFilter>>> createDynamicFilterSupplier(List<Long> values, ColumnHandle columnHandle, String filterId)
             throws IOException
     {
         BloomFilter filter = new BloomFilter(values.size(), 0.01);
@@ -236,6 +236,7 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
 
         DynamicFilter dynamicFilter = DynamicFilterFactory.create(filterId, columnHandle, out.toByteArray(), DynamicFilter.Type.GLOBAL);
 
-        return () -> ImmutableMap.of(columnHandle, dynamicFilter);
+        Map<ColumnHandle, DynamicFilter> dynamicFilterMap = ImmutableMap.of(columnHandle, dynamicFilter);
+        return () -> ImmutableList.of(dynamicFilterMap);
     }
 }

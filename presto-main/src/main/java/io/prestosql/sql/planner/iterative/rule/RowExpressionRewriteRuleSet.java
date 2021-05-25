@@ -31,7 +31,9 @@ import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
@@ -50,6 +52,7 @@ import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableMap.builder;
+import static io.prestosql.spi.relation.SpecialForm.Form.OR;
 import static io.prestosql.sql.planner.plan.Patterns.aggregation;
 import static io.prestosql.sql.planner.plan.Patterns.applyNode;
 import static io.prestosql.sql.planner.plan.Patterns.filter;
@@ -85,7 +88,7 @@ public class RowExpressionRewriteRuleSet
         return ImmutableSet.of(
                 valueRowExpressionRewriteRule(),
                 tableScanRowExpressionRewriteRule(),
-                filterRowExpressionRewriteRule(),
+                filterRowExpressionRewriteRule(metadata),
                 projectRowExpressionRewriteRule(),
                 applyNodeRowExpressionRewriteRule(),
                 windowRowExpressionRewriteRule(metadata),
@@ -108,9 +111,9 @@ public class RowExpressionRewriteRuleSet
         return new ValuesRowExpressionRewrite();
     }
 
-    public Rule<FilterNode> filterRowExpressionRewriteRule()
+    public Rule<FilterNode> filterRowExpressionRewriteRule(Metadata metadata)
     {
-        return new FilterRowExpressionRewrite();
+        return new FilterRowExpressionRewrite(metadata);
     }
 
     public Rule<TableScanNode> tableScanRowExpressionRewriteRule()
@@ -363,6 +366,13 @@ public class RowExpressionRewriteRuleSet
     private final class FilterRowExpressionRewrite
             implements Rule<FilterNode>
     {
+        private final Metadata metadata;
+
+        public FilterRowExpressionRewrite(Metadata metadata)
+        {
+            this.metadata = metadata;
+        }
+
         @Override
         public Pattern<FilterNode> getPattern()
         {
@@ -373,6 +383,10 @@ public class RowExpressionRewriteRuleSet
         public Result apply(FilterNode filterNode, Captures captures, Context context)
         {
             checkState(filterNode.getSource() != null);
+            RowExpression dynamicFilter = DynamicFilters.extractDynamicFilterExpression(filterNode.getPredicate(), metadata);
+            if (dynamicFilter instanceof SpecialForm && ((SpecialForm) dynamicFilter).getForm() == OR) {
+                return Result.empty();
+            }
             RowExpression rewritten = rewriter.rewrite(filterNode.getPredicate(), context);
 
             if (filterNode.getPredicate().equals(rewritten)) {

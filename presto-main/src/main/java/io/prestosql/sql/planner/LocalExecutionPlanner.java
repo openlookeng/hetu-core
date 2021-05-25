@@ -261,6 +261,7 @@ import static io.prestosql.SystemSessionProperties.getFilterAndProjectMinOutputP
 import static io.prestosql.SystemSessionProperties.getSpillOperatorThresholdReuseExchange;
 import static io.prestosql.SystemSessionProperties.getTaskConcurrency;
 import static io.prestosql.SystemSessionProperties.getTaskWriterCount;
+import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
 import static io.prestosql.SystemSessionProperties.isCrossRegionDynamicFilterEnabled;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
 import static io.prestosql.SystemSessionProperties.isSpillEnabled;
@@ -298,6 +299,7 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.TypeUtils.writeNativeValue;
 import static io.prestosql.spi.util.Reflection.constructorMethodHandle;
 import static io.prestosql.spiller.PartitioningSpillerFactory.unsupportedPartitioningSpillerFactory;
+import static io.prestosql.sql.DynamicFilters.extractStaticFilters;
 import static io.prestosql.sql.gen.LambdaBytecodeGenerator.compileLambdaProvider;
 import static io.prestosql.sql.planner.RowExpressionInterpreter.Level.OPTIMIZED;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.COORDINATOR_DISTRIBUTION;
@@ -1503,10 +1505,6 @@ public class LocalExecutionPlanner
                         assignments,
                         outputSymbols);
             }
-//            else if (sourceNode instanceof CTEScanNode) {
-//                CTEScanNode cteScanNode = (CTEScanNode) sourceNode;
-//                return createCTEScanFactory(cteScanNode, context, outputSymbols);
-//            }
             else {
                 // plan source
                 source = sourceNode.accept(this, context);
@@ -1527,14 +1525,26 @@ public class LocalExecutionPlanner
             Map<Symbol, Integer> outputMappings = outputMappingsBuilder.build();
 
             Optional<DynamicFilters.ExtractResult> extractDynamicFilterResult = filterExpression.map(DynamicFilters::extractDynamicFilters);
-            Optional<RowExpression> translatedFilter = extractDynamicFilterResult
-                    .map(DynamicFilters.ExtractResult::getStaticConjuncts)
-                    .map(logicalRowExpressions::combineConjuncts);
+
+            List<List<DynamicFilters.Descriptor>> extractDynamicFilterUnionResult;
+            if (isCTEReuseEnabled(session)) {
+                extractDynamicFilterUnionResult = DynamicFilters.extractDynamicFiltersAsUnion(filterExpression, metadata);
+            }
+            else {
+                if (extractDynamicFilterResult.isPresent()) {
+                    extractDynamicFilterUnionResult = ImmutableList.of(extractDynamicFilterResult.get().getDynamicConjuncts());
+                }
+                else {
+                    extractDynamicFilterUnionResult = ImmutableList.of();
+                }
+            }
+            Optional<RowExpression> translatedFilter = extractStaticFilters(filterExpression, metadata);
 
             // TODO: Execution must be plugged in here
-            Supplier<Map<ColumnHandle, DynamicFilter>> dynamicFilterSupplier = getDynamicFilterSupplier(extractDynamicFilterResult, sourceNode, context);
+            Supplier<List<Map<ColumnHandle, DynamicFilter>>> dynamicFilterSupplier = getDynamicFilterSupplier(Optional.of(extractDynamicFilterUnionResult), sourceNode, context);
             Optional<DynamicFilterSupplier> dynamicFilter = Optional.empty();
-            if (dynamicFilterSupplier != null) {
+            if ((dynamicFilterSupplier != null && extractDynamicFilterResult.isPresent() && !extractDynamicFilterResult.get().getDynamicConjuncts().isEmpty())
+                    || (dynamicFilterSupplier != null && isCTEReuseEnabled(session) && !extractDynamicFilterUnionResult.isEmpty())) {
                 dynamicFilter = Optional.of(new DynamicFilterSupplier(dynamicFilterSupplier, System.currentTimeMillis(), getDynamicFilteringWaitTime(session).toMillis()));
             }
 
@@ -1595,16 +1605,16 @@ public class LocalExecutionPlanner
             }
         }
 
-        private Supplier<Map<ColumnHandle, DynamicFilter>> getDynamicFilterSupplier(Optional<DynamicFilters.ExtractResult> extractDynamicFilterResult, PlanNode sourceNode, LocalExecutionPlanContext context)
+        private Supplier<List<Map<ColumnHandle, DynamicFilter>>> getDynamicFilterSupplier(Optional<List<List<DynamicFilters.Descriptor>>> dynamicFilters, PlanNode sourceNode, LocalExecutionPlanContext context)
         {
-            Optional<List<DynamicFilters.Descriptor>> dynamicFilters = extractDynamicFilterResult.map(DynamicFilters.ExtractResult::getDynamicConjuncts);
             if (dynamicFilters.isPresent() && !dynamicFilters.get().isEmpty()) {
                 log.debug("[TableScan] Dynamic filters: %s", dynamicFilters);
                 if (sourceNode instanceof TableScanNode) {
                     TableScanNode tableScanNode = (TableScanNode) sourceNode;
                     LocalDynamicFiltersCollector collector = context.getDynamicFiltersCollector();
                     collector.initContext(dynamicFilters.get(), SymbolUtils.toLayOut(tableScanNode.getOutputSymbols()));
-                    dynamicFilters.get().forEach(dynamicFilter -> dynamicFilterCacheManager.registerTask(createCacheKey(dynamicFilter.getId(), session.getQueryId().getId()), context.getTaskId()));
+                    dynamicFilters.get().forEach(dynamicFilterList ->
+                            dynamicFilterList.forEach(dynamicFilter -> dynamicFilterCacheManager.registerTask(createCacheKey(dynamicFilter.getId(), session.getQueryId().getId()), context.getTaskId())));
                     return () -> collector.getDynamicFilters(tableScanNode);
                 }
             }

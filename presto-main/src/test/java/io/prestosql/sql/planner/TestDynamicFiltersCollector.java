@@ -99,7 +99,7 @@ public class TestDynamicFiltersCollector
         TableScanNode tableScan = mock(TableScanNode.class);
         when(tableScan.getAssignments()).thenReturn(ImmutableMap.of(new Symbol(columnName), columnHandle));
         List<DynamicFilters.Descriptor> dynamicFilterDescriptors = ImmutableList.of(new DynamicFilters.Descriptor(filterId, new VariableReferenceExpression(columnName, BIGINT)));
-        collector.initContext(dynamicFilterDescriptors, SymbolUtils.toLayOut(tableScan.getOutputSymbols()));
+        collector.initContext(ImmutableList.of(dynamicFilterDescriptors), SymbolUtils.toLayOut(tableScan.getOutputSymbols()));
 
         assertTrue(collector.getDynamicFilters(tableScan).isEmpty(), "there should be no dynamic filter available");
 
@@ -109,10 +109,10 @@ public class TestDynamicFiltersCollector
         TimeUnit.MILLISECONDS.sleep(100);
 
         // get available dynamic filter and verify it
-        Map<ColumnHandle, DynamicFilter> dynamicFilters = collector.getDynamicFilters(tableScan);
+        List<Map<ColumnHandle, DynamicFilter>> dynamicFilters = collector.getDynamicFilters(tableScan);
         assertEquals(dynamicFilters.size(), 1, "there should be a new dynamic filter");
         assertEquals(dynamicFilters.size(), 1);
-        DynamicFilter dynamicFilter = dynamicFilters.get(columnHandle);
+        DynamicFilter dynamicFilter = dynamicFilters.get(0).get(columnHandle);
         assertTrue(dynamicFilter instanceof HashSetDynamicFilter, "new dynamic filter should be hashset");
         assertEquals(dynamicFilter.getSize(), valueSet.size(), "new dynamic filter should have correct size");
         for (String value : valueSet) {
