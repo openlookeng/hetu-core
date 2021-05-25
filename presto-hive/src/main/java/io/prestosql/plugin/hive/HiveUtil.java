@@ -1050,55 +1050,62 @@ public final class HiveUtil
         return HiveType.toHiveTypes(schema.getProperty(IOConstants.COLUMNS_TYPES, ""));
     }
 
-    public static boolean isPartitionFiltered(List<HivePartitionKey> partitionKeys, Set<DynamicFilter> dynamicFilters, TypeManager typeManager)
+    public static boolean isPartitionFiltered(List<HivePartitionKey> partitionKeys, List<Set<DynamicFilter>> dynamicFilterList, TypeManager typeManager)
     {
-        if (partitionKeys == null || dynamicFilters == null) {
+        if (partitionKeys == null || dynamicFilterList == null || dynamicFilterList.isEmpty()) {
             return false;
         }
 
         Map<String, String> partitions = partitionKeys.stream()
                 .collect(Collectors.toMap(HivePartitionKey::getName, HivePartitionKey::getValue));
 
-        for (DynamicFilter dynamicFilter : dynamicFilters) {
-            final ColumnHandle columnHandle = dynamicFilter.getColumnHandle();
+        boolean result = false;
+        for (int i = 0; i < dynamicFilterList.size(); i++) {
+            for (DynamicFilter dynamicFilter : dynamicFilterList.get(i)) {
+                final ColumnHandle columnHandle = dynamicFilter.getColumnHandle();
 
-            // If the dynamic filter contains no data there can't be any match
-            if (dynamicFilter.isEmpty()) {
-                return true;
-            }
-
-            // No need to check non-partition columns
-            if (!((HiveColumnHandle) columnHandle).isPartitionKey()) {
-                continue;
-            }
-
-            String partitionValue = partitions.get(columnHandle.getColumnName());
-            if (partitionValue == null) {
-                continue;
-            }
-
-            // Skip partitions with null value
-            if (DEFAULT_PARTITION_VALUE.equals(partitionValue)) {
-                continue;
-            }
-
-            try {
-                Object realObjectValue = getValueAsType(((HiveColumnHandle) columnHandle)
-                        .getColumnMetadata(typeManager).getType(), partitionValue);
-                // FIXME: Remove this check once BloomFilter type conversion is removed
-                if (dynamicFilter instanceof BloomFilterDynamicFilter && !(realObjectValue instanceof Long)) {
-                    realObjectValue = partitionValue;
+                // If the dynamic filter contains no data there can't be any match
+                if (dynamicFilter.isEmpty()) {
+                    result = true;
                 }
-                if (!dynamicFilter.contains(realObjectValue)) {
-                    return true;
+
+                // No need to check non-partition columns
+                if (!((HiveColumnHandle) columnHandle).isPartitionKey()) {
+                    continue;
                 }
-            }
-            catch (PrestoException | ClassCastException e) {
-                log.error("cannot cast class" + e.getMessage());
-                return false;
+
+                String partitionValue = partitions.get(columnHandle.getColumnName());
+                if (partitionValue == null) {
+                    continue;
+                }
+
+                // Skip partitions with null value
+                if (DEFAULT_PARTITION_VALUE.equals(partitionValue)) {
+                    continue;
+                }
+
+                try {
+                    Object realObjectValue = getValueAsType(((HiveColumnHandle) columnHandle)
+                            .getColumnMetadata(typeManager).getType(), partitionValue);
+                    // FIXME: Remove this check once BloomFilter type conversion is removed
+                    if (dynamicFilter instanceof BloomFilterDynamicFilter && !(realObjectValue instanceof Long)) {
+                        realObjectValue = partitionValue;
+                    }
+                    if (!dynamicFilter.contains(realObjectValue)) {
+                        result = true;
+                    }
+                }
+                catch (PrestoException | ClassCastException e) {
+                    log.error("cannot cast class" + e.getMessage());
+                    return false;
+                }
+                //return if this dynamic filter is not filtering
+                if (!result) {
+                    return false;
+                }
             }
         }
-        return false;
+        return result;
     }
 
     public static Iterator<Page> getMergeSortedPages(List<ConnectorPageSource> pageSources,

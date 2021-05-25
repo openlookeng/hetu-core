@@ -99,6 +99,7 @@ import java.util.function.Supplier;
 
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
 import static io.prestosql.spi.connector.ConnectorSplitManager.SplitSchedulingStrategy.GROUPED_SCHEDULING;
 import static io.prestosql.spi.connector.ConnectorSplitManager.SplitSchedulingStrategy.UNGROUPED_SCHEDULING;
 import static io.prestosql.sql.planner.optimizations.PlanNodeSearcher.searchFrom;
@@ -316,14 +317,24 @@ public class DistributedExecutionPlanner
                 Map<String, Object> queryInfo,
                 boolean partOfReuse)
         {
-            List<DynamicFilters.Descriptor> dynamicFilters = filter
-                    .map(FilterNode::getPredicate)
-                    .map(DynamicFilters::extractDynamicFilters)
-                    .map(DynamicFilters.ExtractResult::getDynamicConjuncts)
-                    .orElse(ImmutableList.of());
-
-            Supplier<Set<DynamicFilter>> dynamicFilterSupplier = null;
-            if (!dynamicFilters.isEmpty() && !stageExecutionDescriptor.isScanGroupedExecution(nodeId)) {
+            List<List<DynamicFilters.Descriptor>> dynamicFilters;
+            if (isCTEReuseEnabled(session)) {
+                dynamicFilters = DynamicFilters.extractDynamicFiltersAsUnion(filter.map(FilterNode::getPredicate), metadata);
+            }
+            else {
+                List<DynamicFilters.Descriptor> descriptors = filter
+                        .map(FilterNode::getPredicate)
+                        .map(DynamicFilters::extractDynamicFilters)
+                        .map(DynamicFilters.ExtractResult::getDynamicConjuncts).orElse(ImmutableList.of());
+                if (!descriptors.isEmpty()) {
+                    dynamicFilters = ImmutableList.of(descriptors);
+                }
+                else {
+                    dynamicFilters = ImmutableList.of();
+                }
+            }
+            Supplier<List<Set<DynamicFilter>>> dynamicFilterSupplier = null;
+            if (dynamicFilters != null && !dynamicFilters.isEmpty() && !stageExecutionDescriptor.isScanGroupedExecution(nodeId)) {
                 dynamicFilterSupplier = DynamicFilterService.getDynamicFilterSupplier(session.getQueryId(), dynamicFilters, assignments);
             }
 

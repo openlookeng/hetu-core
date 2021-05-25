@@ -132,7 +132,7 @@ public class BackgroundHiveSplitLoader
     private final ConcurrentLazyQueue<HivePartitionMetadata> partitions;
     private final Deque<Iterator<InternalHiveSplit>> fileIterators = new ConcurrentLinkedDeque<>();
     private final Optional<ValidWriteIdList> validWriteIds;
-    private final Supplier<Set<DynamicFilter>> dynamicFilterSupplier;
+    private final Supplier<List<Set<DynamicFilter>>> dynamicFilterSupplier;
     private final Configuration configuration;
 
     // Purpose of this lock:
@@ -174,7 +174,7 @@ public class BackgroundHiveSplitLoader
             int loaderConcurrency,
             boolean recursiveDirWalkerEnabled,
             Optional<ValidWriteIdList> validWriteIds,
-            Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
+            Supplier<List<Set<DynamicFilter>>> dynamicFilterSupplier,
             Optional<QueryType> queryType,
             Map<String, Object> queryInfo,
             TypeManager typeManager)

@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.google.common.base.Verify.verify;
+import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
 import static io.prestosql.SystemSessionProperties.isDefaultFilterFactorEnabled;
 import static io.prestosql.cost.FilterStatsCalculator.UNKNOWN_FILTER_COEFFICIENT;
 import static io.prestosql.sql.planner.plan.Patterns.tableScan;
@@ -129,7 +130,7 @@ public class TableScanStatsRule
 
             Expression pushDownExpression = domainTranslator.toPredicate(predicate.transform(assignments :: get));
             PlanNodeStatsEstimate estimate = filterStatsCalculator.filterStats(tableEstimates, pushDownExpression, session, types);
-            if (isDefaultFilterFactorEnabled(session) && estimate.isOutputRowCountUnknown()) {
+            if ((isDefaultFilterFactorEnabled(session) || isCTEReuseEnabled(session)) && estimate.isOutputRowCountUnknown()) {
                 PlanNodeStatsEstimate finalTableEstimates = tableEstimates;
                 estimate = tableEstimates.mapOutputRowCount(sourceRowCount -> finalTableEstimates.getOutputRowCount() * UNKNOWN_FILTER_COEFFICIENT);
             }

@@ -15,7 +15,6 @@ package io.prestosql.plugin.hive;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.Booleans;
 import io.airlift.log.Logger;
 import io.prestosql.plugin.hive.HiveBucketing.BucketingVersion;
@@ -47,12 +46,13 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.plugin.hive.HiveBucketing.getHiveBucket;
@@ -168,7 +168,7 @@ public class HivePageSource
     public Page getNextPage()
     {
         try {
-            final Map<ColumnHandle, DynamicFilter> dynamicFilters;
+            final List<Map<ColumnHandle, DynamicFilter>> dynamicFilters;
             if (dynamicFilterSupplier.isPresent()) {
                 dynamicFilters = dynamicFilterSupplier.get().getDynamicFilters();
                 // Wait for any dynamic filter
@@ -177,13 +177,18 @@ public class HivePageSource
                 }
 
                 // Close the current PageSource if the partition should be filtered
-                if (isPartitionFiltered(partitionKeys, new HashSet(dynamicFilters.values()), typeManager)) {
+                List<Set<DynamicFilter>> dynamicFilterList = new ArrayList();
+                for (Map<ColumnHandle, DynamicFilter> df : dynamicFilters) {
+                    Set<DynamicFilter> values = df.values().stream().collect(Collectors.toSet());
+                    dynamicFilterList.add(values);
+                }
+                if (isPartitionFiltered(partitionKeys, dynamicFilterList, typeManager)) {
                     close();
                     return null;
                 }
             }
             else {
-                dynamicFilters = ImmutableMap.of();
+                dynamicFilters = ImmutableList.of();
             }
 
             Page dataPage = delegate.getNextPage();
@@ -195,7 +200,7 @@ public class HivePageSource
             // we filter out rows that are not in the bloom filter
             // using the filter rows function
             if (!dynamicFilters.isEmpty()) {
-                final Map<Integer, ColumnHandle> eligibleColumns = getEligibleColumnsForRowFiltering(dataPage.getChannelCount(), dynamicFilters);
+                final List<Map<Integer, ColumnHandle>> eligibleColumns = getEligibleColumnsForRowFiltering(dataPage.getChannelCount(), dynamicFilters);
                 if (!eligibleColumns.isEmpty()) {
                     dataPage = filter(dynamicFilters, dataPage, eligibleColumns, types);
                 }
@@ -298,35 +303,54 @@ public class HivePageSource
         return delegate;
     }
 
-    private Map<Integer, ColumnHandle> getEligibleColumnsForRowFiltering(int channelCount, Map<ColumnHandle, DynamicFilter> dynamicFilters)
+    private List<Map<Integer, ColumnHandle>> getEligibleColumnsForRowFiltering(int channelCount, List<Map<ColumnHandle, DynamicFilter>> dynamicFilters)
     {
-        Map<Integer, ColumnHandle> eligibleColumns = new HashMap<>();
-        for (int channel = 0; channel < channelCount; channel++) {
-            HiveColumnHandle columnHandle = columnMappings.get(channel).getHiveColumnHandle();
-            if (!columnHandle.isPartitionKey() && dynamicFilters.containsKey(columnHandle)) {
-                if (dynamicFilters.get(columnHandle).getSize() <= rowFilteringThreshold) {
-                    eligibleColumns.put(channel, columnHandle);
+        List<Map<Integer, ColumnHandle>> eligibleColumnsList = new ArrayList<>();
+        for (Map<ColumnHandle, DynamicFilter> dynamicFilter : dynamicFilters) {
+            Map<Integer, ColumnHandle> eligibleColumns = new HashMap<>();
+            for (int channel = 0; channel < channelCount; channel++) {
+                HiveColumnHandle columnHandle = columnMappings.get(channel).getHiveColumnHandle();
+                if (!columnHandle.isPartitionKey() && dynamicFilter.containsKey(columnHandle)) {
+                    if (dynamicFilter.get(columnHandle).getSize() <= rowFilteringThreshold) {
+                        eligibleColumns.put(channel, columnHandle);
+                    }
                 }
             }
+            if (!eligibleColumns.isEmpty()) {
+                eligibleColumnsList.add(eligibleColumns);
+            }
         }
-        return eligibleColumns;
+        return eligibleColumnsList;
     }
 
-    private static boolean[] filterRows(Map<ColumnHandle, DynamicFilter> dynamicFilters, Page page, Map<Integer, ColumnHandle> eligibleColumns, Type[] types)
+    private static boolean[] filterRows(List<Map<ColumnHandle, DynamicFilter>> dynamicFilters, Page page, List<Map<Integer, ColumnHandle>> eligibleColumns, Type[] types)
     {
         boolean[] result = new boolean[page.getPositionCount()];
-        Arrays.fill(result, Boolean.TRUE);
-        for (Map.Entry<Integer, ColumnHandle> column : eligibleColumns.entrySet()) {
-            final int columnIndex = column.getKey();
-            final ColumnHandle columnHandle = column.getValue();
-            final DynamicFilter dynamicFilter = dynamicFilters.get(columnHandle);
-            final Block block = page.getBlock(columnIndex).getLoadedBlock();
-            if (dynamicFilter instanceof BloomFilterDynamicFilter) {
-                block.filter(((BloomFilterDynamicFilter) dynamicFilters.get(columnHandle)).getBloomFilterDeserialized(), result);
+        Arrays.fill(result, Boolean.FALSE);
+        // loop to handle union of filters if any
+        for (int j = 0; j < dynamicFilters.size(); j++) {
+            boolean[] filterResult = new boolean[page.getPositionCount()];
+            Arrays.fill(filterResult, Boolean.TRUE);
+            for (Map.Entry<Integer, ColumnHandle> column : eligibleColumns.get(j).entrySet()) {
+                final int columnIndex = column.getKey();
+                final ColumnHandle columnHandle = column.getValue();
+                final DynamicFilter dynamicFilter = dynamicFilters.get(j).get(columnHandle);
+                final Block block = page.getBlock(columnIndex).getLoadedBlock();
+                if (dynamicFilter instanceof BloomFilterDynamicFilter) {
+                    block.filter(((BloomFilterDynamicFilter) dynamicFilters.get(j).get(columnHandle)).getBloomFilterDeserialized(), filterResult);
+                }
+                else {
+                    for (int i = 0; i < block.getPositionCount(); i++) {
+                        filterResult[i] = filterResult[i] && dynamicFilter.contains(TypeUtils.readNativeValue(types[columnIndex], block, i));
+                    }
+                }
             }
-            else {
+            // apply union of last filter
+            for (Map.Entry<Integer, ColumnHandle> column : eligibleColumns.get(j).entrySet()) {
+                final int columnIndex = column.getKey();
+                final Block block = page.getBlock(columnIndex).getLoadedBlock();
                 for (int i = 0; i < block.getPositionCount(); i++) {
-                    result[i] = result[i] && dynamicFilter.contains(TypeUtils.readNativeValue(types[columnIndex], block, i));
+                    result[i] = result[i] || filterResult[i];
                 }
             }
         }
@@ -334,7 +358,7 @@ public class HivePageSource
     }
 
     @VisibleForTesting
-    public static Page filter(Map<ColumnHandle, DynamicFilter> dynamicFilters, Page page, Map<Integer, ColumnHandle> eligibleColumns, Type[] types)
+    public static Page filter(List<Map<ColumnHandle, DynamicFilter>> dynamicFilters, Page page, List<Map<Integer, ColumnHandle>> eligibleColumns, Type[] types)
     {
         boolean[] result = filterRows(dynamicFilters, page, eligibleColumns, types);
         int[] rowsToKeep = toPositions(result);

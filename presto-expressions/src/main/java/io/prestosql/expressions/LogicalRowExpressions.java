@@ -327,6 +327,22 @@ public final class LogicalRowExpressions
         return singletonList(expression);
     }
 
+    public static List<RowExpression> extractAllPredicates(RowExpression expression)
+    {
+        List<RowExpression> predicates = new ArrayList<>();
+        if (expression instanceof SpecialForm && (((SpecialForm) expression).getForm() == AND || ((SpecialForm) expression).getForm() == OR)) {
+            if (((SpecialForm) expression).getArguments().size() != 2) {
+                throw new IllegalStateException("logical binary expression requires exactly 2 operands");
+            }
+            predicates.addAll(extractAllPredicates(((SpecialForm) expression).getArguments().get(0)));
+            predicates.addAll(extractAllPredicates(((SpecialForm) expression).getArguments().get(1)));
+        }
+        else {
+            return asList(expression);
+        }
+        return predicates;
+    }
+
     public RowExpression combinePredicates(SpecialForm.Form form, Collection<RowExpression> expressions)
     {
         if (form == AND) {

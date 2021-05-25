@@ -139,7 +139,7 @@ public class CarbondataSplitManager
     @Override
     public ConnectorSplitSource getSplits(ConnectorTransactionHandle transactionHandle,
             ConnectorSession session, ConnectorTableHandle tableHandle,
-            SplitSchedulingStrategy splitSchedulingStrategy, Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
+            SplitSchedulingStrategy splitSchedulingStrategy, Supplier<List<Set<DynamicFilter>>> dynamicFilterSupplier,
             Optional<QueryType> queryType, Map<String, Object> queryProperties,
             Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates,
             boolean partOfReuse)

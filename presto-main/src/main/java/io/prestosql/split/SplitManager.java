@@ -38,6 +38,7 @@ import io.prestosql.spi.resourcegroups.QueryType;
 
 import javax.inject.Inject;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -88,7 +89,7 @@ public class SplitManager
         return getSplits(session, table, splitSchedulingStrategy, null, Optional.empty(), ImmutableMap.of(), ImmutableSet.of(), false, null);
     }
 
-    public SplitSource getSplits(Session session, TableHandle table, SplitSchedulingStrategy splitSchedulingStrategy, Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
+    public SplitSource getSplits(Session session, TableHandle table, SplitSchedulingStrategy splitSchedulingStrategy, Supplier<List<Set<DynamicFilter>>> dynamicFilterSupplier,
             Optional<QueryType> queryType, Map<String, Object> queryInfo, Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates,
             boolean partOfReuse, PlanNodeId nodeId)
     {

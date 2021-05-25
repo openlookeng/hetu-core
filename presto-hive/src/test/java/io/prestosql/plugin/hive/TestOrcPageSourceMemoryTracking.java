@@ -803,7 +803,7 @@ public class TestOrcPageSourceMemoryTracking
                 new ParquetFileWriterConfig()).getSessionProperties());
         List<ConnectorPageSource> pageSources = new ArrayList<>();
 
-        Supplier<Map<ColumnHandle, DynamicFilter>> supplier = null;
+        Supplier<List<Map<ColumnHandle, DynamicFilter>>> supplier = null;
         DynamicFilterSupplier theSupplier = new DynamicFilterSupplier(supplier, System.currentTimeMillis(), waitTime);
 
         Optional<DynamicFilterSupplier> dynamicFilterSupplier = Optional.of(theSupplier);

@@ -180,7 +180,7 @@ public class TestAddExchangesPlans
                         " select * from ss,sd where ss.orderkey = sd.orderkey",
                 cteEnabledSession(),
                 anyTree(node(JoinNode.class,
-                        anyTree(exchange(node(CTEScanNode.class, anyTree(tableScan("orders"))))),
+                        anyTree(exchange(node(CTEScanNode.class, tableScan("orders")))),
                         anyTree(exchange(node(CTEScanNode.class, tableScan("orders")))))),
                 allOptimizers);
     }

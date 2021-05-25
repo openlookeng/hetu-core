@@ -102,8 +102,10 @@ public class DataCenterPageSource
     @Override
     public Page getNextPage()
     {
-        if (dynamicFilterSupplier.isPresent()) {
-            applyDynamicFilters(dynamicFilterSupplier.get().getDynamicFilters());
+        if (dynamicFilterSupplier.isPresent() && !dynamicFilterSupplier.get().getDynamicFilters().isEmpty()) {
+            /*  applying only for the first map in the dynamic filter since we do not have
+                more than one element as we do not expect disjuncts in this connector   */
+            applyDynamicFilters(dynamicFilterSupplier.get().getDynamicFilters().get(0));
         }
 
         if (!this.pages.isEmpty()) {

@@ -91,8 +91,8 @@ public class TestDynamicFilterServiceWithBloomFilter
         VariableReferenceExpression mockExpression = mock(VariableReferenceExpression.class);
         when(mockExpression.getName()).thenReturn("name");
         ColumnHandle mockColumnHandle = mock(ColumnHandle.class);
-        Supplier<Set<DynamicFilter>> dynamicFilterSupplier = DynamicFilterService.getDynamicFilterSupplier(session.getQueryId(),
-                ImmutableList.of(new DynamicFilters.Descriptor(filterId, mockExpression)),
+        Supplier<List<Set<DynamicFilter>>> dynamicFilterSupplier = DynamicFilterService.getDynamicFilterSupplier(session.getQueryId(),
+                ImmutableList.of(ImmutableList.of(new DynamicFilters.Descriptor(filterId, mockExpression))),
                 ImmutableMap.of(new Symbol("name"), mockColumnHandle));
         assertTrue(dynamicFilterSupplier.get().isEmpty(), "should return empty dynamic filter set when dynamic filters are not available");
 
@@ -108,20 +108,20 @@ public class TestDynamicFilterServiceWithBloomFilter
 
         // Test getDynamicFilterSupplier
         dynamicFilterSupplier = DynamicFilterService.getDynamicFilterSupplier(session.getQueryId(),
-                ImmutableList.of(new DynamicFilters.Descriptor(filterId, mockExpression)),
+                ImmutableList.of(ImmutableList.of(new DynamicFilters.Descriptor(filterId, mockExpression))),
                 ImmutableMap.of(new Symbol("name"), mockColumnHandle));
-        Set<DynamicFilter> dynamicFilters = dynamicFilterSupplier.get();
+        List<Set<DynamicFilter>> dynamicFilters = dynamicFilterSupplier.get();
         assertFalse(dynamicFilters == null, "dynamic filters should be ready");
         assertEquals(dynamicFilters.size(), 1, "there should be 1 dynamic filter in supplier");
 
-        DynamicFilter dynamicFilter = dynamicFilters.iterator().next();
+        DynamicFilter dynamicFilter = dynamicFilters.get(0).iterator().next();
         for (int i = 1; i < 9; i++) {
             assertTrue(dynamicFilter.contains(String.valueOf(i)));
         }
         assertFalse(dynamicFilter.contains("10"));
 
         dynamicFilterSupplier = DynamicFilterService.getDynamicFilterSupplier(new QueryId("invalid"),
-                ImmutableList.of(new DynamicFilters.Descriptor(filterId, mockExpression)),
+                ImmutableList.of(ImmutableList.of(new DynamicFilters.Descriptor(filterId, mockExpression))),
                 ImmutableMap.of(new Symbol("name"), mockColumnHandle));
         assertTrue(dynamicFilterSupplier.get().isEmpty(), "should return empty dynamic filter set for invalid or non-existing queryId");
 

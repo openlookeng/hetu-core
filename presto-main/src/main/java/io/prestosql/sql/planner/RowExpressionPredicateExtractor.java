@@ -47,6 +47,7 @@ import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
+import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
@@ -66,6 +67,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -165,6 +167,9 @@ public class RowExpressionPredicateExtractor
 
             // Remove non-deterministic conjuncts
             predicate = logicalRowExpressions.filterDeterministicConjuncts(predicate);
+
+            Optional<RowExpression> staticFilters = DynamicFilters.extractStaticFilters(Optional.of(predicate), metadata);
+            predicate = staticFilters.isPresent() ? staticFilters.get() : TRUE_CONSTANT;
 
             return logicalRowExpressions.combineConjuncts(predicate, underlyingPredicate);
         }

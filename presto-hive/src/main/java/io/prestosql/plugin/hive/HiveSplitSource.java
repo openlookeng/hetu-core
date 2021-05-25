@@ -102,7 +102,7 @@ class HiveSplitSource
     private final CounterStat highMemorySplitSourceCounter;
     private final AtomicBoolean loggedHighMemoryWarning = new AtomicBoolean();
 
-    private final Supplier<Set<DynamicFilter>> dynamicFilterSupplier;
+    private final Supplier<List<Set<DynamicFilter>>> dynamicFilterSupplier;
     private final Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates;
     private final boolean isSplitFilteringEnabled;
 
@@ -121,7 +121,7 @@ class HiveSplitSource
             HiveSplitLoader splitLoader,
             AtomicReference<State> stateReference,
             CounterStat highMemorySplitSourceCounter,
-            Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
+            Supplier<List<Set<DynamicFilter>>> dynamicFilterSupplier,
             Set<TupleDomain<ColumnMetadata>> userDefinedCachedPredicates,
             TypeManager typeManager,
             HiveConfig hiveConfig,
@@ -160,7 +160,7 @@ class HiveSplitSource
             HiveSplitLoader splitLoader,
             Executor executor,
             CounterStat highMemorySplitSourceCounter,
-            Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
+            Supplier<List<Set<DynamicFilter>>> dynamicFilterSupplier,
             Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates,
             TypeManager typeManager,
             HiveConfig hiveConfig,
@@ -225,7 +225,7 @@ class HiveSplitSource
             HiveSplitLoader splitLoader,
             Executor executor,
             CounterStat highMemorySplitSourceCounter,
-            Supplier<Set<DynamicFilter>> dynamicFilterSupplier,
+            Supplier<List<Set<DynamicFilter>>> dynamicFilterSupplier,
             Set<TupleDomain<ColumnMetadata>> userDefinedCachePredicates,
             TypeManager typeManager,
             HiveConfig hiveConfig,
