@@ -73,20 +73,20 @@ import static java.util.Objects.requireNonNull;
 public class LogicalPart
         implements Serializable
 {
+    enum LogicalPartState
+    {
+        ACCEPTING_PAGES, FINISHED_ADDING, PROCESSING, COMPLETED
+    }
+
     private static final long serialVersionUID = -8601397465573888504L;
     private static final Logger LOG = Logger.get(LogicalPart.class);
     private static final JsonCodec<TypeSignature> TYPE_SIGNATURE_JSON_CODEC = JsonCodec.jsonCodec(TypeSignature.class);
     private static final String TABLE_DATA_FOLDER = "data";
 
-    enum ProcessingState
-    {
-        NOT_STARTED, IN_PROGRESS, COMPLETE
-    }
-
     private long rows;
     private long byteSize;
 
-    private final AtomicReference<ProcessingState> processingState = new AtomicReference<>(ProcessingState.NOT_STARTED);
+    private final AtomicReference<LogicalPartState> processingState = new AtomicReference<>(LogicalPartState.ACCEPTING_PAGES);
     private final List<Integer> sortChannels;
     private final List<SortOrder> sortOrders;
     private final List<Integer> indexChannels;
@@ -163,7 +163,12 @@ public class LogicalPart
             }
         }
 
-        this.processingState.set(ProcessingState.NOT_STARTED);
+        this.processingState.set(LogicalPartState.ACCEPTING_PAGES);
+    }
+
+    long getByteSize()
+    {
+        return byteSize;
     }
 
     void restoreTransientObjects(PageSorter pageSorter, TypeManager typeManager, PagesSerde pagesSerde, Path tableDataRoot)
@@ -185,18 +190,32 @@ public class LogicalPart
 
         pages.add(page);
         rows += page.getPositionCount();
-        byteSize += page.getRetainedSizeInBytes();
+        byteSize += page.getSizeInBytes();
+    }
+
+    boolean pageInMemory()
+    {
+        return pages != null;
+    }
+
+    void unloadPages()
+    {
+        pages = null;
+    }
+
+    void finishAdding()
+    {
+        processingState.set(LogicalPartState.FINISHED_ADDING);
     }
 
     List<Page> getPages()
     {
-        if (pages == null) {
+        if (!pageInMemory()) {
             try {
                 readPages();
             }
             catch (Exception e) {
                 LOG.error("Failed to load pages from " + getPageFileName(), e);
-//                throw new UncheckedIOException("Unable to load pages from disk", e);
             }
         }
         return pages;
@@ -223,7 +242,7 @@ public class LogicalPart
      */
     List<Page> getPages(TupleDomain<ColumnHandle> predicate)
     {
-        if (processingState.get() != ProcessingState.COMPLETE) {
+        if (processingState.get() != LogicalPartState.COMPLETED) {
             return getPages();
         }
 
@@ -288,7 +307,7 @@ public class LogicalPart
                         Comparable max = columnMinMaxEntry.getValue();
                         if (highBoundless && !lowBoundless) {
                             // >= or >
-                            Object lowLookupValue = range.getLow().getValue();
+                            Object lowLookupValue = getNativeValue(range.getLow().getValue());
                             if (lowLookupValue instanceof Comparable) {
                                 Comparable lowComparableLookupValue = (Comparable) lowLookupValue;
                                 boolean inclusive = range.getLow().getBound().equals(Marker.Bound.EXACTLY);
@@ -308,7 +327,7 @@ public class LogicalPart
                         }
                         else if (!highBoundless && lowBoundless) {
                             // <= or <
-                            Object highLookupValue = range.getHigh().getValue();
+                            Object highLookupValue = getNativeValue(range.getHigh().getValue());
                             if (highLookupValue instanceof Comparable) {
                                 Comparable highComparableLookupValue = (Comparable) highLookupValue;
                                 boolean inclusive = range.getHigh().getBound().equals(Marker.Bound.EXACTLY);
@@ -328,8 +347,8 @@ public class LogicalPart
                         }
                         else if (!highBoundless && !lowBoundless) {
                             // BETWEEN
-                            Object lowLookupValue = range.getLow().getValue();
-                            Object highLookupValue = range.getHigh().getValue();
+                            Object lowLookupValue = getNativeValue(range.getLow().getValue());
+                            Object highLookupValue = getNativeValue(range.getHigh().getValue());
                             if (lowLookupValue instanceof Comparable && highLookupValue instanceof Comparable) {
                                 Comparable lowComparableLookupValue = (Comparable) lowLookupValue;
                                 Comparable highComparableLookupValue = (Comparable) highLookupValue;
@@ -422,8 +441,8 @@ public class LogicalPart
                             LOG.warn("Lookup value is not Comparable. Sparse index could not be queried.");
                             return getPages();
                         }
-                        low = (Comparable) range.getLow().getValue();
-                        high = (Comparable) indexedPagesMap.lastKey();
+                        low = (Comparable) getNativeValue(range.getLow().getValue());
+                        high = indexedPagesMap.lastKey();
                         if (low.compareTo(high) > 0) {
                             navigableMap = Collections.emptyNavigableMap();
                         }
@@ -437,8 +456,8 @@ public class LogicalPart
                             LOG.warn("Lookup value is not Comparable. Sparse index could not be queried.");
                             return getPages();
                         }
-                        low = (Comparable) indexedPagesMap.firstKey();
-                        high = (Comparable) range.getHigh().getValue();
+                        low = indexedPagesMap.firstKey();
+                        high = (Comparable) getNativeValue(range.getHigh().getValue());
                         toInclusive = range.getHigh().getBound().equals(Marker.Bound.EXACTLY);
                         if (low.compareTo(high) > 0) {
                             navigableMap = Collections.emptyNavigableMap();
@@ -453,8 +472,8 @@ public class LogicalPart
                             LOG.warn("Lookup value is not Comparable. Sparse index could not be queried.");
                             return getPages();
                         }
-                        low = min((Comparable) range.getHigh().getValue(), (Comparable) range.getLow().getValue());
-                        high = max((Comparable) range.getHigh().getValue(), (Comparable) range.getLow().getValue());
+                        low = min((Comparable) getNativeValue(range.getHigh().getValue()), (Comparable) getNativeValue(range.getLow().getValue()));
+                        high = max((Comparable) getNativeValue(range.getHigh().getValue()), (Comparable) getNativeValue(range.getLow().getValue()));
                         navigableMap = indexedPagesMap.subMap(low, fromInclusive, high, toInclusive);
                     }
                     else {
@@ -485,7 +504,7 @@ public class LogicalPart
             return resultPageList;
         }
 
-        return null;
+        return getPages();
     }
 
     private Integer getLowerPageIndex(Comparable lowestInDom, Comparable lowBound, boolean includeLowBound, Comparable highBound, boolean includeHighBound)
@@ -526,11 +545,14 @@ public class LogicalPart
 
     void process()
     {
-        if (processingState.get() != ProcessingState.NOT_STARTED) {
-            return;
+        switch (processingState.get()) {
+            case ACCEPTING_PAGES:
+            case PROCESSING:
+            case COMPLETED:
+                return;
         }
 
-        processingState.set(ProcessingState.IN_PROGRESS);
+        processingState.set(LogicalPartState.PROCESSING);
 
         // sort and create sparse index
         if (!sortChannels.isEmpty()) {
@@ -550,7 +572,7 @@ public class LogicalPart
             long newByteSize = 0;
             for (int i = 0; i < sortedPages.size(); i++) {
                 Page page = sortedPages.get(i);
-                newByteSize += page.getRetainedSizeInBytes();
+                newByteSize += page.getSizeInBytes();
                 newRowCount += page.getPositionCount();
                 Object value = getNativeValue(types.get(sortChannels.get(0)), page.getBlock(sortChannels.get(0)), 0);
                 if (value != null) {
@@ -584,7 +606,7 @@ public class LogicalPart
         // create bloom index on index columns
         for (Integer indexChannel : indexChannels) {
             Set<Object> values = new HashSet<>();
-            for (Page page : pages) {
+            for (Page page : getPages()) {
                 for (int i = 0; i < page.getPositionCount(); i++) {
                     Object value = getNativeValue(types.get(indexChannel), page.getBlock(indexChannel), i);
                     if (value != null) {
@@ -624,13 +646,13 @@ public class LogicalPart
             indexChannelFilters.put(indexChannel, filter);
         }
 
+        this.processingState.set(LogicalPartState.COMPLETED);
         try {
             writePages();
         }
         catch (Exception e) {
             LOG.error("Error spilling LogicalPart " + getPageFileName() + " to disk. Restoring will be unavailable.", e);
         }
-        this.processingState.set(ProcessingState.COMPLETE);
     }
 
     private String getPageFileName()
@@ -779,10 +801,10 @@ public class LogicalPart
 
     boolean canAdd()
     {
-        return processingState.get() == ProcessingState.NOT_STARTED && byteSize < maxLogicalPartBytes;
+        return processingState.get() == LogicalPartState.ACCEPTING_PAGES && byteSize < maxLogicalPartBytes;
     }
 
-    AtomicReference<ProcessingState> getProcessingState()
+    AtomicReference<LogicalPartState> getProcessingState()
     {
         return processingState;
     }

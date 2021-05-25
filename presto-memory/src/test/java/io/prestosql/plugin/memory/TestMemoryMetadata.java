@@ -155,9 +155,11 @@ public class TestMemoryMetadata
                 Optional.empty());
 
         List<SchemaTableName> tableNames = metadata.listTables(SESSION, Optional.empty());
-        assertTrue(tableNames.size() == 1, "Expected exactly one table");
+        assertEquals(tableNames.size(), 0, "Expected zero table");
 
         metadata.finishCreateTable(SESSION, table, ImmutableList.of(), ImmutableList.of());
+        tableNames = metadata.listTables(SESSION, Optional.empty());
+        assertEquals(tableNames.size(), 1, "Expected exactly one table");
     }
 
     @Test

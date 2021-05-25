@@ -33,6 +33,8 @@ import io.prestosql.testing.TestingPagesSerdeFactory;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.OptionalDouble;
 import java.util.OptionalLong;
 
@@ -53,9 +55,13 @@ public class TestMemoryTableManager
 
     @BeforeMethod
     public void setUp()
+            throws IOException
     {
+        if (!MemoryThreadManager.isSharedThreadPoolInitilized()) {
+            MemoryThreadManager.initSharedThreadPool(4);
+        }
         pagesStore = new MemoryTableManager(
-                new MemoryConfig().setMaxDataPerNode(new DataSize(1, DataSize.Unit.MEGABYTE)),
+                new MemoryConfig().setMaxDataPerNode(new DataSize(1, DataSize.Unit.MEGABYTE)).setSpillRoot(Files.createTempDirectory("test-memory-table").toString()),
                 sorter,
                 new TestingTypeManager(),
                 new TestingPagesSerdeFactory().createPagesSerde());
@@ -174,7 +180,7 @@ public class TestMemoryTableManager
     private static Page createOneMegaBytePage()
     {
         BlockBuilder blockBuilder = BIGINT.createFixedSizeBlockBuilder(POSITIONS_PER_PAGE);
-        while (blockBuilder.getRetainedSizeInBytes() < 1024 * 1024) {
+        while (blockBuilder.getSizeInBytes() < 1024 * 1024) {
             BIGINT.writeLong(blockBuilder, 42L);
         }
         return new Page(0, blockBuilder.build());

@@ -34,10 +34,14 @@ public final class MemoryOutputTableHandle
     private final List<ColumnInfo> columns;
     private final List<SortingColumn> sortedBy;
     private final List<String> indexColumns;
+    private final String schemaName;
+    private final String tableName;
 
     @JsonCreator
     public MemoryOutputTableHandle(
             @JsonProperty("table") long table,
+            @JsonProperty("schemaName") String schemaName,
+            @JsonProperty("tableName") String tableName,
             @JsonProperty("compressEnabled") boolean compressionEnabled,
             @JsonProperty("activeTableIds") Set<Long> activeTableIds,
             @JsonProperty("columns") List<ColumnInfo> columns,
@@ -45,6 +49,8 @@ public final class MemoryOutputTableHandle
             @JsonProperty("indexColumns") List<String> indexColumns)
     {
         this.table = table;
+        this.schemaName = schemaName;
+        this.tableName = tableName;
         this.compressionEnabled = compressionEnabled;
         this.activeTableIds = requireNonNull(activeTableIds, "activeTableIds is null");
         this.columns = requireNonNull(columns, "columns is null");
@@ -54,7 +60,7 @@ public final class MemoryOutputTableHandle
 
     public MemoryOutputTableHandle(long table, Set<Long> activeTableIds)
     {
-        this(table, SPILL_COMPRESSION_DEFAULT_VALUE, activeTableIds, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+        this(table, "", "", SPILL_COMPRESSION_DEFAULT_VALUE, activeTableIds, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     }
 
     @JsonProperty
@@ -91,6 +97,18 @@ public final class MemoryOutputTableHandle
     public List<String> getIndexColumns()
     {
         return indexColumns;
+    }
+
+    @JsonProperty
+    public String getSchemaName()
+    {
+        return schemaName;
+    }
+
+    @JsonProperty
+    public String getTableName()
+    {
+        return tableName;
     }
 
     @Override

@@ -51,6 +51,7 @@ import io.prestosql.spi.type.TypeManager;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
 
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
@@ -199,8 +200,9 @@ public class MemoryMetadata
     @Override
     public Map<SchemaTableName, List<ColumnMetadata>> listTableColumns(ConnectorSession session, SchemaTablePrefix prefix)
     {
-        return getMemoryCatalogEntity().getParameters().values().stream()
-                .map(TableInfo::deserialize)
+        return getMemoryCatalogEntity().getParameters().entrySet().stream()
+                .filter(entry -> !entry.getKey().equals(NEXT_ID_KEY))
+                .map(entry -> TableInfo.deserialize(entry.getValue()))
                 .filter(table -> prefix.matches(table.getSchemaTableName()))
                 .collect(toMap(TableInfo::getSchemaTableName, handle -> handle.getMetadata(typeManager).getColumns()));
     }
@@ -311,26 +313,17 @@ public class MemoryMetadata
         Set<Node> nodes = nodeManager.getRequiredWorkerNodes();
         checkState(!nodes.isEmpty(), "No Memory nodes available");
 
-        long tableId = nextId;
-
-        List<ColumnInfo> columnInfos = columns.build();
-        metastore.createTable(TableEntity.builder()
-                .setCatalogName(MEM_KEY)
-                .setDatabaseName(tableMetadata.getTable().getSchemaName())
-                .setTableName(tableMetadata.getTable().getTableName())
-                .setTableType(TableEntityType.TABLE.toString())
-                .setParameter(ID_KEY, String.valueOf(tableId))
-                .build());
-        updateTableInfo(tableId, new TableInfo(
-                tableId,
-                tableMetadata.getTable().getSchemaName(),
-                tableMetadata.getTable().getTableName(),
-                columnInfos,
-                new HashMap<>()));
-
         boolean spillCompressionEnabled = MemoryTableProperties.getSpillCompressionEnabled(tableMetadata.getProperties());
 
-        return new MemoryOutputTableHandle(tableId, spillCompressionEnabled, getTableIdSet(), columnInfos, sortedBy, indexColumns);
+        return new MemoryOutputTableHandle(
+                nextId,
+                tableMetadata.getTable().getSchemaName(),
+                tableMetadata.getTable().getTableName(),
+                spillCompressionEnabled,
+                getTableIdSet(nextId),
+                columns.build(),
+                sortedBy,
+                indexColumns);
     }
 
     private void checkSchemaNotExists(String schemaName)
@@ -370,6 +363,22 @@ public class MemoryMetadata
     {
         requireNonNull(tableHandle, "tableHandle is null");
         MemoryOutputTableHandle memoryOutputHandle = (MemoryOutputTableHandle) tableHandle;
+
+        List<ColumnInfo> columnInfos = memoryOutputHandle.getColumns();
+        long tableId = memoryOutputHandle.getTable();
+        metastore.createTable(TableEntity.builder()
+                .setCatalogName(MEM_KEY)
+                .setDatabaseName(memoryOutputHandle.getSchemaName())
+                .setTableName(memoryOutputHandle.getTableName())
+                .setTableType(TableEntityType.TABLE.toString())
+                .setParameter(ID_KEY, String.valueOf(tableId))
+                .build());
+        updateTableInfo(tableId, new TableInfo(
+                tableId,
+                memoryOutputHandle.getSchemaName(),
+                memoryOutputHandle.getTableName(),
+                columnInfos,
+                new HashMap<>()));
 
         updateRowsOnHosts(memoryOutputHandle.getTable(), fragments);
         return Optional.empty();
@@ -614,8 +623,11 @@ public class MemoryMetadata
         return tableEntity.getViewOriginalText() != null;
     }
 
-    private Set<Long> getTableIdSet()
+    private Set<Long> getTableIdSet(Long... ids)
     {
-        return getMemoryCatalogEntity().getParameters().keySet().stream().filter(e -> !NEXT_ID_KEY.equals(e)).map(Long::valueOf).collect(Collectors.toSet());
+        Set<Long> res = new HashSet<>();
+        getMemoryCatalogEntity().getParameters().keySet().stream().filter(e -> !NEXT_ID_KEY.equals(e)).map(Long::valueOf).forEach(res::add);
+        res.addAll(Arrays.asList(ids));
+        return res;
     }
 }

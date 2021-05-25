@@ -77,7 +77,7 @@ public class SortBuffer
         this(maxMemory, types, sortFields, sortOrders, pageSorter, PageBuilderStatus.DEFAULT_MAX_PAGE_SIZE_IN_BYTES);
     }
 
-    public long getRetainedBytes()
+    public long getSizeInBytes()
     {
         return INSTANCE_SIZE + usedMemoryBytes;
     }
@@ -97,7 +97,7 @@ public class SortBuffer
     {
         checkState(canAdd(page), "page buffer is full");
         pages.add(page);
-        usedMemoryBytes += page.getRetainedSizeInBytes();
+        usedMemoryBytes += page.getSizeInBytes();
         rowCount = addExact(rowCount, page.getPositionCount());
     }
 

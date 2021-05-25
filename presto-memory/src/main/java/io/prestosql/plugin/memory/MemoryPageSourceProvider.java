@@ -120,7 +120,7 @@ public final class MemoryPageSourceProvider
                 for (Map.Entry<ColumnHandle, DynamicFilter> entry : filter.entrySet()) {
                     MemoryColumnHandle columnHandle = (MemoryColumnHandle) entry.getKey();
                     DynamicFilter dynamicFilter = entry.getValue();
-                    Object value = TypeUtils.readNativeValue(columnHandle.getType(), page.getBlock(columns.indexOf(columnHandle)), i);
+                    Object value = TypeUtils.readNativeValue(columnHandle.getType(typeManager), page.getBlock(columns.indexOf(columnHandle)), i);
                     if (!dynamicFilter.contains(value)) {
                         match = false;
                     }

@@ -64,7 +64,7 @@ public class MemoryPageSinkProvider
         long tableId = memoryOutputTableHandle.getTable();
         checkState(memoryOutputTableHandle.getActiveTableIds().contains(tableId));
 
-        pagesStore.cleanUp(memoryOutputTableHandle.getActiveTableIds());
+        pagesStore.refreshTables(memoryOutputTableHandle.getActiveTableIds());
         pagesStore.initialize(tableId, memoryOutputTableHandle.isCompressionEnabled(), memoryOutputTableHandle.getColumns(), memoryOutputTableHandle.getSortedBy(), memoryOutputTableHandle.getIndexColumns());
         return new MemoryPageSink(pagesStore, currentHostAddress, tableId);
     }
@@ -76,7 +76,7 @@ public class MemoryPageSinkProvider
         long tableId = memoryInsertTableHandle.getTable();
         checkState(memoryInsertTableHandle.getActiveTableIds().contains(tableId));
 
-        pagesStore.cleanUp(memoryInsertTableHandle.getActiveTableIds());
+        pagesStore.refreshTables(memoryInsertTableHandle.getActiveTableIds());
         pagesStore.initialize(tableId, SPILL_COMPRESSION_DEFAULT_VALUE, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
         return new MemoryPageSink(pagesStore, currentHostAddress, tableId);
     }
@@ -107,13 +107,14 @@ public class MemoryPageSinkProvider
         @Override
         public CompletableFuture<Collection<Slice>> finish()
         {
-            tablesManager.finishCreateTable(tableId);
+            tablesManager.finishUpdatingTable(tableId);
             return completedFuture(ImmutableList.of(new MemoryDataFragment(currentHostAddress, addedRows).toSlice()));
         }
 
         @Override
         public void abort()
         {
+            tablesManager.cleanTable(tableId);
         }
     }
 }

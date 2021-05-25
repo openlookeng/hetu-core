@@ -31,18 +31,23 @@ import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.text.NumberFormat;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.Comparator;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.OptionalLong;
@@ -51,6 +56,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static io.prestosql.plugin.memory.MemoryErrorCode.MEMORY_LIMIT_EXCEEDED;
 import static io.prestosql.plugin.memory.MemoryErrorCode.MISSING_DATA;
@@ -73,8 +79,8 @@ public class MemoryTableManager
     private final PagesSerde pagesSerde;
 
     @GuardedBy("this")
-    private long currentBytes;
-    private final Map<Long, TableData> tables = new HashMap<>();
+    private final AtomicLong currentBytes = new AtomicLong();
+    private final Map<Long, Table> tables = new LinkedHashMap<>(16, 0.75f, true);
 
     @Inject
     public MemoryTableManager(MemoryConfig config, PageSorter pageSorter, TypeManager typeManager, PagesSerde pagesSerde)
@@ -88,8 +94,10 @@ public class MemoryTableManager
         this.pagesSerde = requireNonNull(pagesSerde, "pagesSerde is null");
     }
 
-    public void finishCreateTable(long id)
+    public void finishUpdatingTable(long id)
     {
+        tables.get(id).finishCreation();
+
         Timer timer = new Timer(true);
         timer.scheduleAtFixedRate(new TimerTask()
         {
@@ -114,7 +122,7 @@ public class MemoryTableManager
     public synchronized void initialize(long tableId, boolean compressionEnabled, List<ColumnInfo> columns, List<SortingColumn> sortedBy, List<String> indexColumns)
     {
         if (!tables.containsKey(tableId)) {
-            tables.put(tableId, new TableData(tableId, compressionEnabled, spillRoot.resolve(String.valueOf(tableId)), columns, sortedBy, indexColumns, pageSorter, config, typeManager, pagesSerde));
+            tables.put(tableId, new Table(tableId, compressionEnabled, spillRoot.resolve(String.valueOf(tableId)), columns, sortedBy, indexColumns, pageSorter, config, typeManager, pagesSerde));
         }
     }
 
@@ -126,14 +134,9 @@ public class MemoryTableManager
 
         page.compact();
 
-        long newSize = currentBytes + page.getRetainedSizeInBytes();
-        if (maxBytes < newSize) {
-            throw new PrestoException(MEMORY_LIMIT_EXCEEDED, format("Memory limit [%d] for memory connector exceeded", maxBytes));
-        }
-        currentBytes = newSize;
-
-        TableData tableData = tables.get(tableId);
-        tableData.add(page);
+        Table table = tables.get(tableId); // get current table to make sure it's not LRU
+        applyForMemory(page.getSizeInBytes(), tableId, () -> {}, () -> releaseMemory(table.rollBackUncommitted(), "Rolling back."));
+        table.add(page);
     }
 
     public List<Page> getPages(
@@ -162,14 +165,17 @@ public class MemoryTableManager
             try {
                 restoreTable(tableId);
             }
+            catch (PrestoException pe) {
+                throw pe;
+            }
             catch (Exception e) {
-                throw new PrestoException(MISSING_DATA, "Failed to find/restore table on a worker.");
+                throw new PrestoException(MISSING_DATA, "Failed to find/restore table on a worker", e);
             }
         }
-        TableData tableData = tables.get(tableId);
-        if (tableData.getRows() < expectedRows) {
+        Table table = tables.get(tableId);
+        if (table.getRows() < expectedRows) {
             throw new PrestoException(MISSING_DATA,
-                    format("Expected to find [%s] rows on a worker, but found [%s].", expectedRows, tableData.getRows()));
+                    format("Expected to find [%s] rows on a worker, but found [%s].", expectedRows, table.getRows()));
         }
 
         ImmutableList.Builder<Page> projectedPages = ImmutableList.builder();
@@ -178,10 +184,10 @@ public class MemoryTableManager
 
         List<Page> pages;
         if (predicate.isAll()) {
-            pages = tableData.getPages(splitNumber);
+            pages = table.getPages(splitNumber);
         }
         else {
-            pages = tableData.getPages(splitNumber, predicate);
+            pages = table.getPages(splitNumber, predicate);
         }
 
         for (int i = 0; i < pages.size(); i++) {
@@ -212,7 +218,20 @@ public class MemoryTableManager
         return tables.containsKey(tableId);
     }
 
-    public synchronized void cleanUp(Set<Long> activeTableIds)
+    public synchronized void cleanTable(Long tableId)
+    {
+        if (tables.containsKey(tableId)) {
+            try {
+                releaseMemory(tables.get(tableId).getByteSize(), "Cleaning table");
+                tables.remove(tableId);
+            }
+            catch (Exception e) {
+                LOG.error(e, "Unable to clean table " + tableId);
+            }
+        }
+    }
+
+    public synchronized void refreshTables(Set<Long> activeTableIds)
     {
         // We have to remember that there might be some race conditions when there are two tables created at once.
         // That can lead to a situation when MemoryPagesStore already knows about a newer second table on some worker
@@ -228,14 +247,27 @@ public class MemoryTableManager
         }
         long latestTableId = Collections.max(activeTableIds);
 
-        for (Iterator<Map.Entry<Long, TableData>> tableDataIterator = tables.entrySet().iterator(); tableDataIterator.hasNext(); ) {
-            Map.Entry<Long, TableData> tablePagesEntry = tableDataIterator.next();
+        Iterator<Map.Entry<Long, Table>> tableDataIterator = tables.entrySet().iterator();
+        while (tableDataIterator.hasNext()) {
+            Map.Entry<Long, Table> tablePagesEntry = tableDataIterator.next();
             Long tableId = tablePagesEntry.getKey();
             if (tableId < latestTableId && !activeTableIds.contains(tableId)) {
-                for (Page removedPage : tablePagesEntry.getValue().getPages()) {
-                    currentBytes -= removedPage.getRetainedSizeInBytes();
-                }
+                releaseMemory(tablePagesEntry.getValue().getByteSize(), "Table refresh");
                 tableDataIterator.remove();
+                LOG.info("[TableRefresh] Dropped table %s from memory", tableId);
+            }
+        }
+
+        if (config.getSpillRoot() != null && Files.exists(config.getSpillRoot())) {
+            try {
+                Files.list(config.getSpillRoot())
+                        .filter(Files::isDirectory)
+                        .filter(path -> !activeTableIds.contains(Long.valueOf(path.getFileName().toString())))
+                        .peek(path -> LOG.info("[TableRefresh] Cleaning table " + Long.valueOf(path.getFileName().toString()) + " from disk."))
+                        .forEach(this::deleteRecursively);
+            }
+            catch (Exception e) {
+                LOG.error(e, "[TableRefresh] Unable to update spilled tables");
             }
         }
     }
@@ -254,8 +286,8 @@ public class MemoryTableManager
     private synchronized void spillTable(long id)
             throws IOException
     {
-        TableData tableData = tables.get(id);
-        if (tableData.isSpilled()) {
+        Table table = tables.get(id);
+        if (table.isSpilled()) {
             return;
         }
         LOG.debug("[Spill] serializing metadata of table " + id);
@@ -264,13 +296,17 @@ public class MemoryTableManager
         if (!Files.exists(tablePath)) {
             Files.createDirectories(tablePath);
         }
+        table.setState(Table.TableState.SPILLED);
         try (OutputStream outputStream = Files.newOutputStream(tablePath.resolve(TABLE_METADATA_SUFFIX))) {
             ObjectOutputStream oos = new ObjectOutputStream(outputStream);
-            oos.writeObject(tableData);
+            oos.writeObject(table);
         }
-        tableData.finishSpilling();
+        catch (Exception e) {
+            // if spilling failed mark it back to spilled
+            table.setState(Table.TableState.COMMITTED);
+        }
         long dur = System.currentTimeMillis() - start;
-        LOG.debug("[Spill] Table " + id + " has been serialized to disk . Time elapsed: " + dur + "ms");
+        LOG.debug("[Spill] Table " + id + " has been serialized to disk. Time elapsed: " + dur + "ms");
     }
 
     private synchronized void restoreTable(long id)
@@ -287,11 +323,81 @@ public class MemoryTableManager
         }
         try (InputStream inputStream = Files.newInputStream(tablePath.resolve(TABLE_METADATA_SUFFIX))) {
             ObjectInputStream ois = new ObjectInputStream(inputStream);
-            TableData tableData = (TableData) ois.readObject();
-            tableData.restoreTransientObjects(pageSorter, typeManager, pagesSerde, tablePath);
-            tables.put(id, tableData);
+            Table table = (Table) ois.readObject();
+            table.restoreTransientObjects(pageSorter, typeManager, pagesSerde, tablePath);
+            applyForMemory(table.getByteSize(), -1, () -> logNumFormat("Loaded table %s with %s bytes.", id, table.getByteSize()), () -> {});
+            tables.put(id, table);
         }
         long dur = System.currentTimeMillis() - start;
         LOG.debug("[Load] Table " + id + " has been restored. Time elapsed: " + dur + "ms");
+    }
+
+    private void deleteRecursively(Path path)
+    {
+        try {
+            Files.walk(path)
+                    .sorted(Comparator.reverseOrder())
+                    .map(Path::toFile)
+                    .forEach(File::delete);
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Apply for given size of memory in memory connector. If it can't be fulfilled the method tries to release tables from memory according to LRU order.
+     *
+     * @param bytes memory size requested
+     * @param reserved reserved tableId so it will not be considered cleanable from LRU
+     * @param onSuccess operation after successful memory allocation
+     * @param rollBack operation when memory request cannot be fulfilled
+     * @throws PrestoException if the request still can't be fulfilled after dropping all non-reserved tables
+     */
+    private synchronized void applyForMemory(long bytes, long reserved, Runnable onSuccess, Runnable rollBack)
+            throws PrestoException
+    {
+        long newSize = bytes + currentBytes.get();
+        while (maxBytes < newSize) {
+            logNumFormat("Not enough memory for the request. Current bytes: %s. Limit: %s. Requested size: %s", currentBytes.get(), maxBytes, bytes);
+            tables.get(reserved); // perform a get and make sure reserved table is not LRU
+            Map.Entry<Long, Table> lru = tables.entrySet().iterator().next();
+            if (lru != null && lru.getKey() != reserved && lru.getValue().isSpilled()) {
+                // if there is any LRU table available to be dropped, evict it to make space for current
+                releaseMemory(lru.getValue().getByteSize(), "Offloading LRU");
+                tables.remove(lru.getKey());
+                logNumFormat("Released %s bytes by offloading LRU table %s. Current bytes after offloading: %s", lru.getValue().getByteSize(), lru.getKey(), currentBytes.get());
+                newSize = currentBytes.get() + bytes;
+            }
+            else {
+                long current = currentBytes.get();
+                rollBack.run();
+                throw new PrestoException(MEMORY_LIMIT_EXCEEDED, format("Memory limit [%s] for memory connector exceeded. Current: [%s]. Requested: [%s]",
+                        NumberFormat.getIntegerInstance(Locale.US).format(maxBytes),
+                        NumberFormat.getIntegerInstance(Locale.US).format(current),
+                        NumberFormat.getIntegerInstance(Locale.US).format(bytes)));
+            }
+        }
+        currentBytes.set(newSize);
+        onSuccess.run();
+        logNumFormat("Fulfilled %s bytes. Current: %s", bytes, currentBytes.get());
+    }
+
+    private synchronized void releaseMemory(long bytes, String reason)
+    {
+        currentBytes.addAndGet(-bytes);
+        logNumFormat("Released %s bytes. Current: %s. Caused by: " + reason, bytes, currentBytes.get());
+    }
+
+    /**
+     * Format long numbers by thousands so it's easier to read.
+     */
+    private void logNumFormat(String format, long... numbers)
+    {
+        Object[] formatted = new String[numbers.length];
+        for (int i = 0; i < numbers.length; i++) {
+            formatted[i] = NumberFormat.getIntegerInstance(Locale.US).format(numbers[i]);
+        }
+        LOG.debug(format, formatted);
     }
 }

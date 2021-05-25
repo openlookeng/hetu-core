@@ -165,7 +165,7 @@ public class TestLogicalPart
                 0,
                 0,
                 false);
-        AtomicReference<LogicalPart.ProcessingState> processingState = new AtomicReference<>(LogicalPart.ProcessingState.COMPLETE);
+        AtomicReference<LogicalPart.LogicalPartState> processingState = new AtomicReference<>(LogicalPart.LogicalPartState.COMPLETED);
         ReflectionTestUtils.setField(logicalPart, "processingState", processingState);
 
         List<Integer> indexChannels = new ArrayList<>();
@@ -858,7 +858,7 @@ public class TestLogicalPart
                 0,
                 false);
 
-        AtomicReference<LogicalPart.ProcessingState> processingState = new AtomicReference<>(LogicalPart.ProcessingState.COMPLETE);
+        AtomicReference<LogicalPart.LogicalPartState> processingState = new AtomicReference<>(LogicalPart.LogicalPartState.COMPLETED);
         ReflectionTestUtils.setField(logicalPart, "processingState", processingState);
 
         List<Integer> indexChannels = new ArrayList<>();
@@ -984,7 +984,7 @@ public class TestLogicalPart
                 0,
                 false);
 
-        AtomicReference<LogicalPart.ProcessingState> processingState = new AtomicReference<>(LogicalPart.ProcessingState.COMPLETE);
+        AtomicReference<LogicalPart.LogicalPartState> processingState = new AtomicReference<>(LogicalPart.LogicalPartState.COMPLETED);
         ReflectionTestUtils.setField(logicalPart, "processingState", processingState);
 
         List<Integer> indexChannels = new ArrayList<>();

@@ -30,18 +30,32 @@ import java.io.Serializable;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
-public class TableData
+public class Table
         implements Serializable
 {
+    public long getByteSize()
+    {
+        return byteSize;
+    }
+
+    enum TableState
+    {
+        MODIFIED, COMMITTED, SPILLED
+    }
+
     private static final long serialVersionUID = 588783549296983464L;
-    private static final Logger LOG = Logger.get(TableData.class);
+    private static final Logger LOG = Logger.get(Table.class);
+    private static final Long PROCESSING_DELAY = 5000L; // 5s
+    private static final ScheduledExecutorService executor = MemoryThreadManager.getSharedThreadPool();
 
     private final long processingDelay;
     private final int totalSplits;
@@ -53,15 +67,16 @@ public class TableData
     private final int maxPageSizeBytes;
     private final List<List<LogicalPart>> splits;
     private final boolean compressionEnabled;
-    private boolean isOnDisk;
+    private TableState tableState;
     private long lastModified = System.currentTimeMillis();
+    private long byteSize;
 
     private transient Path tableDataRoot;
     private transient PagesSerde pagesSerde;
     private transient PageSorter pageSorter;
     private transient TypeManager typeManager;
 
-    public TableData(long id, boolean compressionEnabled, Path tableDataRoot, List<ColumnInfo> columns, List<SortingColumn> sortedBy,
+    public Table(long id, boolean compressionEnabled, Path tableDataRoot, List<ColumnInfo> columns, List<SortingColumn> sortedBy,
             List<String> indexColumns, PageSorter pageSorter, MemoryConfig config, TypeManager typeManager, PagesSerde pagesSerde)
     {
         this.tableDataRoot = tableDataRoot;
@@ -89,7 +104,7 @@ public class TableData
                     List<LogicalPart> split = splits.get(i);
                     for (int j = 0; j < split.size(); j++) {
                         LogicalPart logicalPart = split.get(j);
-                        if (logicalPart.getProcessingState().get() == LogicalPart.ProcessingState.NOT_STARTED) {
+                        if (logicalPart.getProcessingState().get() == LogicalPart.LogicalPartState.FINISHED_ADDING) {
                             int finalI = i;
                             int finalJ = j;
                             MemoryThreadManager.getSharedThreadPool().execute(() -> {
@@ -135,14 +150,16 @@ public class TableData
         LogicalPart currentSplitPart = splitParts.get(splitParts.size() - 1);
         currentSplitPart.add(page);
 
+        byteSize += page.getSizeInBytes();
         lastModified = System.currentTimeMillis();
+        tableState = TableState.MODIFIED;
     }
 
     public boolean allProcessed()
     {
         for (List<LogicalPart> split : splits) {
             for (LogicalPart logicalPart : split) {
-                if (logicalPart.getProcessingState().get() != LogicalPart.ProcessingState.COMPLETE) {
+                if (logicalPart.getProcessingState().get() != LogicalPart.LogicalPartState.COMPLETED) {
                     return false;
                 }
             }
@@ -150,14 +167,44 @@ public class TableData
         return true;
     }
 
-    public boolean isSpilled()
+    /**
+     * Removed all uncommitted LogicalParts, and return their total size in bytes.
+     */
+    public long rollBackUncommitted()
     {
-        return isOnDisk;
+        int size = 0;
+        for (List<LogicalPart> split : splits) {
+            Iterator<LogicalPart> iterator = split.iterator();
+            while (iterator.hasNext()) {
+                LogicalPart lp = iterator.next();
+                if (lp.getProcessingState().get() == LogicalPart.LogicalPartState.ACCEPTING_PAGES) {
+                    size += lp.getByteSize();
+                    iterator.remove();
+                }
+            }
+        }
+        byteSize -= size;
+        return size;
     }
 
-    public void finishSpilling()
+    public boolean isSpilled()
     {
-        isOnDisk = true;
+        return tableState == TableState.SPILLED;
+    }
+
+    public void finishCreation()
+    {
+        tableState = TableState.COMMITTED;
+        for (List<LogicalPart> spilt : splits) {
+            for (LogicalPart logicalPart : spilt) {
+                logicalPart.finishAdding();
+            }
+        }
+    }
+
+    public void setState(TableState state)
+    {
+        tableState = state;
     }
 
     protected List<Page> getPages()
