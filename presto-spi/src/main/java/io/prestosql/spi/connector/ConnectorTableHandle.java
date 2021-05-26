@@ -126,4 +126,10 @@ public interface ConnectorTableHandle
     {
         return false;
     }
+
+    /* This method checks if table properties caching supported*/
+    default boolean isTablePropertiesCacheSupported()
+    {
+        return false;
+    }
 }

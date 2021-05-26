@@ -138,6 +138,7 @@ public final class MetadataManager
 
     // This section of code declares the dataCenterConnectorManager object
     private final Provider<DataCenterConnectorManager> dataCenterConnectorManager;
+    private Map<String, ConcurrentHashMap<ConnectorTableHandle, TableProperties>> tablePropertiesQueryCache = new ConcurrentHashMap<>();
 
     @Inject
     public MetadataManager(
@@ -363,6 +364,9 @@ public final class MetadataManager
         CatalogMetadata catalogMetadata = getCatalogMetadata(session, catalogName);
         ConnectorMetadata metadata = catalogMetadata.getMetadataFor(catalogName);
         ConnectorSession connectorSession = session.toConnectorSession(catalogName);
+        TableProperties tableProperties;
+        ConcurrentHashMap<ConnectorTableHandle, TableProperties> tablePropertiesMap;
+        String queryId = session.getQueryId().getId();
 
         if (metadata.usesLegacyTableLayouts()) {
             return handle.getLayout()
@@ -371,7 +375,28 @@ public final class MetadataManager
                             .get()
                             .getTableProperties());
         }
-        return new TableProperties(catalogName, handle.getTransaction(), metadata.getTableProperties(connectorSession, handle.getConnectorHandle()));
+
+        if (!handle.getConnectorHandle().isTablePropertiesCacheSupported()) {
+            return new TableProperties(catalogName, handle.getTransaction(), metadata.getTableProperties(connectorSession, handle.getConnectorHandle()));
+        }
+
+        if (tablePropertiesQueryCache.get(queryId) != null && tablePropertiesQueryCache.get(queryId).get(handle.getConnectorHandle()) != null) {
+            return tablePropertiesQueryCache.get(queryId).get(handle.getConnectorHandle());
+        }
+        else {
+            tableProperties = new TableProperties(catalogName, handle.getTransaction(), metadata.getTableProperties(connectorSession, handle.getConnectorHandle()));
+            if (tablePropertiesQueryCache.containsKey(queryId)) {
+                tablePropertiesMap = tablePropertiesQueryCache.get(queryId);
+            }
+            else {
+                tablePropertiesMap = new ConcurrentHashMap<>();
+            }
+
+            tablePropertiesMap.put(handle.getConnectorHandle(), tableProperties);
+            tablePropertiesQueryCache.put(queryId, tablePropertiesMap);
+        }
+
+        return tableProperties;
     }
 
     @Override
@@ -707,6 +732,7 @@ public final class MetadataManager
     @Override
     public void cleanupQuery(Session session)
     {
+        tablePropertiesQueryCache.remove(session.getQueryId().getId());
         QueryCatalogs queryCatalogs = catalogsByQueryId.remove(session.getQueryId());
         if (queryCatalogs != null) {
             queryCatalogs.finish();

@@ -84,11 +84,11 @@ public class AsyncQueue<T>
     {
         if (finishing && borrowerCount == 0) {
             if (elements.size() == 0) {
-                completeAsync(executor, notEmptySignal);
+                notEmptySignal.set(null);
                 notEmptySignal = SettableFuture.create();
             }
             else if (elements.size() >= targetQueueSize) {
-                completeAsync(executor, notFullSignal);
+                notFullSignal.set(null);
                 notFullSignal = SettableFuture.create();
             }
         }
@@ -104,7 +104,7 @@ public class AsyncQueue<T>
         elements.add(element);
         int newSize = elements.size();
         if (newSize == 1) {
-            completeAsync(executor, notEmptySignal);
+            notEmptySignal.set(null);
             notEmptySignal = SettableFuture.create();
         }
         if (newSize >= targetQueueSize) {
@@ -131,7 +131,7 @@ public class AsyncQueue<T>
         }
         // This checks that the queue size changed from above threshold to below. Therefore, writers shall be notified.
         if (oldSize >= targetQueueSize && oldSize - reduceBy < targetQueueSize) {
-            completeAsync(executor, notFullSignal);
+            notFullSignal.set(null);
             notFullSignal = SettableFuture.create();
         }
         return result;
@@ -216,11 +216,6 @@ public class AsyncQueue<T>
                         }
                     }
                 }, directExecutor());
-    }
-
-    private static void completeAsync(Executor executor, SettableFuture<?> future)
-    {
-        executor.execute(() -> future.set(null));
     }
 
     public static final class BorrowResult<T, R>

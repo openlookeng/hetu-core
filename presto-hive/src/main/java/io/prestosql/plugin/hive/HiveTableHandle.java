@@ -323,7 +323,18 @@ public class HiveTableHandle
         }
         HiveTableHandle that = (HiveTableHandle) o;
         return Objects.equals(schemaName, that.schemaName) &&
-                Objects.equals(tableName, that.tableName);
+                Objects.equals(tableName, that.tableName) &&
+                Objects.equals(tableParameters, that.tableParameters) &&
+                Objects.equals(partitionColumns, that.partitionColumns) &&
+                Objects.equals(partitions, that.partitions) &&
+                Objects.equals(compactEffectivePredicate, that.compactEffectivePredicate) &&
+                Objects.equals(enforcedConstraint, that.enforcedConstraint) &&
+                Objects.equals(bucketHandle, that.bucketHandle) &&
+                Objects.equals(bucketFilter, that.bucketFilter) &&
+                Objects.equals(analyzePartitionValues, that.analyzePartitionValues) &&
+                Objects.equals(predicateColumns, that.predicateColumns) &&
+                Objects.equals(disjunctCompactEffectivePredicate, that.disjunctCompactEffectivePredicate) &&
+                suitableToPush == that.suitableToPush;
     }
 
     @Override
@@ -384,6 +395,13 @@ public class HiveTableHandle
     /* This method checks if reuse table scan can be used*/
     @Override
     public boolean isReuseTableScanSupported()
+    {
+        return true;
+    }
+
+    /* This method checks if table properties caching supported*/
+    @Override
+    public boolean isTablePropertiesCacheSupported()
     {
         return true;
     }
