@@ -167,6 +167,10 @@ public class TaskSnapshotManager
     public void setTotalComponents(int totalComponents)
     {
         this.totalComponents = totalComponents;
+        if (totalComponents == 0) {
+            // If this task only has table-scan pipelines, then "restore" is implicitly done
+            restoreResult.setSnapshotResult(-1, SnapshotResult.SUCCESSFUL);
+        }
     }
 
     public void succeededToCapture(SnapshotStateId componentId)

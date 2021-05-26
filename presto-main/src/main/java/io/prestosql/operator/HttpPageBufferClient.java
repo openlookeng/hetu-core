@@ -614,14 +614,6 @@ public final class HttpPageBufferClient
                     catch (RuntimeException | IOException e) {
                         // Ignored. Just return whatever message we were able to decode
                     }
-                    if (querySnapshotManager != null) {
-                        // Snapshot: for internal server errors on the worker, treat as resumable error.
-                        if (querySnapshotManager.isCoordinator() && response.getStatusCode() >= 500) {
-                            log.debug("Expected response code to be 200, but was %s:%n%s", response.getStatusCode(), body.toString());
-                            querySnapshotManager.cancelToResume();
-                            return createEmptyPagesResponse(getTaskInstanceId(response), getToken(response), getNextToken(response), getComplete(response));
-                        }
-                    }
                     throw new PageTransportErrorException(format("Expected response code to be 200, but was %s:%n%s", response.getStatusCode(), body.toString()));
                 }
 
@@ -649,6 +641,14 @@ public final class HttpPageBufferClient
                 }
             }
             catch (PageTransportErrorException e) {
+                if (querySnapshotManager != null && querySnapshotManager.isCoordinator()) {
+                    // Snapshot: for internal server errors on the worker, or unexpected OK results, treat as resumable error.
+                    if (response.getStatusCode() >= 500 || response.getStatusCode() == HttpStatus.OK.code()) {
+                        log.debug(e.getMessage());
+                        querySnapshotManager.cancelToResume();
+                        return createEmptyPagesResponse(getTaskInstanceId(response), getToken(response), getNextToken(response), getComplete(response));
+                    }
+                }
                 throw new PageTransportErrorException(format("Error fetching %s: %s", request.getUri().toASCIIString(), e.getMessage()), e);
             }
         }

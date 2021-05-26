@@ -14,6 +14,7 @@
  */
 package io.prestosql.snapshot;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
@@ -353,16 +354,27 @@ public class QuerySnapshotManager
         if (restoreResult.isPresent()) {
             SnapshotResult result = restoreResult.get().getSnapshotResult();
             long snapshotId = restoreResult.get().getSnapshotId();
-            if (result == SnapshotResult.FAILED) {
-                LOG.debug("[FATAL] Failed to resume for: " + taskId + ", snapshot " + snapshotId);
-                updateQueryRestore(snapshotId, taskId, SnapshotComponentCounter.ComponentState.FAILED);
+            if (snapshotId < 0) {
+                synchronized (restoreComponentCounters) {
+                    // Special case. Task will never receive any marker. Treat as finished.
+                    checkArgument(result == SnapshotResult.SUCCESSFUL);
+                    for (Long sid : restoreComponentCounters.keySet()) {
+                        updateQueryRestore(sid, taskId, SnapshotComponentCounter.ComponentState.SUCCESSFUL);
+                    }
+                }
             }
-            else if (result == SnapshotResult.FAILED_FATAL) {
-                LOG.debug("Failed to resume for: " + taskId + ", snapshot " + snapshotId);
-                updateQueryRestore(snapshotId, taskId, SnapshotComponentCounter.ComponentState.FAILED_FATAL);
-            }
-            else if (result == SnapshotResult.SUCCESSFUL) {
-                updateQueryRestore(snapshotId, taskId, SnapshotComponentCounter.ComponentState.SUCCESSFUL);
+            else {
+                if (result == SnapshotResult.FAILED) {
+                    LOG.debug("[FATAL] Failed to resume for: " + taskId + ", snapshot " + snapshotId);
+                    updateQueryRestore(snapshotId, taskId, SnapshotComponentCounter.ComponentState.FAILED);
+                }
+                else if (result == SnapshotResult.FAILED_FATAL) {
+                    LOG.debug("Failed to resume for: " + taskId + ", snapshot " + snapshotId);
+                    updateQueryRestore(snapshotId, taskId, SnapshotComponentCounter.ComponentState.FAILED_FATAL);
+                }
+                else if (result == SnapshotResult.SUCCESSFUL) {
+                    updateQueryRestore(snapshotId, taskId, SnapshotComponentCounter.ComponentState.SUCCESSFUL);
+                }
             }
         }
     }
@@ -476,7 +488,8 @@ public class QuerySnapshotManager
         }
     }
 
-    public RestoreResult getQuerySnapshotRestoreResult()
+    @VisibleForTesting
+    RestoreResult getQuerySnapshotRestoreResult()
     {
         return restoreResult;
     }

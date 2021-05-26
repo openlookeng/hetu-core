@@ -147,6 +147,7 @@ public class Analysis
     private ConnectorTableMetadata tableMetadata;
     private boolean createTableAsSelectWithData = true;
     private boolean createTableAsSelectNoOp;
+    private TableHandle createTableAsSelectNoOpTarget;
     private Optional<List<Identifier>> createTableColumnAliases = Optional.empty();
     private Optional<String> createTableComment = Optional.empty();
 
@@ -234,9 +235,15 @@ public class Analysis
         return createTableAsSelectNoOp;
     }
 
-    public void setCreateTableAsSelectNoOp(boolean createTableAsSelectNoOp)
+    public TableHandle getCreateTableAsSelectNoOpTarget()
+    {
+        return createTableAsSelectNoOpTarget;
+    }
+
+    public void setCreateTableAsSelectNoOp(boolean createTableAsSelectNoOp, TableHandle target)
     {
         this.createTableAsSelectNoOp = createTableAsSelectNoOp;
+        this.createTableAsSelectNoOpTarget = target;
     }
 
     public void setAsyncQuery(boolean asyncQuery)
