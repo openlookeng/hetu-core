@@ -35,7 +35,7 @@ public class HiveTransaction
     private final HiveIdentity identity;
     private final long transactionId;
     private final ScheduledFuture<?> heartbeatTask;
-    private final Map<HiveTableHandle, AtomicBoolean> locksMap = new HashMap<>();
+    private final Map<String, AtomicBoolean> locksMap = new HashMap<>();
     private final Map<HivePartition, AtomicBoolean> partitionLocks = new HashMap<>();
 
     private final Map<SchemaTableName, ValidTxnWriteIdList> validHiveTransactionsForTable = new HashMap<>();
@@ -98,7 +98,7 @@ public class HiveTransaction
             }
         }
         else {
-            AtomicBoolean lockFlag = locksMap.get(tableHandle);
+            AtomicBoolean lockFlag = locksMap.get(tableHandle.getSchemaPrefixedTableName());
             if (lockFlag == null || !lockFlag.get()) {
                 return true;
             }
@@ -122,10 +122,10 @@ public class HiveTransaction
             });
         }
         else {
-            AtomicBoolean flag = locksMap.get(tableHandle);
+            AtomicBoolean flag = locksMap.get(tableHandle.getSchemaPrefixedTableName());
             if (flag == null) {
                 flag = new AtomicBoolean(true);
-                locksMap.put(tableHandle, flag);
+                locksMap.put(tableHandle.getSchemaPrefixedTableName(), flag);
             }
             else {
                 flag.set(true);
