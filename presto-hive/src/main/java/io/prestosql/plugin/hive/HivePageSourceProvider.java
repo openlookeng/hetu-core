@@ -252,7 +252,8 @@ public class HivePageSourceProvider
                 indexOptional,
                 splitMetadata,
                 hiveSplit.isCacheable(),
-                hiveSplit.getLastModifiedTime());
+                hiveSplit.getLastModifiedTime(),
+                hiveSplit.getCustomSplitInfo());
         if (pageSource.isPresent()) {
             return pageSource.get();
         }
@@ -417,7 +418,8 @@ public class HivePageSourceProvider
             Optional<List<IndexMetadata>> indexes,
             SplitMetadata splitMetadata,
             boolean splitCacheable,
-            long dataSourceLastModifiedTime)
+            long dataSourceLastModifiedTime,
+            Map<String, String> customSplitInfo)
     {
         List<ColumnMapping> columnMappings = ColumnMapping.buildColumnMappings(
                 partitionKeys,
@@ -481,7 +483,8 @@ public class HivePageSourceProvider
                     effectivePredicate,
                     hiveStorageTimeZone,
                     typeManager,
-                    s3SelectPushdownEnabled);
+                    s3SelectPushdownEnabled,
+                    customSplitInfo);
 
             if (cursor.isPresent()) {
                 RecordCursor delegate = cursor.get();

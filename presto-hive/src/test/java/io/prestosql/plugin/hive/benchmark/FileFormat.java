@@ -318,7 +318,8 @@ public enum FileFormat
                         TupleDomain.all(),
                         DateTimeZone.forID(session.getTimeZoneKey().getId()),
                         TYPE_MANAGER,
-                        false)
+                        false,
+                        ImmutableMap.of())
                 .get();
         return new RecordPageSource(columnTypes, recordCursor);
     }

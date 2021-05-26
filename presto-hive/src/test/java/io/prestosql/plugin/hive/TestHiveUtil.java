@@ -56,10 +56,14 @@ import static io.prestosql.plugin.hive.HiveUtil.getPartitionKeyColumnHandles;
 import static io.prestosql.plugin.hive.HiveUtil.getRegularColumnHandles;
 import static io.prestosql.plugin.hive.HiveUtil.isPartitionFiltered;
 import static io.prestosql.plugin.hive.HiveUtil.parseHiveTimestamp;
+import static io.prestosql.plugin.hive.HiveUtil.shouldUseRecordReaderFromInputFormat;
 import static io.prestosql.plugin.hive.HiveUtil.toPartitionValues;
 import static io.prestosql.spi.type.StandardTypes.BIGINT;
 import static io.prestosql.spi.type.StandardTypes.VARCHAR;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
+import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.FILE_INPUT_FORMAT;
+import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.FILE_OUTPUT_FORMAT;
+import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.META_TABLE_SERDE;
 import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_CLASS;
 import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_FORMAT;
 import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
@@ -125,6 +129,21 @@ public class TestHiveUtil
         assertToPartitionValues("a=1");
         assertToPartitionValues("pk=!@%23$%25%5E&%2A()%2F%3D");
         assertToPartitionValues("pk=__HIVE_DEFAULT_PARTITION__");
+    }
+
+    @Test
+    public void testShouldUseRecordReaderFromInputFormat()
+    {
+        Properties schema = new Properties();
+        schema.setProperty(FILE_INPUT_FORMAT, "org.apache.hudi.hadoop.HoodieParquetInputFormat");
+        schema.setProperty(META_TABLE_SERDE, "parquet.hive.serde.ParquetHiveSerDe");
+        schema.setProperty(FILE_OUTPUT_FORMAT, "");
+        assertTrue(shouldUseRecordReaderFromInputFormat(new Configuration(), schema));
+
+        schema.setProperty(FILE_INPUT_FORMAT, "org.apache.hudi.hadoop.realtime.HoodieParquetRealtimeInputFormat");
+        schema.setProperty(META_TABLE_SERDE, "parquet.hive.serde.ParquetHiveSerDe");
+        schema.setProperty(FILE_OUTPUT_FORMAT, "");
+        assertTrue(shouldUseRecordReaderFromInputFormat(new Configuration(), schema));
     }
 
     @Test

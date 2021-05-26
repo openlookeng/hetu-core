@@ -5688,7 +5688,9 @@ public class TestHiveIntegrationSmokeTest
                         Optional.empty(),
                         false,
                         Optional.empty(),
-                        Optional.empty(), false);
+                        Optional.empty(),
+                        false,
+                        ImmutableMap.of());
                 hiveSplitList.add(hiveSplit);
             }
 
