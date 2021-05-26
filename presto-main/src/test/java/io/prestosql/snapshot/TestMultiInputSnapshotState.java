@@ -475,7 +475,7 @@ public class TestMultiInputSnapshotState
         }
 
         @Override
-        public Optional<Set<String>> getInputChannels(int expectedChannelCount)
+        public Optional<Set<String>> getInputChannels()
         {
             return Optional.of(Sets.newHashSet(source1, source2));
         }
@@ -486,7 +486,7 @@ public class TestMultiInputSnapshotState
             extends TestingRestorable
     {
         @Override
-        public Optional<Set<String>> getInputChannels(int expectedChannelCount)
+        public Optional<Set<String>> getInputChannels()
         {
             return Optional.empty();
         }

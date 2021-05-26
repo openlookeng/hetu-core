@@ -323,32 +323,27 @@ public class MergeOperator
     }
 
     @Override
-    public Optional<Set<String>> getInputChannels(int expectedChannelCount)
+    public Optional<Set<String>> getInputChannels()
     {
         if (inputChannels.isPresent()) {
             return inputChannels;
         }
 
-        if (expectedChannelCount == 0 && !blockedOnSplits.isDone()) {
+        if (!blockedOnSplits.isDone()) {
             // Need to wait for all splits/locations/channels to be added
             return Optional.empty();
         }
 
         Set<String> channels = new HashSet<>();
+
         for (ExchangeClient client : clients) {
             channels.addAll(client.getAllClients());
         }
-
-        if (expectedChannelCount == 0 || channels.size() == expectedChannelCount) {
-            // All channels have been added (i.e. blockedOnSplits is done) or have received expected number of input channels.
-            // Because markers are sent to all potential table-scan tasks, expectedChannelCount should be the same as the final count,
-            // so the input channel list won't change again, and can be cached.
-            inputChannels = Optional.of(channels);
-            return inputChannels;
-        }
-        else {
-            return Optional.empty();
-        }
+        // All channels have been added (i.e. blockedOnSplits is done) or have received expected number of input channels.
+        // Because markers are sent to all potential table-scan tasks, expectedChannelCount should be the same as the final count,
+        // so the input channel list won't change again, and can be cached.
+        inputChannels = Optional.of(channels);
+        return inputChannels;
     }
 
     @Override

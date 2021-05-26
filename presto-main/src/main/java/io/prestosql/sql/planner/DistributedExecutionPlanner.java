@@ -126,12 +126,12 @@ public class DistributedExecutionPlanner
         this.metadata = requireNonNull(metadata, "metadata is null");
     }
 
-    public StageExecutionPlan plan(SubPlan root, Session session, Mode mode, Long resumeSnapshotId, long nextSnapshotId, Map<Integer, Integer> parallelSources)
+    public StageExecutionPlan plan(SubPlan root, Session session, Mode mode, Long resumeSnapshotId, long nextSnapshotId)
     {
         ImmutableList.Builder<SplitSource> allSplitSources = ImmutableList.builder();
         try {
             if (mode != Mode.SNAPSHOT) {
-                return doPlan(mode, root, session, resumeSnapshotId, nextSnapshotId, allSplitSources, null, null, parallelSources);
+                return doPlan(mode, root, session, resumeSnapshotId, nextSnapshotId, allSplitSources, null, null);
             }
 
             // Capture dependencies among table scan sources. Only need to do this for the initial planning.
@@ -139,7 +139,7 @@ public class DistributedExecutionPlanner
             Map<PlanFragmentId, Object> leftmostSources = new HashMap<>();
             // Source dependency. Key is SplitSource or ValuesNode or RemoteSourceNode; value is SplitSource or ValuesNode or RemoteSourceNode
             Multimap<Object, Object> sourceDependencies = HashMultimap.create();
-            StageExecutionPlan ret = doPlan(mode, root, session, resumeSnapshotId, nextSnapshotId, allSplitSources, leftmostSources, sourceDependencies, parallelSources);
+            StageExecutionPlan ret = doPlan(mode, root, session, resumeSnapshotId, nextSnapshotId, allSplitSources, leftmostSources, sourceDependencies);
 
             for (Map.Entry<Object, Object> entry : sourceDependencies.entries()) {
                 List<MarkerSplitSource> right = collectSources(leftmostSources, entry.getValue());
@@ -206,21 +206,9 @@ public class DistributedExecutionPlanner
             long nextSnapshotId,
             ImmutableList.Builder<SplitSource> allSplitSources,
             Map<PlanFragmentId, Object> leftmostSources,
-            Multimap<Object, Object> sourceDependencies,
-            Map<Integer, Integer> parallelSources)
+            Multimap<Object, Object> sourceDependencies)
     {
         PlanFragment currentFragment = root.getFragment();
-
-        if (parallelSources != null) {
-            for (RemoteSourceNode node : currentFragment.getRemoteSourceNodes()) {
-                // This RemoteSourceNode is a combination of multiple sources
-                if (node.getSourceFragmentIds().size() > 1) {
-                    for (PlanFragmentId id : node.getSourceFragmentIds()) {
-                        parallelSources.put(Integer.valueOf(id.toString()), node.getSourceFragmentIds().size());
-                    }
-                }
-            }
-        }
 
         // get splits for this fragment, this is lazy so split assignments aren't actually calculated here
         Map<PlanNodeId, SplitSource> splitSources;
@@ -245,7 +233,7 @@ public class DistributedExecutionPlanner
         // create child stages
         ImmutableList.Builder<StageExecutionPlan> dependencies = ImmutableList.builder();
         for (SubPlan childPlan : root.getChildren()) {
-            dependencies.add(doPlan(mode, childPlan, session, resumeSnapshotId, nextSnapshotId, allSplitSources, leftmostSources, sourceDependencies, parallelSources));
+            dependencies.add(doPlan(mode, childPlan, session, resumeSnapshotId, nextSnapshotId, allSplitSources, leftmostSources, sourceDependencies));
         }
 
         // extract TableInfo

@@ -28,7 +28,7 @@ public class TestMarkerPage
     @Test
     public void testSerde()
     {
-        MarkerPage page = new MarkerPage(100, true, 0);
+        MarkerPage page = new MarkerPage(100, true);
         SerializedPage spage = SerializedPage.forMarker(page);
         page = spage.toMarker();
         Assert.assertEquals(page.getSnapshotId(), 100);
