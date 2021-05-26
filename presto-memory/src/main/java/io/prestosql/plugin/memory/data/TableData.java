@@ -31,9 +31,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -44,15 +42,15 @@ public class TableData
 {
     private static final long serialVersionUID = 588783549296983464L;
     private static final Logger LOG = Logger.get(TableData.class);
-    private static final Long PROCESSING_DELAY = 5000L; // 5s
-    private static final ScheduledExecutorService executor = MemoryThreadManager.getSharedThreadPool();
 
+    private final long processingDelay;
     private final int totalSplits;
     private final AtomicInteger nextSplit;
     private final List<ColumnInfo> columns;
     private final List<SortingColumn> sortedBy;
     private final List<String> indexColumns;
     private final long maxLogicalPartBytes;
+    private final int maxPageSizeBytes;
     private final List<List<LogicalPart>> splits;
     private final boolean compressionEnabled;
     private boolean isOnDisk;
@@ -69,6 +67,8 @@ public class TableData
         this.tableDataRoot = tableDataRoot;
         this.totalSplits = config.getSplitsPerNode();
         this.maxLogicalPartBytes = config.getMaxLogicalPartSize().toBytes();
+        this.maxPageSizeBytes = Long.valueOf(config.getMaxPageSize().toBytes()).intValue();
+        this.processingDelay = config.getProcessingDelay().toMillis();
         this.compressionEnabled = compressionEnabled;
         this.columns = requireNonNull(columns, "columns is null");
         this.sortedBy = requireNonNull(sortedBy, "sortedBy is null");
@@ -83,36 +83,30 @@ public class TableData
         }
         this.nextSplit = new AtomicInteger(0);
 
-        Timer timer = new Timer(true);
-        timer.scheduleAtFixedRate(new TimerTask()
-        {
-            @Override
-            public void run()
-            {
-                if ((System.currentTimeMillis() - lastModified) > PROCESSING_DELAY) {
-                    for (int i = 0; i < splits.size(); i++) {
-                        List<LogicalPart> split = splits.get(i);
-                        for (int j = 0; j < split.size(); j++) {
-                            LogicalPart logicalPart = split.get(j);
-                            if (logicalPart.getProcessingState().get() == LogicalPart.ProcessingState.NOT_STARTED) {
-                                int finalI = i;
-                                int finalJ = j;
-                                executor.execute(() -> {
-                                    LOG.info("Processing Table %d :: Split %d/%d :: LogicalPart %d/%d", id, finalI + 1, splits.size(), finalJ + 1, split.size());
-                                    try {
-                                        logicalPart.process();
-                                    }
-                                    catch (Exception e) {
-                                        LOG.warn("Failed to process Table %d :: Split %d/%d :: LogicalPart %d/%d", id, finalI + 1, splits.size(), finalJ + 1, split.size());
-                                    }
-                                    LOG.info("Processed Table %d :: Split %d/%d :: LogicalPart %d/%d", id, finalI + 1, splits.size(), finalJ + 1, split.size());
-                                });
-                            }
+        MemoryThreadManager.getSharedThreadPool().scheduleWithFixedDelay(() -> {
+            if ((System.currentTimeMillis() - lastModified) > processingDelay) {
+                for (int i = 0; i < splits.size(); i++) {
+                    List<LogicalPart> split = splits.get(i);
+                    for (int j = 0; j < split.size(); j++) {
+                        LogicalPart logicalPart = split.get(j);
+                        if (logicalPart.getProcessingState().get() == LogicalPart.ProcessingState.NOT_STARTED) {
+                            int finalI = i;
+                            int finalJ = j;
+                            MemoryThreadManager.getSharedThreadPool().execute(() -> {
+                                LOG.info("Processing Table %d :: Split %d/%d :: LogicalPart %d/%d", id, finalI + 1, splits.size(), finalJ + 1, split.size());
+                                try {
+                                    logicalPart.process();
+                                }
+                                catch (Exception e) {
+                                    LOG.warn("Failed to process Table %d :: Split %d/%d :: LogicalPart %d/%d", id, finalI + 1, splits.size(), finalJ + 1, split.size());
+                                }
+                                LOG.info("Processed Table %d :: Split %d/%d :: LogicalPart %d/%d", id, finalI + 1, splits.size(), finalJ + 1, split.size());
+                            });
                         }
                     }
                 }
             }
-        }, 1000, 5000);
+        }, 5, 2, TimeUnit.SECONDS);
     }
 
     // used for deserialization
@@ -135,7 +129,7 @@ public class TableData
         List<LogicalPart> splitParts = splits.get(splitNum);
         if (splitParts.isEmpty() || !splitParts.get(splitParts.size() - 1).canAdd()) {
             int logicalPartNum = splitParts.size();
-            splitParts.add(new LogicalPart(columns, sortedBy, indexColumns, tableDataRoot, pageSorter, maxLogicalPartBytes, typeManager, pagesSerde, splitNum, logicalPartNum, compressionEnabled));
+            splitParts.add(new LogicalPart(columns, sortedBy, indexColumns, tableDataRoot, pageSorter, maxLogicalPartBytes, maxPageSizeBytes, typeManager, pagesSerde, splitNum, logicalPartNum, compressionEnabled));
         }
 
         LogicalPart currentSplitPart = splitParts.get(splitParts.size() - 1);

@@ -14,25 +14,34 @@
 package io.prestosql.plugin.memory;
 
 import io.airlift.configuration.Config;
+import io.airlift.configuration.ConfigDescription;
 import io.airlift.units.DataSize;
+import io.airlift.units.Duration;
 import io.airlift.units.MaxDataSize;
+import io.airlift.units.MaxDuration;
 import io.airlift.units.MinDataSize;
+import io.airlift.units.MinDuration;
+import io.prestosql.spi.block.PageBuilderStatus;
 import io.prestosql.spi.function.Mandatory;
 
+import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.TimeUnit;
 
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 
 public class MemoryConfig
 {
     private int splitsPerNode = Runtime.getRuntime().availableProcessors();
-    private DataSize maxDataPerNode = new DataSize(128, DataSize.Unit.MEGABYTE);
+    private DataSize maxDataPerNode = new DataSize(256, DataSize.Unit.MEGABYTE);
     private DataSize maxLogicalPartSize = new DataSize(256, MEGABYTE);
+    private DataSize maxPageSize = new DataSize(PageBuilderStatus.DEFAULT_MAX_PAGE_SIZE_IN_BYTES, DataSize.Unit.BYTE);
+    private Duration processingDelay = new Duration(5, TimeUnit.SECONDS);
     private Path spillRoot;
-    private int processingThreads = Runtime.getRuntime().availableProcessors();
+    private int threadPoolSize = Math.max((Runtime.getRuntime().availableProcessors() / 2), 1);
 
     @NotNull
     public int getSplitsPerNode()
@@ -91,6 +100,50 @@ public class MemoryConfig
     public MemoryConfig setMaxLogicalPartSize(DataSize maxLogicalPartSize)
     {
         this.maxLogicalPartSize = maxLogicalPartSize;
+        return this;
+    }
+
+    @MinDataSize("1kB")
+    @MaxDataSize("10MB")
+    public DataSize getMaxPageSize()
+    {
+        return maxPageSize;
+    }
+
+    @Config("memory.max-page-size")
+    @ConfigDescription("Max size of pages stored in Memory Connector (default: 1MB)")
+    public MemoryConfig setMaxPageSize(DataSize maxPageSize)
+    {
+        this.maxPageSize = maxPageSize;
+        return this;
+    }
+
+    @MinDuration("1s")
+    @MaxDuration("10s")
+    public Duration getProcessingDelay()
+    {
+        return processingDelay;
+    }
+
+    @Config("memory.logical-part-processing-delay")
+    @ConfigDescription("The delay between when table is created/updated and logical part processing starts (default: 5s)")
+    public MemoryConfig setProcessingDelay(Duration processingDelay)
+    {
+        this.processingDelay = processingDelay;
+        return this;
+    }
+
+    @Min(1)
+    public int getThreadPoolSize()
+    {
+        return threadPoolSize;
+    }
+
+    @Config("memory.thread-pool-size")
+    @ConfigDescription("Maximum threads to allocate for background processing, e.g. sorting, cleanup, etc (default: half of threads available to the JVM)")
+    public MemoryConfig setThreadPoolSize(int threadPoolSize)
+    {
+        this.threadPoolSize = threadPoolSize;
         return this;
     }
 }

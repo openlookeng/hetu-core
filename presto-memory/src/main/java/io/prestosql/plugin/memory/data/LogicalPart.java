@@ -14,6 +14,7 @@
  */
 package io.prestosql.plugin.memory.data;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
 import io.airlift.slice.InputStreamSliceInput;
@@ -33,6 +34,7 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.predicate.Domain;
+import io.prestosql.spi.predicate.Marker;
 import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.predicate.SortedRangeSet;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -52,16 +54,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -88,12 +91,13 @@ public class LogicalPart
     private final List<SortOrder> sortOrders;
     private final List<Integer> indexChannels;
     private final long maxLogicalPartBytes;
+    private final int maxPageSizeBytes;
     private final int splitNum;
     private final int logicalPartNum;
     private final boolean compressionEnabled;
 
     // indexes
-    private final TreeMap<Object, List<Integer>> indexedPagesMap = new TreeMap<>();
+    private final TreeMap<Comparable, List<Integer>> indexedPagesMap = new TreeMap<>();
     private final Map<Integer, BloomFilter> indexChannelFilters = new HashMap<>();
     private final Map<Integer, Map.Entry<Comparable, Comparable>> columnMinMax = new HashMap<>();
 
@@ -111,6 +115,7 @@ public class LogicalPart
             Path tableDataRoot,
             PageSorter pageSorter,
             long maxLogicalPartBytes,
+            int maxPageSizeBytes,
             TypeManager typeManager,
             PagesSerde pagesSerde,
             int splitNum,
@@ -122,6 +127,7 @@ public class LogicalPart
         this.logicalPartNum = logicalPartNum;
         this.pages = new ArrayList<>();
         this.maxLogicalPartBytes = maxLogicalPartBytes;
+        this.maxPageSizeBytes = maxPageSizeBytes;
         this.compressionEnabled = compressionEnabled;
         this.pagesSerde = requireNonNull(pagesSerde, "pagesSerde is null");
         this.pageSorter = requireNonNull(pageSorter, "pageSorter is null");
@@ -160,7 +166,7 @@ public class LogicalPart
         this.processingState.set(ProcessingState.NOT_STARTED);
     }
 
-    public void restoreTransientObjects(PageSorter pageSorter, TypeManager typeManager, PagesSerde pagesSerde, Path tableDataRoot)
+    void restoreTransientObjects(PageSorter pageSorter, TypeManager typeManager, PagesSerde pagesSerde, Path tableDataRoot)
     {
         this.pageSorter = pageSorter;
         this.types = new ArrayList<>(typeSignatures.size());
@@ -182,7 +188,7 @@ public class LogicalPart
         byteSize += page.getRetainedSizeInBytes();
     }
 
-    public List<Page> getPages()
+    List<Page> getPages()
     {
         if (pages == null) {
             try {
@@ -238,33 +244,105 @@ public class LogicalPart
             }
         }
 
+        // start filtering
         if (bloomIdxChannelsToDomainMap.isEmpty() && sparseIdxChannelsToDomainMap.isEmpty()) {
             return getPages();
         }
 
+        return getPages(allIdxChannelsToDomainMap, bloomIdxChannelsToDomainMap, sparseIdxChannelsToDomainMap);
+    }
+
+    List<Page> getPages(
+            Map<Integer, Domain> allIdxChannelsToDomainMap,
+            Map<Integer, Domain> bloomIdxChannelsToDomainMap,
+            Map<Integer, Domain> sparseIdxChannelsToDomainMap)
+    {
         // check minmax filter
         for (Map.Entry<Integer, Domain> e : allIdxChannelsToDomainMap.entrySet()) {
             Domain columnPredicate = e.getValue();
             int expressionColumnIndex = e.getKey();
             if (columnMinMax.containsKey(expressionColumnIndex)) {
                 List<Range> ranges = ((SortedRangeSet) (columnPredicate.getValues())).getOrderedRanges();
+                int failedLookups = 0;
+                for (Range range : ranges) {
+                    if (range.isSingleValue()) {
+                        Object lookupValue = getNativeValue(range.getSingleValue());
+                        if (lookupValue instanceof Comparable) {
+                            Comparable comparableLookupValue = (Comparable) lookupValue;
+                            Map.Entry<Comparable, Comparable> columnMinMaxEntry = columnMinMax.get(e.getKey());
+                            Comparable min = columnMinMaxEntry.getKey();
+                            Comparable max = columnMinMaxEntry.getValue();
 
-                // minmax currently only supports equality e.g. c=1
-                if (ranges.size() != 1 || !ranges.get(0).isSingleValue()) {
-                    continue;
-                }
-
-                Object lookupValue = getNativeValue(ranges.get(0).getSingleValue());
-                if (lookupValue instanceof Comparable) {
-                    Comparable comparableLookupValue = (Comparable) lookupValue;
-                    Map.Entry<Comparable, Comparable> columMinMax = columnMinMax.get(e.getKey());
-                    Comparable min = columMinMax.getKey();
-                    Comparable max = columMinMax.getValue();
-
-                    if (comparableLookupValue.compareTo(min) < 0 || comparableLookupValue.compareTo(max) > 0) {
-                        // lookup value is outside minmax range, skip logicalpart
-                        return Collections.emptyList();
+                            if (comparableLookupValue.compareTo(min) < 0 || comparableLookupValue.compareTo(max) > 0) {
+                                // lookup value is outside minmax range, skip logicalpart
+                                failedLookups++;
+                            }
+                        }
                     }
+                    else {
+                        // <, <=, >=, >, BETWEEN
+                        boolean highBoundless = range.getHigh().isUpperUnbounded();
+                        boolean lowBoundless = range.getLow().isLowerUnbounded();
+                        Map.Entry<Comparable, Comparable> columnMinMaxEntry = columnMinMax.get(e.getKey());
+                        Comparable min = columnMinMaxEntry.getKey();
+                        Comparable max = columnMinMaxEntry.getValue();
+                        if (highBoundless && !lowBoundless) {
+                            // >= or >
+                            Object lowLookupValue = range.getLow().getValue();
+                            if (lowLookupValue instanceof Comparable) {
+                                Comparable lowComparableLookupValue = (Comparable) lowLookupValue;
+                                boolean inclusive = range.getLow().getBound().equals(Marker.Bound.EXACTLY);
+                                if (inclusive) {
+                                    if (lowComparableLookupValue.compareTo(max) > 0) {
+                                        // lookup value is outside minmax range, skip logicalpart
+                                        failedLookups++;
+                                    }
+                                }
+                                else {
+                                    if (lowComparableLookupValue.compareTo(max) >= 0) {
+                                        // lookup value is outside minmax range, skip logicalpart
+                                        failedLookups++;
+                                    }
+                                }
+                            }
+                        }
+                        else if (!highBoundless && lowBoundless) {
+                            // <= or <
+                            Object highLookupValue = range.getHigh().getValue();
+                            if (highLookupValue instanceof Comparable) {
+                                Comparable highComparableLookupValue = (Comparable) highLookupValue;
+                                boolean inclusive = range.getHigh().getBound().equals(Marker.Bound.EXACTLY);
+                                if (inclusive) {
+                                    if (highComparableLookupValue.compareTo(min) < 0) {
+                                        // lookup value is outside minmax range, skip logicalpart
+                                        failedLookups++;
+                                    }
+                                }
+                                else {
+                                    if (highComparableLookupValue.compareTo(min) <= 0) {
+                                        // lookup value is outside minmax range, skip logicalpart
+                                        failedLookups++;
+                                    }
+                                }
+                            }
+                        }
+                        else if (!highBoundless && !lowBoundless) {
+                            // BETWEEN
+                            Object lowLookupValue = range.getLow().getValue();
+                            Object highLookupValue = range.getHigh().getValue();
+                            if (lowLookupValue instanceof Comparable && highLookupValue instanceof Comparable) {
+                                Comparable lowComparableLookupValue = (Comparable) lowLookupValue;
+                                Comparable highComparableLookupValue = (Comparable) highLookupValue;
+                                if (lowComparableLookupValue.compareTo(max) > 0 || highComparableLookupValue.compareTo(min) < 0) {
+                                    // lookup value is outside minmax range, skip logicalpart
+                                    failedLookups++;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (failedLookups == ranges.size()) {
+                    return Collections.emptyList();
                 }
             }
         }
@@ -303,11 +381,6 @@ public class LogicalPart
 
             List<Range> ranges = ((SortedRangeSet) (columnPredicate.getValues())).getOrderedRanges();
 
-            // Only single equality expressions are currently supported
-            if (ranges.size() != 1 || !ranges.get(0).isSingleValue()) {
-                continue;
-            }
-
             // assume pages were sorted as follows:
             // [a->[{a,a}, {a,a}, {a,b}], b->[{b,b}, {b,b}, {b}]
             // i.e. a has three pages, b has 3 pages
@@ -315,38 +388,135 @@ public class LogicalPart
             // first lookup b for an exact match, which will return the second page
             // however, there is also a "b" in the last page of "a" list
             // this must be returned also
-            Object lookupValue = getNativeValue(ranges.get(0).getSingleValue());
-            List<Integer> result = indexedPagesMap.getOrDefault(lookupValue, new ArrayList<>());
 
-            Map.Entry<Object, List<Integer>> lowerEntry = indexedPagesMap.lowerEntry(lookupValue);
+            Set<Integer> result = new HashSet<>();
+            for (Range range : ranges) {
+                if (range.isSingleValue()) {
+                    // unique value(for example: id=1, id in (1) (IN operator gives single exact values one by one)), bound: EXACTLY
+                    Object lookupValue = getNativeValue(range.getSingleValue());
+                    if (!(lookupValue instanceof Comparable)) {
+                        LOG.warn("Lookup value is not Comparable. Sparse index could not be queried.");
+                        return getPages();
+                    }
+                    result.addAll(indexedPagesMap.getOrDefault(lookupValue, new ArrayList<>()));
 
-            if (lowerEntry == null) {
-                return result.stream().map(i -> getPages().get(i)).collect(Collectors.toList());
-            }
+                    Integer additionalPageIdx = getLowerPageIndex((Comparable) lookupValue, (Comparable) lookupValue, true, null, false);
+                    if (additionalPageIdx != null) {
+                        result.add(additionalPageIdx);
+                    }
+                    continue;
+                }
+                else {
+                    // <, <=, >=, >, BETWEEN
+                    boolean highBoundless = range.getHigh().isUpperUnbounded();
+                    boolean lowBoundless = range.getLow().isLowerUnbounded();
+                    boolean fromInclusive = range.getLow().getBound().equals(Marker.Bound.EXACTLY);
+                    boolean toInclusive = range.getHigh().getBound().equals(Marker.Bound.EXACTLY);
 
-            // determine if the last page of the lower entry should be included
-            List<Integer> lowerEntryPages = lowerEntry.getValue();
-            Page lastPage = getPages().get(lowerEntryPages.get(lowerEntryPages.size() - 1));
-            Object lastPageLastValue = getNativeValue(types.get(sortChannels.get(0)), lastPage.getBlock(sortChannels.get(0)), lastPage.getPositionCount() - 1);
+                    NavigableMap<Comparable, List<Integer>> navigableMap = null;
+                    Comparable low = null;
+                    Comparable high = null;
+                    if (highBoundless && !lowBoundless) {
+                        // >= or >
+                        if (!(range.getLow().getValue() instanceof Comparable)) {
+                            LOG.warn("Lookup value is not Comparable. Sparse index could not be queried.");
+                            return getPages();
+                        }
+                        low = (Comparable) range.getLow().getValue();
+                        high = (Comparable) indexedPagesMap.lastKey();
+                        if (low.compareTo(high) > 0) {
+                            navigableMap = Collections.emptyNavigableMap();
+                        }
+                        else {
+                            navigableMap = indexedPagesMap.subMap(low, fromInclusive, high, true);
+                        }
+                    }
+                    else if (!highBoundless && lowBoundless) {
+                        // <= or <
+                        if (!(range.getHigh().getValue() instanceof Comparable)) {
+                            LOG.warn("Lookup value is not Comparable. Sparse index could not be queried.");
+                            return getPages();
+                        }
+                        low = (Comparable) indexedPagesMap.firstKey();
+                        high = (Comparable) range.getHigh().getValue();
+                        toInclusive = range.getHigh().getBound().equals(Marker.Bound.EXACTLY);
+                        if (low.compareTo(high) > 0) {
+                            navigableMap = Collections.emptyNavigableMap();
+                        }
+                        else {
+                            navigableMap = indexedPagesMap.subMap(low, true, high, toInclusive);
+                        }
+                    }
+                    else if (!highBoundless && !lowBoundless) {
+                        // BETWEEN, non-inclusive range < && >
+                        if (!(range.getLow().getValue() instanceof Comparable || range.getHigh().getValue() instanceof Comparable)) {
+                            LOG.warn("Lookup value is not Comparable. Sparse index could not be queried.");
+                            return getPages();
+                        }
+                        low = min((Comparable) range.getHigh().getValue(), (Comparable) range.getLow().getValue());
+                        high = max((Comparable) range.getHigh().getValue(), (Comparable) range.getLow().getValue());
+                        navigableMap = indexedPagesMap.subMap(low, fromInclusive, high, toInclusive);
+                    }
+                    else {
+                        return getPages();
+                    }
 
-            if (lastPageLastValue instanceof Comparable && lookupValue instanceof Comparable) {
-                Comparable comparableLastValue = (Comparable) lastPageLastValue;
-                Comparable comparableLookupValue = (Comparable) lookupValue;
+                    for (Map.Entry entry : navigableMap.entrySet()) {
+                        result.addAll((Collection<? extends Integer>) entry.getValue());
+                    }
+                    if (!lowBoundless) {
+                        Comparable lowestSparseIdxInDom = null;
+                        if (!navigableMap.isEmpty()) {
+                            lowestSparseIdxInDom = navigableMap.firstKey();
+                        }
+                        Integer additionalResultIdx = getLowerPageIndex(lowestSparseIdxInDom, low, fromInclusive, high, toInclusive);
 
-                // if last page's last value is equal to or greater than lookup value, the last page must be included
-                if (comparableLastValue.compareTo(comparableLookupValue) >= 0) {
-                    result.add(lowerEntryPages.get(lowerEntryPages.size() - 1));
+                        if (additionalResultIdx != null) {
+                            result.add(additionalResultIdx);
+                        }
+                    }
                 }
             }
-            else {
-                // if unable to do a comparison, return last page anyway bc it may contain the lookup value
-                result.add(lowerEntryPages.get(lowerEntryPages.size() - 1));
-            }
 
-            return result.stream().map(i -> getPages().get(i)).collect(Collectors.toList());
+            List<Page> resultPageList = new ArrayList<>();
+            for (Integer idx : result) {
+                resultPageList.add(getPages().get(idx));
+            }
+            return resultPageList;
         }
 
-        return getPages();
+        return null;
+    }
+
+    private Integer getLowerPageIndex(Comparable lowestInDom, Comparable lowBound, boolean includeLowBound, Comparable highBound, boolean includeHighBound)
+    {
+        Map.Entry<Comparable, List<Integer>> lowerSparseEntry;
+        if (lowestInDom != null) {
+            lowerSparseEntry = indexedPagesMap.lowerEntry(lowestInDom);
+        }
+        else {
+            lowerSparseEntry = indexedPagesMap.floorEntry(lowBound);
+        }
+
+        if (lowerSparseEntry == null) {
+            return null;
+        }
+
+        List<Integer> lowerPages = lowerSparseEntry.getValue();
+        Integer lastPageIdx = lowerPages.get(lowerPages.size() - 1);
+        Page lastPage = getPages().get(lastPageIdx);
+
+        Object lastPageLastValue = getNativeValue(types.get(sortChannels.get(0)), lastPage.getBlock(sortChannels.get(0)), lastPage.getPositionCount() - 1);
+        if (!(lastPageLastValue instanceof Comparable)) {
+            return lastPageIdx;
+        }
+
+        int comp = ((Comparable) lastPageLastValue).compareTo(lowBound);
+        if (comp > 0 || (comp == 0 && includeLowBound)) {
+            return lastPageIdx;
+        }
+
+        return null;
     }
 
     long getRows()
@@ -369,7 +539,8 @@ public class LogicalPart
                     types,
                     sortChannels,
                     sortOrders,
-                    pageSorter);
+                    pageSorter,
+                    maxPageSizeBytes);
             pages.stream().forEach(sortBuffer::add);
             List<Page> sortedPages = new ArrayList<>();
             sortBuffer.flushTo(sortedPages::add);
@@ -383,7 +554,10 @@ public class LogicalPart
                 newRowCount += page.getPositionCount();
                 Object value = getNativeValue(types.get(sortChannels.get(0)), page.getBlock(sortChannels.get(0)), 0);
                 if (value != null) {
-                    indexedPagesMap.computeIfAbsent(value, e -> new LinkedList<>()).add(i);
+                    if (!(value instanceof Comparable)) {
+                        throw new RuntimeException(String.format("Unable to create sparse index for channel %d, type is not Comparable.", sortChannels.get(0)));
+                    }
+                    indexedPagesMap.computeIfAbsent((Comparable) value, e -> new LinkedList<>()).add(i);
                 }
             }
 
@@ -480,10 +654,10 @@ public class LogicalPart
             }
         }
         long dur = System.currentTimeMillis() - start;
-        LOG.debug("[Load] " + pagesFile + " completed. Time elapsed: " + dur + "ms");
+        LOG.debug("[Load] %s completed. Time elapsed: %dms", pagesFile.toString(), dur);
     }
 
-    public synchronized void writePages()
+    private synchronized void writePages()
             throws IOException
     {
         long start = System.currentTimeMillis();
@@ -499,7 +673,7 @@ public class LogicalPart
             }
         }
         long dur = System.currentTimeMillis() - start;
-        LOG.debug("[Spill] " + pagesFile + " completed. Time elapsed: " + dur + "ms");
+        LOG.debug("[Spill] %s completed. Time elapsed: %dms", pagesFile.toString(), dur);
     }
 
     private Comparable min(Comparable c1, Comparable c2)
@@ -574,7 +748,8 @@ public class LogicalPart
         return true;
     }
 
-    private boolean testFilter(BloomFilter filter, Object value)
+    @VisibleForTesting
+    public boolean testFilter(BloomFilter filter, Object value)
     {
         if (value instanceof Long) {
             return filter.test(((Long) value).longValue());

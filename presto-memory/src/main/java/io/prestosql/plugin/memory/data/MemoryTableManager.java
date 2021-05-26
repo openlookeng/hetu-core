@@ -96,7 +96,7 @@ public class MemoryTableManager
             @Override
             public void run()
             {
-                if (tables.get(id).allProcessed()) {
+                if (tables.containsKey(id) && tables.get(id).allProcessed()) {
                     try {
                         if (tables.get(id).isSpilled()) {
                             timer.cancel();

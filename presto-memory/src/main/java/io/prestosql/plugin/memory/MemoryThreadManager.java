@@ -24,14 +24,41 @@ import java.util.concurrent.ThreadFactory;
 public class MemoryThreadManager
 {
     private static final ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("MemoryConnector-pool-%d").setDaemon(true).build();
-    private static final ScheduledExecutorService executor = Executors.newScheduledThreadPool(Math.max((Runtime.getRuntime().availableProcessors() / 2), 2), threadFactory);
+    private static ScheduledExecutorService executor;
 
     private MemoryThreadManager()
     {
     }
 
+    /**
+     * Should only be called once in MemoryConnectorFactory when connector is starting.
+     * Callers should then use getSharedThreadPool()
+     * @param size
+     * @return
+     */
+    public static ScheduledExecutorService initSharedThreadPool(int size)
+    {
+        if (executor == null) {
+            executor = Executors.newScheduledThreadPool(Math.max(size, 1), threadFactory);
+        }
+        else {
+            throw new RuntimeException("Thread pool was already initialized");
+        }
+
+        return executor;
+    }
+
+    public static boolean isSharedThreadPoolInitilized()
+    {
+        return executor != null;
+    }
+
     public static ScheduledExecutorService getSharedThreadPool()
     {
+        if (executor == null) {
+            throw new RuntimeException("Thread pool not initialized");
+        }
+
         return executor;
     }
 

@@ -20,6 +20,7 @@ import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.block.PageBuilderStatus;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
@@ -54,7 +55,8 @@ public class SortBuffer
             List<Type> types,
             List<Integer> sortFields,
             List<SortOrder> sortOrders,
-            PageSorter pageSorter)
+            PageSorter pageSorter,
+            int maxPageSizeBytes)
     {
         checkArgument(maxMemory.toBytes() > 0, "maxMemory is zero");
         this.maxMemoryBytes = maxMemory.toBytes();
@@ -62,7 +64,17 @@ public class SortBuffer
         this.sortFields = ImmutableList.copyOf(requireNonNull(sortFields, "sortFields is null"));
         this.sortOrders = ImmutableList.copyOf(requireNonNull(sortOrders, "sortOrders is null"));
         this.pageSorter = requireNonNull(pageSorter, "pageSorter is null");
-        this.pageBuilder = new PageBuilder(types);
+        this.pageBuilder = PageBuilder.withMaxPageSize(maxPageSizeBytes, types);
+    }
+
+    public SortBuffer(
+            DataSize maxMemory,
+            List<Type> types,
+            List<Integer> sortFields,
+            List<SortOrder> sortOrders,
+            PageSorter pageSorter)
+    {
+        this(maxMemory, types, sortFields, sortOrders, pageSorter, PageBuilderStatus.DEFAULT_MAX_PAGE_SIZE_IN_BYTES);
     }
 
     public long getRetainedBytes()
