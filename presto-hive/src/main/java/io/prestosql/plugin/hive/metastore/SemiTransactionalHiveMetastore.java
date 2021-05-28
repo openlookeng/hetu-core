@@ -126,7 +126,6 @@ import static org.apache.hadoop.hive.metastore.conf.MetastoreConf.getTimeVar;
 public class SemiTransactionalHiveMetastore
 {
     private static final Logger log = Logger.get(SemiTransactionalHiveMetastore.class);
-    private static final int PARTITION_COMMIT_BATCH_SIZE = 8;
 
     private final HiveMetastore delegate;
     private final HiveMetastoreClosure closure;
@@ -141,6 +140,7 @@ public class SemiTransactionalHiveMetastore
     private final ListeningExecutorService hiveMetastoreClientService;
 
     private boolean throwOnCleanupFailure;
+    private int partitionCommitBatchSize;
 
     @GuardedBy("this")
     private final Map<SchemaTableName, Action<TableAndMore>> tableActions = new HashMap<>();
@@ -181,7 +181,8 @@ public class SemiTransactionalHiveMetastore
             boolean skipTargetCleanupOnRollback,
             Optional<Duration> hiveTransactionHeartbeatInterval,
             ScheduledExecutorService heartbeatService,
-            ScheduledExecutorService hiveMetastoreClientService)
+            ScheduledExecutorService hiveMetastoreClientService,
+            int hmsWriteBatchSize)
     {
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.delegate = requireNonNull(delegate, "delegate is null");
@@ -194,6 +195,7 @@ public class SemiTransactionalHiveMetastore
         this.configuredTransactionHeartbeatInterval = requireNonNull(hiveTransactionHeartbeatInterval, "hiveTransactionHeartbeatInterval is null");
         this.hiveMetastoreClientService = MoreExecutors.listeningDecorator(hiveMetastoreClientService);
         this.closure = new HiveMetastoreClosure(delegate);
+        this.partitionCommitBatchSize = hmsWriteBatchSize;
     }
 
     public synchronized List<String> getAllDatabases()
@@ -780,6 +782,8 @@ public class SemiTransactionalHiveMetastore
         HdfsContext hdfsContext = new HdfsContext(session, databaseName, tableName);
         HiveIdentity identity = new HiveIdentity(session);
         boolean canUpdateStats = canUpdateStats(session, acidWriteType);
+        this.partitionCommitBatchSize = HiveSessionProperties.getMetastoreWriteBatchSize(session);
+
         if (oldPartitionAction == null) {
             partitionActionsOfTable.put(
                     partition.getValues(),
@@ -1662,7 +1666,7 @@ public class SemiTransactionalHiveMetastore
             PartitionAdder partitionAdder = partitionAdders.computeIfAbsent(
                     partition.getSchemaTableName(),
                     ignored -> new PartitionAdder(partitionAndMore.getIdentity(), partition.getDatabaseName(), partition.getTableName(), delegate,
-                            PARTITION_COMMIT_BATCH_SIZE, updateStatisticsOperations));
+                            partitionCommitBatchSize, updateStatisticsOperations));
 
             if (pathExists(hdfsContext, hdfsEnvironment, currentPath)) {
                 if (!targetPath.equals(currentPath)) {

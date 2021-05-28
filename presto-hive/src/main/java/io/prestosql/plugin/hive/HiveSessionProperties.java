@@ -90,6 +90,7 @@ public final class HiveSessionProperties
     private static final String ORC_DISJUCT_PREDICATE_PUSHDOWN = "orc_disjunct_predicate_pushdown_enabled";
     private static final String ORC_PUSHDOWN_DATACACHE = "orc_pushdown_data_cache_enabled";
     private static final String WRITE_PARTITION_DISTRIBUTION = "write_partition_distribution";
+    private static final String METASTORE_WRITE_BATCH_SIZE = "metastore_write_batch_size";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -362,6 +363,11 @@ public final class HiveSessionProperties
                         hiveConfig.getTemporaryStagingDirectoryPath(),
                         false),
                 integerProperty(
+                        METASTORE_WRITE_BATCH_SIZE,
+                        "Batch size for requests to HMS for partition and partition statistics write operation",
+                        hiveConfig.getMetastoreWriteBatchSize(),
+                        false),
+                integerProperty(
                         DYNAMIC_FILTERING_ROW_FILTERING_THRESHOLD,
                         "Only enable row filtering with dynamic filter if the filter size is below this threshold",
                         hiveConfig.getDynamicFilteringRowFilteringThreshold(),
@@ -401,6 +407,11 @@ public final class HiveSessionProperties
     public static boolean isWritePartitionDistributionEnabled(ConnectorSession session)
     {
         return session.getProperty(WRITE_PARTITION_DISTRIBUTION, Boolean.class);
+    }
+
+    public static int getMetastoreWriteBatchSize(ConnectorSession session)
+    {
+        return session.getProperty(METASTORE_WRITE_BATCH_SIZE, Integer.class);
     }
 
     public static boolean isForceLocalScheduling(ConnectorSession session)
