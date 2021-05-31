@@ -67,6 +67,7 @@ import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static io.airlift.concurrent.Threads.threadsNamed;
 import static io.prestosql.SystemSessionProperties.getQueryMaxCpuTime;
 import static io.prestosql.execution.QueryState.RUNNING;
+import static io.prestosql.spi.StandardErrorCode.EXCEEDED_TIME_LIMIT;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.utils.StateUtils.isMultiCoordinatorEnabled;
 import static java.lang.String.format;
@@ -137,6 +138,13 @@ public class SqlQueryManager
             }
             catch (Throwable e) {
                 log.error(e, "Error enforcing query CPU time limits");
+            }
+
+            try {
+                killExpiredQuery();
+            }
+            catch (Throwable e) {
+                log.error(e, "Error killing expired query");
             }
         }, 1, 1, TimeUnit.SECONDS);
     }
@@ -418,6 +426,28 @@ public class SqlQueryManager
                     if (query.getBasicQueryInfo().getQueryId().equals(localQuery.getQueryId())) {
                         memoryManager.killLocalQuery(localQuery);
                     }
+                }
+            }
+        }
+    }
+
+    /**
+     * Kill query when expired, state has already been updated in StateFetcher.
+     */
+    private void killExpiredQuery()
+    {
+        if (!isMultiCoordinatorEnabled()) {
+            return;
+        }
+        List<QueryExecution> localRunningQueries = queryTracker.getAllQueries().stream()
+                .filter(query -> query.getState() == RUNNING)
+                .collect(toImmutableList());
+
+        Map<String, SharedQueryState> queries = StateCacheStore.get().getCachedStates(StateStoreConstants.FINISHED_QUERY_STATE_COLLECTION_NAME);
+        if (queries != null) {
+            for (QueryExecution localQuery : localRunningQueries) {
+                if (queries.containsKey(localQuery.getQueryId().getId())) {
+                    localQuery.fail(new PrestoException(EXCEEDED_TIME_LIMIT, "Query killed because the query has expired. Please try again in a few minutes."));
                 }
             }
         }
