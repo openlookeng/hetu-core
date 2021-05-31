@@ -124,6 +124,7 @@ Please see the [Hive Security Configuration](./hive-security.md) section for a m
 | `hive.max-splits-to-group`    | Max number of splits can be grouped. If value is 1 it will not group. Minimum value is 1     | 1   |
 | `hive.metastore-client-service-threads` | Number of threads for metastore clients to operate in parallel to communicate with hive metastore. | 4 |
 | `hive.worker-metastore-cache-enabled` | Enable the caching of the hive metastore on the worker nodes also. | `false` |
+| `hive.metastore-write-batch-size` | Number of partitions sent to meta store in per request. | `8` |
 
 
 
@@ -778,14 +779,22 @@ DROP SCHEMA hive.web
   ``` properties
   hive.metastore-client-service-threads = 4
   #Default: 4
-  #Recommended: The number of running HMS service.
+  #Recommended: The number of running hive metastore service instances * 4.
   ```
 
   Based on the number of thread pool that many parallel HMS operation can be called, this shall reduce the overall time to get the partitions.
 
   **Note**: additionally, multiple Hive Metastore services can be added to the cluster, the same will be accessed in round-robin manner thereby ensuring better load over hive metastore.
 
+  ``` properties
+  hive.metastore-write-batch-size = 64
+  #Default: 8
+  #Recommended: 64 or higher writes to batch together per request to hive metastore service.
+  ```
+  This reduces the round trip time between the HMS and openlookeng coordinator server.
   
+  **Note**: this can also be configured using hive session property `hive.metastore_write_batch_size`. 
+
 
 * ##### Direct Delete for whole partition deletes
 

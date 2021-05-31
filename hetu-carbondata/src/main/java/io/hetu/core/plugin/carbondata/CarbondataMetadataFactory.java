@@ -108,7 +108,7 @@ public class CarbondataMetadataFactory
                 vacuumExecutorService, heartbeatService, hiveMetastoreClientService, typeTranslator, nodeVersion.toString(),
                 accessControlMetadataFactory, carbondataTableReader, carbondataConfig.getStoreLocation(),
                 carbondataConfig.getMajorVacuumSegSize(), carbondataConfig.getMinorVacuumSegCount(),
-                carbondataConfig.getAutoVacuumEnable());
+                carbondataConfig.getAutoVacuumEnable(), carbondataConfig.getMetastoreWriteBatchSize());
     }
 
     public CarbondataMetadataFactory(HiveMetastore metastore, HdfsEnvironment hdfsEnvironment,
@@ -128,7 +128,7 @@ public class CarbondataMetadataFactory
                                      TypeTranslator typeTranslator, String hetuVersion,
                                      AccessControlMetadataFactory accessControlMetadataFactory,
                                      CarbondataTableReader carbondataTableReader, String storeLocation, long majorVacuumSegSize, long minorVacuumSegCount,
-                                     boolean autoVacuumEnable)
+                                     boolean autoVacuumEnable, int hmsWriteBatchSize)
     {
         super(metastore,
                 hdfsEnvironment,
@@ -154,7 +154,9 @@ public class CarbondataMetadataFactory
                 typeTranslator,
                 hetuVersion,
                 accessControlMetadataFactory,
-                2, 0.0, false, Optional.of(new Duration(5, TimeUnit.MINUTES)));
+                2, 0.0, false,
+                Optional.of(new Duration(5, TimeUnit.MINUTES)),
+                hmsWriteBatchSize);
         this.allowCorruptWritesForTesting = allowCorruptWritesForTesting;
         this.skipDeletionForAlter = skipDeletionForAlter;
         this.skipTargetCleanupOnRollback = skipTargetCleanupOnRollback;
@@ -211,7 +213,7 @@ public class CarbondataMetadataFactory
                         vacuumExecutorService, this.vacuumCleanupInterval, this.skipDeletionForAlter,
                         this.skipTargetCleanupOnRollback,
                         this.hiveTransactionHeartbeatInterval,
-                        this.heartbeatService, hiveMetastoreClientService);
+                        this.heartbeatService, hiveMetastoreClientService, hmsWriteBatchSize);
 
         return new CarbondataMetadata(metastore,
                 this.hdfsEnvironment,

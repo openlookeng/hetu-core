@@ -73,6 +73,7 @@ public class HiveMetadataFactory
     private final double vacuumDeltaPercentThreshold;
     private final boolean autoVacuumEnabled;
     private Optional<Duration> vacuumCollectorInterval;
+    protected final int hmsWriteBatchSize;
 
     @Inject
     @SuppressWarnings("deprecation")
@@ -120,7 +121,8 @@ public class HiveMetadataFactory
                 hiveConfig.getVacuumDeltaNumThreshold(),
                 hiveConfig.getVacuumDeltaPercentThreshold(),
                 hiveConfig.getAutoVacuumEnabled(),
-                hiveConfig.getVacuumCollectorInterval());
+                hiveConfig.getVacuumCollectorInterval(),
+                hiveConfig.getMetastoreWriteBatchSize());
     }
 
     public HiveMetadataFactory(
@@ -151,7 +153,8 @@ public class HiveMetadataFactory
             int vacuumDeltaNumThreshold,
             double vacuumDeltaPercentThreshold,
             boolean autoVacuumEnabled,
-            Optional<Duration> vacuumCollectorInterval)
+            Optional<Duration> vacuumCollectorInterval,
+            int hmsWriteBatchSize)
     {
         this.allowCorruptWritesForTesting = allowCorruptWritesForTesting;
         this.skipDeletionForAlter = skipDeletionForAlter;
@@ -189,6 +192,7 @@ public class HiveMetadataFactory
         this.vacuumDeltaPercentThreshold = vacuumDeltaPercentThreshold;
         this.autoVacuumEnabled = autoVacuumEnabled;
         this.vacuumCollectorInterval = vacuumCollectorInterval;
+        this.hmsWriteBatchSize = hmsWriteBatchSize;
     }
 
     @Override
@@ -204,7 +208,8 @@ public class HiveMetadataFactory
                 skipTargetCleanupOnRollback,
                 hiveTransactionHeartbeatInterval,
                 heartbeatService,
-                hiveMetastoreClientService);
+                hiveMetastoreClientService,
+                hmsWriteBatchSize);
 
         return new HiveMetadata(
                 metastore,

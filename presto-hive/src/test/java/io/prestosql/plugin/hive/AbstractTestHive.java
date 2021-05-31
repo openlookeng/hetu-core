@@ -761,7 +761,7 @@ public abstract class AbstractTestHive
                 TEST_SERVER_VERSION,
                 SqlStandardAccessControlMetadata::new,
                 10, 0.1, false,
-                Optional.of(Duration.valueOf("5m")));
+                Optional.of(Duration.valueOf("5m")), hiveConfig.getMetastoreWriteBatchSize());
         transactionManager = new HiveTransactionManager();
         splitManager = new HiveSplitManager(
                 transactionHandle -> ((HiveMetadata) transactionManager.get(transactionHandle)).getMetastore(),

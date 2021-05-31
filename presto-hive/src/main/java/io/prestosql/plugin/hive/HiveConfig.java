@@ -201,6 +201,7 @@ public class HiveConfig
     private double vacuumDeltaPercentThreshold = 0.1;
     private boolean autoVacuumEnabled;
     private boolean orcPredicatePushdownEnabled;
+    private int hmsWriteBatchSize = 8;
 
     public int getMaxInitialSplits()
     {
@@ -1071,6 +1072,19 @@ public class HiveConfig
     public HiveConfig setFileStatusCacheExpireAfterWrite(Duration fileStatusCacheExpireAfterWrite)
     {
         this.fileStatusCacheExpireAfterWrite = fileStatusCacheExpireAfterWrite;
+        return this;
+    }
+
+    public int getMetastoreWriteBatchSize()
+    {
+        return hmsWriteBatchSize;
+    }
+
+    @Config("hive.metastore-write-batch-size")
+    @ConfigDescription("Batch size for writing to hms")
+    public HiveConfig setMetastoreWriteBatchSize(int hmsWriteBatchSize)
+    {
+        this.hmsWriteBatchSize = hmsWriteBatchSize;
         return this;
     }
 
