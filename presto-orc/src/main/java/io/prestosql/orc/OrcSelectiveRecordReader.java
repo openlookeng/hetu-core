@@ -363,11 +363,36 @@ public class OrcSelectiveRecordReader
 
             while (matchingRows.hasNext()) {
                 Integer row = matchingRows.peek();
-                if (row >= currentPositionInStripe && row < currentPositionInStripe + batchSize) {
+                if (row < currentPositionInStripe) {
+                    // this can happen if a row group containing matching rows was filtered out
+                    // for example, if matchingRows is for column1 but query is for column1 and column2.
+                    // since row groups have minmax values, a row group could have been filtered out because of
+                    // column2 predicate. this means that the current matchingRow could be 10 (within the first
+                    // row group), but the first row group might've been filtered out due to column2 predicate,
+                    // so currentPositionInStripe is already in second row group
+                    //
+                    // stripe 1
+                    //    -> row group 1 (rows 1 to 10000) [filtered out due to column2 predicate]
+                    //       1
+                    //       2
+                    //       ...
+                    //       10     <- matchingRows cursor is here, but this row group has been filtered out
+                    //       ...
+                    //       10000
+                    //    -> row group 2 (rows 10001 to 20000)
+                    //       10001
+                    //       10002   <- currentPositionInStripe is here
+                    //       ...
+                    //       20000
+                    matchingRows.next();
+                }
+                else if (row < currentPositionInStripe + currentBatchSize) {
+                    // matchingRows cursor is within current batch
                     matchingRowsInBlock.add(toIntExact(Long.valueOf(row) - currentPositionInStripe));
                     matchingRows.next();
                 }
-                else if (row >= currentPositionInStripe + currentBatchSize) {
+                else {
+                    // matchingRows cursor is ahead of current batch, next batch will use it
                     break;
                 }
             }
