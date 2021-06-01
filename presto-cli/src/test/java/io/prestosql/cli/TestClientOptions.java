@@ -118,6 +118,14 @@ public class TestClientOptions
     }
 
     @Test
+    public void testMaxBatchProcessSize()
+    {
+        Console console = singleCommand(Console.class).parse("--max-batch-process-size=1000400", "--extra-credential", "test.token.foo=foo", "--extra-credential", "test.token.bar=bar");
+        ClientOptions options = console.clientOptions;
+        assertEquals(options.maxBatchProcessSize, "1000400");
+    }
+
+    @Test
     public void testSessionProperties()
     {
         Console console = singleCommand(Console.class).parse("--session", "system=system-value", "--session", "catalog.name=catalog-property");

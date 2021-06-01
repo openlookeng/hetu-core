@@ -20,7 +20,9 @@ import io.airlift.log.Logger;
 import io.prestosql.client.ClientSelectedRole;
 import io.prestosql.client.Column;
 import io.prestosql.client.ErrorLocation;
+import io.prestosql.client.QueryData;
 import io.prestosql.client.QueryError;
+import io.prestosql.client.QueryResults;
 import io.prestosql.client.QueryStatusInfo;
 import io.prestosql.client.StatementClient;
 import io.prestosql.client.Warning;
@@ -63,6 +65,7 @@ public class Query
     private final AtomicBoolean ignoreUserInterrupt = new AtomicBoolean();
     private final StatementClient client;
     private final boolean debug;
+    private String cubeInitQueryResult;
 
     public Query(StatementClient client, boolean debug)
     {
@@ -139,6 +142,25 @@ public class Query
         }
     }
 
+    public boolean renderCubeOutput(Terminal terminal, PrintStream out, PrintStream errorChannel, ClientOptions.OutputFormat outputFormat, boolean usePager, boolean showProgress)
+    {
+        Thread clientThread = Thread.currentThread();
+        SignalHandler oldHandler = Signal.handle(SIGINT, signal -> {
+            if (ignoreUserInterrupt.get() || client.isClientAborted()) {
+                return;
+            }
+            client.close();
+            clientThread.interrupt();
+        });
+        try {
+            return resultsCubeInitialQuery(terminal, out, errorChannel, outputFormat, usePager, showProgress);
+        }
+        finally {
+            Signal.handle(SIGINT, oldHandler);
+            Thread.interrupted(); // clear interrupt status
+        }
+    }
+
     private boolean renderQueryOutput(Terminal terminal, PrintStream out, PrintStream errorChannel, ClientOptions.OutputFormat outputFormat, boolean usePager, boolean showProgress)
     {
         StatusPrinter statusPrinter = null;
@@ -163,6 +185,71 @@ public class Query
             }
             else {
                 renderResults(out, outputFormat, usePager, results.getColumns());
+            }
+        }
+
+        checkState(!client.isRunning());
+
+        warningsPrinter.print(client.finalStatusInfo().getWarnings(), true, true);
+
+        if (showProgress) {
+            statusPrinter.printFinalInfo();
+        }
+
+        if (client.isClientAborted()) {
+            errorChannel.println("Query aborted by user");
+            return false;
+        }
+        if (client.isClientError()) {
+            errorChannel.println("Query is gone (server restarted?)");
+            return false;
+        }
+
+        verify(client.isFinished());
+        if (client.finalStatusInfo().getError() != null) {
+            renderFailure(errorChannel);
+            return false;
+        }
+
+        return true;
+    }
+
+    private boolean resultsCubeInitialQuery(Terminal terminal, PrintStream out, PrintStream errorChannel, ClientOptions.OutputFormat outputFormat, boolean usePager, boolean showProgress)
+    {
+        StatusPrinter statusPrinter = null;
+        WarningsPrinter warningsPrinter = new PrintStreamWarningsPrinter(errorChannel);
+        if (showProgress) {
+            statusPrinter = new StatusPrinter(client, errorChannel, debug);
+            statusPrinter.printInitialStatusUpdates(terminal);
+        }
+        else {
+            processInitialStatusUpdates(warningsPrinter);
+        }
+
+        // if running or finished
+        if (client.isRunning() || (client.isFinished() && client.finalStatusInfo().getError() == null)) {
+            QueryStatusInfo results = client.isRunning() ? client.currentStatusInfo() : client.finalStatusInfo();
+            if (results.getUpdateType() != null) {
+                renderUpdate(errorChannel, results);
+            }
+            else if (results.getColumns() == null) {
+                errorChannel.printf("Query %s has no columns\n", results.getId());
+                return false;
+            }
+            else {
+                renderResults(out, outputFormat, usePager, results.getColumns());
+                ///populate results from here
+                if (client.isFinished() && client.finalStatusInfo().getError() == null) {
+                    QueryData queryData = ((QueryResults) results);
+                    //QueryData queryData = client.currentData();
+                    queryData.getData();
+                    //todo: hasNext iterator, hasNextiterator
+                    if (queryData.getData().iterator().hasNext()) {
+                        if (queryData.getData().iterator().next().iterator().hasNext()) {
+                            cubeInitQueryResult = queryData.getData().iterator().next().iterator().next().toString();
+                        }
+                    }
+                }
             }
         }
 
@@ -337,6 +424,11 @@ public class Query
     public void close()
     {
         client.close();
+    }
+
+    public String getcubeInitQueryResult()
+    {
+        return cubeInitQueryResult;
     }
 
     public void renderFailure(PrintStream out)

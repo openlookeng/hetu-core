@@ -31,24 +31,25 @@ public class CreateCube
     private final QualifiedName cubeName;
     private final boolean notExists;
     private final QualifiedName sourceTableName;
+    private final Optional<Expression> where;
     private final List<Identifier> groupingSet;
     private final Set<FunctionCall> aggregations;
     private final List<Property> properties;
 
     public CreateCube(QualifiedName cubeName, QualifiedName sourceTableName, List<Identifier> groupingSet,
-            Set<FunctionCall> aggregations, boolean notExists, List<Property> properties)
+            Set<FunctionCall> aggregations, boolean notExists, List<Property> properties, Optional<Expression> where)
     {
-        this(Optional.empty(), cubeName, sourceTableName, groupingSet, aggregations, notExists, properties);
+        this(Optional.empty(), cubeName, sourceTableName, groupingSet, aggregations, notExists, properties, where);
     }
 
     public CreateCube(NodeLocation location, QualifiedName cubeName, QualifiedName sourceTableName, List<Identifier> groupingSet,
-            Set<FunctionCall> aggregations, boolean notExists, List<Property> properties)
+            Set<FunctionCall> aggregations, boolean notExists, List<Property> properties, Optional<Expression> where)
     {
-        this(Optional.of(location), cubeName, sourceTableName, groupingSet, aggregations, notExists, properties);
+        this(Optional.of(location), cubeName, sourceTableName, groupingSet, aggregations, notExists, properties, where);
     }
 
     private CreateCube(Optional<NodeLocation> location, QualifiedName cubeName, QualifiedName sourceTableName, List<Identifier> groupingSet,
-            Set<FunctionCall> aggregations, boolean notExists, List<Property> properties)
+            Set<FunctionCall> aggregations, boolean notExists, List<Property> properties, Optional<Expression> where)
     {
         super(location);
         this.cubeName = requireNonNull(cubeName, "cube name is null");
@@ -57,6 +58,7 @@ public class CreateCube
         this.aggregations = aggregations;
         this.notExists = notExists;
         this.properties = properties;
+        this.where = where;
     }
 
     public QualifiedName getCubeName()
@@ -82,6 +84,11 @@ public class CreateCube
     public Set<FunctionCall> getAggregations()
     {
         return aggregations;
+    }
+
+    public Optional<Expression> getWhere()
+    {
+        return where;
     }
 
     public boolean isNotExists()

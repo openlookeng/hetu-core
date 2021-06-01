@@ -312,6 +312,7 @@ class AstBuilder
         List<Identifier> groupingSet = ImmutableList.of();
         List<FunctionCall> aggregations = ImmutableList.of();
         List<Property> properties = new ArrayList<>();
+        Optional<Expression> optionalExpression = visitIfPresent(context.expression(), Expression.class);
         boolean cubeGroupProvided = false;
         boolean aggregationsProvided = false;
         for (SqlBaseParser.CubePropertyContext propertyContext : context.cubeProperties().cubeProperty()) {
@@ -366,7 +367,7 @@ class AstBuilder
                         aggItem.getArguments()));
             }
         });
-        return new CreateCube(getLocation(context), cubeName, sourceTableName, groupingSet, decomposedAggregations, context.EXISTS() != null, properties);
+        return new CreateCube(getLocation(context), cubeName, sourceTableName, groupingSet, decomposedAggregations, context.EXISTS() != null, properties, optionalExpression);
     }
 
     @Override

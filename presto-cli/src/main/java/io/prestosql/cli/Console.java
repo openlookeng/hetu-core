@@ -44,6 +44,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 
 import static com.google.common.base.CharMatcher.whitespace;
 import static com.google.common.base.Preconditions.checkState;
@@ -74,6 +75,7 @@ public class Console
 
     private static final String PROMPT_NAME = "lk";
     private static final Duration EXIT_DELAY = new Duration(3, SECONDS);
+    private static final Pattern createCubePattern = Pattern.compile("^(create)\\s*cube.*where.*", Pattern.CASE_INSENSITIVE);
 
     @Inject
     public HelpOption helpOption;
@@ -139,6 +141,17 @@ public class Console
                 Optional.ofNullable(clientOptions.krb5CredentialCachePath),
                 !clientOptions.krb5DisableRemoteServiceHostnameCanonicalization)) {
             if (hasQuery) {
+                if (createCubePattern.matcher(query).matches()) {
+                    CubeConsole cubeConsole = new CubeConsole(this);
+                    return cubeConsole.executeCubeCommand(
+                            queryRunner,
+                            exiting,
+                            query,
+                            clientOptions.outputFormat,
+                            clientOptions.ignoreErrors,
+                            clientOptions.progress);
+                }
+
                 return executeCommand(
                         queryRunner,
                         exiting,
@@ -147,7 +160,6 @@ public class Console
                         clientOptions.ignoreErrors,
                         clientOptions.progress);
             }
-
             runConsole(queryRunner, exiting);
             return true;
         }
@@ -194,6 +206,11 @@ public class Console
         catch (IOException exception) {
             throw new UncheckedIOException("Failed to read password from console", exception);
         }
+    }
+
+    public ClientOptions getClientOptions()
+    {
+        return clientOptions;
     }
 
     private void runConsole(QueryRunner queryRunner, AtomicBoolean exiting)
@@ -257,7 +274,15 @@ public class Console
                     if (split.terminator().equals("\\G")) {
                         outputFormat = ClientOptions.OutputFormat.VERTICAL;
                     }
-                    process(queryRunner, split.statement(), outputFormat, tableNameCompleter::populateCache, true, true, reader.getTerminal(), System.out, System.out);
+                    if (createCubePattern.matcher(split.statement()).matches()) {
+                        PrintStream out = System.out;
+                        PrintStream errorChannel = System.out;
+                        CubeConsole cubeConsole = new CubeConsole(this);
+                        cubeConsole.createCubeCommand(split.statement(), queryRunner, ClientOptions.OutputFormat.NULL, tableNameCompleter::populateCache, true, true, reader.getTerminal(), out, errorChannel);
+                    }
+                    else {
+                        process(queryRunner, split.statement(), outputFormat, tableNameCompleter::populateCache, true, true, reader.getTerminal(), System.out, System.out);
+                    }
                 }
 
                 // replace remaining with trailing partial statement
@@ -435,5 +460,18 @@ public class Console
             System.setOut(out);
             System.setErr(err);
         }
+    }
+
+    public void runQuery(QueryRunner queryRunner,
+                                  String sql,
+                                  ClientOptions.OutputFormat outputFormat,
+                                  Runnable schemaChanged,
+                                  boolean usePager,
+                                  boolean showProgress,
+                                  Terminal terminal,
+                                  PrintStream out,
+                                  PrintStream errorChannel)
+    {
+        process(queryRunner, sql, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
     }
 }

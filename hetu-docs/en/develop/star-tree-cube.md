@@ -41,6 +41,16 @@ Next, to add data to the cube:
 ```sql 
 INSERT INTO CUBE nation_cube WHERE nationkey > 5;
 ```
+Creating a star-tree cube with CLI with WHERE clause:
+```sql 
+CREATE CUBE nation_cube 
+ON nation 
+WITH (AGGREGATIONS=(count(*), count(distinct regionkey), avg(nationkey), max(regionkey)),
+GROUP=(nationkey),
+format='orc', partitioned_by=ARRAY['nationkey'])
+WHERE nationkey > 4;
+```
+
 To use the new cube, just query the original table using aggregations that were included in the cube:
 ```sql 
 SELECT count(*) FROM nation WHERE nationkey > 5 GROUP BY nationkey;
@@ -89,6 +99,10 @@ INSERT INTO CUBE store_sales_cube WHERE ss_sold_date_sk >= 2452011 AND ss_sold_d
 INSERT INTO CUBE store_sales_cube WHERE ss_sold_date_sk BETWEEN 2452111 AND 2452210;
 INSERT INTO CUBE store_sales_cube WHERE ss_sold_date_sk BETWEEN 2452211 AND 2452275;
 
+Alternative to overcome this issue, use CLI if expression is Between Predicate or Comparison Expression. CLI internally queries multiple insert statements.
+
+CREATE CUBE store_sales_cube ON store_sales WITH (AGGREGATIONS = (sum(ss_net_paid), sum(ss_sales_price), sum(ss_quantity)), GROUP = (ss_sold_date_sk, ss_store_sk)) WHERE ss_sold_date_sk BETWEEN 2451911 AND 242275;
+
 Internally the system will rewrite and merge all continuous range predicates into a single predicate;
 
 SHOW CUBES;
@@ -116,9 +130,16 @@ Note:
 2. Only Single column predicates can be merged. 
 ```
 
+#CLI changes
+
+The CLI supports the create cube statement with where clause. The where clause used in the create cube statement is the range of data to be inserted into the cube.
+Once the user runs create cube statement with where clause then the cli internally runs the insert cube statements. This process improves the user experience and
+improves the memory footprint based on the cluster memory limits. As of now, only Between Predicate and Comparison Expressions are supported. We support only Integer and Long Literals.
+
 ## Limitation
 
 1. Star tree cube is only effective when the group by cardinality is considerably lower than the number of rows in 
    source table.
 2. A significant amount of user effort required in maintaining Cubes for large datasets.
 3. Only incremental insert into cube is supported. Cannot delete specific rows from Cube.
+4. For the create cube statement in CLI, we only support Between Predicate or Comparison Expression. We support only Integer and Long Literal.
