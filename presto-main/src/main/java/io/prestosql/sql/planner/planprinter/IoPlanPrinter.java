@@ -35,6 +35,7 @@ import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.TableFinishNode;
+import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.CreateReference;
 import io.prestosql.sql.planner.plan.TableWriterNode.CreateTarget;
 import io.prestosql.sql.planner.plan.TableWriterNode.DeleteAsInsertTarget;
@@ -505,6 +506,13 @@ public class IoPlanPrinter
             }
             else if (writerTarget instanceof UpdateTarget) {
                 UpdateTarget target = (UpdateTarget) writerTarget;
+                context.setOutputTable(new CatalogSchemaTableName(
+                        target.getHandle().getCatalogName().getCatalogName(),
+                        target.getSchemaTableName().getSchemaName(),
+                        target.getSchemaTableName().getTableName()));
+            }
+            else if (writerTarget instanceof TableWriterNode.UpdateAsInsertTarget) {
+                TableWriterNode.UpdateAsInsertTarget target = (TableWriterNode.UpdateAsInsertTarget) writerTarget;
                 context.setOutputTable(new CatalogSchemaTableName(
                         target.getHandle().getCatalogName().getCatalogName(),
                         target.getSchemaTableName().getSchemaName(),

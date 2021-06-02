@@ -25,6 +25,7 @@ import io.prestosql.execution.Output;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.FunctionHandle;
@@ -33,6 +34,7 @@ import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.tree.ExistsPredicate;
 import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.FieldReference;
 import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.sql.tree.GroupingOperation;
 import io.prestosql.sql.tree.Identifier;
@@ -155,6 +157,7 @@ public class Analysis
     private boolean isInsertOverwrite;
     private Optional<Update> update = Optional.empty();
     private Optional<TableHandle> analyzeTarget = Optional.empty();
+    private Optional<List<ColumnMetadata>> updatedColumns = Optional.empty();
 
     // for describe input and describe output
     private final boolean isDescribe;
@@ -168,6 +171,12 @@ public class Analysis
     private Statement originalStatement;
     private CubeInsert cubeInsert;
     private boolean cubeOverwrite;
+
+    // row id field for update/delete queries
+    private final Map<NodeRef<Table>, FieldReference> rowIdField = new LinkedHashMap<>();
+
+    // row id handle for update/delete queries
+    private final Map<NodeRef<Table>, ColumnHandle> rowIdHandle = new LinkedHashMap<>();
 
     public Analysis(@Nullable Statement root, List<Expression> parameters, boolean isDescribe)
     {
@@ -694,6 +703,16 @@ public class Analysis
         return insert;
     }
 
+    public void setUpdatedColumns(List<ColumnMetadata> updatedColumns)
+    {
+        this.updatedColumns = Optional.of(updatedColumns);
+    }
+
+    public Optional<List<ColumnMetadata>> getUpdatedColumns()
+    {
+        return updatedColumns;
+    }
+
     public boolean isInsertOverwrite()
     {
         return isInsertOverwrite;
@@ -879,6 +898,26 @@ public class Analysis
     public boolean isOrderByRedundant(OrderBy orderBy)
     {
         return redundantOrderBy.contains(NodeRef.of(orderBy));
+    }
+
+    public void setRowIdField(Table table, FieldReference field)
+    {
+        rowIdField.put(NodeRef.of(table), field);
+    }
+
+    public FieldReference getRowIdField(Table table)
+    {
+        return rowIdField.get(NodeRef.of(table));
+    }
+
+    public void setRowIdHandle(Table table, ColumnHandle handle)
+    {
+        rowIdHandle.put(NodeRef.of(table), handle);
+    }
+
+    public ColumnHandle getRowIdHandle(Table table)
+    {
+        return rowIdHandle.get(NodeRef.of(table));
     }
 
     public void registerCubeForTable(TableHandle original, TableHandle cube)

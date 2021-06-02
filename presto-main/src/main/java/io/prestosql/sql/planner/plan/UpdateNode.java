@@ -22,12 +22,14 @@ import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.plan.TableWriterNode.UpdateTarget;
-import io.prestosql.sql.tree.AssignmentItem;
+import io.prestosql.sql.tree.Expression;
 
 import javax.annotation.concurrent.Immutable;
 
 import java.util.List;
+import java.util.Map;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 @Immutable
@@ -37,8 +39,9 @@ public class UpdateNode
     private final PlanNode source;
     private final UpdateTarget target;
     private final Symbol rowId;
-    private final List<AssignmentItem> assignmentItems;
+    private final List<Symbol> columnValueAndRowIdSymbols;
     private final List<Symbol> outputs;
+    private final Map<String, Expression> updateColumnExpression;
 
     @JsonCreator
     public UpdateNode(
@@ -46,16 +49,21 @@ public class UpdateNode
             @JsonProperty("source") PlanNode source,
             @JsonProperty("target") UpdateTarget target,
             @JsonProperty("rowId") Symbol rowId,
-            @JsonProperty("assignmentItems") List<AssignmentItem> assignmentItems,
-            @JsonProperty("outputs") List<Symbol> outputs)
+            @JsonProperty("columnValueAndRowIdSymbols") List<Symbol> columnValueAndRowIdSymbols,
+            @JsonProperty("outputs") List<Symbol> outputs,
+            @JsonProperty("updateColumnExpression") Map<String, Expression> updateColumnExpression)
     {
         super(id);
 
         this.source = requireNonNull(source, "source is null");
         this.target = requireNonNull(target, "target is null");
         this.rowId = requireNonNull(rowId, "rowId is null");
-        this.assignmentItems = requireNonNull(assignmentItems, "assignmentItems is null");
+        this.columnValueAndRowIdSymbols = ImmutableList.copyOf(requireNonNull(columnValueAndRowIdSymbols, "columnValueAndRowIdSymbols is null"));
         this.outputs = ImmutableList.copyOf(requireNonNull(outputs, "outputs is null"));
+        this.updateColumnExpression = requireNonNull(updateColumnExpression, "outputs is null");
+        int symbolsSize = columnValueAndRowIdSymbols.size();
+        int columnsSize = target.getUpdatedColumns().size();
+        checkArgument(symbolsSize == columnsSize + 1, "The symbol count %s must be one greater than updated columns count %s", symbolsSize, columnsSize);
     }
 
     @JsonProperty
@@ -77,9 +85,9 @@ public class UpdateNode
     }
 
     @JsonProperty
-    public List<AssignmentItem> getAssignmentItems()
+    public List<Symbol> getColumnValueAndRowIdSymbols()
     {
-        return assignmentItems;
+        return columnValueAndRowIdSymbols;
     }
 
     @JsonProperty("outputs")
@@ -87,6 +95,12 @@ public class UpdateNode
     public List<Symbol> getOutputSymbols()
     {
         return outputs;
+    }
+
+    @JsonProperty
+    public Map<String, Expression> getUpdateColumnExpression()
+    {
+        return updateColumnExpression;
     }
 
     @Override
@@ -104,6 +118,6 @@ public class UpdateNode
     @Override
     public PlanNode replaceChildren(List<PlanNode> newChildren)
     {
-        return new UpdateNode(getId(), Iterables.getOnlyElement(newChildren), target, rowId, assignmentItems, outputs);
+        return new UpdateNode(getId(), Iterables.getOnlyElement(newChildren), target, rowId, columnValueAndRowIdSymbols, outputs, updateColumnExpression);
     }
 }

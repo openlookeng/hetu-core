@@ -97,10 +97,12 @@ import io.prestosql.operator.StatisticsWriterOperator.StatisticsWriterOperatorFa
 import io.prestosql.operator.StreamingAggregationOperator.StreamingAggregationOperatorFactory;
 import io.prestosql.operator.TableDeleteOperator.TableDeleteOperatorFactory;
 import io.prestosql.operator.TableScanOperator.TableScanOperatorFactory;
+import io.prestosql.operator.TableUpdateOperator;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.operator.TaskOutputOperator.TaskOutputFactory;
 import io.prestosql.operator.TopNOperator.TopNOperatorFactory;
 import io.prestosql.operator.TopNRankingNumberOperator;
+import io.prestosql.operator.UpdateOperator;
 import io.prestosql.operator.VacuumTableOperator;
 import io.prestosql.operator.ValuesOperator.ValuesOperatorFactory;
 import io.prestosql.operator.WindowFunctionDefinition;
@@ -207,10 +209,12 @@ import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
+import io.prestosql.sql.planner.plan.TableUpdateNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.DeleteTarget;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
+import io.prestosql.sql.planner.plan.UpdateNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
@@ -2923,6 +2927,42 @@ public class LocalExecutionPlanner
         }
 
         @Override
+        public PhysicalOperation visitUpdate(UpdateNode node, LocalExecutionPlanContext context)
+        {
+            PhysicalOperation source = node.getSource().accept(this, context);
+            List<Integer> channelNumbers = createColumnValueAndRowIdChannels(node.getSource().getOutputSymbols(), node.getColumnValueAndRowIdSymbols());
+            OperatorFactory operatorFactory = new UpdateOperator.UpdateOperatorFactory(
+                    context.getNextOperatorId(),
+                    node.getId(),
+                    channelNumbers,
+                    node.getTarget().getUpdatedColumns());
+
+            Map<Symbol, Integer> layout = ImmutableMap.<Symbol, Integer>builder()
+                    .put(node.getOutputSymbols().get(0), 0)
+                    .put(node.getOutputSymbols().get(1), 1)
+                    .build();
+
+            return new PhysicalOperation(operatorFactory, layout, context, source);
+        }
+
+        private List<Integer> createColumnValueAndRowIdChannels(List<Symbol> outputSymbols, List<Symbol> columnValueAndRowIdSymbols)
+        {
+            Integer[] columnValueAndRowIdChannels = new Integer[columnValueAndRowIdSymbols.size()];
+            int symbolCounter = 0;
+            // This depends on the outputSymbols being ordered as the blocks of the
+            // resulting page are ordered.
+            for (Symbol symbol : outputSymbols) {
+                int index = columnValueAndRowIdSymbols.indexOf(symbol);
+                if (index >= 0) {
+                    columnValueAndRowIdChannels[index] = symbolCounter;
+                }
+                symbolCounter++;
+            }
+            checkArgument(symbolCounter == columnValueAndRowIdSymbols.size(), "symbolCounter %s should be columnValueAndRowIdChannels.size() %s", symbolCounter);
+            return Arrays.asList(columnValueAndRowIdChannels);
+        }
+
+        @Override
         public PhysicalOperation visitTableDelete(TableDeleteNode node, LocalExecutionPlanContext context)
         {
             Optional<PhysicalOperation> source = Optional.empty();
@@ -2935,6 +2975,14 @@ public class LocalExecutionPlanner
                     sourceLayout, node.getFilter(), node.getAssignments(), context.getTypes());
 
             return new PhysicalOperation(operatorFactory, makeLayout(node), context, source, UNGROUPED_EXECUTION);
+        }
+
+        @Override
+        public PhysicalOperation visitTableUpdate(TableUpdateNode node, LocalExecutionPlanContext context)
+        {
+            OperatorFactory operatorFactory = new TableUpdateOperator.TableUpdateOperatorFactory(context.getNextOperatorId(), node.getId(), metadata, session, node.getTarget());
+
+            return new PhysicalOperation(operatorFactory, makeLayout(node), context, UNGROUPED_EXECUTION);
         }
 
         @Override
@@ -3432,7 +3480,11 @@ public class LocalExecutionPlanner
                 return metadata.finishInsert(session, ((InsertTarget) target).getHandle(), fragments, statistics);
             }
             else if (target instanceof UpdateTarget) {
-                return metadata.finishUpdate(session, ((UpdateTarget) target).getHandle(), fragments, statistics);
+                metadata.finishUpdate(session, ((UpdateTarget) target).getHandle(), fragments);
+                return Optional.empty();
+            }
+            else if (target instanceof TableWriterNode.UpdateAsInsertTarget) {
+                return metadata.finishUpdateAsInsert(session, ((TableWriterNode.UpdateAsInsertTarget) target).getHandle(), fragments, statistics);
             }
             else if (target instanceof VacuumTarget) {
                 return metadata.finishVacuum(session, ((VacuumTarget) target).getHandle(), fragments, statistics);

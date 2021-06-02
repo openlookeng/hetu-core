@@ -1724,7 +1724,7 @@ public class HiveMetadata
     }
 
     @Override
-    public HiveUpdateTableHandle beginUpdate(ConnectorSession session, ConnectorTableHandle tableHandle)
+    public HiveUpdateTableHandle beginUpdateAsInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, Optional.empty(), HiveACIDWriteType.UPDATE);
         return new HiveUpdateTableHandle(insertTableHandle.getSchemaName(), insertTableHandle.getTableName(),
@@ -1733,6 +1733,7 @@ public class HiveMetadata
                 insertTableHandle.getTableStorageFormat(), insertTableHandle.getPartitionStorageFormat());
     }
 
+    @Override
     public HiveDeleteAsInsertTableHandle beginDeletesAsInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, Optional.empty(), HiveACIDWriteType.DELETE);
@@ -1745,7 +1746,7 @@ public class HiveMetadata
     }
 
     @Override
-    public Optional<ConnectorOutputMetadata> finishUpdate(ConnectorSession session, ConnectorUpdateTableHandle updateHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
+    public Optional<ConnectorOutputMetadata> finishUpdateAsInsert(ConnectorSession session, ConnectorUpdateTableHandle updateHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
     {
         HiveUpdateTableHandle updateTableHandle = (HiveUpdateTableHandle) updateHandle;
         HiveInsertTableHandle insertTableHandle = new HiveInsertTableHandle(updateTableHandle.getSchemaName(), updateTableHandle.getTableName(),
@@ -2021,7 +2022,13 @@ public class HiveMetadata
     }
 
     @Override
-    public ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
+    public ColumnHandle getDeleteRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        return HiveColumnHandle.updateRowIdHandle();
+    }
+
+    @Override
+    public ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle, List<ColumnHandle> updatedColumns)
     {
         return HiveColumnHandle.updateRowIdHandle();
     }

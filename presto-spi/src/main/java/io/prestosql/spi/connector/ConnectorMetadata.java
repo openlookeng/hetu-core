@@ -24,6 +24,7 @@ import io.prestosql.spi.security.RoleGrant;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.statistics.TableStatisticsMetadata;
+import io.prestosql.spi.type.Type;
 
 import javax.annotation.Nullable;
 
@@ -445,9 +446,19 @@ public interface ConnectorMetadata
      * These IDs will be passed to the {@code deleteRows()} method of the
      * {@link io.prestosql.spi.connector.UpdatablePageSource} that created them.
      */
-    default ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
+    default ColumnHandle getDeleteRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        throw new PrestoException(NOT_SUPPORTED, "This connector does not support updates or deletes");
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support deletes");
+    }
+
+    /**
+     * Get the column handle that will generate row IDs for the update operation.
+     * These IDs will be passed to the {@code updateRows() method of the
+     * {@link io.prestosql.spi.connector.UpdatablePageSource} that created them.
+     */
+    default ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle, List<ColumnHandle> updatedColumns)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support updates");
     }
 
     /**
@@ -471,7 +482,7 @@ public interface ConnectorMetadata
     /**
      * Begin update query
      */
-    default ConnectorUpdateTableHandle beginUpdate(ConnectorSession session, ConnectorTableHandle tableHandle)
+    default ConnectorUpdateTableHandle beginUpdateAsInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         throw new PrestoException(NOT_SUPPORTED, "This connector does not support updates");
     }
@@ -482,11 +493,36 @@ public interface ConnectorMetadata
     }
 
     /**
-     * Finish Update query
+     * Finish Update query as insert
      */
-    default Optional<ConnectorOutputMetadata> finishUpdate(ConnectorSession session, ConnectorUpdateTableHandle updateHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
+    default Optional<ConnectorOutputMetadata> finishUpdateAsInsert(ConnectorSession session, ConnectorUpdateTableHandle updateHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
     {
         throw new PrestoException(GENERIC_INTERNAL_ERROR, "ConnectorMetadata beginUpdate() is implemented without finishUpdate()");
+    }
+
+    /**
+     * Do whatever is necessary to start an UPDATE query, returning the {@link ConnectorTableHandle}
+     * instance that will be passed to split generation, and to the {@link #finishUpdate} method.
+     * @param session The session in which to start the update operation.
+     * @param tableHandle A ConnectorTableHandle for the table to be updated.
+     * @param updatedColumnTypes A list of the ColumnHandles of columns that will be updated by this UPDATE
+     * operation, in table column order.
+     * @return a ConnectorTableHandle that will be passed to split generation, and to the
+     * {@link #finishUpdate} method.
+     */
+    default ConnectorTableHandle beginUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, List<Type> updatedColumnTypes)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support updates");
+    }
+
+    /**
+     * Finish an update query
+     *
+     * @param fragments all fragments returned by {@link io.prestosql.spi.connector.UpdatablePageSource#finish()}
+     */
+    default void finishUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, Collection<Slice> fragments)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support updates");
     }
 
     /**
@@ -610,6 +646,19 @@ public interface ConnectorMetadata
      * Execute the delete operation on the handle returned from {@link #applyDelete}.
      */
     default OptionalLong executeDelete(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        throw new PrestoException(GENERIC_INTERNAL_ERROR, "ConnectorMetadata applyDelete() is implemented without executeDelete()");
+    }
+
+    default Optional<ConnectorTableHandle> applyUpdate(ConnectorSession session, ConnectorTableHandle handle, Map<String, String> setExpression)
+    {
+        return Optional.empty();
+    }
+
+    /**
+     * Execute the delete operation on the handle returned from {@link #applyDelete}.
+     */
+    default OptionalLong executeUpdate(ConnectorSession session, ConnectorTableHandle handle)
     {
         throw new PrestoException(GENERIC_INTERNAL_ERROR, "ConnectorMetadata applyDelete() is implemented without executeDelete()");
     }

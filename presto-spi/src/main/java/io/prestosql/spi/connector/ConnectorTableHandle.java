@@ -16,6 +16,7 @@ package io.prestosql.spi.connector;
 import io.prestosql.spi.predicate.Domain;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
+import java.util.Map;
 import java.util.function.Function;
 
 public interface ConnectorTableHandle
@@ -63,6 +64,24 @@ public interface ConnectorTableHandle
         throw new NotImplementedException();
     }
 
+    default Map<String, String> getUpdateColumnExpressionMap()
+    {
+        return null;
+    }
+
+    default void setUpdateColumnExpressionMap(Map<String, String> updateColumnExpressionMap)
+    {
+    }
+
+    default Boolean getDeleteOrUpdate()
+    {
+        return false;
+    }
+
+    default void setDeleteOrUpdate(boolean deleteOrUpdate)
+    {
+    }
+
     /**
      * io.prestosql.sql.planner.SqlQueryBuilder requires the qualified
      * name of the table to build the SQL query. Supporting ConnectorTableHandle
@@ -84,6 +103,11 @@ public interface ConnectorTableHandle
 
     /* to check table is acid type */
     default boolean isDeleteAsInsertSupported()
+    {
+        return false;
+    }
+
+    default boolean isUpdateAsInsertSupported()
     {
         return false;
     }

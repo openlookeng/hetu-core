@@ -37,6 +37,7 @@ import io.prestosql.spi.connector.TableNotFoundException;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.statistics.TableStatistics;
+import io.prestosql.spi.type.Type;
 
 import java.util.Collection;
 import java.util.List;
@@ -314,5 +315,65 @@ public class JdbcMetadata
     public JdbcClient getJdbcClient()
     {
         return jdbcClient;
+    }
+
+    @Override
+    public ColumnHandle getDeleteRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        return jdbcClient.getDeleteRowIdColumnHandle(session, tableHandle);
+    }
+
+    @Override
+    public Optional<ConnectorTableHandle> applyDelete(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return jdbcClient.applyDelete(session, handle);
+    }
+
+    @Override
+    public OptionalLong executeDelete(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return jdbcClient.executeDelete(session, handle);
+    }
+
+    @Override
+    public Optional<ConnectorTableHandle> applyUpdate(ConnectorSession session, ConnectorTableHandle handle, Map<String, String> setExpression)
+    {
+        return jdbcClient.applyUpdate(session, handle, setExpression);
+    }
+
+    @Override
+    public OptionalLong executeUpdate(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return jdbcClient.executeUpdate(session, handle);
+    }
+
+    @Override
+    public ConnectorTableHandle beginDelete(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        return jdbcClient.beginDelete(session, tableHandle);
+    }
+
+    @Override
+    public void finishDelete(ConnectorSession session, ConnectorTableHandle tableHandle, Collection<Slice> fragments)
+    {
+        jdbcClient.finishDelete(session, tableHandle, fragments);
+    }
+
+    @Override
+    public ConnectorTableHandle beginUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, List<Type> updatedColumnTypes)
+    {
+        return jdbcClient.beginUpdate(session, tableHandle, updatedColumnTypes);
+    }
+
+    @Override
+    public void finishUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, Collection<Slice> fragments)
+    {
+        jdbcClient.finishUpdate(session, tableHandle, fragments);
+    }
+
+    @Override
+    public ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle, List<ColumnHandle> updatedColumns)
+    {
+        return jdbcClient.getUpdateRowIdColumnHandle(session, tableHandle, updatedColumns);
     }
 }

@@ -4982,7 +4982,6 @@ public abstract class AbstractTestQueries
     public void testDescribeOutputNonSelect()
     {
         assertDescribeOutputRowCount("CREATE TABLE foo AS SELECT * FROM nation");
-        assertDescribeOutputRowCount("DELETE FROM orders");
 
         assertDescribeOutputEmpty("CALL foo()");
         assertDescribeOutputEmpty("SET SESSION optimize_hash_generation=false");

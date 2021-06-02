@@ -15,6 +15,7 @@
 package io.hetu.core.plugin.oracle;
 
 import com.google.common.base.CharMatcher;
+import com.google.common.base.VerifyException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -25,8 +26,11 @@ import io.hetu.core.plugin.oracle.config.UnsupportedTypeHandling;
 import io.hetu.core.plugin.oracle.optimization.OracleQueryGenerator;
 import io.prestosql.plugin.jdbc.BaseJdbcClient;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
+import io.prestosql.plugin.jdbc.BlockWriteFunction;
+import io.prestosql.plugin.jdbc.BooleanWriteFunction;
 import io.prestosql.plugin.jdbc.ColumnMapping;
 import io.prestosql.plugin.jdbc.ConnectionFactory;
+import io.prestosql.plugin.jdbc.DoubleWriteFunction;
 import io.prestosql.plugin.jdbc.JdbcColumnHandle;
 import io.prestosql.plugin.jdbc.JdbcIdentity;
 import io.prestosql.plugin.jdbc.JdbcTableHandle;
@@ -34,15 +38,19 @@ import io.prestosql.plugin.jdbc.JdbcTypeHandle;
 import io.prestosql.plugin.jdbc.LongWriteFunction;
 import io.prestosql.plugin.jdbc.SliceWriteFunction;
 import io.prestosql.plugin.jdbc.StatsCollecting;
+import io.prestosql.plugin.jdbc.WriteFunction;
 import io.prestosql.plugin.jdbc.WriteMapping;
+import io.prestosql.plugin.jdbc.WriteNullFunction;
 import io.prestosql.plugin.jdbc.optimization.JdbcConverterContext;
 import io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule;
 import io.prestosql.plugin.jdbc.optimization.JdbcPushDownParameter;
 import io.prestosql.plugin.jdbc.optimization.JdbcQueryGeneratorResult;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.SuppressFBWarnings;
+import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.function.FunctionMetadataManager;
 import io.prestosql.spi.function.StandardFunctionResolution;
@@ -80,7 +88,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 
+import static com.google.common.base.Verify.verify;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
@@ -120,6 +131,7 @@ import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
+import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
 import static java.lang.Byte.toUnsignedInt;
@@ -204,6 +216,12 @@ public class OracleClient
      * enable to user oracle synonyms
      */
     private final boolean synonymsEnabled;
+
+    private List<Type> updatedColumnTypes;
+
+    private List<WriteFunction> columnWriters;
+
+    private List<WriteNullFunction> nullWriters;
 
     /**
      * Create Oracle client using the configurations.
@@ -527,6 +545,11 @@ public class OracleClient
                 columnMapping = Optional.of(varcharColumnMapping(createUnboundedVarcharType()));
                 break;
 
+            case OracleTypes.ROWID:
+                int length = min(18, CharType.MAX_LENGTH);
+                columnMapping = Optional.of(charColumnMapping(createCharType(length)));
+                break;
+
             case OracleTypes.BLOB:
             case OracleTypes.RAW:
             case OracleTypes.LONG_RAW:
@@ -701,8 +724,186 @@ public class OracleClient
      *
      * @return String
      */
+    @Override
     protected String generateTemporaryTableName()
     {
         return super.generateTemporaryTableName().substring(0, TEMPORARY_TABLE_NAME_MAX_LENGTH);
+    }
+
+    @Override
+    public ColumnHandle getDeleteRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        JdbcTypeHandle jdbcTypeHandle = new JdbcTypeHandle(Types.ROWID, Optional.of("rowid"), 18, 0, Optional.empty());
+        return new JdbcColumnHandle("ROWID", jdbcTypeHandle, VARCHAR, true);
+    }
+
+    @Override
+    public Optional<ConnectorTableHandle> applyDelete(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        if (pushDownModule.equals(JdbcPushDownModule.DEFAULT)) {
+            return Optional.empty();
+        }
+        return Optional.of(handle);
+    }
+
+    @Override
+    public OptionalLong executeDelete(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        JdbcIdentity identity = JdbcIdentity.from(session);
+        JdbcTableHandle oracleHandle = (JdbcTableHandle) handle;
+        try (Connection connection = connectionFactory.openConnection(identity)) {
+            String sql = "DELETE FROM " + quoted(oracleHandle.getCatalogName(), oracleHandle.getSchemaName(), oracleHandle.getTableName());
+            PreparedStatement statement = connection.prepareStatement(sql);
+            log.debug("Execute: %s", sql);
+            return OptionalLong.of(statement.executeUpdate());
+        }
+        catch (SQLException e) {
+            throw new PrestoException(JDBC_ERROR, e);
+        }
+    }
+
+    @Override
+    public ConnectorTableHandle beginDelete(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        JdbcTableHandle jdbcTableHandle = (JdbcTableHandle) tableHandle;
+        jdbcTableHandle.setDeleteOrUpdate(true);
+        return jdbcTableHandle;
+    }
+
+    @Override
+    public void finishDelete(ConnectorSession session, ConnectorTableHandle tableHandle, Collection<Slice> fragments)
+    {
+    }
+
+    @Override
+    public ConnectorTableHandle beginUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, List<Type> updatedColumnTypes)
+    {
+        this.updatedColumnTypes = updatedColumnTypes;
+        List<WriteMapping> writeMappings = updatedColumnTypes.stream()
+                .map(type ->
+                {
+                    WriteMapping writeMapping = toWriteMapping(session, type);
+                    WriteFunction writeFunction = writeMapping.getWriteFunction();
+                    verify(
+                            type.getJavaType() == writeFunction.getJavaType(),
+                            "openLooKeng type %s is not compatible with write function %s accepting %s",
+                            type,
+                            writeFunction,
+                            writeFunction.getJavaType());
+                    return writeMapping;
+                })
+                .collect(toImmutableList());
+
+        this.columnWriters = writeMappings.stream()
+                .map(WriteMapping::getWriteFunction)
+                .collect(toImmutableList());
+
+        this.nullWriters = writeMappings.stream()
+                .map(WriteMapping::getWriteNullFunction)
+                .collect(toImmutableList());
+
+        JdbcTableHandle jdbcTableHandle = (JdbcTableHandle) tableHandle;
+        jdbcTableHandle.setDeleteOrUpdate(true);
+        return jdbcTableHandle;
+    }
+
+    public void setStatement(PreparedStatement statement, Block block, int position, int channel)
+            throws SQLException
+    {
+        int parameterIndex = channel + 1;
+
+        if (block.isNull(position)) {
+            nullWriters.get(channel).setNull(statement, parameterIndex);
+            return;
+        }
+
+        Type type = updatedColumnTypes.get(channel);
+        Class<?> javaType = type.getJavaType();
+        WriteFunction writeFunction = columnWriters.get(channel);
+        if (javaType == boolean.class) {
+            ((BooleanWriteFunction) writeFunction).set(statement, parameterIndex, type.getBoolean(block, position));
+        }
+        else if (javaType == long.class) {
+            ((LongWriteFunction) writeFunction).set(statement, parameterIndex, type.getLong(block, position));
+        }
+        else if (javaType == double.class) {
+            ((DoubleWriteFunction) writeFunction).set(statement, parameterIndex, type.getDouble(block, position));
+        }
+        else if (javaType == Slice.class) {
+            ((SliceWriteFunction) writeFunction).set(statement, parameterIndex, type.getSlice(block, position));
+        }
+        else if (javaType == Block.class) {
+            ((BlockWriteFunction) writeFunction).set(statement, parameterIndex, (Block) type.getObject(block, position));
+        }
+        else {
+            throw new VerifyException(format("Unexpected type %s with java type %s", type, javaType.getName()));
+        }
+    }
+
+    @Override
+    public void finishUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, Collection<Slice> fragments)
+    {
+    }
+
+    @Override
+    public String buildDeleteSql(ConnectorTableHandle handle)
+    {
+        JdbcTableHandle tableHandle = (JdbcTableHandle) handle;
+        return format(
+                "DELETE FROM %s WHERE ROWID=%s",
+                quoted(tableHandle.getCatalogName(), tableHandle.getSchemaName(), tableHandle.getTableName()), "?");
+    }
+
+    @Override
+    public String buildUpdateSql(ConnectorTableHandle handle, int setNum, List<String> updatedColumns)
+    {
+        JdbcTableHandle tableHandle = (JdbcTableHandle) handle;
+        StringBuilder sqlBuilder = new StringBuilder();
+        sqlBuilder.append(format("UPDATE %s SET ", quoted(tableHandle.getCatalogName(), tableHandle.getSchemaName(), tableHandle.getTableName())));
+        for (int i = 0; i < setNum; i++) {
+            sqlBuilder.append(updatedColumns.get(i));
+            sqlBuilder.append(" = ? ");
+            if (i != setNum - 1) {
+                sqlBuilder.append(", ");
+            }
+        }
+        sqlBuilder.append("WHERE ROWID=?");
+        return sqlBuilder.toString();
+    }
+
+    @Override
+    public void setDeleteSql(PreparedStatement statement, Block rowIds, int position)
+    {
+        String rowId = rowIds.getString(position, position, 18);
+        try {
+            statement.setString(1, rowId);
+        }
+        catch (SQLException e) {
+            throw new PrestoException(JDBC_ERROR, e);
+        }
+    }
+
+    @Override
+    public void setUpdateSql(PreparedStatement statement, List<Block> columnValueAndRowIdBlock, int position, List<String> updatedColumns)
+    {
+        Block rowIds = columnValueAndRowIdBlock.get(columnValueAndRowIdBlock.size() - 1);
+
+        try {
+            for (int i = 0; i < updatedColumns.size(); i++) {
+                setStatement(statement, columnValueAndRowIdBlock.get(i), position, i);
+            }
+            String rowId = rowIds.getString(position, position, 18);
+            statement.setString(updatedColumns.size() + 1, rowId);
+        }
+        catch (SQLException e) {
+            throw new PrestoException(JDBC_ERROR, e);
+        }
+    }
+
+    @Override
+    public ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle, List<ColumnHandle> updatedColumns)
+    {
+        JdbcTypeHandle jdbcTypeHandle = new JdbcTypeHandle(Types.ROWID, Optional.of("rowid"), 18, 0, Optional.empty());
+        return new JdbcColumnHandle("ROWID", jdbcTypeHandle, VARCHAR, true);
     }
 }

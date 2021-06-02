@@ -28,6 +28,7 @@ import io.prestosql.spi.security.RoleGrant;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.statistics.TableStatisticsMetadata;
+import io.prestosql.spi.type.Type;
 
 import javax.annotation.Nullable;
 
@@ -516,9 +517,15 @@ public class CachedConnectorMetadata
     }
 
     @Override
-    public ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
+    public ColumnHandle getDeleteRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        return delegate.getUpdateRowIdColumnHandle(session, tableHandle);
+        return delegate.getDeleteRowIdColumnHandle(session, tableHandle);
+    }
+
+    @Override
+    public ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle, List<ColumnHandle> updatedColumns)
+    {
+        return delegate.getUpdateRowIdColumnHandle(session, tableHandle, updatedColumns);
     }
 
     @Override
@@ -531,6 +538,18 @@ public class CachedConnectorMetadata
     public void finishDelete(ConnectorSession session, ConnectorTableHandle tableHandle, Collection<Slice> fragments)
     {
         delegate.finishDelete(session, tableHandle, fragments);
+    }
+
+    @Override
+    public ConnectorTableHandle beginUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, List<Type> updatedColumnTypes)
+    {
+        return delegate.beginUpdate(session, tableHandle, updatedColumnTypes);
+    }
+
+    @Override
+    public void finishUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, Collection<Slice> fragments)
+    {
+        delegate.finishUpdate(session, tableHandle, fragments);
     }
 
     @Override
@@ -651,6 +670,18 @@ public class CachedConnectorMetadata
     public OptionalLong executeDelete(ConnectorSession session, ConnectorTableHandle handle)
     {
         return delegate.executeDelete(session, handle);
+    }
+
+    @Override
+    public Optional<ConnectorTableHandle> applyUpdate(ConnectorSession session, ConnectorTableHandle handle, Map<String, String> setExpression)
+    {
+        return delegate.applyUpdate(session, handle, setExpression);
+    }
+
+    @Override
+    public OptionalLong executeUpdate(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return delegate.executeUpdate(session, handle);
     }
 
     @Override

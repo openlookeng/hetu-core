@@ -61,6 +61,7 @@ public class BaseJdbcConfig
     private boolean jmxEnabled = true;
     // Hetu: JDBC fetch size configuration
     private int fetchSize;
+    private boolean dmlStatementsCommitInATransaction;
     // Hetu: JDBC query push down enable
     private boolean pushDownEnable = true;
     // Hetu: JDBC push down module
@@ -414,6 +415,22 @@ public class BaseJdbcConfig
     {
         this.fetchSize = fetchSize;
         return this;
+    }
+
+    /**
+     * If a connection, all its DML statements, such as Insert, Update or Delete, will be executed and committed as a transaction. Default is false, every 1000 statements will be executed and committed as a transaction.
+     */
+    @Config("dml-statements-commit-in-a-transaction")
+    @ConfigDescription("If a connection, all its DML statements, such as Insert, Update or Delete, will be executed and committed as a transaction. Default is false, every 1000 statements will be executed and committed as a transaction.")
+    public BaseJdbcConfig setDmlStatementsCommitInATransaction(boolean dmlStatementsCommitInATransaction)
+    {
+        this.dmlStatementsCommitInATransaction = dmlStatementsCommitInATransaction;
+        return this;
+    }
+
+    public boolean isDmlStatementsCommitInATransaction()
+    {
+        return dmlStatementsCommitInATransaction;
     }
 
     public boolean isPushDownEnable()

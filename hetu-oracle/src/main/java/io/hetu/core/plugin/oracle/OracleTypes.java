@@ -94,6 +94,8 @@ public class OracleTypes
      */
     public static final int LONG = -1;
 
+    public static final int ROWID = -8;
+
     private OracleTypes()
     {
     }

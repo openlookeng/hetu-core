@@ -247,9 +247,14 @@ public interface Metadata
     Optional<ConnectorOutputMetadata> finishInsert(Session session, InsertTableHandle tableHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics);
 
     /**
-     * Get the row ID column handle used with UpdatablePageSource.
+     * Get the row ID column handle used with UpdatablePageSource#deleteRows.
      */
-    ColumnHandle getUpdateRowIdColumnHandle(Session session, TableHandle tableHandle);
+    ColumnHandle getDeleteRowIdColumnHandle(Session session, TableHandle tableHandle);
+
+    /**
+     * Get the row ID column handle used with UpdatablePageSource#updateRows.
+     */
+    ColumnHandle getUpdateRowIdColumnHandle(Session session, TableHandle tableHandle, List<ColumnHandle> updatedColumns);
 
     /**
      * @return whether delete without table scan is supported
@@ -271,6 +276,10 @@ public interface Metadata
      */
     OptionalLong executeDelete(Session session, TableHandle tableHandle);
 
+    Optional<TableHandle> applyUpdate(Session session, TableHandle tableHandle, Map<String, String> setExpression);
+
+    OptionalLong executeUpdate(Session session, TableHandle tableHandle);
+
     /**
      * Begin delete query
      */
@@ -279,7 +288,23 @@ public interface Metadata
     /**
      * Begin update query
      */
-    default UpdateTableHandle beginUpdate(Session session, TableHandle tableHandle)
+    default UpdateTableHandle beginUpdateAsInsert(Session session, TableHandle tableHandle)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "update not supported yet for this connector!!");
+    }
+
+    /**
+     * Begin update query
+     */
+    default TableHandle beginUpdate(Session session, TableHandle tableHandle, List<Type> updatedColumnTypes)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "update not supported yet for this connector!!");
+    }
+
+    /**
+     * Finish update query
+     */
+    default void finishUpdate(Session session, TableHandle tableHandle, Collection<Slice> fragments)
     {
         throw new PrestoException(NOT_SUPPORTED, "update not supported yet for this connector!!");
     }
@@ -292,7 +317,7 @@ public interface Metadata
         throw new PrestoException(NOT_SUPPORTED, "DeletAsInsert not supported yet for this connector!!");
     }
 
-    default Optional<ConnectorOutputMetadata> finishUpdate(Session session, UpdateTableHandle tableHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
+    default Optional<ConnectorOutputMetadata> finishUpdateAsInsert(Session session, UpdateTableHandle tableHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
     {
         throw new PrestoException(NOT_SUPPORTED, "update not supported yet for this connector!!");
     }

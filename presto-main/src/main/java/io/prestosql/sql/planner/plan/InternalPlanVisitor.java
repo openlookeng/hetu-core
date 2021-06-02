@@ -94,6 +94,11 @@ public abstract class InternalPlanVisitor<R, C>
         return visitPlan(node, context);
     }
 
+    public R visitTableUpdate(TableUpdateNode node, C context)
+    {
+        return visitPlan(node, context);
+    }
+
     public R visitVacuumTable(VacuumTableNode node, C context)
     {
         return visitPlan(node, context);

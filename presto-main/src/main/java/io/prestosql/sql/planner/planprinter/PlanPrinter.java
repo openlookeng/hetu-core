@@ -103,9 +103,11 @@ import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
+import io.prestosql.sql.planner.plan.TableUpdateNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
+import io.prestosql.sql.planner.plan.UpdateNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 import io.prestosql.sql.planner.planprinter.NodeRepresentation.TypedSymbol;
 import io.prestosql.sql.relational.FunctionResolution;
@@ -1208,6 +1210,18 @@ public class PlanPrinter
         }
 
         @Override
+        public Void visitUpdate(UpdateNode node, Void context)
+        {
+            NodeRepresentation nodeOutput = addNode(node, format("Update[%s]", node.getTarget()));
+            int index = 0;
+            for (String columnName : node.getTarget().getUpdatedColumns()) {
+                nodeOutput.appendDetailsLine("%s := %s", columnName, node.getColumnValueAndRowIdSymbols().get(index).getName());
+                index++;
+            }
+            return processChildren(node, context);
+        }
+
+        @Override
         public Void visitTableDelete(TableDeleteNode node, Void context)
         {
             String formatString = "[%s";
@@ -1219,6 +1233,18 @@ public class PlanPrinter
             }
             formatString += "]";
             addNode(node, "TableDelete", format(formatString, arguments.toArray()));
+
+            return processChildren(node, context);
+        }
+
+        @Override
+        public Void visitTableUpdate(TableUpdateNode node, Void context)
+        {
+            String formatString = "[%s";
+            List<Object> arguments = new ArrayList<>();
+            arguments.add(node.getTarget());
+            formatString += "]";
+            addNode(node, "TableUpdate", format(formatString, arguments.toArray()));
 
             return processChildren(node, context);
         }
