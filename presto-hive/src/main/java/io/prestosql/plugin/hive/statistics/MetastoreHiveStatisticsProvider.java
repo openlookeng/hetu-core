@@ -157,7 +157,9 @@ public class MetastoreHiveStatisticsProvider
             if (!includeColumnStatistics) {
                 OptionalDouble averageRows = calculateAverageRowsPerPartition(statisticsSample.values());
                 TableStatistics.Builder result = TableStatistics.builder();
-                result.setRowCount(Estimate.of(averageRows.getAsDouble() * partitions.size()));
+                if (averageRows.isPresent()) {
+                    result.setRowCount(Estimate.of(averageRows.getAsDouble() * partitions.size()));
+                }
                 result.setFileCount(calulateFileCount(statisticsSample.values()));
                 result.setOnDiskDataSizeInBytes(calculateTotalOnDiskSizeInBytes(statisticsSample.values()));
                 return result.build();
