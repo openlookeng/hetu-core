@@ -514,18 +514,18 @@ public final class RowExpressionDomainTranslator
             }
 
             if (call.getDisplayName().equals("LIKE_PATTERN")
-                    && call.getArguments().size() != 2
-                    && !(call.getArguments().get(0) instanceof ConstantExpression)
-                    && !(call.getArguments().get(0).getType() instanceof VarcharType)
-                    && !(call.getArguments().get(1) instanceof ConstantExpression)
-                    && !(call.getArguments().get(1).getType() instanceof VarcharType)) {
+                    && (call.getArguments().size() != 2
+                    || !(call.getArguments().get(0) instanceof ConstantExpression)
+                    || !(call.getArguments().get(0).getType() instanceof VarcharType)
+                    || !(call.getArguments().get(1) instanceof ConstantExpression)
+                    || !(call.getArguments().get(1).getType() instanceof VarcharType))) {
                 // dynamic escape
                 return Optional.empty();
             }
             else if (resolution.isCastFunction(call.getFunctionHandle())
-                    && call.getArguments().size() != 1
-                    && !(call.getArguments().get(0) instanceof ConstantExpression)
-                    && !(call.getArguments().get(0).getType() instanceof VarcharType)) {
+                    && (call.getArguments().size() != 1
+                    || !(call.getArguments().get(0) instanceof ConstantExpression)
+                    || !(call.getArguments().get(0).getType() instanceof VarcharType))) {
                 // dynamic pattern
                 return Optional.empty();
             }
