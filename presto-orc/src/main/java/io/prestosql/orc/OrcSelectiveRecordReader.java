@@ -65,7 +65,6 @@ public class OrcSelectiveRecordReader
     private final List<Integer> excludePositions;
     private final List<Integer> columnReaderOrder;
     private final Map<Integer, TupleDomainFilter> filters;
-    private int[] positions;
     List<Integer> outputColumns;
     Map<Integer, Type> includedColumns;
 
@@ -236,9 +235,8 @@ public class OrcSelectiveRecordReader
         }
 
         matchingRowsInBatchArray = null;
-        int positionCount = initializePositions(batchSize);
-
-        int[] positionsToRead = this.positions;
+        int[] positionsToRead = initializePositions(batchSize);
+        int positionCount = positionsToRead.length;
 
         /* first evaluate columns with filter AND conditions */
         SelectiveColumnReader[] columnReaders = getColumnReaders();
@@ -350,7 +348,7 @@ public class OrcSelectiveRecordReader
         return page;
     }
 
-    private int initializePositions(int batchSize)
+    private int[] initializePositions(int batchSize)
     {
         // currentPosition to currentBatchSize
         StripeInformation stripe = stripes.get(currentStripe);
@@ -386,7 +384,7 @@ public class OrcSelectiveRecordReader
                     //       20000
                     matchingRows.next();
                 }
-                else if (row < currentPositionInStripe + currentBatchSize) {
+                else if (row < currentPositionInStripe + batchSize) {
                     // matchingRows cursor is within current batch
                     matchingRowsInBlock.add(toIntExact(Long.valueOf(row) - currentPositionInStripe));
                     matchingRows.next();
@@ -402,19 +400,16 @@ public class OrcSelectiveRecordReader
                     i -> matchingRowsInBatchArray[i] = matchingRowsInBlock.get(i));
         }
 
-        if (positions == null || positions.length < batchSize) {
-            if (matchingRowsInBatchArray != null) {
-                positions = matchingRowsInBatchArray;
-                return matchingRowsInBatchArray.length;
-            }
-
-            positions = new int[batchSize];
+        if (matchingRowsInBatchArray != null) {
+            return matchingRowsInBatchArray;
+        }
+        else {
+            int[] positions = new int[batchSize];
             for (int i = 0; i < batchSize; i++) {
                 positions[i] = i;
             }
+            return positions;
         }
-
-        return batchSize;
     }
 
     @Override
