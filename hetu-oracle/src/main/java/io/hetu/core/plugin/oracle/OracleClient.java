@@ -201,6 +201,8 @@ public class OracleClient
 
     private static final int MAX_NVARCHAR2_LENGTH = 4000;
 
+    private static final int ROWID_LENGTH = 18;
+
     private final int numberDefaultScale;
 
     private final RoundingMode roundingMode;
@@ -546,7 +548,7 @@ public class OracleClient
                 break;
 
             case OracleTypes.ROWID:
-                int length = min(18, CharType.MAX_LENGTH);
+                int length = min(ROWID_LENGTH, CharType.MAX_LENGTH);
                 columnMapping = Optional.of(charColumnMapping(createCharType(length)));
                 break;
 
@@ -746,16 +748,44 @@ public class OracleClient
         return Optional.of(handle);
     }
 
+    private String extractSubQuery(String subQuery)
+    {
+        String query = subQuery.substring(subQuery.indexOf("WHERE"));
+        int count = 1;
+        int lastIndex = 0;
+        for (int i = query.indexOf("(") + 1; i < query.length(); i++) {
+            if (String.valueOf(query.charAt(i)).equals("(")) {
+                count++;
+            }
+            if (String.valueOf(query.charAt(i)).equals(")")) {
+                count--;
+            }
+            if (count == 0) {
+                lastIndex = i;
+                break;
+            }
+        }
+        return query.substring(0, lastIndex + 1);
+    }
+
     @Override
     public OptionalLong executeDelete(ConnectorSession session, ConnectorTableHandle handle)
     {
         JdbcIdentity identity = JdbcIdentity.from(session);
         JdbcTableHandle oracleHandle = (JdbcTableHandle) handle;
         try (Connection connection = connectionFactory.openConnection(identity)) {
-            String sql = "DELETE FROM " + quoted(oracleHandle.getCatalogName(), oracleHandle.getSchemaName(), oracleHandle.getTableName());
-            PreparedStatement statement = connection.prepareStatement(sql);
-            log.debug("Execute: %s", sql);
-            return OptionalLong.of(statement.executeUpdate());
+            String sql = "DELETE FROM " + oracleHandle.getSchemaPrefixedTableName();
+            if (oracleHandle.getGeneratedSql().isPresent()) {
+                String subQuery = oracleHandle.getGeneratedSql().get().getSql();
+                sql = String.format("%s %s", sql, extractSubQuery(subQuery));
+                PreparedStatement statement = connection.prepareStatement(sql);
+                return OptionalLong.of(statement.executeUpdate());
+            }
+            else {
+                PreparedStatement statement = connection.prepareStatement(sql);
+                log.debug("Execute: %s", sql);
+                return OptionalLong.of(statement.executeUpdate());
+            }
         }
         catch (SQLException e) {
             throw new PrestoException(JDBC_ERROR, e);

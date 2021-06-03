@@ -20,6 +20,7 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.connector.UpdatablePageSource;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 
 import java.util.Collection;
@@ -34,6 +35,8 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static java.util.Objects.requireNonNull;
 
+// Table delete doesn't need snapshot support
+@RestorableConfig(unsupported = true)
 public abstract class AbstractRowChangeOperator
         implements Operator
 {

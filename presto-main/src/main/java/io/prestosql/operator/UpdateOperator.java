@@ -16,12 +16,15 @@ package io.prestosql.operator;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.RestorableConfig;
 
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
+// Table delete doesn't need snapshot support
+@RestorableConfig(unsupported = true)
 public class UpdateOperator
         extends AbstractRowChangeOperator
 {

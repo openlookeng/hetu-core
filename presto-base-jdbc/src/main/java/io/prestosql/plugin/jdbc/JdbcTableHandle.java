@@ -24,7 +24,6 @@ import io.prestosql.spi.predicate.TupleDomain;
 
 import javax.annotation.Nullable;
 
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -45,7 +44,6 @@ public class JdbcTableHandle
     // Hetu: If query is push down use pushDown sql to build sql and use columnHandles directly
     private final Optional<GeneratedSql> generatedSql;
     private boolean deleteOrUpdate;
-    private Map<String, String> updateColumnExpressionMap;
 
     public JdbcTableHandle(SchemaTableName schemaTableName, @Nullable String catalogName, @Nullable String schemaName, String tableName)
     {
@@ -70,7 +68,7 @@ public class JdbcTableHandle
             TupleDomain<ColumnHandle> constraint,
             OptionalLong limit)
     {
-        this(schemaTableName, catalogName, schemaName, tableName, constraint, limit, Optional.empty(), false, null);
+        this(schemaTableName, catalogName, schemaName, tableName, constraint, limit, Optional.empty(), false);
     }
 
     @JsonCreator
@@ -82,8 +80,7 @@ public class JdbcTableHandle
             @JsonProperty("constraint") TupleDomain<ColumnHandle> constraint,
             @JsonProperty("limit") OptionalLong limit,
             @JsonProperty("sql") Optional<GeneratedSql> generatedSql,
-            @JsonProperty("deleteOrUpdate") boolean deleteOrUpdate,
-            @JsonProperty("updateColumnExpressionMap") Map<String, String> updateColumnExpressionMap)
+            @JsonProperty("deleteOrUpdate") boolean deleteOrUpdate)
     {
         this.schemaTableName = requireNonNull(schemaTableName, "schemaTableName is null");
         this.catalogName = catalogName;
@@ -93,7 +90,6 @@ public class JdbcTableHandle
         this.limit = requireNonNull(limit, "limit is null");
         this.generatedSql = generatedSql;
         this.deleteOrUpdate = deleteOrUpdate;
-        this.updateColumnExpressionMap = updateColumnExpressionMap;
     }
 
     @JsonProperty
@@ -151,17 +147,6 @@ public class JdbcTableHandle
         this.deleteOrUpdate = deleteOrUpdate;
     }
 
-    @JsonProperty
-    public Map<String, String> getUpdateColumnExpressionMap()
-    {
-        return updateColumnExpressionMap;
-    }
-
-    public void setUpdateColumnExpressionMap(Map<String, String> updateColumnExpressionMap)
-    {
-        this.updateColumnExpressionMap = updateColumnExpressionMap;
-    }
-
     /**
      * Hetu DC Connector uses {@link JdbcTableHandle}.
      * Overriding this method makes all JdbcConnectors using {@link JdbcTableHandle}
@@ -193,8 +178,7 @@ public class JdbcTableHandle
     {
         JdbcTableHandle oldJdbcTableHandle = (JdbcTableHandle) oldConnectorTableHandle;
         return new JdbcTableHandle(schemaTableName, catalogName, schemaName, tableName, oldJdbcTableHandle.getConstraint(),
-                oldJdbcTableHandle.getLimit(), oldJdbcTableHandle.getGeneratedSql(), oldJdbcTableHandle.getDeleteOrUpdate(),
-                oldJdbcTableHandle.getUpdateColumnExpressionMap());
+                oldJdbcTableHandle.getLimit(), oldJdbcTableHandle.getGeneratedSql(), oldJdbcTableHandle.getDeleteOrUpdate());
     }
 
     @Override

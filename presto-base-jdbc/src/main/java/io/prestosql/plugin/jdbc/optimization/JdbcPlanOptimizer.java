@@ -287,8 +287,7 @@ public class JdbcPlanOptimizer
                             TupleDomain.all(),
                             OptionalLong.empty(),
                             Optional.of(new GeneratedSql(sql, true)),
-                            false,
-                            null),
+                            false),
                     context.getTransaction().get(),
                     Optional.empty());
             return Optional.of(

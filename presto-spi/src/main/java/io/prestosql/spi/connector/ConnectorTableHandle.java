@@ -16,7 +16,6 @@ package io.prestosql.spi.connector;
 import io.prestosql.spi.predicate.Domain;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
-import java.util.Map;
 import java.util.function.Function;
 
 public interface ConnectorTableHandle
@@ -62,24 +61,6 @@ public interface ConnectorTableHandle
     default Object getTableName()
     {
         throw new NotImplementedException();
-    }
-
-    default Map<String, String> getUpdateColumnExpressionMap()
-    {
-        return null;
-    }
-
-    default void setUpdateColumnExpressionMap(Map<String, String> updateColumnExpressionMap)
-    {
-    }
-
-    default Boolean getDeleteOrUpdate()
-    {
-        return false;
-    }
-
-    default void setDeleteOrUpdate(boolean deleteOrUpdate)
-    {
     }
 
     /**
