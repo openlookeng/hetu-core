@@ -2277,6 +2277,9 @@ public class SemiTransactionalHiveMetastore
             if (hdfsEnvironment.getFileSystem(context, source).rename(source, target)) {
                 cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, target, true));
             }
+            else {
+                renameNewPartitionDirectory(context, hdfsEnvironment, source, target, cleanUpTasksForAbort);
+            }
         }
         catch (IOException e) {
             renameNewPartitionDirectory(context, hdfsEnvironment, source, target, cleanUpTasksForAbort);
