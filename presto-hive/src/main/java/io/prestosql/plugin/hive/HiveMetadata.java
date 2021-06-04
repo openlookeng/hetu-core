@@ -3004,7 +3004,10 @@ public class HiveMetadata
                             fileSystem.delete(status.getPath());
                         }
                         else {
-                            if (mergedFileNames.contains(fileName)) {
+                            // Rename snapshot-altered file names (<name>_snapshot_<queryId>) to original name, if:
+                            // For normal tables, the file is part of the output file list (mergedFileNames)
+                            // For transaqctional tables, the file's parent folder is part of the output file list
+                            if (mergedFileNames.contains(fileName) || mergedFileNames.contains(status.getPath().getParent().getName())) {
                                 String newName = removeSnapshotFileName(fileName, queryId);
                                 log.debug("Renaming merged file resume=false: %s to %s", fileName, newName);
                                 fileSystem.rename(status.getPath(), new Path(folder, newName));
@@ -3017,6 +3020,13 @@ public class HiveMetadata
                         }
                     }
                 }
+            }
+
+            Path acidVersionFile = AcidUtils.OrcAcidVersion.getVersionFilePath(folder);
+            if (fileSystem.exists(acidVersionFile) && fileSystem.getFileStatus(acidVersionFile).getLen() == 0) {
+                // For some reason, an empty _orc_acid_version file was created. Recreate it.
+                fileSystem.delete(acidVersionFile);
+                AcidUtils.OrcAcidVersion.writeVersionFile(folder, fileSystem);
             }
         }
     }
