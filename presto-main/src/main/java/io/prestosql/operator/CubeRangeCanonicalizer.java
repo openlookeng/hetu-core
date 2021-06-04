@@ -134,6 +134,9 @@ public class CubeRangeCanonicalizer
             if (value instanceof Cast) {
                 value = ((Cast) value).getExpression();
             }
+            if (LiteralInterpreter.evaluate(metadata, session, value) == null) {
+                return super.visitComparisonExpression(comparisonExpression, ignored);
+            }
             if (operator == EQUAL) {
                 Expression low = encoder.toExpression(LiteralInterpreter.evaluate(metadata, session, value), type);
                 Expression high = encoder.toExpression(((Long) LiteralInterpreter.evaluate(metadata, session, value) + 1), type);
