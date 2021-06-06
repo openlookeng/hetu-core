@@ -496,6 +496,8 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 >
 > Use Reuse Exchange to cache data in memory if the query contains tables or Common Table Expressions(CTE) which are present more than one time with the same projections and filters on them. Enabling this feature will reduce the time taken to execute the query by caching data in memory and avoiding reading from disk multiple times.
 > This can also be specified on a per-query basis using the `reuse_table_scan` session property.
+>
+> Note: when `cte_reuse_enabled` or `optimizer.cte-reuse-enabled` is enabled reuse exchange will be disabled.
 
 ### `optimizer.cte-reuse-enabled`
 

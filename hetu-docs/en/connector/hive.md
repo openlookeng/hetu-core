@@ -121,7 +121,7 @@ Please see the [Hive Security Configuration](./hive-security.md) section for a m
 | `hive.vacuum-delta-percent-threshold`     | Maximum percent of delta directories to allow without compacting it. Value should be in range 0.1 to 1.0      | 0.1   |
 | `hive.vacuum-cleanup-recheck-interval`    | Interval after which vacuum cleanup task will be resubmitted. Minimum value is 5 minutes.    | `5 Minutes`    |
 | `hive.vacuum-collector-interval`    | Interval after which vacuum collector task will be resubmitted.     | `5 Minutes`    |
-| `hive.max-splits-to-group`    | Max number of splits can be grouped. If value is 1 it will not group. Minimum value is 1     | 1   |
+| `hive.max-splits-to-group`    | Max number of splits that can be grouped. If value is 1 it will not group. Minimum value is 1. More small splits, creates more drivers due to this more memory, scheduling, context switching is required which impact the read performance. Grouping of small splits together reduces the number of splits & driver creation, due this less resources are required which improves performance. | 1   |
 | `hive.metastore-client-service-threads` | Number of threads for metastore clients to operate in parallel to communicate with hive metastore. | 4 |
 | `hive.worker-metastore-cache-enabled` | Enable the caching of the hive metastore on the worker nodes also. | `false` |
 | `hive.metastore-write-batch-size` | Number of partitions sent to meta store in per request. | `8` |
