@@ -87,6 +87,7 @@ import io.prestosql.operator.RowNumberOperator;
 import io.prestosql.operator.ScanFilterAndProjectOperator.ScanFilterAndProjectOperatorFactory;
 import io.prestosql.operator.SetBuilderOperator.SetBuilderOperatorFactory;
 import io.prestosql.operator.SetBuilderOperator.SetSupplier;
+import io.prestosql.operator.SortAggregationOperator;
 import io.prestosql.operator.SourceOperatorFactory;
 import io.prestosql.operator.SpatialIndexBuilderOperator.SpatialIndexBuilderOperatorFactory;
 import io.prestosql.operator.SpatialIndexBuilderOperator.SpatialPredicate;
@@ -2998,7 +2999,8 @@ public class LocalExecutionPlanner
                     Optional.empty(),
                     source.getPipelineExecutionStrategy(),
                     maxLocalExchangeBufferSize,
-                    true);
+                    true,
+                    node.getAggregationType());
 
             List<OperatorFactory> operatorFactories = new ArrayList<>(source.getOperatorFactories());
             List<Symbol> expectedLayout = node.getInputs().get(0);
@@ -3072,7 +3074,8 @@ public class LocalExecutionPlanner
                     hashChannel,
                     exchangeSourcePipelineExecutionStrategy,
                     maxLocalExchangeBufferSize,
-                    false);
+                    false,
+                    node.getAggregationType());
             int totalSinkCount = 0;
             for (int i = 0; i < node.getSources().size(); i++) {
                 DriverFactoryParameters driverFactoryParameters = driverFactoryParametersList.get(i);
@@ -3249,7 +3252,9 @@ public class LocalExecutionPlanner
                     mappings,
                     10_000,
                     Optional.of(maxPartialAggregationMemorySize),
-                    node.getStep().isOutputPartial());
+                    node.getStep().isOutputPartial(),
+                    node.getAggregationType(),
+                    node.getFinalizeSymbol());
             return new PhysicalOperation(operatorFactory, mappings.build(), context, source);
         }
 
@@ -3272,6 +3277,51 @@ public class LocalExecutionPlanner
                 int expectedGroups,
                 Optional<DataSize> maxPartialAggregationMemorySize,
                 boolean useSystemMemory)
+        {
+            return createHashAggregationOperatorFactory(
+                    planNodeId,
+                    aggregations,
+                    globalGroupingSets,
+                    groupBySymbols,
+                    step,
+                    hashSymbol,
+                    groupIdSymbol,
+                    source,
+                    hasDefaultOutput,
+                    spillEnabled,
+                    isStreamable,
+                    unspillMemoryLimit,
+                    context,
+                    startOutputChannel,
+                    outputMappings,
+                    expectedGroups,
+                    maxPartialAggregationMemorySize,
+                    useSystemMemory,
+                    AggregationNode.AggregationType.HASH,
+                    Optional.empty());
+        }
+
+        private OperatorFactory createHashAggregationOperatorFactory(
+                PlanNodeId planNodeId,
+                Map<Symbol, Aggregation> aggregations,
+                Set<Integer> globalGroupingSets,
+                List<Symbol> groupBySymbols,
+                Step step,
+                Optional<Symbol> hashSymbol,
+                Optional<Symbol> groupIdSymbol,
+                PhysicalOperation source,
+                boolean hasDefaultOutput,
+                boolean spillEnabled,
+                boolean isStreamable,
+                DataSize unspillMemoryLimit,
+                LocalExecutionPlanContext context,
+                int startOutputChannel,
+                ImmutableMap.Builder<Symbol, Integer> outputMappings,
+                int expectedGroups,
+                Optional<DataSize> maxPartialAggregationMemorySize,
+                boolean useSystemMemory,
+                AggregationNode.AggregationType aggregationType,
+                Optional<Symbol> finalizeSymbol)
         {
             List<Symbol> aggregationOutputSymbols = new ArrayList<>();
             List<AccumulatorFactory> accumulatorFactories = new ArrayList<>();
@@ -3305,11 +3355,37 @@ public class LocalExecutionPlanner
                 channel++;
             }
 
+            // finalizeValue follows the aggregations by channels
+            if (step.equals(PARTIAL) && finalizeSymbol.isPresent()) {
+                outputMappings.put(finalizeSymbol.get(), channel++);
+            }
+
             List<Integer> groupByChannels = getChannelsForSymbols(groupBySymbols, source.getLayout());
             List<Type> groupByTypes = groupByChannels.stream()
                     .map(entry -> source.getTypes().get(entry))
                     .collect(toImmutableList());
 
+            if (aggregationType.equals(AggregationNode.AggregationType.SORT_BASED)) {
+                Optional<Integer> hashChannel = hashSymbol.map(channelGetter(source));
+                return new SortAggregationOperator.SortAggregationOperatorFactory(
+                        context.getNextOperatorId(),
+                        planNodeId,
+                        groupByTypes,
+                        groupByChannels,
+                        ImmutableList.copyOf(globalGroupingSets),
+                        step,
+                        hasDefaultOutput,
+                        accumulatorFactories,
+                        hashChannel,
+                        groupIdChannel,
+                        expectedGroups,
+                        maxPartialAggregationMemorySize,
+                        spillEnabled,
+                        unspillMemoryLimit,
+                        spillerFactory,
+                        joinCompiler,
+                        useSystemMemory);
+            }
             if (isStreamable) {
                 return new StreamingAggregationOperatorFactory(
                         context.getNextOperatorId(),

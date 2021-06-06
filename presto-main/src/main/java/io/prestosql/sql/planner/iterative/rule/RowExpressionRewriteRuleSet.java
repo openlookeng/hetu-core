@@ -502,7 +502,9 @@ public class RowExpressionRewriteRuleSet
                         node.getPreGroupedSymbols(),
                         node.getStep(),
                         node.getHashSymbol(),
-                        node.getGroupIdSymbol());
+                        node.getGroupIdSymbol(),
+                        node.getAggregationType(),
+                        node.getFinalizeSymbol());
                 return Result.ofPlanNode(aggregationNode);
             }
             return Result.empty();

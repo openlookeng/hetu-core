@@ -1,0 +1,6 @@
+remote exchange (GATHER, SINGLE, [])
+    final aggregation over (ss_item_sk)
+        local exchange (GATHER, SINGLE, [])
+            remote exchange (REPARTITION, HASH, ["ss_item_sk"])
+                partial aggregation over (ss_item_sk)
+                    scan store_sales_customer_item

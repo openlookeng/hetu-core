@@ -1,0 +1,9 @@
+remote exchange (GATHER, SINGLE, [])
+    final SortAggregate over (ss_customer_sk, ss_item_sk, ss_sold_date_sk)
+        local exchange (GATHER, SINGLE, [])
+            partial SortAggregate over (ss_customer_sk, ss_item_sk, ss_sold_date_sk)
+                join (LEFT, PARTITIONED):
+                    scan store_sales_item_customer_solddate
+                    local exchange (GATHER, SINGLE, [])
+                        remote exchange (REPARTITION, hive:buckets=1, hiveTypes=[bigint], ["sr_item_sk"])
+                            scan store_returns

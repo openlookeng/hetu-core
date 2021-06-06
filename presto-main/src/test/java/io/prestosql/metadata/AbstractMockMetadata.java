@@ -672,4 +672,22 @@ public abstract class AbstractMockMetadata
     public void resetCreateForRerun(Session session, OutputTableHandle tableHandle, OptionalLong snapshotIndex)
     {
     }
+
+    @Override
+    public List<String> getTableSortedColumns(Session session, TableHandle tableHandle)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<String> getTableBucketedBy(Session session, TableHandle tableHandle)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int getTableBucketedCount(Session session, TableHandle tableHandle)
+    {
+        throw new UnsupportedOperationException();
+    }
 }

@@ -75,6 +75,8 @@ public class TransformUncorrelatedInPredicateSubqueryToJoin
                 ImmutableList.of(),
                 AggregationNode.Step.SINGLE,
                 Optional.empty(),
+                Optional.empty(),
+                AggregationNode.AggregationType.HASH,
                 Optional.empty());
 
         JoinNode joinNode = new JoinNode(context.getIdAllocator().getNextId(),

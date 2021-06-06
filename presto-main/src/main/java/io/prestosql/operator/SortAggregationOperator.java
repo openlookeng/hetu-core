@@ -1,0 +1,463 @@
+/*
+ * Copyright (C) 2018-2021. Huawei Technologies Co., Ltd. All rights reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.prestosql.operator;
+
+import io.airlift.log.Logger;
+import io.airlift.units.DataSize;
+import io.prestosql.operator.aggregation.AccumulatorFactory;
+import io.prestosql.operator.aggregation.builder.AggregationBuilder;
+import io.prestosql.operator.aggregation.builder.InMemoryHashAggregationBuilder;
+import io.prestosql.operator.aggregation.builder.InMemorySortAggregationBuilder;
+import io.prestosql.operator.aggregation.builder.SpillableHashAggregationBuilder;
+import io.prestosql.spi.Page;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
+import io.prestosql.spi.type.Type;
+import io.prestosql.spiller.SpillerFactory;
+import io.prestosql.sql.gen.JoinCompiler;
+
+import java.util.List;
+import java.util.Optional;
+
+import static com.google.common.base.Preconditions.checkState;
+import static io.prestosql.spi.type.BooleanType.BOOLEAN;
+import static java.util.Objects.requireNonNull;
+
+@RestorableConfig(uncapturedFields = {"sortedPageFinished", "aggregationBuilderType"})
+public class SortAggregationOperator
+        extends GroupAggregationOperator
+{
+    private boolean sortedPageFinished;
+    private AggregationNode.AggregationType aggregationBuilderType;
+
+    public static class SortAggregationOperatorFactory
+            extends GroupAggregationOperatorFactory
+    {
+        public SortAggregationOperatorFactory(int operatorId, PlanNodeId planNodeId, List<? extends Type> groupByTypes,
+                                              List<Integer> groupByChannels, List<Integer> globalAggregationGroupIds,
+                                              AggregationNode.Step step, boolean produceDefaultOutput,
+                                              List<AccumulatorFactory> accumulatorFactories, Optional<Integer> hashChannel,
+                                              Optional<Integer> groupIdChannel, int expectedGroups,
+                                              Optional<DataSize> maxPartialMemory, boolean spillEnabled,
+                                              DataSize unspillMemoryLimit, SpillerFactory spillerFactory,
+                                              JoinCompiler joinCompiler, boolean useSystemMemory)
+        {
+            super(operatorId, planNodeId, groupByTypes, groupByChannels, globalAggregationGroupIds, step, produceDefaultOutput,
+                    accumulatorFactories, hashChannel, groupIdChannel, expectedGroups, maxPartialMemory, spillEnabled,
+                    unspillMemoryLimit, spillerFactory, joinCompiler, useSystemMemory);
+        }
+
+        SortAggregationOperatorFactory(
+                int operatorId,
+                PlanNodeId planNodeId,
+                List<? extends Type> groupByTypes,
+                List<Integer> groupByChannels,
+                List<Integer> globalAggregationGroupIds,
+                AggregationNode.Step step,
+                boolean produceDefaultOutput,
+                List<AccumulatorFactory> accumulatorFactories,
+                Optional<Integer> hashChannel,
+                Optional<Integer> groupIdChannel,
+                int expectedGroups,
+                Optional<DataSize> maxPartialMemory,
+                boolean spillEnabled,
+                DataSize memoryLimitForMerge,
+                DataSize memoryLimitForMergeWithMemory,
+                SpillerFactory spillerFactory,
+                JoinCompiler joinCompiler,
+                boolean useSystemMemory)
+        {
+            super(
+                    operatorId,
+                    planNodeId,
+                    groupByTypes,
+                    groupByChannels,
+                    globalAggregationGroupIds,
+                    step,
+                    produceDefaultOutput,
+                    accumulatorFactories,
+                    hashChannel,
+                    groupIdChannel,
+                    expectedGroups,
+                    maxPartialMemory,
+                    spillEnabled,
+                    memoryLimitForMerge,
+                    memoryLimitForMergeWithMemory,
+                    spillerFactory,
+                    joinCompiler,
+                    useSystemMemory);
+        }
+
+        @Override
+        public Operator createOperator(DriverContext driverContext)
+        {
+            checkState(!closed, "Factory is already closed");
+
+            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, SortAggregationOperator.class.getSimpleName());
+            SortAggregationOperator sortAggregationOperator = new SortAggregationOperator(
+                    operatorContext,
+                    groupByTypes,
+                    groupByChannels,
+                    globalAggregationGroupIds,
+                    step,
+                    produceDefaultOutput,
+                    accumulatorFactories,
+                    hashChannel,
+                    groupIdChannel,
+                    expectedGroups,
+                    maxPartialMemory,
+                    spillEnabled,
+                    memoryLimitForMerge,
+                    memoryLimitForMergeWithMemory,
+                    spillerFactory,
+                    joinCompiler,
+                    useSystemMemory);
+            return sortAggregationOperator;
+        }
+
+        @Override
+        public OperatorFactory duplicate()
+        {
+            return new SortAggregationOperatorFactory(
+                    operatorId,
+                    planNodeId,
+                    groupByTypes,
+                    groupByChannels,
+                    globalAggregationGroupIds,
+                    step,
+                    produceDefaultOutput,
+                    accumulatorFactories,
+                    hashChannel,
+                    groupIdChannel,
+                    expectedGroups,
+                    maxPartialMemory,
+                    spillEnabled,
+                    memoryLimitForMerge,
+                    memoryLimitForMergeWithMemory,
+                    spillerFactory,
+                    joinCompiler,
+                    useSystemMemory);
+        }
+
+        @Override
+        public void noMoreOperators()
+        {
+            closed = true;
+        }
+    }
+
+    private static final Logger LOG = Logger.get(SortAggregationOperator.class);
+
+    public SortAggregationOperator(OperatorContext operatorContext, List<Type> groupByTypes,
+                                   List<Integer> groupByChannels, List<Integer> globalAggregationGroupIds,
+                                   AggregationNode.Step step, boolean produceDefaultOutput,
+                                   List<AccumulatorFactory> accumulatorFactories, Optional<Integer> hashChannel,
+                                   Optional<Integer> groupIdChannel, int expectedGroups,
+                                   Optional<DataSize> maxPartialMemory, boolean spillEnabled,
+                                   DataSize memoryLimitForMerge, DataSize memoryLimitForMergeWithMemory,
+                                   SpillerFactory spillerFactory, JoinCompiler joinCompiler, boolean useSystemMemory)
+    {
+        super(operatorContext, groupByTypes, groupByChannels, globalAggregationGroupIds, step, produceDefaultOutput,
+                accumulatorFactories, hashChannel, groupIdChannel, expectedGroups, maxPartialMemory, spillEnabled,
+                memoryLimitForMerge, memoryLimitForMergeWithMemory, spillerFactory, joinCompiler, useSystemMemory);
+    }
+
+    public AggregationBuilder createPartialAggregationBuilder(AggregationNode.AggregationType aggregationType)
+    {
+        if (aggregationType.equals(AggregationNode.AggregationType.SORT_BASED)) {
+            //sort aggregation is done for finalized values
+            this.aggregationBuilderType = AggregationNode.AggregationType.SORT_BASED;
+            return new InMemorySortAggregationBuilder(
+                    accumulatorFactories,
+                    step,
+                    expectedGroups,
+                    groupByTypes,
+                    groupByChannels,
+                    hashChannel,
+                    operatorContext,
+                    maxPartialMemory,
+                    joinCompiler,
+                    () -> {
+                        memoryContext.setBytes(((InMemorySortAggregationBuilder) aggregationBuilder).getSizeInMemory());
+                        if (step.isOutputPartial() && maxPartialMemory.isPresent()) {
+                            // do not yield on memory for partial aggregations
+                            return true;
+                        }
+                        return operatorContext.isWaitingForMemory().isDone();
+                    });
+        }
+        else {
+            //hash aggregation is done for not finalized values
+            this.aggregationBuilderType = AggregationNode.AggregationType.HASH;
+            return new InMemoryHashAggregationBuilder(
+                    accumulatorFactories,
+                    step,
+                    expectedGroups,
+                    groupByTypes,
+                    groupByChannels,
+                    hashChannel,
+                    operatorContext,
+                    maxPartialMemory,
+                    joinCompiler,
+                    () -> {
+                        memoryContext.setBytes(((InMemoryHashAggregationBuilder) aggregationBuilder).getSizeInMemory());
+                        if (step.isOutputPartial() && maxPartialMemory.isPresent()) {
+                            // do not yield on memory for partial aggregations
+                            return true;
+                        }
+                        return operatorContext.isWaitingForMemory().isDone();
+                    });
+        }
+    }
+
+    public AggregationBuilder createFinalAggregationBuilder(AggregationNode.AggregationType aggregationType)
+    {
+        if (aggregationType.equals(AggregationNode.AggregationType.SORT_BASED)) {
+            this.aggregationBuilderType = AggregationNode.AggregationType.SORT_BASED;
+            return new InMemorySortAggregationBuilder(
+                    accumulatorFactories,
+                    step,
+                    expectedGroups,
+                    groupByTypes,
+                    groupByChannels,
+                    hashChannel,
+                    operatorContext,
+                    maxPartialMemory,
+                    joinCompiler,
+                    () -> {
+                        memoryContext.setBytes(((InMemorySortAggregationBuilder) aggregationBuilder).getSizeInMemory());
+                        if (step.isOutputPartial() && maxPartialMemory.isPresent()) {
+                            // do not yield on memory for partial aggregations
+                            return true;
+                        }
+                        return operatorContext.isWaitingForMemory().isDone();
+                    });
+        }
+        else {
+            this.aggregationBuilderType = AggregationNode.AggregationType.HASH;
+            return new SpillableHashAggregationBuilder(
+                    accumulatorFactories,
+                    step,
+                    expectedGroups,
+                    groupByTypes,
+                    groupByChannels,
+                    hashChannel,
+                    operatorContext,
+                    memoryLimitForMerge,
+                    memoryLimitForMergeWithMemory,
+                    spillerFactory,
+                    joinCompiler);
+        }
+    }
+
+    @Override
+    public void addInput(Page page)
+    {
+        checkState(unfinishedWork == null, "Operator has unfinished work");
+        checkState(!finishing, "Operator is already finishing");
+        requireNonNull(page, "page is null");
+        inputProcessed = true;
+
+        if (aggregationBuilder == null) {
+            // TODO: We ignore spillEnabled here if any aggregate has ORDER BY clause or DISTINCT because they are not yet implemented for spilling.
+            if (step.isOutputPartial() || !spillEnabled || hasOrderBy() || hasDistinct()) {
+                if (step.equals(AggregationNode.Step.FINAL)) {
+                    if (BOOLEAN.getBoolean(page.getBlock(page.getChannelCount() - pageFinalizeLocation), 0)) {
+                        // page contains finalized values show go to sort aggregation
+                        aggregationBuilder = createPartialAggregationBuilder(AggregationNode.AggregationType.SORT_BASED);
+                    }
+                    else {
+                        //corner values we should use hash aggregation
+                        aggregationBuilder = createPartialAggregationBuilder(AggregationNode.AggregationType.HASH);
+                    }
+                }
+                else {
+                    aggregationBuilder = createPartialAggregationBuilder(AggregationNode.AggregationType.SORT_BASED);
+                }
+            }
+            else {
+                if (BOOLEAN.getBoolean(page.getBlock(page.getChannelCount() - pageFinalizeLocation), 0)) {
+                    // finalized values show go to sort aggregation
+                    aggregationBuilder = createFinalAggregationBuilder(AggregationNode.AggregationType.SORT_BASED);
+                }
+                else {
+                    //corner values we should use hash aggregation
+                    aggregationBuilder = createFinalAggregationBuilder(AggregationNode.AggregationType.HASH);
+                    LOG.debug("spill hash obj : " + aggregationBuilder.toString());
+                }
+            }
+        }
+        else {
+            checkState(!aggregationBuilder.isFull(), "Aggregation buffer is full");
+        }
+
+        // process the current page; save the unfinished work if we are waiting for memory
+        unfinishedWork = aggregationBuilder.processPage(page);
+        if (unfinishedWork.process()) {
+            unfinishedWork = null;
+        }
+        if (step.equals(AggregationNode.Step.FINAL)) {
+            if (BOOLEAN.getBoolean(page.getBlock(page.getChannelCount() - pageFinalizeLocation), 0)) {
+                sortedPageFinished = true;
+            }
+        }
+
+        aggregationBuilder.updateMemory();
+    }
+
+    @Override
+    public Page getOutput()
+    {
+        if (finished) {
+            return null;
+        }
+
+        // process unfinished work if one exists
+        if (unfinishedWork != null) {
+            boolean workDone = unfinishedWork.process();
+            aggregationBuilder.updateMemory();
+            if (!workDone) {
+                return null;
+            }
+            unfinishedWork = null;
+        }
+
+        if (outputPages == null) {
+            if (finishing) {
+                if (aggregationBuilder == null) {
+                    finished = true;
+                    return null;
+                }
+            }
+
+            if (aggregationBuilder == null) {
+                return null;
+            }
+
+            /* When step is FINAL all finalized values will be handled by InMemorySortAggregationBuilder so need to wait till
+            memory is filled or all pages are received, it will yield output immediately.
+            But values that are not finalized received to InMemoryHashAggregationBuilder yield only after memory full or when all pages received */
+            if (step.equals(AggregationNode.Step.FINAL) && (!(aggregationBuilderType.equals(AggregationNode.AggregationType.SORT_BASED)) &&
+                            !finishing && !aggregationBuilder.isFull())) {
+                return null;
+            }
+
+            // only flush if we are finishing or the aggregation builder is full
+            if (step.equals(AggregationNode.Step.PARTIAL) && !finishing && !aggregationBuilder.isFull()) {
+                return null;
+            }
+
+            outputPages = aggregationBuilder.buildResult(step);
+        }
+
+        if (!outputPages.process()) {
+            return null;
+        }
+
+        if (outputPages.isFinished()) {
+            closeAggregationBuilder();
+            return null;
+        }
+
+        Page page = outputPages.getResult();
+
+        if (step.equals(AggregationNode.Step.FINAL) && sortedPageFinished == true && finishing == false) {
+            closeAggregationBuilder();
+        }
+
+        return page;
+    }
+
+    @Override
+    public void close()
+    {
+        closeAggregationBuilder();
+    }
+
+    protected void closeAggregationBuilder()
+    {
+        outputPages = null;
+        if (aggregationBuilder != null) {
+            if (!aggregationBuilderType.equals(AggregationNode.AggregationType.SORT_BASED)) {
+                aggregationBuilder.recordHashCollisions(hashCollisionsCounter);
+            }
+
+            aggregationBuilder.close();
+            // aggregationBuilder.close() will release all memory reserved in memory accounting.
+            // The reference must be set to null afterwards to avoid unaccounted memory.
+            aggregationBuilder = null;
+        }
+        memoryContext.setBytes(0);
+    }
+
+    @Override
+    public void finish()
+    {
+        finishing = true;
+        sortedPageFinished = true;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        SortAggregationOperatorState myState = new SortAggregationOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        if (aggregationBuilder != null) {
+            myState.aggregationBuilder = aggregationBuilder.capture(serdeProvider);
+        }
+        myState.memoryContext = memoryContext.getBytes();
+        myState.inputProcessed = inputProcessed;
+        myState.finishing = finishing;
+        myState.finished = finished;
+        myState.baseState = super.capture(serdeProvider);
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        SortAggregationOperatorState myState = (SortAggregationOperatorState) state;
+        operatorContext.restore(myState.operatorContext, serdeProvider);
+        if (myState.aggregationBuilder != null) {
+            if (this.aggregationBuilder == null) {
+                createAggregationBuilder();
+            }
+            aggregationBuilder.restore(myState.aggregationBuilder, serdeProvider);
+        }
+        else {
+            aggregationBuilder = null;
+        }
+        this.memoryContext.setBytes(myState.memoryContext);
+        inputProcessed = myState.inputProcessed;
+        finishing = myState.finishing;
+        finished = myState.finished;
+        super.restore(myState.baseState, serdeProvider);
+    }
+
+    private static class SortAggregationOperatorState
+            extends GroupAggregationOperatorState
+    {
+        private Object baseState;
+        private Object operatorContext;
+        private Object aggregationBuilder;
+        private long memoryContext;
+        private boolean inputProcessed;
+        private boolean finishing;
+        private boolean finished;
+    }
+}

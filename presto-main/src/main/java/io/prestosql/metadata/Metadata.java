@@ -545,4 +545,10 @@ public interface Metadata
      * false, otherwise
      */
     boolean isPreAggregationSupported(Session session, CatalogName catalogName);
+
+    List<String> getTableSortedColumns(Session session, TableHandle tableHandle);
+
+    List<String> getTableBucketedBy(Session session, TableHandle tableHandle);
+
+    int getTableBucketedCount(Session session, TableHandle tableHandle);
 }

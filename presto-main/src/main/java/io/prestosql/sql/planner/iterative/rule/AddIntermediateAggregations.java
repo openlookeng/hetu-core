@@ -121,7 +121,9 @@ public class AddIntermediateAggregations
                     aggregation.getPreGroupedSymbols(),
                     AggregationNode.Step.INTERMEDIATE,
                     aggregation.getHashSymbol(),
-                    aggregation.getGroupIdSymbol());
+                    aggregation.getGroupIdSymbol(),
+                    aggregation.getAggregationType(),
+                    aggregation.getFinalizeSymbol());
             source = ExchangeNode.gatheringExchange(idAllocator.getNextId(), ExchangeNode.Scope.LOCAL, source);
         }
 
@@ -164,7 +166,9 @@ public class AddIntermediateAggregations
                 aggregation.getPreGroupedSymbols(),
                 AggregationNode.Step.INTERMEDIATE,
                 aggregation.getHashSymbol(),
-                aggregation.getGroupIdSymbol());
+                aggregation.getGroupIdSymbol(),
+                aggregation.getAggregationType(),
+                aggregation.getFinalizeSymbol());
     }
 
     /**

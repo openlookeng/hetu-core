@@ -142,6 +142,7 @@ import io.prestosql.sql.planner.optimizations.AddExchangeAboveCTENode;
 import io.prestosql.sql.planner.optimizations.AddExchanges;
 import io.prestosql.sql.planner.optimizations.AddLocalExchanges;
 import io.prestosql.sql.planner.optimizations.AddReuseExchange;
+import io.prestosql.sql.planner.optimizations.AddSortBasedAggregation;
 import io.prestosql.sql.planner.optimizations.ApplyConnectorOptimization;
 import io.prestosql.sql.planner.optimizations.BeginTableWrite;
 import io.prestosql.sql.planner.optimizations.CheckSubqueryNodesAreRewritten;
@@ -650,6 +651,7 @@ public class PlanOptimizers
         builder.add(pushdownDeleteWithExchangeRule);
         builder.add(pushdownDeleteRule);
 
+        builder.add(new AddSortBasedAggregation(metadata, statsCalculator, costCalculator, costComparator));
         // Optimizers above this don't understand local exchanges, so be careful moving this.
         builder.add(new AddLocalExchanges(metadata, typeAnalyzer));
         builder.add(new AddExchangeAboveCTENode());

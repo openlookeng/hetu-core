@@ -15,6 +15,7 @@ package io.prestosql.operator.exchange;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.operator.PipelineExecutionStrategy;
@@ -22,6 +23,7 @@ import io.prestosql.operator.TaskContext;
 import io.prestosql.snapshot.MultiInputRestorable;
 import io.prestosql.snapshot.MultiInputSnapshotState;
 import io.prestosql.snapshot.SnapshotStateId;
+import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.snapshot.RestorableConfig;
@@ -62,6 +64,8 @@ import static java.util.Objects.requireNonNull;
 public class LocalExchange
         implements MultiInputRestorable
 {
+    private static final Logger LOG = Logger.get(LocalExchange.class);
+
     private final Supplier<LocalExchanger> exchangerSupplier;
 
     private final List<LocalExchangeSource> sources;
@@ -121,7 +125,8 @@ public class LocalExchange
             boolean isForMerge,
             TaskContext taskContext,
             String id,
-            boolean snapshotEnabled)
+            boolean snapshotEnabled,
+            AggregationNode.AggregationType aggregationType)
     {
         this.bufferCount = bufferCount;
         this.isForMerge = isForMerge;
@@ -154,7 +159,13 @@ public class LocalExchange
             exchangerSupplier = () -> new RandomExchanger(buffers, memoryManager);
         }
         else if (partitioning.equals(FIXED_HASH_DISTRIBUTION)) {
-            exchangerSupplier = () -> new PartitioningExchanger(buffers, memoryManager, types, partitionChannels, partitionHashChannel);
+            if (!aggregationType.equals(AggregationNode.AggregationType.SORT_BASED)) {
+                exchangerSupplier = () -> new PartitioningExchanger(buffers, memoryManager, types, partitionChannels, partitionHashChannel);
+            }
+            else {
+                exchangerSupplier = () -> new SortBasedAggregationPartitioningExchanger(buffers, memoryManager, types,
+                        partitionChannels, partitionHashChannel, taskContext.getSession());
+            }
         }
         else if (partitioning.equals(FIXED_PASSTHROUGH_DISTRIBUTION)) {
             Iterator<LocalExchangeSource> sourceIterator = this.sources.iterator();
@@ -349,6 +360,7 @@ public class LocalExchange
         private final DataSize maxBufferedBytes;
         private final int bufferCount;
         private final boolean isForMerge;
+        private final AggregationNode.AggregationType aggregationType;
 
         @GuardedBy("this")
         private boolean noMoreSinkFactories;
@@ -371,7 +383,7 @@ public class LocalExchange
                 PipelineExecutionStrategy exchangeSourcePipelineExecutionStrategy,
                 DataSize maxBufferedBytes)
         {
-            this(partitioning, defaultConcurrency, types, partitionChannels, partitionHashChannel, exchangeSourcePipelineExecutionStrategy, maxBufferedBytes, false);
+            this(partitioning, defaultConcurrency, types, partitionChannels, partitionHashChannel, exchangeSourcePipelineExecutionStrategy, maxBufferedBytes, false, AggregationNode.AggregationType.HASH);
         }
 
         public LocalExchangeFactory(
@@ -382,7 +394,8 @@ public class LocalExchange
                 Optional<Integer> partitionHashChannel,
                 PipelineExecutionStrategy exchangeSourcePipelineExecutionStrategy,
                 DataSize maxBufferedBytes,
-                boolean isForMerge)
+                boolean isForMerge,
+                AggregationNode.AggregationType aggregationType)
         {
             this.partitioning = requireNonNull(partitioning, "partitioning is null");
             this.types = requireNonNull(types, "types is null");
@@ -393,6 +406,7 @@ public class LocalExchange
 
             this.bufferCount = computeBufferCount(partitioning, defaultConcurrency, partitionChannels);
             this.isForMerge = isForMerge;
+            this.aggregationType = aggregationType;
         }
 
         public synchronized LocalExchangeSinkFactoryId newSinkFactoryId()
@@ -418,6 +432,11 @@ public class LocalExchange
             return getLocalExchange(lifespan, null, null, false);
         }
 
+        public LocalExchange getLocalExchange(Lifespan lifespan, TaskContext taskContext)
+        {
+            return getLocalExchange(lifespan, taskContext, null, false);
+        }
+
         public synchronized LocalExchange getLocalExchange(Lifespan lifespan, TaskContext taskContext, String id, boolean snapshotEnabled)
         {
             if (exchangeSourcePipelineExecutionStrategy == UNGROUPED_EXECUTION) {
@@ -429,7 +448,8 @@ public class LocalExchange
             return localExchangeMap.computeIfAbsent(lifespan, ignored -> {
                 checkState(noMoreSinkFactories);
                 LocalExchange localExchange =
-                        new LocalExchange(numSinkFactories, bufferCount, partitioning, types, partitionChannels, partitionHashChannel, maxBufferedBytes, isForMerge, taskContext, id, snapshotEnabled);
+                        new LocalExchange(numSinkFactories, bufferCount, partitioning, types, partitionChannels, partitionHashChannel, maxBufferedBytes, isForMerge, taskContext, id, snapshotEnabled,
+                                aggregationType);
                 for (LocalExchangeSinkFactoryId closedSinkFactoryId : closedSinkFactories) {
                     localExchange.getSinkFactory(closedSinkFactoryId).close();
                 }

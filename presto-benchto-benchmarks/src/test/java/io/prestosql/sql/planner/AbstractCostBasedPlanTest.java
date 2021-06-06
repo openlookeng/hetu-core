@@ -62,6 +62,7 @@ public abstract class AbstractCostBasedPlanTest
     private final boolean pushdown;
     private final boolean cteReuse;
     private final boolean reuseExchange;
+    private final boolean sortAggregator;
 
     public AbstractCostBasedPlanTest(LocalQueryRunnerSupplier supplier, boolean pushdown, boolean cteReuse)
     {
@@ -69,6 +70,7 @@ public abstract class AbstractCostBasedPlanTest
         this.pushdown = pushdown;
         this.cteReuse = cteReuse;
         this.reuseExchange = false;
+        this.sortAggregator = false;
     }
 
     public AbstractCostBasedPlanTest(LocalQueryRunnerSupplier supplier, boolean pushdown, boolean cteReuse, boolean reuseExchange)
@@ -77,6 +79,16 @@ public abstract class AbstractCostBasedPlanTest
         this.pushdown = pushdown;
         this.cteReuse = cteReuse;
         this.reuseExchange = reuseExchange;
+        this.sortAggregator = false;
+    }
+
+    public AbstractCostBasedPlanTest(LocalQueryRunnerSupplier supplier, boolean pushdown, boolean cteReuse, boolean reuseExchange, boolean sortAggregator)
+    {
+        super(supplier);
+        this.pushdown = pushdown;
+        this.cteReuse = cteReuse;
+        this.reuseExchange = reuseExchange;
+        this.sortAggregator = sortAggregator;
     }
 
     protected abstract Stream<String> getQueryResourcePaths();
@@ -105,6 +117,9 @@ public abstract class AbstractCostBasedPlanTest
         }
         else if (reuseExchange) {
             fileName = ".reuse" + fileName;
+        }
+        else if (sortAggregator) {
+            fileName = ".sort_agg" + fileName;
         }
 
         return queryResourcePath.replaceAll("\\.sql$", fileName);
@@ -227,14 +242,26 @@ public abstract class AbstractCostBasedPlanTest
         @Override
         public Void visitAggregation(AggregationNode node, Integer indent)
         {
-            output(
-                    indent,
-                    "%s aggregation over (%s)",
-                    node.getStep().name().toLowerCase(ENGLISH),
-                    node.getGroupingKeys().stream()
-                            .map(Object::toString)
-                            .sorted()
-                            .collect(joining(", ")));
+            if (node.getAggregationType().equals(AggregationNode.AggregationType.SORT_BASED)) {
+                output(
+                        indent,
+                        "%s SortAggregate over (%s)",
+                        node.getStep().name().toLowerCase(ENGLISH),
+                        node.getGroupingKeys().stream()
+                                .map(Object::toString)
+                                .sorted()
+                                .collect(joining(", ")));
+            }
+            else {
+                output(
+                        indent,
+                        "%s aggregation over (%s)",
+                        node.getStep().name().toLowerCase(ENGLISH),
+                        node.getGroupingKeys().stream()
+                                .map(Object::toString)
+                                .sorted()
+                                .collect(joining(", ")));
+            }
 
             return visitPlan(node, indent + 1);
         }

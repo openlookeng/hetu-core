@@ -294,6 +294,8 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
                 ImmutableList.of(),
                 AggregationNode.Step.SINGLE,
                 Optional.empty(),
+                Optional.empty(),
+                AggregationNode.AggregationType.HASH,
                 Optional.empty());
 
         //Filter rows with count < 1 from aggregation results to match the NOT_EQUALS clause in original query.

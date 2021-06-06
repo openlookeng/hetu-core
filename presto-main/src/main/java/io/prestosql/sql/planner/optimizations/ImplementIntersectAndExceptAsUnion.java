@@ -284,6 +284,8 @@ public class ImplementIntersectAndExceptAsUnion
                     ImmutableList.of(),
                     Step.SINGLE,
                     Optional.empty(),
+                    Optional.empty(),
+                    AggregationNode.AggregationType.HASH,
                     Optional.empty());
         }
 

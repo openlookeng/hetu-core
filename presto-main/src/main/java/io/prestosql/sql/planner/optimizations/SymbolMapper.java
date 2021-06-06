@@ -158,7 +158,9 @@ public class SymbolMapper
                 ImmutableList.of(),
                 node.getStep(),
                 node.getHashSymbol().map(this::map),
-                node.getGroupIdSymbol().map(this::map));
+                node.getGroupIdSymbol().map(this::map),
+                node.getAggregationType(),
+                node.getFinalizeSymbol());
     }
 
     private Aggregation map(Aggregation aggregation)

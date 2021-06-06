@@ -25,6 +25,8 @@ import io.prestosql.spi.relation.RowExpression;
 
 import javax.annotation.concurrent.Immutable;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +50,8 @@ public class AggregationNode
     private final Optional<Symbol> hashSymbol;
     private final Optional<Symbol> groupIdSymbol;
     private final List<Symbol> outputs;
+    private AggregationType aggregationType;
+    private Optional<Symbol> finalizeSymbol;
 
     @JsonCreator
     public AggregationNode(
@@ -58,7 +62,9 @@ public class AggregationNode
             @JsonProperty("preGroupedSymbols") List<Symbol> preGroupedSymbols,
             @JsonProperty("step") Step step,
             @JsonProperty("hashSymbol") Optional<Symbol> hashSymbol,
-            @JsonProperty("groupIdSymbol") Optional<Symbol> groupIdSymbol)
+            @JsonProperty("groupIdSymbol") Optional<Symbol> groupIdSymbol,
+            @JsonProperty("aggregationType") AggregationType aggregationType,
+            @JsonProperty("finalizeSymbol") Optional<Symbol> finalizeSymbol)
     {
         super(id);
 
@@ -88,7 +94,18 @@ public class AggregationNode
         hashSymbol.ifPresent(outputs::add);
         outputs.addAll(aggregations.keySet());
 
+        if (aggregationType == AggregationType.SORT_BASED) {
+            if (step.equals(Step.PARTIAL)) {
+                if (finalizeSymbol.isPresent()) {
+                    List<Symbol> symbolList = new ArrayList<>(Arrays.asList(finalizeSymbol.get()));
+                    outputs.addAll(symbolList);
+                }
+            }
+        }
+
         this.outputs = outputs.build();
+        this.aggregationType = aggregationType;
+        this.finalizeSymbol = finalizeSymbol;
     }
 
     public List<Symbol> getGroupingKeys()
@@ -199,7 +216,8 @@ public class AggregationNode
     @Override
     public PlanNode replaceChildren(List<PlanNode> newChildren)
     {
-        return new AggregationNode(getId(), Iterables.getOnlyElement(newChildren), aggregations, groupingSets, preGroupedSymbols, step, hashSymbol, groupIdSymbol);
+        return new AggregationNode(getId(), Iterables.getOnlyElement(newChildren), aggregations, groupingSets, preGroupedSymbols, step, hashSymbol, groupIdSymbol,
+                aggregationType, finalizeSymbol);
     }
 
     public boolean producesDistinctRows()
@@ -236,6 +254,28 @@ public class AggregationNode
     public static GroupingSetDescriptor groupingSets(List<Symbol> groupingKeys, int groupingSetCount, Set<Integer> globalGroupingSets)
     {
         return new GroupingSetDescriptor(groupingKeys, groupingSetCount, globalGroupingSets);
+    }
+
+    @JsonProperty("aggregationType")
+    public AggregationType getAggregationType()
+    {
+        return aggregationType;
+    }
+
+    public void setAggregationType(AggregationType aggregationType)
+    {
+        this.aggregationType = aggregationType;
+    }
+
+    @JsonProperty("finalizeSymbol")
+    public Optional<Symbol> getFinalizeSymbol()
+    {
+        return finalizeSymbol;
+    }
+
+    public void setFinalizeSymbol(Optional<Symbol> finalizeSymbol)
+    {
+        this.finalizeSymbol = finalizeSymbol;
     }
 
     public static class GroupingSetDescriptor
@@ -423,5 +463,11 @@ public class AggregationNode
         {
             return Objects.hash(functionCall, arguments, distinct, filter, orderingScheme, mask);
         }
+    }
+
+    public enum AggregationType
+    {
+        HASH,
+        SORT_BASED
     }
 }

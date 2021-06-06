@@ -14,74 +14,31 @@
 package io.prestosql.operator;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
-import io.prestosql.memory.context.LocalMemoryContext;
-import io.prestosql.operator.aggregation.Accumulator;
 import io.prestosql.operator.aggregation.AccumulatorFactory;
-import io.prestosql.operator.aggregation.builder.HashAggregationBuilder;
 import io.prestosql.operator.aggregation.builder.InMemoryHashAggregationBuilder;
 import io.prestosql.operator.aggregation.builder.SpillableHashAggregationBuilder;
-import io.prestosql.operator.scalar.CombineHashFunction;
-import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
-import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.plan.AggregationNode.Step;
 import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
-import io.prestosql.spi.snapshot.RestorableConfig;
-import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.SpillerFactory;
 import io.prestosql.sql.gen.JoinCompiler;
 
-import java.io.Serializable;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
-import static io.prestosql.operator.aggregation.builder.InMemoryHashAggregationBuilder.toTypes;
-import static io.prestosql.sql.planner.optimizations.HashGenerationOptimizer.INITIAL_HASH_VALUE;
-import static io.prestosql.type.TypeUtils.NULL_HASH_CODE;
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(uncapturedFields = {"snapshotState", "groupByTypes", "groupByChannels", "globalAggregationGroupIds",
-        "accumulatorFactories", "hashChannel", "groupIdChannel", "maxPartialMemory", "memoryLimitForMerge",
-        "memoryLimitForMergeWithMemory", "spillerFactory", "joinCompiler", "types", "outputPages", "unfinishedWork"})
 public class HashAggregationOperator
-        implements Operator
+        extends GroupAggregationOperator
 {
-    private static final double MERGE_WITH_MEMORY_RATIO = 0.9;
-
     public static class HashAggregationOperatorFactory
-            implements OperatorFactory
+            extends GroupAggregationOperatorFactory
     {
-        private final int operatorId;
-        private final PlanNodeId planNodeId;
-        private final List<Type> groupByTypes;
-        private final List<Integer> groupByChannels;
-        private final List<Integer> globalAggregationGroupIds;
-        private final Step step;
-        private final boolean produceDefaultOutput;
-        private final List<AccumulatorFactory> accumulatorFactories;
-        private final Optional<Integer> hashChannel;
-        private final Optional<Integer> groupIdChannel;
-
-        private final int expectedGroups;
-        private final Optional<DataSize> maxPartialMemory;
-        private final boolean spillEnabled;
-        private final DataSize memoryLimitForMerge;
-        private final DataSize memoryLimitForMergeWithMemory;
-        private final SpillerFactory spillerFactory;
-        private final JoinCompiler joinCompiler;
-        private final boolean useSystemMemory;
-
-        private boolean closed;
-
         @VisibleForTesting
         public HashAggregationOperatorFactory(
                 int operatorId,
@@ -180,24 +137,25 @@ public class HashAggregationOperator
                 JoinCompiler joinCompiler,
                 boolean useSystemMemory)
         {
-            this.operatorId = operatorId;
-            this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
-            this.hashChannel = requireNonNull(hashChannel, "hashChannel is null");
-            this.groupIdChannel = requireNonNull(groupIdChannel, "groupIdChannel is null");
-            this.groupByTypes = ImmutableList.copyOf(groupByTypes);
-            this.groupByChannels = ImmutableList.copyOf(groupByChannels);
-            this.globalAggregationGroupIds = ImmutableList.copyOf(globalAggregationGroupIds);
-            this.step = step;
-            this.produceDefaultOutput = produceDefaultOutput;
-            this.accumulatorFactories = ImmutableList.copyOf(accumulatorFactories);
-            this.expectedGroups = expectedGroups;
-            this.maxPartialMemory = requireNonNull(maxPartialMemory, "maxPartialMemory is null");
-            this.spillEnabled = spillEnabled;
-            this.memoryLimitForMerge = requireNonNull(memoryLimitForMerge, "memoryLimitForMerge is null");
-            this.memoryLimitForMergeWithMemory = requireNonNull(memoryLimitForMergeWithMemory, "memoryLimitForMergeWithMemory is null");
-            this.spillerFactory = requireNonNull(spillerFactory, "spillerFactory is null");
-            this.joinCompiler = requireNonNull(joinCompiler, "joinCompiler is null");
-            this.useSystemMemory = useSystemMemory;
+            super(
+                    operatorId,
+                    planNodeId,
+                    groupByTypes,
+                    groupByChannels,
+                    globalAggregationGroupIds,
+                    step,
+                    produceDefaultOutput,
+                    accumulatorFactories,
+                    hashChannel,
+                    groupIdChannel,
+                    expectedGroups,
+                    maxPartialMemory,
+                    spillEnabled,
+                    memoryLimitForMerge,
+                    memoryLimitForMergeWithMemory,
+                    spillerFactory,
+                    joinCompiler,
+                    useSystemMemory);
         }
 
         @Override
@@ -258,38 +216,6 @@ public class HashAggregationOperator
         }
     }
 
-    private final OperatorContext operatorContext;
-    private final SingleInputSnapshotState snapshotState;
-    private final List<Type> groupByTypes;
-    private final List<Integer> groupByChannels;
-    private final List<Integer> globalAggregationGroupIds;
-    private final Step step;
-    private final boolean produceDefaultOutput;
-    private final List<AccumulatorFactory> accumulatorFactories;
-    private final Optional<Integer> hashChannel;
-    private final Optional<Integer> groupIdChannel;
-    private final int expectedGroups;
-    private final Optional<DataSize> maxPartialMemory;
-    private final boolean spillEnabled;
-    private final DataSize memoryLimitForMerge;
-    private final DataSize memoryLimitForMergeWithMemory;
-    private final SpillerFactory spillerFactory;
-    private final JoinCompiler joinCompiler;
-    private final boolean useSystemMemory;
-
-    private final List<Type> types;
-    private final HashCollisionsCounter hashCollisionsCounter;
-
-    private HashAggregationBuilder aggregationBuilder;
-    private LocalMemoryContext memoryContext;
-    private WorkProcessor<Page> outputPages;
-    private boolean inputProcessed;
-    private boolean finishing;
-    private boolean finished;
-
-    // for yield when memory is not available
-    private Work<?> unfinishedWork;
-
     public HashAggregationOperator(
             OperatorContext operatorContext,
             List<Type> groupByTypes,
@@ -309,73 +235,32 @@ public class HashAggregationOperator
             JoinCompiler joinCompiler,
             boolean useSystemMemory)
     {
-        this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
-        requireNonNull(step, "step is null");
-        requireNonNull(accumulatorFactories, "accumulatorFactories is null");
-        requireNonNull(operatorContext, "operatorContext is null");
-        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
+        super(operatorContext,
+                groupByTypes,
+                groupByChannels,
+                globalAggregationGroupIds,
+                step,
+                produceDefaultOutput,
+                accumulatorFactories,
+                hashChannel,
+                groupIdChannel,
+                expectedGroups,
+                maxPartialMemory,
+                spillEnabled,
+                memoryLimitForMerge,
+                memoryLimitForMergeWithMemory,
+                spillerFactory,
+                joinCompiler,
+                useSystemMemory);
 
-        this.groupByTypes = ImmutableList.copyOf(groupByTypes);
-        this.groupByChannels = ImmutableList.copyOf(groupByChannels);
-        this.globalAggregationGroupIds = ImmutableList.copyOf(globalAggregationGroupIds);
-        this.accumulatorFactories = ImmutableList.copyOf(accumulatorFactories);
-        this.hashChannel = requireNonNull(hashChannel, "hashChannel is null");
-        this.groupIdChannel = requireNonNull(groupIdChannel, "groupIdChannel is null");
-        this.step = step;
-        this.produceDefaultOutput = produceDefaultOutput;
-        this.expectedGroups = expectedGroups;
-        this.maxPartialMemory = requireNonNull(maxPartialMemory, "maxPartialMemory is null");
-        this.types = toTypes(groupByTypes, step, accumulatorFactories, hashChannel);
-        this.spillEnabled = spillEnabled;
-        this.memoryLimitForMerge = requireNonNull(memoryLimitForMerge, "memoryLimitForMerge is null");
-        this.memoryLimitForMergeWithMemory = requireNonNull(memoryLimitForMergeWithMemory, "memoryLimitForMergeWithMemory is null");
-        this.spillerFactory = requireNonNull(spillerFactory, "spillerFactory is null");
-        this.joinCompiler = requireNonNull(joinCompiler, "joinCompiler is null");
         this.hashCollisionsCounter = new HashCollisionsCounter(operatorContext);
         operatorContext.setInfoSupplier(hashCollisionsCounter);
-        this.useSystemMemory = useSystemMemory;
-
-        this.memoryContext = operatorContext.localUserMemoryContext();
-        if (useSystemMemory) {
-            this.memoryContext = operatorContext.localSystemMemoryContext();
-        }
-    }
-
-    @Override
-    public OperatorContext getOperatorContext()
-    {
-        return operatorContext;
     }
 
     @Override
     public void finish()
     {
         finishing = true;
-    }
-
-    @Override
-    public boolean isFinished()
-    {
-        if (snapshotState != null && snapshotState.hasMarker()) {
-            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
-            return false;
-        }
-
-        return finished;
-    }
-
-    @Override
-    public boolean needsInput()
-    {
-        if (finishing || outputPages != null) {
-            return false;
-        }
-        else if (aggregationBuilder != null && aggregationBuilder.isFull()) {
-            return false;
-        }
-        else {
-            return unfinishedWork == null;
-        }
     }
 
     @Override
@@ -450,33 +335,6 @@ public class HashAggregationOperator
         // assume initial aggregationBuilder is not full
     }
 
-    private boolean hasOrderBy()
-    {
-        return accumulatorFactories.stream().anyMatch(AccumulatorFactory::hasOrderBy);
-    }
-
-    private boolean hasDistinct()
-    {
-        return accumulatorFactories.stream().anyMatch(AccumulatorFactory::hasDistinct);
-    }
-
-    @Override
-    public ListenableFuture<?> startMemoryRevoke()
-    {
-        if (aggregationBuilder != null) {
-            return aggregationBuilder.startMemoryRevoke();
-        }
-        return NOT_BLOCKED;
-    }
-
-    @Override
-    public void finishMemoryRevoke()
-    {
-        if (aggregationBuilder != null) {
-            aggregationBuilder.finishMemoryRevoke();
-        }
-    }
-
     @Override
     public Page getOutput()
     {
@@ -536,24 +394,12 @@ public class HashAggregationOperator
     }
 
     @Override
-    public Page pollMarker()
-    {
-        return snapshotState.nextMarker();
-    }
-
-    @Override
     public void close()
     {
         closeAggregationBuilder();
     }
 
-    @VisibleForTesting
-    public HashAggregationBuilder getAggregationBuilder()
-    {
-        return aggregationBuilder;
-    }
-
-    private void closeAggregationBuilder()
+    protected void closeAggregationBuilder()
     {
         outputPages = null;
         if (aggregationBuilder != null) {
@@ -564,113 +410,5 @@ public class HashAggregationOperator
             aggregationBuilder = null;
         }
         memoryContext.setBytes(0);
-    }
-
-    private Page getGlobalAggregationOutput()
-    {
-        List<Accumulator> accumulators = accumulatorFactories.stream()
-                .map(AccumulatorFactory::createAccumulator)
-                .collect(Collectors.toList());
-
-        // global aggregation output page will only be constructed once,
-        // so a new PageBuilder is constructed (instead of using PageBuilder.reset)
-        PageBuilder output = new PageBuilder(globalAggregationGroupIds.size(), types);
-
-        for (int groupId : globalAggregationGroupIds) {
-            output.declarePosition();
-            int channel = 0;
-
-            for (; channel < groupByTypes.size(); channel++) {
-                if (channel == groupIdChannel.get()) {
-                    output.getBlockBuilder(channel).writeLong(groupId);
-                }
-                else {
-                    output.getBlockBuilder(channel).appendNull();
-                }
-            }
-
-            if (hashChannel.isPresent()) {
-                long hashValue = calculateDefaultOutputHash(groupByTypes, groupIdChannel.get(), groupId);
-                output.getBlockBuilder(channel++).writeLong(hashValue);
-            }
-
-            for (int j = 0; j < accumulators.size(); channel++, j++) {
-                if (step.isOutputPartial()) {
-                    accumulators.get(j).evaluateIntermediate(output.getBlockBuilder(channel));
-                }
-                else {
-                    accumulators.get(j).evaluateFinal(output.getBlockBuilder(channel));
-                }
-            }
-        }
-
-        if (output.isEmpty()) {
-            return null;
-        }
-        return output.build();
-    }
-
-    private static long calculateDefaultOutputHash(List<Type> groupByChannels, int groupIdChannel, int groupId)
-    {
-        // Default output has NULLs on all columns except of groupIdChannel
-        long result = INITIAL_HASH_VALUE;
-        for (int channel = 0; channel < groupByChannels.size(); channel++) {
-            if (channel != groupIdChannel) {
-                result = CombineHashFunction.getHash(result, NULL_HASH_CODE);
-            }
-            else {
-                result = CombineHashFunction.getHash(result, BigintType.hash(groupId));
-            }
-        }
-        return result;
-    }
-
-    @Override
-    public Object capture(BlockEncodingSerdeProvider serdeProvider)
-    {
-        HashAggregationOperatorState myState = new HashAggregationOperatorState();
-        myState.operatorContext = operatorContext.capture(serdeProvider);
-        myState.hashCollisionsCounter = hashCollisionsCounter.capture(serdeProvider);
-        if (aggregationBuilder != null) {
-            myState.aggregationBuilder = aggregationBuilder.capture(serdeProvider);
-        }
-        myState.memoryContext = memoryContext.getBytes();
-        myState.inputProcessed = inputProcessed;
-        myState.finishing = finishing;
-        myState.finished = finished;
-        return myState;
-    }
-
-    @Override
-    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
-    {
-        HashAggregationOperatorState myState = (HashAggregationOperatorState) state;
-        operatorContext.restore(myState.operatorContext, serdeProvider);
-        hashCollisionsCounter.restore(myState.hashCollisionsCounter, serdeProvider);
-        if (myState.aggregationBuilder != null) {
-            if (this.aggregationBuilder == null) {
-                createAggregationBuilder();
-            }
-            aggregationBuilder.restore(myState.aggregationBuilder, serdeProvider);
-        }
-        else {
-            aggregationBuilder = null;
-        }
-        this.memoryContext.setBytes(myState.memoryContext);
-        inputProcessed = myState.inputProcessed;
-        finishing = myState.finishing;
-        finished = myState.finished;
-    }
-
-    private static class HashAggregationOperatorState
-            implements Serializable
-    {
-        private Object operatorContext;
-        private Object hashCollisionsCounter;
-        private Object aggregationBuilder;
-        private long memoryContext;
-        private boolean inputProcessed;
-        private boolean finishing;
-        private boolean finished;
     }
 }

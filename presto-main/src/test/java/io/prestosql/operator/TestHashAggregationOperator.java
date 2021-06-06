@@ -25,7 +25,7 @@ import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.HashAggregationOperator.HashAggregationOperatorFactory;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
-import io.prestosql.operator.aggregation.builder.HashAggregationBuilder;
+import io.prestosql.operator.aggregation.builder.AggregationBuilder;
 import io.prestosql.operator.aggregation.builder.InMemoryHashAggregationBuilder;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.BlockBuilder;
@@ -316,7 +316,6 @@ public class TestHashAggregationOperator
 
         //TODO-cp-I2DSGQ: change expectedMapping after implementation of operatorContext capture
         expectedMapping.put("operatorContext", 0);
-        expectedMapping.put("hashCollisionsCounter", hashCollisionsCounterMapping);
         expectedMapping.put("aggregationBuilder", aggregationBuilderMapping);
         expectedMapping.put("memoryContext", 10355419L);
         expectedMapping.put("inputProcessed", true);
@@ -326,26 +325,8 @@ public class TestHashAggregationOperator
         hashCollisionsCounterMapping.put("hashCollisions", 0L);
         hashCollisionsCounterMapping.put("expectedHashCollisions", 0.0);
 
-        aggregationBuilderMapping.put("groupByHash", groupByHashMapping);
         aggregationBuilderMapping.put("aggregators", aggregatorsMapping);
         aggregationBuilderMapping.put("full", false);
-
-        groupByHashMapping.put("currentPageBuilder", currentPageBuilderMapping);
-        groupByHashMapping.put("completedPagesMemorySize", 0L);
-        groupByHashMapping.put("hashCapacity", 262144);
-        groupByHashMapping.put("maxFill", 196608);
-        groupByHashMapping.put("mask", 262143);
-        groupByHashMapping.put("groupAddressByHash", long[].class);
-        groupByHashMapping.put("groupIdsByHash", int[].class);
-        groupByHashMapping.put("rawHashByHashPosition", byte[].class);
-        groupByHashMapping.put("groupAddressByGroupId", groupAddressByGroupIdMapping);
-        groupByHashMapping.put("nextGroupId", 40000);
-        groupByHashMapping.put("dictionaryLookBack", null);
-        groupByHashMapping.put("hashCollisions", 7228L);
-        groupByHashMapping.put("expectedHashCollisions", 0.0);
-        groupByHashMapping.put("preallocatedMemoryInBytes", 0L);
-        groupByHashMapping.put("currentPageSizeInBytes", 1703144L);
-        groupByHashMapping.put("channelBuilders", channelBuildersMapping);
 
         aggregatorsMapping.add(aggregator0Mapping);
         aggregatorsMapping.add(aggregator1Mapping);
@@ -999,7 +980,7 @@ public class TestHashAggregationOperator
     private int getHashCapacity(Operator operator)
     {
         assertTrue(operator instanceof HashAggregationOperator);
-        HashAggregationBuilder aggregationBuilder = ((HashAggregationOperator) operator).getAggregationBuilder();
+        AggregationBuilder aggregationBuilder = ((HashAggregationOperator) operator).getAggregationBuilder();
         if (aggregationBuilder == null) {
             return 0;
         }

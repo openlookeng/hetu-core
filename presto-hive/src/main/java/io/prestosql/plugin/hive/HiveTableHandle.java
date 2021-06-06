@@ -405,4 +405,10 @@ public class HiveTableHandle
     {
         return true;
     }
+
+    @Override
+    public boolean isSortBasedAggregationSupported()
+    {
+        return true;
+    }
 }

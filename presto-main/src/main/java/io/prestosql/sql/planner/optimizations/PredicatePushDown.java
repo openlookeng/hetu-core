@@ -349,7 +349,8 @@ public class PredicatePushDown
                         node.getPartitioningScheme(),
                         builder.build(),
                         node.getInputs(),
-                        node.getOrderingScheme());
+                        node.getOrderingScheme(),
+                        node.getAggregationType());
             }
 
             return node;
@@ -1595,7 +1596,9 @@ public class PredicatePushDown
                         ImmutableList.of(),
                         node.getStep(),
                         node.getHashSymbol(),
-                        node.getGroupIdSymbol());
+                        node.getGroupIdSymbol(),
+                        node.getAggregationType(),
+                        node.getFinalizeSymbol());
             }
             if (!postAggregationConjuncts.isEmpty()) {
                 output = new FilterNode(idAllocator.getNextId(), output, logicalRowExpressions.combineConjuncts(postAggregationConjuncts));

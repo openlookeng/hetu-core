@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableSet;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
+import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.Assignments;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.ProjectNode;
@@ -171,7 +172,8 @@ public class PushProjectionThroughExchange
                 partitioningScheme,
                 newSourceBuilder.build(),
                 inputsBuilder.build(),
-                exchange.getOrderingScheme());
+                exchange.getOrderingScheme(),
+                AggregationNode.AggregationType.HASH);
 
         // we need to strip unnecessary symbols (hash, partitioning columns).
         return Result.ofPlanNode(restrictOutputs(context.getIdAllocator(),

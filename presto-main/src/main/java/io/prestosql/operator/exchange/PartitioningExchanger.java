@@ -35,10 +35,10 @@ import static java.util.Objects.requireNonNull;
 class PartitioningExchanger
         implements LocalExchanger
 {
-    private final List<Consumer<PageReference>> buffers;
-    private final LocalExchangeMemoryManager memoryManager;
+    protected final List<Consumer<PageReference>> buffers;
+    protected final LocalExchangeMemoryManager memoryManager;
     private final LocalPartitionGenerator partitionGenerator;
-    private final IntArrayList[] partitionAssignments;
+    protected final IntArrayList[] partitionAssignments;
 
     public PartitioningExchanger(
             List<Consumer<PageReference>> partitions,

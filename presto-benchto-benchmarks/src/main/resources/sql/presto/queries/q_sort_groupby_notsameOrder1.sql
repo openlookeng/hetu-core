@@ -1,0 +1,3 @@
+-- mismatch in order of sort by item,customer and groupBy customer , item
+select avg(${database}.${schema}.store_sales_item_customer_solddate.ss_item_sk),${database}.${schema}.store_sales_item_customer_solddate.ss_sold_date_sk from ${database}.${schema}.store_sales_item_customer_solddate
+group by ${database}.${schema}.store_sales_item_customer_solddate.ss_customer_sk, ${database}.${schema}.store_sales_item_customer_solddate.ss_sold_date_sk

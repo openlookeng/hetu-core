@@ -1,0 +1,309 @@
+/*
+ * Copyright (C) 2018-2021. Huawei Technologies Co., Ltd. All rights reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.prestosql.operator;
+
+import io.airlift.slice.DynamicSliceOutput;
+import io.airlift.slice.Slice;
+import io.airlift.slice.SliceOutput;
+import io.airlift.slice.Slices;
+import io.prestosql.spi.Page;
+import io.prestosql.spi.PageBuilder;
+import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
+import io.prestosql.spi.type.Type;
+import io.prestosql.sql.gen.JoinCompiler;
+import org.openjdk.jol.info.ClassLayout;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import static com.google.common.base.Preconditions.checkState;
+import static io.airlift.slice.SizeOf.sizeOf;
+import static io.prestosql.spi.type.BigintType.BIGINT;
+
+// This implementation assumes arrays used in the hash are always a power of 2
+@RestorableConfig(uncapturedFields = {"types", "hashTypes", "channels", "hashStrategy",
+        "inputHashChannel", "hashGenerator", "updateMemory", "channelBuilders", "dictionaryLookBack", "processDictionary",
+        "currentPageBuilder", "completedPagesMemorySize", "rawPrevHash", "nextSortBasedGroupId", "maxGroupId", "nextGroupIdStartingRange",
+        "currentGroupIdStartingRange", "newGroupId", "sliceIndex", "step"})
+public class MultiChannelGroupBySort
+        extends MultiChannelGroupBy implements GroupBySort
+{
+    private static final int INSTANCE_SIZE = ClassLayout.parseClass(MultiChannelGroupBySort.class).instanceSize();
+
+    private PageBuilder currentPageBuilder;
+    private long completedPagesMemorySize;
+    private long rawPrevHash;
+    private int nextSortBasedGroupId;
+    private List<Integer> maxGroupId;
+    private int nextGroupIdStartingRange;
+    private int currentGroupIdStartingRange;
+    private int newGroupId;
+    private int sliceIndex;
+    AggregationNode.Step step;
+
+    public MultiChannelGroupBySort(
+            List<? extends Type> hashTypes,
+            int[] hashChannels,
+            Optional<Integer> inputHashChannel,
+            int expectedSize,
+            boolean processDictionary,
+            JoinCompiler joinCompiler,
+            AggregationNode.Step step)
+    {
+        super(hashTypes, hashChannels, inputHashChannel, expectedSize, processDictionary, joinCompiler);
+        startNewPage();
+
+        this.rawPrevHash = -1;
+        this.maxGroupId = new ArrayList<>();
+        this.currentGroupIdStartingRange = Integer.MAX_VALUE;
+        this.nextGroupIdStartingRange = Integer.MAX_VALUE;
+        this.newGroupId = 0;
+        this.sliceIndex = 0;
+        this.step = step;
+    }
+
+    @Override
+    public long getEstimatedSize()
+    {
+        return INSTANCE_SIZE +
+                (sizeOf(channelBuilders.get(0).elements()) * channelBuilders.size()) +
+                completedPagesMemorySize +
+                currentPageBuilder.getRetainedSizeInBytes();
+    }
+
+    @Override
+    public List<Type> getTypes()
+    {
+        return types;
+    }
+
+    @Override
+    public int getGroupCount()
+    {
+        return nextSortBasedGroupId;
+    }
+
+    @Override
+    public void appendValuesTo(int groupId, PageBuilder pageBuilder, int outputChannelOffset)
+    {
+        int currentSliceIndex = sliceIndex;
+        if (groupId == nextGroupIdStartingRange) {
+            currentGroupIdStartingRange = nextGroupIdStartingRange;
+            if (maxGroupId.size() != 0) {
+                nextGroupIdStartingRange = maxGroupId.get(0);
+                maxGroupId.remove(0);
+            }
+            else {
+                nextGroupIdStartingRange = Integer.MAX_VALUE;
+            }
+            sliceIndex++;
+            groupId = newGroupId == 0 ? groupId : newGroupId;
+            newGroupId = 0;
+        }
+        else if (groupId > currentGroupIdStartingRange) {
+            groupId = newGroupId++;
+        }
+
+        int blockIndex = currentSliceIndex;
+        int position = groupId;
+        hashStrategy.appendTo(blockIndex, position, pageBuilder, outputChannelOffset);
+    }
+
+    @Override
+    public Work<?> addPage(Page page)
+    {
+        currentPageSizeInBytes = page.getRetainedSizeInBytes();
+        if (isRunLengthEncoded(page)) {
+            return new AddRunLengthEncodedPageWork(page, this);
+        }
+        if (canProcessDictionary(page)) {
+            return new AddDictionaryPageWork(page, this);
+        }
+
+        return new AddNonDictionaryPageWork(page, this);
+    }
+
+    @Override
+    public Work<GroupByIdBlock> getGroupIds(Page page)
+    {
+        currentPageSizeInBytes = page.getRetainedSizeInBytes();
+        if (isRunLengthEncoded(page)) {
+            return new MultiChannelGroupBySort.GetRunLengthEncodedGroupIdsWork(page, this);
+        }
+        if (canProcessDictionary(page)) {
+            return new MultiChannelGroupBySort.GetDictionaryGroupIdsWork(page, this);
+        }
+
+        return new MultiChannelGroupBySort.GetNonDictionaryGroupIdsWork(page, this);
+    }
+
+    @Override
+    public boolean contains(int position, Page page, int[] hashChannels)
+    {
+        //This is used for only for aggregation not for hashing
+        return false;
+    }
+
+    @Override
+    public boolean contains(int position, Page page, int[] hashChannels, long rawHash)
+    {
+        //This is used for only for aggregation not for hashing
+        return false;
+    }
+
+    public int putIfAbsent(int position, Page page)
+    {
+        long rawHash = hashGenerator.hashPosition(position, page);
+        return putIfAbsent(position, page, rawHash);
+    }
+
+    public int putIfAbsent(int position, Page page, long rawHash)
+    {
+        int groupId;
+        if (rawPrevHash == -1) {
+            groupId = addNewGroup(position, page, rawHash);
+            rawPrevHash = rawHash;
+            return groupId;
+        }
+
+        if (rawPrevHash == rawHash) {
+            return nextSortBasedGroupId - 1;
+        }
+
+        rawPrevHash = rawHash;
+        groupId = addNewGroup(position, page, rawHash);
+        return groupId;
+    }
+
+    private int addNewGroup(int position, Page page, long rawHash)
+    {
+        // add the row to the open page
+        for (int i = 0; i < channels.length; i++) {
+            int hashChannel = channels[i];
+            Type type = types.get(i);
+            type.appendTo(page.getBlock(hashChannel), position, currentPageBuilder.getBlockBuilder(i));
+        }
+        if (precomputedHashChannel.isPresent()) {
+            BIGINT.writeLong(currentPageBuilder.getBlockBuilder(precomputedHashChannel.getAsInt()), rawHash);
+        }
+        currentPageBuilder.declarePosition();
+
+        if (currentPageBuilder.isFull()) {
+            startNewPage();
+        }
+
+        int groupId = nextSortBasedGroupId++;
+        return groupId;
+    }
+
+    private void startNewPage()
+    {
+        if (currentPageBuilder != null) {
+            completedPagesMemorySize += currentPageBuilder.getRetainedSizeInBytes();
+            currentPageBuilder = currentPageBuilder.newPageBuilderLike();
+            if (nextGroupIdStartingRange == Integer.MAX_VALUE) {
+                nextGroupIdStartingRange = nextSortBasedGroupId;
+            }
+            else {
+                maxGroupId.add(nextSortBasedGroupId);
+            }
+        }
+        else {
+            currentPageBuilder = new PageBuilder(types);
+        }
+
+        for (int i = 0; i < types.size(); i++) {
+            channelBuilders.get(i).add(currentPageBuilder.getBlockBuilder(i));
+        }
+    }
+
+    public boolean needMoreCapacity()
+    {
+        return false;
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        MultiChannelGroupBySortState myState = new MultiChannelGroupBySortState();
+        myState.currentPageBuilder = currentPageBuilder.capture(serdeProvider);
+        myState.completedPagesMemorySize = completedPagesMemorySize;
+        myState.nextGroupId = nextSortBasedGroupId;
+        if (dictionaryLookBack != null) {
+            myState.dictionaryLookBack = dictionaryLookBack.capture(serdeProvider);
+        }
+
+        myState.channelBuilders = new byte[channelBuilders.size()][][];
+        for (int i = 0; i < channelBuilders.size(); i++) {
+            if (channelBuilders.get(i).size() > 0) {
+                // The last block in channelBuilder[i] is always in currentPageBuilder
+                myState.channelBuilders[i] = new byte[channelBuilders.get(i).size() - 1][];
+                for (int j = 0; j < channelBuilders.get(i).size() - 1; j++) {
+                    SliceOutput sliceOutput = new DynamicSliceOutput(1);
+                    serdeProvider.getBlockEncodingSerde().writeBlock(sliceOutput, channelBuilders.get(i).get(j));
+                    myState.channelBuilders[i][j] = sliceOutput.getUnderlyingSlice().getBytes();
+                }
+            }
+        }
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        MultiChannelGroupBySortState myState = (MultiChannelGroupBySortState) state;
+        this.currentPageBuilder.restore(myState.currentPageBuilder, serdeProvider);
+        this.completedPagesMemorySize = myState.completedPagesMemorySize;
+        myState.currentPageSizeInBytes = currentPageSizeInBytes;
+        this.newGroupId = myState.nextGroupId;
+        if (myState.dictionaryLookBack != null) {
+            Slice input = Slices.wrappedBuffer(((DictionaryLookBack.DictionaryLookBackState) myState.dictionaryLookBack).dictionary);
+            this.dictionaryLookBack = new DictionaryLookBack(serdeProvider.getBlockEncodingSerde().readBlock(input.getInput()));
+            this.dictionaryLookBack.restore(myState.dictionaryLookBack, serdeProvider);
+        }
+        else {
+            this.dictionaryLookBack = null;
+        }
+        this.currentPageSizeInBytes = myState.currentPageSizeInBytes;
+
+        checkState(myState.channelBuilders.length == this.channelBuilders.size());
+        for (int i = 0; i < myState.channelBuilders.length; i++) {
+            if (myState.channelBuilders[i] != null) {
+                this.channelBuilders.get(i).clear();
+                for (int j = 0; j < myState.channelBuilders[i].length; j++) {
+                    Slice input = Slices.wrappedBuffer(myState.channelBuilders[i][j]);
+                    this.channelBuilders.get(i).add(serdeProvider.getBlockEncodingSerde().readBlock(input.getInput()));
+                }
+                this.channelBuilders.get(i).add(this.currentPageBuilder.getBlockBuilder(i));
+            }
+        }
+    }
+
+    private static class MultiChannelGroupBySortState
+            implements Serializable
+    {
+        private Object currentPageBuilder;
+        private long completedPagesMemorySize;
+        private int nextGroupId;
+        private Object dictionaryLookBack;
+        private long currentPageSizeInBytes;
+        private byte[][][] channelBuilders;
+    }
+}
