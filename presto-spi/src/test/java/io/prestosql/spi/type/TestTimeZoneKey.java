@@ -179,6 +179,9 @@ public class TestTimeZoneKey
         // previous spot for Canada/East-Saskatchewan
         assertFalse(hasValue[2040]);
         hasValue[2040] = true;
+        // previous spot for US/Pacific-New
+        assertFalse(hasValue[2174]);
+        hasValue[2174] = true;
         // previous spot for EST
         assertFalse(hasValue[2180]);
         hasValue[2180] = true;
@@ -213,7 +216,7 @@ public class TestTimeZoneKey
             hasher.putString(timeZoneKey.getId(), StandardCharsets.UTF_8);
         }
         // Zone file should not (normally) be changed, so let's make this more difficult
-        assertEquals(hasher.hash().asLong(), -4582158485614614451L, "zone-index.properties file contents changed!");
+        assertEquals(hasher.hash().asLong(), -3921697845448163147L, "zone-index.properties file contents changed!");
     }
 
     public void assertTimeZoneNotSupported(String zoneId)

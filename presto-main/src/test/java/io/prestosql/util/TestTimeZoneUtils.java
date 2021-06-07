@@ -66,6 +66,12 @@ public class TestTimeZoneUtils
                 continue;
             }
 
+            if (zoneId.equals("US/Pacific-New")) {
+                // TODO: remove once minimum Java version is increased to these versions:
+                // https://bugs.openjdk.java.net/browse/JDK-8254679
+                continue;
+            }
+
             DateTimeZone dateTimeZone = DateTimeZone.forID(zoneId);
             DateTimeZone indexedZone = getDateTimeZone(TimeZoneKey.getTimeZoneKey(zoneId));
 
