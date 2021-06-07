@@ -142,7 +142,6 @@ import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 import org.apache.log4j.Logger;
-import org.joda.time.DateTimeZone;
 
 import java.io.File;
 import java.io.IOException;
@@ -248,8 +247,8 @@ public class CarbondataMetadata
     }
 
     public CarbondataMetadata(SemiTransactionalHiveMetastore metastore,
-            HdfsEnvironment hdfsEnvironment, HivePartitionManager partitionManager, DateTimeZone timeZone,
-            boolean allowCorruptWritesForTesting, boolean writesToNonManagedTablesEnabled,
+            HdfsEnvironment hdfsEnvironment, HivePartitionManager partitionManager,
+            boolean writesToNonManagedTablesEnabled,
             boolean createsOfNonManagedTablesEnabled, boolean tableCreatesWithLocationAllowed,
             TypeManager typeManager, LocationService locationService,
             JsonCodec<PartitionUpdate> partitionUpdateCodec,
@@ -259,7 +258,7 @@ public class CarbondataMetadata
             CarbondataTableReader carbondataTableReader, String carbondataTableStore, long carbondataMajorVacuumSegSize, long carbondataMinorVacuumSegCount,
             ScheduledExecutorService executorService, ScheduledExecutorService hiveMetastoreClientService)
     {
-        super(metastore, hdfsEnvironment, partitionManager, timeZone, allowCorruptWritesForTesting,
+        super(metastore, hdfsEnvironment, partitionManager,
                 writesToNonManagedTablesEnabled, createsOfNonManagedTablesEnabled, tableCreatesWithLocationAllowed,
                 typeManager, locationService, partitionUpdateCodec, typeTranslator, hetuVersion,
                 hiveStatisticsProvider, accessControlMetadata, false, 2, 0.0, executorService,
@@ -1145,8 +1144,6 @@ public class CarbondataMetadata
     @Override
     public CarbondataOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout)
     {
-        verifyJvmTimeZone();
-
         // get the root directory for the database
         SchemaTableName schemaTableName = tableMetadata.getTable();
         String schemaName = schemaTableName.getSchemaName();

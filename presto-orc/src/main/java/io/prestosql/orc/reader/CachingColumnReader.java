@@ -77,12 +77,12 @@ public class CachingColumnReader<T>
     }
 
     @Override
-    public void startStripe(ZoneId fileTimeZone, ZoneId storageTimeZone, InputStreamSources dictionaryStreamSources,
-                            ColumnMetadata<ColumnEncoding> encoding) throws IOException
+    public void startStripe(ZoneId fileTimeZone, InputStreamSources dictionaryStreamSources,
+            ColumnMetadata<ColumnEncoding> encoding) throws IOException
     {
         this.offset = 0;
         this.nextBatchSize = 0;
-        delegate.startStripe(fileTimeZone, storageTimeZone, dictionaryStreamSources, encoding);
+        delegate.startStripe(fileTimeZone, dictionaryStreamSources, encoding);
     }
 
     @Override

@@ -145,7 +145,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
             ColumnMetadata<OrcType> orcTypes,
             Optional<OrcDecompressor> decompressor,
             int rowsInRowGroup,
-            DateTimeZone hiveStorageTimeZone,
+            DateTimeZone legacyFileTimeZone,
             HiveWriterVersion hiveWriterVersion,
             MetadataReader metadataReader,
             DataSize maxMergeDistance,
@@ -174,7 +174,6 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         requireNonNull(orcDataSource, "orcDataSource is null");
         requireNonNull(orcTypes, "types is null");
         requireNonNull(decompressor, "decompressor is null");
-        requireNonNull(hiveStorageTimeZone, "hiveStorageTimeZone is null");
         requireNonNull(userMetadata, "userMetadata is null");
         requireNonNull(systemMemoryUsage, "systemMemoryUsage is null");
         requireNonNull(exceptionTransform, "exceptionTransform is null");
@@ -280,7 +279,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         AggregatedMemoryContext streamReadersSystemMemoryContext = this.systemMemoryUsage.newAggregatedMemoryContext();
         stripeReader = new StripeReader(
                 orcDataSource,
-                hiveStorageTimeZone.toTimeZone().toZoneId(),
+                legacyFileTimeZone.toTimeZone().toZoneId(),
                 decompressor,
                 orcTypes,
                 ImmutableSet.copyOf(readColumns),
@@ -650,8 +649,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
             for (AbstractColumnReader columnReader : columnReaders) {
                 if (columnReader != null) {
                     ZoneId fileTimeZone = stripe.getFileTimeZone();
-                    ZoneId storageTimeZone = stripe.getStorageTimeZone();
-                    columnReader.startStripe(fileTimeZone, storageTimeZone,
+                    columnReader.startStripe(fileTimeZone,
                             dictionaryStreamSources, columnEncodings);
                 }
             }

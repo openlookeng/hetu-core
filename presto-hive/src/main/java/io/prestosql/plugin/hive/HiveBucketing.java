@@ -170,7 +170,7 @@ public final class HiveBucketing
             return Optional.empty();
         }
 
-        if (containsTimestampBucketedV2(table.getStorage().getBucketProperty().get(), table)) {
+        if (bucketedOnTimestamp(table.getStorage().getBucketProperty().get(), table)) {
             return Optional.empty();
         }
 
@@ -269,35 +269,27 @@ public final class HiveBucketing
         }
     }
 
-    public static boolean containsTimestampBucketedV2(HiveBucketProperty bucketProperty, Table table)
+    public static boolean bucketedOnTimestamp(HiveBucketProperty bucketProperty, Table table)
     {
-        switch (bucketProperty.getBucketingVersion()) {
-            case BUCKETING_V1:
-                return false;
-            case BUCKETING_V2:
-                break;
-            default:
-                throw new IllegalArgumentException("Unsupported bucketing version: " + bucketProperty.getBucketingVersion());
-        }
         return bucketProperty.getBucketedBy().stream()
                 .map(columnName -> table.getColumn(columnName)
                         .orElseThrow(() -> new IllegalArgumentException(format("Cannot find column '%s' in %s", columnName, table))))
                 .map(Column::getType)
                 .map(HiveType::getTypeInfo)
-                .anyMatch(HiveBucketing::containsTimestampBucketedV2);
+                .anyMatch(HiveBucketing::bucketedOnTimestamp);
     }
 
-    private static boolean containsTimestampBucketedV2(TypeInfo type)
+    private static boolean bucketedOnTimestamp(TypeInfo type)
     {
         switch (type.getCategory()) {
             case PRIMITIVE:
                 return ((PrimitiveTypeInfo) type).getPrimitiveCategory() == TIMESTAMP;
             case LIST:
-                return containsTimestampBucketedV2(((ListTypeInfo) type).getListElementTypeInfo());
+                return bucketedOnTimestamp(((ListTypeInfo) type).getListElementTypeInfo());
             case MAP:
                 MapTypeInfo mapTypeInfo = (MapTypeInfo) type;
-                // Note: we do not check map value type because HiveBucketingV2#hashOfMap hashes map values with v1
-                return containsTimestampBucketedV2(mapTypeInfo.getMapKeyTypeInfo());
+                return bucketedOnTimestamp(mapTypeInfo.getMapKeyTypeInfo()) ||
+                        bucketedOnTimestamp(mapTypeInfo.getMapValueTypeInfo());
             default:
                 // TODO: support more types, e.g. ROW
                 throw new UnsupportedOperationException("Computation of Hive bucket hashCode is not supported for Hive category: " + type.getCategory());

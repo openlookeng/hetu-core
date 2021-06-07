@@ -109,8 +109,6 @@ public final class HiveBucketingV1
                     case DATE:
                         // day offset from 1970-01-01
                         return toIntExact(prestoType.getLong(block, position));
-                    case TIMESTAMP:
-                        return hashTimestamp(prestoType.getLong(block, position));
                     default:
                         throw new UnsupportedOperationException("Computation of Hive bucket hashCode is not supported for Hive primitive category: " + primitiveCategory);
                 }
@@ -161,8 +159,6 @@ public final class HiveBucketingV1
                     case DATE:
                         // day offset from 1970-01-01
                         return toIntExact((long) value);
-                    case TIMESTAMP:
-                        return hashTimestamp((long) value);
                     default:
                         throw new UnsupportedOperationException("Computation of Hive bucket hashCode is not supported for Hive primitive category: " + primitiveCategory);
                 }
@@ -174,15 +170,6 @@ public final class HiveBucketingV1
                 // TODO: support more types, e.g. ROW
                 throw new UnsupportedOperationException("Computation of Hive bucket hashCode is not supported for Hive category: " + type.getCategory());
         }
-    }
-
-    @SuppressWarnings("NumericCastThatLosesPrecision")
-    private static int hashTimestamp(long epochMillis)
-    {
-        long seconds = (Math.floorDiv(epochMillis, 1000L) << 30);
-        long nanos = Math.floorMod(epochMillis, 1000) * 1_000_000L;
-        long secondsAndNanos = seconds | nanos;
-        return (int) ((secondsAndNanos >>> 32) ^ secondsAndNanos);
     }
 
     private static int hashOfMap(MapTypeInfo type, Block singleMapBlock)

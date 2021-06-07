@@ -127,9 +127,9 @@ public class ResultCachingSelectiveColumnReader<T>
     }
 
     @Override
-    public void startStripe(ZoneId fileTimeZone, ZoneId storageTimeZone,
-                            InputStreamSources dictionaryStreamSources,
-                            ColumnMetadata<ColumnEncoding> encoding) throws IOException
+    public void startStripe(ZoneId fileTimeZone,
+            InputStreamSources dictionaryStreamSources,
+            ColumnMetadata<ColumnEncoding> encoding) throws IOException
     {
         this.offset = 0;
         this.readSize = 0;
@@ -144,7 +144,7 @@ public class ResultCachingSelectiveColumnReader<T>
 
         cachedBlock = cacheAccumulated(stripeInformation);*/
 
-        delegate.startStripe(fileTimeZone, storageTimeZone, dictionaryStreamSources, encoding);
+        delegate.startStripe(fileTimeZone, dictionaryStreamSources, encoding);
     }
 
     @Override

@@ -88,12 +88,6 @@ public class TestingConnectorSession
     }
 
     @Override
-    public boolean isLegacyTimestamp()
-    {
-        return false;
-    }
-
-    @Override
     public <T> T getProperty(String name, Class<T> type)
     {
         T var = null;

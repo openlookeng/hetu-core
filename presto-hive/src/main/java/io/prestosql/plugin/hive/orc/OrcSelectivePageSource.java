@@ -23,7 +23,6 @@ import io.prestosql.plugin.hive.HivePageSourceProvider.ColumnMapping;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorPageSource;
-import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 
@@ -53,7 +52,6 @@ public class OrcSelectivePageSource
             OrcDataSource orcDataSource,
             AggregatedMemoryContext systemMemoryContext,
             FileFormatDataSourceStats stats,
-            ConnectorSession session,
             List<ColumnMapping> columnMappings,
             TypeManager typeManager)
     {

@@ -316,7 +316,7 @@ public class BaseJdbcClient
     @Override
     public Optional<ColumnMapping> toPrestoType(ConnectorSession session, Connection connection, JdbcTypeHandle typeHandle)
     {
-        return jdbcTypeToPrestoType(session, typeHandle);
+        return jdbcTypeToPrestoType(typeHandle);
     }
 
     @Override

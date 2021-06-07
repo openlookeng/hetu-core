@@ -16,7 +16,6 @@ package io.prestosql.plugin.jdbc;
 import com.google.common.base.CharMatcher;
 import com.google.common.primitives.Shorts;
 import com.google.common.primitives.SignedBytes;
-import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Decimals;
@@ -35,7 +34,6 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -287,42 +285,23 @@ public final class StandardColumnMappings
      * {@link #timestampColumnMapping} instead.
      */
     @Deprecated
-    public static ColumnMapping timestampColumnMappingUsingSqlTimestamp(ConnectorSession session)
+    public static ColumnMapping timestampColumnMappingUsingSqlTimestamp()
     {
-        if (session.isLegacyTimestamp()) {
-            ZoneId sessionZone = ZoneId.of(session.getTimeZoneKey().getId());
-            return ColumnMapping.longMapping(
-                    TIMESTAMP,
-                    (resultSet, columnIndex) -> {
-                        Timestamp timestamp = resultSet.getTimestamp(columnIndex);
-                        return toPrestoLegacyTimestamp(timestamp.toLocalDateTime(), sessionZone);
-                    },
-                    timestampWriteFunctionUsingSqlTimestamp(session));
-        }
-
         return ColumnMapping.longMapping(
                 TIMESTAMP,
                 (resultSet, columnIndex) -> {
                     Timestamp timestamp = resultSet.getTimestamp(columnIndex);
                     return toPrestoTimestamp(timestamp.toLocalDateTime());
                 },
-                timestampWriteFunctionUsingSqlTimestamp(session));
+                timestampWriteFunctionUsingSqlTimestamp());
     }
 
-    public static ColumnMapping timestampColumnMapping(ConnectorSession session)
+    public static ColumnMapping timestampColumnMapping()
     {
-        if (session.isLegacyTimestamp()) {
-            ZoneId sessionZone = ZoneId.of(session.getTimeZoneKey().getId());
-            return ColumnMapping.longMapping(
-                    TIMESTAMP,
-                    (resultSet, columnIndex) -> toPrestoLegacyTimestamp(resultSet.getObject(columnIndex, LocalDateTime.class), sessionZone),
-                    timestampWriteFunction(session));
-        }
-
         return ColumnMapping.longMapping(
                 TIMESTAMP,
                 (resultSet, columnIndex) -> toPrestoTimestamp(resultSet.getObject(columnIndex, LocalDateTime.class)),
-                timestampWriteFunction(session));
+                timestampWriteFunction());
     }
 
     /**
@@ -332,33 +311,14 @@ public final class StandardColumnMappings
      * {@link #timestampWriteFunction} instead.
      */
     @Deprecated
-    public static LongWriteFunction timestampWriteFunctionUsingSqlTimestamp(ConnectorSession connectorSession)
+    public static LongWriteFunction timestampWriteFunctionUsingSqlTimestamp()
     {
-        if (connectorSession.isLegacyTimestamp()) {
-            ZoneId sessionZone = ZoneId.of(connectorSession.getTimeZoneKey().getId());
-            return (statement, index, value) -> statement.setTimestamp(index, Timestamp.valueOf(fromPrestoLegacyTimestamp(value, sessionZone)));
-        }
         return (statement, index, value) -> statement.setTimestamp(index, Timestamp.valueOf(fromPrestoTimestamp(value)));
     }
 
-    public static LongWriteFunction timestampWriteFunction(ConnectorSession session)
+    public static LongWriteFunction timestampWriteFunction()
     {
-        if (session.isLegacyTimestamp()) {
-            ZoneId sessionZone = ZoneId.of(session.getTimeZoneKey().getId());
-            return (statement, index, value) -> statement.setObject(index, fromPrestoLegacyTimestamp(value, sessionZone));
-        }
-        return (statement, index, value) -> {
-            statement.setObject(index, fromPrestoTimestamp(value));
-        };
-    }
-
-    /**
-     * @deprecated applicable in legacy timestamp semantics only
-     */
-    @Deprecated
-    private static long toPrestoLegacyTimestamp(LocalDateTime localDateTime, ZoneId sessionZone)
-    {
-        return localDateTime.atZone(sessionZone).toInstant().toEpochMilli();
+        return (statement, index, value) -> statement.setObject(index, fromPrestoTimestamp(value));
     }
 
     private static long toPrestoTimestamp(LocalDateTime localDateTime)
@@ -366,21 +326,12 @@ public final class StandardColumnMappings
         return localDateTime.atZone(UTC).toInstant().toEpochMilli();
     }
 
-    /**
-     * @deprecated applicable in legacy timestamp semantics only
-     */
-    @Deprecated
-    private static LocalDateTime fromPrestoLegacyTimestamp(long value, ZoneId sessionZone)
-    {
-        return Instant.ofEpochMilli(value).atZone(sessionZone).toLocalDateTime();
-    }
-
     private static LocalDateTime fromPrestoTimestamp(long value)
     {
         return Instant.ofEpochMilli(value).atZone(UTC).toLocalDateTime();
     }
 
-    public static Optional<ColumnMapping> jdbcTypeToPrestoType(ConnectorSession session, JdbcTypeHandle type)
+    public static Optional<ColumnMapping> jdbcTypeToPrestoType(JdbcTypeHandle type)
     {
         int columnSize = type.getColumnSize();
         switch (type.getJdbcType()) {
@@ -444,7 +395,7 @@ public final class StandardColumnMappings
 
             case Types.TIMESTAMP:
                 // TODO default to `timestampColumnMapping`
-                return Optional.of(timestampColumnMappingUsingSqlTimestamp(session));
+                return Optional.of(timestampColumnMappingUsingSqlTimestamp());
         }
         return Optional.empty();
     }

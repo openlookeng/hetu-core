@@ -15,8 +15,9 @@ package io.prestosql.plugin.hive;
 
 import com.google.common.collect.ImmutableList;
 import io.airlift.units.DataSize;
-import io.prestosql.plugin.hive.HiveWriteUtils.FieldSetter;
 import io.prestosql.plugin.hive.metastore.StorageFormat;
+import io.prestosql.plugin.hive.parquet.ParquetRecordWriter;
+import io.prestosql.plugin.hive.util.FieldSetterFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.SettableStructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.mapred.JobConf;
+import org.joda.time.DateTimeZone;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.io.IOException;
@@ -43,7 +45,6 @@ import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_WRITER_CLOSE_ERROR;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_WRITER_DATA_ERROR;
 import static io.prestosql.plugin.hive.HiveUtil.getColumnNames;
 import static io.prestosql.plugin.hive.HiveUtil.getColumnTypes;
-import static io.prestosql.plugin.hive.HiveWriteUtils.createFieldSetter;
 import static io.prestosql.plugin.hive.HiveWriteUtils.createRecordWriter;
 import static io.prestosql.plugin.hive.HiveWriteUtils.getRowColumnInspectors;
 import static io.prestosql.plugin.hive.HiveWriteUtils.initializeSerializer;
@@ -64,7 +65,7 @@ public class RecordFileWriter
     private final SettableStructObjectInspector tableInspector;
     private final List<StructField> structFields;
     private final Object row;
-    private final FieldSetter[] setters;
+    private final FieldSetterFactory.FieldSetter[] setters;
     private final long estimatedWriterSystemMemoryUsage;
 
     private boolean committed;
@@ -77,6 +78,7 @@ public class RecordFileWriter
             DataSize estimatedWriterSystemMemoryUsage,
             JobConf conf,
             TypeManager typeManager,
+            DateTimeZone parquetTimeZone,
             ConnectorSession session)
     {
         this.path = requireNonNull(path, "path is null");
@@ -104,9 +106,12 @@ public class RecordFileWriter
 
         row = tableInspector.create();
 
-        setters = new FieldSetter[structFields.size()];
+        DateTimeZone timeZone = (recordWriter instanceof ParquetRecordWriter) ? parquetTimeZone : DateTimeZone.UTC;
+        FieldSetterFactory fieldSetterFactory = new FieldSetterFactory(timeZone);
+
+        setters = new FieldSetterFactory.FieldSetter[structFields.size()];
         for (int i = 0; i < setters.length; i++) {
-            setters[i] = createFieldSetter(tableInspector, row, structFields.get(i), fileColumnTypes.get(structFields.get(i).getFieldID()));
+            setters[i] = fieldSetterFactory.create(tableInspector, row, structFields.get(i), fileColumnTypes.get(structFields.get(i).getFieldID()));
         }
 
         this.estimatedWriterSystemMemoryUsage = estimatedWriterSystemMemoryUsage.toBytes();

@@ -88,7 +88,8 @@ import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
-import static io.prestosql.spi.util.DateTimeZoneIndex.getDateTimeZone;
+import static io.prestosql.sql.tree.Extract.Field.TIMEZONE_HOUR;
+import static io.prestosql.sql.tree.Extract.Field.TIMEZONE_MINUTE;
 import static io.prestosql.testing.DateTimeTestingUtils.sqlTimestampOf;
 import static io.prestosql.type.JsonType.JSON;
 import static io.prestosql.util.StructuralTestUtil.mapType;
@@ -97,7 +98,6 @@ import static java.lang.Runtime.getRuntime;
 import static java.lang.String.format;
 import static java.util.Collections.singletonList;
 import static java.util.concurrent.Executors.newFixedThreadPool;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.IntStream.range;
 import static org.joda.time.DateTimeZone.UTC;
@@ -872,7 +872,7 @@ public class TestExpressionCompiler
         assertExecute("try_cast('foo' as varchar)", VARCHAR, "foo");
         assertExecute("try_cast('foo' as bigint)", BIGINT, null);
         assertExecute("try_cast('foo' as integer)", INTEGER, null);
-        assertExecute("try_cast('2001-08-22' as timestamp)", TIMESTAMP, sqlTimestampOf(2001, 8, 22, 0, 0, 0, 0, TEST_SESSION));
+        assertExecute("try_cast('2001-08-22' as timestamp)", TIMESTAMP, sqlTimestampOf(2001, 8, 22, 0, 0, 0, 0));
         assertExecute("try_cast(bound_string as bigint)", BIGINT, null);
         assertExecute("try_cast(cast(null as varchar) as bigint)", BIGINT, null);
         assertExecute("try_cast(bound_long / 13  as bigint)", BIGINT, 94L);
@@ -1495,19 +1495,19 @@ public class TestExpressionCompiler
     {
         for (DateTime left : dateTimeValues) {
             for (Field field : Field.values()) {
+                if (field == TIMEZONE_MINUTE || field == TIMEZONE_HOUR) {
+                    continue;
+                }
                 Long expected = null;
                 Long millis = null;
                 if (left != null) {
                     millis = left.getMillis();
                     expected = callExtractFunction(TEST_SESSION.toConnectorSession(), millis, field);
                 }
-                DateTimeZone zone = getDateTimeZone(TEST_SESSION.getTimeZoneKey());
-                long zoneOffsetMinutes = millis != null ? MILLISECONDS.toMinutes(zone.getOffset(millis)) : 0;
                 String expressionPattern = format(
-                        "extract(%s from from_unixtime(%%s / 1000.0E0, %s, %s))",
+                        "extract(%s from from_unixtime(cast(%s as double) / 1000))",
                         field,
-                        zoneOffsetMinutes / 60,
-                        zoneOffsetMinutes % 60);
+                        millis);
                 assertExecute(generateExpression(expressionPattern, millis), BIGINT, expected);
             }
         }
@@ -1520,25 +1520,25 @@ public class TestExpressionCompiler
     {
         switch (field) {
             case YEAR:
-                return DateTimeFunctions.yearFromTimestamp(session, value);
+                return DateTimeFunctions.yearFromTimestamp(value);
             case QUARTER:
-                return DateTimeFunctions.quarterFromTimestamp(session, value);
+                return DateTimeFunctions.quarterFromTimestamp(value);
             case MONTH:
-                return DateTimeFunctions.monthFromTimestamp(session, value);
+                return DateTimeFunctions.monthFromTimestamp(value);
             case WEEK:
-                return DateTimeFunctions.weekFromTimestamp(session, value);
+                return DateTimeFunctions.weekFromTimestamp(value);
             case DAY:
             case DAY_OF_MONTH:
-                return DateTimeFunctions.dayFromTimestamp(session, value);
+                return DateTimeFunctions.dayFromTimestamp(value);
             case DAY_OF_WEEK:
             case DOW:
-                return DateTimeFunctions.dayOfWeekFromTimestamp(session, value);
+                return DateTimeFunctions.dayOfWeekFromTimestamp(value);
             case YEAR_OF_WEEK:
             case YOW:
-                return DateTimeFunctions.yearOfWeekFromTimestamp(session, value);
+                return DateTimeFunctions.yearOfWeekFromTimestamp(value);
             case DAY_OF_YEAR:
             case DOY:
-                return DateTimeFunctions.dayOfYearFromTimestamp(session, value);
+                return DateTimeFunctions.dayOfYearFromTimestamp(value);
             case HOUR:
                 return DateTimeFunctions.hourFromTimestamp(session, value);
             case MINUTE:

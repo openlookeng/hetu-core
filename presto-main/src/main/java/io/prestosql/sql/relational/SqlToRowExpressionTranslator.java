@@ -17,7 +17,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import io.prestosql.Session;
-import io.prestosql.SystemSessionProperties;
 import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.operator.scalar.TryFunction;
 import io.prestosql.spi.function.FunctionKind;
@@ -33,7 +32,6 @@ import io.prestosql.spi.type.DecimalParseResult;
 import io.prestosql.spi.type.Decimals;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.RowType.Field;
-import io.prestosql.spi.type.TimeZoneKey;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.UnknownType;
@@ -174,8 +172,6 @@ public final class SqlToRowExpressionTranslator
                 types,
                 layout,
                 functionAndTypeManager,
-                session.getTimeZoneKey(),
-                SystemSessionProperties.isLegacyTimestamp(session),
                 transactionId);
         RowExpression result = visitor.process(expression, null);
 
@@ -196,8 +192,6 @@ public final class SqlToRowExpressionTranslator
         private final Map<NodeRef<Expression>, Type> types;
         private final Map<Symbol, Integer> layout;
         private final FunctionAndTypeManager functionAndTypeManager;
-        private final TimeZoneKey timeZoneKey;
-        private final boolean isLegacyTimestamp;
         private final Optional<TransactionId> transactionId;
         private final FunctionResolution functionResolution;
 
@@ -206,16 +200,12 @@ public final class SqlToRowExpressionTranslator
                 Map<NodeRef<Expression>, Type> types,
                 Map<Symbol, Integer> layout,
                 FunctionAndTypeManager functionAndTypeManager,
-                TimeZoneKey timeZoneKey,
-                boolean isLegacyTimestamp,
                 Optional<TransactionId> transactionId)
         {
             this.functionKind = functionKind;
             this.types = ImmutableMap.copyOf(requireNonNull(types, "types is null"));
             this.functionAndTypeManager = functionAndTypeManager;
             this.layout = layout;
-            this.timeZoneKey = timeZoneKey;
-            this.isLegacyTimestamp = isLegacyTimestamp;
             this.transactionId = transactionId;
             this.functionResolution = new FunctionResolution(functionAndTypeManager);
         }
@@ -345,13 +335,7 @@ public final class SqlToRowExpressionTranslator
                 value = parseTimeWithTimeZone(node.getValue());
             }
             else {
-                if (isLegacyTimestamp) {
-                    // parse in time zone of client
-                    value = parseTimeWithoutTimeZone(timeZoneKey, node.getValue());
-                }
-                else {
-                    value = parseTimeWithoutTimeZone(node.getValue());
-                }
+                value = parseTimeWithoutTimeZone(node.getValue());
             }
             return constant(value, getType(node));
         }
@@ -359,13 +343,7 @@ public final class SqlToRowExpressionTranslator
         @Override
         protected RowExpression visitTimestampLiteral(TimestampLiteral node, Void context)
         {
-            long value;
-            if (isLegacyTimestamp) {
-                value = parseTimestampLiteral(timeZoneKey, node.getValue());
-            }
-            else {
-                value = parseTimestampLiteral(node.getValue());
-            }
+            long value = parseTimestampLiteral(node.getValue());
             return constant(value, getType(node));
         }
 

@@ -135,6 +135,7 @@ public class OrcPageSourceFactory
     private final FileFormatDataSourceStats stats;
     private final OrcCacheStore orcCacheStore;
     private final int domainCompactionThreshold;
+    private final DateTimeZone legacyTimeZone;
 
     @Inject
     public OrcPageSourceFactory(TypeManager typeManager, HiveConfig config, HdfsEnvironment hdfsEnvironment, FileFormatDataSourceStats stats, OrcCacheStore orcCacheStore)
@@ -146,6 +147,7 @@ public class OrcPageSourceFactory
         this.stats = requireNonNull(stats, "stats is null");
         this.orcCacheStore = orcCacheStore;
         this.domainCompactionThreshold = config.getDomainCompactionThreshold();
+        this.legacyTimeZone = requireNonNull(config, "hiveConfig is null").getOrcLegacyDateTimeZone();
     }
 
     @Override
@@ -159,7 +161,6 @@ public class OrcPageSourceFactory
             Properties schema,
             List<HiveColumnHandle> columns,
             TupleDomain<HiveColumnHandle> effectivePredicate,
-            DateTimeZone hiveStorageTimeZone,
             Optional<DynamicFilterSupplier> dynamicFilters,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
@@ -194,7 +195,7 @@ public class OrcPageSourceFactory
                 useOrcColumnNames,
                 isFullAcidTable(Maps.fromProperties(schema)),
                 effectivePredicate,
-                hiveStorageTimeZone,
+                legacyTimeZone,
                 typeManager,
                 getOrcMaxMergeDistance(session),
                 getOrcMaxBufferSize(session),
@@ -228,7 +229,7 @@ public class OrcPageSourceFactory
             boolean useOrcColumnNames,
             boolean isFullAcid,
             TupleDomain<HiveColumnHandle> effectivePredicate,
-            DateTimeZone hiveStorageTimeZone,
+            DateTimeZone legacyFileTimeZone,
             TypeManager typeManager,
             DataSize maxMergeDistance,
             DataSize maxBufferSize,
@@ -394,7 +395,7 @@ public class OrcPageSourceFactory
                     predicateBuilder.build(),
                     start,
                     length,
-                    hiveStorageTimeZone,
+                    legacyFileTimeZone,
                     systemMemoryUsage,
                     INITIAL_BATCH_SIZE,
                     exception -> handleException(orcDataSource.getId(), exception),

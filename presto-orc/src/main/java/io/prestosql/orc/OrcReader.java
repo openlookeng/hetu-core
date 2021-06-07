@@ -52,6 +52,7 @@ import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggre
 import static io.prestosql.orc.metadata.OrcColumnId.ROOT_COLUMN;
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
+import static org.joda.time.DateTimeZone.UTC;
 
 public class OrcReader
 {
@@ -158,7 +159,7 @@ public class OrcReader
             List<OrcColumn> readColumns,
             List<Type> readTypes,
             OrcPredicate predicate,
-            DateTimeZone hiveStorageTimeZone,
+            DateTimeZone legacyFileTimeZone,
             AggregatedMemoryContext systemMemoryUsage,
             int initialBatchSize,
             Function<Exception, RuntimeException> exceptionTransform)
@@ -170,7 +171,7 @@ public class OrcReader
                 predicate,
                 0,
                 orcDataSource.getSize(),
-                hiveStorageTimeZone,
+                legacyFileTimeZone,
                 systemMemoryUsage,
                 initialBatchSize,
                 exceptionTransform,
@@ -188,7 +189,7 @@ public class OrcReader
             OrcPredicate predicate,
             long offset,
             long length,
-            DateTimeZone hiveStorageTimeZone,
+            DateTimeZone legacyFileTimeZone,
             AggregatedMemoryContext systemMemoryUsage,
             int initialBatchSize,
             Function<Exception, RuntimeException> exceptionTransform)
@@ -208,7 +209,7 @@ public class OrcReader
                 footer.getTypes(),
                 decompressor,
                 footer.getRowsInRowGroup(),
-                requireNonNull(hiveStorageTimeZone, "hiveStorageTimeZone is null"),
+                requireNonNull(legacyFileTimeZone, "hiveStorageTimeZone is null"),
                 hiveWriterVersion,
                 metadataReader,
                 maxMergeDistance,
@@ -231,7 +232,7 @@ public class OrcReader
             List<OrcColumn> readColumns,
             List<Type> readTypes,
             OrcPredicate predicate,
-            DateTimeZone hiveStorageTimeZone,
+            DateTimeZone legacyFileTimeZone,
             AggregatedMemoryContext systemMemoryUsage,
             int initialBatchSize,
             Function<Exception, RuntimeException> exceptionTransform,
@@ -245,7 +246,7 @@ public class OrcReader
                 predicate,
                 0,
                 orcDataSource.getSize(),
-                hiveStorageTimeZone,
+                legacyFileTimeZone,
                 systemMemoryUsage,
                 initialBatchSize,
                 exceptionTransform,
@@ -319,7 +320,7 @@ public class OrcReader
             OrcPredicate predicate,
             long offset,
             long length,
-            DateTimeZone hiveStorageTimeZone,
+            DateTimeZone legacyFileTimeZone,
             AggregatedMemoryContext systemMemoryUsage,
             int initialBatchSize,
             Function<Exception, RuntimeException> exceptionTransform,
@@ -353,7 +354,7 @@ public class OrcReader
                 footer.getTypes(),
                 decompressor,
                 footer.getRowsInRowGroup(),
-                requireNonNull(hiveStorageTimeZone, "hiveStorageTimeZone is null"),
+                requireNonNull(legacyFileTimeZone, "legacyFileTimeZone is null"),
                 hiveWriterVersion,
                 metadataReader,
                 maxMergeDistance,
@@ -423,8 +424,7 @@ public class OrcReader
     static void validateFile(
             OrcWriteValidation writeValidation,
             OrcDataSource input,
-            List<Type> readTypes,
-            DateTimeZone hiveStorageTimeZone)
+            List<Type> readTypes)
             throws OrcCorruptionException
     {
         try {
@@ -433,7 +433,7 @@ public class OrcReader
                     orcReader.getRootColumn().getNestedColumns(),
                     readTypes,
                     OrcPredicate.TRUE,
-                    hiveStorageTimeZone,
+                    UTC,
                     newSimpleAggregatedMemoryContext(),
                     INITIAL_BATCH_SIZE,
                     exception -> {

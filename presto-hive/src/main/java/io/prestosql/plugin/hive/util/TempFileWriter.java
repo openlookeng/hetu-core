@@ -34,7 +34,6 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.orc.metadata.CompressionKind.LZ4;
-import static org.joda.time.DateTimeZone.UTC;
 
 public class TempFileWriter
         implements Closeable
@@ -90,7 +89,6 @@ public class TempFileWriter
                         .withDictionaryMaxMemory(new DataSize(1, MEGABYTE)),
                 false,
                 ImmutableMap.of(),
-                UTC,
                 false,
                 OrcWriteValidationMode.BOTH,
                 new OrcWriterStats(), Optional.empty(), Optional.empty());

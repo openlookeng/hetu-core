@@ -522,7 +522,7 @@ public class TestGreenPlumTypeMapping
     }
 
     @Test(dataProvider = "testTimestampDataProvider")
-    public void testTimestamp(boolean legacyTimestamp, boolean insertWithPresto)
+    public void testTimestamp(boolean insertWithPresto)
     {
         // using two non-JVM zones so that we don't need to worry what Postgres system zone is
         for (ZoneId sessionZone : ImmutableList.of(ZoneOffset.UTC, jvmZone, vilnius, kathmandu, ZoneId.of(TestingSession.DEFAULT_TIME_ZONE_KEY.getId()))) {
@@ -534,17 +534,16 @@ public class TestGreenPlumTypeMapping
 
             if (!insertWithPresto) {
                 // when writing, Postgres JDBC driver converts LocalDateTime to string representing date-time in JVM zone
-                addTimestampTestIfSupported(tests, legacyTimestamp, sessionZone, epoch); // epoch also is a gap in JVM zone
-                addTimestampTestIfSupported(tests, legacyTimestamp, sessionZone, timeGapInJvmZone1);
-                addTimestampTestIfSupported(tests, legacyTimestamp, sessionZone, timeGapInJvmZone2);
+                addTimestampTestIfSupported(tests, epoch); // epoch also is a gap in JVM zone
+                addTimestampTestIfSupported(tests, timeGapInJvmZone1);
+                addTimestampTestIfSupported(tests, timeGapInJvmZone2);
             }
 
-            addTimestampTestIfSupported(tests, legacyTimestamp, sessionZone, timeGapInVilnius);
-            addTimestampTestIfSupported(tests, legacyTimestamp, sessionZone, timeGapInKathmandu);
+            addTimestampTestIfSupported(tests, timeGapInVilnius);
+            addTimestampTestIfSupported(tests, timeGapInKathmandu);
 
             Session session = Session.builder(getQueryRunner().getDefaultSession())
                     .setTimeZoneKey(TimeZoneKey.getTimeZoneKey(sessionZone.getId()))
-                    .setSystemProperty("legacy_timestamp", Boolean.toString(legacyTimestamp))
                     .build();
 
             if (insertWithPresto) {
@@ -556,13 +555,8 @@ public class TestGreenPlumTypeMapping
         }
     }
 
-    private void addTimestampTestIfSupported(DataTypeTest tests, boolean legacyTimestamp, ZoneId sessionZone, LocalDateTime dateTime)
+    private void addTimestampTestIfSupported(DataTypeTest tests, LocalDateTime dateTime)
     {
-        if (legacyTimestamp && isGap(sessionZone, dateTime)) {
-            // in legacy timestamp semantics we cannot represent this dateTime
-            return;
-        }
-
         tests.addRoundTrip(timestampDataType(), dateTime);
     }
 
@@ -570,10 +564,8 @@ public class TestGreenPlumTypeMapping
     public Object[][] testTimestampDataProvider()
     {
         return new Object[][] {
-                {true, true},
-                {false, true},
-                {true, false},
-                {false, false},
+                {true},
+                {false},
         };
     }
 

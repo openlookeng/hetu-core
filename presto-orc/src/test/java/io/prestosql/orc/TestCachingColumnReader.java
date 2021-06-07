@@ -180,11 +180,10 @@ public class TestCachingColumnReader
         InputStreamSources inputStreamSources = mock(InputStreamSources.class);
         Stripe stripe = mock(Stripe.class);
         ZoneId fileTimeZone = stripe.getFileTimeZone();
-        ZoneId storageTimeZone = stripe.getStorageTimeZone();
         ColumnMetadata<ColumnEncoding> columnEncodings = stripe.getColumnEncodings();
 
-        cachingColumnReader.startStripe(fileTimeZone, storageTimeZone, inputStreamSources, columnEncodings);
-        verify(streamReader, atLeastOnce()).startStripe(eq(fileTimeZone), eq(storageTimeZone), eq(inputStreamSources),
+        cachingColumnReader.startStripe(fileTimeZone, inputStreamSources, columnEncodings);
+        verify(streamReader, atLeastOnce()).startStripe(eq(fileTimeZone), eq(inputStreamSources),
                 eq(columnEncodings));
     }
 

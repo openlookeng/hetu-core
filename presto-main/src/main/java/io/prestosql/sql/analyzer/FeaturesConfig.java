@@ -57,7 +57,9 @@ import static java.util.concurrent.TimeUnit.MINUTES;
         "analyzer.experimental-syntax-enabled",
         "optimizer.processing-optimization",
         "deprecated.legacy-order-by",
-        "deprecated.legacy-join-using"})
+        "deprecated.legacy-join-using",
+        "deprecated.legacy-timestamp",
+})
 public class FeaturesConfig
 {
     @VisibleForTesting
@@ -92,7 +94,6 @@ public class FeaturesConfig
     private boolean pushLimitThroughSemiJoin = true;
     private boolean pushLimitThroughOuterJoin = true;
     private boolean exchangeCompressionEnabled;
-    private boolean legacyTimestamp = true;
     private boolean legacyMapSubscript;
     private boolean optimizeMixedDistinctAggregations;
     private boolean unwrapCasts = true;
@@ -253,18 +254,6 @@ public class FeaturesConfig
     {
         this.distributedIndexJoinsEnabled = distributedIndexJoinsEnabled;
         return this;
-    }
-
-    @Config("deprecated.legacy-timestamp")
-    public FeaturesConfig setLegacyTimestamp(boolean value)
-    {
-        this.legacyTimestamp = value;
-        return this;
-    }
-
-    public boolean isLegacyTimestamp()
-    {
-        return legacyTimestamp;
     }
 
     @Config("deprecated.legacy-map-subscript")

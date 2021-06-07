@@ -510,7 +510,7 @@ class HiveSplitSource
                         nullableValue = NullableValue.asNull(columnMetadata.getType());
                     }
                     else {
-                        nullableValue = HiveUtil.parsePartitionValue(columnMetadata.getName(), partitionStringValue, columnMetadata.getType(), hiveConfig.getDateTimeZone());
+                        nullableValue = HiveUtil.parsePartitionValue(columnMetadata.getName(), partitionStringValue, columnMetadata.getType());
                     }
                     return domain.includesNullableValue(nullableValue.getValue());
                 });

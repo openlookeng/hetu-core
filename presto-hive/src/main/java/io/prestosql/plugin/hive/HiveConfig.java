@@ -57,12 +57,11 @@ import static java.util.concurrent.TimeUnit.MINUTES;
         "hive.optimized-reader.enabled",
         "hive.orc.optimized-writer.enabled",
         "hive.rcfile-optimized-writer.enabled",
+        "hive.time-zone",
 })
 public class HiveConfig
 {
     private static final Splitter SPLITTER = Splitter.on(',').trimResults().omitEmptyStrings();
-
-    private String timeZone = TimeZone.getDefault().getID();
 
     private DataSize maxSplitSize = new DataSize(64, MEGABYTE);
     private int maxPartitionsPerScan = 100_000;
@@ -115,6 +114,9 @@ public class HiveConfig
 
     private DataSize textMaxLineLength = new DataSize(100, MEGABYTE);
 
+    private String orcLegacyTimeZone = TimeZone.getDefault().getID();
+
+    private String parquetTimeZone = TimeZone.getDefault().getID();
     private boolean useParquetColumnNames;
     private boolean failOnCorruptedParquetStatistics = true;
     private DataSize parquetMaxReadBlockSize = new DataSize(16, MEGABYTE);
@@ -150,6 +152,7 @@ public class HiveConfig
     private Duration orcRowDataCacheTtl = new Duration(4, HOURS);
     private DataSize orcRowDataCacheMaximumWeight = new DataSize(20, GIGABYTE);
 
+    private String rcfileTimeZone = TimeZone.getDefault().getID();
     private boolean rcfileWriterValidate;
 
     private HiveMetastoreAuthenticationType hiveMetastoreAuthenticationType = HiveMetastoreAuthenticationType.NONE;
@@ -332,24 +335,6 @@ public class HiveConfig
     public boolean getRecursiveDirWalkerEnabled()
     {
         return recursiveDirWalkerEnabled;
-    }
-
-    public DateTimeZone getDateTimeZone()
-    {
-        return DateTimeZone.forTimeZone(TimeZone.getTimeZone(timeZone));
-    }
-
-    @NotNull
-    public String getTimeZone()
-    {
-        return timeZone;
-    }
-
-    @Config("hive.time-zone")
-    public HiveConfig setTimeZone(String id)
-    {
-        this.timeZone = (id != null) ? id : TimeZone.getDefault().getID();
-        return this;
     }
 
     @NotNull
@@ -947,6 +932,25 @@ public class HiveConfig
         return this;
     }
 
+    public DateTimeZone getRcfileDateTimeZone()
+    {
+        return DateTimeZone.forTimeZone(TimeZone.getTimeZone(rcfileTimeZone));
+    }
+
+    @NotNull
+    public String getRcfileTimeZone()
+    {
+        return rcfileTimeZone;
+    }
+
+    @Config("hive.rcfile.time-zone")
+    @ConfigDescription("Time zone for RCFile binary read and write")
+    public HiveConfig setRcfileTimeZone(String rcfileTimeZone)
+    {
+        this.rcfileTimeZone = rcfileTimeZone;
+        return this;
+    }
+
     public boolean isRcfileWriterValidate()
     {
         return rcfileWriterValidate;
@@ -985,6 +989,44 @@ public class HiveConfig
     public HiveConfig setTextMaxLineLength(DataSize textMaxLineLength)
     {
         this.textMaxLineLength = textMaxLineLength;
+        return this;
+    }
+
+    public DateTimeZone getOrcLegacyDateTimeZone()
+    {
+        return DateTimeZone.forTimeZone(TimeZone.getTimeZone(orcLegacyTimeZone));
+    }
+
+    @NotNull
+    public String getOrcLegacyTimeZone()
+    {
+        return orcLegacyTimeZone;
+    }
+
+    @Config("hive.orc.time-zone")
+    @ConfigDescription("Time zone for legacy ORC files that do not contain a time zone")
+    public HiveConfig setOrcLegacyTimeZone(String orcLegacyTimeZone)
+    {
+        this.orcLegacyTimeZone = orcLegacyTimeZone;
+        return this;
+    }
+
+    public DateTimeZone getParquetDateTimeZone()
+    {
+        return DateTimeZone.forTimeZone(TimeZone.getTimeZone(parquetTimeZone));
+    }
+
+    @NotNull
+    public String getParquetTimeZone()
+    {
+        return parquetTimeZone;
+    }
+
+    @Config("hive.parquet.time-zone")
+    @ConfigDescription("Time zone for Parquet read and write")
+    public HiveConfig setParquetTimeZone(String parquetTimeZone)
+    {
+        this.parquetTimeZone = parquetTimeZone;
         return this;
     }
 

@@ -16,20 +16,66 @@ package io.prestosql.operator.scalar;
 
 import io.prestosql.Session;
 import io.prestosql.spi.type.TimeType;
+import io.prestosql.spi.type.TimeZoneKey;
 import io.prestosql.spi.type.TimestampType;
+import io.prestosql.testing.TestingSession;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.testng.annotations.Test;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalTime;
+import java.time.OffsetTime;
+import java.time.ZoneOffset;
+
 import static io.prestosql.spi.type.TimeWithTimeZoneType.TIME_WITH_TIME_ZONE;
+import static io.prestosql.spi.type.TimeZoneKey.UTC_KEY;
+import static io.prestosql.spi.type.TimeZoneKey.getTimeZoneKey;
 import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
+import static io.prestosql.spi.util.DateTimeZoneIndex.getDateTimeZone;
+import static io.prestosql.testing.TestingSession.testSessionBuilder;
 
 public class TestDateTimeFunctions
-        extends TestDateTimeFunctionsBase
+        extends AbstractTestFunctions
 {
+    protected static final TimeZoneKey TIME_ZONE_KEY = TestingSession.DEFAULT_TIME_ZONE_KEY;
+    protected static final DateTimeZone DATE_TIME_ZONE = getDateTimeZone(TIME_ZONE_KEY);
+    protected static final DateTimeZone UTC_TIME_ZONE = getDateTimeZone(UTC_KEY);
+    protected static final DateTimeZone DATE_TIME_ZONE_NUMERICAL = getDateTimeZone(getTimeZoneKey("-11:00"));
+    protected static final TimeZoneKey KATHMANDU_ZONE_KEY = getTimeZoneKey("Asia/Kathmandu");
+    protected static final DateTimeZone KATHMANDU_ZONE = getDateTimeZone(KATHMANDU_ZONE_KEY);
+    protected static final ZoneOffset WEIRD_ZONE = ZoneOffset.ofHoursMinutes(7, 9);
+    protected static final DateTimeZone WEIRD_DATE_TIME_ZONE = DateTimeZone.forID(WEIRD_ZONE.getId());
+
+    protected static final DateTime DATE = new DateTime(2001, 8, 22, 0, 0, 0, 0, DateTimeZone.UTC);
+    protected static final String DATE_LITERAL = "DATE '2001-08-22'";
+    protected static final String DATE_ISO8601_STRING = "2001-08-22";
+
+    protected static final LocalTime TIME = LocalTime.of(3, 4, 5, 321_000_000);
+    protected static final String TIME_LITERAL = "TIME '03:04:05.321'";
+    protected static final OffsetTime WEIRD_TIME = OffsetTime.of(3, 4, 5, 321_000_000, WEIRD_ZONE);
+    protected static final String WEIRD_TIME_LITERAL = "TIME '03:04:05.321 +07:09'";
+
+    protected static final DateTime TIMESTAMP = new DateTime(2001, 8, 22, 3, 4, 5, 321, UTC_TIME_ZONE); // This is TIMESTAMP w/o TZ
+    protected static final DateTime TIMESTAMP_WITH_NUMERICAL_ZONE = new DateTime(2001, 8, 22, 3, 4, 5, 321, DATE_TIME_ZONE_NUMERICAL);
+    protected static final String TIMESTAMP_LITERAL = "TIMESTAMP '2001-08-22 03:04:05.321'";
+    protected static final String TIMESTAMP_ISO8601_STRING = "2001-08-22T03:04:05.321-11:00";
+    protected static final String TIMESTAMP_ISO8601_STRING_NO_TIME_ZONE = "2001-08-22T03:04:05.321";
+    protected static final DateTime WEIRD_TIMESTAMP = new DateTime(2001, 8, 22, 3, 4, 5, 321, WEIRD_DATE_TIME_ZONE);
+    protected static final String WEIRD_TIMESTAMP_LITERAL = "TIMESTAMP '2001-08-22 03:04:05.321 +07:09'";
+    protected static final String WEIRD_TIMESTAMP_ISO8601_STRING = "2001-08-22T03:04:05.321+07:09";
+
+    protected static final String INTERVAL_LITERAL = "INTERVAL '90061.234' SECOND";
+    protected static final Duration DAY_TO_SECOND_INTERVAL = Duration.ofMillis(90061234);
+
     public TestDateTimeFunctions()
     {
-        super(false);
+        super(testSessionBuilder()
+                .setTimeZoneKey(TIME_ZONE_KEY)
+                .setStartTime(Instant.ofEpochMilli(new DateTime(2017, 4, 1, 12, 34, 56, 789, UTC_TIME_ZONE).getMillis()).getEpochSecond())
+                .build());
     }
 
     @Test
@@ -67,7 +113,7 @@ public class TestDateTimeFunctions
                 .setStartTime(new DateTime(2017, 3, 1, 15, 45, 0, 0, KATHMANDU_ZONE).getMillis())
                 .build();
         try (FunctionAssertions localAssertion = new FunctionAssertions(localSession)) {
-            localAssertion.assertFunctionString("CURRENT_TIME", TIME_WITH_TIME_ZONE, "15:45:00.000 Asia/Kathmandu");
+            localAssertion.assertFunctionString("CURRENT_TIME", TIME_WITH_TIME_ZONE, "15:30:00.000 Asia/Kathmandu");
         }
     }
 

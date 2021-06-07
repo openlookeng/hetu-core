@@ -39,16 +39,15 @@ import static io.prestosql.testing.DateTimeTestingUtils.sqlTimestampOf;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static io.prestosql.type.IntervalDayTimeType.INTERVAL_DAY_TIME;
 
-public abstract class TestTimeBase
+public class TestTimeBase
         extends AbstractTestFunctions
 {
     protected static final TimeZoneKey TIME_ZONE_KEY = TestingSession.DEFAULT_TIME_ZONE_KEY;
     protected static final DateTimeZone DATE_TIME_ZONE = getDateTimeZone(TIME_ZONE_KEY);
 
-    public TestTimeBase(boolean legacyTimestamp)
+    public TestTimeBase()
     {
         super(testSessionBuilder()
-                .setSystemProperty("legacy_timestamp", String.valueOf(legacyTimestamp))
                 .setTimeZoneKey(TIME_ZONE_KEY)
                 .build());
     }
@@ -56,9 +55,9 @@ public abstract class TestTimeBase
     @Test
     public void testLiteral()
     {
-        assertFunction("TIME '03:04:05.321'", TIME, sqlTimeOf(3, 4, 5, 321, session));
-        assertFunction("TIME '03:04:05'", TIME, sqlTimeOf(3, 4, 5, 0, session));
-        assertFunction("TIME '03:04'", TIME, sqlTimeOf(3, 4, 0, 0, session));
+        assertFunction("TIME '03:04:05.321'", TIME, sqlTimeOf(3, 4, 5, 321));
+        assertFunction("TIME '03:04:05'", TIME, sqlTimeOf(3, 4, 5, 0));
+        assertFunction("TIME '03:04'", TIME, sqlTimeOf(3, 4, 0, 0));
         assertInvalidFunction("TIME 'text'", SemanticErrorCode.INVALID_LITERAL, "line 1:1: 'text' is not a valid time literal");
     }
 
@@ -178,7 +177,7 @@ public abstract class TestTimeBase
     {
         assertFunction("cast(TIME '03:04:05.321' as timestamp)",
                 TIMESTAMP,
-                sqlTimestampOf(1970, 1, 1, 3, 4, 5, 321, session));
+                sqlTimestampOf(1970, 1, 1, 3, 4, 5, 321));
     }
 
     @Test

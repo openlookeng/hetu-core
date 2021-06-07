@@ -60,6 +60,7 @@ import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.DefaultCodec;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hive.common.util.ReflectionUtil;
+import org.joda.time.DateTimeZone;
 
 import java.io.IOException;
 import java.security.Principal;
@@ -141,6 +142,7 @@ public class HiveWriterFactory
     private final int maxOpenSortFiles;
     private final boolean immutablePartitions;
     private final InsertExistingPartitionsBehavior insertExistingPartitionsBehavior;
+    private final DateTimeZone parquetTimeZone;
 
     private final ConnectorSession session;
     private final OptionalInt bucketCount;
@@ -182,6 +184,7 @@ public class HiveWriterFactory
             DataSize sortBufferSize,
             int maxOpenSortFiles,
             boolean immutablePartitions,
+            DateTimeZone parquetTimeZone,
             ConnectorSession session,
             NodeManager nodeManager,
             EventClient eventClient,
@@ -231,6 +234,7 @@ public class HiveWriterFactory
         if (immutablePartitions) {
             checkArgument(insertExistingPartitionsBehavior != InsertExistingPartitionsBehavior.APPEND, "insertExistingPartitionsBehavior cannot be APPEND");
         }
+        this.parquetTimeZone = requireNonNull(parquetTimeZone, "parquetTimeZone is null");
 
         this.acidWriteType = acidWriteType;
         // divide input columns into partition and data columns
@@ -654,6 +658,7 @@ public class HiveWriterFactory
                         partitionStorageFormat.getEstimatedWriterSystemMemoryUsage(),
                         conf,
                         typeManager,
+                        parquetTimeZone,
                         session);
             }
             if (isTxnTable) {

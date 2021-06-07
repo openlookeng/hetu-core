@@ -20,7 +20,6 @@ import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.type.SqlDate;
 import io.prestosql.spi.type.SqlTimestamp;
 import io.prestosql.spi.type.SqlVarbinary;
-import io.prestosql.spi.type.TimeZoneKey;
 import io.prestosql.spi.type.Type;
 import org.testng.annotations.Test;
 
@@ -57,8 +56,6 @@ import static org.testng.Assert.assertNull;
 
 public class TestReadBloomFilter
 {
-    private static final TimeZoneKey TIME_ZONE = TimeZoneKey.getTimeZoneKey(HIVE_STORAGE_TIME_ZONE.getID());
-
     @Test
     public void test()
             throws Exception
@@ -70,9 +67,9 @@ public class TestReadBloomFilter
 
         testType(DATE, ImmutableList.of(new SqlDate(1), new SqlDate(5_000), new SqlDate(10_000)), 5_000L, 7_777L);
         testType(TIMESTAMP,
-                ImmutableList.of(new SqlTimestamp(1, TIME_ZONE), new SqlTimestamp(500_000L, TIME_ZONE), new SqlTimestamp(1_000_000L, TIME_ZONE)),
-                500_000L + HIVE_STORAGE_TIME_ZONE.getOffset(500_000L),
-                777_777L + HIVE_STORAGE_TIME_ZONE.getOffset(777_777L));
+                ImmutableList.of(new SqlTimestamp(1), new SqlTimestamp(500_000L), new SqlTimestamp(1_000_000L)),
+                500_000L,
+                777_777L);
 
         testType(REAL, ImmutableList.of(1.11f, 500_000.56f, 1_000_000.99f), (long) floatToIntBits(500_000.56f), (long) floatToIntBits(777_777.77f));
         testType(DOUBLE, ImmutableList.of(1.11, 500_000.55, 1_000_000.99), 500_000.55, 777_777.77);

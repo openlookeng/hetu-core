@@ -51,7 +51,7 @@ public class TestParquetPageSourceFactory
     {
         HiveHdfsConfiguration hiveHdfsConfiguration = new HiveHdfsConfiguration(new HdfsConfigurationInitializer(new HiveConfig(), ImmutableSet.of()), ImmutableSet.of());
         HdfsEnvironment hdfsEnvironment = new HdfsEnvironment(hiveHdfsConfiguration, new HiveConfig(), new NoHdfsAuthentication());
-        parquetPageSourceFactory = new ParquetPageSourceFactory(new TestingTypeManager(), hdfsEnvironment, new FileFormatDataSourceStats());
+        parquetPageSourceFactory = new ParquetPageSourceFactory(new TestingTypeManager(), hdfsEnvironment, new FileFormatDataSourceStats(), new HiveConfig());
     }
 
     @AfterClass(alwaysRun = true)
@@ -68,7 +68,7 @@ public class TestParquetPageSourceFactory
         schema.setProperty(SERIALIZATION_LIB, "");
         schema.setProperty(FILE_INPUT_FORMAT, "");
         schema.setProperty(FILE_OUTPUT_FORMAT, "");
-        Optional<? extends ConnectorPageSource> optionalPageSource = parquetPageSourceFactory.createPageSource(new Configuration(), null, null, 0L, 0L, 0L, schema, null, null, null, Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), null, false, -1L);
+        Optional<? extends ConnectorPageSource> optionalPageSource = parquetPageSourceFactory.createPageSource(new Configuration(), null, null, 0L, 0L, 0L, schema, null, null, Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), null, false, -1L);
         assertFalse(optionalPageSource.isPresent());
     }
 
@@ -80,7 +80,7 @@ public class TestParquetPageSourceFactory
         schema.setProperty(SERIALIZATION_LIB, PARQUET.getSerDe());
         schema.setProperty(FILE_INPUT_FORMAT, HoodieParquetRealtimeInputFormat.class.getName());
         schema.setProperty(FILE_OUTPUT_FORMAT, "");
-        Optional<? extends ConnectorPageSource> optionalPageSource = parquetPageSourceFactory.createPageSource(new Configuration(), null, null, 0L, 0L, 0L, schema, null, null, null, Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), null, false, -1L);
+        Optional<? extends ConnectorPageSource> optionalPageSource = parquetPageSourceFactory.createPageSource(new Configuration(), null, null, 0L, 0L, 0L, schema, null, null, Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), null, false, -1L);
         assertTrue(shouldUseRecordReaderFromInputFormat(new Configuration(), schema));
         assertFalse(optionalPageSource.isPresent());
     }

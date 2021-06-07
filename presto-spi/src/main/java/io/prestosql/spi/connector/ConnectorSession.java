@@ -41,8 +41,6 @@ public interface ConnectorSession
 
     long getStartTime();
 
-    boolean isLegacyTimestamp();
-
     <T> T getProperty(String name, Class<T> type);
 
     //for cbg supporting the hive view we need the catalog

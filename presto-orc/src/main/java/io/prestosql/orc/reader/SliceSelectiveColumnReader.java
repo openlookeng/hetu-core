@@ -60,7 +60,7 @@ public class SliceSelectiveColumnReader
     }
 
     @Override
-    public void startStripe(ZoneId fileTimeZone, ZoneId storageTimeZone, InputStreamSources dictionaryStreamSources, ColumnMetadata<ColumnEncoding> encoding)
+    public void startStripe(ZoneId fileTimeZone, InputStreamSources dictionaryStreamSources, ColumnMetadata<ColumnEncoding> encoding)
             throws IOException
     {
         ColumnEncoding.ColumnEncodingKind columnEncodingKind = encoding.get(streamDescriptor.getColumnId()).getColumnEncodingKind();
@@ -74,7 +74,7 @@ public class SliceSelectiveColumnReader
             throw new IllegalArgumentException("Unsupported encoding " + columnEncodingKind);
         }
 
-        currentReader.startStripe(fileTimeZone, storageTimeZone, dictionaryStreamSources, encoding);
+        currentReader.startStripe(fileTimeZone, dictionaryStreamSources, encoding);
     }
 
     @Override
