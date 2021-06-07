@@ -1352,6 +1352,17 @@ public class TestExpressionDomainTranslator
                         between(C_VARCHAR, stringLiteral("App10"), stringLiteral("App15")),
                         between(C_VARCHAR, stringLiteral("App25"), stringLiteral("App35"))),
                 and(greaterThan(C_VARCHAR, stringLiteral("App02")), lessThan(C_VARCHAR, stringLiteral("App12"))));
+
+        mergeAndAssert(true,
+                ExpressionUtils.or(
+                        between(C_VARCHAR, stringLiteral("App01"), stringLiteral("App05")),
+                        equal(C_VARCHAR, stringLiteral("App06")),
+                        equal(C_VARCHAR, stringLiteral("App07")),
+                        equal(C_VARCHAR, nullLiteral()),
+                        and(greaterThan(C_VARCHAR, stringLiteral("App07")), lessThanOrEqual(C_VARCHAR, stringLiteral("App09"))),
+                        between(C_VARCHAR, stringLiteral("App10"), stringLiteral("App15")),
+                        between(C_VARCHAR, stringLiteral("App25"), stringLiteral("App35"))),
+                between(C_VARCHAR, stringLiteral("App02"), stringLiteral("App04")));
     }
 
     private void testDateType()
@@ -1407,6 +1418,17 @@ public class TestExpressionDomainTranslator
                         equal(C_DATE, date("2020-01-05")),
                         between(C_DATE, date("2020-01-06"), date("2020-01-07"))),
                 between(C_DATE, date("2020-01-02"), date("2020-01-10")));
+
+        mergeAndAssert(true,
+                ExpressionUtils.or(
+                        between(C_DATE, date("2020-01-01"), date("2020-01-05")),
+                        equal(C_DATE, date("2020-01-06")),
+                        equal(C_DATE, date("2020-01-07")),
+                        equal(C_DATE, nullLiteral()),
+                        and(greaterThan(C_DATE, date("2020-01-07")), lessThanOrEqual(C_DATE, date("2020-01-09"))),
+                        between(C_DATE, date("2020-01-10"), date("2020-01-15")),
+                        between(C_DATE, date("2020-01-25"), date("2020-01-29"))),
+                between(C_DATE, date("2020-01-02"), date("2020-01-12")));
     }
 
     private void testSmallIntType()
@@ -1462,6 +1484,17 @@ public class TestExpressionDomainTranslator
                         equal(C_SMALLINT, smallIntLiteral("5")),
                         between(C_SMALLINT, smallIntLiteral("6"), smallIntLiteral("7"))),
                 between(C_SMALLINT, smallIntLiteral("2"), smallIntLiteral("10")));
+
+        mergeAndAssert(true,
+                ExpressionUtils.or(
+                        between(C_SMALLINT, smallIntLiteral("1"), smallIntLiteral("5")),
+                        equal(C_SMALLINT, smallIntLiteral("6")),
+                        equal(C_SMALLINT, smallIntLiteral("7")),
+                        equal(C_SMALLINT, nullLiteral()),
+                        and(greaterThan(C_SMALLINT, smallIntLiteral("7")), lessThanOrEqual(C_SMALLINT, smallIntLiteral("9"))),
+                        between(C_SMALLINT, smallIntLiteral("10"), smallIntLiteral("15")),
+                        between(C_SMALLINT, smallIntLiteral("25"), smallIntLiteral("35"))),
+                between(C_SMALLINT, smallIntLiteral("2"), smallIntLiteral("12")));
     }
 
     private void testTinyIntType()
@@ -1517,6 +1550,17 @@ public class TestExpressionDomainTranslator
                         equal(C_TINYINT, tinyIntLiteral("5")),
                         between(C_TINYINT, tinyIntLiteral("6"), tinyIntLiteral("7"))),
                 between(C_TINYINT, tinyIntLiteral("2"), tinyIntLiteral("10")));
+
+        mergeAndAssert(true,
+                ExpressionUtils.or(
+                        between(C_TINYINT, tinyIntLiteral("1"), tinyIntLiteral("5")),
+                        equal(C_TINYINT, tinyIntLiteral("6")),
+                        equal(C_TINYINT, tinyIntLiteral("7")),
+                        equal(C_TINYINT, nullLiteral()),
+                        and(greaterThan(C_TINYINT, tinyIntLiteral("7")), lessThanOrEqual(C_TINYINT, tinyIntLiteral("9"))),
+                        between(C_TINYINT, tinyIntLiteral("10"), tinyIntLiteral("15")),
+                        between(C_TINYINT, tinyIntLiteral("25"), tinyIntLiteral("35"))),
+                between(C_TINYINT, tinyIntLiteral("2"), tinyIntLiteral("12")));
     }
 
     private void testIntegerType()
@@ -1572,6 +1616,17 @@ public class TestExpressionDomainTranslator
                         equal(C_INTEGER, intLiteral("5")),
                         between(C_INTEGER, intLiteral("6"), intLiteral("7"))),
                 between(C_INTEGER, intLiteral("2"), intLiteral("10")));
+
+        mergeAndAssert(true,
+                ExpressionUtils.or(
+                        between(C_INTEGER, intLiteral("1"), intLiteral("5")),
+                        equal(C_INTEGER, intLiteral("6")),
+                        equal(C_INTEGER, intLiteral("7")),
+                        equal(C_INTEGER, nullLiteral()),
+                        and(greaterThan(C_INTEGER, intLiteral("7")), lessThanOrEqual(C_INTEGER, intLiteral("9"))),
+                        between(C_INTEGER, intLiteral("10"), intLiteral("15")),
+                        between(C_INTEGER, intLiteral("25"), intLiteral("35"))),
+                between(C_INTEGER, intLiteral("2"), intLiteral("12")));
     }
 
     private void testBigIntType()
@@ -1627,6 +1682,17 @@ public class TestExpressionDomainTranslator
                         equal(C_BIGINT, bigintLiteral(5L)),
                         between(C_BIGINT, bigintLiteral(6L), bigintLiteral(7L))),
                 between(C_BIGINT, bigintLiteral(2L), bigintLiteral(10L)));
+
+        mergeAndAssert(true,
+                ExpressionUtils.or(
+                        between(C_BIGINT, bigintLiteral(1L), bigintLiteral(5L)),
+                        equal(C_BIGINT, bigintLiteral(6L)),
+                        equal(C_BIGINT, nullLiteral()),
+                        equal(C_BIGINT, bigintLiteral(7L)),
+                        and(greaterThan(C_BIGINT, bigintLiteral(7L)), lessThanOrEqual(C_BIGINT, bigintLiteral(9L))),
+                        between(C_BIGINT, bigintLiteral(10L), bigintLiteral(15L)),
+                        between(C_BIGINT, bigintLiteral(25L), bigintLiteral(35L))),
+                between(C_BIGINT, bigintLiteral(2L), bigintLiteral(12L)));
     }
 
     private Expression mergeAndAssert(boolean contains, Expression expression, Expression partExpression)
