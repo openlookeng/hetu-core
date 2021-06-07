@@ -61,7 +61,6 @@ import static io.prestosql.spi.type.SmallintType.SMALLINT;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.testing.DateTimeTestingUtils.sqlTimestampOf;
-import static io.prestosql.testing.TestingConnectorSession.SESSION;
 import static java.util.Collections.nCopies;
 import static java.util.stream.Collectors.toList;
 import static org.testng.Assert.assertEquals;
@@ -139,7 +138,7 @@ public class TestSelectiveOrcReader
                 .collect(toList());
 
         List<SqlTimestamp> timestamps = longValues.stream()
-                .map(timestamp -> sqlTimestampOf(timestamp & Integer.MAX_VALUE, SESSION))
+                .map(timestamp -> sqlTimestampOf(timestamp))
                 .collect(toList());
 
         tester.testRoundTrip(BIGINT, longValues, ImmutableList.of(ImmutableMap.of(0, filter)));

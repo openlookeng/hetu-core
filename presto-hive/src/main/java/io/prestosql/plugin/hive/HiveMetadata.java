@@ -104,7 +104,6 @@ import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.OpenCSVSerde;
 import org.apache.hadoop.mapred.JobConf;
-import org.joda.time.DateTimeZone;
 
 import java.io.File;
 import java.io.IOException;
@@ -141,7 +140,7 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Streams.stream;
-import static io.prestosql.plugin.hive.HiveBucketing.containsTimestampBucketedV2;
+import static io.prestosql.plugin.hive.HiveBucketing.bucketedOnTimestamp;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_FILESYSTEM_ERROR;
 import static io.prestosql.plugin.hive.HiveStorageFormat.ORC;
 import static io.prestosql.plugin.hive.HiveTableProperties.IS_EXTERNAL_TABLE;
@@ -218,11 +217,9 @@ public class HiveMetadata
     private static final String CSV_QUOTE_KEY = OpenCSVSerde.QUOTECHAR;
     private static final String CSV_ESCAPE_KEY = OpenCSVSerde.ESCAPECHAR;
 
-    private final boolean allowCorruptWritesForTesting;
     protected final SemiTransactionalHiveMetastore metastore;
     protected final HdfsEnvironment hdfsEnvironment;
     private final HivePartitionManager partitionManager;
-    private final DateTimeZone timeZone;
     protected final TypeManager typeManager;
     protected final LocationService locationService;
     private final JsonCodec<PartitionUpdate> partitionUpdateCodec;
@@ -247,8 +244,6 @@ public class HiveMetadata
             SemiTransactionalHiveMetastore metastore,
             HdfsEnvironment hdfsEnvironment,
             HivePartitionManager partitionManager,
-            DateTimeZone timeZone,
-            boolean allowCorruptWritesForTesting,
             boolean writesToNonManagedTablesEnabled,
             boolean createsOfNonManagedTablesEnabled,
             boolean tableCreatesWithLocationAllowed,
@@ -266,12 +261,9 @@ public class HiveMetadata
             Optional<Duration> vacuumCollectorInterval,
             ScheduledExecutorService hiveMetastoreClientService)
     {
-        this.allowCorruptWritesForTesting = allowCorruptWritesForTesting;
-
         this.metastore = requireNonNull(metastore, "metastore is null");
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.partitionManager = requireNonNull(partitionManager, "partitionManager is null");
-        this.timeZone = requireNonNull(timeZone, "timeZone is null");
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.locationService = requireNonNull(locationService, "locationService is null");
         this.partitionUpdateCodec = requireNonNull(partitionUpdateCodec, "partitionUpdateCodec is null");
@@ -1162,7 +1154,6 @@ public class HiveMetadata
     @Override
     public ConnectorTableHandle beginStatisticsCollection(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        verifyJvmTimeZone();
         SchemaTableName tableName = ((HiveTableHandle) tableHandle).getSchemaTableName();
         metastore.getTable(new HiveIdentity(session), tableName.getSchemaName(), tableName.getTableName())
                 .orElseThrow(() -> new TableNotFoundException(tableName));
@@ -1232,8 +1223,6 @@ public class HiveMetadata
     @Override
     public HiveOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout)
     {
-        verifyJvmTimeZone();
-
         if (getExternalLocation(tableMetadata.getProperties()) != null || isExternalTable(tableMetadata.getProperties())) {
             throw new PrestoException(NOT_SUPPORTED, "External tables cannot be created using CREATE TABLE AS");
         }
@@ -1534,8 +1523,6 @@ public class HiveMetadata
     private HiveInsertTableHandle beginInsertUpdateInternal(ConnectorSession session, ConnectorTableHandle tableHandle,
                                                             Optional<String> partition, HiveACIDWriteType writeType)
     {
-        verifyJvmTimeZone();
-
         HiveIdentity identity = new HiveIdentity(session);
         SchemaTableName tableName = ((HiveTableHandle) tableHandle).getSchemaTableName();
         Table table = metastore.getTable(identity, tableName.getSchemaName(), tableName.getTableName())
@@ -1855,7 +1842,6 @@ public class HiveMetadata
         long rowCount = basicStatistics.getRowCount().orElseThrow(() -> new IllegalArgumentException("rowCount not present"));
         Map<String, HiveColumnStatistics> columnStatistics = Statistics.fromComputedStatistics(
                 session,
-                timeZone,
                 computedColumnStatistics,
                 columnTypes,
                 rowCount);
@@ -2458,8 +2444,8 @@ public class HiveMetadata
     private Optional<ConnectorNewTableLayout> getInsertTableLayoutInternal(ConnectorSession session, Table table)
     {
         if (table.getStorage().getBucketProperty().isPresent()) {
-            if (containsTimestampBucketedV2(table.getStorage().getBucketProperty().get(), table)) {
-                throw new PrestoException(NOT_SUPPORTED, "Table bucketing version not supported for writing when bucketing on timestamp type");
+            if (bucketedOnTimestamp(table.getStorage().getBucketProperty().get(), table)) {
+                throw new PrestoException(NOT_SUPPORTED, "Writing to tables bucketed on timestamp not supported");
             }
         }
 
@@ -2663,15 +2649,6 @@ public class HiveMetadata
     public List<GrantInfo> listTablePrivileges(ConnectorSession session, SchemaTablePrefix schemaTablePrefix)
     {
         return accessControlMetadata.listTablePrivileges(session, listTables(session, schemaTablePrefix));
-    }
-
-    protected void verifyJvmTimeZone()
-    {
-        if (!allowCorruptWritesForTesting && !timeZone.equals(DateTimeZone.getDefault())) {
-            throw new PrestoException(HiveErrorCode.HIVE_TIMEZONE_MISMATCH, format(
-                    "To write Hive data, your JVM timezone must match the Hive storage timezone. Add -Duser.timezone=%s to your JVM arguments.",
-                    timeZone.getID()));
-        }
     }
 
     public static HiveStorageFormat extractHiveStorageFormat(Table table)

@@ -105,12 +105,6 @@ public class TestDataCenterMetadata
         }
 
         @Override
-        public boolean isLegacyTimestamp()
-        {
-            return false;
-        }
-
-        @Override
         public <T> T getProperty(String name, Class<T> type)
         {
             return null;

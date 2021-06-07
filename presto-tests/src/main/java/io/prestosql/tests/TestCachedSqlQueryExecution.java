@@ -76,14 +76,12 @@ public class TestCachedSqlQueryExecution
             .setSchema("tiny")
             .setIdentity(new Identity("test_current_user", Optional.empty()))
             .setPath(new SqlPath(Optional.of("testPath")))
-            .setSystemProperty("legacy_timestamp", String.valueOf(true))
             .setSystemProperty("enable_execution_plan_cache", String.valueOf(true))
             .setTimeZoneKey(getTimeZoneKey("+06:09"))
             .build();
     private static final Session DEFAULT_SESSION = testSessionBuilder()
             .setCatalog("test")
             .setSchema("default")
-            .setSystemProperty("legacy_timestamp", String.valueOf(true))
             .setSystemProperty("enable_execution_plan_cache", String.valueOf(true))
             .setTimeZoneKey(getTimeZoneKey("+06:09"))
             .build();
@@ -91,7 +89,6 @@ public class TestCachedSqlQueryExecution
     private static final Session CACHING_DISABLED_SESSION = testSessionBuilder()
             .setCatalog("tpch")
             .setSchema("tiny")
-            .setSystemProperty("legacy_timestamp", String.valueOf(true))
             .setTimeZoneKey(getTimeZoneKey("+06:09"))
             .setSystemProperty("enable_execution_plan_cache", String.valueOf(false))
             .build();
@@ -99,7 +96,6 @@ public class TestCachedSqlQueryExecution
     private static final Session DEFAULT_SESSION_WITH_CHANGED_PROPERTY = testSessionBuilder()
             .setCatalog("tpch")
             .setSchema("tiny")
-            .setSystemProperty("legacy_timestamp", String.valueOf(true))
             .setTimeZoneKey(getTimeZoneKey("+06:09"))
             .setSystemProperty("enable_execution_plan_cache", String.valueOf(true))
             .setSystemProperty(SystemSessionProperties.JOIN_DISTRIBUTION_TYPE, FeaturesConfig.JoinDistributionType.AUTOMATIC.toString())

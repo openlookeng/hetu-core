@@ -15,7 +15,6 @@ package io.prestosql.plugin.hive;
 
 import io.airlift.concurrent.BoundedExecutor;
 import io.airlift.json.JsonCodec;
-import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.prestosql.plugin.hive.metastore.CachingHiveMetastore;
 import io.prestosql.plugin.hive.metastore.HiveMetastore;
@@ -24,7 +23,6 @@ import io.prestosql.plugin.hive.security.AccessControlMetadataFactory;
 import io.prestosql.plugin.hive.statistics.MetastoreHiveStatisticsProvider;
 import io.prestosql.plugin.hive.statistics.TableColumnStatistics;
 import io.prestosql.spi.type.TypeManager;
-import org.joda.time.DateTimeZone;
 
 import javax.inject.Inject;
 
@@ -41,12 +39,9 @@ import static java.util.Objects.requireNonNull;
 public class HiveMetadataFactory
         implements Supplier<TransactionalMetadata>
 {
-    private static final Logger log = Logger.get(HiveMetadataFactory.class);
-
     protected final Map<String, TableColumnStatistics> statsCache = new ConcurrentHashMap();
     protected final Map<String, List<HivePartition>> samplePartitionCache = new ConcurrentHashMap();
 
-    private final boolean allowCorruptWritesForTesting;
     private final boolean skipDeletionForAlter;
     private final boolean skipTargetCleanupOnRollback;
     private final boolean writesToNonManagedTablesEnabled;
@@ -56,7 +51,6 @@ public class HiveMetadataFactory
     private final HiveMetastore metastore;
     private final HdfsEnvironment hdfsEnvironment;
     private final HivePartitionManager partitionManager;
-    private final DateTimeZone timeZone;
     private final TypeManager typeManager;
     private final LocationService locationService;
     private final JsonCodec<PartitionUpdate> partitionUpdateCodec;
@@ -97,9 +91,7 @@ public class HiveMetadataFactory
                 metastore,
                 hdfsEnvironment,
                 partitionManager,
-                hiveConfig.getDateTimeZone(),
                 hiveConfig.getMaxConcurrentFileRenames(),
-                hiveConfig.getAllowCorruptWritesForTesting(),
                 hiveConfig.isSkipDeletionForAlter(),
                 hiveConfig.isSkipTargetCleanupOnRollback(),
                 hiveConfig.getWritesToNonManagedTablesEnabled(),
@@ -129,9 +121,7 @@ public class HiveMetadataFactory
             HiveMetastore metastore,
             HdfsEnvironment hdfsEnvironment,
             HivePartitionManager partitionManager,
-            DateTimeZone timeZone,
             int maxConcurrentFileRenames,
-            boolean allowCorruptWritesForTesting,
             boolean skipDeletionForAlter,
             boolean skipTargetCleanupOnRollback,
             boolean writesToNonManagedTablesEnabled,
@@ -156,7 +146,6 @@ public class HiveMetadataFactory
             Optional<Duration> vacuumCollectorInterval,
             int hmsWriteBatchSize)
     {
-        this.allowCorruptWritesForTesting = allowCorruptWritesForTesting;
         this.skipDeletionForAlter = skipDeletionForAlter;
         this.skipTargetCleanupOnRollback = skipTargetCleanupOnRollback;
         this.writesToNonManagedTablesEnabled = writesToNonManagedTablesEnabled;
@@ -167,7 +156,6 @@ public class HiveMetadataFactory
         this.metastore = requireNonNull(metastore, "metastore is null");
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.partitionManager = requireNonNull(partitionManager, "partitionManager is null");
-        this.timeZone = requireNonNull(timeZone, "timeZone is null");
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.locationService = requireNonNull(locationService, "locationService is null");
         this.partitionUpdateCodec = requireNonNull(partitionUpdateCodec, "partitionUpdateCodec is null");
@@ -176,13 +164,6 @@ public class HiveMetadataFactory
         this.accessControlMetadataFactory = requireNonNull(accessControlMetadataFactory, "accessControlMetadataFactory is null");
         this.hiveTransactionHeartbeatInterval = requireNonNull(hiveTransactionHeartbeatInterval, "hiveTransactionHeartbeatInterval is null");
         this.vacuumCleanupRecheckInterval = requireNonNull(vacuumCleanupRecheckInterval, "vacuumCleanupInterval is null");
-
-        if (!allowCorruptWritesForTesting && !timeZone.equals(DateTimeZone.getDefault())) {
-            log.warn("Hive writes are disabled. " +
-                            "To write data to Hive, your JVM timezone must match the Hive storage timezone. " +
-                            "Add -Duser.timezone=%s to your JVM arguments",
-                    timeZone.getID());
-        }
 
         renameExecution = new BoundedExecutor(executorService, maxConcurrentFileRenames);
         this.hiveVacuumService = requireNonNull(hiveVacuumService, "hiveVacuumService is null");
@@ -215,8 +196,6 @@ public class HiveMetadataFactory
                 metastore,
                 hdfsEnvironment,
                 partitionManager,
-                timeZone,
-                allowCorruptWritesForTesting,
                 writesToNonManagedTablesEnabled,
                 createsOfNonManagedTablesEnabled,
                 tableCreatesWithLocationAllowed,

@@ -28,6 +28,7 @@ import io.prestosql.plugin.hive.DeleteDeltaLocations;
 import io.prestosql.plugin.hive.FileFormatDataSourceStats;
 import io.prestosql.plugin.hive.HdfsEnvironment;
 import io.prestosql.plugin.hive.HiveColumnHandle;
+import io.prestosql.plugin.hive.HiveConfig;
 import io.prestosql.plugin.hive.HivePageSourceFactory;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorPageSource;
@@ -97,13 +98,15 @@ public class ParquetPageSourceFactory
     private final TypeManager typeManager;
     private final HdfsEnvironment hdfsEnvironment;
     private final FileFormatDataSourceStats stats;
+    private final DateTimeZone timeZone;
 
     @Inject
-    public ParquetPageSourceFactory(TypeManager typeManager, HdfsEnvironment hdfsEnvironment, FileFormatDataSourceStats stats)
+    public ParquetPageSourceFactory(TypeManager typeManager, HdfsEnvironment hdfsEnvironment, FileFormatDataSourceStats stats, HiveConfig hiveConfig)
     {
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.stats = requireNonNull(stats, "stats is null");
+        timeZone = requireNonNull(hiveConfig, "hiveConfig is null").getParquetDateTimeZone();
     }
 
     @Override
@@ -117,7 +120,6 @@ public class ParquetPageSourceFactory
             Properties schema,
             List<HiveColumnHandle> columns,
             TupleDomain<HiveColumnHandle> effectivePredicate,
-            DateTimeZone hiveStorageTimeZone,
             Optional<DynamicFilterSupplier> dynamicFilter,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
@@ -147,7 +149,8 @@ public class ParquetPageSourceFactory
                 getParquetMaxReadBlockSize(session),
                 typeManager,
                 effectivePredicate,
-                stats));
+                stats,
+                timeZone));
     }
 
     public static ParquetPageSource createParquetPageSource(
@@ -165,7 +168,8 @@ public class ParquetPageSourceFactory
             DataSize maxReadBlockSize,
             TypeManager typeManager,
             TupleDomain<HiveColumnHandle> effectivePredicate,
-            FileFormatDataSourceStats stats)
+            FileFormatDataSourceStats stats,
+            DateTimeZone timeZone)
     {
         AggregatedMemoryContext systemMemoryContext = newSimpleAggregatedMemoryContext();
 

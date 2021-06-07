@@ -18,7 +18,7 @@ import com.google.gson.Gson;
 import io.prestosql.plugin.hive.HiveACIDWriteType;
 import io.prestosql.plugin.hive.HiveFileWriter;
 import io.prestosql.plugin.hive.HiveType;
-import io.prestosql.plugin.hive.HiveWriteUtils;
+import io.prestosql.plugin.hive.util.FieldSetterFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
@@ -64,6 +64,7 @@ import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.log4j.Logger;
+import org.joda.time.DateTimeZone;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -104,7 +105,7 @@ public class CarbondataFileWriter
     private final Object row;
     private final SettableStructObjectInspector tableInspector;
     private final List<StructField> structFields;
-    private final HiveWriteUtils.FieldSetter[] setters;
+    private final FieldSetterFactory.FieldSetter[] setters;
     private final Properties properties;
     private final Optional<AcidOutputFormat.Options> acidOptions;
     private final HiveACIDWriteType acidWriteType;
@@ -183,9 +184,12 @@ public class CarbondataFileWriter
 
         row = tableInspector.create();
 
-        setters = new HiveWriteUtils.FieldSetter[structFields.size()];
+        setters = new FieldSetterFactory.FieldSetter[structFields.size()];
+
+        FieldSetterFactory fieldSetterFactory = new FieldSetterFactory(DateTimeZone.UTC);
+
         for (int i = 0; i < setters.length; i++) {
-            setters[i] = HiveWriteUtils.createFieldSetter(tableInspector, row, structFields.get(i),
+            setters[i] = fieldSetterFactory.create(tableInspector, row, structFields.get(i),
                     fileColumnTypes.get(structFields.get(i).getFieldID()));
         }
 

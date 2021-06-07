@@ -70,7 +70,7 @@ public class OpenGaussClient
             return WriteMapping.sliceMapping("bytea", varbinaryWriteFunction());
         }
         if (TIMESTAMP.equals(type)) {
-            return WriteMapping.longMapping("timestamp", timestampWriteFunctionUsingSqlTimestamp(session));
+            return WriteMapping.longMapping("timestamp", timestampWriteFunctionUsingSqlTimestamp());
         }
         if (TIMESTAMP_WITH_TIME_ZONE.equals(type)) {
             return WriteMapping.longMapping("timestamp with time zone", timestampWithTimeZoneWriteFunction());
@@ -140,7 +140,7 @@ public class OpenGaussClient
             return Optional.of(typedVarcharColumnMapping(jdbcTypeName));
         }
         if (typeHandle.getJdbcType() == Types.TIMESTAMP) {
-            return Optional.of(timestampColumnMappingUsingSqlTimestamp(session));
+            return Optional.of(timestampColumnMappingUsingSqlTimestamp());
         }
         if (typeHandle.getJdbcType() == Types.ARRAY && supportArrays) {
             if (!typeHandle.getArrayDimensions().isPresent()) {

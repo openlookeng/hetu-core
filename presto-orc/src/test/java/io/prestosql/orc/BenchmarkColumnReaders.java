@@ -66,7 +66,6 @@ import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.SmallintType.SMALLINT;
-import static io.prestosql.spi.type.TimeZoneKey.UTC_KEY;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
@@ -1040,7 +1039,7 @@ public class BenchmarkColumnReaders
         {
             List<SqlTimestamp> values = new ArrayList<>();
             for (int i = 0; i < ROWS; ++i) {
-                values.add(new SqlTimestamp((random.nextLong()), UTC_KEY));
+                values.add(new SqlTimestamp((random.nextLong())));
             }
             return values.iterator();
         }
@@ -1063,7 +1062,7 @@ public class BenchmarkColumnReaders
             List<SqlTimestamp> values = new ArrayList<>();
             for (int i = 0; i < ROWS; ++i) {
                 if (random.nextBoolean()) {
-                    values.add(new SqlTimestamp(random.nextLong(), UTC_KEY));
+                    values.add(new SqlTimestamp(random.nextLong()));
                 }
                 else {
                     values.add(null);

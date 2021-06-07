@@ -56,7 +56,7 @@ public class PostgreSqlClient
             return WriteMapping.sliceMapping("bytea", varbinaryWriteFunction());
         }
         if (TIMESTAMP.equals(type)) {
-            return WriteMapping.longMapping("timestamp", timestampWriteFunction(session));
+            return WriteMapping.longMapping("timestamp", timestampWriteFunction());
         }
         if (TIMESTAMP_WITH_TIME_ZONE.equals(type)) {
             return WriteMapping.longMapping("timestamp with time zone", timestampWithTimeZoneWriteFunction());

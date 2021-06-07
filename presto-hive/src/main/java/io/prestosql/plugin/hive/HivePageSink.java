@@ -524,7 +524,7 @@ public class HivePageSink
                 for (int i = 0; i < partitionKeys.size(); i++) {
                     HivePartitionKey partitionKey = partitionKeys.get(i);
                     Type type = partitionTypes.get(i);
-                    Object partitionColumnValue = HiveUtil.typedPartitionKey(partitionKey.getValue(), type, partitionKey.getName(), null);
+                    Object partitionColumnValue = HiveUtil.typedPartitionKey(partitionKey.getValue(), type, partitionKey.getName());
                     RunLengthEncodedBlock block = RunLengthEncodedBlock.create(type, partitionColumnValue, 1);
                     type.appendTo(block, 0, builder.getBlockBuilder(i));
                 }

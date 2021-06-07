@@ -412,7 +412,7 @@ public class GreenPlumSqlClient
             return Optional.of(typedVarcharColumnMapping(jdbcTypeName));
         }
         if (typeHandle.getJdbcType() == Types.TIMESTAMP) {
-            return Optional.of(timestampColumnMapping(session));
+            return Optional.of(timestampColumnMapping());
         }
         if (typeHandle.getJdbcType() == Types.ARRAY && supportArrays) {
             if (!typeHandle.getArrayDimensions().isPresent()) {
@@ -447,7 +447,7 @@ public class GreenPlumSqlClient
             return WriteMapping.sliceMapping("bytea", varbinaryWriteFunction());
         }
         if (TIMESTAMP.equals(type)) {
-            return WriteMapping.longMapping("timestamp", timestampWriteFunction(session));
+            return WriteMapping.longMapping("timestamp", timestampWriteFunction());
         }
         if (TIMESTAMP_WITH_TIME_ZONE.equals(type)) {
             return WriteMapping.longMapping("timestamp with time zone", timestampWithTimeZoneWriteFunction());

@@ -52,12 +52,15 @@ import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.testing.NoOpIndexClient;
 import io.prestosql.testing.TestingConnectorSession;
 import io.prestosql.type.InternalTypeManager;
+import org.apache.hadoop.hive.common.type.Timestamp;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -94,7 +97,7 @@ public final class HiveTestUtils
         FileFormatDataSourceStats stats = new FileFormatDataSourceStats();
         HdfsEnvironment testHdfsEnvironment = createTestHdfsEnvironment(hiveConfig);
         return ImmutableSet.<HivePageSourceFactory>builder()
-                .add(new RcFilePageSourceFactory(TYPE_MANAGER, testHdfsEnvironment, stats))
+                .add(new RcFilePageSourceFactory(TYPE_MANAGER, testHdfsEnvironment, stats, hiveConfig))
                 .add(new OrcPageSourceFactory(TYPE_MANAGER, hiveConfig, testHdfsEnvironment, stats, OrcCacheStore.builder().newCacheStore(
                         new HiveConfig().getOrcFileTailCacheLimit(), Duration.ofMillis(new HiveConfig().getOrcFileTailCacheTtl().toMillis()),
                         new HiveConfig().getOrcStripeFooterCacheLimit(),
@@ -104,8 +107,13 @@ public final class HiveTestUtils
                         Duration.ofMillis(new HiveConfig().getOrcBloomFiltersCacheTtl().toMillis()),
                         new HiveConfig().getOrcRowDataCacheMaximumWeight(), Duration.ofMillis(new HiveConfig().getOrcRowDataCacheTtl().toMillis()),
                         new HiveConfig().isOrcCacheStatsMetricCollectionEnabled())))
-                .add(new ParquetPageSourceFactory(TYPE_MANAGER, testHdfsEnvironment, stats))
+                .add(new ParquetPageSourceFactory(TYPE_MANAGER, testHdfsEnvironment, stats, hiveConfig))
                 .build();
+    }
+
+    public static HiveRecordCursorProvider createGenericHiveRecordCursorProvider(HdfsEnvironment hdfsEnvironment)
+    {
+        return new GenericHiveRecordCursorProvider(hdfsEnvironment);
     }
 
     public static Set<HiveSelectivePageSourceFactory> getDefaultHiveSelectiveFactories(HiveConfig hiveConfig)
@@ -255,5 +263,10 @@ public final class HiveTestUtils
         };
 
         return dynamicFilterSupplier;
+    }
+
+    public static Timestamp hiveTimestamp(LocalDateTime local)
+    {
+        return Timestamp.ofEpochSecond(local.toEpochSecond(ZoneOffset.UTC), local.getNano());
     }
 }

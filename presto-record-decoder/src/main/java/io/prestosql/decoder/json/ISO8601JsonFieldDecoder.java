@@ -104,8 +104,14 @@ public class ISO8601JsonFieldDecoder
             try {
                 String textValue = value.asText();
                 if (columnType == TIMESTAMP) {
-                    TemporalAccessor parseResult = ISO_DATE_TIME.parse(textValue);
-                    return TimeUnit.DAYS.toMillis(parseResult.getLong(EPOCH_DAY)) + parseResult.getLong(MILLI_OF_DAY);
+                    try {
+                        TemporalAccessor parseResult = ISO_OFFSET_DATE_TIME.parse(textValue);
+                        return TimeUnit.DAYS.toMillis(parseResult.getLong(EPOCH_DAY)) + parseResult.getLong(MILLI_OF_DAY);
+                    }
+                    catch (DateTimeParseException e) {
+                        TemporalAccessor parseResult = ISO_DATE_TIME.parse(textValue);
+                        return TimeUnit.DAYS.toMillis(parseResult.getLong(EPOCH_DAY)) + parseResult.getLong(MILLI_OF_DAY);
+                    }
                 }
                 if (columnType == TIMESTAMP_WITH_TIME_ZONE) {
                     TemporalAccessor parseResult = ISO_OFFSET_DATE_TIME.parse(textValue);

@@ -54,7 +54,7 @@ public final class SelectiveColumnReaders
             case CHAR:
                 return new SliceSelectiveColumnReader(orcType, column, filter, outputType, systemMemoryContext.newLocalMemoryContext(SelectiveColumnReaders.class.getSimpleName()));
             case TIMESTAMP:
-                return new TimestampSelectiveColumnReader(column, filter, hiveStorageTimeZone, outputType.isPresent(), systemMemoryContext.newLocalMemoryContext(SelectiveColumnReaders.class.getSimpleName()));
+                return new TimestampSelectiveColumnReader(column, filter, outputType.isPresent(), systemMemoryContext.newLocalMemoryContext(SelectiveColumnReaders.class.getSimpleName()));
             case DECIMAL:
                 if (orcType.getPrecision().get() > MAX_SHORT_PRECISION) {
                     return new LongDecimalSelectiveColumnReader(orcType, column, filter, outputType, systemMemoryContext.newLocalMemoryContext(SelectiveColumnReaders.class.getSimpleName()));

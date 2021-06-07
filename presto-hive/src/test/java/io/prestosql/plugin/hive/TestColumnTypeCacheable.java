@@ -550,8 +550,8 @@ public class TestColumnTypeCacheable
         ConnectorSession session = new TestingConnectorSession(new HiveSessionProperties(new HiveConfig().setDynamicFilterPartitionFilteringEnabled(false), new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
         ColumnMetadata ptdMetadata = new ColumnMetadata("pt_d", TIMESTAMP);
         Set<TupleDomain<ColumnMetadata>> cachePredicates = ImmutableSet.of(
-                TupleDomain.withColumnDomains(ImmutableMap.of(ptdMetadata, Domain.singleValue(TIMESTAMP, HiveUtil.parseHiveTimestamp("1995-10-09 00:00:00", new HiveConfig().getDateTimeZone())))),
-                TupleDomain.withColumnDomains(ImmutableMap.of(ptdMetadata, Domain.singleValue(TIMESTAMP, HiveUtil.parseHiveTimestamp("1995-11-14 00:00:00", new HiveConfig().getDateTimeZone())))));
+                TupleDomain.withColumnDomains(ImmutableMap.of(ptdMetadata, Domain.singleValue(TIMESTAMP, HiveUtil.parseHiveTimestamp("1995-10-09 00:00:00")))),
+                TupleDomain.withColumnDomains(ImmutableMap.of(ptdMetadata, Domain.singleValue(TIMESTAMP, HiveUtil.parseHiveTimestamp("1995-11-14 00:00:00")))));
         HiveSplitSource hiveSplitSource = HiveSplitSource.allAtOnce(
                 session,
                 "database",

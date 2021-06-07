@@ -137,6 +137,7 @@ public class OrcSelectivePageSourceFactory
     private final HdfsEnvironment hdfsEnvironment;
     private final FileFormatDataSourceStats stats;
     private final OrcCacheStore orcCacheStore;
+    private final DateTimeZone legacyTimeZone;
 
     @Inject
     public OrcSelectivePageSourceFactory(TypeManager typeManager, HiveConfig config, HdfsEnvironment hdfsEnvironment, FileFormatDataSourceStats stats, OrcCacheStore orcCacheStore)
@@ -147,6 +148,7 @@ public class OrcSelectivePageSourceFactory
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.stats = requireNonNull(stats, "stats is null");
         this.orcCacheStore = orcCacheStore;
+        this.legacyTimeZone = requireNonNull(config, "hiveConfig is null").getOrcLegacyDateTimeZone();
     }
 
     @Override
@@ -163,7 +165,6 @@ public class OrcSelectivePageSourceFactory
             List<Integer> outputColumns,
             TupleDomain<HiveColumnHandle> domainPredicate,
             Optional<List<TupleDomain<HiveColumnHandle>>> additionPredicates,
-            DateTimeZone hiveStorageTimeZone,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,
@@ -207,7 +208,7 @@ public class OrcSelectivePageSourceFactory
                     prefilledValues,
                     outputColumns,
                     domainPredicate,
-                    hiveStorageTimeZone,
+                    legacyTimeZone,
                     typeManager,
                     getOrcMaxMergeDistance(session),
                     getOrcMaxBufferSize(session),
@@ -281,7 +282,7 @@ public class OrcSelectivePageSourceFactory
                 prefilledValues,
                 outputColumns,
                 domainPredicate,
-                hiveStorageTimeZone,
+                legacyTimeZone,
                 typeManager,
                 getOrcMaxMergeDistance(session),
                 getOrcMaxBufferSize(session),
@@ -485,7 +486,7 @@ public class OrcSelectivePageSourceFactory
             Map<Integer, Object> typedPrefilledValues = new HashMap<>();
             for (Map.Entry prefilledValue : prefilledValues.entrySet()) {
                 typedPrefilledValues.put(Integer.valueOf(prefilledValue.getKey().toString()),
-                        typedPartitionKey(prefilledValue.getValue().toString(), columnTypes.get(prefilledValue.getKey()), columnNames.get(prefilledValue.getKey()), hiveStorageTimeZone));
+                        typedPartitionKey(prefilledValue.getValue().toString(), columnTypes.get(prefilledValue.getKey()), columnNames.get(prefilledValue.getKey())));
             }
 
             // Convert the predicate to each column id wise. Will be used to associate as filter with each column reader
@@ -546,7 +547,6 @@ public class OrcSelectivePageSourceFactory
 //                    isFullAcid && indexes.isPresent(),
                     systemMemoryUsage,
                     stats,
-                    session,
                     columnMappings,
                     typeManager);
         }

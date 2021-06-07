@@ -39,7 +39,6 @@ import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeUtils;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
-import org.joda.time.DateTimeZone;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -88,14 +87,12 @@ public class HivePageSource
     public HivePageSource(
             List<ColumnMapping> columnMappings,
             Optional<BucketAdaptation> bucketAdaptation,
-            DateTimeZone hiveStorageTimeZone,
             TypeManager typeManager,
             ConnectorPageSource delegate,
             Optional<DynamicFilterSupplier> dynamicFilterSupplier,
             ConnectorSession session,
             List<HivePartitionKey> partitionKeys)
     {
-        requireNonNull(hiveStorageTimeZone, "hiveStorageTimeZone is null");
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
 
         this.delegate = requireNonNull(delegate, "delegate is null");
@@ -129,7 +126,7 @@ public class HivePageSource
             }
 
             if (columnMapping.getKind() == PREFILLED) {
-                prefilledValues[columnIndex] = typedPartitionKey(columnMapping.getPrefilledValue(), type, name, hiveStorageTimeZone);
+                prefilledValues[columnIndex] = typedPartitionKey(columnMapping.getPrefilledValue(), type, name);
             }
         }
         this.coercers = coercers.build();

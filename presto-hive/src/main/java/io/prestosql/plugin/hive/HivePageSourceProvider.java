@@ -51,7 +51,6 @@ import io.prestosql.spi.type.TypeManager;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.eclipse.jetty.util.URIUtil;
-import org.joda.time.DateTimeZone;
 
 import javax.inject.Inject;
 
@@ -82,7 +81,6 @@ import static java.util.stream.Collectors.toList;
 public class HivePageSourceProvider
         implements ConnectorPageSourceProvider
 {
-    private final DateTimeZone hiveStorageTimeZone;
     private final HdfsEnvironment hdfsEnvironment;
     private final Set<HiveRecordCursorProvider> cursorProviders;
     private final TypeManager typeManager;
@@ -104,7 +102,6 @@ public class HivePageSourceProvider
             Set<HiveSelectivePageSourceFactory> selectivePageSourceFactories)
     {
         requireNonNull(hiveConfig, "hiveConfig is null");
-        this.hiveStorageTimeZone = hiveConfig.getDateTimeZone();
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.cursorProviders = ImmutableSet.copyOf(requireNonNull(cursorProviders, "cursorProviders is null"));
         this.pageSourceFactories = ImmutableSet.copyOf(
@@ -215,7 +212,7 @@ public class HivePageSourceProvider
          */
         if (hiveTable.isSuitableToPush()) {
             return createSelectivePageSource(selectivePageSourceFactories, configuration,
-                    session, hiveSplit, assignUniqueIndicesToPartitionColumns(hiveColumns), hiveStorageTimeZone, typeManager,
+                    session, hiveSplit, assignUniqueIndicesToPartitionColumns(hiveColumns), typeManager,
                     dynamicFilterSupplier, hiveSplit.getDeleteDeltaLocations(),
                     hiveSplit.getStartRowOffsetOfFile(),
                     indexOptional, hiveSplit.isCacheable(),
@@ -241,7 +238,6 @@ public class HivePageSourceProvider
                 hiveTable.getCompactEffectivePredicate().intersect(predicate),
                 hiveColumns,
                 hiveSplit.getPartitionKeys(),
-                hiveStorageTimeZone,
                 typeManager,
                 hiveSplit.getColumnCoercions(),
                 hiveSplit.getBucketConversion(),
@@ -303,7 +299,6 @@ public class HivePageSourceProvider
             ConnectorSession session,
             HiveSplit split,
             List<HiveColumnHandle> columns,
-            DateTimeZone hiveStorageTimeZone,
             TypeManager typeManager,
             Optional<DynamicFilterSupplier> dynamicFilterSupplier,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
@@ -369,7 +364,6 @@ public class HivePageSourceProvider
                     outputColumns,
                     effectivePredicate,
                     additionPredicates,
-                    hiveStorageTimeZone,
                     deleteDeltaLocations,
                     startRowOffsetOfFile,
                     indexes,
@@ -381,7 +375,6 @@ public class HivePageSourceProvider
                 return new HivePageSource(
                                 columnMappings,
                                 Optional.empty(),
-                                hiveStorageTimeZone,
                                 typeManager,
                                 pageSource.get(),
                                 dynamicFilterSupplier,
@@ -407,7 +400,6 @@ public class HivePageSourceProvider
             TupleDomain<HiveColumnHandle> effectivePredicate,
             List<HiveColumnHandle> hiveColumns,
             List<HivePartitionKey> partitionKeys,
-            DateTimeZone hiveStorageTimeZone,
             TypeManager typeManager,
             Map<Integer, HiveType> columnCoercions,
             Optional<HiveSplit.BucketConversion> bucketConversion,
@@ -445,7 +437,6 @@ public class HivePageSourceProvider
                     schema,
                     toColumnHandles(regularAndInterimColumnMappings, true),
                     effectivePredicate,
-                    hiveStorageTimeZone,
                     dynamicFilterSupplier,
                     deleteDeltaLocations,
                     startRowOffsetOfFile,
@@ -458,7 +449,6 @@ public class HivePageSourceProvider
                         new HivePageSource(
                                 columnMappings,
                                 bucketAdaptation,
-                                hiveStorageTimeZone,
                                 typeManager,
                                 pageSource.get(),
                                 dynamicFilterSupplier,
@@ -481,7 +471,6 @@ public class HivePageSourceProvider
                     schema,
                     toColumnHandles(regularAndInterimColumnMappings, doCoercion),
                     effectivePredicate,
-                    hiveStorageTimeZone,
                     typeManager,
                     s3SelectPushdownEnabled,
                     customSplitInfo);
@@ -510,7 +499,6 @@ public class HivePageSourceProvider
 
                 HiveRecordCursor hiveRecordCursor = new HiveRecordCursor(
                         columnMappings,
-                        hiveStorageTimeZone,
                         typeManager,
                         delegate);
                 List<Type> columnTypes = hiveColumns.stream()

@@ -302,7 +302,7 @@ public class MaterializedResult
             type.writeLong(blockBuilder, packDateTimeWithZone(millisUtc, timeZoneKey));
         }
         else if (TIMESTAMP.equals(type)) {
-            long millisUtc = ((SqlTimestamp) value).getMillisUtc();
+            long millisUtc = ((SqlTimestamp) value).getMillis();
             type.writeLong(blockBuilder, millisUtc);
         }
         else if (TIMESTAMP_WITH_TIME_ZONE.equals(type)) {

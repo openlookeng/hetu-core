@@ -74,7 +74,6 @@ import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.orc.NullMemoryManager;
 import org.apache.orc.impl.WriterImpl;
-import org.joda.time.DateTimeZone;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -507,7 +506,6 @@ public class TestOrcPageSourceMemoryTracking
                     TupleDomain.all(),
                     columns,
                     partitionKeys,
-                    DateTimeZone.UTC,
                     TYPE_MANAGER,
                     ImmutableMap.of(),
                     Optional.empty(),

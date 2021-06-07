@@ -16,7 +16,6 @@ package io.prestosql.type;
 import io.airlift.slice.Slice;
 import io.airlift.slice.XxHash64;
 import io.prestosql.spi.block.Block;
-import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.function.BlockIndex;
 import io.prestosql.spi.function.BlockPosition;
 import io.prestosql.spi.function.IsNull;
@@ -121,29 +120,24 @@ public final class TimeWithTimeZoneOperators
 
     @ScalarOperator(CAST)
     @SqlType(StandardTypes.TIME)
-    public static long castToTime(ConnectorSession session, @SqlType(StandardTypes.TIME_WITH_TIME_ZONE) long value)
+    public static long castToTime(@SqlType(StandardTypes.TIME_WITH_TIME_ZONE) long value)
     {
         // This is exactly the same operation as for TIME WITH TIME ZONE -> TIMESTAMP, as the representations
         // of those types are aligned in range that is covered by TIME WITH TIME ZONE.
-        return castToTimestamp(session, value);
+        return castToTimestamp(value);
     }
 
     @ScalarOperator(CAST)
     @SqlType(StandardTypes.TIMESTAMP)
-    public static long castToTimestamp(ConnectorSession session, @SqlType(StandardTypes.TIME_WITH_TIME_ZONE) long value)
+    public static long castToTimestamp(@SqlType(StandardTypes.TIME_WITH_TIME_ZONE) long value)
     {
-        if (session.isLegacyTimestamp()) {
-            return unpackMillisUtc(value);
-        }
-        else {
-            // This is hack that we need to use as the timezone interpretation depends on date (not only on time)
-            // TODO remove REFERENCE_TIMESTAMP_UTC when removing support for political time zones in TIME WIT TIME ZONE
-            long currentMillisOfDay = ChronoField.MILLI_OF_DAY.getFrom(Instant.ofEpochMilli(REFERENCE_TIMESTAMP_UTC).atZone(ZoneOffset.UTC));
-            long timeMillisUtcInCurrentDay = REFERENCE_TIMESTAMP_UTC - currentMillisOfDay + unpackMillisUtc(value);
+        // This is hack that we need to use as the timezone interpretation depends on date (not only on time)
+        // TODO remove REFERENCE_TIMESTAMP_UTC when removing support for political time zones in TIME WIT TIME ZONE
+        long currentMillisOfDay = ChronoField.MILLI_OF_DAY.getFrom(Instant.ofEpochMilli(REFERENCE_TIMESTAMP_UTC).atZone(ZoneOffset.UTC));
+        long timeMillisUtcInCurrentDay = REFERENCE_TIMESTAMP_UTC - currentMillisOfDay + unpackMillisUtc(value);
 
-            ISOChronology chronology = getChronology(unpackZoneKey(value));
-            return unpackMillisUtc(value) + chronology.getZone().getOffset(timeMillisUtcInCurrentDay);
-        }
+        ISOChronology chronology = getChronology(unpackZoneKey(value));
+        return unpackMillisUtc(value) + chronology.getZone().getOffset(timeMillisUtcInCurrentDay);
     }
 
     @ScalarOperator(CAST)

@@ -47,6 +47,7 @@ import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.META_TABLE_LOCATION;
+import static org.joda.time.DateTimeZone.UTC;
 
 public class CarbondataWriterFactory
         extends HiveWriterFactory
@@ -87,7 +88,7 @@ public class CarbondataWriterFactory
                 additionalTableParameters, bucketCount, sortedBy, locationHandle,
                 locationService, queryId, pageSinkMetadataProvider,
                 typeManager, hdfsEnvironment, pageSorter, sortBufferSize,
-                maxOpenSortFiles, immutablePartitions, session, nodeManager,
+                maxOpenSortFiles, immutablePartitions, UTC, session, nodeManager,
                 eventClient, hiveSessionProperties, hiveWriterStats, orcFileWriterFactory);
 
         this.additionalJobConf = requireNonNull(additionalJobConf, "Additional JobConf is null");

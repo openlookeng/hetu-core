@@ -23,7 +23,6 @@ import io.prestosql.spi.type.TypeManager;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
-import org.joda.time.DateTimeZone;
 
 import javax.inject.Inject;
 
@@ -67,7 +66,6 @@ public class S3SelectRecordCursorProvider
             Properties schema,
             List<HiveColumnHandle> columns,
             TupleDomain<HiveColumnHandle> effectivePredicate,
-            DateTimeZone hiveStorageTimeZone,
             TypeManager typeManager,
             boolean s3SelectPushdownEnabled,
             Map<String, String> customSplitInfo)
@@ -88,7 +86,7 @@ public class S3SelectRecordCursorProvider
             IonSqlQueryBuilder queryBuilder = new IonSqlQueryBuilder(typeManager);
             String ionSqlQuery = queryBuilder.buildSql(columns, effectivePredicate);
             S3SelectLineRecordReader recordReader = new S3SelectCsvRecordReader(configuration, hiveConfig, path, start, length, schema, ionSqlQuery, s3ClientFactory);
-            return Optional.of(new S3SelectRecordCursor<>(configuration, path, recordReader, length, schema, columns, hiveStorageTimeZone, typeManager));
+            return Optional.of(new S3SelectRecordCursor<>(configuration, path, recordReader, length, schema, columns, typeManager));
         }
 
         // unsupported serdes

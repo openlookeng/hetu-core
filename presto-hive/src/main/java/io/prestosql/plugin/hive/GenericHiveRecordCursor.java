@@ -26,7 +26,9 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.type.Date;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
+import org.apache.hadoop.hive.common.type.Timestamp;
 import org.apache.hadoop.hive.serde2.Deserializer;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.io.HiveCharWritable;
@@ -40,17 +42,13 @@ import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.RecordReader;
-import org.joda.time.DateTimeZone;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigInteger;
-import java.sql.Date;
-import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -105,7 +103,6 @@ class GenericHiveRecordCursor<K, V extends Writable>
     private final boolean[] nulls;
 
     private final long totalBytes;
-    private final DateTimeZone hiveStorageTimeZone;
 
     private long completedBytes;
     private Object rowData;
@@ -118,7 +115,6 @@ class GenericHiveRecordCursor<K, V extends Writable>
             long totalBytes,
             Properties splitSchema,
             List<HiveColumnHandle> columns,
-            DateTimeZone hiveStorageTimeZone,
             TypeManager typeManager)
     {
         requireNonNull(path, "path is null");
@@ -126,14 +122,12 @@ class GenericHiveRecordCursor<K, V extends Writable>
         checkArgument(totalBytes >= 0, "totalBytes is negative");
         requireNonNull(splitSchema, "splitSchema is null");
         requireNonNull(columns, "columns is null");
-        requireNonNull(hiveStorageTimeZone, "hiveStorageTimeZone is null");
 
         this.path = path;
         this.recordReader = recordReader;
         this.totalBytes = totalBytes;
         this.key = recordReader.createKey();
         this.value = recordReader.createValue();
-        this.hiveStorageTimeZone = hiveStorageTimeZone;
 
         this.deserializer = getDeserializer(configuration, splitSchema);
         this.rowInspector = getTableObjectInspector(deserializer);
@@ -278,35 +272,18 @@ class GenericHiveRecordCursor<K, V extends Writable>
         else {
             Object fieldValue = ((PrimitiveObjectInspector) fieldInspectors[column]).getPrimitiveJavaObject(fieldData);
             checkState(fieldValue != null, "fieldValue should not be null");
-            longs[column] = getLongExpressedValue(fieldValue, hiveStorageTimeZone);
+            longs[column] = getLongExpressedValue(fieldValue);
             nulls[column] = false;
         }
     }
 
-    private static long getLongExpressedValue(Object value, DateTimeZone hiveTimeZone)
+    private long getLongExpressedValue(Object value)
     {
         if (value instanceof Date) {
-            long storageTime = ((Date) value).getTime();
-            // convert date from VM current time zone to UTC
-            long utcMillis = storageTime + DateTimeZone.getDefault().getOffset(storageTime);
-            return TimeUnit.MILLISECONDS.toDays(utcMillis);
+            return ((Date) value).toEpochDay();
         }
         if (value instanceof Timestamp) {
-            // The Hive SerDe parses timestamps using the default time zone of
-            // this JVM, but the data might have been written using a different
-            // time zone. We need to convert it to the configured time zone.
-
-            // the timestamp that Hive parsed using the JVM time zone
-            long parsedJvmMillis = ((Timestamp) value).getTime();
-
-            // remove the JVM time zone correction from the timestamp
-            DateTimeZone jvmTimeZone = DateTimeZone.getDefault();
-            long hiveMillis = jvmTimeZone.convertUTCToLocal(parsedJvmMillis);
-
-            // convert to UTC using the real time zone for the underlying data
-            long utcMillis = hiveTimeZone.convertLocalToUTC(hiveMillis, false);
-
-            return utcMillis;
+            return ((Timestamp) value).toEpochMilli();
         }
         if (value instanceof Float) {
             return floatToRawIntBits(((Float) value));

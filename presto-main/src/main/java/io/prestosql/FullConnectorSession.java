@@ -39,7 +39,6 @@ public class FullConnectorSession
     private final CatalogName catalogName;
     private final String catalog;
     private final SessionPropertyManager sessionPropertyManager;
-    private final boolean isLegacyTimestamp;
 
     public FullConnectorSession(Session session, ConnectorIdentity identity)
     {
@@ -49,7 +48,6 @@ public class FullConnectorSession
         this.catalogName = null;
         this.catalog = null;
         this.sessionPropertyManager = null;
-        this.isLegacyTimestamp = SystemSessionProperties.isLegacyTimestamp(session);
     }
 
     public FullConnectorSession(
@@ -66,7 +64,6 @@ public class FullConnectorSession
         this.catalogName = requireNonNull(catalogName, "catalogName is null");
         this.catalog = requireNonNull(catalog, "catalog is null");
         this.sessionPropertyManager = requireNonNull(sessionPropertyManager, "sessionPropertyManager is null");
-        this.isLegacyTimestamp = SystemSessionProperties.isLegacyTimestamp(session);
     }
 
     public Session getSession()
@@ -114,12 +111,6 @@ public class FullConnectorSession
     public Optional<String> getTraceToken()
     {
         return session.getTraceToken();
-    }
-
-    @Override
-    public boolean isLegacyTimestamp()
-    {
-        return isLegacyTimestamp;
     }
 
     @Override

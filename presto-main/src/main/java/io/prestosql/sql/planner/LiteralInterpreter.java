@@ -256,24 +256,14 @@ public final class LiteralInterpreter
         @Override
         protected Long visitTimeLiteral(TimeLiteral node, ConnectorSession session)
         {
-            if (session.isLegacyTimestamp()) {
-                return parseTimeLiteral(session.getTimeZoneKey(), node.getValue());
-            }
-            else {
-                return parseTimeLiteral(node.getValue());
-            }
+            return parseTimeLiteral(node.getValue());
         }
 
         @Override
         protected Long visitTimestampLiteral(TimestampLiteral node, ConnectorSession session)
         {
             try {
-                if (session.isLegacyTimestamp()) {
-                    return parseTimestampLiteral(session.getTimeZoneKey(), node.getValue());
-                }
-                else {
-                    return parseTimestampLiteral(node.getValue());
-                }
+                return parseTimestampLiteral(node.getValue());
             }
             catch (RuntimeException e) {
                 throw new SemanticException(INVALID_LITERAL, node, "'%s' is not a valid timestamp literal", node.getValue());

@@ -73,7 +73,6 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -271,7 +270,6 @@ public class OracleClient
     /**
      * timestamp with time zone
      *
-     * @param connectorSession connectorSession
      * @return LongWriteFunction
      * @deprecated This method uses {@link java.sql.Timestamp} and the class cannot
      * represent date-time value when JVM zone had
@@ -281,26 +279,9 @@ public class OracleClient
      * supports {@link LocalDateTime}, use
      */
     @Deprecated
-    public static LongWriteFunction timestampWithTimeZoneWriteFunctionUsingSqlTimestamp(
-            ConnectorSession connectorSession)
+    public static LongWriteFunction timestampWithTimeZoneWriteFunctionUsingSqlTimestamp()
     {
-        if (connectorSession.isLegacyTimestamp()) {
-            ZoneId sessionZone = ZoneId.of(connectorSession.getTimeZoneKey().getId());
-            return (statement, index, value) -> setTimestampWithTimeZoneLegacy(statement, index, value, sessionZone);
-        }
         return (statement, index, value) -> setTimestampWithTimeZone(statement, index, value);
-    }
-
-    private static void setTimestampWithTimeZoneLegacy(PreparedStatement statement, int index, long value,
-            ZoneId sessionZone)
-    {
-        try {
-            statement.setTimestamp(index, new Timestamp(DateTimeEncoding.unpackMillisUtc(
-                    fromHetuLegacyTimestamp(value, sessionZone).atZone(sessionZone).toInstant().toEpochMilli())));
-        }
-        catch (SQLException e) {
-            throw new PrestoException(JDBC_ERROR, "Hetu Oracle connector failed to set Timestamp With Time Zone Legacy");
-        }
     }
 
     private static void setTimestampWithTimeZone(PreparedStatement statement, int index, long value)
@@ -312,11 +293,6 @@ public class OracleClient
         catch (SQLException e) {
             throw new PrestoException(JDBC_ERROR, "Hetu Oracle connector failed to set Timestamp With Time Zone");
         }
-    }
-
-    private static LocalDateTime fromHetuLegacyTimestamp(long value, ZoneId sessionZone)
-    {
-        return Instant.ofEpochMilli(value).atZone(sessionZone).toLocalDateTime();
     }
 
     private static LocalDateTime fromHetuTimestamp(long value)
@@ -558,7 +534,7 @@ public class OracleClient
                 break;
 
             case OracleTypes.TIMESTAMP:
-                columnMapping = Optional.of(timestampColumnMappingUsingSqlTimestamp(session));
+                columnMapping = Optional.of(timestampColumnMappingUsingSqlTimestamp());
                 break;
 
             // the following two data type is not supported because of oracle.sql.TIMESTAMPTZ
@@ -680,14 +656,14 @@ public class OracleClient
             return WriteMapping.sliceMapping("BLOB", varbinaryWriteFunction());
         }
         else if (TIMESTAMP.equals(type)) {
-            return WriteMapping.longMapping("TIMESTAMP", timestampWriteFunctionUsingSqlTimestamp(session));
+            return WriteMapping.longMapping("TIMESTAMP", timestampWriteFunctionUsingSqlTimestamp());
         }
         else if (TIMESTAMP_WITH_TIME_ZONE.equals(type)) {
             return WriteMapping.longMapping("TIMESTAMP(3) WITH TIME ZONE",
-                    timestampWithTimeZoneWriteFunctionUsingSqlTimestamp(session));
+                    timestampWithTimeZoneWriteFunctionUsingSqlTimestamp());
         }
         else if (DATE.equals(type)) {
-            return WriteMapping.longMapping("DATE", timestampWriteFunctionUsingSqlTimestamp(session));
+            return WriteMapping.longMapping("DATE", timestampWriteFunctionUsingSqlTimestamp());
         }
         else {
             throw new PrestoException(NOT_SUPPORTED, "Unsupported column type: " + type.getDisplayName());

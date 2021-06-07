@@ -38,7 +38,6 @@ import io.prestosql.type.InternalTypeManager;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.JobConf;
-import org.joda.time.DateTimeZone;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -176,7 +175,6 @@ public class TestOrcAcidPageSource
                 createSchema(),
                 columnHandles,
                 tupleDomain,
-                DateTimeZone.UTC,
                 Optional.empty(),
                 deleteDeltaLocations,
                 Optional.empty(),

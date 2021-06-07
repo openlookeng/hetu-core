@@ -22,7 +22,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.RecordReader;
-import org.joda.time.DateTimeZone;
 
 import javax.inject.Inject;
 
@@ -57,7 +56,6 @@ public class GenericHiveRecordCursorProvider
             Properties schema,
             List<HiveColumnHandle> columns,
             TupleDomain<HiveColumnHandle> effectivePredicate,
-            DateTimeZone hiveStorageTimeZone,
             TypeManager typeManager,
             boolean s3SelectPushdownEnabled,
             Map<String, String> customSplitInfo)
@@ -80,7 +78,6 @@ public class GenericHiveRecordCursorProvider
                     length,
                     schema,
                     columns,
-                    hiveStorageTimeZone,
                     typeManager));
         });
     }

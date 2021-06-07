@@ -57,7 +57,6 @@ public final class DateTimeUtils
         return DATE_FORMATTER.print(TimeUnit.DAYS.toMillis(days));
     }
 
-    private static final DateTimeFormatter LEGACY_TIMESTAMP_WITHOUT_TIME_ZONE_FORMATTER;
     private static final DateTimeFormatter TIMESTAMP_WITHOUT_TIME_ZONE_FORMATTER;
     private static final DateTimeFormatter TIMESTAMP_WITH_TIME_ZONE_FORMATTER;
     private static final DateTimeFormatter TIMESTAMP_WITH_OR_WITHOUT_TIME_ZONE_FORMATTER;
@@ -69,10 +68,6 @@ public final class DateTimeUtils
                 DateTimeFormat.forPattern("yyyy-M-d H:m:s").getParser(),
                 DateTimeFormat.forPattern("yyyy-M-d H:m:s.SSS").getParser()};
         DateTimePrinter timestampWithoutTimeZonePrinter = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss.SSS").getPrinter();
-        LEGACY_TIMESTAMP_WITHOUT_TIME_ZONE_FORMATTER = new DateTimeFormatterBuilder()
-                .append(timestampWithoutTimeZonePrinter, timestampWithoutTimeZoneParser)
-                .toFormatter()
-                .withOffsetParsed();
 
         TIMESTAMP_WITHOUT_TIME_ZONE_FORMATTER = new DateTimeFormatterBuilder()
                 .append(timestampWithoutTimeZonePrinter, timestampWithoutTimeZoneParser)
@@ -156,13 +151,8 @@ public final class DateTimeUtils
     @Deprecated
     public static long parseTimestampLiteral(TimeZoneKey timeZoneKey, String value)
     {
-        try {
-            DateTime dateTime = TIMESTAMP_WITH_TIME_ZONE_FORMATTER.parseDateTime(value);
-            return packDateTimeWithZone(dateTime);
-        }
-        catch (RuntimeException e) {
-            return LEGACY_TIMESTAMP_WITHOUT_TIME_ZONE_FORMATTER.withChronology(getChronology(timeZoneKey)).parseMillis(value);
-        }
+        DateTime dateTime = TIMESTAMP_WITH_TIME_ZONE_FORMATTER.parseDateTime(value);
+        return packDateTimeWithZone(dateTime);
     }
 
     /**
@@ -224,15 +214,6 @@ public final class DateTimeUtils
     public static String printTimestampWithoutTimeZone(long timestamp)
     {
         return TIMESTAMP_WITHOUT_TIME_ZONE_FORMATTER.print(timestamp);
-    }
-
-    /**
-     * @deprecated applicable in legacy timestamp semantics only
-     */
-    @Deprecated
-    public static String printTimestampWithoutTimeZone(TimeZoneKey timeZoneKey, long timestamp)
-    {
-        return LEGACY_TIMESTAMP_WITHOUT_TIME_ZONE_FORMATTER.withChronology(getChronology(timeZoneKey)).print(timestamp);
     }
 
     public static boolean timestampHasTimeZone(String value)

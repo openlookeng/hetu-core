@@ -42,7 +42,6 @@ import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.testing.TestingConnectorSession;
-import org.joda.time.DateTimeZone;
 import org.testng.annotations.Test;
 
 import java.math.BigDecimal;
@@ -474,7 +473,7 @@ public class TestMetastoreHiveStatisticsProvider
 
     private static void assertConvertPartitionValueToDouble(Type type, String value, double expected)
     {
-        Object prestoValue = parsePartitionValue(format("p=%s", value), value, type, DateTimeZone.getDefault()).getValue();
+        Object prestoValue = parsePartitionValue(format("p=%s", value), value, type).getValue();
         assertEquals(convertPartitionValueToDouble(type, prestoValue), expected);
     }
 
@@ -777,7 +776,7 @@ public class TestMetastoreHiveStatisticsProvider
 
     private static HivePartition partition(String name)
     {
-        return parsePartition(TABLE, name, ImmutableList.of(PARTITION_COLUMN_1, PARTITION_COLUMN_2), ImmutableList.of(VARCHAR, BIGINT), DateTimeZone.getDefault());
+        return parsePartition(TABLE, name, ImmutableList.of(PARTITION_COLUMN_1, PARTITION_COLUMN_2), ImmutableList.of(VARCHAR, BIGINT));
     }
 
     private static PartitionStatistics rowsCount(long rowsCount)

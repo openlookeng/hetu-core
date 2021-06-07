@@ -47,7 +47,6 @@ public class ElasticsearchPageSourceProvider
 
         return new ElasticsearchPageSource(
                 client,
-                session,
                 (ElasticsearchTableHandle) table, (ElasticsearchSplit) split,
                 columns.stream()
                         .map(ElasticsearchColumnHandle.class::cast)

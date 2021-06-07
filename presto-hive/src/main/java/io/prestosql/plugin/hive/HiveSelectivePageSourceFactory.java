@@ -20,7 +20,6 @@ import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.TupleDomain;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.joda.time.DateTimeZone;
 
 import java.util.List;
 import java.util.Map;
@@ -42,7 +41,6 @@ public interface HiveSelectivePageSourceFactory
             List<Integer> outputColumns,
             TupleDomain<HiveColumnHandle> domainPredicate,
             Optional<List<TupleDomain<HiveColumnHandle>>> additionPredicates,
-            DateTimeZone hiveStorageTimeZone,
             Optional<DeleteDeltaLocations> deleteDeltaLocations,
             Optional<Long> startRowOffsetOfFile,
             Optional<List<IndexMetadata>> indexes,

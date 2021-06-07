@@ -18,7 +18,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.RecordReader;
-import org.joda.time.DateTimeZone;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -50,10 +49,9 @@ class S3SelectRecordCursor<K, V extends Writable>
             long totalBytes,
             Properties splitSchema,
             List<HiveColumnHandle> columns,
-            DateTimeZone hiveStorageTimeZone,
             TypeManager typeManager)
     {
-        super(configuration, path, recordReader, totalBytes, updateSplitSchema(splitSchema, columns), columns, hiveStorageTimeZone, typeManager);
+        super(configuration, path, recordReader, totalBytes, updateSplitSchema(splitSchema, columns), columns, typeManager);
     }
 
     // since s3select only returns the required column, not the whole columns

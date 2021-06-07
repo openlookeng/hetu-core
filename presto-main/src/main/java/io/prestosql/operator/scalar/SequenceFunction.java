@@ -137,7 +137,7 @@ public final class SequenceFunction
 
         int value = 0;
         for (int i = 0; i < length; ++i) {
-            BIGINT.writeLong(blockBuilder, DateTimeOperators.timestampPlusIntervalYearToMonth(session, start, value));
+            BIGINT.writeLong(blockBuilder, DateTimeOperators.timestampPlusIntervalYearToMonth(start, value));
             value += step;
         }
 

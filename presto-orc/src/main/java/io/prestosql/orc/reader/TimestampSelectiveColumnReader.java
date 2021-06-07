@@ -28,7 +28,6 @@ import io.prestosql.spi.block.LongArrayBlock;
 import io.prestosql.spi.block.LongArrayBlockBuilder;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
@@ -49,6 +48,7 @@ import static io.prestosql.orc.reader.ApacheHiveTimestampDecoder.decodeTimestamp
 import static io.prestosql.orc.stream.MissingInputStreamSource.missingStreamSource;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static java.util.Objects.requireNonNull;
+import static org.joda.time.DateTimeZone.UTC;
 
 public class TimestampSelectiveColumnReader
         implements SelectiveColumnReader<Long>
@@ -87,7 +87,6 @@ public class TimestampSelectiveColumnReader
     public TimestampSelectiveColumnReader(
             OrcColumn streamDescriptor,
             Optional<TupleDomainFilter> filter,
-            DateTimeZone hiveStorageTimeZone,
             boolean outputRequired,
             LocalMemoryContext systemMemoryContext)
     {
@@ -96,11 +95,11 @@ public class TimestampSelectiveColumnReader
         this.outputRequired = outputRequired;
         this.systemMemoryContext = requireNonNull(systemMemoryContext, "systemMemoryContext is null");
         this.nullsAllowed = this.filter == null || this.filter.testNull();
-        this.baseTimestampInSeconds = new DateTime(2015, 1, 1, 0, 0, requireNonNull(hiveStorageTimeZone, "hiveStorageTimeZone is null")).getMillis() / 1000;
+        this.baseTimestampInSeconds = new DateTime(2015, 1, 1, 0, 0, requireNonNull(UTC, "hiveStorageTimeZone is null")).getMillis() / 1000;
     }
 
     @Override
-    public void startStripe(ZoneId fileTimeZone, ZoneId storageTimeZone, InputStreamSources dictionaryStreamSources, ColumnMetadata<ColumnEncoding> encoding)
+    public void startStripe(ZoneId fileTimeZone, InputStreamSources dictionaryStreamSources, ColumnMetadata<ColumnEncoding> encoding)
     {
         presentStreamSource = missingStreamSource(BooleanInputStream.class);
         secondsStreamSource = missingStreamSource(LongInputStream.class);

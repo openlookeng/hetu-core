@@ -85,7 +85,6 @@ import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.TextInputFormat;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hudi.hadoop.realtime.HoodieRealtimeFileSplit;
-import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.DateTimeFormatterBuilder;
@@ -123,7 +122,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Lists.transform;
-import static io.prestosql.plugin.hive.HiveBucketing.containsTimestampBucketedV2;
+import static io.prestosql.plugin.hive.HiveBucketing.bucketedOnTimestamp;
 import static io.prestosql.plugin.hive.HiveColumnHandle.bucketColumnHandle;
 import static io.prestosql.plugin.hive.util.CustomSplitConversionUtils.recreateSplitWithCustomInfo;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
@@ -378,9 +377,9 @@ public final class HiveUtil
         return TimeUnit.MILLISECONDS.toDays(millis);
     }
 
-    public static long parseHiveTimestamp(String value, DateTimeZone timeZone)
+    public static long parseHiveTimestamp(String value)
     {
-        return HIVE_TIMESTAMP_PARSER.withZone(timeZone).parseMillis(value);
+        return HIVE_TIMESTAMP_PARSER.parseMillis(value);
     }
 
     public static boolean isSplittable(InputFormat<?, ?> inputFormat, FileSystem fileSystem, Path path)
@@ -525,7 +524,7 @@ public final class HiveUtil
                 isCharType(type);
     }
 
-    public static NullableValue parsePartitionValue(String partitionName, String value, Type type, DateTimeZone timeZone)
+    public static NullableValue parsePartitionValue(String partitionName, String value, Type type)
     {
         verifyPartitionTypeSupported(partitionName, type);
 
@@ -611,7 +610,7 @@ public final class HiveUtil
             if (isNull) {
                 return NullableValue.asNull(TIMESTAMP);
             }
-            return NullableValue.of(TIMESTAMP, timestampPartitionKey(value, timeZone, partitionName));
+            return NullableValue.of(TIMESTAMP, timestampPartitionKey(value, partitionName));
         }
 
         if (REAL.equals(type)) {
@@ -808,10 +807,10 @@ public final class HiveUtil
         }
     }
 
-    public static long timestampPartitionKey(String value, DateTimeZone zone, String name)
+    public static long timestampPartitionKey(String value, String name)
     {
         try {
-            return parseHiveTimestamp(value, zone);
+            return parseHiveTimestamp(value);
         }
         catch (IllegalArgumentException e) {
             throw new PrestoException(HiveErrorCode.HIVE_INVALID_PARTITION_VALUE, format("Invalid partition value '%s' for TIMESTAMP partition key: %s", value, name));
@@ -880,7 +879,7 @@ public final class HiveUtil
         // add hidden columns
         columns.add(HiveColumnHandle.pathColumnHandle());
         if (table.getStorage().getBucketProperty().isPresent()) {
-            if (!containsTimestampBucketedV2(table.getStorage().getBucketProperty().get(), table)) {
+            if (!bucketedOnTimestamp(table.getStorage().getBucketProperty().get(), table)) {
                 columns.add(bucketColumnHandle());
             }
         }
@@ -1025,7 +1024,7 @@ public final class HiveUtil
         }
     }
 
-    public static Object typedPartitionKey(String value, Type type, String name, DateTimeZone hiveStorageTimeZone)
+    public static Object typedPartitionKey(String value, Type type, String name)
     {
         byte[] bytes = value.getBytes(UTF_8);
 
@@ -1063,7 +1062,7 @@ public final class HiveUtil
             return datePartitionKey(value, name);
         }
         else if (type.equals(TIMESTAMP)) {
-            return timestampPartitionKey(value, hiveStorageTimeZone, name);
+            return timestampPartitionKey(value, name);
         }
         else if (isShortDecimal(type)) {
             return shortDecimalPartitionKey(value, (DecimalType) type, name);

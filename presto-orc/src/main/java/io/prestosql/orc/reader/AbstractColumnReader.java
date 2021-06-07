@@ -22,7 +22,7 @@ import java.time.ZoneId;
 
 public interface AbstractColumnReader
 {
-    void startStripe(ZoneId fileTimeZone, ZoneId storageTimeZone, InputStreamSources dictionaryStreamSources, ColumnMetadata<ColumnEncoding> encoding)
+    void startStripe(ZoneId fileTimeZone, InputStreamSources dictionaryStreamSources, ColumnMetadata<ColumnEncoding> encoding)
             throws IOException;
 
     void startRowGroup(InputStreamSources dataStreamSources)

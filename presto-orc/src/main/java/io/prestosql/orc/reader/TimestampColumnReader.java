@@ -26,7 +26,6 @@ import io.prestosql.orc.stream.LongInputStream;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.LongArrayBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
-import io.prestosql.spi.type.TimeZoneKey;
 import io.prestosql.spi.type.TimestampType;
 import io.prestosql.spi.type.Type;
 import org.joda.time.DateTimeZone;
@@ -40,7 +39,6 @@ import java.time.ZonedDateTime;
 import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
-import static com.google.common.base.Verify.verify;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.orc.metadata.Stream.StreamKind.DATA;
 import static io.prestosql.orc.metadata.Stream.StreamKind.PRESENT;
@@ -60,9 +58,6 @@ public class TimestampColumnReader
     private final OrcColumn column;
 
     private long baseTimestampInSeconds;
-    @Nullable
-    private DateTimeZone storageDateTimeZone;
-    @Nullable
     private DateTimeZone fileDateTimeZone;
 
     private int readOffset;
@@ -176,17 +171,9 @@ public class TimestampColumnReader
         for (int i = 0; i < nextBatchSize; i++) {
             values[i] = decodeTimestamp(secondsStream.next(), nanosStream.next(), baseTimestampInSeconds);
         }
-        if (storageDateTimeZone != fileDateTimeZone) {
-            verify(storageDateTimeZone != null && fileDateTimeZone != null);
-            if (fileDateTimeZone == DateTimeZone.UTC) {
-                for (int i = 0; i < nextBatchSize; i++) {
-                    values[i] = storageDateTimeZone.convertLocalToUTC(values[i], false);
-                }
-            }
-            else {
-                for (int i = 0; i < nextBatchSize; i++) {
-                    values[i] = fileDateTimeZone.getMillisKeepLocal(storageDateTimeZone, values[i]);
-                }
+        if (fileDateTimeZone != DateTimeZone.UTC) {
+            for (int i = 0; i < nextBatchSize; i++) {
+                values[i] = fileDateTimeZone.convertUTCToLocal(values[i]);
             }
         }
         return new LongArrayBlock(nextBatchSize, Optional.empty(), values);
@@ -208,20 +195,10 @@ public class TimestampColumnReader
                 values[i] = decodeTimestamp(secondsStream.next(), nanosStream.next(), baseTimestampInSeconds);
             }
         }
-        if (storageDateTimeZone != fileDateTimeZone) {
-            verify(storageDateTimeZone != null && fileDateTimeZone != null);
-            if (fileDateTimeZone == DateTimeZone.UTC) {
-                for (int i = 0; i < nextBatchSize; i++) {
-                    if (!isNull[i]) {
-                        values[i] = storageDateTimeZone.convertLocalToUTC(values[i], false);
-                    }
-                }
-            }
-            else {
-                for (int i = 0; i < nextBatchSize; i++) {
-                    if (!isNull[i]) {
-                        values[i] = fileDateTimeZone.getMillisKeepLocal(storageDateTimeZone, values[i]);
-                    }
+        if (fileDateTimeZone != DateTimeZone.UTC) {
+            for (int i = 0; i < nextBatchSize; i++) {
+                if (!isNull[i]) {
+                    values[i] = fileDateTimeZone.convertUTCToLocal(values[i]);
                 }
             }
         }
@@ -239,21 +216,11 @@ public class TimestampColumnReader
     }
 
     @Override
-    public void startStripe(ZoneId fileTimeZone, ZoneId storageTimeZone, InputStreamSources dictionaryStreamSources, ColumnMetadata<ColumnEncoding> encoding)
+    public void startStripe(ZoneId fileTimeZone, InputStreamSources dictionaryStreamSources, ColumnMetadata<ColumnEncoding> encoding)
     {
         baseTimestampInSeconds = ZonedDateTime.of(2015, 1, 1, 0, 0, 0, 0, fileTimeZone).toEpochSecond();
 
-        TimeZoneKey fileTimeZoneKey = TimeZoneKey.getTimeZoneKey(fileTimeZone.getId());
-        TimeZoneKey storageTimeZoneKey = TimeZoneKey.getTimeZoneKey(storageTimeZone.getId());
-        if (fileTimeZoneKey.equals(storageTimeZoneKey)) {
-            storageDateTimeZone = null;
-            fileDateTimeZone = null;
-        }
-        else {
-            storageDateTimeZone = DateTimeZone.forID(storageTimeZoneKey.getId());
-            fileDateTimeZone = DateTimeZone.forID(fileTimeZoneKey.getId());
-        }
-
+        fileDateTimeZone = DateTimeZone.forID(fileTimeZone.getId());
         presentStreamSource = missingStreamSource(BooleanInputStream.class);
         secondsStreamSource = missingStreamSource(LongInputStream.class);
         nanosStreamSource = missingStreamSource(LongInputStream.class);

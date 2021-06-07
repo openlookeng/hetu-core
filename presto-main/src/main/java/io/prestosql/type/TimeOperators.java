@@ -118,19 +118,14 @@ public final class TimeOperators
     @SqlType(StandardTypes.TIME_WITH_TIME_ZONE)
     public static long castToTimeWithTimeZone(ConnectorSession session, @SqlType(StandardTypes.TIME) long value)
     {
-        if (session.isLegacyTimestamp()) {
-            return packDateTimeWithZone(value, session.getTimeZoneKey());
-        }
-        else {
-            ISOChronology localChronology = getChronology(session.getTimeZoneKey());
+        ISOChronology localChronology = getChronology(session.getTimeZoneKey());
 
-            // This cast does treat TIME as wall time in session TZ. This means that in order to get
-            // its UTC representation we need to shift the value by the offset of TZ.
-            // We use value offset in this place to be sure that we will have same hour represented
-            // in TIME WITH TIME ZONE. Calculating real TZ offset will happen when really required.
-            // This is done due to inadequate TIME WITH TIME ZONE representation.
-            return packDateTimeWithZone(localChronology.getZone().convertLocalToUTC(value, false), session.getTimeZoneKey());
-        }
+        // This cast does treat TIME as wall time in session TZ. This means that in order to get
+        // its UTC representation we need to shift the value by the offset of TZ.
+        // We use value offset in this place to be sure that we will have same hour represented
+        // in TIME WITH TIME ZONE. Calculating real TZ offset will happen when really required.
+        // This is done due to inadequate TIME WITH TIME ZONE representation.
+        return packDateTimeWithZone(localChronology.getZone().convertLocalToUTC(value, false), session.getTimeZoneKey());
     }
 
     @ScalarOperator(CAST)
@@ -152,12 +147,7 @@ public final class TimeOperators
     @SqlType("varchar(x)")
     public static Slice castToSlice(ConnectorSession session, @SqlType(StandardTypes.TIME) long value)
     {
-        if (session.isLegacyTimestamp()) {
-            return utf8Slice(printTimeWithoutTimeZone(session.getTimeZoneKey(), value));
-        }
-        else {
-            return utf8Slice(printTimeWithoutTimeZone(value));
-        }
+        return utf8Slice(printTimeWithoutTimeZone(value));
     }
 
     @ScalarOperator(CAST)
@@ -166,12 +156,7 @@ public final class TimeOperators
     public static long castFromSlice(ConnectorSession session, @SqlType("varchar(x)") Slice value)
     {
         try {
-            if (session.isLegacyTimestamp()) {
-                return parseTimeWithoutTimeZone(session.getTimeZoneKey(), value.toStringUtf8());
-            }
-            else {
-                return parseTimeWithoutTimeZone(value.toStringUtf8());
-            }
+            return parseTimeWithoutTimeZone(value.toStringUtf8());
         }
         catch (IllegalArgumentException e) {
             throw new PrestoException(INVALID_CAST_ARGUMENT, "Value cannot be cast to time: " + value.toStringUtf8(), e);

@@ -197,7 +197,7 @@ public final class FormatFunction
             return (session, block) -> toZonedDateTime(type.getLong(block, position));
         }
         if (type.equals(TIMESTAMP)) {
-            return (session, block) -> toLocalDateTime(session, type.getLong(block, position));
+            return (session, block) -> toLocalDateTime(type.getLong(block, position));
         }
         if (type.equals(TIME)) {
             return (session, block) -> toLocalTime(session, type.getLong(block, position));
@@ -266,23 +266,14 @@ public final class FormatFunction
         return ZonedDateTime.ofInstant(instant, zoneId);
     }
 
-    private static LocalDateTime toLocalDateTime(ConnectorSession session, long value)
+    private static LocalDateTime toLocalDateTime(long value)
     {
         Instant instant = Instant.ofEpochMilli(value);
-        if (session.isLegacyTimestamp()) {
-            ZoneId zoneId = ZoneId.of(session.getTimeZoneKey().getId());
-            return LocalDateTime.ofInstant(instant, zoneId);
-        }
         return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 
     private static LocalTime toLocalTime(ConnectorSession session, long value)
     {
-        if (session.isLegacyTimestamp()) {
-            Instant instant = Instant.ofEpochMilli(value);
-            ZoneId zoneId = ZoneId.of(session.getTimeZoneKey().getId());
-            return ZonedDateTime.ofInstant(instant, zoneId).toLocalTime();
-        }
         return LocalTime.ofNanoOfDay(MILLISECONDS.toNanos(value));
     }
 

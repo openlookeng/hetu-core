@@ -60,6 +60,7 @@ import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultHiveFileWriterFac
 import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultOrcFileWriterFactory;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static org.apache.hadoop.hive.ql.exec.Utilities.getBucketIdFromFile;
+import static org.joda.time.DateTimeZone.UTC;
 import static org.testng.Assert.assertEquals;
 
 public class TestHiveWriterFactory
@@ -140,6 +141,7 @@ public class TestHiveWriterFactory
                 hiveConfig.getWriterSortBufferSize(),
                 hiveConfig.getMaxOpenSortFiles(),
                 false,
+                UTC,
                 session,
                 new TestingNodeManager("fake-environment"),
                 new HiveEventClient(),
