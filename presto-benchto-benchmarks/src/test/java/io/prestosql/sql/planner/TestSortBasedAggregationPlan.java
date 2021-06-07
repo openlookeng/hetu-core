@@ -98,6 +98,22 @@ public class TestSortBasedAggregationPlan
                     " bucketed_by=array['ss_item_sk'], bucket_count = 1," +
                     "sorted_by = ARRAY['ss_item_sk', 'ss_customer_sk', 'ss_sold_date_sk']) as select * from tpcds.tiny.store_sales");
 
+            queryRunner.execute("create  table store_sales_item_customer_solddate_buckArr1_buckCount4 with (transactional = false, format='orc'," +
+                    " bucketed_by=array['ss_item_sk'], bucket_count = 4," +
+                    "sorted_by = ARRAY['ss_item_sk', 'ss_customer_sk', 'ss_sold_date_sk']) as select * from tpcds.tiny.store_sales");
+
+            queryRunner.execute("create  table store_sales_item_customer_solddate_buckArr2_buckCount3 with (transactional = false, format='orc'," +
+                    " bucketed_by=array['ss_item_sk' , 'ss_customer_sk'], bucket_count = 3," +
+                    "sorted_by = ARRAY['ss_item_sk', 'ss_customer_sk', 'ss_sold_date_sk']) as select * from tpcds.tiny.store_sales");
+
+            queryRunner.execute("create  table store_sales_item_customer_solddate_buckArr2_buckCount1_wrngOrder with (transactional = false, format='orc'," +
+                    " bucketed_by=array['ss_customer_sk', 'ss_item_sk'], bucket_count = 1," +
+                    "sorted_by = ARRAY['ss_item_sk', 'ss_customer_sk', 'ss_sold_date_sk']) as select * from tpcds.tiny.store_sales");
+
+            queryRunner.execute("create  table SortWithColNameEndWithInt(data_100 , data_101, data_102 )  with (transactional = false, format='orc'," +
+                    " bucketed_by=array['data_102', 'data_101'], bucket_count = 1," +
+                    "sorted_by = ARRAY['data_102', 'data_101']) as select  ss_customer_sk, ss_sold_date_sk, ss_item_sk from tpcds.tiny.store_sales");
+
             return queryRunner;
         }, false, false, false, true);
     }
@@ -108,7 +124,8 @@ public class TestSortBasedAggregationPlan
         //1,2,5,7,10,14,15,20,23,26,33,37,43,44,45,50,56,93
         return Stream.of("q_InnerJoin", "q_leftJoin", "q_rightjoin", "q_rightjoin_wrong_order", "q_Inner_LeftJoin", "q_sort_groupby_notsameOrder",
                 "q_sort_groupby_notsameOrder1", "q_groupByHavingMore", "q_InnerJoinWrongOrder", "q_InnerJoinLessCriterias",
-                "q_InnerJoinGroupLessCriterias")
+                "q_InnerJoinGroupLessCriterias", "q_bucketAndSortDifferentOrder", "BucketAndGroupSameSortIsMore", "BucketGroupAreDifferent",
+                "groupsAreMoreThanBucket", "ColNameEndWithInt")
                 .flatMap(i -> {
                     String queryId = format("%s", i);
                     System.out.println("query ID: " + queryId);

@@ -546,9 +546,5 @@ public interface Metadata
      */
     boolean isPreAggregationSupported(Session session, CatalogName catalogName);
 
-    List<String> getTableSortedColumns(Session session, TableHandle tableHandle);
-
-    List<String> getTableBucketedBy(Session session, TableHandle tableHandle);
-
-    int getTableBucketedCount(Session session, TableHandle tableHandle);
+    boolean canPerformSortBasedAggregation(Session session, TableHandle tableHandle, List<String> keyNames);
 }

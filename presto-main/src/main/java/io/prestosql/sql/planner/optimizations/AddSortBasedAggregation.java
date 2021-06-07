@@ -119,53 +119,21 @@ public class AddSortBasedAggregation
         public PlanNode visitAggregation(AggregationNode node, RewriteContext<TableHandleInfo> context)
         {
             boolean doSortBasedAggregation = false;
-            List<String> sortedByColumnNames = new ArrayList<>();
-
             List<String> groupingKeyNames = new ArrayList<>();
             List<String> groupingKeyNamesTemp = groupingKeyNames;
             node.getGroupingKeys().forEach(symbol -> groupingKeyNamesTemp.add(symbol.getName()));
             groupingKeyNames = groupingKeyNames.stream().map(x -> getActualColName(x)).collect(Collectors.toList());
 
+            if (0 == groupingKeyNames.size()) {
+                return visitPlan(node, context);
+            }
+
             //send groupingKeyNames info to below nodes so that, Ex: join nodes can validate it
             TableHandleInfo tableHandleInfo = new TableHandleInfo(groupingKeyNames);
             context.defaultRewrite(node, tableHandleInfo);
 
-            if (tableHandleInfo.isJoinCriteriaOrdered()) {
-                sortedByColumnNames = tableHandleInfo.getSortedByColumnNames();
-                // group by should be sub set of sort, it can be in same order
-                if ((0 != sortedByColumnNames.size()) && (0 != groupingKeyNames.size()) && (sortedByColumnNames.size() >= groupingKeyNames.size())) {
-                    // bucketby columns and groupby Columns should be same.
-                    // or when bucket count should be 1 and bucket column that matches with groupBy
-                    boolean singleBucketedColumn = ((tableHandleInfo.getBucketedCount() == 1) && (tableHandleInfo.getBucketedByColumnNames().size() == 1) &&
-                            (groupingKeyNames.get(0).equals(tableHandleInfo.getBucketedByColumnNames().get(0))));
-
-                    if ((tableHandleInfo.getBucketedCount() == 1) && (tableHandleInfo.getBucketedByColumnNames().size() > 1)) {
-                        boolean notMatching = false;
-                        int minSize = groupingKeyNames.size() > tableHandleInfo.getBucketedByColumnNames().size() ? tableHandleInfo.getBucketedByColumnNames().size() : groupingKeyNames.size();
-                        for (int numOfComparedKeys = 0; numOfComparedKeys < minSize; numOfComparedKeys++) {
-                            if ((!groupingKeyNames.get(numOfComparedKeys).equals(tableHandleInfo.getBucketedByColumnNames().get(numOfComparedKeys)))) {
-                                notMatching = true;
-                                break;
-                            }
-                        }
-                        if (!notMatching) {
-                            singleBucketedColumn = true;
-                        }
-                    }
-                    if ((groupingKeyNames.size() == tableHandleInfo.getBucketedByColumnNames().size()) || singleBucketedColumn) {
-                        boolean notMatching = false;
-                        for (int numOfComparedKeys = 0; numOfComparedKeys < groupingKeyNames.size(); numOfComparedKeys++) {
-                            if ((!groupingKeyNames.get(numOfComparedKeys).equals(sortedByColumnNames.get(numOfComparedKeys))) ||
-                                    (!singleBucketedColumn && !groupingKeyNames.get(numOfComparedKeys).equals(tableHandleInfo.getBucketedByColumnNames().get(numOfComparedKeys)))) {
-                                notMatching = true;
-                                break;
-                            }
-                        }
-                        if (!notMatching) {
-                            doSortBasedAggregation = true;
-                        }
-                    }
-                }
+            if ((null != tableHandleInfo.tableHandles) && (tableHandleInfo.isJoinCriteriaOrdered())) {
+                doSortBasedAggregation = metadata.canPerformSortBasedAggregation(session, tableHandleInfo.tableHandles, groupingKeyNames);
             }
 
             if (doSortBasedAggregation) {
@@ -198,28 +166,11 @@ public class AddSortBasedAggregation
                 CostProvider costProvider = new CachingCostProvider(costCalculator, statsProvider, Optional.of(memo), session, planSymbolAllocator.getTypes());
 
                 if (costOptimized(node, sortAggregateNode, costProvider)) {
-                    if (LOG.isDebugEnabled()) {
-                        String dbgSortedByColumnNames = new String("");
-                        sortedByColumnNames.stream().forEach(s -> dbgSortedByColumnNames.concat(s + ", "));
-                        String dbgGroupingkeys = new String("");
-                        if (groupingKeyNames.size() > 0) {
-                            groupingKeyNames.stream().forEach(s -> dbgGroupingkeys.concat(s + ", "));
-                        }
-                        LOG.debug("Selected Node Groupingkeys : " + dbgGroupingkeys + ". sortedByColumnName :" + dbgSortedByColumnNames);
-                    }
                     return sortAggregateNode;
                 }
             }
             else {
-                if (LOG.isDebugEnabled()) {
-                    String dbgSortedByColumnNames = new String("");
-                    if (sortedByColumnNames != null) {
-                        sortedByColumnNames.stream().forEach(s -> dbgSortedByColumnNames.concat(s + ", "));
-                    }
-                    String dbgGroupingkeys = new String("");
-                    groupingKeyNames.stream().forEach(s -> dbgGroupingkeys.concat(s + ", "));
-                    LOG.debug("Not selected Node Groupingkeys : " + dbgGroupingkeys + ". sortedByColumnName :" + dbgSortedByColumnNames);
-                }
+                LOG.debug(" Node not matched for sort based aggregation ");
             }
             return node;
         }
@@ -236,13 +187,7 @@ public class AddSortBasedAggregation
             // only at probe side we select tables for sort aggregation
             if (context.get() != null && context.get().isProbeSide()) {
                 TableHandle tableHandle = tableScanNode.getTable();
-                List<String> sortedByColumnNames = metadata.getTableSortedColumns(session, tableHandle);
-                if (sortedByColumnNames != null) {
-                    context.get().setTableHandle(tableHandle);
-                    context.get().setSortedByColumnNames(sortedByColumnNames);
-                }
-                context.get().setBucketedByColumnNames(metadata.getTableBucketedBy(session, tableHandle));
-                context.get().setBucketedCount(metadata.getTableBucketedCount(session, tableHandle));
+                context.get().setTableHandle(tableHandle);
             }
             return tableScanNode;
         }
@@ -293,29 +238,8 @@ public class AddSortBasedAggregation
             }
 
             // Checking Sorted columns with JoinCriteriaOrdered
-            List<String> sortedColumnNames = tableHandleInfo.getSortedByColumnNames();
-            if (sortedColumnNames.size() != 0) {
-                if (null != sortedColumnNames) {
-                    if (sortedColumnNames.size() < node.getCriteria().size()) {
-                        //sorted columns are less than join criteria columns
-                        tableHandleInfo.setJoinCriteriaOrdered(false);
-                        LOG.debug("number of sorted columns " + sortedColumnNames.size() + "are less JoinCriteriaOrdered size " + node.getCriteria().size());
-                    }
-                    else {
-                        for (int j = 0; j < node.getCriteria().size(); j++) {
-                            if (!sortedColumnNames.get(j).equals(node.getCriteria().get(j).getLeft().getName())) {
-                                tableHandleInfo.setJoinCriteriaOrdered(false);
-                                LOG.debug("sortedColumnNames different form node Criteria.");
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            else {
-                LOG.debug("number of sorted columns is Zero");
-                tableHandleInfo.setJoinCriteriaOrdered(false);
-            }
+            List<String> leftCriteriaNames = new ArrayList<>();
+            node.getCriteria().forEach(c -> leftCriteriaNames.add(c.getLeft().getName()));
 
             //This is build Side we will not select table
             context.get().setProbeSide(false);
@@ -352,47 +276,27 @@ public class AddSortBasedAggregation
 
     public static class TableHandleInfo
     {
-        private List<TableHandle> tableHandles;
+        private TableHandle tableHandles;
         private boolean isProbeSide;
         private boolean isJoinCriteriaOrdered;
         private List<String> orgGroupingKeyNames;
-        private List<String> sortedByColumnNames;
-        private List<String> bucketedByColumnNames;
-        private int bucketedCount;
 
         public TableHandleInfo(List<String> orgGroupingKeyNames)
         {
-            this.tableHandles = new ArrayList<>();
+            this.tableHandles = null;
             this.isProbeSide = true;
             this.isJoinCriteriaOrdered = true;
             this.orgGroupingKeyNames = new ArrayList<>(orgGroupingKeyNames);
-            this.sortedByColumnNames = new ArrayList<>();
-            this.bucketedByColumnNames = new ArrayList<>();
         }
 
-        public List<TableHandle> getTableHandle()
+        public TableHandle getTableHandle()
         {
             return tableHandles;
         }
 
         public void setTableHandle(TableHandle tableHandle)
         {
-            this.tableHandles.add(tableHandle);
-        }
-
-        public void setTableHandle(List<TableHandle> tableHandles)
-        {
-            this.tableHandles.addAll(tableHandles);
-        }
-
-        public void setSortedByColumnNames(List<String> sortedByColumnNames)
-        {
-            this.sortedByColumnNames.addAll(sortedByColumnNames);
-        }
-
-        public List<String> getSortedByColumnNames()
-        {
-            return sortedByColumnNames;
+            this.tableHandles = tableHandle;
         }
 
         public void setProbeSide(boolean probeSide)
@@ -418,28 +322,6 @@ public class AddSortBasedAggregation
         public List<String> getGroupingKeyNames()
         {
             return orgGroupingKeyNames;
-        }
-
-        public List<String> getBucketedByColumnNames()
-        {
-            return bucketedByColumnNames;
-        }
-
-        public void setBucketedByColumnNames(List<String> bucketedByColumnNames)
-        {
-            if (null != bucketedByColumnNames) {
-                this.bucketedByColumnNames.addAll(bucketedByColumnNames);
-            }
-        }
-
-        public int getBucketedCount()
-        {
-            return bucketedCount;
-        }
-
-        public void setBucketedCount(int bucketedCount)
-        {
-            this.bucketedCount = bucketedCount;
         }
     }
 }

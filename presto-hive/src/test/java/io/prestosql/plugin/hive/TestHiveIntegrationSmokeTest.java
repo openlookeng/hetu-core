@@ -5682,7 +5682,11 @@ public class TestHiveIntegrationSmokeTest
 
         MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
                 "year from sorttable  group by year order by year");
+        assertEquals(sortResult.toString(), hashResult.toString());
 
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
+        sortResult = computeActual("select avg(orderkey), count(year), year from sorttable  group by year order by year");
         assertEquals(sortResult.toString(), hashResult.toString());
 
         assertUpdate("DROP TABLE sorttable");
@@ -5717,6 +5721,11 @@ public class TestHiveIntegrationSmokeTest
 
         assertEquals(sortResult.toString(), hashResult.toString());
 
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
+        sortResult = computeActual("select year from sorttable1 group by year order by year");
+        assertEquals(sortResult.toString(), hashResult.toString());
+
         assertUpdate("DROP TABLE sorttable1");
         assertUpdate("DROP TABLE unsorttable1");
     }
@@ -5740,13 +5749,15 @@ public class TestHiveIntegrationSmokeTest
                 "format = 'ORC',  bucketed_by=array['year'], bucket_count=10, sorted_by = ARRAY['year'])  as select * from unsorttable2 order by year");
 
         assertUpdate("set session sort_based_aggregation_enabled=true");
-
         MaterializedResult sortResult = computeActual("select avg(orderkey), count(year), year from sorttable2 group by year order by year");
 
         assertUpdate("set session sort_based_aggregation_enabled=false");
 
         MaterializedResult hashResult = computeActual("select avg(orderkey), count(year), year from sorttable2 group by year order by year");
 
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
+        sortResult = computeActual("select avg(orderkey), count(year), year from sorttable2 group by year order by year");
         assertEquals(sortResult.toString(), hashResult.toString());
 
         assertUpdate("DROP TABLE sorttable2");
@@ -5797,6 +5808,11 @@ public class TestHiveIntegrationSmokeTest
 
         assertEquals(sortResult.toString(), hashResult.toString());
 
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
+        sortResult = computeActual("select avg(orderkey), count(year), year from sorttable3 group by year order by year");
+        assertEquals(sortResult.toString(), hashResult.toString());
+
         assertUpdate("DROP TABLE sorttable3");
         assertUpdate("DROP TABLE unsorttable3");
     }
@@ -5829,6 +5845,11 @@ public class TestHiveIntegrationSmokeTest
         MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
                 "year from sorttable4  group by year order by year");
 
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
+        sortResult = computeActual("select avg(orderkey), count(year), year from sorttable4  group by year order by year");
         assertEquals(sortResult.toString(), hashResult.toString());
 
         assertUpdate("DROP TABLE sorttable4");
@@ -5865,6 +5886,11 @@ public class TestHiveIntegrationSmokeTest
 
         assertEquals(sortResult.toString(), hashResult.toString());
 
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
+        sortResult = computeActual("select avg(orderkey), count(year), year from sorttable5  group by year order by year");
+        assertEquals(sortResult.toString(), hashResult.toString());
+
         assertUpdate("DROP TABLE sorttable5");
         assertUpdate("DROP TABLE unsorttable5");
     }
@@ -5897,6 +5923,11 @@ public class TestHiveIntegrationSmokeTest
         MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
                 "year from sorttable6  group by year order by year");
 
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
+        sortResult = computeActual("select avg(orderkey), count(year), year from sorttable6  group by year order by year");
         assertEquals(sortResult.toString(), hashResult.toString());
 
         assertUpdate("DROP TABLE sorttable6");
@@ -5934,6 +5965,11 @@ public class TestHiveIntegrationSmokeTest
 
         assertEquals(sortResult.toString(), hashResult.toString());
 
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
+        sortResult = computeActual("select avg(orderkey), count(year), iscurrentemployee from sorttable7  group by iscurrentemployee order by iscurrentemployee");
+        assertEquals(sortResult.toString(), hashResult.toString());
+
         assertUpdate("DROP TABLE sorttable7");
         assertUpdate("DROP TABLE unsorttable7");
     }
@@ -5948,9 +5984,9 @@ public class TestHiveIntegrationSmokeTest
         computeActual("create table unsorttable8 (orderkey int, year bigint) WITH (transactional = false , " +
                 "format = 'ORC')");
 
-        String str = generateNumberOfRowsForTwoColumns(2500);
+        String str = generateNumberOfRowsForTwoColumns(2500, 10);
 
-        assertUpdate("insert into unsorttable8 values " + str, 2500);
+        assertUpdate("insert into unsorttable8 values " + str, 2510);
 
         computeActual("create table sorttable8  with(transactional = false, " +
                 "format = 'ORC',  bucketed_by=array['year'], bucket_count=1, sorted_by = ARRAY['year'])  as select * from unsorttable8 order by year");
@@ -5965,6 +6001,18 @@ public class TestHiveIntegrationSmokeTest
         MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
                 "year from sorttable8  group by year order by year");
 
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
+        sortResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable8  group by year order by year");
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+        assertUpdate("set session prcnt_drivers_for_partial_aggr=25");
+        sortResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable8  group by year order by year");
         assertEquals(sortResult.toString(), hashResult.toString());
 
         assertUpdate("DROP TABLE sorttable8");
@@ -5999,6 +6047,16 @@ public class TestHiveIntegrationSmokeTest
 
         assertEquals(sortResult.toString(), hashResult.toString());
 
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
+        sortResult = computeActual("select avg(orderkey), count(year), year from sorttable9  group by year order by year");
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+        assertUpdate("set session prcnt_drivers_for_partial_aggr=25");
+        sortResult = computeActual("select avg(orderkey), count(year), year from sorttable9  group by year order by year");
+        assertEquals(sortResult.toString(), hashResult.toString());
+
         assertUpdate("DROP TABLE sorttable9");
         assertUpdate("DROP TABLE unsorttable9");
     }
@@ -6012,9 +6070,9 @@ public class TestHiveIntegrationSmokeTest
         computeActual("create table unsorttable10 (orderkey int, year int) WITH (transactional = false , " +
                 "format = 'ORC')");
 
-        String str = generateNumberOfRowsForTwoColumns(2500);
+        String str = generateNumberOfRowsForTwoColumns(2500, 5);
 
-        assertUpdate("insert into unsorttable10 values " + str, 2500);
+        assertUpdate("insert into unsorttable10 values " + str, 2505);
 
         computeActual("create table sorttable10  with(transactional = false, " +
                 "format = 'ORC',  bucketed_by=array['year'], bucket_count=1, sorted_by = ARRAY['year'])  as select * from unsorttable10 order by year");
@@ -6031,11 +6089,23 @@ public class TestHiveIntegrationSmokeTest
 
         assertEquals(sortResult.toString(), hashResult.toString());
 
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
+        sortResult = computeActual("select avg(orderkey), count(year)," +
+            "year from sorttable10  group by year order by year");
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+        assertUpdate("set session prcnt_drivers_for_partial_aggr=25");
+        sortResult = computeActual("select avg(orderkey), count(year)," +
+                "year from sorttable10  group by year order by year");
+        assertEquals(sortResult.toString(), hashResult.toString());
+
         assertUpdate("DROP TABLE sorttable10");
         assertUpdate("DROP TABLE unsorttable10");
     }
 
-    private String generateNumberOfRowsForTwoColumns(int numberOfRows)
+    private String generateNumberOfRowsForTwoColumns(int numberOfRows, int numberOfNullRows)
     {
         String str = "";
         String str1;
@@ -6043,6 +6113,17 @@ public class TestHiveIntegrationSmokeTest
             str1 = " ( " + (i + 200) + " , " + i + " ) ";
             str = str.concat(str1);
             if (i != numberOfRows - 1) {
+                str = str.concat(",");
+            }
+        }
+
+        if (numberOfNullRows != 0) {
+            str = str.concat(",");
+        }
+        for (int i = 0; i < numberOfNullRows; i++) {
+            str1 = " ( " + (i + 200) + " , null  ) ";
+            str = str.concat(str1);
+            if (i != numberOfNullRows - 1) {
                 str = str.concat(",");
             }
         }

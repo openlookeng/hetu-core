@@ -1,0 +1,5 @@
+remote exchange (GATHER, SINGLE, [])
+    final aggregation over (ss_customer_sk, ss_item_sk, ss_sold_date_sk)
+        local exchange (GATHER, SINGLE, [])
+            partial aggregation over (ss_customer_sk, ss_item_sk, ss_sold_date_sk)
+                scan store_sales_item_customer_solddate_buckarr2_buckcount1_wrngorder

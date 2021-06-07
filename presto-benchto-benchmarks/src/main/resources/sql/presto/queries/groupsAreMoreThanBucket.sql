@@ -1,0 +1,2 @@
+select avg(${database}.${schema}.store_sales_item_customer_solddate_buckArr2_buckCount3.ss_item_sk),${database}.${schema}.store_sales_item_customer_solddate_buckArr2_buckCount3.ss_sold_date_sk from ${database}.${schema}.store_sales_item_customer_solddate_buckArr2_buckCount3
+group by ${database}.${schema}.store_sales_item_customer_solddate_buckArr2_buckCount3.ss_item_sk,  ${database}.${schema}.store_sales_item_customer_solddate_buckArr2_buckCount3.ss_customer_sk, ${database}.${schema}.store_sales_item_customer_solddate_buckArr2_buckCount3.ss_sold_date_sk

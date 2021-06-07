@@ -3091,28 +3091,67 @@ public class HiveMetadata
     }
 
     @Override
-    public List<String> getTableSortedColumns(ConnectorSession session, ConnectorTableHandle tableHandle)
+    public boolean canPerformSortBasedAggregation(ConnectorSession session, ConnectorTableHandle tableHandle, List<String> groupKeyNames)
     {
         ConnectorTableMetadata connectorTableMetadata = getTableMetadata(session, ((HiveTableHandle) tableHandle).getSchemaTableName());
         List<SortingColumn> sortingColumn = (List<SortingColumn>) connectorTableMetadata.getProperties().get("sorted_by");
-        if ((null == sortingColumn) || (sortingColumn.size() == 0)) {
-            return null;
+        if ((sortingColumn == null) || (sortingColumn.size() == 0)) {
+            return false;
         }
-        List<String> columnNames = sortingColumn.stream().map(column -> column.getColumnName()).collect(Collectors.toList());
-        return columnNames;
-    }
+        connectorTableMetadata.getProperties().get(HiveTableProperties.BUCKET_COUNT_PROPERTY);
+        int bucketCount = 0;
+        List<String> bucketedColumns = (List<String>) connectorTableMetadata.getProperties().get(HiveTableProperties.BUCKETED_BY_PROPERTY);
+        if (null != bucketedColumns) {
+            bucketCount = (int) connectorTableMetadata.getProperties().get(HiveTableProperties.BUCKET_COUNT_PROPERTY);
+        }
 
-    @Override
-    public List<String> getTableBucketedBy(ConnectorSession session, ConnectorTableHandle tableHandle)
-    {
-        ConnectorTableMetadata connectorTableMetadata = getTableMetadata(session, ((HiveTableHandle) tableHandle).getSchemaTableName());
-        return (List<String>) connectorTableMetadata.getProperties().get(HiveTableProperties.BUCKETED_BY_PROPERTY);
-    }
+        List<String> sortedColumnNames = sortingColumn.stream().map(column -> column.getColumnName()).collect(Collectors.toList());
+        if (sortedColumnNames.size() < groupKeyNames.size()) {
+            //sorted columns are less than join criteria columns
+            log.debug("number of sorted columns " + sortedColumnNames.size() + "are less join column size " + groupKeyNames.size());
+            return false;
+        }
 
-    @Override
-    public int getTableBucketedCount(ConnectorSession session, ConnectorTableHandle tableHandle)
-    {
-        ConnectorTableMetadata connectorTableMetadata = getTableMetadata(session, ((HiveTableHandle) tableHandle).getSchemaTableName());
-        return (int) connectorTableMetadata.getProperties().get(HiveTableProperties.BUCKET_COUNT_PROPERTY);
+        // bucketby columns and groupby Columns should be same.
+        // or when bucket count should be 1 and bucket column that matches with groupBy
+        // or when bucket count is 0 no need to compare buckets
+        boolean singleOrZeroBucketedColumn = (((bucketCount == 1) && (bucketedColumns.size() == 1) &&
+                (groupKeyNames.get(0).equals(bucketedColumns.get(0)))) || (bucketCount == 0));
+
+        if ((bucketCount == 1) && (bucketedColumns.size() > 1)) {
+            boolean notMatching = false;
+            int minSize = groupKeyNames.size() > bucketedColumns.size() ? bucketedColumns.size() : groupKeyNames.size();
+            for (int numOfComparedKeys = 0; numOfComparedKeys < minSize; numOfComparedKeys++) {
+                if ((!groupKeyNames.get(numOfComparedKeys).equals(bucketedColumns.get(numOfComparedKeys)))) {
+                    notMatching = true;
+                    break;
+                }
+            }
+            if (!notMatching) {
+                singleOrZeroBucketedColumn = true;
+            }
+        }
+        if (singleOrZeroBucketedColumn || (groupKeyNames.size() == bucketedColumns.size())) {
+            for (int numOfComparedKeys = 0; numOfComparedKeys < groupKeyNames.size(); numOfComparedKeys++) {
+                if ((!groupKeyNames.get(numOfComparedKeys).equals(sortedColumnNames.get(numOfComparedKeys))) ||
+                        (!singleOrZeroBucketedColumn && !groupKeyNames.get(numOfComparedKeys).equals(bucketedColumns.get(numOfComparedKeys)))) {
+                    if (log.isDebugEnabled()) {
+                        final String[] dbgGroupKeyNames = {new String("")};
+                        groupKeyNames.stream().forEach(k -> dbgGroupKeyNames[0] = dbgGroupKeyNames[0].concat(k + " , "));
+                        final String[] dbgSortedColumnNames = {new String("")};
+                        sortedColumnNames.stream().forEach(k -> dbgSortedColumnNames[0] = dbgSortedColumnNames[0].concat(k + " , "));
+                        if ((null != bucketedColumns) && (bucketedColumns.size() > 0)) {
+                            final String[] dbgbucketedColumns = {new String("")};
+                            bucketedColumns.stream().forEach(k -> dbgbucketedColumns[0] = dbgbucketedColumns[0].concat(k + " , "));
+                            log.debug("Not matching sortedColumnNames: " + dbgSortedColumnNames + " group columns name: " + dbgGroupKeyNames + " bucketedColumns :" + dbgbucketedColumns);
+                        }
+                        log.debug("Not matching sortedColumnNames: " + dbgSortedColumnNames + " group columns name: " + dbgGroupKeyNames);
+                    }
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
     }
 }

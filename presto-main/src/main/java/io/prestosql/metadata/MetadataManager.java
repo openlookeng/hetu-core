@@ -1520,27 +1520,11 @@ public final class MetadataManager
     }
 
     @Override
-    public List<String> getTableSortedColumns(Session session, TableHandle tableHandle)
+    public boolean canPerformSortBasedAggregation(Session session, TableHandle tableHandle, List<String> keyNames)
     {
         CatalogName catalogName = tableHandle.getCatalogName();
         ConnectorMetadata metadata = getMetadata(session, catalogName);
-        return metadata.getTableSortedColumns(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle());
-    }
-
-    @Override
-    public List<String> getTableBucketedBy(Session session, TableHandle tableHandle)
-    {
-        CatalogName catalogName = tableHandle.getCatalogName();
-        ConnectorMetadata metadata = getMetadata(session, catalogName);
-        return metadata.getTableBucketedBy(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle());
-    }
-
-    @Override
-    public int getTableBucketedCount(Session session, TableHandle tableHandle)
-    {
-        CatalogName catalogName = tableHandle.getCatalogName();
-        ConnectorMetadata metadata = getMetadata(session, catalogName);
-        return metadata.getTableBucketedCount(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle());
+        return metadata.canPerformSortBasedAggregation(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle(), keyNames);
     }
 
     //

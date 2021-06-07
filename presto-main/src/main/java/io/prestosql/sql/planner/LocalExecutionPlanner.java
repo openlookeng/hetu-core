@@ -3234,27 +3234,50 @@ public class LocalExecutionPlanner
                 LocalExecutionPlanContext context)
         {
             ImmutableMap.Builder<Symbol, Integer> mappings = ImmutableMap.builder();
-            OperatorFactory operatorFactory = createHashAggregationOperatorFactory(
-                    node.getId(),
-                    node.getAggregations(),
-                    node.getGlobalGroupingSets(),
-                    node.getGroupingKeys(),
-                    node.getStep(),
-                    node.getHashSymbol(),
-                    node.getGroupIdSymbol(),
-                    source,
-                    node.hasDefaultOutput(),
-                    spillEnabled,
-                    node.isStreamable(),
-                    unspillMemoryLimit,
-                    context,
-                    0,
-                    mappings,
-                    10_000,
-                    Optional.of(maxPartialAggregationMemorySize),
-                    node.getStep().isOutputPartial(),
-                    node.getAggregationType(),
-                    node.getFinalizeSymbol());
+            OperatorFactory operatorFactory;
+
+            if (node.getAggregationType().equals(AggregationNode.AggregationType.SORT_BASED)) {
+                operatorFactory = createSortAggregationOperatorFactory(
+                        node.getId(),
+                        node.getAggregations(),
+                        node.getGlobalGroupingSets(),
+                        node.getGroupingKeys(),
+                        node.getStep(),
+                        node.getHashSymbol(),
+                        node.getGroupIdSymbol(),
+                        source,
+                        node.hasDefaultOutput(),
+                        spillEnabled,
+                        unspillMemoryLimit,
+                        context,
+                        0,
+                        mappings,
+                        10_000,
+                        Optional.of(maxPartialAggregationMemorySize),
+                        node.getStep().isOutputPartial(),
+                        node.getFinalizeSymbol());
+            }
+            else {
+                operatorFactory = createHashAggregationOperatorFactory(
+                        node.getId(),
+                        node.getAggregations(),
+                        node.getGlobalGroupingSets(),
+                        node.getGroupingKeys(),
+                        node.getStep(),
+                        node.getHashSymbol(),
+                        node.getGroupIdSymbol(),
+                        source,
+                        node.hasDefaultOutput(),
+                        spillEnabled,
+                        node.isStreamable(),
+                        unspillMemoryLimit,
+                        context,
+                        0,
+                        mappings,
+                        10_000,
+                        Optional.of(maxPartialAggregationMemorySize),
+                        node.getStep().isOutputPartial());
+            }
             return new PhysicalOperation(operatorFactory, mappings.build(), context, source);
         }
 
@@ -3278,114 +3301,15 @@ public class LocalExecutionPlanner
                 Optional<DataSize> maxPartialAggregationMemorySize,
                 boolean useSystemMemory)
         {
-            return createHashAggregationOperatorFactory(
-                    planNodeId,
-                    aggregations,
-                    globalGroupingSets,
-                    groupBySymbols,
-                    step,
-                    hashSymbol,
-                    groupIdSymbol,
-                    source,
-                    hasDefaultOutput,
-                    spillEnabled,
-                    isStreamable,
-                    unspillMemoryLimit,
-                    context,
-                    startOutputChannel,
-                    outputMappings,
-                    expectedGroups,
-                    maxPartialAggregationMemorySize,
-                    useSystemMemory,
-                    AggregationNode.AggregationType.HASH,
-                    Optional.empty());
-        }
-
-        private OperatorFactory createHashAggregationOperatorFactory(
-                PlanNodeId planNodeId,
-                Map<Symbol, Aggregation> aggregations,
-                Set<Integer> globalGroupingSets,
-                List<Symbol> groupBySymbols,
-                Step step,
-                Optional<Symbol> hashSymbol,
-                Optional<Symbol> groupIdSymbol,
-                PhysicalOperation source,
-                boolean hasDefaultOutput,
-                boolean spillEnabled,
-                boolean isStreamable,
-                DataSize unspillMemoryLimit,
-                LocalExecutionPlanContext context,
-                int startOutputChannel,
-                ImmutableMap.Builder<Symbol, Integer> outputMappings,
-                int expectedGroups,
-                Optional<DataSize> maxPartialAggregationMemorySize,
-                boolean useSystemMemory,
-                AggregationNode.AggregationType aggregationType,
-                Optional<Symbol> finalizeSymbol)
-        {
-            List<Symbol> aggregationOutputSymbols = new ArrayList<>();
             List<AccumulatorFactory> accumulatorFactories = new ArrayList<>();
-            for (Map.Entry<Symbol, Aggregation> entry : aggregations.entrySet()) {
-                Symbol symbol = entry.getKey();
-                Aggregation aggregation = entry.getValue();
-
-                accumulatorFactories.add(buildAccumulatorFactory(source, aggregation));
-                aggregationOutputSymbols.add(symbol);
-            }
-
-            // add group-by key fields each in a separate channel
-            int channel = startOutputChannel;
-            Optional<Integer> groupIdChannel = Optional.empty();
-            for (Symbol symbol : groupBySymbols) {
-                outputMappings.put(symbol, channel);
-                if (groupIdSymbol.isPresent() && groupIdSymbol.get().equals(symbol)) {
-                    groupIdChannel = Optional.of(channel);
-                }
-                channel++;
-            }
-
-            // hashChannel follows the group by channels
-            if (hashSymbol.isPresent()) {
-                outputMappings.put(hashSymbol.get(), channel++);
-            }
-
-            // aggregations go in following channels
-            for (Symbol symbol : aggregationOutputSymbols) {
-                outputMappings.put(symbol, channel);
-                channel++;
-            }
-
-            // finalizeValue follows the aggregations by channels
-            if (step.equals(PARTIAL) && finalizeSymbol.isPresent()) {
-                outputMappings.put(finalizeSymbol.get(), channel++);
-            }
+            Optional<Integer> groupIdChannel = getOutputMappingAndGroupIdChannel(aggregations, groupBySymbols, hashSymbol, groupIdSymbol,
+                    source, startOutputChannel, outputMappings, accumulatorFactories, Optional.empty(), Optional.empty());
 
             List<Integer> groupByChannels = getChannelsForSymbols(groupBySymbols, source.getLayout());
             List<Type> groupByTypes = groupByChannels.stream()
                     .map(entry -> source.getTypes().get(entry))
                     .collect(toImmutableList());
 
-            if (aggregationType.equals(AggregationNode.AggregationType.SORT_BASED)) {
-                Optional<Integer> hashChannel = hashSymbol.map(channelGetter(source));
-                return new SortAggregationOperator.SortAggregationOperatorFactory(
-                        context.getNextOperatorId(),
-                        planNodeId,
-                        groupByTypes,
-                        groupByChannels,
-                        ImmutableList.copyOf(globalGroupingSets),
-                        step,
-                        hasDefaultOutput,
-                        accumulatorFactories,
-                        hashChannel,
-                        groupIdChannel,
-                        expectedGroups,
-                        maxPartialAggregationMemorySize,
-                        spillEnabled,
-                        unspillMemoryLimit,
-                        spillerFactory,
-                        joinCompiler,
-                        useSystemMemory);
-            }
             if (isStreamable) {
                 return new StreamingAggregationOperatorFactory(
                         context.getNextOperatorId(),
@@ -3418,6 +3342,104 @@ public class LocalExecutionPlanner
                         joinCompiler,
                         useSystemMemory);
             }
+        }
+
+        private OperatorFactory createSortAggregationOperatorFactory(
+                PlanNodeId planNodeId,
+                Map<Symbol, Aggregation> aggregations,
+                Set<Integer> globalGroupingSets,
+                List<Symbol> groupBySymbols,
+                Step step,
+                Optional<Symbol> hashSymbol,
+                Optional<Symbol> groupIdSymbol,
+                PhysicalOperation source,
+                boolean hasDefaultOutput,
+                boolean spillEnabled,
+                DataSize unspillMemoryLimit,
+                LocalExecutionPlanContext context,
+                int startOutputChannel,
+                ImmutableMap.Builder<Symbol, Integer> outputMappings,
+                int expectedGroups,
+                Optional<DataSize> maxPartialAggregationMemorySize,
+                boolean useSystemMemory,
+                Optional<Symbol> finalizeSymbol)
+        {
+            List<AccumulatorFactory> accumulatorFactories = new ArrayList<>();
+            Optional<Integer> groupIdChannel = getOutputMappingAndGroupIdChannel(aggregations, groupBySymbols, hashSymbol, groupIdSymbol,
+                    source, startOutputChannel, outputMappings, accumulatorFactories, Optional.of(step), finalizeSymbol);
+
+            List<Integer> groupByChannels = getChannelsForSymbols(groupBySymbols, source.getLayout());
+            List<Type> groupByTypes = groupByChannels.stream()
+                    .map(entry -> source.getTypes().get(entry))
+                    .collect(toImmutableList());
+
+            Optional<Integer> hashChannel = hashSymbol.map(channelGetter(source));
+            return new SortAggregationOperator.SortAggregationOperatorFactory(
+                    context.getNextOperatorId(),
+                    planNodeId,
+                    groupByTypes,
+                    groupByChannels,
+                    ImmutableList.copyOf(globalGroupingSets),
+                    step,
+                    hasDefaultOutput,
+                    accumulatorFactories,
+                    hashChannel,
+                    groupIdChannel,
+                    expectedGroups,
+                    maxPartialAggregationMemorySize,
+                    spillEnabled,
+                    unspillMemoryLimit,
+                    spillerFactory,
+                    joinCompiler,
+                    useSystemMemory);
+        }
+
+        private Optional<Integer> getOutputMappingAndGroupIdChannel(Map<Symbol, Aggregation> aggregations,
+                                                                     List<Symbol> groupBySymbols,
+                                                                     Optional<Symbol> hashSymbol,
+                                                                     Optional<Symbol> groupIdSymbol,
+                                                                     PhysicalOperation source,
+                                                                     int startOutputChannel,
+                                                                     ImmutableMap.Builder<Symbol, Integer> outputMappings,
+                                                                     List<AccumulatorFactory> accumulatorFactories,
+                                                                     Optional<Step> step,
+                                                                     Optional<Symbol> finalizeSymbol)
+        {
+            List<Symbol> aggregationOutputSymbols = new ArrayList<>();
+            for (Map.Entry<Symbol, Aggregation> entry : aggregations.entrySet()) {
+                Symbol symbol = entry.getKey();
+                Aggregation aggregation = entry.getValue();
+                accumulatorFactories.add(buildAccumulatorFactory(source, aggregation));
+                aggregationOutputSymbols.add(symbol);
+            }
+
+            // add group-by key fields each in a separate channel
+            int channel = startOutputChannel;
+            Optional<Integer> groupIdChannel = Optional.empty();
+            for (Symbol symbol : groupBySymbols) {
+                outputMappings.put(symbol, channel);
+                if (groupIdSymbol.isPresent() && groupIdSymbol.get().equals(symbol)) {
+                    groupIdChannel = Optional.of(channel);
+                }
+                channel++;
+            }
+
+            // hashChannel follows the group by channels
+            if (hashSymbol.isPresent()) {
+                outputMappings.put(hashSymbol.get(), channel++);
+            }
+
+            // aggregations go in following channels
+            for (Symbol symbol : aggregationOutputSymbols) {
+                outputMappings.put(symbol, channel);
+                channel++;
+            }
+
+            // finalizeValue follows the aggregations by channels
+            if (finalizeSymbol.isPresent() && step.get().equals(PARTIAL)) {
+                outputMappings.put(finalizeSymbol.get(), channel++);
+            }
+            return groupIdChannel;
         }
     }
 

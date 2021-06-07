@@ -177,8 +177,24 @@ public class SortAggregationOperator
                 memoryLimitForMerge, memoryLimitForMergeWithMemory, spillerFactory, joinCompiler, useSystemMemory);
     }
 
-    public AggregationBuilder createPartialAggregationBuilder(AggregationNode.AggregationType aggregationType)
+    public AggregationBuilder createAggregationBuilder(Page page, boolean spillEnabled)
     {
+        AggregationNode.AggregationType aggregationType;
+        if (step.equals(AggregationNode.Step.FINAL)) {
+            if (BOOLEAN.getBoolean(page.getBlock(page.getChannelCount() - pageFinalizeLocation), 0)) {
+                // page contains finalized values show go to sort aggregation
+                aggregationType = AggregationNode.AggregationType.SORT_BASED;
+            }
+            else {
+                //corner values we should use hash aggregation
+                aggregationType = AggregationNode.AggregationType.HASH;
+            }
+        }
+        else {
+            // For partial Aggregation only sort based one is chosen
+            aggregationType = AggregationNode.AggregationType.SORT_BASED;
+        }
+
         if (aggregationType.equals(AggregationNode.AggregationType.SORT_BASED)) {
             //sort aggregation is done for finalized values
             this.aggregationBuilderType = AggregationNode.AggregationType.SORT_BASED;
@@ -201,7 +217,7 @@ public class SortAggregationOperator
                         return operatorContext.isWaitingForMemory().isDone();
                     });
         }
-        else {
+        else if (!spillEnabled) {
             //hash aggregation is done for not finalized values
             this.aggregationBuilderType = AggregationNode.AggregationType.HASH;
             return new InMemoryHashAggregationBuilder(
@@ -216,31 +232,6 @@ public class SortAggregationOperator
                     joinCompiler,
                     () -> {
                         memoryContext.setBytes(((InMemoryHashAggregationBuilder) aggregationBuilder).getSizeInMemory());
-                        if (step.isOutputPartial() && maxPartialMemory.isPresent()) {
-                            // do not yield on memory for partial aggregations
-                            return true;
-                        }
-                        return operatorContext.isWaitingForMemory().isDone();
-                    });
-        }
-    }
-
-    public AggregationBuilder createFinalAggregationBuilder(AggregationNode.AggregationType aggregationType)
-    {
-        if (aggregationType.equals(AggregationNode.AggregationType.SORT_BASED)) {
-            this.aggregationBuilderType = AggregationNode.AggregationType.SORT_BASED;
-            return new InMemorySortAggregationBuilder(
-                    accumulatorFactories,
-                    step,
-                    expectedGroups,
-                    groupByTypes,
-                    groupByChannels,
-                    hashChannel,
-                    operatorContext,
-                    maxPartialMemory,
-                    joinCompiler,
-                    () -> {
-                        memoryContext.setBytes(((InMemorySortAggregationBuilder) aggregationBuilder).getSizeInMemory());
                         if (step.isOutputPartial() && maxPartialMemory.isPresent()) {
                             // do not yield on memory for partial aggregations
                             return true;
@@ -276,30 +267,10 @@ public class SortAggregationOperator
         if (aggregationBuilder == null) {
             // TODO: We ignore spillEnabled here if any aggregate has ORDER BY clause or DISTINCT because they are not yet implemented for spilling.
             if (step.isOutputPartial() || !spillEnabled || hasOrderBy() || hasDistinct()) {
-                if (step.equals(AggregationNode.Step.FINAL)) {
-                    if (BOOLEAN.getBoolean(page.getBlock(page.getChannelCount() - pageFinalizeLocation), 0)) {
-                        // page contains finalized values show go to sort aggregation
-                        aggregationBuilder = createPartialAggregationBuilder(AggregationNode.AggregationType.SORT_BASED);
-                    }
-                    else {
-                        //corner values we should use hash aggregation
-                        aggregationBuilder = createPartialAggregationBuilder(AggregationNode.AggregationType.HASH);
-                    }
-                }
-                else {
-                    aggregationBuilder = createPartialAggregationBuilder(AggregationNode.AggregationType.SORT_BASED);
-                }
+                aggregationBuilder = createAggregationBuilder(page, false);
             }
             else {
-                if (BOOLEAN.getBoolean(page.getBlock(page.getChannelCount() - pageFinalizeLocation), 0)) {
-                    // finalized values show go to sort aggregation
-                    aggregationBuilder = createFinalAggregationBuilder(AggregationNode.AggregationType.SORT_BASED);
-                }
-                else {
-                    //corner values we should use hash aggregation
-                    aggregationBuilder = createFinalAggregationBuilder(AggregationNode.AggregationType.HASH);
-                    LOG.debug("spill hash obj : " + aggregationBuilder.toString());
-                }
+                aggregationBuilder = createAggregationBuilder(page, true);
             }
         }
         else {
