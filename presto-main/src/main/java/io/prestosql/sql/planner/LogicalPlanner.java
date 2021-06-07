@@ -16,6 +16,7 @@ package io.prestosql.sql.planner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import io.hetu.core.spi.cube.CubeFilter;
 import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.CubeStatus;
 import io.prestosql.Session;
@@ -97,7 +98,6 @@ import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.sql.tree.NullLiteral;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.Query;
-import io.prestosql.sql.tree.QuerySpecification;
 import io.prestosql.sql.tree.Statement;
 import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.Update;
@@ -489,12 +489,11 @@ public class LogicalPlanner
                 visibleTableColumnNames,
                 newTableLayout,
                 statisticsMetadata);
-        Expression cubeWhere = analysis.getWhere((QuerySpecification) (insertCubeStatement.getQuery().getQueryBody()));
         Expression rewritten = null;
         Set<Identifier> predicateColumns = new HashSet<>();
-        if (cubeWhere != null) {
+        if (insertCubeStatement.getWhere().isPresent()) {
             rewritten = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session, namedSubPlan, uniqueIdAllocator)
-                    .rewriteExpression(tableWriterPlan, cubeWhere, analysis, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator));
+                    .rewriteExpression(tableWriterPlan, insertCubeStatement.getWhere().get(), analysis, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator));
             predicateColumns.addAll(ExpressionUtils.getIdentifiers(rewritten));
         }
         CubeMetadata cubeMetadata = insert.getMetadata();
@@ -520,7 +519,7 @@ public class LogicalPlanner
                 new CubeUpdateMetadata(
                         tableMetadata.getQualifiedName().toString(),
                         tableLastModifiedTimeSupplier.getAsLong(),
-                        cubeWhere != null ? ExpressionFormatter.formatExpression(rewritten, Optional.empty()) : null,
+                        rewritten != null ? ExpressionFormatter.formatExpression(rewritten, Optional.empty()) : null,
                         insertCubeStatement.isOverwrite()),
                         predicateColumnsType);
         return new RelationPlan(cubeFinishNode, analysis.getScope(insertCubeStatement), cubeFinishNode.getOutputSymbols());
@@ -540,12 +539,13 @@ public class LogicalPlanner
             return false;
         }
 
-        if (cubeMetadata.getPredicateString() == null) {
+        CubeFilter cubeFilter = cubeMetadata.getCubeFilter();
+        if (cubeFilter == null || cubeFilter.getCubePredicate() == null) {
             //Means Cube was created for entire dataset.
             return true;
         }
         SqlParser sqlParser = new SqlParser();
-        Expression cubePredicateAsExpr = sqlParser.createExpression(cubeMetadata.getPredicateString(), createParsingOptions(session));
+        Expression cubePredicateAsExpr = sqlParser.createExpression(cubeFilter.getCubePredicate(), createParsingOptions(session));
         cubePredicateAsExpr = ExpressionUtils.rewriteIdentifiersToSymbolReferences(cubePredicateAsExpr);
         ExpressionDomainTranslator.ExtractionResult decomposedCubePredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, cubePredicateAsExpr, types);
         return decomposedCubePredicate.getTupleDomain().overlaps(decomposedNewDataPredicate.getTupleDomain());

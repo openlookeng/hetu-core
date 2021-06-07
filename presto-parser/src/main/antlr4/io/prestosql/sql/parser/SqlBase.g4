@@ -188,6 +188,7 @@ cubeProperties
 cubeProperty
     : AGGREGATIONS EQ '(' aggregations ')'
     | GROUP EQ '(' cubeGroup ')'
+    | FILTER EQ '(' sourceFilter ')'
     | property
     ;
 
@@ -301,6 +302,10 @@ groupingSet
 
 cubeGroup
     : (identifier (',' identifier)*)?
+    ;
+
+sourceFilter
+    : expression
     ;
 
 namedQuery

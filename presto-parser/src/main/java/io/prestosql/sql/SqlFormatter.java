@@ -998,6 +998,11 @@ public final class SqlFormatter
                     .collect(joining(", "));
             builder.append("AGGREGATIONS = (").append(aggregations).append("), ");
             builder.append("GROUP=(").append(group).append(")");
+            node.getSourceFilter().ifPresent(predicate -> {
+                builder.append(", FILTER  = (")
+                        .append(formatExpression(predicate, parameters))
+                        .append(")");
+            });
             if (!node.getProperties().isEmpty()) {
                 String properties = node.getProperties().stream()
                         .map(element -> formatExpression(element.getName(), parameters) + " = " + formatExpression(element.getValue(), parameters))
@@ -1005,6 +1010,9 @@ public final class SqlFormatter
                 builder.append(", ").append(properties);
             }
             builder.append(" )");
+            node.getWhere().ifPresent(predicate -> {
+                builder.append(" WHERE ").append(formatExpression(predicate, parameters));
+            });
             return null;
         }
 

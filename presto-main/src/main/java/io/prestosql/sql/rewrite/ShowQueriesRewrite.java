@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
+import io.hetu.core.spi.cube.CubeFilter;
 import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.CubeStatus;
 import io.hetu.core.spi.cube.aggregator.AggregationSignature;
@@ -310,31 +311,43 @@ final class ShowQueriesRewrite
                     new StringLiteral(""),
                     FALSE_LITERAL));
             cubeMetadataList.forEach(cubeMetadata -> {
+                CubeFilter cubeFilter = cubeMetadata.getCubeFilter();
+                String cubeFilterString = "";
+                if (cubeFilter != null) {
+                    if (cubeFilter.getSourceTablePredicate() != null) {
+                        cubeFilterString = cubeFilter.getSourceTablePredicate() + Optional.ofNullable(cubeFilter.getCubePredicate())
+                                .map(predicate -> " AND " + predicate)
+                                .orElse("");
+                    }
+                    else {
+                        cubeFilterString = cubeFilter.getCubePredicate();
+                    }
+                }
                 rows.add(row(
-                        new StringLiteral(cubeMetadata.getCubeName()),
                         new StringLiteral(cubeMetadata.getSourceTableName()),
+                        new StringLiteral(cubeMetadata.getCubeName()),
                         new StringLiteral(cubeStatusMap.get(cubeMetadata.getCubeName())),
                         new StringLiteral(String.join(",", cubeMetadata.getDimensions())),
                         new StringLiteral(cubeMetadata.getAggregationSignatures().stream().map(AggregationSignature::toString).collect(Collectors.joining(","))),
-                        new StringLiteral(String.join(",", cubeMetadata.getPredicateString())),
+                        new StringLiteral(cubeFilterString),
                         TRUE_LITERAL));
             });
 
             ImmutableList<Expression> expressions = rows.build();
             return simpleQuery(
                     selectList(
-                            aliasedName("cube_name", "Cube Name"),
                             aliasedName("table_name", "Table Name"),
+                            aliasedName("cube_name", "Cube Name"),
                             aliasedName("cube_status", "Status"),
                             aliasedName("dimensions", "Dimensions"),
                             aliasedName("aggregations", "Aggregations"),
-                            aliasedName("predicate_string", "Where Clause")),
+                            aliasedName("cube_predicate", "Cube Predicate")),
                     aliased(
                             new Values(expressions),
                             "Cube Result",
-                            ImmutableList.of("cube_name", "table_name", "cube_status", "dimensions", "aggregations", "predicate_string", "include")),
+                            ImmutableList.of("table_name", "cube_name", "cube_status", "dimensions", "aggregations", "cube_predicate", "include")),
                     identifier("include"),
-                    ordering(ascending("cube_name")));
+                    ordering(ascending("table_name"), ascending("cube_name")));
         }
 
         @Override

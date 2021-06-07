@@ -17,17 +17,12 @@ package io.prestosql.cube;
 
 import io.hetu.core.spi.cube.CubeStatement;
 import io.hetu.core.spi.cube.aggregator.AggregationSignature;
-import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.plan.AggregationNode;
-import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
-import io.prestosql.sql.ExpressionFormatter;
-import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.optimizations.StarTreeAggregationRule;
-import io.prestosql.sql.planner.planprinter.RowExpressionFormatter;
 import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.LongLiteral;
@@ -36,8 +31,6 @@ import io.prestosql.sql.tree.SymbolReference;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
 
 public class CubeStatementGenerator
 {
@@ -47,10 +40,8 @@ public class CubeStatementGenerator
     }
 
     public static CubeStatement generate(
-            Metadata metadata,
             String fromTable,
             AggregationNode aggregationNode,
-            FilterNode filterNode,
             Map<String, Object> symbolMappings)
     {
         CubeStatement.Builder builder = CubeStatement.newBuilder();
@@ -106,31 +97,6 @@ public class CubeStatementGenerator
             else {
                 // Don't know how to handle it
                 throw new IllegalArgumentException("Column " + symbol + " is not an actual column");
-            }
-        }
-
-        if (filterNode != null) {
-            RowExpression predicate = filterNode.getPredicate();
-            Set<Symbol> expressionSymbols = SymbolsExtractor.extractUnique(predicate);
-            for (Symbol symbol : expressionSymbols) {
-                Object column = symbolMappings.get(symbol.getName());
-                if (column instanceof ColumnHandle) {
-                    builder.select(((ColumnHandle) column).getColumnName());
-                    builder.groupBy(((ColumnHandle) column).getColumnName());
-                }
-                else {
-                    // Don't know how to handle it
-                    throw new IllegalArgumentException("Column " + symbol + " is not an actual column");
-                }
-            }
-
-            if (OriginalExpressionUtils.isExpression(predicate)) {
-                Expression expression = OriginalExpressionUtils.castToExpression(predicate);
-                builder.where(ExpressionFormatter.formatExpression(expression, Optional.empty()));
-            }
-            else {
-                String predicateString = new RowExpressionFormatter(metadata).formatRowExpression(predicate);
-                builder.where(predicateString);
             }
         }
         return builder.build();

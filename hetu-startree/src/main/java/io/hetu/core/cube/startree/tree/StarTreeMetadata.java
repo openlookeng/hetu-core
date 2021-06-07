@@ -20,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import io.hetu.core.spi.cube.CubeFilter;
 import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.CubeStatement;
 import io.hetu.core.spi.cube.CubeStatus;
@@ -52,7 +53,7 @@ public class StarTreeMetadata
 
     private final List<Set<String>> groups;
 
-    private final String predicateString;
+    private final CubeFilter cubeFilter;
 
     private final long sourceTableLastUpdatedTime;
 
@@ -69,7 +70,7 @@ public class StarTreeMetadata
             @JsonProperty("sourceTableLastUpdatedTime") long sourceTableLastUpdatedTime,
             @JsonProperty("columns") List<StarTreeColumn> columns,
             @JsonProperty("groups") List<Set<String>> groups,
-            @JsonProperty("predicateString") String predicateString,
+            @JsonProperty("cubeFilter") CubeFilter cubeFilter,
             @JsonProperty("lastUpdatedTime") long lastUpdatedTime,
             @JsonProperty("cubeStatus") CubeStatus cubeStatus)
     {
@@ -80,7 +81,7 @@ public class StarTreeMetadata
         requireNonNull(groups, "groups is null").forEach(group -> {
             this.groups.add(new TreeSet<>(group));
         });
-        this.predicateString = predicateString;
+        this.cubeFilter = cubeFilter;
         this.sourceTableLastUpdatedTime = sourceTableLastUpdatedTime;
         this.lastUpdatedTime = lastUpdatedTime;
         this.cubeStatus = cubeStatus;
@@ -114,9 +115,9 @@ public class StarTreeMetadata
     }
 
     @JsonProperty
-    public String getPredicateString()
+    public CubeFilter getCubeFilter()
     {
-        return predicateString;
+        return cubeFilter;
     }
 
     @JsonProperty
@@ -147,25 +148,33 @@ public class StarTreeMetadata
     @Override
     public boolean matches(CubeStatement statement)
     {
+        //Predicate column checks are done separately
         return this.sourceTableName.equals(statement.getFrom()) &&
-                hasDimensions(statement.getSelection()) &&
-                hasGroup(statement.getGroupBy()) &&
-                supportAggregations(statement.getAggregations()) &&
+                areAggregationsSupported(statement.getAggregations()) &&
+                hasColumns(statement.getSelection()) &&
+                //As of now only one group per cube is supported
+                groupMatches(statement.getAggregations().stream().anyMatch(AggregationSignature::isDistinct), statement.getGroupBy()) &&
                 getCubeStatus() != CubeStatus.INACTIVE;
     }
 
-    private boolean hasDimensions(Collection<String> dimensions)
+    private boolean hasColumns(Collection<String> columns)
     {
-        return getDimensions().containsAll(dimensions);
+        return getDimensions().containsAll(columns);
     }
 
-    private boolean hasGroup(Set<String> group)
+    private boolean groupMatches(boolean hasDistinctAgg, Set<String> group)
     {
         Set<String> sorted = new TreeSet<>(group);
-        return groups.stream().anyMatch(cubeGroup -> cubeGroup.equals(sorted));
+        if (hasDistinctAgg) {
+            //if cube supports count distinct then group by should match exactly
+            return groups.stream().anyMatch(cubeGroup -> cubeGroup.equals(sorted));
+        }
+        else {
+            return groups.stream().anyMatch(cubeGroup -> cubeGroup.containsAll(sorted));
+        }
     }
 
-    private boolean supportAggregations(Collection<AggregationSignature> aggregations)
+    private boolean areAggregationsSupported(Collection<AggregationSignature> aggregations)
     {
         Collection<AggregationSignature> decomposedAggregations = new ArrayList<>();
         aggregations.forEach(aggregationSignature -> {
@@ -266,21 +275,23 @@ public class StarTreeMetadata
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
+
         StarTreeMetadata that = (StarTreeMetadata) o;
-        return sourceTableLastUpdatedTime == that.sourceTableLastUpdatedTime
-                && lastUpdatedTime == that.lastUpdatedTime
-                && starTreeName.equals(that.starTreeName)
-                && sourceTableName.equals(that.sourceTableName)
-                && columns.equals(that.columns)
-                && groups.equals(that.groups)
-                && predicateString.equals(that.predicateString)
-                && cubeStatus == that.cubeStatus;
+
+        return Objects.equals(sourceTableLastUpdatedTime, that.sourceTableLastUpdatedTime)
+                && Objects.equals(lastUpdatedTime, that.lastUpdatedTime)
+                && Objects.equals(starTreeName, that.starTreeName)
+                && Objects.equals(sourceTableName, that.sourceTableName)
+                && Objects.equals(columns, that.columns)
+                && Objects.equals(groups, that.groups)
+                && Objects.equals(cubeFilter, that.cubeFilter)
+                && Objects.equals(cubeStatus, that.cubeStatus);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(starTreeName, sourceTableName, columns, groups, predicateString, sourceTableLastUpdatedTime, lastUpdatedTime, cubeStatus);
+        return Objects.hash(starTreeName, sourceTableName, columns, groups, cubeFilter, sourceTableLastUpdatedTime, lastUpdatedTime, cubeStatus);
     }
 
     @Override
@@ -291,7 +302,7 @@ public class StarTreeMetadata
                 ", sourceTableName='" + sourceTableName + '\'' +
                 ", columns=" + columns +
                 ", groups=" + groups +
-                ", predicateString='" + predicateString + '\'' +
+                ", cubeFilter=" + cubeFilter + '\'' +
                 ", sourceTableLastUpdatedTime=" + sourceTableLastUpdatedTime +
                 ", lastUpdatedTime=" + lastUpdatedTime +
                 ", cubeStatus=" + cubeStatus +

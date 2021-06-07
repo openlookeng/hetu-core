@@ -64,6 +64,7 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeNotFoundException;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.VarcharType;
+import io.prestosql.sql.ExpressionUtils;
 import io.prestosql.sql.SqlPath;
 import io.prestosql.sql.parser.ParsingException;
 import io.prestosql.sql.parser.SqlParser;
@@ -760,6 +761,7 @@ class StatementAnalyzer
             Scope queryScope = process(new Table(node.getSourceTableName()), scope);
             ImmutableList.Builder<Field> outputFields = ImmutableList.builder();
             for (FunctionCall aggFunction : aggFunctions) {
+                //count(1) or count(col)
                 String argument = aggFunction.getArguments().isEmpty() || aggFunction.getArguments().get(0) instanceof LongLiteral ? null : ((Identifier) aggFunction.getArguments().get(0)).getValue();
                 String aggFunctionName = aggFunction.getName().toString().toLowerCase(ENGLISH);
                 if (!cubeSupportedFunctions.contains(aggFunctionName)) {
@@ -781,7 +783,16 @@ class StatementAnalyzer
                     outputFields.add(Field.newUnqualified(aggFunctionName + "_" + "all" + (aggFunction.isDistinct() ? "_distinct" : ""), BIGINT));
                 }
             }
-
+            Optional<Expression> sourceFilterPredicate = node.getSourceFilter();
+            sourceFilterPredicate.ifPresent(predicate -> {
+                Set<Identifier> predicateColumns = ExpressionUtils.getIdentifiers(predicate);
+                node.getGroupingSet().stream()
+                        .filter(predicateColumns::contains)
+                        .findFirst()
+                        .ifPresent(identifier -> {
+                            throw new SemanticException(NOT_SUPPORTED, node, "Column '%s' not allowed in source filter predicate. Source filter predicate cannot contain any of the columns defined in Group property", identifier);
+                        });
+            });
             return createAndAssignScope(node, scope, outputFields.build());
         }
 

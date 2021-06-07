@@ -102,22 +102,22 @@ public abstract class AbstractTestStarTreeQueries
                 " min(regionkey), max(regionkey), max(nationkey), min(nationkey))," +
                 " group=())");
         MaterializedResult result = computeActual("SHOW CUBES FOR nation_show_cube_table_1");
-        MaterializedRow matchingRow1 = result.getMaterializedRows().stream().filter(row -> row.getField(0).toString().contains("nation_show_cube_1")).findFirst().orElse(null);
+        MaterializedRow matchingRow1 = result.getMaterializedRows().stream().filter(row -> row.getField(1).toString().contains("nation_show_cube_1")).findFirst().orElse(null);
         assertNotNull(matchingRow1);
         assertTrue(matchingRow1.getFields().containsAll(ImmutableList.of("hive.tpch.nation_show_cube_1", "hive.tpch.nation_show_cube_table_1", "Inactive", "nationkey")));
 
-        MaterializedRow matchingRow2 = result.getMaterializedRows().stream().filter(row -> row.getField(0).toString().contains("nation_show_cube_2")).findFirst().orElse(null);
+        MaterializedRow matchingRow2 = result.getMaterializedRows().stream().filter(row -> row.getField(1).toString().contains("nation_show_cube_2")).findFirst().orElse(null);
         assertNotNull(matchingRow2);
         assertTrue(matchingRow2.getFields().containsAll(ImmutableList.of("hive.tpch.nation_show_cube_2", "hive.tpch.nation_show_cube_table_1", "Inactive", "")));
 
         result = computeActual("SHOW CUBES FOR nation_show_cube_table_1");
         assertEquals(result.getRowCount(), 2);
 
-        matchingRow1 = result.getMaterializedRows().stream().filter(row -> row.getField(0).toString().contains("nation_show_cube_1")).findFirst().orElse(null);
+        matchingRow1 = result.getMaterializedRows().stream().filter(row -> row.getField(1).toString().contains("nation_show_cube_1")).findFirst().orElse(null);
         assertNotNull(matchingRow1);
         assertTrue(result.getMaterializedRows().get(0).getFields().containsAll(ImmutableList.of("hive.tpch.nation_show_cube_1", "hive.tpch.nation_show_cube_table_1", "Inactive", "nationkey")));
 
-        matchingRow2 = result.getMaterializedRows().stream().filter(row -> row.getField(0).toString().contains("nation_show_cube_2")).findFirst().orElse(null);
+        matchingRow2 = result.getMaterializedRows().stream().filter(row -> row.getField(1).toString().contains("nation_show_cube_2")).findFirst().orElse(null);
         assertNotNull(matchingRow2);
         assertTrue(result.getMaterializedRows().get(1).getFields().containsAll(ImmutableList.of("hive.tpch.nation_show_cube_2", "hive.tpch.nation_show_cube_table_1", "Inactive", "")));
         assertUpdate("DROP CUBE nation_show_cube_1");
@@ -135,7 +135,7 @@ public abstract class AbstractTestStarTreeQueries
                 " group=(nationkey), format= 'orc', partitioned_by = ARRAY['nationkey'])");
         assertUpdate("INSERT INTO CUBE nation_insert_cube_1 where nationkey > 5", 19);
         assertQueryFails("INSERT INTO CUBE nation where 1 > 0", "Cube not found 'hive.tpch.nation'");
-        assertQueryFails("INSERT INTO CUBE nation_insert_cube_1 where regionkey > 5", "All columns in where clause must be part Cube group\\.");
+        assertQueryFails("INSERT INTO CUBE nation_insert_cube_1 where regionkey > 5", "Some columns in 'regionkey' in where clause are not part of Cube.");
         assertUpdate("DROP CUBE nation_insert_cube_1");
         assertUpdate("DROP TABLE nation_table_cube_insert_test_1");
     }
@@ -214,6 +214,10 @@ public abstract class AbstractTestStarTreeQueries
         assertQuery(sessionStarTree,
                 "SELECT count(*) FROM nation_table_multi_column_group WHERE name = 'CHINA' GROUP BY name",
                 "SELECT count(*) FROM nation WHERE name = 'CHINA' GROUP BY name",
+                assertTableScan("nation_cube_multi_column_group"));
+        assertQuery(sessionStarTree,
+                "SELECT count(*) FROM nation_table_multi_column_group WHERE name = 'CHINA' GROUP BY nationkey, regionkey",
+                "SELECT count(*) FROM nation WHERE name = 'CHINA' GROUP BY nationkey, regionkey",
                 assertTableScan("nation_table_multi_column_group"));
         assertQuery(sessionStarTree,
                 "SELECT count(*) FROM nation_table_multi_column_group WHERE name = 'CHINA' GROUP BY name, regionkey",
@@ -335,13 +339,13 @@ public abstract class AbstractTestStarTreeQueries
                 " min(regionkey), max(regionkey), max(nationkey), min(nationkey))," +
                 " group=(nationkey), format= 'orc', partitioned_by = ARRAY['nationkey'])");
         MaterializedResult result = computeActual("SHOW CUBES FOR nation_table_status_test");
-        MaterializedRow matchingRow = result.getMaterializedRows().stream().filter(row -> row.getField(0).toString().contains("nation_status_cube_1")).findFirst().orElse(null);
+        MaterializedRow matchingRow = result.getMaterializedRows().stream().filter(row -> row.getField(1).toString().contains("nation_status_cube_1")).findFirst().orElse(null);
         assertNotNull(matchingRow);
         assertEquals(matchingRow.getField(2), "Inactive");
 
         assertUpdate("INSERT INTO CUBE nation_status_cube_1 where nationkey > 5", 19);
         result = computeActual("SHOW CUBES FOR nation_table_status_test");
-        matchingRow = result.getMaterializedRows().stream().filter(row -> row.getField(0).toString().contains("nation_status_cube_1")).findFirst().orElse(null);
+        matchingRow = result.getMaterializedRows().stream().filter(row -> row.getField(1).toString().contains("nation_status_cube_1")).findFirst().orElse(null);
         assertNotNull(matchingRow);
         assertEquals(matchingRow.getField(2), "Active");
 
@@ -546,7 +550,50 @@ public abstract class AbstractTestStarTreeQueries
                 "SELECT orderdate, count(distinct custkey) FROM orders_count_distinct WHERE orderdate BETWEEN date '1992-01-01' AND date '1992-01-10' GROUP BY orderdate ORDER BY orderdate",
                 "SELECT orderdate, count(distinct custkey) FROM orders WHERE orderdate BETWEEN '1992-01-01' AND '1992-01-10' GROUP BY orderdate ORDER BY orderdate",
                 assertTableScan("orders_count_distinct_cube"));
-        assertQuerySucceeds("DROP TABLE orders_count_distinct");
+        assertUpdate("DROP TABLE orders_count_distinct");
+    }
+
+    @Test
+    public void testWithSourceFilter()
+    {
+        computeActual("CREATE TABLE orders_source_filter_test AS SELECT * FROM orders");
+        computeActual("CREATE CUBE orders_cube_with_source_filter ON orders_source_filter_test WITH (AGGREGATIONS = (sum(totalprice), count(distinct orderkey)), GROUP = (custkey), FILTER = (orderdate BETWEEN date '1992-01-01' AND date '1992-01-10' AND orderstatus IN('F', 'O')))");
+        assertQuerySucceeds("INSERT INTO CUBE orders_cube_with_source_filter");
+        assertQuery(sessionStarTree,
+                "SELECT custkey, sum(totalprice), count(distinct orderkey) FROM orders_source_filter_test WHERE orderdate BETWEEN date '1992-01-01' AND date '1992-01-10' AND orderstatus = 'F' GROUP BY custkey",
+                "SELECT custkey, sum(totalprice), count(distinct orderkey) FROM orders WHERE orderdate BETWEEN '1992-01-01' and '1992-01-10' AND orderstatus = 'F' GROUP BY custkey",
+                assertTableScan("orders_source_filter_test"));
+        assertQuery(sessionStarTree,
+                "SELECT custkey, sum(totalprice), count(distinct orderkey) FROM orders_source_filter_test WHERE orderdate BETWEEN date '1992-01-01' AND date '1992-01-10' AND orderstatus IN('F', 'O') GROUP BY custkey",
+                "SELECT custkey, sum(totalprice), count(distinct orderkey) FROM orders WHERE orderdate BETWEEN '1992-01-01' and '1992-01-10' AND orderstatus IN('F', 'O') GROUP BY custkey",
+                assertTableScan("orders_cube_with_source_filter"));
+        assertUpdate("DROP TABLE orders_source_filter_test");
+    }
+
+    @Test
+    public void testWithSourceFilterAndDataFilter()
+    {
+        computeActual("CREATE TABLE orders_table_source_data_filter AS SELECT * FROM orders");
+        computeActual("CREATE CUBE orders_cube_source_data_filter ON orders_table_source_data_filter WITH (AGGREGATIONS = (sum(totalprice), count(distinct orderkey)), GROUP = (custkey, orderpriority), FILTER = (orderdate BETWEEN date '1992-01-01' AND date '1992-01-10'))");
+        assertQuerySucceeds("INSERT INTO CUBE orders_cube_source_data_filter WHERE orderpriority = '1-URGENT'");
+        assertQuery(sessionStarTree,
+                "SELECT custkey, orderpriority, sum(totalprice) FROM orders_table_source_data_filter WHERE orderdate BETWEEN date '1992-01-01' AND date '1992-01-10' group by custkey, orderpriority",
+                "SELECT custkey, orderpriority, sum(totalprice) FROM orders WHERE orderdate BETWEEN '1992-01-01' AND '1992-01-10' group by custkey, orderpriority",
+                assertTableScan("orders_table_source_data_filter"));
+        assertQuery(sessionStarTree,
+                "SELECT custkey, orderpriority, sum(totalprice), count(distinct orderkey) FROM orders_table_source_data_filter WHERE orderdate BETWEEN date '1992-01-01' AND date '1992-01-10' AND orderpriority = '1-URGENT' GROUP BY custkey, orderpriority ORDER BY custkey, orderpriority",
+                "SELECT custkey, orderpriority, sum(totalprice), count(distinct orderkey) FROM orders WHERE orderdate BETWEEN '1992-01-01' and '1992-01-10' AND orderpriority = '1-URGENT' GROUP BY custkey, orderpriority ORDER BY custkey, orderpriority",
+                assertTableScan("orders_cube_source_data_filter"));
+        assertQuerySucceeds("INSERT INTO CUBE orders_cube_source_data_filter WHERE orderpriority = '2-HIGH'");
+        assertQuery(sessionStarTree,
+                "SELECT custkey, orderpriority, sum(totalprice), count(distinct orderkey) FROM orders_table_source_data_filter WHERE orderdate BETWEEN date '1992-01-01' AND date '1992-01-10' AND orderpriority = '2-HIGH' GROUP BY custkey, orderpriority ORDER BY custkey, orderpriority",
+                "SELECT custkey, orderpriority, sum(totalprice), count(distinct orderkey) FROM orders WHERE orderdate BETWEEN '1992-01-01' and '1992-01-10' AND orderpriority = '2-HIGH' GROUP BY custkey, orderpriority ORDER BY custkey, orderpriority",
+                assertTableScan("orders_cube_source_data_filter"));
+        assertQuery(sessionStarTree,
+                "SELECT custkey, orderpriority, sum(totalprice), count(distinct orderkey) FROM orders_table_source_data_filter WHERE orderdate BETWEEN date '1992-01-01' AND date '1992-01-10' AND (orderpriority = '1-URGENT' OR orderpriority = '2-HIGH') GROUP BY custkey, orderpriority ORDER BY custkey, orderpriority",
+                "SELECT custkey, orderpriority, sum(totalprice), count(distinct orderkey) FROM orders WHERE orderdate BETWEEN '1992-01-01' and '1992-01-10' AND orderpriority IN ('1-URGENT', '2-HIGH') GROUP BY custkey, orderpriority ORDER BY custkey, orderpriority",
+                assertTableScan("orders_cube_source_data_filter"));
+        assertUpdate("DROP TABLE orders_table_source_data_filter");
     }
 
     private Consumer<Plan> assertInTableScans(String tableName)

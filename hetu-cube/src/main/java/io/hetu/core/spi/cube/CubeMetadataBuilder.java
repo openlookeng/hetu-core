@@ -25,7 +25,7 @@ public interface CubeMetadataBuilder
 
     void addGroup(Set<String> group);
 
-    void withPredicate(String predicateString);
+    void withCubeFilter(CubeFilter cubeFilter);
 
     void setCubeStatus(CubeStatus cubeStatus);
 

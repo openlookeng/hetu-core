@@ -157,7 +157,7 @@ public class CubeConsole
             List<Identifier> groupingSet = createCube.getGroupingSet();
             List<Property> properties = createCube.getProperties();
             boolean notExists = createCube.isNotExists();
-            CreateCube modifiedCreateCube = new CreateCube(cubeName, sourceTableName, groupingSet, aggregations, notExists, properties, Optional.empty());
+            CreateCube modifiedCreateCube = new CreateCube(cubeName, sourceTableName, groupingSet, aggregations, notExists, properties, Optional.empty(), createCube.getSourceFilter().orElse(null));
             String queryCreateCube = SqlFormatter.formatSql(modifiedCreateCube, Optional.empty());
 
             console.runQuery(queryRunner, queryCreateCube, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);

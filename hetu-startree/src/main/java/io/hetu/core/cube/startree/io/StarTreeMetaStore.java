@@ -23,6 +23,7 @@ import io.hetu.core.cube.startree.tree.DimensionColumn;
 import io.hetu.core.cube.startree.tree.StarTreeColumn;
 import io.hetu.core.cube.startree.tree.StarTreeMetadata;
 import io.hetu.core.cube.startree.tree.StarTreeMetadataBuilder;
+import io.hetu.core.spi.cube.CubeFilter;
 import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.CubeMetadataBuilder;
 import io.hetu.core.spi.cube.CubeStatus;
@@ -55,6 +56,7 @@ public class StarTreeMetaStore
     public static final String ORIGINAL_COLUMN = "originalColumn";
     public static final String STAR_TABLE_NAME = "starTableName";
     public static final String GROUPING_STRING = "groupingString";
+    public static final String SOURCE_FILTER_STRING = "sourceFilterString";
     public static final String PREDICATE_STRING = "predicateString";
     public static final String CUBE_STATUS = "cubeStatus";
     public static final String SOURCE_TABLE_LAST_UPDATED_TIME = "sourceLastUpdatedTime";
@@ -90,7 +92,11 @@ public class StarTreeMetaStore
             String groupingString = table.getParameters().get(GROUPING_STRING);
             //Create empty set to support Empty Group
             builder.addGroup((groupingString == null || groupingString.isEmpty()) ? new HashSet<>() : Sets.newHashSet(groupingString.split(COLUMN_DELIMITER)));
-            builder.withPredicate(table.getParameters().get(PREDICATE_STRING));
+            String sourceTablePredicate = table.getParameters().get(SOURCE_FILTER_STRING);
+            String cubePredicate = table.getParameters().get(PREDICATE_STRING);
+            if (sourceTablePredicate != null || cubePredicate != null) {
+                builder.withCubeFilter(new CubeFilter(sourceTablePredicate, cubePredicate));
+            }
             builder.setCubeStatus(CubeStatus.forValue(Integer.parseInt(table.getParameters().get(CUBE_STATUS))));
             builder.setTableLastUpdatedTime(Long.parseLong(table.getParameters().get(SOURCE_TABLE_LAST_UPDATED_TIME)));
             builder.setCubeLastUpdatedTime(Long.parseLong(table.getParameters().get(CUBE_LAST_UPDATED_TIME)));
@@ -210,7 +216,8 @@ public class StarTreeMetaStore
         parameters.put(SOURCE_TABLE_NAME, starTreeMetadata.getSourceTableName());
         parameters.put(STAR_TABLE_NAME, starTreeMetadata.getCubeName());
         parameters.put(GROUPING_STRING, String.join(COLUMN_DELIMITER, starTreeMetadata.getGroup()));
-        parameters.put(PREDICATE_STRING, starTreeMetadata.getPredicateString());
+        parameters.put(SOURCE_FILTER_STRING, starTreeMetadata.getCubeFilter() == null ? null : starTreeMetadata.getCubeFilter().getSourceTablePredicate());
+        parameters.put(PREDICATE_STRING, starTreeMetadata.getCubeFilter() == null ? null : starTreeMetadata.getCubeFilter().getCubePredicate());
         parameters.put(CUBE_STATUS, String.valueOf(starTreeMetadata.getCubeStatus().getValue()));
         parameters.put(CUBE_LAST_UPDATED_TIME, String.valueOf(starTreeMetadata.getLastUpdatedTime()));
         parameters.put(SOURCE_TABLE_LAST_UPDATED_TIME, String.valueOf(starTreeMetadata.getSourceTableLastUpdatedTime()));

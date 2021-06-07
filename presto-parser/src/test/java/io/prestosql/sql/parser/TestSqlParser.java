@@ -1652,7 +1652,23 @@ public class TestSqlParser
                         ImmutableSet.of(
                                 new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("c")))),
                         false,
-                        ImmutableList.of(), Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10")))));
+                        ImmutableList.of(),
+                        Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10"))),
+                        null));
+
+        assertStatement("CREATE CUBE foo ON bar WITH (AGGREGATIONS=(count(distinct c), sum(e)), GROUP = (a, b), FILTER = (f between 1 and 10)) WHERE d1 > 10",
+                new CreateCube(QualifiedName.of("foo"),
+                        QualifiedName.of("bar"),
+                        ImmutableList.of(
+                                new Identifier("a"),
+                                new Identifier("b")),
+                        ImmutableSet.of(
+                                new FunctionCall(QualifiedName.of("count"), true, ImmutableList.of(new Identifier("c"))),
+                                new FunctionCall(QualifiedName.of("sum"), ImmutableList.of(new Identifier("e")))),
+                        false,
+                        ImmutableList.of(),
+                        Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10"))),
+                        new BetweenPredicate(new Identifier("f"), new LongLiteral("1"), new LongLiteral("10"))));
 
         assertStatement("CREATE CUBE foo ON bar WITH (AGGREGATIONS=(count(c), sum(d), avg(e)), GROUP = (a, b)) WHERE d1 > 10",
                 new CreateCube(QualifiedName.of("foo"),
@@ -1666,7 +1682,9 @@ public class TestSqlParser
                                 new FunctionCall(QualifiedName.of("sum"), ImmutableList.of(new Identifier("e"))),
                                 new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("e")))),
                         false,
-                        ImmutableList.of(), Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10")))));
+                        ImmutableList.of(),
+                        Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10"))),
+                        null));
 
         assertStatement("CREATE CUBE c1.s1.foo ON c2.s2.bar WITH (AGGREGATIONS=(count(c)), GROUP = (a, b)) WHERE d1 > 10",
                 new CreateCube(QualifiedName.of("c1", "s1", "foo"),
@@ -1677,7 +1695,9 @@ public class TestSqlParser
                         ImmutableSet.of(
                                 new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("c")))),
                         false,
-                        ImmutableList.of(), Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10")))));
+                        ImmutableList.of(),
+                        Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10"))),
+                        null));
 
         assertStatement("CREATE CUBE IF NOT EXISTS foo ON bar WITH (AGGREGATIONS=(count(c)), GROUP = (a, b)) WHERE d1 > 10",
                 new CreateCube(QualifiedName.of("foo"),
@@ -1688,7 +1708,9 @@ public class TestSqlParser
                         ImmutableSet.of(
                                 new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("c")))),
                         true,
-                        ImmutableList.of(), Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10")))));
+                        ImmutableList.of(),
+                        Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10"))),
+                        null));
 
         assertStatement("CREATE CUBE IF NOT EXISTS foo ON bar WITH (AGGREGATIONS=(count(c)), GROUP = (a, b), format = 'ORC', partitioned_by = ARRAY[ 'd' ]) WHERE d1 > 10",
                 new CreateCube(QualifiedName.of("foo"),
@@ -1700,7 +1722,23 @@ public class TestSqlParser
                                 new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("c")))),
                         true,
                         ImmutableList.of(new Property(new Identifier("format"), new StringLiteral("ORC")), new Property(new Identifier("partitioned_by"),
-                                new ArrayConstructor(ImmutableList.of(new StringLiteral("d"))))), Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10")))));
+                        new ArrayConstructor(ImmutableList.of(new StringLiteral("d"))))),
+                        Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10"))),
+                        null));
+
+        assertStatement("CREATE CUBE IF NOT EXISTS foo ON bar WITH (AGGREGATIONS=(count(c)), GROUP = (a, b), format = 'ORC', partitioned_by = ARRAY[ 'd' ], FILTER = (d2 > 20)) WHERE d1 > 10",
+                new CreateCube(QualifiedName.of("foo"),
+                        QualifiedName.of("bar"),
+                        ImmutableList.of(
+                                new Identifier("a"),
+                                new Identifier("b")),
+                        ImmutableSet.of(
+                                new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("c")))),
+                        true,
+                        ImmutableList.of(new Property(new Identifier("format"), new StringLiteral("ORC")), new Property(new Identifier("partitioned_by"),
+                                new ArrayConstructor(ImmutableList.of(new StringLiteral("d"))))),
+                        Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10"))),
+                        new ComparisonExpression(GREATER_THAN, new Identifier("d2"), new LongLiteral("20"))));
     }
 
     @Test
