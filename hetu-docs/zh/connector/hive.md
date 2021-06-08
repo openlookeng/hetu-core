@@ -670,7 +670,7 @@ DROP SCHEMA hive.web
 
   * **对于AArch64：**
 
-    - 使用[vacuum操作unify](../vacuum.md)合并每个分区中由多个文件写入创建的多个文件，这样在读取期间调度拆分会更快。
+    - 使用[vacuum操作unify](../sql/vacuum.md)合并每个分区中由多个文件写入创建的多个文件，这样在读取期间调度拆分会更快。
 
       ```sql
       VACUUM TABLE catalog_sales FULL UNIFY;

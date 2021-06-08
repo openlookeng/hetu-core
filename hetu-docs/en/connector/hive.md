@@ -730,7 +730,7 @@ DROP SCHEMA hive.web
 
   * **For AARCH64:**
 
-    - Use [vacuum operation unify](../vacuum.md) to merge the multiple files created by many file writes in each partition such that scheduling splits becomes faster during read.
+    - Use [vacuum operation unify](../sql/vacuum.md) to merge the multiple files created by many file writes in each partition such that scheduling splits becomes faster during read.
 
       ```sql
       VACUUM TABLE catalog_sales FULL UNIFY;
