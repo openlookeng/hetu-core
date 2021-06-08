@@ -37,7 +37,7 @@ public class PassthroughExchanger
     }
 
     @Override
-    public void accept(Page page)
+    public void accept(Page page, String origin)
     {
         long retainedSizeInBytes = page.getRetainedSizeInBytes();
         bufferMemoryManager.updateMemoryUsage(retainedSizeInBytes);
@@ -48,7 +48,7 @@ public class PassthroughExchanger
             memoryTracker.accept(-retainedSizeInBytes);
         });
 
-        localExchangeSource.addPage(pageReference);
+        localExchangeSource.addPage(pageReference, origin);
     }
 
     @Override

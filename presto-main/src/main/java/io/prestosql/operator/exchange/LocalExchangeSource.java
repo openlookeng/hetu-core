@@ -24,6 +24,7 @@ import io.prestosql.snapshot.MultiInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.MarkerPage;
+import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
@@ -32,6 +33,7 @@ import javax.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -58,6 +60,8 @@ public class LocalExchangeSource
     private final Consumer<LocalExchangeSource> onFinish;
 
     private final BlockingQueue<PageReference> buffer = new LinkedBlockingDeque<>();
+    // originBuffer mirrors buffer, but keeps track of the origin of each page
+    private final BlockingQueue<Optional<String>> originBuffer = new LinkedBlockingDeque<>();
     private final AtomicLong bufferedBytes = new AtomicLong();
 
     private final Object lock = new Object();
@@ -95,7 +99,7 @@ public class LocalExchangeSource
         return Collections.unmodifiableSet(inputChannels);
     }
 
-    void addPage(PageReference pageReference)
+    void addPage(PageReference pageReference, String origin)
     {
         checkNotHoldsLock();
 
@@ -115,7 +119,7 @@ public class LocalExchangeSource
                         // But the above never happens because "merge" operators are always preceded by OrderByOperators,
                         // which only send data pages at the end, *after* all markers. That means when snapshot is taken,
                         // no data page has been received, so when the snapshot is restored, there won't be any pending pages.
-                        page = snapshotState.processPage(() -> pageReference.peekPage()).orElse(null);
+                        page = snapshotState.processPage(() -> Pair.of(pageReference.peekPage(), origin)).orElse(null);
                     }
                     //if new input page is marker, we don't add it to buffer, it will be obtained through MultiInputSnapshotState's getPendingMarker()
                     if (page instanceof MarkerPage || page == null) {
@@ -134,6 +138,7 @@ public class LocalExchangeSource
                 // the count does not go negative
                 bufferedBytes.addAndGet(pageReference.getRetainedSizeInBytes());
                 buffer.add(pageReference);
+                originBuffer.add(Optional.ofNullable(origin));
                 added = true;
             }
 
@@ -159,7 +164,9 @@ public class LocalExchangeSource
                     @Override
                     public ProcessState<Page> process()
                     {
-                        Page page = removePage();
+                        Pair<Page, String> pair = removePage();
+                        // all work has already been done with origin, so the right element can be ignored
+                        Page page = pair.getLeft();
 
                         if (page == null) {
                             if (isFinished()) {
@@ -205,7 +212,7 @@ public class LocalExchangeSource
                 });
     }
 
-    public Page removePage()
+    public Pair<Page, String> removePage()
     {
         checkNotHoldsLock();
 
@@ -213,8 +220,9 @@ public class LocalExchangeSource
         // and buffered bytes is not expected to be consistent with the buffer (only
         // best effort).
         PageReference pageReference = buffer.poll();
+        Optional<String> origin = originBuffer.poll();
         if (pageReference == null) {
-            return null;
+            return Pair.of(null, null);
         }
 
         // dereference the page outside of lock, since may trigger a callback
@@ -223,7 +231,7 @@ public class LocalExchangeSource
 
         checkFinished();
 
-        return page;
+        return Pair.of(page, origin.orElse(null));
     }
 
     public ListenableFuture<?> waitForReading()

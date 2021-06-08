@@ -223,7 +223,7 @@ public class ArbitraryOutputBuffer
     }
 
     @Override
-    public void enqueue(List<SerializedPage> pages)
+    public void enqueue(List<SerializedPage> pages, String origin)
     {
         checkState(!Thread.holdsLock(this), "Can not enqueue pages while holding a lock on this");
         requireNonNull(pages, "page is null");
@@ -244,7 +244,7 @@ public class ArbitraryOutputBuffer
         // but still arrives at the buffer *before* the marker. These pages are potentially used twice, if we resume from this marker.
         synchronized (this) {
             // All marker related processing is handled by this utility method
-            pages = snapshotState.processSerializedPages(pages);
+            pages = snapshotState.processSerializedPages(pages, origin);
             Collection<ClientBuffer> targetClients = null;
             if (pages.size() == 1 && pages.get(0).isMarkerPage()) {
                 // Broadcast marker to all clients
@@ -290,10 +290,10 @@ public class ArbitraryOutputBuffer
     }
 
     @Override
-    public void enqueue(int partition, List<SerializedPage> pages)
+    public void enqueue(int partition, List<SerializedPage> pages, String origin)
     {
         checkState(partition == 0, "Expected partition number to be zero");
-        enqueue(pages);
+        enqueue(pages, origin);
     }
 
     @Override

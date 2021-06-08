@@ -325,9 +325,9 @@ public class TestPartitionedOutputBuffer
 
         // Add a page between markers from 2 input channels.
         // This page becomes channel state, but needs to be sent to 2nd partition after state is restored.
-        buffer.enqueue(firstPartition, ImmutableList.of(PAGES_SERDE.serialize(marker).setOrigin(channel1)));
-        buffer.enqueue(secondPartition, ImmutableList.of(PAGES_SERDE.serialize(page1).setOrigin(channel2)));
-        buffer.enqueue(secondPartition, ImmutableList.of(PAGES_SERDE.serialize(marker).setOrigin(channel2)));
+        buffer.enqueue(firstPartition, ImmutableList.of(PAGES_SERDE.serialize(marker)), channel1);
+        buffer.enqueue(secondPartition, ImmutableList.of(PAGES_SERDE.serialize(page1)), channel2);
+        buffer.enqueue(secondPartition, ImmutableList.of(PAGES_SERDE.serialize(marker)), channel2);
 
         ArgumentCaptor<SnapshotStateId> idArgument = ArgumentCaptor.forClass(SnapshotStateId.class);
         ArgumentCaptor<Object> stateArgument = ArgumentCaptor.forClass(Object.class);
@@ -350,11 +350,11 @@ public class TestPartitionedOutputBuffer
         buffer.setNoMoreInputChannels();
 
         // Resume both partitions
-        buffer.enqueue(firstPartition, ImmutableList.of(PAGES_SERDE.serialize(resume).setOrigin(channel1)));
+        buffer.enqueue(firstPartition, ImmutableList.of(PAGES_SERDE.serialize(resume)), channel1);
         verify(snapshotUtils, times(2)).loadState(anyObject());
 
         // Newly added page (page2) should be received after the resume marker
-        buffer.enqueue(firstPartition, ImmutableList.of(PAGES_SERDE.serialize(page2).setOrigin(channel1)));
+        buffer.enqueue(firstPartition, ImmutableList.of(PAGES_SERDE.serialize(page2)), channel1);
         ListenableFuture<BufferResult> future = buffer.get(FIRST, 0, sizeOfPages(10));
         assertTrue(future.isDone());
         List<SerializedPage> pages = future.get().getSerializedPages();
@@ -364,7 +364,7 @@ public class TestPartitionedOutputBuffer
 
         // Ensure that page1 is received by 2nd partition.
         // Newly added page (page3) should be received after the resumed page (page1), which is after the resume marker.
-        buffer.enqueue(secondPartition, ImmutableList.of(PAGES_SERDE.serialize(page3).setOrigin(channel1)));
+        buffer.enqueue(secondPartition, ImmutableList.of(PAGES_SERDE.serialize(page3)), channel1);
         future = buffer.get(SECOND, 0, sizeOfPages(10));
         assertTrue(future.isDone());
         pages = future.get().getSerializedPages();

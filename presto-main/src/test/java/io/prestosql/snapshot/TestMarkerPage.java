@@ -61,20 +61,4 @@ public class TestMarkerPage
         deserializedPage = serde.deserialize(serializedPage);
         Assert.assertFalse(deserializedPage instanceof MarkerPage);
     }
-
-    @Test
-    public void testClone()
-    {
-        MarkerPage marker1 = MarkerPage.snapshotPage(1);
-        MarkerPage marker2 = marker1.clone();
-        Assert.assertEquals(marker2.getSnapshotId(), marker1.getSnapshotId());
-        Assert.assertEquals(marker2.isResuming(), marker1.isResuming());
-        Assert.assertEquals(marker2.getOrigin(), marker1.getOrigin());
-
-        marker1.setOrigin("origin");
-        marker2 = marker1.clone();
-        Assert.assertEquals(marker2.getSnapshotId(), marker1.getSnapshotId());
-        Assert.assertEquals(marker2.isResuming(), marker1.isResuming());
-        Assert.assertEquals(marker2.getOrigin(), marker1.getOrigin());
-    }
 }

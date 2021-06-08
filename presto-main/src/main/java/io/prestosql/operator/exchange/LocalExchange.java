@@ -42,7 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -144,8 +144,8 @@ public class LocalExchange
         }
         this.sources = sources.build();
 
-        List<Consumer<PageReference>> buffers = this.sources.stream()
-                .map(buffer -> (Consumer<PageReference>) buffer::addPage)
+        List<BiConsumer<PageReference, String>> buffers = this.sources.stream()
+                .map(buffer -> (BiConsumer<PageReference, String>) buffer::addPage)
                 .collect(toImmutableList());
 
         this.memoryManager = new LocalExchangeMemoryManager(maxBufferedBytes.toBytes());
@@ -541,16 +541,14 @@ public class LocalExchange
         }
     }
 
-    public void broadcastMarker(MarkerPage page)
+    public void broadcastMarker(MarkerPage page, String origin)
     {
         checkState(!isForMerge);
 
         memoryManager.updateMemoryUsage(page.getRetainedSizeInBytes() * sources.size());
         for (LocalExchangeSource source : sources) {
-            // Each target receives a separate copy of the marker page, to avoid potential update conflict.
-            // TODO-cp-I361XN: will likely remove the "clone" method later.
-            PageReference pageReference = new PageReference(page.clone(), 1, () -> memoryManager.updateMemoryUsage(-page.getRetainedSizeInBytes()));
-            source.addPage(pageReference);
+            PageReference pageReference = new PageReference(page, 1, () -> memoryManager.updateMemoryUsage(-page.getRetainedSizeInBytes()));
+            source.addPage(pageReference, origin);
         }
     }
 

@@ -29,6 +29,7 @@ import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.testing.assertions.Assert;
+import org.apache.commons.lang3.tuple.Pair;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -96,38 +97,36 @@ public class TestMultiInputSnapshotState
 
     private Optional<Page> processPage(MultiInputSnapshotState state, String source, Page page)
     {
-        Optional<Page> ret = state.processPage(() -> page == null ? null : page.setOrigin(source));
+        Optional<Page> ret = state.processPage(() -> Pair.of(page, page == null ? null : source));
         restorable.state++;
         return ret;
     }
 
     private Optional<Page> processPageKeepState(String source, Page page)
     {
-        return state.processPage(() -> page == null ? null : page.setOrigin(source));
+        return state.processPage(() -> Pair.of(page, page == null ? null : source));
     }
 
     private Optional<SerializedPage> processSerializedPage(String source, SerializedPage page)
     {
-        Optional<SerializedPage> ret = state.processSerializedPage(() -> page == null ? null : page.setOrigin(source));
+        Optional<SerializedPage> ret = state.processSerializedPage(() -> Pair.of(page, page == null ? null : source));
         restorable.state++;
         return ret;
     }
 
     private Optional<SerializedPage> processSerializedPageKeepState(String source, SerializedPage page)
     {
-        return state.processSerializedPage(() -> page == null ? null : page.setOrigin(source));
+        return state.processSerializedPage(() -> Pair.of(page, page == null ? null : source));
     }
 
     private List<Page> processPages(String source, List<Page> pages)
     {
-        pages.forEach(page -> page.setOrigin(source));
-        return state.processPages(pages);
+        return state.processPages(pages, source);
     }
 
     private List<SerializedPage> processSerializedPages(String source, List<SerializedPage> pages)
     {
-        pages.forEach(page -> page.setOrigin(source));
-        return state.processSerializedPages(pages);
+        return state.processSerializedPages(pages, source);
     }
 
     private boolean isRegularPage(Page page)
@@ -364,32 +363,28 @@ public class TestMultiInputSnapshotState
     public void testNextMarker()
             throws Exception
     {
-        regularPage.setOrigin(source1);
-        marker1.setOrigin(source1);
-        resume1.setOrigin(source1);
-
         // No page
-        Optional<Page> marker = state.nextMarker(() -> null);
+        Optional<Page> marker = state.nextMarker(() -> Pair.of(null, null));
         Assert.assertFalse(marker.isPresent());
 
         // No marker - page saved as pending
-        marker = state.nextMarker(() -> regularPage);
+        marker = state.nextMarker(() -> Pair.of(regularPage, source1));
         Assert.assertFalse(marker.isPresent());
-        marker = state.nextMarker(() -> null);
+        marker = state.nextMarker(() -> Pair.of(null, null));
         Assert.assertFalse(marker.isPresent());
-        Optional<Page> page = state.processPage(() -> null);
+        Optional<Page> page = state.processPage(() -> Pair.of(null, null));
         assertTrue(page.isPresent());
 
         // Marker
-        marker = state.nextMarker(() -> marker1);
+        marker = state.nextMarker(() -> Pair.of(marker1, source1));
         assertTrue(marker.isPresent());
 
         // Resumed page
         when(snapshotManager.loadState(anyObject())).thenReturn(Optional.of(ImmutableList.of(0, serde.serialize(regularPage).capture(serde))));
-        state.processPage(() -> resume1);
-        marker = state.nextMarker(() -> null);
+        state.processPage(() -> Pair.of(resume1, source1));
+        marker = state.nextMarker(() -> Pair.of(null, null));
         Assert.assertFalse(marker.isPresent());
-        page = state.processPage(() -> null);
+        page = state.processPage(() -> Pair.of(null, null));
         assertTrue(page.isPresent());
     }
 
@@ -397,32 +392,28 @@ public class TestMultiInputSnapshotState
     public void testNextSerializedMarker()
             throws Exception
     {
-        regularPage.setOrigin(source1);
-        marker1.setOrigin(source1);
-        resume1.setOrigin(source1);
-
         // No page
-        Optional<SerializedPage> marker = state.nextSerializedMarker(() -> null);
+        Optional<SerializedPage> marker = state.nextSerializedMarker(() -> Pair.of(null, null));
         Assert.assertFalse(marker.isPresent());
 
         // No marker - page saved as pending
-        marker = state.nextSerializedMarker(() -> serde.serialize(regularPage));
+        marker = state.nextSerializedMarker(() -> Pair.of(serde.serialize(regularPage), source1));
         Assert.assertFalse(marker.isPresent());
-        marker = state.nextSerializedMarker(() -> null);
+        marker = state.nextSerializedMarker(() -> Pair.of(null, null));
         Assert.assertFalse(marker.isPresent());
-        Optional<SerializedPage> page = state.processSerializedPage(() -> null);
+        Optional<SerializedPage> page = state.processSerializedPage(() -> Pair.of(null, null));
         assertTrue(page.isPresent());
 
         // Marker
-        marker = state.nextSerializedMarker(() -> SerializedPage.forMarker(marker1));
+        marker = state.nextSerializedMarker(() -> Pair.of(SerializedPage.forMarker(marker1), source1));
         assertTrue(marker.isPresent());
 
         // Resumed page
         when(snapshotManager.loadState(anyObject())).thenReturn(Optional.of(ImmutableList.of(0, serde.serialize(regularPage).capture(serde))));
-        state.processPage(() -> resume1);
-        marker = state.nextSerializedMarker(() -> null);
+        state.processPage(() -> Pair.of(resume1, source1));
+        marker = state.nextSerializedMarker(() -> Pair.of(null, null));
         Assert.assertFalse(marker.isPresent());
-        page = state.processSerializedPage(() -> null);
+        page = state.processSerializedPage(() -> Pair.of(null, null));
         assertTrue(page.isPresent());
     }
 

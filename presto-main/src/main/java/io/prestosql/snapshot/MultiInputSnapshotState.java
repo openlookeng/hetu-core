@@ -22,6 +22,7 @@ import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.snapshot.MarkerPage;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -129,7 +130,7 @@ public class MultiInputSnapshotState
     /**
      * Retrieve the next page to process. See class documentation for details
      */
-    public Optional<Page> processPage(Supplier<Page> pageSupplier)
+    public Optional<Page> processPage(Supplier<Pair<Page, String>> pageSupplier)
     {
         return Optional.ofNullable(processPage(pageSupplier, false, false));
     }
@@ -137,7 +138,7 @@ public class MultiInputSnapshotState
     /**
      * Retrieve the next page to process. See class documentation for details
      */
-    public Optional<SerializedPage> processSerializedPage(Supplier<SerializedPage> pageSupplier)
+    public Optional<SerializedPage> processSerializedPage(Supplier<Pair<SerializedPage, String>> pageSupplier)
     {
         return Optional.ofNullable(processPage(pageSupplier, true, false));
     }
@@ -145,7 +146,7 @@ public class MultiInputSnapshotState
     /**
      * Retrieve the next marker to process
      */
-    public Optional<Page> nextMarker(Supplier<Page> pageSupplier)
+    public Optional<Page> nextMarker(Supplier<Pair<Page, String>> pageSupplier)
     {
         return Optional.ofNullable(processPage(pageSupplier, false, true));
     }
@@ -153,7 +154,7 @@ public class MultiInputSnapshotState
     /**
      * Retrieve the next marker to process
      */
-    public Optional<SerializedPage> nextSerializedMarker(Supplier<SerializedPage> pageSupplier)
+    public Optional<SerializedPage> nextSerializedMarker(Supplier<Pair<SerializedPage, String>> pageSupplier)
     {
         return Optional.ofNullable(processPage(pageSupplier, true, true));
     }
@@ -161,24 +162,24 @@ public class MultiInputSnapshotState
     /**
      * Retrieve all available pages. See class documentation for details
      */
-    public List<Page> processPages(List<Page> pages)
+    public List<Page> processPages(List<Page> pages, String origin)
     {
         Iterator<Page> iterator = pages.iterator();
-        Supplier<Page> supplier = () -> iterator.hasNext() ? iterator.next() : null;
-        return processPages(supplier, iterator::hasNext, false);
+        Supplier<Pair<Page, String>> pairSupplier = () -> Pair.of(iterator.hasNext() ? iterator.next() : null, origin);
+        return processPages(pairSupplier, iterator::hasNext, false);
     }
 
     /**
      * Retrieve all available pages. See class documentation for details
      */
-    public List<SerializedPage> processSerializedPages(List<SerializedPage> pages)
+    public List<SerializedPage> processSerializedPages(List<SerializedPage> pages, String origin)
     {
         Iterator<SerializedPage> iterator = pages.iterator();
-        Supplier<SerializedPage> supplier = () -> iterator.hasNext() ? iterator.next() : null;
-        return processPages(supplier, iterator::hasNext, true);
+        Supplier<Pair<SerializedPage, String>> pairSupplier = () -> Pair.of(iterator.hasNext() ? iterator.next() : null, origin);
+        return processPages(pairSupplier, iterator::hasNext, true);
     }
 
-    private <T> List<T> processPages(Supplier<T> pageSupplier, Supplier<Boolean> hasMore, boolean serialized)
+    private <T> List<T> processPages(Supplier<Pair<T, String>> pageSupplier, Supplier<Boolean> hasMore, boolean serialized)
     {
         List<T> ret = new ArrayList<>();
         T page;
@@ -192,7 +193,7 @@ public class MultiInputSnapshotState
         return ret;
     }
 
-    private <T> T processPage(Supplier<T> pageSupplier, boolean serialized, boolean markerOnly)
+    private <T> T processPage(Supplier<Pair<T, String>> pageSupplier, boolean serialized, boolean markerOnly)
     {
         if (markerOnly && pendingPages != null && pendingPages.hasNext()) {
             // Pending pages are not markers
@@ -205,7 +206,9 @@ public class MultiInputSnapshotState
 
         if (serializedPage == null) {
             // Get a new input
-            T pageInTransition = pageSupplier.get();
+            Pair<T, String> pair = pageSupplier.get();
+            T pageInTransition = pair.getLeft();
+            String origin = pair.getRight();
             if (pageInTransition == null) {
                 return null;
             }
@@ -213,12 +216,12 @@ public class MultiInputSnapshotState
             Optional<String> channel;
             if (pageInTransition instanceof SerializedPage) {
                 serializedPage = (SerializedPage) pageInTransition;
-                channel = serializedPage.getOrigin();
+                channel = Optional.ofNullable(origin);
                 page = pagesSerde.deserialize(serializedPage);
             }
             else {
                 page = (Page) pageInTransition;
-                channel = page.getOrigin();
+                channel = Optional.ofNullable(origin);
             }
 
             // Not a restored pending page, so must be a new input that may need snapshot related processing

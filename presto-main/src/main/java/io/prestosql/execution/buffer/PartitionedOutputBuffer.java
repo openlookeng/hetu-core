@@ -183,14 +183,14 @@ public class PartitionedOutputBuffer
     }
 
     @Override
-    public void enqueue(List<SerializedPage> pages)
+    public void enqueue(List<SerializedPage> pages, String origin)
     {
         checkState(partitions.size() == 1, "Expected exactly one partition");
-        enqueue(0, pages);
+        enqueue(0, pages, origin);
     }
 
     @Override
-    public void enqueue(int partitionNumber, List<SerializedPage> pages)
+    public void enqueue(int partitionNumber, List<SerializedPage> pages, String origin)
     {
         requireNonNull(pages, "pages is null");
 
@@ -214,7 +214,7 @@ public class PartitionedOutputBuffer
                 MultiInputSnapshotState snapshotState = snapshotStates.get(i);
                 synchronized (snapshotState) {
                     // All marker related processing is handled by this utility method
-                    List<SerializedPage> processedPages = snapshotState.processSerializedPages(pages);
+                    List<SerializedPage> processedPages = snapshotState.processSerializedPages(pages, origin);
                     doEnqueue(i, processedPages);
                 }
             }
@@ -222,7 +222,7 @@ public class PartitionedOutputBuffer
         else {
             MultiInputSnapshotState snapshotState = snapshotStates.get(partitionNumber);
             synchronized (snapshotState) {
-                List<SerializedPage> processedPages = snapshotState.processSerializedPages(pages);
+                List<SerializedPage> processedPages = snapshotState.processSerializedPages(pages, origin);
                 doEnqueue(partitionNumber, processedPages);
             }
         }

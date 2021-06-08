@@ -58,12 +58,6 @@ public class MarkerPage
         return isResuming;
     }
 
-    // TODO-cp-I361XN: remove this. Only used in LocalExchange.
-    public MarkerPage clone()
-    {
-        return (MarkerPage) new MarkerPage(snapshotId, isResuming).setOrigin(getOrigin().orElse(null));
-    }
-
     @Override
     public int hashCode()
     {

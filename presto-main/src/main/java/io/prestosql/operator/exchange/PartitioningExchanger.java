@@ -27,7 +27,7 @@ import it.unimi.dsi.fastutil.ints.IntList;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
@@ -35,13 +35,13 @@ import static java.util.Objects.requireNonNull;
 class PartitioningExchanger
         implements LocalExchanger
 {
-    protected final List<Consumer<PageReference>> buffers;
+    protected final List<BiConsumer<PageReference, String>> buffers;
     protected final LocalExchangeMemoryManager memoryManager;
     private final LocalPartitionGenerator partitionGenerator;
     protected final IntArrayList[] partitionAssignments;
 
     public PartitioningExchanger(
-            List<Consumer<PageReference>> partitions,
+            List<BiConsumer<PageReference, String>> partitions,
             LocalExchangeMemoryManager memoryManager,
             List<? extends Type> types,
             List<Integer> partitionChannels,
@@ -69,7 +69,7 @@ class PartitioningExchanger
     }
 
     @Override
-    public synchronized void accept(Page page)
+    public synchronized void accept(Page page, String origin)
     {
         // reset the assignment lists
         for (IntList partitionAssignment : partitionAssignments) {
@@ -91,9 +91,9 @@ class PartitioningExchanger
                     outputBlocks[i] = page.getBlock(i).copyPositions(positions.elements(), 0, positions.size());
                 }
 
-                Page pageSplit = new Page(positions.size(), outputBlocks).setOrigin(page.getOrigin().orElse(null));
+                Page pageSplit = new Page(positions.size(), outputBlocks);
                 memoryManager.updateMemoryUsage(pageSplit.getRetainedSizeInBytes());
-                buffers.get(partition).accept(new PageReference(pageSplit, 1, () -> memoryManager.updateMemoryUsage(-pageSplit.getRetainedSizeInBytes())));
+                buffers.get(partition).accept(new PageReference(pageSplit, 1, () -> memoryManager.updateMemoryUsage(-pageSplit.getRetainedSizeInBytes())), origin);
             }
         }
     }

@@ -345,7 +345,7 @@ public class PartitionedOutputOperator
             // That is, marker 1 is added to client buffer #1, then thread 2 takes over, and adds marker 2 to client buffer #1 and #2.
             // The result is that for buffer #2, it receives marker 2 before marker 1.
             synchronized (partitionFunction.outputBuffer) {
-                partitionFunction.outputBuffer.enqueue(0, Collections.singletonList(SerializedPage.forMarker(marker).setOrigin(partitionFunction.id)));
+                partitionFunction.outputBuffer.enqueue(0, Collections.singletonList(SerializedPage.forMarker(marker)), partitionFunction.id);
             }
         }
         else {
@@ -508,10 +508,10 @@ public class PartitionedOutputOperator
                     partitionPageBuilder.reset();
 
                     List<SerializedPage> serializedPages = splitPage(pagePartition, DEFAULT_MAX_PAGE_SIZE_IN_BYTES).stream()
-                            .map(page -> serde.serialize(page).setOrigin(id))
+                            .map(page -> serde.serialize(page))
                             .collect(toImmutableList());
 
-                    outputBuffer.enqueue(partition, serializedPages);
+                    outputBuffer.enqueue(partition, serializedPages, id);
                     pagesAdded.incrementAndGet();
                     rowsAdded.addAndGet(pagePartition.getPositionCount());
                 }

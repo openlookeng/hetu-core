@@ -1214,14 +1214,14 @@ public class TestArbitraryOutputBuffer
         MarkerPage markerPage = MarkerPage.snapshotPage(1);
         SerializedPage marker = SerializedPage.forMarker(markerPage);
 
-        buffer.enqueue(Collections.singletonList(marker.setOrigin("1")));
+        buffer.enqueue(Collections.singletonList(marker), "1");
         List<SerializedPage> pages = getBufferResult(buffer, FIRST, 0, sizeOfPages(3), NO_WAIT).getSerializedPages();
         assertEquals(pages.size(), 1);
         assertTrue(pages.get(0).isMarkerPage());
         // Acknowledge
         buffer.get(FIRST, 1, sizeOfPages(1)).cancel(true);
 
-        buffer.enqueue(Collections.singletonList(marker.setOrigin("2")));
+        buffer.enqueue(Collections.singletonList(marker), "2");
         pages = getBufferResult(buffer, FIRST, 0, sizeOfPages(3), NO_WAIT).getSerializedPages();
         assertEquals(pages.size(), 0);
     }

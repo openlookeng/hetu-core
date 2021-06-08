@@ -30,6 +30,7 @@ import io.prestosql.operator.WorkProcessor.ProcessState;
 import io.prestosql.snapshot.MultiInputSnapshotState;
 import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
@@ -44,6 +45,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -88,6 +90,8 @@ public class ExchangeClient
     private final Set<String> allTargets = new HashSet<>();
     // Markers received before all targets are known. These markers will be sent to all new targets.
     private final List<SerializedPage> pendingMarkers = Collections.synchronizedList(new ArrayList<>());
+    // pendingOrigins keeps track of the origins in pendingMarkers
+    private final List<Optional<String>> pendingOrigins = Collections.synchronizedList(new ArrayList<>());
 
     @GuardedBy("this")
     private final Deque<HttpPageBufferClient> queuedClients = new LinkedList<>();
@@ -95,7 +99,9 @@ public class ExchangeClient
     private final Set<HttpPageBufferClient> completedClients = newConcurrentHashSet();
     private final LinkedBlockingDeque<SerializedPage> pageBuffer = new LinkedBlockingDeque<>();
     // Snapshot: pararrel array to pageBuffer, about which targets need to receive this page. "null" indicates any one target.
+    // originBuffer is similar to targetBuffer, but detailing where the page is coming from rather than where it is headed
     private final LinkedBlockingDeque<Set<String>> targetBuffer = new LinkedBlockingDeque<>();
+    private final LinkedBlockingDeque<Optional<String>> originBuffer = new LinkedBlockingDeque<>();
 
     @GuardedBy("this")
     private final List<SettableFuture<?>> blockedCallers = new ArrayList<>();
@@ -184,6 +190,7 @@ public class ExchangeClient
         // Markers are potentially inserted at the beginning of the queue. Process them reversely to maintain marker order.
         for (int i = pendingMarkers.size() - 1; i >= 0; i--) {
             SerializedPage page = pendingMarkers.get(i);
+            Optional<String> origin = pendingOrigins.get(i);
             // If this marker still exists in the queue, then add target to its target list;
             // otherwise add the page to the front of the queue, so it's the first page retrieved by the new target.
             Iterator<SerializedPage> pageIterator = pageBuffer.iterator();
@@ -197,6 +204,7 @@ public class ExchangeClient
             else {
                 pageBuffer.addFirst(page);
                 targetBuffer.addFirst(Sets.newHashSet(target));
+                originBuffer.add(origin);
             }
             bufferRetainedSizeInBytes += page.getRetainedSizeInBytes();
         }
@@ -206,6 +214,7 @@ public class ExchangeClient
     {
         noMoreTargets = true;
         pendingMarkers.clear();
+        pendingOrigins.clear();
         scheduleRequestIfNecessary();
     }
 
@@ -259,7 +268,9 @@ public class ExchangeClient
                     @Override
                     public ProcessState<SerializedPage> process()
                     {
-                        SerializedPage page = pollPage(target);
+                        Pair<SerializedPage, String> pair = pollPage(target);
+                        // all work has already been done with origin, so the right element can be ignored
+                        SerializedPage page = pair.getLeft();
 
                         if (page == null) {
                             if (isFinished()) {
@@ -303,27 +314,35 @@ public class ExchangeClient
     }
 
     @Nullable
-    public SerializedPage pollPage(String target)
+    public Pair<SerializedPage, String> pollPage(String target)
     {
         checkState(!Thread.holdsLock(this), "Can not get next page while holding a lock on this");
 
         throwIfFailed();
 
         if (closed.get()) {
-            return null;
+            return Pair.of(null, null);
         }
 
         if (!snapshotEnabled) {
-            return postProcessPage(pageBuffer.poll());
+            return Pair.of(postProcessPage(pageBuffer.poll()), null);
         }
+        Pair<SerializedPage, String> ret = pollPageImpl(target);
 
-        return postProcessPage(pollPageImpl(target));
+        return Pair.of(postProcessPage(ret.getLeft()), ret.getRight());
     }
 
-    private synchronized SerializedPage pollPageImpl(String target)
+    private synchronized Pair<SerializedPage, String> pollPageImpl(String target)
     {
         SerializedPage page = pageBuffer.poll();
+        if (page == null || page == NO_MORE_PAGES) {
+            // These are the cases where the origin buffer will be empty, and .poll() will give null
+            // We handle it separately because a null Optional object is problematic
+            return Pair.of(page, null);
+        }
         Set<String> targets = targetBuffer.poll();
+
+        Optional<String> origin = originBuffer.poll();
         if (page != null && page.isMarkerPage()) {
             if (targets.contains(target)) {
                 targets.remove(target);
@@ -331,12 +350,16 @@ public class ExchangeClient
                     // Put unfinished marker back at top of queue for other targets to retrieve.
                     pageBuffer.addFirst(page);
                     targetBuffer.addFirst(targets);
+                    originBuffer.addFirst(origin);
                 }
             }
             else {
                 SerializedPage marker = page;
+                Optional<String> markerOrigin = origin;
                 // Already sent marker to this target. Poll other pages.
-                page = pollPageImpl(target);
+                Pair<SerializedPage, String> pair = pollPageImpl(target);
+                page = pair.getLeft();
+                origin = Optional.ofNullable(pair.getRight());
                 if (page == NO_MORE_PAGES) {
                     // Can't grab the no-more-pages marker when there are pending marker pages
                     pageBuffer.addFirst(NO_MORE_PAGES);
@@ -345,9 +368,10 @@ public class ExchangeClient
                 // Put unfinished marker back at top of queue for other targets to retrieve.
                 pageBuffer.addFirst(marker);
                 targetBuffer.addFirst(targets);
+                originBuffer.addFirst(markerOrigin);
             }
         }
-        return page;
+        return Pair.of(page, origin.orElse(null));
     }
 
     private SerializedPage postProcessPage(SerializedPage page)
@@ -424,7 +448,9 @@ public class ExchangeClient
         }
         pageBuffer.clear();
         targetBuffer.clear();
+        originBuffer.clear();
         pendingMarkers.clear();
+        pendingOrigins.clear();
         systemMemoryContext.setBytes(0);
         bufferRetainedSizeInBytes = 0;
     }
@@ -492,7 +518,6 @@ public class ExchangeClient
             }
             else {
                 for (SerializedPage page : pages) {
-                    page.setOrigin(location);
                     if (snapshotState != null) {
                         // Only for MergeOperator
                         SerializedPage processedPage;
@@ -504,7 +529,7 @@ public class ExchangeClient
                             // But the above never happens because "merge" operators are always preceded by OrderByOperators,
                             // which only send data pages at the end, *after* all markers. That means when snapshot is taken,
                             // no data page has been received, so when the snapshot is restored, there won't be any pending pages.
-                            processedPage = snapshotState.processSerializedPage(() -> page).orElse(null);
+                            processedPage = snapshotState.processSerializedPage(() -> Pair.of(page, location)).orElse(null);
                         }
                         if (processedPage == null || processedPage.isMarkerPage()) {
                             // Don't add markers to the buffer, otherwise it may affect the order in which these buffers are accessed.
@@ -513,9 +538,11 @@ public class ExchangeClient
                         }
                     }
                     pageBuffer.add(page);
+                    originBuffer.add(Optional.ofNullable(location));
                     if (page.isMarkerPage()) {
                         if (!noMoreTargets) {
                             pendingMarkers.add(page);
+                            pendingOrigins.add(Optional.ofNullable(location));
                         }
                         targetBuffer.add(new HashSet<>(allTargets));
                         // This page will be sent out multiple times. Adjust total size.

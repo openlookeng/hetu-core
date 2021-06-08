@@ -148,9 +148,9 @@ public class TestLocalExchangeSourceOperator
         sinkFactory.noMoreSinkFactories();
 
         MarkerPage marker = MarkerPage.snapshotPage(1);
-        sinkA.addPage(MarkerPage.snapshotPage(1).setOrigin(sinkAId));
+        sinkA.addPage(MarkerPage.snapshotPage(1), sinkAId);
         sinkA.finish();
-        sinkB.addPage(MarkerPage.snapshotPage(1).setOrigin(sinkBId));
+        sinkB.addPage(MarkerPage.snapshotPage(1), sinkBId);
         sinkB.finish();
 
         Page page = operatorA.getOutput();
