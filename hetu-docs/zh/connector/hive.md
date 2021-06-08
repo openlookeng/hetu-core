@@ -116,6 +116,7 @@ Hive连接器安全需要的属性在[Hive配置属性](./hive.md#hive配置属�
 | `hive.max-splits-to-group`    | 可分组的最大拆分数。如果值为1，则不分组。最小值为1。小的拆分越多，创建的驱动越多，因此需要更多内存、调度、上下文切换，这会影响读取性能。将小拆分分组在一起可以减少拆分和创建驱动的数量，因此需要的资源较少，从而提高性能。 | 1   |
 | `hive.metastore-client-service-threads` | 元存储客户端与Hive元存储通信的并行线程数。 | 4 |
 | `hive.worker-metastore-cache-enabled` | 在工作节点上也开启对Hive元存储的缓存。 | `false` |
+| `hive.metastore-write-batch-size` | 每个请求中发送到元存储的分区数。 | 8 |
 
 ## Hive Thrift 元存储配置属性说明
 
@@ -714,12 +715,22 @@ DROP SCHEMA hive.web
   ```properties
   SET SESSION hive.metastore-client-service-threads = 4
   #Default: 4
-  #Recommended: The number of running HMS service.
+  #Recommended: The number of running hive metastore service instances * 4.
   ```
 
   根据许多并行HMS操作可以调用的线程池的数量，这将减少获取分区的总时间。
 
   **说明**：另外，集群中可以添加多个Hive元存储服务，这些服务将以轮询的方式访问，从而保证更佳的Hive元存储负载。
+
+  ```properties
+  hive.metastore-write-batch-size = 64
+  #Default: 8
+  #Recommended: 64 or higher writes to batch together per request to hive metastore service.
+  ```
+
+  这减少了HMS与openLooKeng协调节点服务器之间的往返时间。
+
+  **说明**：该属性也可以使用Hive会话属性`hive.metastore_write_batch_size`进行配置。
 
 * ##### 直接删除整个分区
 
