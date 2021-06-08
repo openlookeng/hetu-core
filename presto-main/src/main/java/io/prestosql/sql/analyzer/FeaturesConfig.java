@@ -1356,7 +1356,7 @@ public class FeaturesConfig
         return sortBasedAggregationEnabled;
     }
 
-    @Config("sort-based-aggregation-enabled")
+    @Config("optimizer.sort-based-aggregation-enabled")
     public FeaturesConfig setSortBasedAggregationEnabled(boolean sortBasedAggregationEnabled)
     {
         this.sortBasedAggregationEnabled = sortBasedAggregationEnabled;
@@ -1368,7 +1368,7 @@ public class FeaturesConfig
         return this.prcntDriversForPartialAggr;
     }
 
-    @Config("prcnt-drivers-for-partial-aggr")
+    @Config("sort.prcnt-drivers-for-partial-aggr")
     @ConfigDescription("sort based aggre percentage of number of drivers that are used for unfinalized/partial values")
     public FeaturesConfig setPrcntDriversForPartialAggr(int prcntDriversForPartialAggr)
     {

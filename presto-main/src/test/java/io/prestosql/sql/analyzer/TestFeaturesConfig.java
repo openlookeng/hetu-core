@@ -247,8 +247,8 @@ public class TestFeaturesConfig
                 .put("deprecated.legacy-date-timestamp-to-varchar-coercion", "true")
                 .put("deprecated.legacy-map-subscript", "true")
                 .put("list-built-in-functions-only", "false")
-                .put("sort-based-aggregation-enabled", "true")
-                .put("prcnt-drivers-for-partial-aggr", "55")
+                .put("optimizer.sort-based-aggregation-enabled", "true")
+                .put("sort.prcnt-drivers-for-partial-aggr", "55")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()

@@ -508,6 +508,23 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > This will help to improve query execution performance when same CTE is used more than once.
 > This can also be specified on a per-query basis using the `cte_reuse_enabled` session property.
 
+### `optimizer.sort-based-aggregation-enabled`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Sort based aggregation is used when underlying source is in pre-sorted order, this is used instead of Hash aggregation which take more footprint to build hash tables.
+> Sort based aggregation used less memory foot print when compared to hash aggregation.
+> Conditions when Sort based aggregation in case of Hive
+> - 1) Grouping columns should be same or less than sorted columns and it should be in the same order.
+> - 2) Joins case probe side table should be sorted and join criteria should be same or less than sorted columns and it should be in the same order.
+> - 3) bucket_count is 1 bucketed_by columns should be same or less than Grouping columns and it should be in the same order. 
+> - 4) bucket_count is more than 1 bucketed_by columns should be same as Grouping columns and it should be in the same order. 
+> 
+> This can also be specified on a per-query basis using the `sort_based_aggregation_enabled` session property.
+> 
+> **Note:** This is supported only for Hive connector.
+
 ## Regular Expression Function Properties
 
 The following properties allow tuning the [regexp](../functions/regexp.md).
@@ -708,6 +725,19 @@ helps with cache affinity scheduling.
 > This can also be specified on a per-query basis using the `cte_max_prefetch_queue_size` session property.
 >
 > **Note:** This should be configured in all workers.
+
+## Sort Base aggregation Properties
+
+### `sort.prcnt-drivers-for-partial-aggr`
+
+> -   **Type:** `int`
+> -   **Default value:** `5`
+>
+> In Sort based aggregation percentage of number of drivers that are used for unfinalized/partial values.
+> This can also be specified on a per-query basis using the `prcnt_drivers_for_partial_aggr` session property.
+> 
+> **Note:** This should be configured on all nodes .
+
 
 ## Query Manager
 
