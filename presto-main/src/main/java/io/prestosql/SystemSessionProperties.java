@@ -166,6 +166,7 @@ public final class SystemSessionProperties
     public static final String SNAPSHOT_SPLIT_COUNT_INTERVAL = "snapshot_split_count_interval";
     public static final String SNAPSHOT_MAX_RETRIES = "snapshot_max_retries";
     public static final String SNAPSHOT_RETRY_TIMEOUT = "snapshot_retry_timeout";
+    public static final String SKIP_ATTACHING_STATS_WITH_PLAN = "skip_attaching_stats_with_plan";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -768,6 +769,11 @@ public final class SystemSessionProperties
                         PRCNT_DRIVERS_FOR_PARTIAL_AGGR,
                         "Sort based aggr, percentage of number of drivers that are used for not finalized values",
                         featuresConfig.getPrcntDriversForPartialAggr(),
+                        false),
+                booleanProperty(
+                        SKIP_ATTACHING_STATS_WITH_PLAN,
+                        "Whether to calculate stats and attach with final plan",
+                        featuresConfig.isSkipAttachingStatsWithPlan(),
                         false));
     }
 
@@ -1350,5 +1356,10 @@ public final class SystemSessionProperties
     public static int getPrcntDriversForPartialAggr(Session session)
     {
         return session.getSystemProperty(PRCNT_DRIVERS_FOR_PARTIAL_AGGR, Integer.class);
+    }
+
+    public static boolean isSkipAttachingStatsWithPlan(Session session)
+    {
+        return session.getSystemProperty(SKIP_ATTACHING_STATS_WITH_PLAN, Boolean.class);
     }
 }

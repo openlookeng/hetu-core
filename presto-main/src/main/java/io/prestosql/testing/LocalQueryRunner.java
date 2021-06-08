@@ -939,7 +939,7 @@ public class LocalQueryRunner
         LogicalPlanner logicalPlanner = new LogicalPlanner(session, optimizers, new PlanSanityChecker(true), idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, warningCollector);
 
         Analysis analysis = analyzer.analyze(preparedQuery.getStatement());
-        return logicalPlanner.plan(analysis, stage);
+        return logicalPlanner.plan(analysis, false, stage);
     }
 
     private static List<Split> getNextBatch(SplitSource splitSource)

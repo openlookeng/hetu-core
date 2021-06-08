@@ -263,7 +263,8 @@ public class RemoveUnsupportedDynamicFilters
             if (source instanceof TableScanNode) {
                 // Keep only small table
                 DynamicFilters.ExtractResult extractResult = extractDynamicFilters(original);
-                if (isOptimizeDynamicFilterGeneration(session) && !highSelectivity(node)) {
+                // If there are no allowed dynamic filter passed from join so nothing to be removed hence no need to check stats
+                if (isOptimizeDynamicFilterGeneration(session) && !allowedDynamicFilterIds.isEmpty() && !highSelectivity(node)) {
                     modified = removeDynamicFilters(original, ImmutableSet.of(), consumedDynamicFilterIds);
                     extractResult.getDynamicConjuncts().forEach(descriptor -> removedDynamicFilterIds.add(descriptor.getId()));
                 }

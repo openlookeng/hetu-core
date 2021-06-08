@@ -170,6 +170,7 @@ public class FeaturesConfig
     private Duration cubeMetadataCacheTtl = new Duration(1, HOURS);
     private boolean sortBasedAggregationEnabled;
     private int prcntDriversForPartialAggr = 5;
+    private boolean skipAttachingStatsWithPlan = true;
 
     public enum JoinReorderingStrategy
     {
@@ -1373,6 +1374,18 @@ public class FeaturesConfig
     public FeaturesConfig setPrcntDriversForPartialAggr(int prcntDriversForPartialAggr)
     {
         this.prcntDriversForPartialAggr = prcntDriversForPartialAggr;
+        return this;
+    }
+
+    public boolean isSkipAttachingStatsWithPlan()
+    {
+        return skipAttachingStatsWithPlan;
+    }
+
+    @Config("optimizer.skip-attaching-stats-with-plan")
+    public FeaturesConfig setSkipAttachingStatsWithPlan(boolean skipAttachingStatsWithPlan)
+    {
+        this.skipAttachingStatsWithPlan = skipAttachingStatsWithPlan;
         return this;
     }
 }

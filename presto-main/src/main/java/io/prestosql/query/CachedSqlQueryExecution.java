@@ -265,7 +265,7 @@ public class CachedSqlQueryExecution
             Map<String, Object> systemSessionProperties)
     {
         // build a new plan
-        Plan plan = logicalPlanner.plan(analysis);
+        Plan plan = logicalPlanner.plan(analysis, true);
         // Cache the plan
         CachedSqlQueryExecutionPlan newCachedPlan = new CachedSqlQueryExecutionPlan(statement, tableNames, tableStatistics, planOptimizers, plan,
                 analysis.getParameters(), columnTypes, getSession().getTimeZoneKey(), getSession().getIdentity(), systemSessionProperties);
