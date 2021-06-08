@@ -29,13 +29,11 @@ import io.prestosql.spi.type.TypeManager;
 import java.io.Serializable;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
@@ -207,14 +205,14 @@ public class Table
         tableState = state;
     }
 
-    protected List<Page> getPages()
-    {
-        return splits.stream().flatMap(Collection::stream).flatMap(lp -> lp.getPages().stream()).collect(Collectors.toList());
-    }
-
     protected List<Page> getPages(int split)
     {
-        return splits.get(split).parallelStream().flatMap(lp -> lp.getPages().stream()).collect(Collectors.toList());
+        // use for-loop instead of stream to improve performance
+        List<Page> list = new ArrayList<>();
+        for (LogicalPart lp : splits.get(split)) {
+            list.addAll(lp.getPages());
+        }
+        return list;
     }
 
     protected List<Page> getPages(int split, TupleDomain<ColumnHandle> predicate)
@@ -223,7 +221,12 @@ public class Table
             return getPages(split);
         }
 
-        return splits.get(split).parallelStream().flatMap(lp -> lp.getPages(predicate).stream()).collect(Collectors.toList());
+        // use for-loop instead of stream to improve performance
+        List<Page> list = new ArrayList<>();
+        for (LogicalPart lp : splits.get(split)) {
+            list.addAll(lp.getPages(predicate));
+        }
+        return list;
     }
 
     protected long getRows()

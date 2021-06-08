@@ -21,7 +21,6 @@ import io.airlift.units.MaxDataSize;
 import io.airlift.units.MaxDuration;
 import io.airlift.units.MinDataSize;
 import io.airlift.units.MinDuration;
-import io.prestosql.spi.block.PageBuilderStatus;
 import io.prestosql.spi.function.Mandatory;
 
 import javax.validation.constraints.Min;
@@ -38,7 +37,7 @@ public class MemoryConfig
     private int splitsPerNode = Runtime.getRuntime().availableProcessors();
     private DataSize maxDataPerNode = new DataSize(256, DataSize.Unit.MEGABYTE);
     private DataSize maxLogicalPartSize = new DataSize(256, MEGABYTE);
-    private DataSize maxPageSize = new DataSize(PageBuilderStatus.DEFAULT_MAX_PAGE_SIZE_IN_BYTES, DataSize.Unit.BYTE);
+    private DataSize maxPageSize = new DataSize(512, DataSize.Unit.KILOBYTE);
     private Duration processingDelay = new Duration(5, TimeUnit.SECONDS);
     private Path spillRoot;
     private int threadPoolSize = Math.max((Runtime.getRuntime().availableProcessors() / 2), 1);
@@ -49,6 +48,9 @@ public class MemoryConfig
         return splitsPerNode;
     }
 
+    @Mandatory(name = "memory.splits-per-node",
+            description = "Number of splits to create per node, should be set to the same value on all nodes",
+            required = true)
     @Config("memory.splits-per-node")
     public MemoryConfig setSplitsPerNode(int splitsPerNode)
     {

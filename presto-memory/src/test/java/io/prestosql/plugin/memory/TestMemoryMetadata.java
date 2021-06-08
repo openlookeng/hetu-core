@@ -36,6 +36,8 @@ import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -167,7 +169,9 @@ public class TestMemoryMetadata
     {
         assertEquals(metadata.listSchemaNames(SESSION), ImmutableList.of("default"));
         metadata.createSchema(SESSION, "test", ImmutableMap.of());
-        assertEquals(metadata.listSchemaNames(SESSION), ImmutableList.of("default", "test"));
+        List<String> actual = new ArrayList<>(metadata.listSchemaNames(SESSION));
+        Collections.sort(actual);
+        assertEquals(actual, ImmutableList.of("default", "test"));
         assertEquals(metadata.listTables(SESSION, Optional.of("test")), ImmutableList.of());
 
         SchemaTableName tableName = new SchemaTableName("test", "first_table");

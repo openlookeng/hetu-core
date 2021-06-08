@@ -22,6 +22,7 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.predicate.Domain;
+import io.prestosql.spi.predicate.SortedRangeSet;
 import io.prestosql.spi.predicate.ValueSet;
 import io.prestosql.spi.type.IntegerType;
 import io.prestosql.spi.type.Type;
@@ -37,9 +38,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -168,7 +171,7 @@ public class TestLogicalPart
         AtomicReference<LogicalPart.LogicalPartState> processingState = new AtomicReference<>(LogicalPart.LogicalPartState.COMPLETED);
         ReflectionTestUtils.setField(logicalPart, "processingState", processingState);
 
-        List<Integer> indexChannels = new ArrayList<>();
+        Set<Integer> indexChannels = new HashSet<>();
         indexChannels.add(0);
         ReflectionTestUtils.setField(logicalPart, "indexChannels", indexChannels);
 
@@ -176,10 +179,10 @@ public class TestLogicalPart
         sortChannels.add(0); // 0 is sorted
         ReflectionTestUtils.setField(logicalPart, "sortChannels", sortChannels);
 
-        Map<Integer, Map.Entry<Comparable, Comparable>> columnMinMax = new HashMap<>();
+        Map<Integer, Map.Entry<Comparable, Comparable>> minMaxIdx = new HashMap<>();
         Map.Entry<Comparable, Comparable> entry1 = new AbstractMap.SimpleEntry<>(min, max);
-        columnMinMax.put(0, entry1);
-        ReflectionTestUtils.setField(logicalPart, "columnMinMax", columnMinMax);
+        minMaxIdx.put(0, entry1);
+        ReflectionTestUtils.setField(logicalPart, "minMaxIdx", minMaxIdx);
 
         return logicalPart;
     }
@@ -190,7 +193,7 @@ public class TestLogicalPart
                 equal(IntegerType.INTEGER, domainValue)),
                 false);
 
-        return logicalPart.getPages(ImmutableMap.<Integer, Domain>builder().put(0, domain).build(), Collections.emptyMap(), Collections.emptyMap());
+        return logicalPart.getPages(ImmutableMap.of(0, ((SortedRangeSet) domain.getValues()).getOrderedRanges()), Collections.emptyMap(), Collections.emptyMap());
     }
 
     @Test
@@ -265,7 +268,7 @@ public class TestLogicalPart
                 equal(IntegerType.INTEGER, val2)),
                 false);
 
-        return logicalPart.getPages(ImmutableMap.<Integer, Domain>builder().put(0, domain).build(), Collections.emptyMap(), Collections.emptyMap());
+        return logicalPart.getPages(ImmutableMap.of(0, ((SortedRangeSet) domain.getValues()).getOrderedRanges()), Collections.emptyMap(), Collections.emptyMap());
     }
 
     @Test
@@ -354,7 +357,7 @@ public class TestLogicalPart
                 greaterThan(IntegerType.INTEGER, domainValue)),
                 false);
 
-        return logicalPart.getPages(ImmutableMap.<Integer, Domain>builder().put(0, domain).build(), Collections.emptyMap(), Collections.emptyMap());
+        return logicalPart.getPages(ImmutableMap.of(0, ((SortedRangeSet) domain.getValues()).getOrderedRanges()), Collections.emptyMap(), Collections.emptyMap());
     }
 
     @Test
@@ -428,7 +431,7 @@ public class TestLogicalPart
                 greaterThanOrEqual(IntegerType.INTEGER, domainValue)),
                 false);
 
-        return logicalPart.getPages(ImmutableMap.<Integer, Domain>builder().put(0, domain).build(), Collections.emptyMap(), Collections.emptyMap());
+        return logicalPart.getPages(ImmutableMap.of(0, ((SortedRangeSet) domain.getValues()).getOrderedRanges()), Collections.emptyMap(), Collections.emptyMap());
     }
 
     @Test
@@ -502,7 +505,7 @@ public class TestLogicalPart
                 lessThan(IntegerType.INTEGER, domainValue)),
                 false);
 
-        return logicalPart.getPages(ImmutableMap.<Integer, Domain>builder().put(0, domain).build(), Collections.emptyMap(), Collections.emptyMap());
+        return logicalPart.getPages(ImmutableMap.of(0, ((SortedRangeSet) domain.getValues()).getOrderedRanges()), Collections.emptyMap(), Collections.emptyMap());
     }
 
     @Test
@@ -576,7 +579,7 @@ public class TestLogicalPart
                 lessThanOrEqual(IntegerType.INTEGER, domainValue)),
                 false);
 
-        return logicalPart.getPages(ImmutableMap.<Integer, Domain>builder().put(0, domain).build(), Collections.emptyMap(), Collections.emptyMap());
+        return logicalPart.getPages(ImmutableMap.of(0, ((SortedRangeSet) domain.getValues()).getOrderedRanges()), Collections.emptyMap(), Collections.emptyMap());
     }
 
     @Test
@@ -650,7 +653,7 @@ public class TestLogicalPart
                 range(IntegerType.INTEGER, low, true, high, true)),
                 false);
 
-        return logicalPart.getPages(ImmutableMap.<Integer, Domain>builder().put(0, domain).build(), Collections.emptyMap(), Collections.emptyMap());
+        return logicalPart.getPages(ImmutableMap.of(0, ((SortedRangeSet) domain.getValues()).getOrderedRanges()), Collections.emptyMap(), Collections.emptyMap());
     }
 
     @Test
@@ -861,7 +864,7 @@ public class TestLogicalPart
         AtomicReference<LogicalPart.LogicalPartState> processingState = new AtomicReference<>(LogicalPart.LogicalPartState.COMPLETED);
         ReflectionTestUtils.setField(logicalPart, "processingState", processingState);
 
-        List<Integer> indexChannels = new ArrayList<>();
+        Set<Integer> indexChannels = new HashSet<>();
         indexChannels.add(0);
         ReflectionTestUtils.setField(logicalPart, "indexChannels", indexChannels);
 
@@ -878,16 +881,16 @@ public class TestLogicalPart
                 equal(IntegerType.INTEGER, domainValue)),
                 false);
 
-        Map<Integer, BloomFilter> indexChannelFilters = new HashMap<>();
-        indexChannelFilters.put(0, mock(BloomFilter.class));
+        Map<Integer, BloomFilter> bloomIdx = new HashMap<>();
+        bloomIdx.put(0, mock(BloomFilter.class));
 
-        ReflectionTestUtils.setField(logicalPart, "indexChannelFilters", indexChannelFilters);
+        ReflectionTestUtils.setField(logicalPart, "bloomIdx", bloomIdx);
 
         LogicalPart spyLogicalPart = spy(logicalPart);
         doReturn(bloomFilterReturn).when(spyLogicalPart).testFilter(Mockito.any(BloomFilter.class), eq(domainValue));
 
         return spyLogicalPart.getPages(Collections.emptyMap(),
-                ImmutableMap.<Integer, Domain>builder().put(0, domain).build(), Collections.emptyMap());
+                ImmutableMap.of(0, ((SortedRangeSet) domain.getValues()).getOrderedRanges()), Collections.emptyMap());
     }
 
     @Test
@@ -957,12 +960,30 @@ public class TestLogicalPart
     }
 
     // Spare Index Tests
-    private TreeMap<Comparable, List<Integer>> getIndexedPagesMap(long[] pageNumbers)
+    private TreeMap<Comparable, LogicalPart.SparseValue> getIndexedPagesMap(long[] pageValues)
     {
-        TreeMap<Comparable, List<Integer>> indexedPagesMap = new TreeMap<>();
+        TreeMap<Comparable, LogicalPart.SparseValue> indexedPagesMap = new TreeMap<>();
 
-        for (int i = 0; i < pageNumbers.length; i += 3) {
-            indexedPagesMap.computeIfAbsent(pageNumbers[i], e -> new LinkedList<>()).add(i / 3);
+        for (int i = 0; i < pageValues.length; i += 3) {
+            List<Integer> pageNumbers = new LinkedList<>();
+            pageNumbers.add(i / 3);
+            Comparable lastPageValue = pageValues[i + 2];
+            int j = i + 3;
+            // get all the pages after this one that start with the same value and should be in the same sparseidx
+            // entry
+            while (j < pageValues.length && pageValues[i] == pageValues[j]) {
+                pageNumbers.add(j / 3);
+                lastPageValue = pageValues[j + 2];
+                j += 3;
+            }
+
+            Comparable finalLastPageValue = lastPageValue;
+            indexedPagesMap.computeIfAbsent(pageValues[i], e -> new LogicalPart.SparseValue(pageNumbers, finalLastPageValue));
+
+            // skip pages covered in while loop
+            if (j > i + 3) {
+                i = j - 3;
+            }
         }
 
         return indexedPagesMap;
@@ -987,7 +1008,7 @@ public class TestLogicalPart
         AtomicReference<LogicalPart.LogicalPartState> processingState = new AtomicReference<>(LogicalPart.LogicalPartState.COMPLETED);
         ReflectionTestUtils.setField(logicalPart, "processingState", processingState);
 
-        List<Integer> indexChannels = new ArrayList<>();
+        Set<Integer> indexChannels = new HashSet<>();
         indexChannels.add(0);
         ReflectionTestUtils.setField(logicalPart, "indexChannels", indexChannels);
 
@@ -995,7 +1016,7 @@ public class TestLogicalPart
         sortChannels.add(0); // 0 is sorted
         ReflectionTestUtils.setField(logicalPart, "sortChannels", sortChannels);
 
-        ReflectionTestUtils.setField(logicalPart, "indexedPagesMap", getIndexedPagesMap(pageValues));
+        ReflectionTestUtils.setField(logicalPart, "sparseIdx", getIndexedPagesMap(pageValues));
 
         ReflectionTestUtils.setField(logicalPart, "types", TYPES);
 
@@ -1014,7 +1035,7 @@ public class TestLogicalPart
                 false);
 
         return logicalPart.getPages(Collections.emptyMap(), Collections.emptyMap(),
-                ImmutableMap.<Integer, Domain>builder().put(0, domain).build());
+                ImmutableMap.of(0, ((SortedRangeSet) domain.getValues()).getOrderedRanges()));
     }
 
     @Test
@@ -1089,7 +1110,7 @@ public class TestLogicalPart
                 false);
 
         return logicalPart.getPages(Collections.emptyMap(), Collections.emptyMap(),
-                ImmutableMap.<Integer, Domain>builder().put(0, domain).build());
+                ImmutableMap.of(0, ((SortedRangeSet) domain.getValues()).getOrderedRanges()));
     }
 
     @Test
@@ -1233,7 +1254,7 @@ public class TestLogicalPart
                 false);
 
         return logicalPart.getPages(Collections.emptyMap(), Collections.emptyMap(),
-                ImmutableMap.<Integer, Domain>builder().put(0, domain).build());
+                ImmutableMap.of(0, ((SortedRangeSet) domain.getValues()).getOrderedRanges()));
     }
 
     @Test
@@ -1310,7 +1331,7 @@ public class TestLogicalPart
         return logicalPart.getPages(
                 Collections.emptyMap(),
                 Collections.emptyMap(),
-                ImmutableMap.<Integer, Domain>builder().put(0, domain).build());
+                ImmutableMap.of(0, ((SortedRangeSet) domain.getValues()).getOrderedRanges()));
     }
 
     @Test
@@ -1384,7 +1405,7 @@ public class TestLogicalPart
                 false);
 
         List<Page> sparseResult = logicalPart.getPages(Collections.emptyMap(), Collections.emptyMap(),
-                ImmutableMap.<Integer, Domain>builder().put(0, domain).build());
+                ImmutableMap.of(0, ((SortedRangeSet) domain.getValues()).getOrderedRanges()));
 
         return sparseResult;
     }
@@ -1460,7 +1481,7 @@ public class TestLogicalPart
                 false);
 
         return logicalPart.getPages(Collections.emptyMap(), Collections.emptyMap(),
-                ImmutableMap.<Integer, Domain>builder().put(0, domain).build());
+                ImmutableMap.of(0, ((SortedRangeSet) domain.getValues()).getOrderedRanges()));
     }
 
     @Test
@@ -1534,7 +1555,7 @@ public class TestLogicalPart
                 false);
 
         return logicalPart.getPages(Collections.emptyMap(), Collections.emptyMap(),
-                ImmutableMap.<Integer, Domain>builder().put(0, domain).build());
+                ImmutableMap.of(0, ((SortedRangeSet) domain.getValues()).getOrderedRanges()));
     }
 
     @Test
@@ -1758,7 +1779,7 @@ public class TestLogicalPart
                 false);
 
         return logicalPart.getPages(Collections.emptyMap(), Collections.emptyMap(),
-                ImmutableMap.<Integer, Domain>builder().put(0, domain).build());
+                ImmutableMap.of(0, ((SortedRangeSet) domain.getValues()).getOrderedRanges()));
     }
 
     @Test

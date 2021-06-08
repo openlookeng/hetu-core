@@ -262,6 +262,7 @@ public class MemoryTableManager
             try {
                 Files.list(config.getSpillRoot())
                         .filter(Files::isDirectory)
+                        .filter(path -> path.getFileName().toString().matches("\\d+"))
                         .filter(path -> !activeTableIds.contains(Long.valueOf(path.getFileName().toString())))
                         .peek(path -> LOG.info("[TableRefresh] Cleaning table " + Long.valueOf(path.getFileName().toString()) + " from disk."))
                         .forEach(this::deleteRecursively);

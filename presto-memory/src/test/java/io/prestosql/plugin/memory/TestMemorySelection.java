@@ -33,7 +33,9 @@ import static org.testng.Assert.assertTrue;
 public class TestMemorySelection
         extends AbstractTestQueryFramework
 {
-    long processingWait = 15000;
+    // after a table is created, a background process processes each of the logiparts (sorts, creates index)
+    // this can take some time. if tests fails try increasing this value
+    long processingWait = 10000;
 
     public TestMemorySelection()
     {
