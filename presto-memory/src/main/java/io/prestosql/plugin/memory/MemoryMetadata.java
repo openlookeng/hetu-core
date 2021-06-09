@@ -329,7 +329,7 @@ public class MemoryMetadata
     private void checkSchemaNotExists(String schemaName)
     {
         if (metastore.getDatabase(MEM_KEY, schemaName).isPresent()) {
-            throw new PrestoException(ALREADY_EXISTS, format("Schema already exists", schemaName));
+            throw new PrestoException(ALREADY_EXISTS, format("Schema already exists %s", schemaName));
         }
     }
 

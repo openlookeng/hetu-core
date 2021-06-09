@@ -103,8 +103,11 @@ public class MemoryTableProperties
     @SuppressWarnings("unchecked")
     public static List<String> getPartitionedBy(Map<String, Object> tableProperties)
     {
-        List<String> partitionedBy = (List<String>) tableProperties.get(PARTITIONED_BY_PROPERTY);
-        return partitionedBy == null ? ImmutableList.of() : ImmutableList.copyOf(partitionedBy);
+        // TODO: support partitioning
+        throw new UnsupportedOperationException("Partitioning is not supported yet.");
+
+//        List<String> partitionedBy = (List<String>) tableProperties.get(PARTITIONED_BY_PROPERTY);
+//        return partitionedBy == null ? ImmutableList.of() : ImmutableList.copyOf(partitionedBy);
     }
 
     @SuppressWarnings("unchecked")
@@ -129,6 +132,9 @@ public class MemoryTableProperties
         else if (lower.endsWith(" DESC")) {
             name = name.substring(0, name.length() - 5).trim();
             order = SortOrder.DESC_NULLS_FIRST;
+
+            // TODO: support DESC
+            throw new UnsupportedOperationException("DESC sort is not supported yet.");
         }
         return new SortingColumn(name, order);
     }
