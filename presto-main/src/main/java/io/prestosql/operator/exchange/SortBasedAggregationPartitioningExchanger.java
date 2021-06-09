@@ -30,7 +30,7 @@ import it.unimi.dsi.fastutil.ints.IntList;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.SystemSessionProperties.getPrcntDriversForPartialAggr;
@@ -42,7 +42,7 @@ public class SortBasedAggregationPartitioningExchanger
 {
     private static final int finalizedChannel = 2;
 
-    protected final List<Consumer<PageReference>> buffers;
+    protected final List<BiConsumer<PageReference, String>> buffers;
     protected final LocalExchangeMemoryManager memoryManager;
     private LocalPartitionGenerator partitionGenerator;
 
@@ -58,12 +58,12 @@ public class SortBasedAggregationPartitioningExchanger
     //1) In case of SortBased aggregation un-finalized values are assigned to one set of drivers (this drivers uses Hash Aggr).
     //2) not finalized values should got to same driver (ex: Page 1 contains value 12 , driver 3 processed it, page 2 contains value 12, so it should pass to same driver.
     //3) finalized vales are assigned different set of drivers(this drivers uses sort Based Aggr).
-    public SortBasedAggregationPartitioningExchanger(List<Consumer<PageReference>> partitions,
-                                                     LocalExchangeMemoryManager memoryManager,
-                                                     List<? extends Type> types,
-                                                     List<Integer> partitionChannels,
-                                                     Optional<Integer> hashChannel,
-                                                     Session session)
+    public SortBasedAggregationPartitioningExchanger(List<BiConsumer<PageReference, String>> partitions,
+            LocalExchangeMemoryManager memoryManager,
+            List<? extends Type> types,
+            List<Integer> partitionChannels,
+            Optional<Integer> hashChannel,
+            Session session)
     {
         this.buffers = ImmutableList.copyOf(requireNonNull(partitions, "partitions is null"));
         this.memoryManager = requireNonNull(memoryManager, "memoryManager is null");
@@ -119,7 +119,7 @@ public class SortBasedAggregationPartitioningExchanger
     }
 
     @Override
-    public synchronized void accept(Page page)
+    public synchronized void accept(Page page, String instanceId)
     {
         // reset the assignment lists
         for (IntList partitionAssignment : partitionAssignments) {
@@ -154,7 +154,7 @@ public class SortBasedAggregationPartitioningExchanger
 
                 Page pageSplit = new Page(positions.size(), outputBlocks);
                 memoryManager.updateMemoryUsage(pageSplit.getRetainedSizeInBytes());
-                buffers.get(partition).accept(new PageReference(pageSplit, 1, () -> memoryManager.updateMemoryUsage(-pageSplit.getRetainedSizeInBytes())));
+                buffers.get(partition).accept(new PageReference(pageSplit, 1, () -> memoryManager.updateMemoryUsage(-pageSplit.getRetainedSizeInBytes())), instanceId);
             }
         }
     }

@@ -167,7 +167,6 @@ public class TestNestedLoopBuildOperator
         serializedPageMapping.put("slice", byte[].class);
         serializedPageMapping.put("positionCount", 3);
         serializedPageMapping.put("uncompressedSizeInBytes", 47);
-        serializedPageMapping.put("origin", null);
         serializedPageMapping.put("pageCodecMarkers", (byte) 0);
         return expectedMapping;
     }

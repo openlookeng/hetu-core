@@ -210,7 +210,8 @@ public class ExchangeOperator
             page = snapshotState.processSerializedPage(() -> exchangeClient.pollPage(id)).orElse(null);
         }
         else {
-            page = exchangeClient.pollPage(id);
+            // origin not needed in this case
+            page = exchangeClient.pollPage(id).getLeft();
         }
         if (page == null) {
             return null;

@@ -128,10 +128,10 @@ public final class BufferTestUtils
     static ListenableFuture<?> enqueuePage(OutputBuffer buffer, Page page, boolean broadcast)
     {
         if (broadcast) {
-            buffer.enqueue(0, ImmutableList.of(PAGES_SERDE.serialize(page)));
+            buffer.enqueue(0, ImmutableList.of(PAGES_SERDE.serialize(page)), null);
         }
         else {
-            buffer.enqueue(ImmutableList.of(PAGES_SERDE.serialize(page).setOrigin("id")));
+            buffer.enqueue(ImmutableList.of(PAGES_SERDE.serialize(page)), "id");
         }
         ListenableFuture<?> future = buffer.isFull();
         assertFalse(future.isDone());
@@ -140,7 +140,7 @@ public final class BufferTestUtils
 
     static ListenableFuture<?> enqueuePage(OutputBuffer buffer, Page page, int partition)
     {
-        buffer.enqueue(partition, ImmutableList.of(PAGES_SERDE.serialize(page).setOrigin("id")));
+        buffer.enqueue(partition, ImmutableList.of(PAGES_SERDE.serialize(page)), "id");
         ListenableFuture<?> future = buffer.isFull();
         assertFalse(future.isDone());
         return future;
@@ -154,17 +154,17 @@ public final class BufferTestUtils
     static void addPage(OutputBuffer buffer, Page page, boolean broadcast)
     {
         if (broadcast) {
-            buffer.enqueue(0, ImmutableList.of(PAGES_SERDE.serialize(page)));
+            buffer.enqueue(0, ImmutableList.of(PAGES_SERDE.serialize(page)), null);
         }
         else {
-            buffer.enqueue(ImmutableList.of(PAGES_SERDE.serialize(page).setOrigin("id")));
+            buffer.enqueue(ImmutableList.of(PAGES_SERDE.serialize(page)), "id");
         }
         assertTrue(buffer.isFull().isDone(), "Expected add page to not block");
     }
 
     static void addPage(OutputBuffer buffer, Page page, int partition)
     {
-        buffer.enqueue(partition, ImmutableList.of(PAGES_SERDE.serialize(page).setOrigin("id")));
+        buffer.enqueue(partition, ImmutableList.of(PAGES_SERDE.serialize(page)), "id");
         assertTrue(buffer.isFull().isDone(), "Expected add page to not block");
     }
 

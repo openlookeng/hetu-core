@@ -443,7 +443,8 @@ public class Query
             long rows = 0;
             long targetResultBytes = targetResultSize.toBytes();
             while (bytes < targetResultBytes) {
-                SerializedPage serializedPage = exchangeClient.pollPage(null);
+                // at this point, origin is irrelevant, so we can safely ignore it
+                SerializedPage serializedPage = exchangeClient.pollPage(null).getLeft();
                 if (serializedPage == null) {
                     break;
                 }
@@ -585,7 +586,8 @@ public class Query
             long rows = 0;
             long targetResultBytes = targetResultSize.toBytes();
             while (bytes < targetResultBytes) {
-                SerializedPage serializedPage = exchangeClient.pollPage(null);
+                // at this point, origin is irrelevant, so we can safely ignore it
+                SerializedPage serializedPage = exchangeClient.pollPage(null).getLeft();
                 if (serializedPage == null) {
                     break;
                 }

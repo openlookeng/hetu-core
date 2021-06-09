@@ -69,7 +69,7 @@ public class LocalExchangeSink
         return finished.get();
     }
 
-    public void addPage(Page page)
+    public void addPage(Page page, String origin)
     {
         requireNonNull(page, "page is null");
 
@@ -85,13 +85,13 @@ public class LocalExchangeSink
         if (!isForMerge && page instanceof MarkerPage) {
             // Bypass exchanger, and ask exchange to broadcast the marker to all targets.
             checkState(exchange != null);
-            exchange.broadcastMarker((MarkerPage) page);
+            exchange.broadcastMarker((MarkerPage) page, origin);
             // For merges, exchanger is always pass-through, and all sources are merged by a single operator instance,
             // so there is no need to "broadcast". Use pass-through exchanger to send markers
             // (so sink->source is considered a single pipeline).
         }
         else {
-            exchanger.accept(page);
+            exchanger.accept(page, origin);
         }
     }
 

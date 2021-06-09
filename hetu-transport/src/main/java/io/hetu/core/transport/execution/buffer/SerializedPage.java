@@ -23,7 +23,6 @@ import io.prestosql.spi.snapshot.Restorable;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.io.Serializable;
-import java.util.Optional;
 import java.util.Properties;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -45,10 +44,6 @@ public class SerializedPage
     private final int uncompressedSizeInBytes;
     private final byte pageCodecMarkers;
     private Properties pageMetadata = new Properties();
-
-    // origin may be null, when it is unknown or uninteresting
-    // TODO-cp-I2D63E: remove origin and introduce PageInTransition to include page, origin, and target
-    private String origin;
 
     public static SerializedPage forMarker(MarkerPage marker)
     {
@@ -171,17 +166,6 @@ public class SerializedPage
         return pageMetadata;
     }
 
-    public Optional<String> getOrigin()
-    {
-        return Optional.ofNullable(origin);
-    }
-
-    public SerializedPage setOrigin(String origin)
-    {
-        this.origin = origin;
-        return this;
-    }
-
     @Override
     public String toString()
     {
@@ -202,7 +186,6 @@ public class SerializedPage
         state.positionCount = getPositionCount();
         state.uncompressedSizeInBytes = getUncompressedSizeInBytes();
         state.pageCodecMarkers = getPageCodecMarkers();
-        state.origin = origin;
         return state;
     }
 
@@ -213,8 +196,7 @@ public class SerializedPage
                 serializedPageState.slice,
                 serializedPageState.pageCodecMarkers,
                 serializedPageState.positionCount,
-                serializedPageState.uncompressedSizeInBytes)
-                .setOrigin(serializedPageState.origin);
+                serializedPageState.uncompressedSizeInBytes);
     }
 
     private static class SerializedPageState
@@ -224,6 +206,5 @@ public class SerializedPage
         private int positionCount;
         private int uncompressedSizeInBytes;
         private byte pageCodecMarkers;
-        private String origin;
     }
 }

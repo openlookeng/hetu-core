@@ -65,7 +65,7 @@ public class PagesSerde
         if (page instanceof MarkerPage) {
             return SerializedPage.forMarker((MarkerPage) page);
         }
-        return serializeImpl(page).setOrigin(page.getOrigin().orElse(null));
+        return serializeImpl(page);
     }
 
     public Page deserialize(SerializedPage page)
@@ -73,7 +73,7 @@ public class PagesSerde
         if (page.isMarkerPage()) {
             return page.toMarker();
         }
-        return deserializeImpl(page).setOrigin(page.getOrigin().orElse(null));
+        return deserializeImpl(page);
     }
 
     private SerializedPage serializeImpl(Page page)

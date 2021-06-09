@@ -1178,14 +1178,15 @@ public class SqlTaskExecution
             // Ask the last OperatorFactory (e.g. TaskOutput or PartitionedOutput or LocalExchangeSink)
             // to send marker page to all their consumers, bypassing the entire source pipeline
             OperatorFactory last = factories.get(factories.size() - 1);
+            // In this case, the marker is added directly, by a single "source", so no need for origin
             if (last instanceof TaskOutputOperator.TaskOutputOperatorFactory) {
-                outputBuffer.enqueue(Collections.singletonList(SerializedPage.forMarker(markerPage)));
+                outputBuffer.enqueue(Collections.singletonList(SerializedPage.forMarker(markerPage)), null);
             }
             else if (last instanceof PartitionedOutputOperator.PartitionedOutputOperatorFactory) {
-                outputBuffer.enqueue(0, Collections.singletonList(SerializedPage.forMarker(markerPage)));
+                outputBuffer.enqueue(0, Collections.singletonList(SerializedPage.forMarker(markerPage)), null);
             }
             else if (last instanceof LocalExchangeSinkOperator.LocalExchangeSinkOperatorFactory) {
-                ((LocalExchangeSinkOperator.LocalExchangeSinkOperatorFactory) last).broadcastMarker(lifespan, markerPage);
+                ((LocalExchangeSinkOperator.LocalExchangeSinkOperatorFactory) last).broadcastMarker(lifespan, markerPage, null);
             }
             else {
                 checkState(false, "Unexpected output operator factory: " + last.getClass().getName());

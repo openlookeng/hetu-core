@@ -49,6 +49,7 @@ import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyObject;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -105,7 +106,7 @@ public class TestPartitionedOutputOperator
         assertEquals(SnapshotTestUtil.toFullSnapshotMapping(snapshot), createExpectedMappingAfterFinish());
 
         ArgumentCaptor<List> pagesArgument = ArgumentCaptor.forClass(List.class);
-        verify(buffer, times(9)).enqueue(anyInt(), pagesArgument.capture());
+        verify(buffer, times(9)).enqueue(anyInt(), pagesArgument.capture(), anyString());
         List<List> pages = pagesArgument.getAllValues();
         // 9 pages:
         // 1 (page 1 partitioned)

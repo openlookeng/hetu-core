@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -45,10 +44,6 @@ public class Page
     private final AtomicLong logicalSizeInBytes = new AtomicLong(-1);
 
     private Properties pageMetadata = new Properties();
-
-    // origin and pendingTargets may be null, when they are unknown or uninteresting
-    // TODO-cp-I2D63E: remove origin and introduce PageInTransition to include page, origin, and target
-    private String origin;
 
     public Page(Block... blocks)
     {
@@ -290,17 +285,6 @@ public class Page
         }
 
         return new Page(this.pageMetadata, loadedBlocks);
-    }
-
-    public Optional<String> getOrigin()
-    {
-        return Optional.ofNullable(origin);
-    }
-
-    public Page setOrigin(String origin)
-    {
-        this.origin = origin;
-        return this;
     }
 
     @Override

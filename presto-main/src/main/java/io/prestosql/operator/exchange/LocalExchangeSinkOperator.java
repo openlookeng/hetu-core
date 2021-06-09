@@ -105,9 +105,9 @@ public class LocalExchangeSinkOperator
             localExchangeFactory.noMoreSinkFactories();
         }
 
-        public void broadcastMarker(Lifespan lifespan, MarkerPage markerPage)
+        public void broadcastMarker(Lifespan lifespan, MarkerPage markerPage, String origin)
         {
-            localExchangeFactory.getLocalExchange(lifespan).broadcastMarker(markerPage);
+            localExchangeFactory.getLocalExchange(lifespan).broadcastMarker(markerPage, origin);
         }
     }
 
@@ -163,15 +163,14 @@ public class LocalExchangeSinkOperator
 
         if (snapshotState != null) {
             if (snapshotState.processPage(page)) {
-                // Make a clone of the page, because the marker may have been passed to multiple drivers.
-                page = snapshotState.nextMarker().clone();
+                page = snapshotState.nextMarker();
             }
         }
 
         if (!(page instanceof MarkerPage)) {
             page = pagePreprocessor.apply(page);
         }
-        sink.addPage(page.setOrigin(id));
+        sink.addPage(page, id);
         operatorContext.recordOutput(page.getSizeInBytes(), page.getPositionCount());
     }
 

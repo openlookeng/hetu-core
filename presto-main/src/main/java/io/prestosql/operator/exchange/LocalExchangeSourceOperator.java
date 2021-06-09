@@ -155,7 +155,8 @@ public class LocalExchangeSourceOperator
             page = snapshotState.processPage(() -> source.removePage()).orElse(null);
         }
         else {
-            page = source.removePage();
+            // origin not needed in this case
+            page = source.removePage().getLeft();
         }
         if (page != null) {
             operatorContext.recordProcessedInput(page.getSizeInBytes(), page.getPositionCount());

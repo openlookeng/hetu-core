@@ -190,7 +190,7 @@ public class TaskOutputOperator
         }
 
         List<SerializedPage> serializedPages = splitPage(page, DEFAULT_MAX_PAGE_SIZE_IN_BYTES).stream()
-                .map(p -> serde.serialize(p).setOrigin(id))
+                .map(p -> serde.serialize(p))
                 .collect(toImmutableList());
 
         if (page instanceof MarkerPage) {
@@ -202,11 +202,11 @@ public class TaskOutputOperator
             // That is, marker 1 is added to client buffer #1, then thread 2 takes over, and adds marker 2 to client buffer #1 and #2.
             // The result is that for buffer #2, it receives marker 2 before marker 1.
             synchronized (outputBuffer) {
-                outputBuffer.enqueue(serializedPages);
+                outputBuffer.enqueue(serializedPages, id);
             }
         }
         else {
-            outputBuffer.enqueue(serializedPages);
+            outputBuffer.enqueue(serializedPages, id);
         }
         operatorContext.recordOutput(page.getSizeInBytes(), page.getPositionCount());
     }

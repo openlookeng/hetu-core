@@ -27,6 +27,7 @@ import io.prestosql.memory.context.SimpleLocalMemoryContext;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.snapshot.MarkerPage;
+import org.apache.commons.lang3.tuple.Pair;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -305,7 +306,7 @@ public class TestExchangeClient
         assertStatus(exchangeClient.getStatus().getPageBufferClientStatuses().get(0), location, "queued", 1, 1, 1, "not scheduled");
 
         // remove the page and wait for the client to fetch another page
-        assertPageEquals(exchangeClient.pollPage(null), createPage(1));
+        assertPageEquals(exchangeClient.pollPage(null).getLeft(), createPage(1));
         do {
             assertLessThan(Duration.nanosSince(start), new Duration(5, TimeUnit.SECONDS));
             sleepUninterruptibly(100, MILLISECONDS);
@@ -318,7 +319,7 @@ public class TestExchangeClient
         assertTrue(exchangeClient.getStatus().getBufferedBytes() > 0);
 
         // remove the page and wait for the client to fetch another page
-        assertPageEquals(exchangeClient.pollPage(null), createPage(2));
+        assertPageEquals(exchangeClient.pollPage(null).getLeft(), createPage(2));
         do {
             assertLessThan(Duration.nanosSince(start), new Duration(5, TimeUnit.SECONDS));
             sleepUninterruptibly(100, MILLISECONDS);
@@ -377,7 +378,9 @@ public class TestExchangeClient
             MILLISECONDS.sleep(10);
         }
         assertEquals(exchangeClient.isClosed(), true);
-        assertNull(exchangeClient.pollPage(null));
+        Pair<SerializedPage, String> pair = exchangeClient.pollPage(null);
+        assertNotNull(pair);
+        assertNull(pair.getLeft());
         assertEquals(exchangeClient.getStatus().getBufferedPages(), 0);
         assertEquals(exchangeClient.getStatus().getBufferedBytes(), 0);
 
@@ -400,7 +403,7 @@ public class TestExchangeClient
 
     private static SerializedPage getNextPage(ExchangeClient exchangeClient, String target)
     {
-        ListenableFuture<SerializedPage> futurePage = Futures.transform(exchangeClient.isBlocked(), ignored -> exchangeClient.pollPage(target), directExecutor());
+        ListenableFuture<SerializedPage> futurePage = Futures.transform(exchangeClient.isBlocked(), ignored -> exchangeClient.pollPage(target).getLeft(), directExecutor());
         return tryGetFutureValue(futurePage, 100, TimeUnit.SECONDS).orElse(null);
     }
 

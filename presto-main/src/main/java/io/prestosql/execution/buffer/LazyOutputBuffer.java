@@ -246,25 +246,25 @@ public class LazyOutputBuffer
     }
 
     @Override
-    public void enqueue(List<SerializedPage> pages)
+    public void enqueue(List<SerializedPage> pages, String origin)
     {
         OutputBuffer outputBuffer;
         synchronized (this) {
             checkState(delegate != null, "Buffer has not been initialized");
             outputBuffer = delegate;
         }
-        outputBuffer.enqueue(pages);
+        outputBuffer.enqueue(pages, origin);
     }
 
     @Override
-    public void enqueue(int partition, List<SerializedPage> pages)
+    public void enqueue(int partition, List<SerializedPage> pages, String origin)
     {
         OutputBuffer outputBuffer;
         synchronized (this) {
             checkState(delegate != null, "Buffer has not been initialized");
             outputBuffer = delegate;
         }
-        outputBuffer.enqueue(partition, pages);
+        outputBuffer.enqueue(partition, pages, origin);
     }
 
     @Override

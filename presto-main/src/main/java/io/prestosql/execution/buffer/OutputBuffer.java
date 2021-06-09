@@ -108,13 +108,13 @@ public interface OutputBuffer
      * Adds a split-up page to an unpartitioned buffer. If no-more-pages has been set, the enqueue
      * page call is ignored.  This can happen with limit queries.
      */
-    void enqueue(List<SerializedPage> pages);
+    void enqueue(List<SerializedPage> pages, String origin);
 
     /**
      * Adds a split-up page to a specific partition.  If no-more-pages has been set, the enqueue
      * page call is ignored.  This can happen with limit queries.
      */
-    void enqueue(int partition, List<SerializedPage> pages);
+    void enqueue(int partition, List<SerializedPage> pages, String origin);
 
     /**
      * Notify buffer that no more pages will be added. Any future calls to enqueue a
