@@ -291,21 +291,26 @@ public class MemoryMetadata
         }
 
         ImmutableList.Builder<ColumnInfo> columns = ImmutableList.builder();
-        Set<String> columnNames = new HashSet<>();
+        Map<String, ColumnMetadata> columnNames = new HashMap<>();
         for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
             ColumnMetadata column = tableMetadata.getColumns().get(i);
             columns.add(new ColumnInfo(new MemoryColumnHandle(i, column.getType().getTypeSignature()), column.getName()));
-            columnNames.add(column.getName());
+            columnNames.put(column.getName(), column);
         }
 
-        sortedByColumnNames.removeAll(columnNames);
-        if (!sortedByColumnNames.isEmpty()) {
-            throw new PrestoException(INVALID_TABLE_PROPERTY, "invalid column(s) in sort_by");
+        for (String sortedByColumnName : sortedByColumnNames) {
+            if (!columnNames.containsKey(sortedByColumnName)) {
+                throw new PrestoException(INVALID_TABLE_PROPERTY, "column " + sortedByColumnName + " in sorted_by does not exist");
+            }
+            if (!columnNames.get(sortedByColumnName).getType().isComparable()) {
+                throw new PrestoException(INVALID_TABLE_PROPERTY, "column " + sortedByColumnName + " in sorted_by is not comparable");
+            }
         }
 
-        indexColumnNames.removeAll(columnNames);
-        if (!indexColumnNames.isEmpty()) {
-            throw new PrestoException(INVALID_TABLE_PROPERTY, "invalid column(s) in index_columns");
+        for (String indexColumnName : indexColumnNames) {
+            if (!columnNames.containsKey(indexColumnName)) {
+                throw new PrestoException(INVALID_TABLE_PROPERTY, "column " + indexColumnName + " in index_columns does not exist");
+            }
         }
 
         long nextId = nextTableId.getAndIncrement();
