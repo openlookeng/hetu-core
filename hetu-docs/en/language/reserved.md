@@ -6,6 +6,7 @@ The following table lists all of the keywords that are reserved in openLooKeng, 
 
 | Keyword             | SQL:2016 | SQL-92   |
 | ------------------- | -------- | -------- |
+| 'AGGREGATIONS'      |          |          |
 | `ALTER`             | reserved | reserved |
 | `AND`               | reserved | reserved |
 | `AS`                | reserved | reserved |

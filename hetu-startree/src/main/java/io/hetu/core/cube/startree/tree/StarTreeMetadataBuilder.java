@@ -16,6 +16,7 @@
 package io.hetu.core.cube.startree.tree;
 
 import com.google.common.collect.ImmutableSet;
+import io.hetu.core.spi.cube.CubeFilter;
 import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.CubeMetadataBuilder;
 import io.hetu.core.spi.cube.CubeStatus;
@@ -31,7 +32,7 @@ public class StarTreeMetadataBuilder
     private final String sourceTableName;
     private final List<StarTreeColumn> columns = new ArrayList<>();
     private final List<Set<String>> groups = new ArrayList<>();
-    private String predicateString;
+    private CubeFilter cubeFilter;
     private CubeStatus cubeStatus;
     private long tableLastUpdatedTime;
     private long cubeLastUpdatedTime;
@@ -48,7 +49,7 @@ public class StarTreeMetadataBuilder
         this.sourceTableName = starTreeMetadata.getSourceTableName();
         this.columns.addAll(starTreeMetadata.getColumns());
         this.groups.add(starTreeMetadata.getGroup());
-        this.predicateString = starTreeMetadata.getPredicateString();
+        this.cubeFilter = starTreeMetadata.getCubeFilter();
         this.tableLastUpdatedTime = starTreeMetadata.getSourceTableLastUpdatedTime();
         this.cubeLastUpdatedTime = starTreeMetadata.getLastUpdatedTime();
         this.cubeStatus = starTreeMetadata.getCubeStatus();
@@ -91,9 +92,9 @@ public class StarTreeMetadataBuilder
     }
 
     @Override
-    public void withPredicate(String predicateString)
+    public void withCubeFilter(CubeFilter cubeFilter)
     {
-        this.predicateString = predicateString;
+        this.cubeFilter = cubeFilter;
     }
 
     @Override
@@ -105,7 +106,7 @@ public class StarTreeMetadataBuilder
                 tableLastUpdatedTime,
                 columns,
                 groups,
-                predicateString,
+                cubeFilter,
                 cubeLastUpdatedTime,
                 cubeStatus);
     }

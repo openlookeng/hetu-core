@@ -73,7 +73,7 @@ public class TestStarTreeMetaStore
                         new AggregateColumn("sum_cost", "SUM", "cost", false),
                         new DimensionColumn("value", "value")),
                 ImmutableList.of(ImmutableSet.of("value")),
-                "",
+                null,
                 10000,
                 CubeStatus.READY);
         cubeMetadata2 = new StarTreeMetadata("star2",
@@ -83,7 +83,7 @@ public class TestStarTreeMetaStore
                         new AggregateColumn("sum_cost", "SUM", "cost", false),
                         new DimensionColumn("value", "value")),
                 ImmutableList.of(ImmutableSet.of("value")),
-                "",
+                null,
                 10000,
                 CubeStatus.READY);
     }

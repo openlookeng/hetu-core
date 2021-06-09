@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.json.ObjectMapperProvider;
 import io.airlift.slice.Slices;
@@ -438,6 +439,37 @@ public class TestTupleDomain
                         Domain.create(
                                 ValueSet.ofRanges(Range.range(BIGINT, 5L, true, 18L, true)),
                                 false))));
+
+        assertTrue(contains(
+                ImmutableMap.of(A,
+                        Domain.create(
+                                ValueSet.ofRanges(Range.range(BIGINT, 1L, true, 10L, true)),
+                                false),
+                                B,
+                        Domain.multipleValues(VARCHAR, ImmutableList.of(utf8Slice("USA"), utf8Slice("CA"), utf8Slice("IND")))),
+                ImmutableMap.of(A,
+                        Domain.create(
+                                ValueSet.ofRanges(Range.range(BIGINT, 1L, true, 10L, true)),
+                                false),
+                                B,
+                        Domain.singleValue(VARCHAR, utf8Slice("USA")))));
+        assertTrue(contains(
+                ImmutableMap.of(A,
+                        Domain.create(
+                                ValueSet.ofRanges(Range.range(BIGINT, 1L, true, 10L, true)),
+                                false),
+                        B,
+                        Domain.multipleValues(VARCHAR, ImmutableList.of(utf8Slice("USA"), utf8Slice("CA"), utf8Slice("IND"))),
+                        C,
+                        Domain.singleValue(VARCHAR, utf8Slice("F"))),
+                ImmutableMap.of(A,
+                        Domain.create(
+                                ValueSet.ofRanges(Range.range(BIGINT, 1L, true, 10L, true)),
+                                false),
+                        B,
+                        Domain.singleValue(VARCHAR, utf8Slice("USA")),
+                        C,
+                        Domain.singleValue(VARCHAR, utf8Slice("F")))));
     }
 
     @Test

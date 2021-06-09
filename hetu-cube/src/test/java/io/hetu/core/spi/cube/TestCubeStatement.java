@@ -51,21 +51,18 @@ public class TestCubeStatement
                 .select("name", "address", "nationkey")
                 .aggregate(AggregationSignature.count())
                 .from("tpch.tiny.customer")
-                .where("nationkey = 123")
                 .build();
 
         CubeStatement statement2 = CubeStatement.newBuilder()
                 .select("name", "address", "nationkey")
                 .aggregate(AggregationSignature.count())
                 .from("tpch.tiny.customer")
-                .where("nationkey = 123")
                 .build();
 
         CubeStatement statement3 = CubeStatement.newBuilder()
                 .select("name", "address")
                 .aggregate(AggregationSignature.count())
                 .from("tpch.tiny.customer")
-                .where("nationkey = 123")
                 .build();
 
         assertEquals(statement1, statement2, "statements are not equal");

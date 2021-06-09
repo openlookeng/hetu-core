@@ -57,6 +57,11 @@ public interface CubeMetadata
     List<String> getAggregations();
 
     /**
+     * Cube selection filter
+     */
+    CubeFilter getCubeFilter();
+
+    /**
      * Return the group by columns
      */
     Set<String> getGroup();
@@ -104,11 +109,6 @@ public interface CubeMetadata
      * Return all aggregation column information
      */
     List<AggregationSignature> getAggregationSignatures();
-
-    /**
-     * Return cube predicate string
-     */
-    String getPredicateString();
 
     /**
      * Return the status of the cube

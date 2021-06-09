@@ -315,6 +315,8 @@ class AstBuilder
         Optional<Expression> optionalExpression = visitIfPresent(context.expression(), Expression.class);
         boolean cubeGroupProvided = false;
         boolean aggregationsProvided = false;
+        boolean sourceFilterProvided = false;
+        Optional<Expression> sourceFilterPredicate = Optional.empty();
         for (SqlBaseParser.CubePropertyContext propertyContext : context.cubeProperties().cubeProperty()) {
             if (propertyContext.cubeGroup() != null) {
                 if (cubeGroupProvided) {
@@ -329,6 +331,13 @@ class AstBuilder
                 }
                 aggregations = visit(propertyContext.aggregations().expression(), FunctionCall.class);
                 aggregationsProvided = true;
+            }
+            else if (propertyContext.sourceFilter() != null) {
+                if (sourceFilterProvided) {
+                    throw new IllegalArgumentException("Duplicate Property: FILTER");
+                }
+                sourceFilterPredicate = visitIfPresent(propertyContext.sourceFilter().expression(), Expression.class);
+                sourceFilterProvided = true;
             }
             else if (propertyContext.property() != null) {
                 properties.add((Property) visitProperty(propertyContext.property()));
@@ -367,7 +376,7 @@ class AstBuilder
                         aggItem.getArguments()));
             }
         });
-        return new CreateCube(getLocation(context), cubeName, sourceTableName, groupingSet, decomposedAggregations, context.EXISTS() != null, properties, optionalExpression);
+        return new CreateCube(getLocation(context), cubeName, sourceTableName, groupingSet, decomposedAggregations, context.EXISTS() != null, properties, optionalExpression, sourceFilterPredicate.orElse(null));
     }
 
     @Override

@@ -35,21 +35,22 @@ public class CreateCube
     private final List<Identifier> groupingSet;
     private final Set<FunctionCall> aggregations;
     private final List<Property> properties;
+    private final Expression sourceFilter;
 
     public CreateCube(QualifiedName cubeName, QualifiedName sourceTableName, List<Identifier> groupingSet,
-            Set<FunctionCall> aggregations, boolean notExists, List<Property> properties, Optional<Expression> where)
+            Set<FunctionCall> aggregations, boolean notExists, List<Property> properties, Optional<Expression> where, Expression sourceFilter)
     {
-        this(Optional.empty(), cubeName, sourceTableName, groupingSet, aggregations, notExists, properties, where);
+        this(Optional.empty(), cubeName, sourceTableName, groupingSet, aggregations, notExists, properties, where, sourceFilter);
     }
 
     public CreateCube(NodeLocation location, QualifiedName cubeName, QualifiedName sourceTableName, List<Identifier> groupingSet,
-            Set<FunctionCall> aggregations, boolean notExists, List<Property> properties, Optional<Expression> where)
+            Set<FunctionCall> aggregations, boolean notExists, List<Property> properties, Optional<Expression> where, Expression sourceFilter)
     {
-        this(Optional.of(location), cubeName, sourceTableName, groupingSet, aggregations, notExists, properties, where);
+        this(Optional.of(location), cubeName, sourceTableName, groupingSet, aggregations, notExists, properties, where, sourceFilter);
     }
 
     private CreateCube(Optional<NodeLocation> location, QualifiedName cubeName, QualifiedName sourceTableName, List<Identifier> groupingSet,
-            Set<FunctionCall> aggregations, boolean notExists, List<Property> properties, Optional<Expression> where)
+            Set<FunctionCall> aggregations, boolean notExists, List<Property> properties, Optional<Expression> where, Expression sourceFilter)
     {
         super(location);
         this.cubeName = requireNonNull(cubeName, "cube name is null");
@@ -59,6 +60,7 @@ public class CreateCube
         this.notExists = notExists;
         this.properties = properties;
         this.where = where;
+        this.sourceFilter = sourceFilter;
     }
 
     public QualifiedName getCubeName()
@@ -96,6 +98,11 @@ public class CreateCube
         return notExists;
     }
 
+    public Optional<Expression> getSourceFilter()
+    {
+        return Optional.ofNullable(sourceFilter);
+    }
+
     @Override
     public <R, C> R accept(AstVisitor<R, C> visitor, C context)
     {
@@ -105,10 +112,15 @@ public class CreateCube
     @Override
     public List<? extends Node> getChildren()
     {
-        return ImmutableList.<Node>builder()
-                .addAll(aggregations)
-                .addAll(properties)
-                .build();
+        ImmutableList.Builder<Node> nodes = ImmutableList.builder();
+        nodes.addAll(groupingSet);
+        nodes.addAll(aggregations);
+        nodes.addAll(properties);
+        where.ifPresent(nodes::add);
+        if (sourceFilter != null) {
+            nodes.add(sourceFilter);
+        }
+        return nodes.build();
     }
 
     @Override
@@ -120,7 +132,9 @@ public class CreateCube
                 groupingSet,
                 aggregations,
                 notExists,
-                properties);
+                properties,
+                where,
+                sourceFilter);
     }
 
     @Override
@@ -133,6 +147,8 @@ public class CreateCube
                 .add("aggregations", aggregations)
                 .add("notExists", notExists)
                 .add("properties", properties)
+                .add("where", where)
+                .add("sourceFilterPredicate", sourceFilter)
                 .toString();
     }
 
@@ -151,6 +167,8 @@ public class CreateCube
                 Objects.equals(groupingSet, that.groupingSet) &&
                 Objects.equals(aggregations, that.aggregations) &&
                 Objects.equals(notExists, that.notExists) &&
-                Objects.equals(properties, that.properties);
+                Objects.equals(properties, that.properties) &&
+                Objects.equals(where, that.where) &&
+                Objects.equals(sourceFilter, that.sourceFilter);
     }
 }

@@ -17,6 +17,7 @@ package io.prestosql.sql.planner.optimizations;
 
 import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
+import io.hetu.core.spi.cube.CubeFilter;
 import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.CubeStatement;
 import io.hetu.core.spi.cube.aggregator.AggregationSignature;
@@ -59,11 +60,16 @@ import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.Identifier;
 import io.prestosql.sql.tree.Literal;
 import io.prestosql.sql.tree.SymbolReference;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -82,7 +88,7 @@ import static io.prestosql.sql.planner.plan.Patterns.optionalSource;
 import static io.prestosql.sql.planner.plan.Patterns.source;
 import static io.prestosql.sql.planner.plan.Patterns.tableScan;
 import static io.prestosql.sql.relational.OriginalExpressionUtils.castToExpression;
-import static io.prestosql.sql.relational.OriginalExpressionUtils.isExpression;
+import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -222,7 +228,7 @@ public class StarTreeAggregationRule
 
         try {
             return optimize(node,
-                    filterNode,
+                    filterNode.orElse(null),
                     tableScanNode,
                     symbolMappings,
                     context.getSession(),
@@ -241,7 +247,7 @@ public class StarTreeAggregationRule
     }
 
     public Result optimize(AggregationNode aggregationNode,
-            Optional<PlanNode> filterNode,
+            final PlanNode filterNode,
             TableScanNode tableScanNode,
             Map<String, Object> symbolMapping,
             Session session,
@@ -253,10 +259,8 @@ public class StarTreeAggregationRule
         TableMetadata tableMetadata = metadata.getTableMetadata(session, tableHandle);
         String tableName = tableMetadata.getQualifiedName().toString();
         CubeStatement statement = CubeStatementGenerator.generate(
-                metadata,
                 tableName,
                 aggregationNode,
-                filterNode.map(FilterNode.class::cast).orElse(null),
                 symbolMapping);
 
         // Don't use star-tree for non-aggregate queries
@@ -275,7 +279,7 @@ public class StarTreeAggregationRule
 
         //Compare FilterNode predicate with Cube predicates to evaluate which cube can be used.
         List<CubeMetadata> matchedCubeMetadataList = cubeMetadataList.stream()
-                .filter(cubeMetadata -> filterPredicateMatches(filterNode.map(FilterNode.class::cast), cubeMetadata, session, symbolAllocator.getTypes()))
+                .filter(cubeMetadata -> filterPredicateMatches((FilterNode) filterNode, cubeMetadata, session, symbolAllocator.getTypes()))
                 .collect(Collectors.toList());
 
         //Match based on filter conditions
@@ -303,54 +307,146 @@ public class StarTreeAggregationRule
         //If multiple cubes are matching then lets select the recent built cube
         //so sort the cube based on the last updated time stamp
         matchedCubeMetadataList.sort(Comparator.comparingLong(CubeMetadata::getLastUpdatedTime).reversed());
-
-        AggregationRewriteWithCube aggregationRewriteWithCube = new AggregationRewriteWithCube(metadata, session, symbolAllocator, idAllocator, symbolMapping, matchedCubeMetadataList.get(0));
-        return Result.ofPlanNode(aggregationRewriteWithCube.rewrite(aggregationNode, filterNode.orElse(null)));
+        CubeMetadata matchedCubeMetadata = matchedCubeMetadataList.get(0);
+        AggregationRewriteWithCube aggregationRewriteWithCube = new AggregationRewriteWithCube(metadata, session, symbolAllocator, idAllocator, symbolMapping, matchedCubeMetadata);
+        return Result.ofPlanNode(aggregationRewriteWithCube.rewrite(aggregationNode, rewriteByRemovingSourceFilter(filterNode, matchedCubeMetadata)));
     }
 
-    private boolean atLeastMatchesOne(List<Expression> cubeSupportedPredicates, TupleDomain<Symbol> statementPredicate, Session session, TypeProvider types)
+    private FilterNode rewriteByRemovingSourceFilter(PlanNode filterNode, CubeMetadata matchedCubeMetadata)
     {
-        return cubeSupportedPredicates.stream().anyMatch(cubeSupportedPredicate -> {
-            ExpressionDomainTranslator.ExtractionResult decomposedCubePredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, cubeSupportedPredicate, types);
+        FilterNode rewritten = (FilterNode) filterNode;
+        if (filterNode != null && matchedCubeMetadata.getCubeFilter() != null && matchedCubeMetadata.getCubeFilter().getSourceTablePredicate() != null) {
+            //rewrite the expression by removing source filter predicate as cube would not have those columns necessarily
+            Expression predicate = castToExpression(((FilterNode) filterNode).getPredicate());
+            SqlParser sqlParser = new SqlParser();
+            Set<Identifier> sourceFilterPredicateColumns = ExpressionUtils.getIdentifiers(sqlParser.createExpression(matchedCubeMetadata.getCubeFilter().getSourceTablePredicate(), new ParsingOptions()));
+            predicate = ExpressionUtils.filterConjuncts(predicate,
+                    conjunct -> !sourceFilterPredicateColumns.containsAll(SymbolsExtractor.extractUnique(conjunct)
+                        .stream()
+                        .map(Symbol::getName)
+                        .map(Identifier::new)
+                        .collect(Collectors.toList())));
+            rewritten = new FilterNode(filterNode.getId(), ((FilterNode) filterNode).getSource(), castToRowExpression(predicate));
+        }
+        return rewritten;
+    }
+
+    private boolean atLeastMatchesOne(List<Expression> cubePredicates, TupleDomain<Symbol> queryPredicate, Session session, TypeProvider types)
+    {
+        return cubePredicates.stream().anyMatch(cubePredicate -> {
+            ExpressionDomainTranslator.ExtractionResult decomposedCubePredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, cubePredicate, types);
             return BooleanLiteral.TRUE_LITERAL.equals(decomposedCubePredicate.getRemainingExpression())
-                    && decomposedCubePredicate.getTupleDomain().contains(statementPredicate);
+                    && decomposedCubePredicate.getTupleDomain().contains(queryPredicate);
         });
     }
 
-    private boolean filterPredicateMatches(Optional<FilterNode> filterNode, CubeMetadata cubeMetadata, Session session, TypeProvider types)
+    private boolean filterPredicateMatches(FilterNode filterNode, CubeMetadata cubeMetadata, Session session, TypeProvider types)
     {
-        if (cubeMetadata.getPredicateString() == null) {
+        CubeFilter cubeFilter = cubeMetadata.getCubeFilter();
+
+        if (cubeFilter == null) {
+            //Cube was built for entire table
+            return filterNode == null || doesCubeContainQueryPredicateColumns(castToExpression(filterNode.getPredicate()), cubeMetadata);
+        }
+
+        if (filterNode == null) {
+            //Query statement has no WHERE clause but CUBE was built for subset of original data
+            return false;
+        }
+
+        SqlParser sqlParser = new SqlParser();
+        Expression queryPredicate = castToExpression(filterNode.getPredicate());
+        Expression sourceTablePredicate = cubeFilter.getSourceTablePredicate() == null ? null : sqlParser.createExpression(cubeFilter.getSourceTablePredicate(), new ParsingOptions());
+        Pair<Expression, Expression> splitPredicate = splitQueryPredicate(queryPredicate, sourceTablePredicate);
+        if (!arePredicatesEqual(splitPredicate.getLeft(), sourceTablePredicate, metadata, session, types)) {
+            LOGGER.debug("Cube source table predicate %s not matching query predicate %s", sourceTablePredicate, queryPredicate);
+            return false;
+        }
+        if (cubeFilter.getCubePredicate() == null) {
+            //Cube has no additional predicates to compare with
             return true;
         }
-        if (!filterNode.isPresent()) {
+        if (splitPredicate.getRight() == null) {
+            //No remaining predicate in Query. Can't compare with Cube predicate
             return false;
         }
-        SqlParser sqlParser = new SqlParser();
-        Expression cubePredicateAsExpr = sqlParser.createExpression(cubeMetadata.getPredicateString(), new ParsingOptions());
-        cubePredicateAsExpr = ExpressionUtils.rewriteIdentifiersToSymbolReferences(cubePredicateAsExpr);
+        Expression cubePredicate = ExpressionUtils.rewriteIdentifiersToSymbolReferences(sqlParser.createExpression(cubeFilter.getCubePredicate(), new ParsingOptions()));
+        ExpressionDomainTranslator.ExtractionResult decomposedQueryPredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, splitPredicate.getRight(), types);
+        if (!BooleanLiteral.TRUE_LITERAL.equals(decomposedQueryPredicate.getRemainingExpression())) {
+            LOGGER.error("StarTree cube cannot support predicate %s", castToExpression(filterNode.getPredicate()));
+            return false;
+        }
+        ExpressionDomainTranslator.ExtractionResult decomposedCubePredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, cubePredicate, types);
+        if (!BooleanLiteral.TRUE_LITERAL.equals(decomposedCubePredicate.getRemainingExpression())) {
+            //Can't create TupleDomain construct for this query predicate.
+            //eg: (col1 = 1 AND col2 = 1) OR (col1 > 1 and col2 = 2)
+            //Extract disjuncts from the Expression expression and evaluate separately
+            return atLeastMatchesOne(ExpressionUtils.extractDisjuncts(cubePredicate), decomposedQueryPredicate.getTupleDomain(), session, types);
+        }
+        return decomposedCubePredicate.getTupleDomain().contains(decomposedQueryPredicate.getTupleDomain());
+    }
 
-        RowExpression statementPredicate = filterNode.get().getPredicate();
-        if (isExpression(statementPredicate)) {
-            Expression statementPredicateAsExpr = castToExpression(statementPredicate);
-            statementPredicateAsExpr = ExpressionUtils.rewriteIdentifiersToSymbolReferences(statementPredicateAsExpr);
-            ExpressionDomainTranslator.ExtractionResult decomposeStatementPredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, statementPredicateAsExpr, types);
-            if (!BooleanLiteral.TRUE_LITERAL.equals(decomposeStatementPredicate.getRemainingExpression())) {
-                LOGGER.error("StarTree index cannot support predicate %s", statementPredicate);
-                return false;
-            }
-            ExpressionDomainTranslator.ExtractionResult decomposedCubePredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, cubePredicateAsExpr, types);
-            if (!BooleanLiteral.TRUE_LITERAL.equals(decomposedCubePredicate.getRemainingExpression())) {
-                //Can't create TupleDomain construct for this Expression.
-                //eg: (col1 = 1 AND col2 = 1) OR (col1 > 1 and col2 = 2)
-                //Extract disjuncts from the Expression expression and evaluate separately
-                return atLeastMatchesOne(ExpressionUtils.extractDisjuncts(cubePredicateAsExpr), decomposeStatementPredicate.getTupleDomain(), session, types);
-            }
-            return decomposedCubePredicate.getTupleDomain().contains(decomposeStatementPredicate.getTupleDomain());
+    private boolean doesCubeContainQueryPredicateColumns(Expression queryPredicate, CubeMetadata cubeMetadata)
+    {
+        Set<Identifier> cubePredicateColumns = new HashSet<>();
+        cubeMetadata.getDimensions().stream().map(Identifier::new).forEach(cubePredicateColumns::add);
+        Set<Identifier> queryPredicateColumns = SymbolsExtractor.extractUnique(queryPredicate)
+                .stream()
+                .map(Symbol::getName)
+                .map(Identifier::new)
+                .collect(Collectors.toSet());
+        return cubePredicateColumns.containsAll(queryPredicateColumns);
+    }
+
+    /**
+     * Split query predicate into two different expressions.
+     * First expression that can be compared with source table.
+     * Second expression is compared with Cube data range(defined as another predicate)
+     */
+    private Pair<Expression, Expression> splitQueryPredicate(Expression queryPredicate, Expression sourceTablePredicate)
+    {
+        if (sourceTablePredicate == null) {
+            return new ImmutablePair<>(null, queryPredicate);
         }
-        else {
-            LOGGER.error("StarTree index cannot support predicate %s", statementPredicate);
+        Set<Identifier> sourceFilterPredicateColumns = ExpressionUtils.getIdentifiers(sourceTablePredicate);
+        List<Expression> conjuncts = ExpressionUtils.extractConjuncts(queryPredicate);
+        List<Expression> sourceFilterPredicates = new ArrayList<>();
+        List<Expression> remainingPredicates = new ArrayList<>();
+        conjuncts.forEach(conjunct -> {
+            List<Identifier> identifiers = SymbolsExtractor.extractUnique(conjunct)
+                    .stream()
+                    .map(Symbol::getName)
+                    .map(Identifier::new)
+                    .collect(Collectors.toList());
+            if (sourceFilterPredicateColumns.containsAll(identifiers)) {
+                sourceFilterPredicates.add(conjunct);
+            }
+            else {
+                remainingPredicates.add(conjunct);
+            }
+        });
+        Expression cubePredicate1 = sourceFilterPredicateColumns.isEmpty() ? null : ExpressionUtils.combineConjuncts(sourceFilterPredicates);
+        Expression cubePredicate2 = remainingPredicates.isEmpty() ? null : ExpressionUtils.combineConjuncts(remainingPredicates);
+        return new ImmutablePair<>(cubePredicate1, cubePredicate2);
+    }
+
+    private boolean arePredicatesEqual(Expression left, Expression right, Metadata metadata, Session session, TypeProvider types)
+    {
+        if (left == null && right == null) {
+            return true;
+        }
+        else if (left == null || right == null) {
             return false;
         }
+        left = ExpressionUtils.rewriteIdentifiersToSymbolReferences(left);
+        right = ExpressionUtils.rewriteIdentifiersToSymbolReferences(right);
+        ExpressionDomainTranslator.ExtractionResult leftDecomposed = ExpressionDomainTranslator.fromPredicate(metadata, session, left, types);
+        ExpressionDomainTranslator.ExtractionResult rightDecomposed = ExpressionDomainTranslator.fromPredicate(metadata, session, right, types);
+        if (!BooleanLiteral.TRUE_LITERAL.equals(leftDecomposed.getRemainingExpression()) || !BooleanLiteral.TRUE_LITERAL.equals(rightDecomposed.getRemainingExpression())) {
+            LOGGER.error("Star tree cube cannot support predicate %s", left);
+            return false;
+        }
+        return leftDecomposed.getTupleDomain().equals(rightDecomposed.getTupleDomain());
     }
 
     /**

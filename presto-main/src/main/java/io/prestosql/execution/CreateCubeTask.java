@@ -18,6 +18,7 @@ package io.prestosql.execution;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.hetu.core.spi.cube.CubeAggregateFunction;
+import io.hetu.core.spi.cube.CubeFilter;
 import io.hetu.core.spi.cube.CubeMetadataBuilder;
 import io.hetu.core.spi.cube.CubeStatus;
 import io.hetu.core.spi.cube.aggregator.AggregationSignature;
@@ -36,6 +37,7 @@ import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.sql.ExpressionFormatter;
 import io.prestosql.sql.analyzer.Analysis;
 import io.prestosql.sql.analyzer.Analyzer;
 import io.prestosql.sql.analyzer.Field;
@@ -236,9 +238,11 @@ public class CreateCubeTask
         //Status and Table modified time will be updated on the first insert into the cube
         builder.setCubeStatus(CubeStatus.INACTIVE);
         builder.setTableLastUpdatedTime(-1L);
+        statement.getSourceFilter().ifPresent(sourceTablePredicate -> {
+            builder.withCubeFilter(new CubeFilter(ExpressionFormatter.formatExpression(sourceTablePredicate, Optional.empty())));
+        });
         builder.setCubeLastUpdatedTime(System.currentTimeMillis());
         optionalCubeMetaStore.get().persist(builder.build());
-
         return immediateFuture(null);
     }
 
