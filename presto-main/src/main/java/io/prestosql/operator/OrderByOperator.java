@@ -18,6 +18,7 @@ import com.google.common.primitives.Ints;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.snapshot.SingleInputSnapshotState;
+import io.prestosql.snapshot.Spillable;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.SortOrder;
@@ -30,6 +31,7 @@ import io.prestosql.spiller.SpillerFactory;
 import io.prestosql.sql.gen.OrderingCompiler;
 
 import java.io.Serializable;
+import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -45,10 +47,14 @@ import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static io.prestosql.util.MergeSortedPages.mergeSortedPages;
 import static java.util.Objects.requireNonNull;
 
+// Snapshot: Most of these fields are immutable objects, excpet for:
+// - spillInProgress: must be "done" when markers are received (see needsInput)
+// - finishMemoryRevoke: must be empty, because new input (including markers) can't be added until finishMemoryRevoke is called
+// - sortedPages: only set after "finish" is called
 @RestorableConfig(uncapturedFields = {"sortChannels", "sortOrder", "outputChannels", "sourceTypes", "spillerFactory",
-        "orderingCompiler", "spiller", "spillInProgress", "finishMemoryRevoke", "sortedPages", "state", "snapshotState"})
+        "orderingCompiler", "spillInProgress", "finishMemoryRevoke", "sortedPages", "state", "snapshotState"})
 public class OrderByOperator
-        implements Operator
+        implements Operator, Spillable
 {
     public static class OrderByOperatorFactory
             implements OperatorFactory
@@ -418,6 +424,21 @@ public class OrderByOperator
     }
 
     @Override
+    public boolean isSpilled()
+    {
+        return spiller.isPresent();
+    }
+
+    @Override
+    public List<Path> getSpilledFilePaths()
+    {
+        if (isSpilled()) {
+            return spiller.get().getSpilledFilePaths();
+        }
+        return ImmutableList.of();
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         OrderByOperatorState myState = new OrderByOperatorState();
@@ -425,6 +446,11 @@ public class OrderByOperator
         myState.revocableMemoryContext = revocableMemoryContext.getBytes();
         myState.localUserMemoryContext = localUserMemoryContext.getBytes();
         myState.pageIndex = pageIndex.capture(serdeProvider);
+
+        // Capture spill related fields
+        if (spiller.isPresent()) {
+            myState.spiller = spiller.get().capture(serdeProvider);
+        }
         return myState;
     }
 
@@ -436,6 +462,17 @@ public class OrderByOperator
         this.revocableMemoryContext.setBytes(myState.revocableMemoryContext);
         this.localUserMemoryContext.setBytes(myState.localUserMemoryContext);
         this.pageIndex.restore(myState.pageIndex, serdeProvider);
+
+        // Restore spill related fields
+        if (myState.spiller != null) {
+            if (!spiller.isPresent()) {
+                spiller = Optional.of(spillerFactory.get().create(
+                        sourceTypes,
+                        operatorContext.getSpillContext(),
+                        operatorContext.newAggregateSystemMemoryContext()));
+            }
+            this.spiller.get().restore(myState.spiller, serdeProvider);
+        }
     }
 
     private static class OrderByOperatorState
@@ -446,5 +483,7 @@ public class OrderByOperator
         private long localUserMemoryContext;
 
         private Object pageIndex;
+
+        private Object spiller;
     }
 }

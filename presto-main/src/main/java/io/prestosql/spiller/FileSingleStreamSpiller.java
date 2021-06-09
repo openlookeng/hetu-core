@@ -257,6 +257,7 @@ public class FileSingleStreamSpiller
             this.pageSizeList = myState.pageSizeList;
             this.targetFile.close();
             Path path = Paths.get(myState.targetFile);
+            // Actual file content is restored after this returns, in SingleInputSnapshotState.loadSpilledFiles
             Files.deleteIfExists(path);
             this.targetFile = closer.register(new FileHolder(Files.createFile(path)));
             for (Long pageSize : pageSizeList) {

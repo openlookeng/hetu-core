@@ -349,6 +349,8 @@ public class TestHashJoinOperator
         lookupJoinOperatorMapping.put("currentProbePositionProducedRow", false);
         lookupJoinOperatorMapping.put("partitionedConsumption", false);
         lookupJoinOperatorMapping.put("lookupPartitions", false);
+        lookupJoinOperatorMapping.put("spiller", null);
+        lookupJoinOperatorMapping.put("savedRows", 0); // Only compare map size
 
         return lookupJoinOperatorMapping;
     }

@@ -743,9 +743,8 @@ public class SqlQueryExecution
 
         // Doesn't work with the following features
         if (SystemSessionProperties.isReuseTableScanEnabled(session)
-                || SystemSessionProperties.isCTEReuseEnabled(session)
-                || SystemSessionProperties.isSpillEnabled(session)) {
-            reasons.add("No support along with reuse_table_scan or cte_reuse_enabled or spill_enabled features");
+                || SystemSessionProperties.isCTEReuseEnabled(session)) {
+            reasons.add("No support along with reuse_table_scan or cte_reuse_enabled features");
         }
 
         // All input tables must support snapshotting
