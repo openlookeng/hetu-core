@@ -31,6 +31,16 @@ import static org.testng.Assert.assertTrue;
 public class TestIndexResources
         extends AbstractTestQueryFramework
 {
+    private static void waitAfterCreation()
+    {
+        try {
+            Thread.sleep(500L);
+        }
+        catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     @SuppressWarnings("unused")
     public TestIndexResources()
     {
@@ -140,6 +150,7 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(1, 'test')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(2, '123'), (3, 'temp')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(3, 'data'), (9, 'ttt'), (5, 'num')");
+        waitAfterCreation();
     }
 
     void createTable2(String tableName)
@@ -161,6 +172,7 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(6, 'FAILURE', 252.36, DATE '2021-01-03')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(7, 'SUCCESS', 101.12, DATE '2021-01-03')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(8, 'SUCCESS', 101.12, DATE '2021-01-03')");
+        waitAfterCreation();
     }
 
     void createTableNullData(String tableName)
@@ -169,6 +181,7 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(111, NULL, NULL)");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(NULL, BIGINT '222', NULL)");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(NULL, NULL, TINYINT '33')");
+        waitAfterCreation();
     }
 
     void createBtreeTable1(String tableName)
@@ -176,6 +189,7 @@ public class TestIndexResources
         assertQuerySucceeds("CREATE TABLE " + tableName + " (key1 INT, key2 INT)" + " WITH (partitioned_by = ARRAY['key2'])");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(0, 10), (1, 11), (2, 12), (1, 11), (3, 13)," +
                 " (1, 11), (2, 12), (4, 14), (3, 13), (5, 15), (6, 16)");
+        waitAfterCreation();
     }
 
     void createBtreeTableTransact1(String tableName)
@@ -183,6 +197,7 @@ public class TestIndexResources
         assertQuerySucceeds("CREATE TABLE " + tableName + " (key1 INT, key2 INT)" + " WITH (transactional = true, partitioned_by = ARRAY['key2'])");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(0, 10), (1, 11), (2, 12), (1, 11), (3, 13)," +
                 " (1, 11), (2, 12), (4, 14), (3, 13), (5, 15), (6, 16)");
+        waitAfterCreation();
     }
 
     void createBtreeTableMultiPart1(String tableName)
@@ -193,6 +208,7 @@ public class TestIndexResources
                 " VALUES(1, 11, 111, 1111, 11111), (2, 22, 222, 2222, 22222), (3, 33, 333, 3333, 33333)," +
                 " (2, 22, 222, 2222, 22222), (5, 55, 555, 5555, 55555), (1, 11, 111, 1111, 11111)," +
                 " (6, 66, 666, 6666, 66666), (7, 77, 777, 7777, 77777), (2, 22, 222, 2222, 22222), (2, 22, 222, 2222, 22222)");
+        waitAfterCreation();
     }
 
     @DataProvider(name = "bitmapSupportedDataTypesRangedValues")
@@ -223,6 +239,7 @@ public class TestIndexResources
                 "(2, SMALLINT '2', BIGINT '2', TINYINT '2', 'b', CHAR 'b', BOOLEAN 'false', DOUBLE '2', REAL '2', DATE '2021-01-12', DECIMAL '22.22'), " +
                 "(2, SMALLINT '2', BIGINT '2', TINYINT '2', 'b', CHAR 'b', BOOLEAN 'false', DOUBLE '2', REAL '2', DATE '2021-01-12', DECIMAL '22.22'), " +
                 "(3, SMALLINT '3', BIGINT '3', TINYINT '3', 'c', CHAR 'c', BOOLEAN 'false', DOUBLE '3', REAL '3', DATE '2021-01-13', DECIMAL '33.33')");
+        waitAfterCreation();
     }
 
     @DataProvider(name = "bitmapSupportedDataTypesBetweenValues")
@@ -263,6 +280,7 @@ public class TestIndexResources
                 "(7, SMALLINT '7', BIGINT '7', TINYINT '7', 'g', CHAR 'g', BOOLEAN 'false', DOUBLE '7', REAL '7', DATE '2021-01-17', DECIMAL '77.77'), " +
                 "(8, SMALLINT '8', BIGINT '8', TINYINT '8', 'h', CHAR 'h', BOOLEAN 'false', DOUBLE '8', REAL '8', DATE '2021-01-18', DECIMAL '88.88'), " +
                 "(9, SMALLINT '9', BIGINT '9', TINYINT '9', 'i', CHAR 'i', BOOLEAN 'true', DOUBLE '9', REAL '9', DATE '2021-01-19', DECIMAL '99.99')");
+        waitAfterCreation();
     }
 
     void createTableSupportedDataTypes(String tableName)
@@ -277,6 +295,7 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(7, SMALLINT '7', BIGINT '7', TINYINT '7', 'g', CHAR 'g', BOOLEAN 'false', DOUBLE '7', REAL '7', DATE '2021-01-17', DECIMAL '77.77')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(8, SMALLINT '8', BIGINT '8', TINYINT '8', 'h', CHAR 'h', BOOLEAN 'false', DOUBLE '8', REAL '8', DATE '2021-01-18', DECIMAL '88.88')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(9, SMALLINT '9', BIGINT '9', TINYINT '9', 'i', CHAR 'i', BOOLEAN 'true', DOUBLE '9', REAL '9', DATE '2021-01-19', DECIMAL '99.99')");
+        waitAfterCreation();
     }
 
     @DataProvider(name = "splitsWithIndexAndData")
@@ -363,6 +382,7 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(2818475983711351641, 2818475983711351641, 2818475983711351641)");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(9214215753243532641, 9214215753243532641, 9214215753243532641)");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(5675354, 5675354, 5675354)");
+        waitAfterCreation();
     }
 
     void createTableBoolean(String tableName)
@@ -376,6 +396,7 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN 'true', BOOLEAN 'false', BOOLEAN 'true')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN 'true', BOOLEAN 'true', BOOLEAN 'false')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(BOOLEAN 'true', BOOLEAN 'true', BOOLEAN 'true')");
+        waitAfterCreation();
     }
 
     void createTableChar(String tableName)
@@ -387,6 +408,7 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(CHAR 'd', CHAR 'd', CHAR 'd')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(CHAR 'e', CHAR 'e', CHAR 'e')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(CHAR 'z', CHAR 'z', CHAR 'z')");
+        waitAfterCreation();
     }
 
     void createTableDate(String tableName)
@@ -398,6 +420,7 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DATE '2022-04-07', DATE '2022-04-07', DATE '2022-04-07')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DATE '1899-05-06', DATE '1997-05-06', DATE '1899-05-06')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DATE '2021-12-21', DATE '2021-12-21', DATE '2021-12-21')");
+        waitAfterCreation();
     }
 
     void createTableDecimal(String tableName)
@@ -409,6 +432,7 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DECIMAL '12.11', DECIMAL '12.11', DECIMAL '11.11')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DECIMAL '13.21', DECIMAL '13.21', DECIMAL '21.21')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DECIMAL '34.45', DECIMAL '34.45', DECIMAL '34.45')");
+        waitAfterCreation();
     }
 
     void createTableDouble(String tableName)
@@ -417,6 +441,7 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DOUBLE '11.11', DOUBLE '11.11', DOUBLE '11.11')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DOUBLE '21.21', DOUBLE '21.21', DOUBLE '21.21')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(DOUBLE '12.34', DOUBLE '43.21', DOUBLE '88.34')");
+        waitAfterCreation();
     }
 
     void createTableInt(String tableName)
@@ -429,6 +454,7 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(5, 5, 5)");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(606, 606, 606)");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(123, 123, 123)");
+        waitAfterCreation();
     }
 
     void createTableReal(String tableName)
@@ -437,6 +463,7 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(REAL '11.11', REAL '11.11', REAL '11.11')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(REAL '21.21', REAL '21.21', REAL '21.21')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(REAL '12.34', REAL '43.21', REAL '88.34')");
+        waitAfterCreation();
     }
 
     void createTableSmallInt(String tableName)
@@ -448,6 +475,7 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(SMALLINT '4', SMALLINT '4', SMALLINT '4')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(SMALLINT '5', SMALLINT '5', SMALLINT '5')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(SMALLINT '-32768', SMALLINT '32767', SMALLINT '0')");
+        waitAfterCreation();
     }
 
     void createTableTinyInt(String tableName)
@@ -459,6 +487,7 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(TINYINT '4', TINYINT '4', TINYINT '4')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(TINYINT '5', TINYINT '5', TINYINT '5')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(TINYINT '-127', TINYINT '0', TINYINT '127')");
+        waitAfterCreation();
     }
 
     void createTableVarChar(String tableName)
@@ -472,6 +501,7 @@ public class TestIndexResources
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('tester', 'tester', 'tester')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('blah', 'blah', 'blah')");
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES('nothing', 'nothing', 'nothing')");
+        waitAfterCreation();
     }
 
     static AtomicInteger count = new AtomicInteger(0);
