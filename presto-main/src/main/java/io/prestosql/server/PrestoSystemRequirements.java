@@ -79,6 +79,7 @@ final class PrestoSystemRequirements
             }
             if ("aarch64".equals(osArch)) {
                 warnRequirement("Support for the ARM architecture is experimental");
+                verifyJavaVersionForArm();
             }
         }
         else if ("Mac OS X".equals(osName)) {
@@ -108,6 +109,17 @@ final class PrestoSystemRequirements
         }
 
         failRequirement("Hetu requires Java 8u144+ (found %s)", javaVersion);
+    }
+
+    private static void verifyJavaVersionForArm()
+    {
+        String javaVersion = StandardSystemProperty.JAVA_VERSION.value();
+        JavaVersion version = JavaVersion.parse(javaVersion);
+        if (version.getMajor() >= 11) {
+            return;
+        }
+
+        failRequirement("Hetu requires Java 11.0+ for arm (found %s)", javaVersion);
     }
 
     private static void verifyUsingG1Gc()
