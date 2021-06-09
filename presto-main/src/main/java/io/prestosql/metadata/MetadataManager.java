@@ -917,21 +917,6 @@ public final class MetadataManager
     }
 
     @Override
-    public Optional<TableHandle> applyUpdate(Session session, TableHandle table, Map<String, String> setExpression)
-    {
-        CatalogName catalogName = table.getCatalogName();
-        ConnectorMetadata metadata = getMetadata(session, catalogName);
-
-        if (metadata.usesLegacyTableLayouts()) {
-            return Optional.empty();
-        }
-
-        ConnectorSession connectorSession = session.toConnectorSession(catalogName);
-        return metadata.applyUpdate(connectorSession, table.getConnectorHandle(), setExpression)
-                .map(newHandle -> new TableHandle(catalogName, newHandle, table.getTransaction(), Optional.empty()));
-    }
-
-    @Override
     public OptionalLong executeUpdate(Session session, TableHandle table)
     {
         CatalogName catalogName = table.getCatalogName();

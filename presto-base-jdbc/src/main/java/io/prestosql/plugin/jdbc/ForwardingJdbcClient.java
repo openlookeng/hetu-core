@@ -304,12 +304,6 @@ public abstract class ForwardingJdbcClient
     }
 
     @Override
-    public Optional<ConnectorTableHandle> applyUpdate(ConnectorSession session, ConnectorTableHandle handle, Map<String, String> setExpression)
-    {
-        return getDelegate().applyUpdate(session, handle, setExpression);
-    }
-
-    @Override
     public OptionalLong executeUpdate(ConnectorSession session, ConnectorTableHandle handle)
     {
         return getDelegate().executeUpdate(session, handle);

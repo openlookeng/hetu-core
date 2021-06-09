@@ -101,12 +101,6 @@ public class TransactionScopeCachingJdbcClient
     }
 
     @Override
-    public Optional<ConnectorTableHandle> applyUpdate(ConnectorSession session, ConnectorTableHandle handle, Map<String, String> setExpression)
-    {
-        return super.applyUpdate(session, handle, setExpression);
-    }
-
-    @Override
     public OptionalLong executeUpdate(ConnectorSession session, ConnectorTableHandle handle)
     {
         return super.executeUpdate(session, handle);

@@ -368,12 +368,6 @@ public abstract class AbstractMockMetadata
     }
 
     @Override
-    public Optional<TableHandle> applyUpdate(Session session, TableHandle tableHandle, Map<String, String> setExpression)
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
     public OptionalLong executeUpdate(Session session, TableHandle tableHandle)
     {
         throw new UnsupportedOperationException();

@@ -276,8 +276,6 @@ public interface Metadata
      */
     OptionalLong executeDelete(Session session, TableHandle tableHandle);
 
-    Optional<TableHandle> applyUpdate(Session session, TableHandle tableHandle, Map<String, String> setExpression);
-
     OptionalLong executeUpdate(Session session, TableHandle tableHandle);
 
     /**

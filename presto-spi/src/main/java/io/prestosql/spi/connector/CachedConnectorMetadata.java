@@ -673,12 +673,6 @@ public class CachedConnectorMetadata
     }
 
     @Override
-    public Optional<ConnectorTableHandle> applyUpdate(ConnectorSession session, ConnectorTableHandle handle, Map<String, String> setExpression)
-    {
-        return delegate.applyUpdate(session, handle, setExpression);
-    }
-
-    @Override
     public OptionalLong executeUpdate(ConnectorSession session, ConnectorTableHandle handle)
     {
         return delegate.executeUpdate(session, handle);

@@ -190,11 +190,6 @@ public interface JdbcClient
         return OptionalLong.empty();
     }
 
-    default Optional<ConnectorTableHandle> applyUpdate(ConnectorSession session, ConnectorTableHandle handle, Map<String, String> setExpression)
-    {
-        return Optional.empty();
-    }
-
     default OptionalLong executeUpdate(ConnectorSession session, ConnectorTableHandle handle)
     {
         return OptionalLong.empty();

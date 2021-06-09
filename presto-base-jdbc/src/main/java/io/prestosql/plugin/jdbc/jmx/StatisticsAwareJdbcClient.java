@@ -44,7 +44,6 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -261,12 +260,6 @@ public class StatisticsAwareJdbcClient
     }
 
     @Override
-    public Optional<ConnectorTableHandle> applyUpdate(ConnectorSession session, ConnectorTableHandle handle, Map<String, String> setExpression)
-    {
-        return stats.applyUpdate.wrap(() -> getDelegate().applyUpdate(session, handle, setExpression));
-    }
-
-    @Override
     public OptionalLong executeUpdate(ConnectorSession session, ConnectorTableHandle handle)
     {
         return stats.executeUpdate.wrap(() -> getDelegate().executeUpdate(session, handle));
@@ -369,7 +362,6 @@ public class StatisticsAwareJdbcClient
         public final JdbcApiStats buildDeleteSql = new JdbcApiStats();
         public final JdbcApiStats setDeleteSql = new JdbcApiStats();
         public final JdbcApiStats getUpdateRowIdColumnHandle = new JdbcApiStats();
-        public final JdbcApiStats applyUpdate = new JdbcApiStats();
         public final JdbcApiStats executeUpdate = new JdbcApiStats();
 
         @Managed

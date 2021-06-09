@@ -650,11 +650,6 @@ public interface ConnectorMetadata
         throw new PrestoException(GENERIC_INTERNAL_ERROR, "ConnectorMetadata applyDelete() is implemented without executeDelete()");
     }
 
-    default Optional<ConnectorTableHandle> applyUpdate(ConnectorSession session, ConnectorTableHandle handle, Map<String, String> setExpression)
-    {
-        return Optional.empty();
-    }
-
     /**
      * Execute the delete operation on the handle returned from {@link #applyDelete}.
      */

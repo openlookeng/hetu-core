@@ -54,6 +54,7 @@ import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static io.prestosql.sql.planner.optimizations.QueryCardinalityUtil.isAtMostScalar;
 import static io.prestosql.sql.planner.plan.ChildReplacer.replaceChildren;
 import static java.util.stream.Collectors.toSet;
 
@@ -129,7 +130,7 @@ public class BeginTableWrite
         @Override
         public PlanNode visitDelete(DeleteNode node, RewriteContext<Context> context)
         {
-            DeleteTarget deleteTarget = (DeleteTarget) context.get().getMaterializedHandle(node.getTarget()).get();
+            DeleteTarget deleteTarget = (DeleteTarget) context.get().handle.get();
             return new DeleteNode(
                     node.getId(),
                     rewriteModifyTableScan(node.getSource(), deleteTarget.getHandle()),
@@ -141,7 +142,7 @@ public class BeginTableWrite
         @Override
         public PlanNode visitUpdate(UpdateNode node, RewriteContext<Context> context)
         {
-            UpdateTarget updateTarget = (UpdateTarget) context.get().getMaterializedHandle(node.getTarget()).get();
+            UpdateTarget updateTarget = (UpdateTarget) context.get().handle.get();
             return new UpdateNode(
                     node.getId(),
                     rewriteModifyTableScan(node.getSource(), updateTarget.getHandle()),
@@ -199,10 +200,20 @@ public class BeginTableWrite
                 return ((VacuumTableNode) node).getTarget();
             }
             if (node instanceof DeleteNode) {
-                return ((DeleteNode) node).getTarget();
+                DeleteNode deleteNode = (DeleteNode) node;
+                DeleteTarget delete = deleteNode.getTarget();
+                return new DeleteTarget(
+                        locateTableScanHandle(deleteNode.getSource()),
+                        delete.getSchemaTableName());
             }
             if (node instanceof UpdateNode) {
-                return ((UpdateNode) node).getTarget();
+                UpdateNode updateNode = (UpdateNode) node;
+                UpdateTarget update = updateNode.getTarget();
+                return new UpdateTarget(
+                        locateTableScanHandle(updateNode.getSource()),
+                        update.getSchemaTableName(),
+                        update.getUpdatedColumns(),
+                        update.getUpdatedColumnTypes());
             }
             if (node instanceof ExchangeNode || node instanceof UnionNode) {
                 Set<WriterTarget> writerTargets = node.getSources().stream()
@@ -251,6 +262,29 @@ public class BeginTableWrite
                         metadata.getTableMetadata(session, vacuum.getHandle()).getTable());
             }
             throw new IllegalArgumentException("Unhandled target type: " + target.getClass().getSimpleName());
+        }
+
+        private TableHandle locateTableScanHandle(PlanNode node)
+        {
+            if (node instanceof TableScanNode) {
+                return ((TableScanNode) node).getTable();
+            }
+            if (node instanceof FilterNode) {
+                return locateTableScanHandle(((FilterNode) node).getSource());
+            }
+            if (node instanceof ProjectNode) {
+                return locateTableScanHandle(((ProjectNode) node).getSource());
+            }
+            if (node instanceof SemiJoinNode) {
+                return locateTableScanHandle(((SemiJoinNode) node).getSource());
+            }
+            if (node instanceof JoinNode) {
+                JoinNode joinNode = (JoinNode) node;
+                if (joinNode.getType() == JoinNode.Type.INNER && isAtMostScalar(joinNode.getRight())) {
+                    return locateTableScanHandle(joinNode.getLeft());
+                }
+            }
+            throw new IllegalArgumentException("Invalid descendant for DeleteNode or UpdateNode" + node.getClass().getName());
         }
 
         private PlanNode rewriteModifyTableScan(PlanNode node, TableHandle handle)

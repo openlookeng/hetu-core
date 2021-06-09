@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -44,6 +45,7 @@ public class JdbcUpdatablePageSource
     private final JdbcClient jdbcClient;
     private final JdbcSplit jdbcSplit;
     private final Connection connection;
+    private final int batchSizeLimit = 1000;
     private boolean dmlStatementsCommittedAsAnTransaction;
 
     public JdbcUpdatablePageSource(RecordSet recordSet, ConnectorSession session,
@@ -79,7 +81,7 @@ public class JdbcUpdatablePageSource
                 statement.addBatch();
                 batchSize++;
 
-                if (batchSize >= 1000) {
+                if (batchSize >= batchSizeLimit) {
                     statement.executeBatch();
                     batchSize = 0;
                     if (!dmlStatementsCommittedAsAnTransaction) {
