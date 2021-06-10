@@ -264,13 +264,13 @@ public class MemoryMetadata
         }
 
         if (sortedBy.size() > 1) {
-            throw new PrestoException(INVALID_TABLE_PROPERTY, "sort_by property currently only supports one column");
+            throw new PrestoException(INVALID_TABLE_PROPERTY, "sorted_by property currently only supports one column");
         }
 
         Set<String> sortedByColumnNames = new HashSet<>();
         for (SortingColumn s : sortedBy) {
             if (!sortedByColumnNames.add(s.getColumnName())) {
-                throw new PrestoException(INVALID_TABLE_PROPERTY, "duplicate column(s) in sort_by property");
+                throw new PrestoException(INVALID_TABLE_PROPERTY, "duplicate column(s) in sorted_by property");
             }
         }
 
@@ -286,7 +286,7 @@ public class MemoryMetadata
             }
 
             if (sortedByColumnNames.contains(c)) {
-                throw new PrestoException(INVALID_TABLE_PROPERTY, "duplicate column(s) in sort_by and index_columns, sort_by columns are automatically indexed");
+                throw new PrestoException(INVALID_TABLE_PROPERTY, "duplicate column(s) in sorted_by and index_columns, sorted_by columns are automatically indexed");
             }
         }
 

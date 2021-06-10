@@ -32,7 +32,7 @@ import static java.util.Locale.ENGLISH;
 public class MemoryTableProperties
 {
     public static final String SPILL_COMPRESSION_PROPERTY = "spill_compression";
-    public static final boolean SPILL_COMPRESSION_DEFAULT_VALUE = false;
+    public static final boolean SPILL_COMPRESSION_DEFAULT_VALUE = true;
     public static final String PARTITIONED_BY_PROPERTY = "partitioned_by";
     public static final String SORTED_BY_PROPERTY = "sorted_by";
     public static final String INDEX_COLUMNS_PROPERTY = "index_columns";
