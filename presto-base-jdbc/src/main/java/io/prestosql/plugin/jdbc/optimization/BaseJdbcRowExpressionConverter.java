@@ -48,7 +48,7 @@ import io.prestosql.sql.ExpressionFormatter;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
-import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +64,7 @@ import static io.prestosql.spi.util.DateTimeUtils.printDate;
 import static io.prestosql.sql.builder.functioncall.BaseFunctionUtil.isDefaultFunction;
 import static java.lang.Float.intBitsToFloat;
 import static java.lang.String.format;
+import static java.time.ZoneOffset.UTC;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
@@ -141,7 +142,7 @@ public class BaseJdbcRowExpressionConverter
         }
         if (functionMetadata.getName().getObjectName().equals(TIMESTAMP_LITERAL)) {
             long time = (long) ((ConstantExpression) call.getArguments().get(0)).getValue();
-            return format("TIMESTAMP '%s'", new Timestamp(time));
+            return format("TIMESTAMP '%s'", Instant.ofEpochMilli(time).atZone(UTC).toLocalDateTime());
         }
         return handleFunction(call, functionMetadata, context);
     }
@@ -252,7 +253,7 @@ public class BaseJdbcRowExpressionConverter
         }
         if (type instanceof TimestampType) {
             Long time = (Long) literal.getValue();
-            return format("TIMESTAMP '%s'", new Timestamp(time));
+            return format("TIMESTAMP '%s'", Instant.ofEpochMilli(time).atZone(UTC).toLocalDateTime());
         }
         throw new PrestoException(NOT_SUPPORTED, String.format("Cannot handle the constant expression %s with value of type %s", literal.getValue(), type));
     }
