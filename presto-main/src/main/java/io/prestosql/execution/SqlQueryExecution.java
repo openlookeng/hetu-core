@@ -701,7 +701,7 @@ public class SqlQueryExecution
             WarningCollector warningCollector)
     {
         LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector);
-        return logicalPlanner.plan(analysis);
+        return logicalPlanner.plan(analysis, true);
     }
 
     // Check if snapshot feature conflict with other aspects of the query.

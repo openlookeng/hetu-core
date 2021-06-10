@@ -77,12 +77,14 @@ public class TestCachedSqlQueryExecution
             .setIdentity(new Identity("test_current_user", Optional.empty()))
             .setPath(new SqlPath(Optional.of("testPath")))
             .setSystemProperty("enable_execution_plan_cache", String.valueOf(true))
+            .setSystemProperty("skip_attaching_stats_with_plan", String.valueOf(false))
             .setTimeZoneKey(getTimeZoneKey("+06:09"))
             .build();
     private static final Session DEFAULT_SESSION = testSessionBuilder()
             .setCatalog("test")
             .setSchema("default")
             .setSystemProperty("enable_execution_plan_cache", String.valueOf(true))
+            .setSystemProperty("skip_attaching_stats_with_plan", String.valueOf(false))
             .setTimeZoneKey(getTimeZoneKey("+06:09"))
             .build();
 
@@ -91,6 +93,7 @@ public class TestCachedSqlQueryExecution
             .setSchema("tiny")
             .setTimeZoneKey(getTimeZoneKey("+06:09"))
             .setSystemProperty("enable_execution_plan_cache", String.valueOf(false))
+            .setSystemProperty("skip_attaching_stats_with_plan", String.valueOf(false))
             .build();
 
     private static final Session DEFAULT_SESSION_WITH_CHANGED_PROPERTY = testSessionBuilder()
@@ -98,6 +101,7 @@ public class TestCachedSqlQueryExecution
             .setSchema("tiny")
             .setTimeZoneKey(getTimeZoneKey("+06:09"))
             .setSystemProperty("enable_execution_plan_cache", String.valueOf(true))
+            .setSystemProperty("skip_attaching_stats_with_plan", String.valueOf(false))
             .setSystemProperty(SystemSessionProperties.JOIN_DISTRIBUTION_TYPE, FeaturesConfig.JoinDistributionType.AUTOMATIC.toString())
             .build();
 

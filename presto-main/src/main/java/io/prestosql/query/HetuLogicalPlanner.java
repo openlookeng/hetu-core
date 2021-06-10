@@ -39,6 +39,7 @@ import io.prestosql.utils.OptimizerUtils;
 import java.util.List;
 import java.util.Optional;
 
+import static io.prestosql.SystemSessionProperties.isSkipAttachingStatsWithPlan;
 import static io.prestosql.sql.planner.sanity.PlanSanityChecker.DISTRIBUTED_PLAN_SANITY_CHECKER;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -82,7 +83,7 @@ public class HetuLogicalPlanner
     }
 
     @Override
-    public Plan plan(Analysis analysis, Stage stage)
+    public Plan plan(Analysis analysis, boolean skipStatsWithPlan, Stage stage)
     {
         PlanNode root = planStatement(analysis, analysis.getStatement());
 
@@ -111,10 +112,18 @@ public class HetuLogicalPlanner
         }
 
         TypeProvider types = planSymbolAllocator.getTypes();
-        StatsProvider statsProvider = new CachingStatsProvider(statsCalculator, session, types);
-        CostProvider costProvider = new CachingCostProvider(costCalculator, statsProvider, Optional.empty(), session,
-                types);
-        return new Plan(root, types, StatsAndCosts.create(root, statsProvider, costProvider));
+
+        // Incase SKIP_ATTACHING_STATS_WITH_PLAN is enabled, in order to reduce call to get stats from metastore,
+        // we calculate stats here only if need to show as part of EXPLAIN, otherwise not needed.
+        if (skipStatsWithPlan && isSkipAttachingStatsWithPlan(session)) {
+            return new Plan(root, types, StatsAndCosts.empty());
+        }
+        else {
+            StatsProvider statsProvider = new CachingStatsProvider(statsCalculator, session, types);
+            CostProvider costProvider = new CachingCostProvider(costCalculator, statsProvider, Optional.empty(), session,
+                    types);
+            return new Plan(root, types, StatsAndCosts.create(root, statsProvider, costProvider));
+        }
     }
 
     public void validateCachedPlan(PlanNode planNode, Session session, Metadata metadata, TypeAnalyzer typeAnalyzer, WarningCollector warningCollector)

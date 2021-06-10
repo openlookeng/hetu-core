@@ -23,6 +23,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static io.prestosql.SystemSessionProperties.PREFER_PARTIAL_AGGREGATION;
+import static io.prestosql.SystemSessionProperties.SKIP_ATTACHING_STATS_WITH_PLAN;
 import static io.prestosql.plugin.tpch.TpchConnectorFactory.TPCH_COLUMN_NAMING_PROPERTY;
 import static io.prestosql.tests.statistics.MetricComparisonStrategies.absoluteError;
 import static io.prestosql.tests.statistics.MetricComparisonStrategies.defaultTolerance;
@@ -41,7 +42,8 @@ public class TestTpchDistributedStats
     {
         DistributedQueryRunner runner = TpchQueryRunnerBuilder.builder()
                 // We are not able to calculate stats for PARTIAL aggregations
-                .amendSession(builder -> builder.setSystemProperty(PREFER_PARTIAL_AGGREGATION, "false"))
+                .amendSession(builder -> builder.setSystemProperty(PREFER_PARTIAL_AGGREGATION, "false")
+                .setSystemProperty(SKIP_ATTACHING_STATS_WITH_PLAN, "false"))
                 .buildWithoutCatalogs();
         runner.createCatalog(
                 "tpch",

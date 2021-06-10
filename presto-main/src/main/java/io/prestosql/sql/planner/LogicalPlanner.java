@@ -125,6 +125,7 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Streams.zip;
+import static io.prestosql.SystemSessionProperties.isSkipAttachingStatsWithPlan;
 import static io.prestosql.metadata.MetadataUtil.toSchemaTableName;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -205,12 +206,12 @@ public class LogicalPlanner
         this.warningCollector = requireNonNull(warningCollector, "warningCollector is null");
     }
 
-    public Plan plan(Analysis analysis)
+    public Plan plan(Analysis analysis, boolean skipStatsWithPlan)
     {
-        return plan(analysis, Stage.OPTIMIZED_AND_VALIDATED);
+        return plan(analysis, skipStatsWithPlan, Stage.OPTIMIZED_AND_VALIDATED);
     }
 
-    public Plan plan(Analysis analysis, Stage stage)
+    public Plan plan(Analysis analysis, boolean skipStatsWithPlan, Stage stage)
     {
         PlanNode root = planStatement(analysis, analysis.getStatement());
 
@@ -232,9 +233,17 @@ public class LogicalPlanner
         }
 
         TypeProvider types = planSymbolAllocator.getTypes();
-        StatsProvider statsProvider = new CachingStatsProvider(statsCalculator, session, types);
-        CostProvider costProvider = new CachingCostProvider(costCalculator, statsProvider, Optional.empty(), session, types);
-        return new Plan(root, types, StatsAndCosts.create(root, statsProvider, costProvider));
+
+        // Incase SKIP_ATTACHING_STATS_WITH_PLAN is enabled, in order to reduce call to get stats from metastore,
+        // we calculate stats here only if need to show as part of EXPLAIN, otherwise not needed.
+        if (skipStatsWithPlan && isSkipAttachingStatsWithPlan(session)) {
+            return new Plan(root, types, StatsAndCosts.empty());
+        }
+        else {
+            StatsProvider statsProvider = new CachingStatsProvider(statsCalculator, session, types);
+            CostProvider costProvider = new CachingCostProvider(costCalculator, statsProvider, Optional.empty(), session, types);
+            return new Plan(root, types, StatsAndCosts.create(root, statsProvider, costProvider));
+        }
     }
 
     public PlanNode planStatement(Analysis analysis, Statement statement)

@@ -148,7 +148,8 @@ public class TestFeaturesConfig
                 .setLegacyMapSubscript(false)
                 .setListBuiltInFunctionsOnly(true)
                 .setSortBasedAggregationEnabled(false)
-                .setPrcntDriversForPartialAggr(5));
+                .setPrcntDriversForPartialAggr(5)
+                .setSkipAttachingStatsWithPlan(true));
     }
 
     @Test
@@ -249,6 +250,7 @@ public class TestFeaturesConfig
                 .put("list-built-in-functions-only", "false")
                 .put("optimizer.sort-based-aggregation-enabled", "true")
                 .put("sort.prcnt-drivers-for-partial-aggr", "55")
+                .put("optimizer.skip-attaching-stats-with-plan", "false")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -346,7 +348,8 @@ public class TestFeaturesConfig
                 .setLegacyMapSubscript(true)
                 .setListBuiltInFunctionsOnly(false)
                 .setSortBasedAggregationEnabled(true)
-                .setPrcntDriversForPartialAggr(55);
+                .setPrcntDriversForPartialAggr(55)
+                .setSkipAttachingStatsWithPlan(false);
 
         assertFullMapping(properties, expected);
     }
