@@ -57,7 +57,6 @@ public class TaskStatus
     private static final long MAX_VERSION = Long.MAX_VALUE;
 
     private final TaskId taskId;
-    private final String taskInstanceId;
     private final long version;
     private final TaskState state;
     private final URI self;
@@ -86,7 +85,6 @@ public class TaskStatus
     @JsonCreator
     public TaskStatus(
             @JsonProperty("taskId") TaskId taskId,
-            @JsonProperty("taskInstanceId") String taskInstanceId,
             @JsonProperty("version") long version,
             @JsonProperty("state") TaskState state,
             @JsonProperty("self") URI self,
@@ -106,7 +104,6 @@ public class TaskStatus
             @JsonProperty("snapshotRestoreResult") Optional<RestoreResult> snapshotRestoreResult)
     {
         this.taskId = requireNonNull(taskId, "taskId is null");
-        this.taskInstanceId = requireNonNull(taskInstanceId, "taskInstanceId is null");
 
         checkState(version >= MIN_VERSION, "version must be >= MIN_VERSION");
         this.version = version;
@@ -142,12 +139,6 @@ public class TaskStatus
     public TaskId getTaskId()
     {
         return taskId;
-    }
-
-    @JsonProperty
-    public String getTaskInstanceId()
-    {
-        return taskInstanceId;
     }
 
     @JsonProperty
@@ -263,14 +254,8 @@ public class TaskStatus
 
     public static TaskStatus initialTaskStatus(TaskId taskId, URI location, String nodeId)
     {
-        return initialTaskStatus(taskId, location, nodeId, "");
-    }
-
-    public static TaskStatus initialTaskStatus(TaskId taskId, URI location, String nodeId, String taskInstanceId)
-    {
         return new TaskStatus(
                 taskId,
-                taskInstanceId,
                 MIN_VERSION,
                 PLANNED,
                 location,
@@ -294,7 +279,6 @@ public class TaskStatus
     {
         return new TaskStatus(
                 taskStatus.getTaskId(),
-                taskStatus.getTaskInstanceId(),
                 MAX_VERSION,
                 state,
                 taskStatus.getSelf(),

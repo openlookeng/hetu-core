@@ -95,19 +95,16 @@ public class ArbitraryOutputBuffer
     private final List<SerializedPageReference> markersForNewBuffers = new ArrayList<>();
 
     private final StateMachine<BufferState> state;
-    private final String taskInstanceId;
 
     private final AtomicLong totalPagesAdded = new AtomicLong();
     private final AtomicLong totalRowsAdded = new AtomicLong();
 
     public ArbitraryOutputBuffer(
-            String taskInstanceId,
             StateMachine<BufferState> state,
             DataSize maxBufferSize,
             Supplier<LocalMemoryContext> systemMemoryContextSupplier,
             Executor notificationExecutor)
     {
-        this.taskInstanceId = requireNonNull(taskInstanceId, "taskInstanceId is null");
         this.state = requireNonNull(state, "state is null");
         requireNonNull(maxBufferSize, "maxBufferSize is null");
         checkArgument(maxBufferSize.toBytes() > 0, "maxBufferSize must be at least 1");
@@ -400,7 +397,7 @@ public class ArbitraryOutputBuffer
 
         // NOTE: buffers are allowed to be created before they are explicitly declared by setOutputBuffers
         // When no-more-buffers is set, we verify that all created buffers have been declared
-        buffer = new ClientBuffer(taskInstanceId, id);
+        buffer = new ClientBuffer(id);
 
         // do not setup the new buffer if we are already failed
         if (state != FAILED) {

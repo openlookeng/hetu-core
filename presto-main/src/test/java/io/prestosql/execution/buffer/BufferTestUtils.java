@@ -85,11 +85,10 @@ public final class BufferTestUtils
         assertEquals(actual.isBufferComplete(), expected.isBufferComplete(), "buffer complete");
     }
 
-    static BufferResult createBufferResult(String bufferId, long token, List<Page> pages)
+    static BufferResult createBufferResult(long token, List<Page> pages)
     {
         checkArgument(!pages.isEmpty(), "pages is empty");
         return new BufferResult(
-                bufferId,
                 token,
                 token + pages.size(),
                 false,

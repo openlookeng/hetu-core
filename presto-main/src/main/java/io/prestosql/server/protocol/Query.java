@@ -48,6 +48,7 @@ import io.prestosql.execution.QueryStats;
 import io.prestosql.execution.StageInfo;
 import io.prestosql.execution.TaskInfo;
 import io.prestosql.operator.ExchangeClient;
+import io.prestosql.operator.TaskLocation;
 import io.prestosql.spi.ErrorCode;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
@@ -750,7 +751,7 @@ public class Query
             types = outputInfo.getColumnTypes();
         }
 
-        for (URI outputLocation : outputInfo.getBufferLocations()) {
+        for (TaskLocation outputLocation : outputInfo.getBufferLocations()) {
             exchangeClient.addLocation(outputLocation);
         }
         if (outputInfo.isNoMoreBufferLocations()) {

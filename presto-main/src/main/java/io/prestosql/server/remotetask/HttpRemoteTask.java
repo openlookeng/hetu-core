@@ -117,6 +117,7 @@ public final class HttpRemoteTask
     private static final Logger log = Logger.get(HttpRemoteTask.class);
 
     private final TaskId taskId;
+    private final String instanceId;
 
     private final Session session;
     private final String nodeId;
@@ -178,6 +179,7 @@ public final class HttpRemoteTask
 
     public HttpRemoteTask(Session session,
             TaskId taskId,
+            String instanceId,
             String nodeId,
             URI location,
             PlanFragment planFragment,
@@ -219,6 +221,7 @@ public final class HttpRemoteTask
 
         try (SetThreadName ignored = new SetThreadName("HttpRemoteTask-%s", taskId)) {
             this.taskId = taskId;
+            this.instanceId = instanceId;
             this.session = session;
             this.nodeId = nodeId;
             this.planFragment = planFragment;
@@ -255,6 +258,7 @@ public final class HttpRemoteTask
             this.taskStatusFetcher = new ContinuousTaskStatusFetcher(
                     this::failTask,
                     initialTask.getTaskStatus(),
+                    instanceId,
                     taskStatusRefreshMaxWait,
                     taskStatusCodec,
                     executor,
@@ -268,6 +272,7 @@ public final class HttpRemoteTask
             this.taskInfoFetcher = new TaskInfoFetcher(
                     this::failTask,
                     initialTask,
+                    instanceId,
                     httpClient,
                     taskInfoUpdateInterval,
                     taskInfoCodec,
@@ -299,6 +304,12 @@ public final class HttpRemoteTask
     public TaskId getTaskId()
     {
         return taskId;
+    }
+
+    @Override
+    public String getInstanceId()
+    {
+        return instanceId;
     }
 
     @Override
@@ -538,7 +549,7 @@ public final class HttpRemoteTask
         TaskUpdateRequest updateRequest = new TaskUpdateRequest(
                 // Snapshot: Add task instance id to all task related requests,
                 // so receiver can verify if the instance id matches
-                taskStatus.getTaskInstanceId(),
+                instanceId,
                 session.toSessionRepresentation(),
                 session.getIdentity().getExtraCredentials(),
                 fragment,
@@ -638,7 +649,7 @@ public final class HttpRemoteTask
         HttpUriBuilder uriBuilder = getHttpUriBuilder(taskStatus).addParameter("targetState", targetState.toString());
         Request request = setContentTypeHeaders(isBinaryEncoding, prepareDelete())
                 .setUri(uriBuilder.build())
-                .addHeader(PRESTO_TASK_INSTANCE_ID, taskStatus.getTaskInstanceId())
+                .addHeader(PRESTO_TASK_INSTANCE_ID, instanceId)
                 .build();
         scheduleAsyncCleanupRequest(createCleanupBackoff(), request, targetState.toString());
     }

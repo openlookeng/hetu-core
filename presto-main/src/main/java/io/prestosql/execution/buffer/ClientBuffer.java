@@ -44,7 +44,6 @@ import static java.util.Objects.requireNonNull;
 @ThreadSafe
 class ClientBuffer
 {
-    private final String taskInstanceId;
     private final OutputBufferId bufferId;
 
     private final AtomicLong rowsAdded = new AtomicLong();
@@ -69,9 +68,8 @@ class ClientBuffer
     @GuardedBy("this")
     private PendingRead pendingRead;
 
-    public ClientBuffer(String taskInstanceId, OutputBufferId bufferId)
+    public ClientBuffer(OutputBufferId bufferId)
     {
-        this.taskInstanceId = requireNonNull(taskInstanceId, "taskInstanceId is null");
         this.bufferId = requireNonNull(bufferId, "bufferId is null");
     }
 
@@ -190,7 +188,7 @@ class ClientBuffer
                 }
 
                 // otherwise, wait for more data to arrive
-                pendingRead = new PendingRead(taskInstanceId, sequenceId, maxSize);
+                pendingRead = new PendingRead(sequenceId, maxSize);
                 return pendingRead.getResultFuture();
             }
         }
@@ -333,13 +331,13 @@ class ClientBuffer
 
         // if request is for pages before the current position, just return an empty result
         if (sequenceId < currentSequenceId.get()) {
-            return emptyResults(taskInstanceId, sequenceId, false);
+            return emptyResults(sequenceId, false);
         }
 
         // if this buffer is finished, notify the client of this, so the client
         // will destroy this buffer
         if (pages.isEmpty() && noMorePages) {
-            return emptyResults(taskInstanceId, currentSequenceId.get(), true);
+            return emptyResults(currentSequenceId.get(), true);
         }
 
         // if request is for pages after the current position, there is a bug somewhere
@@ -362,7 +360,7 @@ class ClientBuffer
             }
             result.add(page.getSerializedPage());
         }
-        return new BufferResult(taskInstanceId, sequenceId, sequenceId + result.size(), false, result);
+        return new BufferResult(sequenceId, sequenceId + result.size(), false, result);
     }
 
     /**
@@ -424,14 +422,12 @@ class ClientBuffer
     @Immutable
     private static class PendingRead
     {
-        private final String taskInstanceId;
         private final long sequenceId;
         private final DataSize maxSize;
         private final SettableFuture<BufferResult> resultFuture = SettableFuture.create();
 
-        private PendingRead(String taskInstanceId, long sequenceId, DataSize maxSize)
+        private PendingRead(long sequenceId, DataSize maxSize)
         {
-            this.taskInstanceId = requireNonNull(taskInstanceId, "taskInstanceId is null");
             this.sequenceId = sequenceId;
             this.maxSize = maxSize;
         }
@@ -453,7 +449,7 @@ class ClientBuffer
 
         public void completeResultFutureWithEmpty()
         {
-            resultFuture.set(emptyResults(taskInstanceId, sequenceId, false));
+            resultFuture.set(emptyResults(sequenceId, false));
         }
     }
 

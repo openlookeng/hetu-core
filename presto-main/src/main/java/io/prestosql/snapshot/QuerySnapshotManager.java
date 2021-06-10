@@ -120,6 +120,11 @@ public class QuerySnapshotManager
         initiatedSnapshotId.add(snapshotId);
     }
 
+    public long getResumeCount()
+    {
+        return retryCount;
+    }
+
     /**
      * Get the successful and complete snapshot id to resume.
      *

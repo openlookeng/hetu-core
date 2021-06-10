@@ -292,10 +292,12 @@ public class TestMemoryRevokingScheduler
     private SqlTask newSqlTask()
     {
         TaskId taskId = new TaskId("query", 0, idGeneator.incrementAndGet());
+        String instanceId = "Testing instance id";
         URI location = URI.create("fake://task/" + taskId);
 
         return createSqlTask(
                 taskId,
+                instanceId,
                 location,
                 "fake",
                 new QueryContext(new QueryId("query"),

@@ -55,6 +55,7 @@ public class TaskInfoFetcher
         implements SimpleHttpResponseCallback<TaskInfo>
 {
     private final TaskId taskId;
+    private final String instanceId;
     private final Consumer<Throwable> onFail;
     private final StateMachine<TaskInfo> taskInfo;
     private final StateMachine<Optional<TaskInfo>> finalTaskInfo;
@@ -88,6 +89,7 @@ public class TaskInfoFetcher
     public TaskInfoFetcher(
             Consumer<Throwable> onFail,
             TaskInfo initialTask,
+            String instanceId,
             HttpClient httpClient,
             Duration updateInterval,
             Codec<TaskInfo> taskInfoCodec,
@@ -103,6 +105,7 @@ public class TaskInfoFetcher
         requireNonNull(errorScheduledExecutor, "errorScheduledExecutor is null");
 
         this.taskId = initialTask.getTaskStatus().getTaskId();
+        this.instanceId = requireNonNull(instanceId, "instanceId is null");
         this.onFail = requireNonNull(onFail, "onFail is null");
         this.taskInfo = new StateMachine<>("task " + taskId, executor, initialTask);
         this.finalTaskInfo = new StateMachine<>("task-" + taskId, executor, Optional.empty());
@@ -230,7 +233,7 @@ public class TaskInfoFetcher
     {
         // Snapshot: Add task instance id to all task related requests,
         // so receiver can verify if the instance id matches
-        return builder.setHeader(PRESTO_TASK_INSTANCE_ID, getTaskInfo().getTaskStatus().getTaskInstanceId());
+        return builder.setHeader(PRESTO_TASK_INSTANCE_ID, instanceId);
     }
 
     synchronized void updateTaskInfo(TaskInfo newValue)

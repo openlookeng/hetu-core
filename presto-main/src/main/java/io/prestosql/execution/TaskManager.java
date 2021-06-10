@@ -31,7 +31,13 @@ import java.util.OptionalInt;
 public interface TaskManager
 {
     /**
-     * Gets all of the currently tracked tasks.  This will included
+     * Gets all of the currently tracked task instanceIds. This will include
+     * uninitialized, running, and completed tasks
+     */
+    List<SqlTask> getAllTasks();
+
+    /**
+     * Gets all of the currently tracked tasks.  This will include
      * uninitialized, running, and completed tasks.
      */
     List<TaskInfo> getAllTaskInfo();
@@ -60,12 +66,6 @@ public interface TaskManager
      * queried.
      */
     ListenableFuture<TaskInfo> getTaskInfo(TaskId taskId, TaskState currentState, String expectedTaskInstanceId);
-
-    /**
-     * Gets the unique instance id of a task.  This can be used to detect a task
-     * that was destroyed and recreated.
-     */
-    String getTaskInstanceId(TaskId taskId);
 
     /**
      * Gets future status for the task after the state changes from
@@ -127,5 +127,5 @@ public interface TaskManager
      * be taken to avoid leaking {@code this} when adding a listener in a constructor. Additionally, it is
      * possible notifications are observed out of order due to the asynchronous execution.
      */
-    void addStateChangeListener(TaskId taskId, StateChangeListener<TaskState> stateChangeListener);
+    void addStateChangeListener(String instanceId, StateChangeListener<TaskState> stateChangeListener);
 }

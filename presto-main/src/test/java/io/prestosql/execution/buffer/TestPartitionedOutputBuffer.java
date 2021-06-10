@@ -82,7 +82,6 @@ import static org.testng.Assert.fail;
 
 public class TestPartitionedOutputBuffer
 {
-    private static final String TASK_INSTANCE_ID = "task-instance-id";
     private static final ImmutableList<BigintType> TYPES = ImmutableList.of(BIGINT);
     private static final OutputBufferId FIRST = new OutputBufferId(0);
     private static final OutputBufferId SECOND = new OutputBufferId(1);
@@ -250,7 +249,7 @@ public class TestPartitionedOutputBuffer
                 createPage(15)));
         assertQueueState(buffer, FIRST, 10, 6);
         // acknowledge all pages from the first partition, should transition to finished state
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 16, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 16, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 16, sizeOfPages(10), NO_WAIT), emptyResults(16, true));
         buffer.abort(FIRST);
         assertQueueClosed(buffer, FIRST, 16);
         assertFinished(buffer);
@@ -533,7 +532,7 @@ public class TestPartitionedOutputBuffer
         buffer.get(FIRST, 3, sizeOfPages(10)).cancel(true);
 
         // attempt to get the three elements again
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, false));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(10), NO_WAIT), emptyResults(0, false));
         // pages not acknowledged yet so state is the same
         assertQueueState(buffer, FIRST, 0, 3);
     }
@@ -661,13 +660,13 @@ public class TestPartitionedOutputBuffer
         assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(1), NO_WAIT), bufferResult(0, createPage(0)));
         buffer.abort(FIRST);
         assertQueueClosed(buffer, FIRST, 0);
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 1, sizeOfPages(1), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 1, sizeOfPages(1), NO_WAIT), emptyResults(0, true));
 
         assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 0, sizeOfPages(1), NO_WAIT), bufferResult(0, createPage(0)));
         buffer.abort(SECOND);
         assertQueueClosed(buffer, SECOND, 0);
         assertFinished(buffer);
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 1, sizeOfPages(1), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 1, sizeOfPages(1), NO_WAIT), emptyResults(0, true));
     }
 
     @Test
@@ -725,7 +724,7 @@ public class TestPartitionedOutputBuffer
 
         // verify the future completed
         // partitioned buffer does not return a "complete" result in this case, but it doesn't matter
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(TASK_INSTANCE_ID, 1, false));
+        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(1, false));
 
         // further requests will see a completed result
         assertQueueClosed(buffer, FIRST, 1);
@@ -762,7 +761,7 @@ public class TestPartitionedOutputBuffer
         assertQueueState(buffer, FIRST, 0, 1);
 
         // verify the future completed
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(TASK_INSTANCE_ID, 1, true));
+        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(1, true));
     }
 
     @Test
@@ -803,7 +802,7 @@ public class TestPartitionedOutputBuffer
         // get and acknowledge the last 6 pages
         assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 1, sizeOfPages(100), NO_WAIT),
                 bufferResult(1, createPage(1), createPage(2), createPage(3), createPage(4), createPage(5), createPage(6)));
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 7, sizeOfPages(100), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 7, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 7, sizeOfPages(100), NO_WAIT), emptyResults(7, true));
 
         buffer.abort(FIRST);
 
@@ -842,7 +841,7 @@ public class TestPartitionedOutputBuffer
         assertQueueClosed(buffer, FIRST, 1);
 
         // verify the future completed
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(TASK_INSTANCE_ID, 1, false));
+        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(1, false));
     }
 
     @Test
@@ -976,7 +975,7 @@ public class TestPartitionedOutputBuffer
         buffer.setNoMorePages();
 
         // get and acknowledge 5 pages
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(5), MAX_WAIT), createBufferResult(TASK_INSTANCE_ID, 0, pages));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(5), MAX_WAIT), createBufferResult(0, pages));
 
         // buffer is not finished
         assertFalse(buffer.isFinished());
@@ -1058,7 +1057,6 @@ public class TestPartitionedOutputBuffer
     private PartitionedOutputBuffer createPartitionedBuffer(OutputBuffers buffers, DataSize dataSize)
     {
         return new PartitionedOutputBuffer(
-                TASK_INSTANCE_ID,
                 new StateMachine<>("bufferState", stateNotificationExecutor, OPEN, TERMINAL_BUFFER_STATES),
                 buffers,
                 dataSize,
@@ -1069,6 +1067,6 @@ public class TestPartitionedOutputBuffer
     private static BufferResult bufferResult(long token, Page firstPage, Page... otherPages)
     {
         List<Page> pages = ImmutableList.<Page>builder().add(firstPage).add(otherPages).build();
-        return createBufferResult(TASK_INSTANCE_ID, token, pages);
+        return createBufferResult(token, pages);
     }
 }

@@ -101,11 +101,12 @@ public class TestHttpPageBufferClient
         TestingClientCallback callback = new TestingClientCallback(requestComplete);
 
         URI location = URI.create("http://localhost:8080");
+        String instanceId = "testing instance id";
         HttpPageBufferClient client = new HttpPageBufferClient(new TestingHttpClient(processor, scheduler),
                 expectedMaxSize,
                 new Duration(1, TimeUnit.MINUTES),
                 true,
-                location,
+                new TaskLocation(location, instanceId),
                 callback,
                 scheduler,
                 pageBufferClientCallbackExecutor,
@@ -188,11 +189,12 @@ public class TestHttpPageBufferClient
         TestingClientCallback callback = new TestingClientCallback(requestComplete);
 
         URI location = URI.create("http://localhost:8080");
+        String instanceId = "testing instance id";
         HttpPageBufferClient client = new HttpPageBufferClient(new TestingHttpClient(processor, scheduler),
                 new DataSize(10, Unit.MEGABYTE),
                 new Duration(1, TimeUnit.MINUTES),
                 true,
-                location,
+                new TaskLocation(location, instanceId),
                 callback,
                 scheduler,
                 pageBufferClientCallbackExecutor,
@@ -230,11 +232,12 @@ public class TestHttpPageBufferClient
         TestingClientCallback callback = new TestingClientCallback(requestComplete);
 
         URI location = URI.create("http://localhost:8080");
+        String instanceId = "testing instance id";
         HttpPageBufferClient client = new HttpPageBufferClient(new TestingHttpClient(processor, scheduler),
                 new DataSize(10, Unit.MEGABYTE),
                 new Duration(1, TimeUnit.MINUTES),
                 true,
-                location,
+                new TaskLocation(location, instanceId),
                 callback,
                 scheduler,
                 pageBufferClientCallbackExecutor,
@@ -301,11 +304,12 @@ public class TestHttpPageBufferClient
         TestingClientCallback callback = new TestingClientCallback(requestComplete);
 
         URI location = URI.create("http://localhost:8080");
+        String instanceId = "testing instance id";
         HttpPageBufferClient client = new HttpPageBufferClient(new TestingHttpClient(processor, scheduler),
                 new DataSize(10, Unit.MEGABYTE),
                 new Duration(1, TimeUnit.MINUTES),
                 true,
-                location,
+                new TaskLocation(location, instanceId),
                 callback,
                 scheduler,
                 pageBufferClientCallbackExecutor,
@@ -357,11 +361,12 @@ public class TestHttpPageBufferClient
         TestingClientCallback callback = new TestingClientCallback(requestComplete);
 
         URI location = URI.create("http://localhost:8080");
+        String instanceId = "testing instance id";
         HttpPageBufferClient client = new HttpPageBufferClient(new TestingHttpClient(processor, scheduler),
                 new DataSize(10, Unit.MEGABYTE),
                 new Duration(30, TimeUnit.SECONDS),
                 true,
-                location,
+                new TaskLocation(location, instanceId),
                 callback,
                 scheduler,
                 ticker,

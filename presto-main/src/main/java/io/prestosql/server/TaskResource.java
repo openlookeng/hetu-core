@@ -147,7 +147,7 @@ public class TaskResource
                 taskUpdateRequest.getConsumerId(),
                 taskUpdateRequest.getTaskInstanceId());
         if (taskInfo == null) {
-            return Response.ok().entity(createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath(), taskUpdateRequest.getTaskInstanceId())).build();
+            return Response.ok().entity(createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath())).build();
         }
 
         if (shouldSummarize(uriInfo)) {
@@ -181,7 +181,7 @@ public class TaskResource
 
         ListenableFuture<TaskInfo> futureTaskInfo = taskManager.getTaskInfo(taskId, currentState, taskInstanceId);
         if (futureTaskInfo == null) {
-            asyncResponse.resume(createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath(), taskInstanceId));
+            asyncResponse.resume(createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath()));
             return;
         }
         Duration waitTime = randomizeWaitTime(maxWait);
@@ -205,7 +205,7 @@ public class TaskResource
     {
         TaskInfo taskInfo = taskManager.getTaskInfo(taskId, taskInstanceId);
         if (taskInfo == null) {
-            taskInfo = createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath(), taskInstanceId);
+            taskInfo = createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath());
         }
         return taskInfo;
     }
@@ -230,7 +230,7 @@ public class TaskResource
 
         ListenableFuture<TaskStatus> futureTaskStatus = taskManager.getTaskStatus(taskId, currentState, taskInstanceId);
         if (futureTaskStatus == null) {
-            asyncResponse.resume(createAbortedTaskStatus(taskId, uriInfo.getAbsolutePath(), taskInstanceId));
+            asyncResponse.resume(createAbortedTaskStatus(taskId, uriInfo.getAbsolutePath()));
             return;
         }
         Duration waitTime = randomizeWaitTime(maxWait);
@@ -253,7 +253,7 @@ public class TaskResource
     {
         TaskStatus taskStatus = taskManager.getTaskStatus(taskId, taskInstanceId);
         if (taskStatus == null) {
-            taskStatus = createAbortedTaskStatus(taskId, uriInfo.getAbsolutePath(), taskInstanceId);
+            taskStatus = createAbortedTaskStatus(taskId, uriInfo.getAbsolutePath());
         }
         return taskStatus;
     }
@@ -273,7 +273,7 @@ public class TaskResource
         TaskInfo taskInfo = taskManager.cancelTask(taskId, targetState, taskInstanceId);
 
         if (taskInfo == null) {
-            taskInfo = createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath(), taskInstanceId);
+            taskInfo = createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath());
         }
 
         if (shouldSummarize(uriInfo)) {
@@ -302,7 +302,6 @@ public class TaskResource
             // Request came from task has been cancelled.
             asyncResponse.resume(Response
                     .status(Status.NO_CONTENT)
-                    .header(PRESTO_TASK_INSTANCE_ID, taskInstanceId)
                     .header(PRESTO_PAGE_TOKEN, token)
                     .header(PRESTO_PAGE_NEXT_TOKEN, token)
                     .header(PRESTO_BUFFER_COMPLETE, false) // keep requesting task running, until they are cancelled (to resume)
@@ -310,12 +309,10 @@ public class TaskResource
             return;
         }
 
-        String taskInstanceIdIfEmpty = taskInstanceId == null ? taskManager.getTaskInstanceId(taskId) : taskInstanceId;
-
         Duration waitTime = randomizeWaitTime(DEFAULT_MAX_WAIT_TIME);
         bufferResultFuture = addTimeout(
                 bufferResultFuture,
-                () -> BufferResult.emptyResults(taskInstanceIdIfEmpty, token, false),
+                () -> BufferResult.emptyResults(token, false),
                 waitTime,
                 timeoutExecutor);
 
@@ -334,7 +331,6 @@ public class TaskResource
 
             return Response.status(status)
                     .entity(entity)
-                    .header(PRESTO_TASK_INSTANCE_ID, result.getTaskInstanceId())
                     .header(PRESTO_PAGE_TOKEN, result.getToken())
                     .header(PRESTO_PAGE_NEXT_TOKEN, result.getNextToken())
                     .header(PRESTO_BUFFER_COMPLETE, result.isBufferComplete())
@@ -346,7 +342,6 @@ public class TaskResource
         bindAsyncResponse(asyncResponse, responseFuture, responseExecutor)
                 .withTimeout(timeout,
                         Response.status(Status.NO_CONTENT)
-                                .header(PRESTO_TASK_INSTANCE_ID, taskInstanceIdIfEmpty)
                                 .header(PRESTO_PAGE_TOKEN, token)
                                 .header(PRESTO_PAGE_NEXT_TOKEN, token)
                                 .header(PRESTO_BUFFER_COMPLETE, false)
@@ -412,14 +407,14 @@ public class TaskResource
     }
 
     // Snapshot: Request includes an invalid task instance id. Return "aborted" result to indicate the task doesn't exist (anymore).
-    private TaskStatus createAbortedTaskStatus(TaskId taskId, URI uri, String taskInstanceId)
+    private TaskStatus createAbortedTaskStatus(TaskId taskId, URI uri)
     {
-        return TaskStatus.failWith(initialTaskStatus(taskId, uri, "", taskInstanceId), TaskState.ABORTED, ImmutableList.of());
+        return TaskStatus.failWith(initialTaskStatus(taskId, uri, ""), TaskState.ABORTED, ImmutableList.of());
     }
 
-    private TaskInfo createAbortedTaskInfo(TaskId taskId, URI uri, String taskInstanceId)
+    private TaskInfo createAbortedTaskInfo(TaskId taskId, URI uri)
     {
         return TaskInfo.createInitialTask(taskId, uri, "", ImmutableList.of(), new TaskStats(DateTime.now(), null))
-                .withTaskStatus(createAbortedTaskStatus(taskId, uri, taskInstanceId));
+                .withTaskStatus(createAbortedTaskStatus(taskId, uri));
     }
 }

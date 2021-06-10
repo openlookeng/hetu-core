@@ -29,8 +29,6 @@ import io.prestosql.protocol.Codec;
 import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.snapshot.RestoreResult;
 import io.prestosql.snapshot.SnapshotResult;
-import io.prestosql.spi.HostAddress;
-import io.prestosql.spi.PrestoException;
 
 import javax.annotation.concurrent.GuardedBy;
 
@@ -38,11 +36,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
-import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.net.HttpHeaders.CONTENT_TYPE;
 import static com.google.common.net.MediaType.JSON_UTF_8;
 import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
@@ -55,8 +51,6 @@ import static io.prestosql.protocol.AdaptingJsonResponseHandler.createAdaptingJs
 import static io.prestosql.protocol.FullSmileResponseHandler.createFullSmileResponseHandler;
 import static io.prestosql.protocol.JsonCodecWrapper.unwrapJsonCodec;
 import static io.prestosql.protocol.RequestHelpers.setContentTypeHeaders;
-import static io.prestosql.spi.StandardErrorCode.REMOTE_TASK_MISMATCH;
-import static io.prestosql.util.Failures.REMOTE_TASK_MISMATCH_ERROR;
 import static java.util.Objects.requireNonNull;
 
 class ContinuousTaskStatusFetcher
@@ -65,6 +59,7 @@ class ContinuousTaskStatusFetcher
     private static final Logger log = Logger.get(ContinuousTaskStatusFetcher.class);
 
     private final TaskId taskId;
+    private final String instanceId;
     private final Consumer<Throwable> onFail;
     private final StateMachine<TaskStatus> taskStatus;
     private final Codec<TaskStatus> taskStatusCodec;
@@ -89,6 +84,7 @@ class ContinuousTaskStatusFetcher
     public ContinuousTaskStatusFetcher(
             Consumer<Throwable> onFail,
             TaskStatus initialTaskStatus,
+            String instanceId,
             Duration refreshMaxWait,
             Codec<TaskStatus> taskStatusCodec,
             Executor executor,
@@ -102,6 +98,7 @@ class ContinuousTaskStatusFetcher
         requireNonNull(initialTaskStatus, "initialTaskStatus is null");
 
         this.taskId = initialTaskStatus.getTaskId();
+        this.instanceId = requireNonNull(instanceId, "instanceId is null");
         this.onFail = requireNonNull(onFail, "onFail is null");
         this.taskStatus = new StateMachine<>("task-" + taskId, executor, initialTaskStatus);
 
@@ -184,7 +181,7 @@ class ContinuousTaskStatusFetcher
     {
         // Add task instance id to all task related requests,
         // so receiver can verify if the instance id matches
-        return builder.setHeader(PRESTO_TASK_INSTANCE_ID, taskStatus.get().getTaskInstanceId());
+        return builder.setHeader(PRESTO_TASK_INSTANCE_ID, instanceId);
     }
 
     TaskStatus getTaskStatus()
@@ -244,14 +241,7 @@ class ContinuousTaskStatusFetcher
     void updateTaskStatus(TaskStatus newValue)
     {
         // change to new value if old value is not changed and new value has a newer version
-        AtomicBoolean taskMismatch = new AtomicBoolean();
         if (taskStatus.setIf(newValue, oldValue -> {
-            // did the task instance id change
-            if (!isNullOrEmpty(oldValue.getTaskInstanceId()) && !oldValue.getTaskInstanceId().equals(newValue.getTaskInstanceId())) {
-                taskMismatch.set(true);
-                return false;
-            }
-
             if (oldValue.getState().isDone()) {
                 // never update if the task has reached a terminal state
                 return false;
@@ -260,13 +250,6 @@ class ContinuousTaskStatusFetcher
             return newValue.getVersion() >= oldValue.getVersion();
         })) {
             updateSnapshots(newValue.getSnapshotCaptureResult(), newValue.getSnapshotRestoreResult());
-        }
-
-        if (taskMismatch.get()) {
-            // This will also set the task status to FAILED state directly.
-            // Additionally, this will issue a DELETE for the task to the worker.
-            // While sending the DELETE is not required, it is preferred because a task was created by the previous request.
-            onFail.accept(new PrestoException(REMOTE_TASK_MISMATCH, String.format("%s (%s)", REMOTE_TASK_MISMATCH_ERROR, HostAddress.fromUri(getTaskStatus().getSelf()))));
         }
     }
 

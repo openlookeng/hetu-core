@@ -23,11 +23,11 @@ import io.prestosql.execution.QueryTracker.TrackedQuery;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.memory.VersionedMemoryPoolId;
+import io.prestosql.operator.TaskLocation;
 import io.prestosql.server.BasicQueryInfo;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.Plan;
 
-import java.net.URI;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -93,10 +93,10 @@ public interface QueryExecution
     {
         private final List<String> columnNames;
         private final List<Type> columnTypes;
-        private final Set<URI> bufferLocations;
+        private final Set<TaskLocation> bufferLocations;
         private final boolean noMoreBufferLocations;
 
-        public QueryOutputInfo(List<String> columnNames, List<Type> columnTypes, Set<URI> bufferLocations, boolean noMoreBufferLocations)
+        public QueryOutputInfo(List<String> columnNames, List<Type> columnTypes, Set<TaskLocation> bufferLocations, boolean noMoreBufferLocations)
         {
             this.columnNames = ImmutableList.copyOf(requireNonNull(columnNames, "columnNames is null"));
             this.columnTypes = ImmutableList.copyOf(requireNonNull(columnTypes, "columnTypes is null"));
@@ -114,7 +114,7 @@ public interface QueryExecution
             return columnTypes;
         }
 
-        public Set<URI> getBufferLocations()
+        public Set<TaskLocation> getBufferLocations()
         {
             return bufferLocations;
         }

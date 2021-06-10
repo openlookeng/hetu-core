@@ -78,8 +78,6 @@ import static org.testng.Assert.fail;
 
 public class TestArbitraryOutputBuffer
 {
-    private static final String TASK_INSTANCE_ID = "task-instance-id";
-
     private static final ImmutableList<BigintType> TYPES = ImmutableList.of(BIGINT);
     private static final OutputBufferId FIRST = new OutputBufferId(0);
     private static final OutputBufferId SECOND = new OutputBufferId(1);
@@ -226,7 +224,7 @@ public class TestArbitraryOutputBuffer
         assertFalse(buffer.isFinished());
 
         // acknowledge the pages from the first buffer; buffer should not close automatically
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 6, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 6, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 6, sizeOfPages(10), NO_WAIT), emptyResults(6, true));
         assertQueueState(buffer, 0, FIRST, 0, 6);
         assertQueueState(buffer, 0, SECOND, 1, 10);
         assertFalse(buffer.isFinished());
@@ -238,7 +236,7 @@ public class TestArbitraryOutputBuffer
         assertFalse(buffer.isFinished());
 
         // acknowledge a page from the second queue; queue should not close automatically
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 11, sizeOfPages(1), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 11, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 11, sizeOfPages(1), NO_WAIT), emptyResults(11, true));
         assertQueueState(buffer, 0, SECOND, 0, 11);
         assertFalse(buffer.isFinished());
 
@@ -248,8 +246,8 @@ public class TestArbitraryOutputBuffer
         assertQueueClosed(buffer, 0, SECOND, 11);
         assertFinished(buffer);
 
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 6, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 6, true));
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 11, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 11, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 6, sizeOfPages(10), NO_WAIT), emptyResults(6, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 11, sizeOfPages(10), NO_WAIT), emptyResults(11, true));
     }
 
     @Test
@@ -452,7 +450,7 @@ public class TestArbitraryOutputBuffer
         buffer.get(FIRST, 3, sizeOfPages(10)).cancel(true);
 
         // attempt to get the three elements again
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, false));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(10), NO_WAIT), emptyResults(0, false));
         // pages are acknowledged
         assertQueueState(buffer, 0, FIRST, 0, 3);
     }
@@ -579,15 +577,15 @@ public class TestArbitraryOutputBuffer
 
         // abort that buffer, and verify the future is finishd
         buffer.abort(FIRST);
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, false));
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, true));
+        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(0, false));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(10), NO_WAIT), emptyResults(0, true));
 
         // add a page and verify the future is not complete
         addPage(buffer, createPage(33));
 
         // add the buffer and verify we did not get the page
         buffer.setOutputBuffers(createInitialEmptyOutputBuffers(ARBITRARY).withBuffer(FIRST, 0));
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(10), NO_WAIT), emptyResults(0, true));
     }
 
     @Test
@@ -629,7 +627,7 @@ public class TestArbitraryOutputBuffer
         // abort buffer, and verify page cannot be acknowledged
         buffer.abort(FIRST);
         assertQueueClosed(buffer, 9, FIRST, 0);
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 1, sizeOfPages(1), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 1, sizeOfPages(1), NO_WAIT), emptyResults(0, true));
 
         outputBuffers = outputBuffers.withBuffer(SECOND, 0).withNoMoreBufferIds();
         buffer.setOutputBuffers(outputBuffers);
@@ -639,7 +637,7 @@ public class TestArbitraryOutputBuffer
         buffer.abort(SECOND);
         assertQueueClosed(buffer, 0, SECOND, 0);
         assertFinished(buffer);
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 1, sizeOfPages(1), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 1, sizeOfPages(1), NO_WAIT), emptyResults(0, true));
     }
 
     @Test
@@ -693,7 +691,7 @@ public class TestArbitraryOutputBuffer
         assertQueueClosed(buffer, 0, FIRST, 1);
 
         // verify the future completed
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(TASK_INSTANCE_ID, 1, false));
+        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(1, false));
     }
 
     @Test
@@ -725,7 +723,7 @@ public class TestArbitraryOutputBuffer
         assertQueueClosed(buffer, 0, FIRST, 1);
 
         // verify the future completed
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(TASK_INSTANCE_ID, 1, false));
+        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(1, false));
     }
 
     @Test
@@ -765,7 +763,7 @@ public class TestArbitraryOutputBuffer
         // get and acknowledge the last 5 pages
         assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 1, sizeOfPages(100), NO_WAIT),
                 bufferResult(1, createPage(1), createPage(2), createPage(3), createPage(4), createPage(5), createPage(6)));
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 7, sizeOfPages(100), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 7, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 7, sizeOfPages(100), NO_WAIT), emptyResults(7, true));
 
         // verify not finished
         assertFalse(buffer.isFinished());
@@ -807,7 +805,7 @@ public class TestArbitraryOutputBuffer
         assertQueueClosed(buffer, 0, FIRST, 1);
 
         // verify the future completed
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(TASK_INSTANCE_ID, 1, false));
+        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(1, false));
     }
 
     @Test
@@ -983,7 +981,7 @@ public class TestArbitraryOutputBuffer
         buffer.setNoMorePages();
 
         // get and acknowledge 5 pages
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(5), MAX_WAIT), createBufferResult(TASK_INSTANCE_ID, 0, pages));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(5), MAX_WAIT), createBufferResult(0, pages));
 
         // buffer is not finished
         assertFalse(buffer.isFinished());
@@ -1037,7 +1035,7 @@ public class TestArbitraryOutputBuffer
 
         // read remaining pages from the first buffer and acknowledge
         assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 1, sizeOfPages(10), NO_WAIT), bufferResult(1, createPage(1), createPage(2)));
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 3, sizeOfPages(1), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 3, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 3, sizeOfPages(1), NO_WAIT), emptyResults(3, true));
         assertFalse(buffer.isFinished());
 
         // finish first queue
@@ -1050,7 +1048,7 @@ public class TestArbitraryOutputBuffer
         buffer.setOutputBuffers(outputBuffers);
 
         // verify second buffer has no results
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 0, sizeOfPages(1), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 0, sizeOfPages(1), NO_WAIT), emptyResults(0, true));
     }
 
     @Test
@@ -1136,7 +1134,6 @@ public class TestArbitraryOutputBuffer
     private ArbitraryOutputBuffer createArbitraryBuffer(OutputBuffers buffers, DataSize dataSize)
     {
         ArbitraryOutputBuffer buffer = new ArbitraryOutputBuffer(
-                TASK_INSTANCE_ID,
                 new StateMachine<>("bufferState", stateNotificationExecutor, OPEN, TERMINAL_BUFFER_STATES),
                 dataSize,
                 () -> new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
@@ -1148,7 +1145,7 @@ public class TestArbitraryOutputBuffer
     private static BufferResult bufferResult(long token, Page firstPage, Page... otherPages)
     {
         List<Page> pages = ImmutableList.<Page>builder().add(firstPage).add(otherPages).build();
-        return createBufferResult(TASK_INSTANCE_ID, token, pages);
+        return createBufferResult(token, pages);
     }
 
     // The following tests apply equally to all 3 types of output buffers, so only specify them here once
@@ -1233,7 +1230,6 @@ public class TestArbitraryOutputBuffer
         switch (bufferType) {
             case ARBITRARY:
                 buffer = new ArbitraryOutputBuffer(
-                        TASK_INSTANCE_ID,
                         new StateMachine<>("bufferState", stateNotificationExecutor, OPEN, TERMINAL_BUFFER_STATES),
                         sizeOfPages(5),
                         () -> new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
@@ -1242,7 +1238,6 @@ public class TestArbitraryOutputBuffer
                 break;
             case BROADCAST:
                 buffer = new BroadcastOutputBuffer(
-                        TASK_INSTANCE_ID,
                         new StateMachine<>("bufferState", stateNotificationExecutor, OPEN, TERMINAL_BUFFER_STATES),
                         sizeOfPages(5),
                         () -> new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
@@ -1251,7 +1246,6 @@ public class TestArbitraryOutputBuffer
                 break;
             case PARTITIONED:
                 buffer = new PartitionedOutputBuffer(
-                        TASK_INSTANCE_ID,
                         new StateMachine<>("bufferState", stateNotificationExecutor, OPEN, TERMINAL_BUFFER_STATES),
                         buffers,
                         sizeOfPages(5),

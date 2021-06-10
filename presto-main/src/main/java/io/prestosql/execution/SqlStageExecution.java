@@ -383,8 +383,7 @@ public final class SqlStageExecution
         for (RemoteTask task : getAllTasks()) {
             ImmutableMultimap.Builder<PlanNodeId, Split> newSplits = ImmutableMultimap.builder();
             for (RemoteTask sourceTask : sourceTasks) {
-                URI exchangeLocation = sourceTask.getTaskStatus().getSelf();
-                newSplits.put(remoteSource.getId(), createRemoteSplitFor(task.getTaskId(), exchangeLocation));
+                newSplits.put(remoteSource.getId(), newConnectSplit(task.getTaskId(), sourceTask));
             }
             task.addSplits(newSplits.build());
         }
@@ -448,7 +447,7 @@ public final class SqlStageExecution
             return Optional.empty();
         }
         checkState(!splitsScheduled.get(), "scheduleTask can not be called once splits have been scheduled");
-        return Optional.of(scheduleTask(node, new TaskId(stateMachine.getStageId(), partition), ImmutableMultimap.of(), totalPartitions));
+        return Optional.of(scheduleTask(node, new TaskId(stateMachine.getStageId(), partition), generateInstanceId(), ImmutableMultimap.of(), totalPartitions));
     }
 
     public synchronized Set<RemoteTask> scheduleSplits(InternalNode node, Multimap<PlanNodeId, Split> splits, Multimap<PlanNodeId, Lifespan> noMoreSplitsNotification)
@@ -470,7 +469,8 @@ public final class SqlStageExecution
             // The output buffer depends on the task id starting from 0 and being sequential, since each
             // task is assigned a private buffer based on task id.
             TaskId taskId = new TaskId(stateMachine.getStageId(), nextTaskId.getAndIncrement());
-            task = scheduleTask(node, taskId, splits, OptionalInt.empty());
+            String instanceId = generateInstanceId();
+            task = scheduleTask(node, taskId, instanceId, splits, OptionalInt.empty());
             newTasks.add(task);
         }
         else {
@@ -489,10 +489,14 @@ public final class SqlStageExecution
         return newTasks.build();
     }
 
-    private synchronized RemoteTask scheduleTask(InternalNode node, TaskId taskId, Multimap<PlanNodeId, Split> sourceSplits, OptionalInt totalPartitions)
+    private String generateInstanceId()
+    {
+        return snapshotManager.getResumeCount() + "-" + UUID.randomUUID();
+    }
+
+    private synchronized RemoteTask scheduleTask(InternalNode node, TaskId taskId, String instanceId, Multimap<PlanNodeId, Split> sourceSplits, OptionalInt totalPartitions)
     {
         checkArgument(!allTasks.contains(taskId), "A task with id %s already exists", taskId);
-
         if (SystemSessionProperties.isSnapshotEnabled(stateMachine.getSession())) {
             // Snapshot: inform snapshot manager so it knows about all tasks,
             // and can determine if a snapshot is complete for all tasks.
@@ -503,9 +507,8 @@ public final class SqlStageExecution
         initialSplits.putAll(sourceSplits);
 
         sourceTasks.forEach((planNodeId, task) -> {
-            TaskStatus status = task.getTaskStatus();
-            if (status.getState() != TaskState.FINISHED) {
-                initialSplits.put(planNodeId, createRemoteSplitFor(taskId, status.getSelf()));
+            if (task.getTaskStatus().getState() != TaskState.FINISHED) {
+                initialSplits.put(planNodeId, newConnectSplit(taskId, task));
             }
         });
 
@@ -515,6 +518,7 @@ public final class SqlStageExecution
         RemoteTask task = remoteTaskFactory.createRemoteTask(
                 stateMachine.getSession(),
                 taskId,
+                instanceId,
                 node,
                 stateMachine.getFragment(),
                 initialSplits.build(),
@@ -555,11 +559,16 @@ public final class SqlStageExecution
         stateMachine.recordGetSplitTime(start);
     }
 
-    private static Split createRemoteSplitFor(TaskId taskId, URI taskLocation)
+    private static Split newConnectSplit(TaskId taskId, RemoteTask sourceTask)
+    {
+        return createRemoteSplitFor(taskId, sourceTask.getInstanceId(), sourceTask.getTaskStatus().getSelf());
+    }
+
+    private static Split createRemoteSplitFor(TaskId taskId, String instanceId, URI taskLocation)
     {
         // Fetch the results from the buffer assigned to the task based on id
         URI splitLocation = uriBuilderFrom(taskLocation).appendPath("results").appendPath(String.valueOf(taskId.getId())).build();
-        return new Split(REMOTE_CONNECTOR_ID, new RemoteSplit(splitLocation), Lifespan.taskWide());
+        return new Split(REMOTE_CONNECTOR_ID, new RemoteSplit(splitLocation, instanceId), Lifespan.taskWide());
     }
 
     private synchronized void updateTaskStatus(TaskStatus taskStatus)

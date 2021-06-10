@@ -92,7 +92,6 @@ public class TestTaskOutputOperator
     private PartitionedOutputBuffer newTestingOutputBuffer(ScheduledExecutorService taskNotificationExecutor)
     {
         return new PartitionedOutputBuffer(
-                "query.1.1",
                 new StateMachine<>("bufferState", taskNotificationExecutor, OPEN, TERMINAL_BUFFER_STATES),
                 createInitialEmptyOutputBuffers(PARTITIONED)
                         .withBuffer(new OutputBuffers.OutputBufferId(0), 0)

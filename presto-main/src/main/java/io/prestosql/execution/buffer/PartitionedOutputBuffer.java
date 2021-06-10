@@ -74,7 +74,6 @@ public class PartitionedOutputBuffer
     private final AtomicLong totalRowsAdded = new AtomicLong();
 
     public PartitionedOutputBuffer(
-            String taskInstanceId,
             StateMachine<BufferState> state,
             OutputBuffers outputBuffers,
             DataSize maxBufferSize,
@@ -95,7 +94,7 @@ public class PartitionedOutputBuffer
 
         ImmutableList.Builder<ClientBuffer> partitions = ImmutableList.builder();
         for (OutputBufferId bufferId : outputBuffers.getBuffers().keySet()) {
-            ClientBuffer partition = new ClientBuffer(taskInstanceId, bufferId);
+            ClientBuffer partition = new ClientBuffer(bufferId);
             partitions.add(partition);
         }
         this.partitions = partitions.build();
