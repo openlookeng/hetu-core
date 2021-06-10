@@ -34,7 +34,7 @@ import static io.airlift.units.DataSize.Unit.MEGABYTE;
 
 public class MemoryConfig
 {
-    private int splitsPerNode;
+    private int splitsPerNode = 1;
     private DataSize maxDataPerNode = new DataSize(256, DataSize.Unit.MEGABYTE);
     private DataSize maxLogicalPartSize = new DataSize(256, MEGABYTE);
     private DataSize maxPageSize = new DataSize(512, DataSize.Unit.KILOBYTE);
@@ -42,7 +42,6 @@ public class MemoryConfig
     private Path spillRoot;
     private int threadPoolSize = Math.max((Runtime.getRuntime().availableProcessors() / 2), 1);
 
-    @Min(1)
     public int getSplitsPerNode()
     {
         return splitsPerNode;
