@@ -23,14 +23,14 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
 import org.apache.hadoop.hbase.client.Result;
+import org.joda.time.chrono.ISOChronology;
+import org.joda.time.format.ISODateTimeFormat;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.sql.Date;
-import java.sql.Time;
-import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
@@ -183,13 +183,15 @@ public class StringRowSerializer
             return ((Long) value).toString().getBytes(UTF_8);
         }
         else if (type.equals(TIME)) {
-            return new Time((Long) value).toString().getBytes(UTF_8);
+            org.joda.time.format.DateTimeFormatter formatter = ISODateTimeFormat.hourMinuteSecondMillis().withChronology(ISOChronology.getInstanceUTC());
+            return formatter.print((Long) value).getBytes(UTF_8);
         }
         else if (type.equals(TINYINT)) {
             return ((Long) value).toString().getBytes(UTF_8);
         }
         else if (type.equals(TIMESTAMP)) {
-            return new Timestamp((Long) value).toString().getBytes(UTF_8);
+            org.joda.time.format.DateTimeFormatter formatter = ISODateTimeFormat.dateHourMinuteSecondMillis().withChronology(ISOChronology.getInstanceUTC());
+            return formatter.print((Long) value).getBytes(UTF_8);
         }
         else if (type instanceof VarcharType && value instanceof String) {
             return ((String) value).getBytes(UTF_8);
@@ -235,10 +237,12 @@ public class StringRowSerializer
             return (T) ((Long) ((Short) Short.parseShort(fieldValue)).longValue());
         }
         else if (type.equals(TIME)) {
-            return (T) (Long) Time.valueOf(fieldValue).getTime();
+            org.joda.time.format.DateTimeFormatter formatter = ISODateTimeFormat.hourMinuteSecondMillis().withChronology(ISOChronology.getInstanceUTC());
+            return (T) (Long) formatter.parseMillis(fieldValue);
         }
         else if (type.equals(TIMESTAMP)) {
-            return (T) (Long) Timestamp.valueOf(fieldValue).getTime();
+            org.joda.time.format.DateTimeFormatter formatter = ISODateTimeFormat.dateHourMinuteSecondMillis().withChronology(ISOChronology.getInstanceUTC());
+            return (T) (Long) formatter.parseMillis(fieldValue);
         }
         else if (type.equals(TINYINT)) {
             return (T) ((Long) ((Byte) Byte.parseByte(fieldValue)).longValue());
