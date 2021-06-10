@@ -111,11 +111,11 @@ public class TestDynamicHiveScalarFunction
             folder.create();
             queryRunner.installPlugin(new MemoryPlugin());
             queryRunner.createCatalog("memory", "memory",
-                    ImmutableMap.of("memory.max-data-per-node", "1GB",
+                    ImmutableMap.of("memory.max-data-per-node", "128MB",
                             "memory.splits-per-node", "2",
                             "memory.spill-path", folder.getRoot().getAbsolutePath(),
-                            "memory.logical-part-processing-delay", "1000ms",
-                            "memory.max-page-size", "50kB"));
+                            "memory.logical-part-processing-delay", "5000ms",
+                            "memory.max-page-size", "1MB"));
         }
         catch (Exception e) {
             closeAllSuppress(e, queryRunner);
