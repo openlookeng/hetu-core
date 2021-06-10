@@ -16,8 +16,10 @@
 package io.hetu.core.hive.dynamicfunctions;
 
 import com.google.common.collect.ImmutableMap;
+import io.airlift.testing.mysql.TestingMySqlServer;
+import io.hetu.core.common.filesystem.TempFolder;
+import io.hetu.core.metastore.HetuMetastorePlugin;
 import io.prestosql.plugin.memory.MemoryPlugin;
-import io.prestosql.testing.QueryRunner;
 import io.prestosql.tests.DistributedQueryRunner;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -26,6 +28,7 @@ import org.testng.annotations.Test;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,7 +40,7 @@ import static org.testng.Assert.assertTrue;
 
 public class TestDynamicHiveScalarFunction
 {
-    private QueryRunner queryRunner;
+    private DistributedQueryRunner queryRunner;
 
     @BeforeClass
     public void setUpClass()
@@ -79,8 +82,40 @@ public class TestDynamicHiveScalarFunction
                     testSessionBuilder().setCatalog("memory").setSchema("default").build())
                     .setNodeCount(1)
                     .build();
+
+            queryRunner.installPlugin(new HetuMetastorePlugin());
+            TestingMySqlServer mysqlServer = new TestingMySqlServer("test", "mysql", "metastore");
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                mysqlServer.close();
+            }));
+            Map<String, String> metastoreConfig = new HashMap<>();
+            metastoreConfig.put("hetu.metastore.type", "jdbc");
+            metastoreConfig.put("hetu.metastore.db.url", mysqlServer.getJdbcUrl("metastore"));
+            metastoreConfig.put("hetu.metastore.db.user", mysqlServer.getUser());
+            metastoreConfig.put("hetu.metastore.db.password", mysqlServer.getPassword());
+            queryRunner.registerCloseable(mysqlServer);
+            queryRunner.getServers().forEach(server -> {
+                try {
+                    server.loadMetastore(metastoreConfig);
+                }
+                catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+            TempFolder folder = new TempFolder();
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                folder.close();
+            }));
+
+            folder.create();
             queryRunner.installPlugin(new MemoryPlugin());
-            queryRunner.createCatalog("memory", "memory", ImmutableMap.of());
+            queryRunner.createCatalog("memory", "memory",
+                    ImmutableMap.of("memory.max-data-per-node", "1GB",
+                            "memory.splits-per-node", "2",
+                            "memory.spill-path", folder.getRoot().getAbsolutePath(),
+                            "memory.logical-part-processing-delay", "1000ms",
+                            "memory.max-page-size", "50kB"));
         }
         catch (Exception e) {
             closeAllSuppress(e, queryRunner);

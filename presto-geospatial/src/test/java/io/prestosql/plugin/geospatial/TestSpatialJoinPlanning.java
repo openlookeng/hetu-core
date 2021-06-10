@@ -15,6 +15,7 @@ package io.prestosql.plugin.geospatial;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.hetu.core.common.filesystem.TempFolder;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.geospatial.KdbTree;
@@ -71,8 +72,25 @@ public class TestSpatialJoinPlanning
                 .setSchema("default")
                 .build());
         queryRunner.installPlugin(new GeoPlugin());
+
+        TempFolder folder = new TempFolder();
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            folder.close();
+        }));
+
+        try {
+            folder.create();
+        }
+        catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        queryRunner.createCatalog("memory", new MemoryConnectorFactory(), ImmutableMap.of("memory.max-data-per-node", "1GB",
+                "memory.splits-per-node", "2",
+                "memory.spill-path", folder.getRoot().getAbsolutePath()));
+
         queryRunner.createCatalog("tpch", new TpchConnectorFactory(1), ImmutableMap.of());
-        queryRunner.createCatalog("memory", new MemoryConnectorFactory(), ImmutableMap.of());
+
         queryRunner.execute(format("CREATE TABLE kdb_tree AS SELECT '%s' AS v", KDB_TREE_JSON));
         queryRunner.execute("CREATE TABLE points (lng, lat, name) AS (VALUES (2.1e0, 2.1e0, 'x'))");
         queryRunner.execute("CREATE TABLE polygons (wkt, name) AS (VALUES ('POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))', 'a'))");

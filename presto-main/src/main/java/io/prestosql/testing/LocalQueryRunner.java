@@ -20,7 +20,10 @@ import com.google.common.io.Closer;
 import io.airlift.http.server.HttpServerConfig;
 import io.airlift.http.server.HttpServerInfo;
 import io.airlift.node.NodeInfo;
+import io.airlift.testing.mysql.TestingMySqlServer;
 import io.airlift.units.Duration;
+import io.hetu.core.metastore.HetuMetastorePlugin;
+import io.hetu.core.metastore.jdbc.JdbcHetuMetastoreFactory;
 import io.prestosql.GroupByHashPageIndexerFactory;
 import io.prestosql.PagesIndexPageSorter;
 import io.prestosql.Session;
@@ -360,6 +363,26 @@ public class LocalQueryRunner
         NodeInfo nodeInfo = new NodeInfo("test");
         FileSystemClientManager fileSystemClientManager = new FileSystemClientManager();
         HetuMetaStoreManager hetuMetaStoreManager = new HetuMetaStoreManager();
+
+        Map<String, String> metastoreConfig = new HashMap<>();
+        try {
+            TestingMySqlServer mysqlServer = new TestingMySqlServer("test", "mysql", "metastore");
+
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                mysqlServer.close();
+            }));
+
+            metastoreConfig.put("hetu.metastore.type", "jdbc");
+            metastoreConfig.put("hetu.metastore.db.url", mysqlServer.getJdbcUrl("metastore"));
+            metastoreConfig.put("hetu.metastore.db.user", mysqlServer.getUser());
+            metastoreConfig.put("hetu.metastore.db.password", mysqlServer.getPassword());
+            hetuMetaStoreManager.addHetuMetaStoreFactory(new JdbcHetuMetastoreFactory(HetuMetastorePlugin.class.getClassLoader()));
+            hetuMetaStoreManager.loadHetuMetastore(new FileSystemClientManager(), metastoreConfig);
+        }
+        catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
         heuristicIndexerManager = new HeuristicIndexerManager(fileSystemClientManager, hetuMetaStoreManager);
         this.cubeManager = new CubeManager(featuresConfig, hetuMetaStoreManager);
         this.connectorManager = new ConnectorManager(

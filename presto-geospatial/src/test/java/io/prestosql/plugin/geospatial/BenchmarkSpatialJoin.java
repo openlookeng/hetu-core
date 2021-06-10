@@ -14,6 +14,7 @@
 package io.prestosql.plugin.geospatial;
 
 import com.google.common.collect.ImmutableMap;
+import io.hetu.core.common.filesystem.TempFolder;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.plugin.memory.MemoryConnectorFactory;
 import io.prestosql.spi.connector.QualifiedObjectName;
@@ -82,7 +83,17 @@ public class BenchmarkSpatialJoin
                     .setSchema("default")
                     .build());
             queryRunner.installPlugin(new GeoPlugin());
-            queryRunner.createCatalog("memory", new MemoryConnectorFactory(), ImmutableMap.of());
+
+            TempFolder folder = new TempFolder();
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                folder.close();
+            }));
+
+            folder.create();
+
+            queryRunner.createCatalog("memory", new MemoryConnectorFactory(), ImmutableMap.of("memory.max-data-per-node", "1GB",
+                    "memory.splits-per-node", "2",
+                    "memory.spill-path", folder.getRoot().getAbsolutePath()));
 
             Path path = Paths.get(BenchmarkSpatialJoin.class.getClassLoader().getResource("us-states.tsv").getPath());
             String polygonValues = Files.lines(path)
