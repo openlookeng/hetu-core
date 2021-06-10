@@ -20,13 +20,20 @@ class ConnectorActions {
   constructor() {
     this.generateActions(
       'receivedConnector',
-      'receivedConnectors'
+      'receivedConnectors',
+      'receivedOriginalConnectors'
     );
   }
 
   fetchSupportedConnectors() {
     ConnectorApiUtils.fetchSupportedConnectors().then((results) => {
       this.actions.receivedConnectors(results);
+    }).catch(logError);
+  }
+
+  fetchOriginalSupportedConnectors(){
+    ConnectorApiUtils.fetchSupportedConnectors().then((results) => {
+      this.actions.receivedOriginalConnectors(results);
     }).catch(logError);
   }
 }

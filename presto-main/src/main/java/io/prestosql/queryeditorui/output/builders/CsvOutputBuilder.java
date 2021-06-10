@@ -74,8 +74,23 @@ public class CsvOutputBuilder
     {
         final String[] values = new String[row.size()];
         for (int i = 0; i < values.length; i++) {
-            final Object value = row.get(i);
-            values[i] = (value == null) ? "" : value.toString();
+            // Display byte array as Hexadecimal in order to keep consistent with OpenLooKeng client
+            if (row.get(i) instanceof byte[]) {
+                byte[] bytes = (byte[]) row.get(i);
+                StringBuilder sb = new StringBuilder();
+                for (byte b : bytes) {
+                    String hex = Integer.toHexString(b & 0xFF);
+                    if (hex.length() < 2) {
+                        sb.append(0);
+                    }
+                    sb.append(hex);
+                }
+                values[i] = sb.toString();
+            }
+            else {
+                final Object value = row.get(i);
+                values[i] = (value == null) ? "" : value.toString();
+            }
         }
         writeCsvRow(values);
     }
