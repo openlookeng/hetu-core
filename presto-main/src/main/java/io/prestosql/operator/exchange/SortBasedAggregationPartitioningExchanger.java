@@ -88,18 +88,29 @@ public class SortBasedAggregationPartitioningExchanger
         if (numberOfHashPartitionLocations > 1) {
             hashPartitionIndexStartPosition = numberOfPartitions - numberOfHashPartitionLocations;
         }
-        int j = 0;
-        int k = 0;
-        for (int i = 0; i < numberOfPartitions; i++) {
-            if (((numberOfHashPartitionLocations == 1) && (hashPartitionIndexStartPosition == i)) ||
-                    ((numberOfHashPartitionLocations > 1) && (hashPartitionIndexStartPosition >= i))) {
-                // stores location of hash partition
-                hashPartitionLocationsMapping[j] = i;
-                j++;
+
+        int sortArrayIndex = 0;
+        int hashArrayIndex = 0;
+        if (numberOfHashPartitionLocations == 1) {
+            for (int i = 0; i < numberOfPartitions; i++) {
+                if (hashPartitionIndexStartPosition != i) {
+                    // stores location of partial partition
+                    sortBasedPartitionLocationsMapping[sortArrayIndex] = i;
+                    sortArrayIndex++;
+                }
             }
-            else {
-                sortBasedPartitionLocationsMapping[k] = i;
-                k++;
+        }
+        else {
+            for (int i = 0; i < numberOfPartitions; i++) {
+                if (hashPartitionIndexStartPosition >= i) {
+                    // stores location of hash partition
+                    hashPartitionLocationsMapping[hashArrayIndex] = i;
+                    hashArrayIndex++;
+                }
+                else {
+                    sortBasedPartitionLocationsMapping[sortArrayIndex] = i;
+                    sortArrayIndex++;
+                }
             }
         }
 

@@ -674,19 +674,7 @@ public abstract class AbstractMockMetadata
     }
 
     @Override
-    public List<String> getTableSortedColumns(Session session, TableHandle tableHandle)
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public List<String> getTableBucketedBy(Session session, TableHandle tableHandle)
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public int getTableBucketedCount(Session session, TableHandle tableHandle)
+    public boolean canPerformSortBasedAggregation(Session session, TableHandle tableHandle, List<String> keyNames)
     {
         throw new UnsupportedOperationException();
     }

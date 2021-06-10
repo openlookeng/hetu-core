@@ -1,0 +1,3 @@
+-- bucket and sort columns are different order(will not select Sort Aggr)
+select avg(${database}.${schema}.store_sales_item_customer_solddate_buckArr2_buckCount1_wrngOrder.ss_item_sk),${database}.${schema}.store_sales_item_customer_solddate_buckArr2_buckCount1_wrngOrder.ss_sold_date_sk from ${database}.${schema}.store_sales_item_customer_solddate_buckArr2_buckCount1_wrngOrder
+group by ${database}.${schema}.store_sales_item_customer_solddate_buckArr2_buckCount1_wrngOrder.ss_item_sk, ${database}.${schema}.store_sales_item_customer_solddate_buckArr2_buckCount1_wrngOrder.ss_customer_sk, ${database}.${schema}.store_sales_item_customer_solddate_buckArr2_buckCount1_wrngOrder.ss_sold_date_sk

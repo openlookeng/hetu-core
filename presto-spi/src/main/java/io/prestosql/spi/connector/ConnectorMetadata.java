@@ -979,23 +979,8 @@ public interface ConnectorMetadata
         throw new UnsupportedOperationException("This connector does not support query resuming");
     }
 
-    /**
-     * returns list of sort by
-     * @param session Presto session
-     * @param table Table Handle
-     */
-    default List<String> getTableSortedColumns(ConnectorSession session, ConnectorTableHandle table)
+    default boolean canPerformSortBasedAggregation(ConnectorSession session, ConnectorTableHandle tableHandle, List<String> keyNames)
     {
-        return null;
-    }
-
-    default List<String> getTableBucketedBy(ConnectorSession session, ConnectorTableHandle tableHandle)
-    {
-        throw new UnsupportedOperationException("This connector does not support get bucket count");
-    }
-
-    default int getTableBucketedCount(ConnectorSession session, ConnectorTableHandle tableHandle)
-    {
-        throw new UnsupportedOperationException("This connector does not support get bucket count");
+        return false;
     }
 }

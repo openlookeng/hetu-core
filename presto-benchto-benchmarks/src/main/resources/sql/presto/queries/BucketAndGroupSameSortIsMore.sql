@@ -1,0 +1,3 @@
+-- 1 bucketed By , bucket count 4, group by and bucket is matching (sort will be selected)
+select avg(${database}.${schema}.store_sales_item_customer_solddate_buckArr1_buckCount4.ss_item_sk),${database}.${schema}.store_sales_item_customer_solddate_buckArr1_buckCount4.ss_item_sk from ${database}.${schema}.store_sales_item_customer_solddate_buckArr1_buckCount4
+group by ${database}.${schema}.store_sales_item_customer_solddate_buckArr1_buckCount4.ss_item_sk
