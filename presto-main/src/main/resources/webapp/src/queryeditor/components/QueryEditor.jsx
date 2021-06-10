@@ -318,6 +318,9 @@ class QueryEditor
   _selectQuery() {
     let selectedQuery = QueryStore.getSelectedQuery();
     if (selectedQuery != null) {
+      if (selectedQuery.length > 0 && selectedQuery.trim().charAt(selectedQuery.trim().length - 1) != ";") {
+        selectedQuery += ";";
+      }
       this.queryEditorRef.current.editor.setValue(selectedQuery);
       this.query = selectedQuery;
     }

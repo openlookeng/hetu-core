@@ -76,15 +76,15 @@ export class QueryListItem extends React.Component {
 
         const splitDetails = (
             <div className="col-xs-12 tinystat-row">
-                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Completed splits">
+                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Completed splits" data-container="body">
                     <span className="glyphicon glyphicon-ok" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
                     {query.queryStats.completedDrivers}
                 </span>
-                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Running splits">
+                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Running splits" data-container="body">
                     <span className="glyphicon glyphicon-play" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
                     {(query.state === "FINISHED" || query.state === "FAILED") ? 0 : query.queryStats.runningDrivers}
                 </span>
-                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Queued splits">
+                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Queued splits" data-container="body">
                     <span className="glyphicon glyphicon-pause" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
                     {(query.state === "FINISHED" || query.state === "FAILED") ? 0 : query.queryStats.queuedDrivers}
                 </span>
@@ -92,15 +92,15 @@ export class QueryListItem extends React.Component {
 
         const timingDetails = (
             <div className="col-xs-12 tinystat-row">
-                <span className="tinystat" data-toggle="tooltip" data-placement="right" title="Wall time spent executing the query (not including queued time)">
+                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Wall time spent executing the query (not including queued time)" data-container="body">
                     <span className="glyphicon glyphicon-hourglass" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
                     {query.queryStats.executionTime}
                 </span>
-                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Total query wall time">
+                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Total query wall time" data-container="body">
                     <span className="glyphicon glyphicon-time" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
                     {query.queryStats.elapsedTime}
                 </span>
-                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="CPU time spent by this query">
+                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="CPU time spent by this query" data-container="body">
                     <span className="glyphicon glyphicon-dashboard" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
                     {query.queryStats.totalCpuTime}
                 </span>
@@ -108,15 +108,15 @@ export class QueryListItem extends React.Component {
 
         const memoryDetails = (
             <div className="col-xs-12 tinystat-row">
-                <span className="tinystat" data-toggle="tooltip" data-placement="right" title="Current total reserved memory">
+                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Current total reserved memory" data-container="body">
                     <span className="glyphicon glyphicon-scale" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
                     {query.queryStats.totalMemoryReservation}
                 </span>
-                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Peak total memory">
+                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Peak total memory" data-container="body">
                     <span className="glyphicon glyphicon-fire" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
                     {query.queryStats.peakTotalMemoryReservation}
                 </span>
-                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Cumulative user memory">
+                <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Cumulative user memory" data-container="body">
                     <span className="glyphicon glyphicon-equalizer" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
                     {formatDataSizeBytes(query.queryStats.cumulativeUserMemory / 1000.0)}
                 </span>

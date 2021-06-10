@@ -21,7 +21,8 @@ class ConnectorStore {
     // handle store listeners
     this.bindListeners({
       onReceivedConnectors: ConnectorActions.RECEIVED_CONNECTORS,
-      onReceivedConnector: ConnectorActions.RECEIVED_CONNECTOR
+      onReceivedConnector: ConnectorActions.RECEIVED_CONNECTOR,
+      onReceivedOriginalConnectors: ConnectorActions.RECEIVED_ORIGINAL_CONNECTORS
     });
 
     // export methods we can use
@@ -41,6 +42,10 @@ class ConnectorStore {
 
   onReceivedConnectors(connectors) {
     this.collection.add(connectors);
+  }
+
+  onReceivedOriginalConnectors(connectors) {
+    this.collection.add(connectors,{update:true});
   }
 
   getCollection() {

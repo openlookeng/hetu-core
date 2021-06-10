@@ -351,6 +351,7 @@ class AddCatalog extends React.Component {
                     newState.errors["submissionError"] = "Error while adding catalog: " + result.message.split('\n', 1)[0];
                     this.setState(newState)
                 }
+                ConnectorActions.fetchOriginalSupportedConnectors();
             }
             else {
                 newState.errors["submissionSuccess"] = "Add catalog successful; Server message: " + result.message

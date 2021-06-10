@@ -26,6 +26,7 @@ import org.joda.time.Duration;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
@@ -67,9 +68,31 @@ public class PreviewTableService
                 {
                     QueryData results = client.currentData();
                     if (results.getData() != null) {
-                        cache.addAll(results.getData());
+                        List<List<Object>> resultsData = ImmutableList.copyOf(results.getData());
+                        for (List<Object> row : resultsData) {
+                            final String[] values = new String[row.size()];
+                            for (int i = 0; i < values.length; i++) {
+                                // Display byte array as Hexadecimal in order to keep consistent with OpenLooKeng client
+                                if (row.get(i) instanceof byte[]) {
+                                    byte[] bytes = (byte[]) row.get(i);
+                                    StringBuilder sb = new StringBuilder();
+                                    for (byte b : bytes) {
+                                        String hex = Integer.toHexString(b & 0xFF);
+                                        if (hex.length() < 2) {
+                                            sb.append(0);
+                                        }
+                                        sb.append(hex);
+                                    }
+                                    values[i] = sb.toString();
+                                }
+                                else {
+                                    final Object value = row.get(i);
+                                    values[i] = (value == null) ? "" : value.toString();
+                                }
+                            }
+                            cache.add(Arrays.asList(values));
+                        }
                     }
-
                     return null;
                 }
             });
