@@ -16,8 +16,8 @@
 package io.hetu.core.hive.dynamicfunctions;
 
 import com.google.common.collect.ImmutableMap;
-import io.airlift.testing.mysql.TestingMySqlServer;
 import io.hetu.core.common.filesystem.TempFolder;
+import io.hetu.core.filesystem.HetuFileSystemClientPlugin;
 import io.hetu.core.metastore.HetuMetastorePlugin;
 import io.prestosql.plugin.memory.MemoryPlugin;
 import io.prestosql.tests.DistributedQueryRunner;
@@ -82,40 +82,19 @@ public class TestDynamicHiveScalarFunction
                     testSessionBuilder().setCatalog("memory").setSchema("default").build())
                     .setNodeCount(1)
                     .build();
-
-            queryRunner.installPlugin(new HetuMetastorePlugin());
-            TestingMySqlServer mysqlServer = new TestingMySqlServer("test", "mysql", "metastore");
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                mysqlServer.close();
-            }));
-            Map<String, String> metastoreConfig = new HashMap<>();
-            metastoreConfig.put("hetu.metastore.type", "jdbc");
-            metastoreConfig.put("hetu.metastore.db.url", mysqlServer.getJdbcUrl("metastore"));
-            metastoreConfig.put("hetu.metastore.db.user", mysqlServer.getUser());
-            metastoreConfig.put("hetu.metastore.db.password", mysqlServer.getPassword());
-            queryRunner.registerCloseable(mysqlServer);
-            queryRunner.getServers().forEach(server -> {
-                try {
-                    server.loadMetastore(metastoreConfig);
-                }
-                catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            });
-
             TempFolder folder = new TempFolder();
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                folder.close();
-            }));
-
             folder.create();
+            Runtime.getRuntime().addShutdownHook(new Thread(folder::close));
+            queryRunner.installPlugin(new HetuFileSystemClientPlugin()); // need dep on hetu-filesystem
+            queryRunner.installPlugin(new HetuMetastorePlugin()); // need dep on hetu-metastore
             queryRunner.installPlugin(new MemoryPlugin());
+            HashMap<String, String> metastoreConfig = new HashMap<>();
+            metastoreConfig.put("hetu.metastore.type", "hetufilesystem");
+            metastoreConfig.put("hetu.metastore.hetufilesystem.profile-name", "default");
+            metastoreConfig.put("hetu.metastore.hetufilesystem.path", folder.newFolder("metastore").getAbsolutePath());
+            queryRunner.getCoordinator().loadMetastore(metastoreConfig);
             queryRunner.createCatalog("memory", "memory",
-                    ImmutableMap.of("memory.max-data-per-node", "128MB",
-                            "memory.splits-per-node", "2",
-                            "memory.spill-path", folder.getRoot().getAbsolutePath(),
-                            "memory.logical-part-processing-delay", "5000ms",
-                            "memory.max-page-size", "1MB"));
+                    ImmutableMap.of("memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath()));
         }
         catch (Exception e) {
             closeAllSuppress(e, queryRunner);

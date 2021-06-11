@@ -614,14 +614,6 @@
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-util</artifactId>
         </dependency>
-        <dependency>
-            <groupId>io.airlift</groupId>
-            <artifactId>testing-mysql-server</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.hetu.core</groupId>
-            <artifactId>hetu-metastore</artifactId>
-        </dependency>
     </dependencies>
 
     <build>

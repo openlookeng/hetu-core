@@ -16,6 +16,8 @@ package io.prestosql.plugin.geospatial;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.hetu.core.common.filesystem.TempFolder;
+import io.hetu.core.filesystem.HetuFileSystemClientPlugin;
+import io.hetu.core.metastore.HetuMetastorePlugin;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.geospatial.KdbTree;
@@ -31,6 +33,8 @@ import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.testing.LocalQueryRunner;
 import org.testng.annotations.Test;
 
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.Optional;
 
 import static com.google.common.base.Strings.nullToEmpty;
@@ -66,30 +70,26 @@ public class TestSpatialJoinPlanning
     }
 
     private static LocalQueryRunner createQueryRunner()
+            throws IOException
     {
         LocalQueryRunner queryRunner = new LocalQueryRunner(testSessionBuilder()
                 .setCatalog("memory")
                 .setSchema("default")
                 .build());
+        queryRunner.installPlugin(new HetuFileSystemClientPlugin());
+        queryRunner.installPlugin(new HetuMetastorePlugin());
         queryRunner.installPlugin(new GeoPlugin());
-
-        TempFolder folder = new TempFolder();
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            folder.close();
-        }));
-
-        try {
-            folder.create();
-        }
-        catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-
-        queryRunner.createCatalog("memory", new MemoryConnectorFactory(), ImmutableMap.of("memory.max-data-per-node", "1GB",
-                "memory.splits-per-node", "2",
-                "memory.spill-path", folder.getRoot().getAbsolutePath()));
-
         queryRunner.createCatalog("tpch", new TpchConnectorFactory(1), ImmutableMap.of());
+
+        TempFolder folder = new TempFolder().create();
+        Runtime.getRuntime().addShutdownHook(new Thread(folder::close));
+        HashMap<String, String> metastoreConfig = new HashMap<>();
+        metastoreConfig.put("hetu.metastore.type", "hetufilesystem");
+        metastoreConfig.put("hetu.metastore.hetufilesystem.profile-name", "default");
+        metastoreConfig.put("hetu.metastore.hetufilesystem.path", folder.newFolder("metastore").getAbsolutePath());
+        queryRunner.loadMetastore(metastoreConfig);
+        queryRunner.createCatalog("memory", new MemoryConnectorFactory(),
+                ImmutableMap.of("memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath()));
 
         queryRunner.execute(format("CREATE TABLE kdb_tree AS SELECT '%s' AS v", KDB_TREE_JSON));
         queryRunner.execute("CREATE TABLE points (lng, lat, name) AS (VALUES (2.1e0, 2.1e0, 'x'))");
