@@ -127,7 +127,7 @@ public class MemoryMetadata
     @Override
     public synchronized void createSchema(ConnectorSession session, String schemaName, Map<String, Object> properties)
     {
-        checkSchemaNotExists(schemaName);
+        checkSchemaExists(schemaName, false);
 
         DatabaseEntity.Builder databaseBuilder = DatabaseEntity.builder()
                 .setCatalogName(MEM_KEY)
@@ -140,7 +140,7 @@ public class MemoryMetadata
     @Override
     public synchronized void dropSchema(ConnectorSession session, String schemaName)
     {
-        checkSchemaExists(schemaName);
+        checkSchemaExists(schemaName, true);
 
         if (!metastore.getAllTables(MEM_KEY, schemaName).isEmpty()) {
             throw new PrestoException(SCHEMA_NOT_EMPTY, "Schema not empty: " + schemaName);
@@ -221,7 +221,7 @@ public class MemoryMetadata
     @Override
     public void renameTable(ConnectorSession session, ConnectorTableHandle tableHandle, SchemaTableName newTableName)
     {
-        checkSchemaExists(newTableName.getSchemaName());
+        checkSchemaExists(newTableName.getSchemaName(), true);
         checkTableNotExists(newTableName, false);
 
         MemoryTableHandle handle = (MemoryTableHandle) tableHandle;
@@ -255,7 +255,7 @@ public class MemoryMetadata
     @Override
     public MemoryOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout)
     {
-        checkSchemaExists(tableMetadata.getTable().getSchemaName());
+        checkSchemaExists(tableMetadata.getTable().getSchemaName(), true);
         checkTableNotExists(tableMetadata.getTable(), false);
 
         List<SortingColumn> sortedBy = MemoryTableProperties.getSortedBy(tableMetadata.getProperties());
@@ -331,20 +331,15 @@ public class MemoryMetadata
                 indexColumns);
     }
 
-    private void checkSchemaNotExists(String schemaName)
-    {
-        if (metastore.getDatabase(MEM_KEY, schemaName).isPresent()) {
-            throw new PrestoException(ALREADY_EXISTS, format("Schema already exists %s", schemaName));
-        }
-    }
-
-    private DatabaseEntity checkSchemaExists(String schemaName)
+    private void checkSchemaExists(String schemaName, boolean expectExist)
     {
         Optional<DatabaseEntity> databaseEntity = metastore.getDatabase(MEM_KEY, schemaName);
-        if (!databaseEntity.isPresent()) {
+        if (expectExist && !databaseEntity.isPresent()) {
             throw new SchemaNotFoundException(schemaName);
         }
-        return databaseEntity.get();
+        if (!expectExist && databaseEntity.isPresent()) {
+            throw new PrestoException(ALREADY_EXISTS, format("Schema already exists %s", schemaName));
+        }
     }
 
     private void checkTableNotExists(SchemaTableName tableName, boolean isView)
@@ -354,7 +349,7 @@ public class MemoryMetadata
         }
     }
 
-    private TableEntity checkTableExists(SchemaTableName tableName, boolean isView)
+    private TableEntity getTableEntity(SchemaTableName tableName, boolean isView)
     {
         Optional<TableEntity> tableEntity = metastore.getTable(MEM_KEY, tableName.getSchemaName(), tableName.getTableName());
         if (!tableEntity.isPresent()) {
@@ -409,7 +404,7 @@ public class MemoryMetadata
     @Override
     public void createView(ConnectorSession session, SchemaTableName viewName, ConnectorViewDefinition definition, boolean replace)
     {
-        checkSchemaExists(viewName.getSchemaName());
+        checkSchemaExists(viewName.getSchemaName(), true);
 
         if (!replace) {
             checkTableNotExists(viewName, true);
@@ -420,7 +415,7 @@ public class MemoryMetadata
     @Override
     public void dropView(ConnectorSession session, SchemaTableName viewName)
     {
-        checkTableExists(viewName, true);
+        getTableEntity(viewName, true);
         updateViewDef(viewName, null);
     }
 
@@ -574,7 +569,7 @@ public class MemoryMetadata
         ConnectorViewDefinition view = views.get(viewName);
         if (view == null) {
             try {
-                TableEntity tableEntity = checkTableExists(viewName, true);
+                TableEntity tableEntity = getTableEntity(viewName, true);
                 if (isView(tableEntity)) {
                     view = VIEW_CODEC.fromJson(Base64.getDecoder().decode(tableEntity.getViewOriginalText()));
                     views.put(viewName, view);
