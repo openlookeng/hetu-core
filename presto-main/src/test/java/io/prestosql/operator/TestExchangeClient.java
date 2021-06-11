@@ -91,6 +91,7 @@ public class TestExchangeClient
         MockExchangeRequestProcessor processor = new MockExchangeRequestProcessor(maxResponseSize);
 
         URI location = URI.create("http://localhost:8080");
+        String instanceId = "testing instance id";
         processor.addPage(location, createPage(1));
         processor.addPage(location, createPage(2));
         processor.addPage(location, createPage(3));
@@ -108,7 +109,7 @@ public class TestExchangeClient
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
                 pageBufferClientCallbackExecutor);
 
-        exchangeClient.addLocation(location);
+        exchangeClient.addLocation(new TaskLocation(location, instanceId));
         exchangeClient.noMoreLocations();
 
         assertEquals(exchangeClient.isClosed(), false);
@@ -135,6 +136,7 @@ public class TestExchangeClient
         MockExchangeRequestProcessor processor = new MockExchangeRequestProcessor(maxResponseSize);
 
         URI location = URI.create("http://localhost:8080");
+        String instanceId = "testing instance id";
         processor.addPage(location, createPage(1));
         MarkerPage marker = MarkerPage.snapshotPage(1);
         processor.addPage(location, marker);
@@ -156,7 +158,7 @@ public class TestExchangeClient
 
         final String target1 = "target1";
         final String target2 = "target2";
-        exchangeClient.addLocation(location);
+        exchangeClient.addLocation(new TaskLocation(location, instanceId));
         exchangeClient.noMoreLocations();
         exchangeClient.addTarget(target1);
         exchangeClient.addTarget(target2);
@@ -213,11 +215,12 @@ public class TestExchangeClient
                 pageBufferClientCallbackExecutor);
 
         URI location1 = URI.create("http://localhost:8081/foo");
+        String instanceId1 = "testing instance id";
         processor.addPage(location1, createPage(1));
         processor.addPage(location1, createPage(2));
         processor.addPage(location1, createPage(3));
         processor.setComplete(location1);
-        exchangeClient.addLocation(location1);
+        exchangeClient.addLocation(new TaskLocation(location1, instanceId1));
 
         assertEquals(exchangeClient.isClosed(), false);
         assertPageEquals(getNextPage(exchangeClient), createPage(1));
@@ -230,11 +233,12 @@ public class TestExchangeClient
         assertEquals(exchangeClient.isClosed(), false);
 
         URI location2 = URI.create("http://localhost:8082/bar");
+        String instanceId2 = "testing instance id2";
         processor.addPage(location2, createPage(4));
         processor.addPage(location2, createPage(5));
         processor.addPage(location2, createPage(6));
         processor.setComplete(location2);
-        exchangeClient.addLocation(location2);
+        exchangeClient.addLocation(new TaskLocation(location2, instanceId2));
 
         assertEquals(exchangeClient.isClosed(), false);
         assertPageEquals(getNextPage(exchangeClient), createPage(4));
@@ -265,6 +269,7 @@ public class TestExchangeClient
         MockExchangeRequestProcessor processor = new MockExchangeRequestProcessor(maxResponseSize);
 
         URI location = URI.create("http://localhost:8080");
+        String instanceId = "testing instance id";
 
         // add a pages
         processor.addPage(location, createPage(1));
@@ -284,7 +289,7 @@ public class TestExchangeClient
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
                 pageBufferClientCallbackExecutor);
 
-        exchangeClient.addLocation(location);
+        exchangeClient.addLocation(new TaskLocation(location, instanceId));
         exchangeClient.noMoreLocations();
         assertEquals(exchangeClient.isClosed(), false);
 
@@ -350,6 +355,7 @@ public class TestExchangeClient
         MockExchangeRequestProcessor processor = new MockExchangeRequestProcessor(maxResponseSize);
 
         URI location = URI.create("http://localhost:8080");
+        String instanceId = "testing instance id";
         processor.addPage(location, createPage(1));
         processor.addPage(location, createPage(2));
         processor.addPage(location, createPage(3));
@@ -365,7 +371,7 @@ public class TestExchangeClient
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
                 pageBufferClientCallbackExecutor);
-        exchangeClient.addLocation(location);
+        exchangeClient.addLocation(new TaskLocation(location, instanceId));
         exchangeClient.noMoreLocations();
 
         // fetch a page

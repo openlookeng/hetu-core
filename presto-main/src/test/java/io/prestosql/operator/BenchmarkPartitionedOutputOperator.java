@@ -204,7 +204,6 @@ public class BenchmarkPartitionedOutputOperator
         private PartitionedOutputBuffer createPartitionedBuffer(OutputBuffers buffers, DataSize dataSize)
         {
             return new PartitionedOutputBuffer(
-                    "task-instance-id",
                     new StateMachine<>("bufferState", SCHEDULER, OPEN, TERMINAL_BUFFER_STATES),
                     buffers,
                     dataSize,

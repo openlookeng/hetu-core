@@ -78,7 +78,6 @@ import static org.testng.Assert.fail;
 public class TestBroadcastOutputBuffer
 {
     private static final PagesSerde PAGES_SERDE = testingPagesSerde();
-    private static final String TASK_INSTANCE_ID = "task-instance-id";
 
     private static final ImmutableList<BigintType> TYPES = ImmutableList.of(BIGINT);
     private static final OutputBufferId FIRST = new OutputBufferId(0);
@@ -240,7 +239,7 @@ public class TestBroadcastOutputBuffer
                 createPage(12),
                 createPage(13)));
         assertQueueState(buffer, FIRST, 8, 6);
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 14, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 14, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 14, sizeOfPages(10), NO_WAIT), emptyResults(14, true));
 
         // finish first queue
         buffer.abort(FIRST);
@@ -254,14 +253,14 @@ public class TestBroadcastOutputBuffer
                 createPage(12),
                 createPage(13)));
         assertQueueState(buffer, SECOND, 4, 10);
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 14, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 14, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 14, sizeOfPages(10), NO_WAIT), emptyResults(14, true));
         buffer.abort(SECOND);
         assertQueueClosed(buffer, FIRST, 14);
         assertQueueClosed(buffer, SECOND, 14);
         assertFinished(buffer);
 
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 14, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 14, true));
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 14, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 14, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 14, sizeOfPages(10), NO_WAIT), emptyResults(14, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 14, sizeOfPages(10), NO_WAIT), emptyResults(14, true));
     }
 
     @Test
@@ -404,7 +403,7 @@ public class TestBroadcastOutputBuffer
         buffer.get(FIRST, 3, sizeOfPages(10)).cancel(true);
 
         // attempt to get the three elements again
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, false));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(10), NO_WAIT), emptyResults(0, false));
         // pages not acknowledged yet so state is the same
         assertQueueState(buffer, FIRST, 0, 3);
     }
@@ -513,7 +512,7 @@ public class TestBroadcastOutputBuffer
         assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), bufferResult(0, createPage(33)));
 
         // acknowledge the page and verify we are finished
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 1, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 1, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 1, sizeOfPages(10), NO_WAIT), emptyResults(1, true));
         buffer.abort(FIRST);
 
         // set final buffers to a set that does not contain the buffer, which will fail
@@ -547,7 +546,7 @@ public class TestBroadcastOutputBuffer
         // abort that buffer, and verify the future is complete and buffer is finished
         buffer.abort(FIRST);
         assertTrue(future.isDone());
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(10), NO_WAIT), emptyResults(0, true));
     }
 
     @Test
@@ -622,13 +621,13 @@ public class TestBroadcastOutputBuffer
         assertBufferResultEquals(TYPES, getBufferResult(bufferedBuffer, FIRST, 0, sizeOfPages(1), NO_WAIT), bufferResult(0, createPage(0)));
         bufferedBuffer.abort(FIRST);
         assertQueueClosed(bufferedBuffer, FIRST, 0);
-        assertBufferResultEquals(TYPES, getBufferResult(bufferedBuffer, FIRST, 1, sizeOfPages(1), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, true));
+        assertBufferResultEquals(TYPES, getBufferResult(bufferedBuffer, FIRST, 1, sizeOfPages(1), NO_WAIT), emptyResults(0, true));
 
         assertBufferResultEquals(TYPES, getBufferResult(bufferedBuffer, SECOND, 0, sizeOfPages(1), NO_WAIT), bufferResult(0, createPage(0)));
         bufferedBuffer.abort(SECOND);
         assertQueueClosed(bufferedBuffer, SECOND, 0);
         assertFinished(bufferedBuffer);
-        assertBufferResultEquals(TYPES, getBufferResult(bufferedBuffer, SECOND, 1, sizeOfPages(1), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, true));
+        assertBufferResultEquals(TYPES, getBufferResult(bufferedBuffer, SECOND, 1, sizeOfPages(1), NO_WAIT), emptyResults(0, true));
     }
 
     @Test
@@ -687,7 +686,7 @@ public class TestBroadcastOutputBuffer
 
         // verify the future completed
         // broadcast buffer does not return a "complete" result in this case, but it doesn't mapper
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(TASK_INSTANCE_ID, 1, false));
+        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(1, false));
 
         // further requests will see a completed result
         assertQueueClosed(buffer, FIRST, 1);
@@ -724,7 +723,7 @@ public class TestBroadcastOutputBuffer
         assertQueueState(buffer, FIRST, 0, 1);
 
         // verify the future completed
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(TASK_INSTANCE_ID, 1, true));
+        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(1, true));
     }
 
     @Test
@@ -765,7 +764,7 @@ public class TestBroadcastOutputBuffer
         // get and acknowledge the last 6 pages
         assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 1, sizeOfPages(100), NO_WAIT),
                 bufferResult(1, createPage(1), createPage(2), createPage(3), createPage(4), createPage(5), createPage(6)));
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 7, sizeOfPages(100), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 7, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 7, sizeOfPages(100), NO_WAIT), emptyResults(7, true));
 
         buffer.abort(FIRST);
 
@@ -804,7 +803,7 @@ public class TestBroadcastOutputBuffer
         assertQueueClosed(buffer, FIRST, 1);
 
         // verify the future completed
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(TASK_INSTANCE_ID, 1, false));
+        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(1, false));
     }
 
     @Test
@@ -982,7 +981,7 @@ public class TestBroadcastOutputBuffer
         buffer.setNoMorePages();
 
         // get and acknowledge 5 pages
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(5), MAX_WAIT), createBufferResult(TASK_INSTANCE_ID, 0, pages));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(5), MAX_WAIT), createBufferResult(0, pages));
 
         // buffer is not finished
         assertFalse(buffer.isFinished());
@@ -1137,7 +1136,6 @@ public class TestBroadcastOutputBuffer
     private BroadcastOutputBuffer createBroadcastBuffer(OutputBuffers outputBuffers, DataSize dataSize, AggregatedMemoryContext memoryContext, Executor notificationExecutor)
     {
         BroadcastOutputBuffer buffer = new BroadcastOutputBuffer(
-                TASK_INSTANCE_ID,
                 new StateMachine<>("bufferState", stateNotificationExecutor, OPEN, TERMINAL_BUFFER_STATES),
                 dataSize,
                 () -> memoryContext.newLocalMemoryContext("test"),
@@ -1198,7 +1196,6 @@ public class TestBroadcastOutputBuffer
     private BroadcastOutputBuffer createBroadcastBuffer(OutputBuffers outputBuffers, DataSize dataSize)
     {
         BroadcastOutputBuffer buffer = new BroadcastOutputBuffer(
-                TASK_INSTANCE_ID,
                 new StateMachine<>("bufferState", stateNotificationExecutor, OPEN, TERMINAL_BUFFER_STATES),
                 dataSize,
                 () -> new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
@@ -1210,6 +1207,6 @@ public class TestBroadcastOutputBuffer
     private static BufferResult bufferResult(long token, Page firstPage, Page... otherPages)
     {
         List<Page> pages = ImmutableList.<Page>builder().add(firstPage).add(otherPages).build();
-        return createBufferResult(TASK_INSTANCE_ID, token, pages);
+        return createBufferResult(token, pages);
     }
 }

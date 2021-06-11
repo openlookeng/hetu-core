@@ -141,7 +141,8 @@ public class ExchangeOperator
         checkArgument(split.getCatalogName().equals(REMOTE_CONNECTOR_ID), "split is not a remote split");
 
         URI location = ((RemoteSplit) split.getConnectorSplit()).getLocation();
-        boolean added = exchangeClient.addLocation(location);
+        String instanceId = ((RemoteSplit) split.getConnectorSplit()).getInstanceId();
+        boolean added = exchangeClient.addLocation(new TaskLocation(location, instanceId));
 
         if (snapshotState != null) {
             // When inputChannels is not empty, then we should have received all locations

@@ -45,6 +45,7 @@ import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.InternalNode;
+import io.prestosql.operator.TaskLocation;
 import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CatalogName;
@@ -392,10 +393,13 @@ public class SqlQueryScheduler
 
     private static void updateQueryOutputLocations(QueryStateMachine queryStateMachine, OutputBufferId rootBufferId, Set<RemoteTask> tasks, boolean noMoreExchangeLocations)
     {
-        Set<URI> bufferLocations = tasks.stream()
-                .map(task -> task.getTaskStatus().getSelf())
-                .map(location -> uriBuilderFrom(location).appendPath("results").appendPath(rootBufferId.toString()).build())
-                .collect(toImmutableSet());
+        Set<TaskLocation> bufferLocations = tasks.stream()
+                .map(task -> {
+                    URI uri = task.getTaskStatus().getSelf();
+                    String instanceId = task.getInstanceId();
+                    URI newUri = uriBuilderFrom(uri).appendPath("results").appendPath(rootBufferId.toString()).build();
+                    return new TaskLocation(newUri, instanceId);
+                }).collect(toImmutableSet());
         queryStateMachine.updateOutputLocations(bufferLocations, noMoreExchangeLocations);
     }
 
@@ -523,7 +527,7 @@ public class SqlQueryScheduler
 
                     // remote source requires nodePartitionMap
                     NodePartitionMap nodePartitionMap = partitioningCache.apply(plan.getFragment().getPartitioning(),
-                                stageTaskCounts == null ? null : stageTaskCounts.get(stageId));
+                            stageTaskCounts == null ? null : stageTaskCounts.get(stageId));
                     if (groupedExecutionForStage) {
                         checkState(connectorPartitionHandles.size() == nodePartitionMap.getBucketToPartition().length);
                     }
@@ -549,7 +553,7 @@ public class SqlQueryScheduler
             else {
                 // all sources are remote
                 NodePartitionMap nodePartitionMap = partitioningCache.apply(plan.getFragment().getPartitioning(),
-                            stageTaskCounts == null ? null : stageTaskCounts.get(stageId));
+                        stageTaskCounts == null ? null : stageTaskCounts.get(stageId));
                 List<InternalNode> partitionToNode = nodePartitionMap.getPartitionToNode();
                 // todo this should asynchronously wait a standard timeout period before failing
                 checkCondition(!partitionToNode.isEmpty(), NO_NODES_AVAILABLE, "No worker nodes available");
@@ -616,14 +620,14 @@ public class SqlQueryScheduler
                     .collect(toList());
 
             ScaledWriterScheduler scheduler = new ScaledWriterScheduler(
-                        stage,
-                        sourceTasksProvider,
-                        writerTasksProvider,
-                        nodeScheduler.createNodeSelector(null),
-                        schedulerExecutor,
-                        getWriterMinSize(session),
-                        isSnapshotEnabled,
-                        stageTaskCounts != null ? stageTaskCounts.get(stageId) : null);
+                    stage,
+                    sourceTasksProvider,
+                    writerTasksProvider,
+                    nodeScheduler.createNodeSelector(null),
+                    schedulerExecutor,
+                    getWriterMinSize(session),
+                    isSnapshotEnabled,
+                    stageTaskCounts != null ? stageTaskCounts.get(stageId) : null);
             whenAllStages(childStages, StageState::isDone)
                     .addListener(scheduler::finish, directExecutor());
             stageSchedulers.put(stageId, scheduler);

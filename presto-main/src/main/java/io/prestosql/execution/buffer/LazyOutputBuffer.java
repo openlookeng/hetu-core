@@ -49,7 +49,6 @@ public class LazyOutputBuffer
         implements OutputBuffer
 {
     private final StateMachine<BufferState> state;
-    private final String taskInstanceId;
     private final DataSize maxBufferSize;
     private final Supplier<LocalMemoryContext> systemMemoryContextSupplier;
     private final Executor executor;
@@ -65,13 +64,11 @@ public class LazyOutputBuffer
 
     public LazyOutputBuffer(
             TaskId taskId,
-            String taskInstanceId,
             Executor executor,
             DataSize maxBufferSize,
             Supplier<LocalMemoryContext> systemMemoryContextSupplier)
     {
         requireNonNull(taskId, "taskId is null");
-        this.taskInstanceId = requireNonNull(taskInstanceId, "taskInstanceId is null");
         this.executor = requireNonNull(executor, "executor is null");
         state = new StateMachine<>(taskId + "-buffer", executor, OPEN, TERMINAL_BUFFER_STATES);
         this.maxBufferSize = requireNonNull(maxBufferSize, "maxBufferSize is null");
@@ -160,13 +157,13 @@ public class LazyOutputBuffer
                 }
                 switch (newOutputBuffers.getType()) {
                     case PARTITIONED:
-                        delegate = new PartitionedOutputBuffer(taskInstanceId, state, newOutputBuffers, maxBufferSize, systemMemoryContextSupplier, executor);
+                        delegate = new PartitionedOutputBuffer(state, newOutputBuffers, maxBufferSize, systemMemoryContextSupplier, executor);
                         break;
                     case BROADCAST:
-                        delegate = new BroadcastOutputBuffer(taskInstanceId, state, maxBufferSize, systemMemoryContextSupplier, executor);
+                        delegate = new BroadcastOutputBuffer(state, maxBufferSize, systemMemoryContextSupplier, executor);
                         break;
                     case ARBITRARY:
-                        delegate = new ArbitraryOutputBuffer(taskInstanceId, state, maxBufferSize, systemMemoryContextSupplier, executor);
+                        delegate = new ArbitraryOutputBuffer(state, maxBufferSize, systemMemoryContextSupplier, executor);
                         break;
                 }
 
@@ -195,7 +192,7 @@ public class LazyOutputBuffer
         synchronized (this) {
             if (delegate == null) {
                 if (state.get() == FINISHED) {
-                    return immediateFuture(emptyResults(taskInstanceId, 0, true));
+                    return immediateFuture(emptyResults(0, true));
                 }
 
                 PendingRead pendingRead = new PendingRead(bufferId, token, maxSize);
@@ -299,7 +296,7 @@ public class LazyOutputBuffer
         // if there is no output buffer, free the pending reads
         if (outputBuffer == null) {
             for (PendingRead pendingRead : pendingReads) {
-                pendingRead.getFutureResult().set(emptyResults(taskInstanceId, 0, true));
+                pendingRead.getFutureResult().set(emptyResults(0, true));
             }
             return;
         }

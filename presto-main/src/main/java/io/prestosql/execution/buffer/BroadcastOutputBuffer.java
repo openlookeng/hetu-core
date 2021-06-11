@@ -65,7 +65,6 @@ import static java.util.Objects.requireNonNull;
 public class BroadcastOutputBuffer
         implements OutputBuffer, MultiInputRestorable
 {
-    private final String taskInstanceId;
     private final StateMachine<BufferState> state;
     private final OutputBufferMemoryManager memoryManager;
     // Snapshot: Output buffers can receive markers from multiple drivers
@@ -88,13 +87,11 @@ public class BroadcastOutputBuffer
     private final AtomicLong totalBufferedPages = new AtomicLong();
 
     public BroadcastOutputBuffer(
-            String taskInstanceId,
             StateMachine<BufferState> state,
             DataSize maxBufferSize,
             Supplier<LocalMemoryContext> systemMemoryContextSupplier,
             Executor notificationExecutor)
     {
-        this.taskInstanceId = requireNonNull(taskInstanceId, "taskInstanceId is null");
         this.state = requireNonNull(state, "state is null");
         this.memoryManager = new OutputBufferMemoryManager(
                 requireNonNull(maxBufferSize, "maxBufferSize is null").toBytes(),
@@ -373,7 +370,7 @@ public class BroadcastOutputBuffer
 
         // NOTE: buffers are allowed to be created before they are explicitly declared by setOutputBuffers
         // When no-more-buffers is set, we verify that all created buffers have been declared
-        buffer = new ClientBuffer(taskInstanceId, id);
+        buffer = new ClientBuffer(id);
 
         // do not setup the new buffer if we are already failed
         if (state != FAILED) {

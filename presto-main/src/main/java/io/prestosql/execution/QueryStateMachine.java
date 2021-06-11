@@ -34,6 +34,7 @@ import io.prestosql.memory.VersionedMemoryPoolId;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.BlockedReason;
 import io.prestosql.operator.OperatorStats;
+import io.prestosql.operator.TaskLocation;
 import io.prestosql.security.AccessControl;
 import io.prestosql.server.BasicQueryInfo;
 import io.prestosql.server.BasicQueryStats;
@@ -641,7 +642,7 @@ public class QueryStateMachine
         outputManager.setColumns(columnNames, columnTypes);
     }
 
-    public void updateOutputLocations(Set<URI> newExchangeLocations, boolean noMoreExchangeLocations)
+    public void updateOutputLocations(Set<TaskLocation> newExchangeLocations, boolean noMoreExchangeLocations)
     {
         outputManager.updateOutputLocations(newExchangeLocations, noMoreExchangeLocations);
     }
@@ -1211,7 +1212,7 @@ public class QueryStateMachine
         @GuardedBy("this")
         private List<Type> columnTypes;
         @GuardedBy("this")
-        private final Set<URI> exchangeLocations = new LinkedHashSet<>();
+        private final Set<TaskLocation> exchangeLocations = new LinkedHashSet<>();
         @GuardedBy("this")
         private boolean noMoreExchangeLocations;
 
@@ -1258,7 +1259,7 @@ public class QueryStateMachine
             this.exchangeLocations.clear();
         }
 
-        public void updateOutputLocations(Set<URI> newExchangeLocations, boolean noMoreExchangeLocations)
+        public void updateOutputLocations(Set<TaskLocation> newExchangeLocations, boolean noMoreExchangeLocations)
         {
             requireNonNull(newExchangeLocations, "newExchangeLocations is null");
 

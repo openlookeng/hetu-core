@@ -347,7 +347,7 @@ public class TestMergeOperator
 
     private static Split createRemoteSplit(String taskId)
     {
-        return new Split(ExchangeOperator.REMOTE_CONNECTOR_ID, new RemoteSplit(URI.create("http://localhost/" + taskId)), Lifespan.taskWide());
+        return new Split(ExchangeOperator.REMOTE_CONNECTOR_ID, new RemoteSplit(URI.create("http://localhost/" + taskId), "new split test instance id"), Lifespan.taskWide());
     }
 
     private static List<Page> pullAvailablePages(Operator operator)

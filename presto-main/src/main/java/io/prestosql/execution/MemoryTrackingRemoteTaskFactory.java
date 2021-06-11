@@ -44,6 +44,7 @@ public class MemoryTrackingRemoteTaskFactory
     @Override
     public RemoteTask createRemoteTask(Session session,
             TaskId taskId,
+            String instanceId,
             InternalNode node,
             PlanFragment fragment,
             Multimap<PlanNodeId, Split> initialSplits,
@@ -56,6 +57,7 @@ public class MemoryTrackingRemoteTaskFactory
     {
         RemoteTask task = remoteTaskFactory.createRemoteTask(session,
                 taskId,
+                instanceId,
                 node,
                 fragment,
                 initialSplits,

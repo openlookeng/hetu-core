@@ -37,7 +37,6 @@ import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 
 import java.io.Closeable;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
@@ -218,9 +217,10 @@ public class ExchangeClient
         scheduleRequestIfNecessary();
     }
 
-    public synchronized boolean addLocation(URI locationUri)
+    public synchronized boolean addLocation(TaskLocation location)
     {
-        requireNonNull(locationUri, "locationUri is null");
+        requireNonNull(location, "TaskLocation is null");
+        requireNonNull(location.getUri(), "location uri is null");
 
         // Ignore new locations after close
         // NOTE: this MUST happen before checking no more locations is checked
@@ -228,9 +228,9 @@ public class ExchangeClient
             return false;
         }
 
-        String location = locationUri.toString();
+        String uri = location.getUri().toString();
         // ignore duplicate locations
-        if (allClients.containsKey(location)) {
+        if (allClients.containsKey(uri)) {
             return false;
         }
 
@@ -241,13 +241,13 @@ public class ExchangeClient
                 maxResponseSize,
                 maxErrorDuration,
                 acknowledgePages,
-                locationUri,
-                new ExchangeClientCallback(location),
+                location,
+                new ExchangeClientCallback(uri),
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 snapshotEnabled,
                 querySnapshotManager);
-        allClients.put(location, client);
+        allClients.put(uri, client);
         queuedClients.add(client);
 
         scheduleRequestIfNecessary();

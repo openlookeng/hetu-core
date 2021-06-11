@@ -24,6 +24,8 @@ public interface RemoteTask
 {
     TaskId getTaskId();
 
+    String getInstanceId();
+
     String getNodeId();
 
     TaskInfo getTaskInfo();

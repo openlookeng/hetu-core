@@ -168,6 +168,7 @@ public class MergeOperator
         checkState(!blockedOnSplits.isDone(), "noMoreSplits has been called already");
 
         URI location = ((RemoteSplit) split.getConnectorSplit()).getLocation();
+        String instanceId = ((RemoteSplit) split.getConnectorSplit()).getInstanceId();
         ExchangeClient exchangeClient = closer.register(exchangeClientSupplier.get(operatorContext.localSystemMemoryContext()));
         if (operatorContext.isSnapshotEnabled()) {
             exchangeClient.setSnapshotEnabled(operatorContext.getDriverContext().getPipelineContext().getTaskContext().getSnapshotManager().getQuerySnapshotManager());
@@ -175,7 +176,7 @@ public class MergeOperator
         }
         exchangeClient.addTarget(id);
         exchangeClient.noMoreTargets();
-        exchangeClient.addLocation(location);
+        exchangeClient.addLocation(new TaskLocation(location, instanceId));
         exchangeClient.noMoreLocations();
         clients.add(exchangeClient);
         pageProducers.add(exchangeClient.pages(id)

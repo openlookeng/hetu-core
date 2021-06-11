@@ -54,7 +54,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -98,6 +97,7 @@ public class SqlTask
 
     public static SqlTask createSqlTask(
             TaskId taskId,
+            String instanceId,
             URI location,
             String nodeId,
             QueryContext queryContext,
@@ -108,13 +108,14 @@ public class SqlTask
             CounterStat failedTasks,
             Metadata metadata)
     {
-        SqlTask sqlTask = new SqlTask(taskId, location, nodeId, queryContext, sqlTaskExecutionFactory, taskNotificationExecutor, maxBufferSize, metadata);
+        SqlTask sqlTask = new SqlTask(taskId, instanceId, location, nodeId, queryContext, sqlTaskExecutionFactory, taskNotificationExecutor, maxBufferSize, metadata);
         sqlTask.initialize(onDone, failedTasks);
         return sqlTask;
     }
 
     private SqlTask(
             TaskId taskId,
+            String instanceId,
             URI location,
             String nodeId,
             QueryContext queryContext,
@@ -124,7 +125,7 @@ public class SqlTask
             Metadata metadata)
     {
         this.taskId = requireNonNull(taskId, "taskId is null");
-        this.taskInstanceId = UUID.randomUUID().toString();
+        this.taskInstanceId = requireNonNull(instanceId, "instanceId is null");
         this.location = requireNonNull(location, "location is null");
         this.nodeId = requireNonNull(nodeId, "nodeId is null");
         this.queryContext = requireNonNull(queryContext, "queryContext is null");
@@ -135,7 +136,6 @@ public class SqlTask
 
         outputBuffer = new LazyOutputBuffer(
                 taskId,
-                taskInstanceId,
                 taskNotificationExecutor,
                 maxBufferSize,
                 // Pass a memory context supplier instead of a memory context to the output buffer,
@@ -305,7 +305,6 @@ public class SqlTask
         }
 
         return new TaskStatus(taskStateMachine.getTaskId(),
-                taskInstanceId,
                 versionNumber,
                 state,
                 location,
@@ -398,7 +397,7 @@ public class SqlTask
     }
 
     public TaskInfo updateTask(Session session, Optional<PlanFragment> fragment, List<TaskSource> sources, OutputBuffers outputBuffers, OptionalInt totalPartitions, Optional<PlanNodeId> consumer,
-                                    Map<String, CommonTableExecutionContext> cteCtx)
+            Map<String, CommonTableExecutionContext> cteCtx)
     {
         try {
             // The LazyOutput buffer does not support write methods, so the actual

@@ -51,7 +51,6 @@ import static org.testng.Assert.fail;
 
 public class TestClientBuffer
 {
-    private static final String TASK_INSTANCE_ID = "task-instance-id";
     private static final ImmutableList<BigintType> TYPES = ImmutableList.of(BIGINT);
     private static final OutputBufferId BUFFER_ID = new OutputBufferId(33);
     private static final String INVALID_SEQUENCE_ID = "Invalid sequence id";
@@ -59,7 +58,7 @@ public class TestClientBuffer
     @Test
     public void testSimplePushBuffer()
     {
-        ClientBuffer buffer = new ClientBuffer(TASK_INSTANCE_ID, BUFFER_ID);
+        ClientBuffer buffer = new ClientBuffer(BUFFER_ID);
 
         // add three pages to the buffer
         for (int i = 0; i < 3; i++) {
@@ -102,7 +101,7 @@ public class TestClientBuffer
         assertBufferInfo(buffer, 1, 5);
 
         // acknowledge all pages from the buffer, should return a finished buffer result
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, 6, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 6, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, 6, sizeOfPages(10), NO_WAIT), emptyResults(6, true));
         assertBufferInfo(buffer, 0, 6);
 
         // buffer is not destroyed until explicitly destroyed
@@ -113,7 +112,7 @@ public class TestClientBuffer
     @Test
     public void testSimplePullBuffer()
     {
-        ClientBuffer buffer = new ClientBuffer(TASK_INSTANCE_ID, BUFFER_ID);
+        ClientBuffer buffer = new ClientBuffer(BUFFER_ID);
 
         // create a page supplier with 3 initial pages
         TestingPagesSupplier supplier = new TestingPagesSupplier();
@@ -165,7 +164,7 @@ public class TestClientBuffer
         assertEquals(supplier.getBufferedPages(), 0);
 
         // acknowledge all pages from the buffer, should return a finished buffer result
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, supplier, 6, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 6, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, supplier, 6, sizeOfPages(10), NO_WAIT), emptyResults(6, true));
         assertBufferInfo(buffer, 0, 6);
         assertEquals(supplier.getBufferedPages(), 0);
 
@@ -177,7 +176,7 @@ public class TestClientBuffer
     @Test
     public void testDuplicateRequests()
     {
-        ClientBuffer buffer = new ClientBuffer(TASK_INSTANCE_ID, BUFFER_ID);
+        ClientBuffer buffer = new ClientBuffer(BUFFER_ID);
 
         // add three pages
         for (int i = 0; i < 3; i++) {
@@ -199,7 +198,7 @@ public class TestClientBuffer
         buffer.getPages(3, sizeOfPages(10)).cancel(true);
 
         // attempt to get the three elements again, which will return an empty resilt
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, 0, sizeOfPages(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, false));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, 0, sizeOfPages(10), NO_WAIT), emptyResults(0, false));
         // pages not acknowledged yet so state is the same
         assertBufferInfo(buffer, 0, 3);
     }
@@ -207,7 +206,7 @@ public class TestClientBuffer
     @Test
     public void testAddAfterNoMorePages()
     {
-        ClientBuffer buffer = new ClientBuffer(TASK_INSTANCE_ID, BUFFER_ID);
+        ClientBuffer buffer = new ClientBuffer(BUFFER_ID);
         buffer.setNoMorePages();
         addPage(buffer, createPage(0));
         addPage(buffer, createPage(0));
@@ -217,7 +216,7 @@ public class TestClientBuffer
     @Test
     public void testAddAfterDestroy()
     {
-        ClientBuffer buffer = new ClientBuffer(TASK_INSTANCE_ID, BUFFER_ID);
+        ClientBuffer buffer = new ClientBuffer(BUFFER_ID);
         buffer.destroy();
         addPage(buffer, createPage(0));
         addPage(buffer, createPage(0));
@@ -227,7 +226,7 @@ public class TestClientBuffer
     @Test
     public void testDestroy()
     {
-        ClientBuffer buffer = new ClientBuffer(TASK_INSTANCE_ID, BUFFER_ID);
+        ClientBuffer buffer = new ClientBuffer(BUFFER_ID);
 
         // add 5 pages the buffer
         for (int i = 0; i < 5; i++) {
@@ -243,13 +242,13 @@ public class TestClientBuffer
         assertBufferDestroyed(buffer, 0);
 
         // follow token from previous read, which should return a finished result
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, 1, sizeOfPages(1), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, true));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, 1, sizeOfPages(1), NO_WAIT), emptyResults(0, true));
     }
 
     @Test
     public void testNoMorePagesFreesReader()
     {
-        ClientBuffer buffer = new ClientBuffer(TASK_INSTANCE_ID, BUFFER_ID);
+        ClientBuffer buffer = new ClientBuffer(BUFFER_ID);
 
         // attempt to get a page
         ListenableFuture<BufferResult> future = buffer.getPages(0, sizeOfPages(10));
@@ -272,13 +271,13 @@ public class TestClientBuffer
         assertBufferInfo(buffer, 0, 1);
 
         // verify the future completed
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(TASK_INSTANCE_ID, 1, true));
+        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(1, true));
     }
 
     @Test
     public void testDestroyFreesReader()
     {
-        ClientBuffer buffer = new ClientBuffer(TASK_INSTANCE_ID, BUFFER_ID);
+        ClientBuffer buffer = new ClientBuffer(BUFFER_ID);
 
         // attempt to get a page
         ListenableFuture<BufferResult> future = buffer.getPages(0, sizeOfPages(10));
@@ -302,7 +301,7 @@ public class TestClientBuffer
 
         // verify the future completed
         // buffer does not return a "complete" result in this case, but it doesn't matter
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(TASK_INSTANCE_ID, 1, false));
+        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(1, false));
 
         // further requests will see a completed result
         assertBufferDestroyed(buffer, 1);
@@ -311,7 +310,7 @@ public class TestClientBuffer
     @Test
     public void testInvalidTokenFails()
     {
-        ClientBuffer buffer = new ClientBuffer(TASK_INSTANCE_ID, BUFFER_ID);
+        ClientBuffer buffer = new ClientBuffer(BUFFER_ID);
         addPage(buffer, createPage(0));
         addPage(buffer, createPage(1));
         buffer.getPages(1, sizeOfPages(10)).cancel(true);
@@ -329,7 +328,7 @@ public class TestClientBuffer
     @Test
     public void testReferenceCount()
     {
-        ClientBuffer buffer = new ClientBuffer(TASK_INSTANCE_ID, BUFFER_ID);
+        ClientBuffer buffer = new ClientBuffer(BUFFER_ID);
 
         // add 2 pages and verify they are referenced
         AtomicBoolean page0HasReference = addPage(buffer, createPage(0));
@@ -413,7 +412,7 @@ public class TestClientBuffer
     private static BufferResult bufferResult(long token, Page firstPage, Page... otherPages)
     {
         List<Page> pages = ImmutableList.<Page>builder().add(firstPage).add(otherPages).build();
-        return createBufferResult(TASK_INSTANCE_ID, token, pages);
+        return createBufferResult(token, pages);
     }
 
     @SuppressWarnings("ConstantConditions")

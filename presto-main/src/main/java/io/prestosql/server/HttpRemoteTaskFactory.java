@@ -137,6 +137,7 @@ public class HttpRemoteTaskFactory
     @Override
     public RemoteTask createRemoteTask(Session session,
             TaskId taskId,
+            String instanceId,
             InternalNode node,
             PlanFragment fragment,
             Multimap<PlanNodeId, Split> initialSplits,
@@ -149,6 +150,7 @@ public class HttpRemoteTaskFactory
     {
         return new HttpRemoteTask(session,
                 taskId,
+                instanceId,
                 node.getNodeIdentifier(),
                 locationFactory.createTaskLocation(node, taskId),
                 fragment,

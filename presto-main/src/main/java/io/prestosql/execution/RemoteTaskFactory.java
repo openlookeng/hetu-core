@@ -30,6 +30,7 @@ public interface RemoteTaskFactory
 {
     RemoteTask createRemoteTask(Session session,
             TaskId taskId,
+            String instanceId,
             InternalNode node,
             PlanFragment fragment,
             Multimap<PlanNodeId, Split> initialSplits,
