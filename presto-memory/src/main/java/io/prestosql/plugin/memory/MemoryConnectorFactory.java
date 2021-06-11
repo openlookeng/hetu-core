@@ -53,6 +53,9 @@ public class MemoryConnectorFactory
     public Connector create(String catalogName, Map<String, String> requiredConfig, ConnectorContext context)
     {
         requireNonNull(requiredConfig, "requiredConfig is null");
+        if (context.getHetuMetastore() == null) {
+            throw new IllegalStateException("HetuMetastore must be configured to use the Memory Connector. Please refer to HetuMetastore docs for details.");
+        }
         try {
             // A plugin is not required to use Guice; it is just very convenient
             Bootstrap app = new Bootstrap(
