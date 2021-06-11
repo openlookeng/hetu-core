@@ -16,6 +16,11 @@ package io.prestosql.plugin.memory;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import io.hetu.core.common.filesystem.TempFolder;
+import io.hetu.core.filesystem.HetuLocalFileSystemClient;
+import io.hetu.core.filesystem.LocalConfig;
+import io.hetu.core.metastore.hetufilesystem.HetuFsMetastore;
+import io.hetu.core.metastore.hetufilesystem.HetuFsMetastoreConfig;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorOutputTableHandle;
 import io.prestosql.spi.connector.ConnectorTableHandle;
@@ -24,10 +29,15 @@ import io.prestosql.spi.connector.ConnectorViewDefinition;
 import io.prestosql.spi.connector.ConnectorViewDefinition.ViewColumn;
 import io.prestosql.spi.connector.SchemaNotFoundException;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.type.testing.TestingTypeManager;
 import io.prestosql.testing.TestingNodeManager;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -51,8 +61,13 @@ public class TestMemoryMetadata
 
     @BeforeMethod
     public void setUp()
+            throws IOException
     {
-        metadata = new MemoryMetadata(new TestingNodeManager());
+        TempFolder tmp = new TempFolder().create();
+        Runtime.getRuntime().addShutdownHook(new Thread(tmp::close));
+        metadata = new MemoryMetadata(new TestingTypeManager(), new TestingNodeManager(),
+                new HetuFsMetastore(new HetuFsMetastoreConfig().setHetuFileSystemMetastorePath(tmp.getRoot().getCanonicalPath()),
+                        new HetuLocalFileSystemClient(new LocalConfig(null), Paths.get(tmp.getRoot().getCanonicalPath()))), null);
     }
 
     @Test
@@ -70,8 +85,8 @@ public class TestMemoryMetadata
         metadata.finishCreateTable(SESSION, table, ImmutableList.of(), ImmutableList.of());
 
         List<SchemaTableName> tables = metadata.listTables(SESSION, Optional.empty());
-        assertTrue(tables.size() == 1, "Expected only one table");
-        assertTrue(tables.get(0).getTableName().equals("temp_table"), "Expected table with name 'temp_table'");
+        assertEquals(tables.size(), 1, "Expected only one table");
+        assertEquals(tables.get(0).getTableName(), "temp_table", "Expected table with name 'temp_table'");
     }
 
     @Test
@@ -142,9 +157,11 @@ public class TestMemoryMetadata
                 Optional.empty());
 
         List<SchemaTableName> tableNames = metadata.listTables(SESSION, Optional.empty());
-        assertTrue(tableNames.size() == 1, "Expected exactly one table");
+        assertEquals(tableNames.size(), 0, "Expected zero table");
 
         metadata.finishCreateTable(SESSION, table, ImmutableList.of(), ImmutableList.of());
+        tableNames = metadata.listTables(SESSION, Optional.empty());
+        assertEquals(tableNames.size(), 1, "Expected exactly one table");
     }
 
     @Test
@@ -152,7 +169,9 @@ public class TestMemoryMetadata
     {
         assertEquals(metadata.listSchemaNames(SESSION), ImmutableList.of("default"));
         metadata.createSchema(SESSION, "test", ImmutableMap.of());
-        assertEquals(metadata.listSchemaNames(SESSION), ImmutableList.of("default", "test"));
+        List<String> actual = new ArrayList<>(metadata.listSchemaNames(SESSION));
+        Collections.sort(actual);
+        assertEquals(actual, ImmutableList.of("default", "test"));
         assertEquals(metadata.listTables(SESSION, Optional.of("test")), ImmutableList.of());
 
         SchemaTableName tableName = new SchemaTableName("test", "first_table");
@@ -169,7 +188,7 @@ public class TestMemoryMetadata
         assertEquals(metadata.listTables(SESSION, Optional.of("default")), ImmutableList.of());
     }
 
-    @Test(expectedExceptions = PrestoException.class, expectedExceptionsMessageRegExp = "View already exists: test\\.test_view")
+    @Test(expectedExceptions = PrestoException.class, expectedExceptionsMessageRegExp = "View .* already exists")
     public void testCreateViewWithoutReplace()
     {
         SchemaTableName test = new SchemaTableName("test", "test_view");
@@ -316,13 +335,6 @@ public class TestMemoryMetadata
         SchemaTableName sameSchemaTableName = new SchemaTableName("test_schema", "test_renamed");
         metadata.renameTable(SESSION, metadata.getTableHandle(SESSION, tableName), sameSchemaTableName);
         assertEquals(metadata.listTables(SESSION, Optional.of("test_schema")), ImmutableList.of(sameSchemaTableName));
-
-        // rename table to different schema
-        metadata.createSchema(SESSION, "test_different_schema", ImmutableMap.of());
-        SchemaTableName differentSchemaTableName = new SchemaTableName("test_different_schema", "test_renamed");
-        metadata.renameTable(SESSION, metadata.getTableHandle(SESSION, sameSchemaTableName), differentSchemaTableName);
-        assertEquals(metadata.listTables(SESSION, Optional.of("test_schema")), ImmutableList.of());
-        assertEquals(metadata.listTables(SESSION, Optional.of("test_different_schema")), ImmutableList.of(differentSchemaTableName));
     }
 
     private void assertNoTables()

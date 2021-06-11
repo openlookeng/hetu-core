@@ -55,12 +55,6 @@ public final class MemorySplitManager
             long rows = dataFragment.getRows();
             totalRows += rows;
 
-            if (table.getLimit().isPresent() && totalRows > table.getLimit().getAsLong()) {
-                rows -= totalRows - table.getLimit().getAsLong();
-                splits.add(new MemorySplit(table.getId(), 0, 1, dataFragment.getHostAddress(), rows, OptionalLong.of(rows)));
-                break;
-            }
-
             for (int i = 0; i < splitsPerNode; i++) {
                 splits.add(new MemorySplit(table.getId(), i, splitsPerNode, dataFragment.getHostAddress(), rows, OptionalLong.empty()));
             }

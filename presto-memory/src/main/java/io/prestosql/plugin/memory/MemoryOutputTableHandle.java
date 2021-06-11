@@ -17,24 +17,50 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.prestosql.spi.connector.ConnectorOutputTableHandle;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
+import static io.prestosql.plugin.memory.MemoryTableProperties.SPILL_COMPRESSION_DEFAULT_VALUE;
 import static java.util.Objects.requireNonNull;
 
 public final class MemoryOutputTableHandle
         implements ConnectorOutputTableHandle
 {
     private final long table;
+    private final boolean compressionEnabled;
     private final Set<Long> activeTableIds;
+    private final List<ColumnInfo> columns;
+    private final List<SortingColumn> sortedBy;
+    private final List<String> indexColumns;
+    private final String schemaName;
+    private final String tableName;
 
     @JsonCreator
     public MemoryOutputTableHandle(
             @JsonProperty("table") long table,
-            @JsonProperty("activeTableIds") Set<Long> activeTableIds)
+            @JsonProperty("schemaName") String schemaName,
+            @JsonProperty("tableName") String tableName,
+            @JsonProperty("compressEnabled") boolean compressionEnabled,
+            @JsonProperty("activeTableIds") Set<Long> activeTableIds,
+            @JsonProperty("columns") List<ColumnInfo> columns,
+            @JsonProperty("sortedBy") List<SortingColumn> sortedBy,
+            @JsonProperty("indexColumns") List<String> indexColumns)
     {
-        this.table = requireNonNull(table, "table is null");
+        this.table = table;
+        this.schemaName = schemaName;
+        this.tableName = tableName;
+        this.compressionEnabled = compressionEnabled;
         this.activeTableIds = requireNonNull(activeTableIds, "activeTableIds is null");
+        this.columns = requireNonNull(columns, "columns is null");
+        this.sortedBy = requireNonNull(sortedBy, "sortedBy is null");
+        this.indexColumns = requireNonNull(indexColumns, "indexColumns is null");
+    }
+
+    public MemoryOutputTableHandle(long table, Set<Long> activeTableIds)
+    {
+        this(table, "", "", SPILL_COMPRESSION_DEFAULT_VALUE, activeTableIds, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     }
 
     @JsonProperty
@@ -44,9 +70,45 @@ public final class MemoryOutputTableHandle
     }
 
     @JsonProperty
+    public boolean isCompressionEnabled()
+    {
+        return compressionEnabled;
+    }
+
+    @JsonProperty
     public Set<Long> getActiveTableIds()
     {
         return activeTableIds;
+    }
+
+    @JsonProperty
+    public List<SortingColumn> getSortedBy()
+    {
+        return sortedBy;
+    }
+
+    @JsonProperty
+    public List<ColumnInfo> getColumns()
+    {
+        return columns;
+    }
+
+    @JsonProperty
+    public List<String> getIndexColumns()
+    {
+        return indexColumns;
+    }
+
+    @JsonProperty
+    public String getSchemaName()
+    {
+        return schemaName;
+    }
+
+    @JsonProperty
+    public String getTableName()
+    {
+        return tableName;
     }
 
     @Override
@@ -55,6 +117,8 @@ public final class MemoryOutputTableHandle
         return toStringHelper(this)
                 .add("table", table)
                 .add("activeTableIds", activeTableIds)
+                .add("sortedBy", sortedBy)
+                .add("indexColumns", indexColumns)
                 .toString();
     }
 }

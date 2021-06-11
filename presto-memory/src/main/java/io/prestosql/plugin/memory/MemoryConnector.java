@@ -13,15 +13,21 @@
  */
 package io.prestosql.plugin.memory;
 
+import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorMetadata;
 import io.prestosql.spi.connector.ConnectorPageSinkProvider;
 import io.prestosql.spi.connector.ConnectorPageSourceProvider;
 import io.prestosql.spi.connector.ConnectorSplitManager;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
+import io.prestosql.spi.session.PropertyMetadata;
 import io.prestosql.spi.transaction.IsolationLevel;
 
 import javax.inject.Inject;
+
+import java.util.List;
+
+import static java.util.Objects.requireNonNull;
 
 public class MemoryConnector
         implements Connector
@@ -30,18 +36,21 @@ public class MemoryConnector
     private final MemorySplitManager splitManager;
     private final MemoryPageSourceProvider pageSourceProvider;
     private final MemoryPageSinkProvider pageSinkProvider;
+    private final List<PropertyMetadata<?>> tableProperties;
 
     @Inject
     public MemoryConnector(
             MemoryMetadata metadata,
             MemorySplitManager splitManager,
             MemoryPageSourceProvider pageSourceProvider,
-            MemoryPageSinkProvider pageSinkProvider)
+            MemoryPageSinkProvider pageSinkProvider,
+            MemoryTableProperties tableProperties)
     {
         this.metadata = metadata;
         this.splitManager = splitManager;
         this.pageSourceProvider = pageSourceProvider;
         this.pageSinkProvider = pageSinkProvider;
+        this.tableProperties = ImmutableList.copyOf(requireNonNull(tableProperties, "tableProperties is null").getTableProperties());
     }
 
     @Override
@@ -72,5 +81,11 @@ public class MemoryConnector
     public ConnectorPageSinkProvider getPageSinkProvider()
     {
         return pageSinkProvider;
+    }
+
+    @Override
+    public List<PropertyMetadata<?>> getTableProperties()
+    {
+        return tableProperties;
     }
 }

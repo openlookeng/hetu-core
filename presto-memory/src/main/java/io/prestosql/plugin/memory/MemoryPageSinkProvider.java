@@ -16,6 +16,7 @@ package io.prestosql.plugin.memory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
+import io.prestosql.plugin.memory.data.MemoryTableManager;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.NodeManager;
 import io.prestosql.spi.Page;
@@ -29,26 +30,28 @@ import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import javax.inject.Inject;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 
 import static com.google.common.base.Preconditions.checkState;
+import static io.prestosql.plugin.memory.MemoryTableProperties.SPILL_COMPRESSION_DEFAULT_VALUE;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 
 public class MemoryPageSinkProvider
         implements ConnectorPageSinkProvider
 {
-    private final MemoryPagesStore pagesStore;
+    private final MemoryTableManager pagesStore;
     private final HostAddress currentHostAddress;
 
     @Inject
-    public MemoryPageSinkProvider(MemoryPagesStore pagesStore, NodeManager nodeManager)
+    public MemoryPageSinkProvider(MemoryTableManager pagesStore, NodeManager nodeManager)
     {
         this(pagesStore, requireNonNull(nodeManager, "nodeManager is null").getCurrentNode().getHostAndPort());
     }
 
     @VisibleForTesting
-    public MemoryPageSinkProvider(MemoryPagesStore pagesStore, HostAddress currentHostAddress)
+    public MemoryPageSinkProvider(MemoryTableManager pagesStore, HostAddress currentHostAddress)
     {
         this.pagesStore = requireNonNull(pagesStore, "pagesStore is null");
         this.currentHostAddress = requireNonNull(currentHostAddress, "currentHostAddress is null");
@@ -61,8 +64,8 @@ public class MemoryPageSinkProvider
         long tableId = memoryOutputTableHandle.getTable();
         checkState(memoryOutputTableHandle.getActiveTableIds().contains(tableId));
 
-        pagesStore.cleanUp(memoryOutputTableHandle.getActiveTableIds());
-        pagesStore.initialize(tableId);
+        pagesStore.refreshTables(memoryOutputTableHandle.getActiveTableIds());
+        pagesStore.initialize(tableId, memoryOutputTableHandle.isCompressionEnabled(), memoryOutputTableHandle.getColumns(), memoryOutputTableHandle.getSortedBy(), memoryOutputTableHandle.getIndexColumns());
         return new MemoryPageSink(pagesStore, currentHostAddress, tableId);
     }
 
@@ -73,22 +76,22 @@ public class MemoryPageSinkProvider
         long tableId = memoryInsertTableHandle.getTable();
         checkState(memoryInsertTableHandle.getActiveTableIds().contains(tableId));
 
-        pagesStore.cleanUp(memoryInsertTableHandle.getActiveTableIds());
-        pagesStore.initialize(tableId);
+        pagesStore.refreshTables(memoryInsertTableHandle.getActiveTableIds());
+        pagesStore.initialize(tableId, SPILL_COMPRESSION_DEFAULT_VALUE, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
         return new MemoryPageSink(pagesStore, currentHostAddress, tableId);
     }
 
     private static class MemoryPageSink
             implements ConnectorPageSink
     {
-        private final MemoryPagesStore pagesStore;
+        private final MemoryTableManager tablesManager;
         private final HostAddress currentHostAddress;
         private final long tableId;
         private long addedRows;
 
-        public MemoryPageSink(MemoryPagesStore pagesStore, HostAddress currentHostAddress, long tableId)
+        public MemoryPageSink(MemoryTableManager tablesManager, HostAddress currentHostAddress, long tableId)
         {
-            this.pagesStore = requireNonNull(pagesStore, "pagesStore is null");
+            this.tablesManager = requireNonNull(tablesManager, "pagesStore is null");
             this.currentHostAddress = requireNonNull(currentHostAddress, "currentHostAddress is null");
             this.tableId = tableId;
         }
@@ -96,7 +99,7 @@ public class MemoryPageSinkProvider
         @Override
         public CompletableFuture<?> appendPage(Page page)
         {
-            pagesStore.add(tableId, page);
+            tablesManager.add(tableId, page);
             addedRows += page.getPositionCount();
             return NOT_BLOCKED;
         }
@@ -104,12 +107,14 @@ public class MemoryPageSinkProvider
         @Override
         public CompletableFuture<Collection<Slice>> finish()
         {
+            tablesManager.finishUpdatingTable(tableId);
             return completedFuture(ImmutableList.of(new MemoryDataFragment(currentHostAddress, addedRows).toSlice()));
         }
 
         @Override
         public void abort()
         {
+            tablesManager.cleanTable(tableId);
         }
     }
 }

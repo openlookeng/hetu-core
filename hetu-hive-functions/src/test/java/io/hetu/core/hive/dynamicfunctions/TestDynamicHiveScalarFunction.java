@@ -16,8 +16,10 @@
 package io.hetu.core.hive.dynamicfunctions;
 
 import com.google.common.collect.ImmutableMap;
+import io.hetu.core.common.filesystem.TempFolder;
+import io.hetu.core.filesystem.HetuFileSystemClientPlugin;
+import io.hetu.core.metastore.HetuMetastorePlugin;
 import io.prestosql.plugin.memory.MemoryPlugin;
-import io.prestosql.testing.QueryRunner;
 import io.prestosql.tests.DistributedQueryRunner;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -26,6 +28,7 @@ import org.testng.annotations.Test;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,7 +40,7 @@ import static org.testng.Assert.assertTrue;
 
 public class TestDynamicHiveScalarFunction
 {
-    private QueryRunner queryRunner;
+    private DistributedQueryRunner queryRunner;
 
     @BeforeClass
     public void setUpClass()
@@ -79,8 +82,19 @@ public class TestDynamicHiveScalarFunction
                     testSessionBuilder().setCatalog("memory").setSchema("default").build())
                     .setNodeCount(1)
                     .build();
+            TempFolder folder = new TempFolder();
+            folder.create();
+            Runtime.getRuntime().addShutdownHook(new Thread(folder::close));
+            queryRunner.installPlugin(new HetuFileSystemClientPlugin()); // need dep on hetu-filesystem
+            queryRunner.installPlugin(new HetuMetastorePlugin()); // need dep on hetu-metastore
             queryRunner.installPlugin(new MemoryPlugin());
-            queryRunner.createCatalog("memory", "memory", ImmutableMap.of());
+            HashMap<String, String> metastoreConfig = new HashMap<>();
+            metastoreConfig.put("hetu.metastore.type", "hetufilesystem");
+            metastoreConfig.put("hetu.metastore.hetufilesystem.profile-name", "default");
+            metastoreConfig.put("hetu.metastore.hetufilesystem.path", folder.newFolder("metastore").getAbsolutePath());
+            queryRunner.getCoordinator().loadMetastore(metastoreConfig);
+            queryRunner.createCatalog("memory", "memory",
+                    ImmutableMap.of("memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath()));
         }
         catch (Exception e) {
             closeAllSuppress(e, queryRunner);

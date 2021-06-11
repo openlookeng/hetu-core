@@ -17,6 +17,7 @@ import io.prestosql.spi.NodeManager;
 import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.VersionEmbedder;
+import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.connector.ConnectorContext;
 import io.prestosql.spi.function.FunctionMetadataManager;
 import io.prestosql.spi.function.StandardFunctionResolution;
@@ -41,6 +42,7 @@ public class ConnectorContextInstance
     private final RowExpressionService rowExpressionService;
     private final FunctionMetadataManager functionMetadataManager;
     private final StandardFunctionResolution functionResolution;
+    private final BlockEncodingSerde blockEncodingSerde;
 
     public ConnectorContextInstance(
             NodeManager nodeManager,
@@ -52,7 +54,8 @@ public class ConnectorContextInstance
             IndexClient indexClient,
             RowExpressionService rowExpressionService,
             FunctionMetadataManager functionMetadataManager,
-            StandardFunctionResolution functionResolution)
+            StandardFunctionResolution functionResolution,
+            BlockEncodingSerde blockEncodingSerde)
     {
         this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
         this.versionEmbedder = requireNonNull(versionEmbedder, "versionEmbedder is null");
@@ -64,6 +67,7 @@ public class ConnectorContextInstance
         this.rowExpressionService = rowExpressionService;
         this.functionMetadataManager = requireNonNull(functionMetadataManager, "functionMetadataManager is null");
         this.functionResolution = requireNonNull(functionResolution, "functionResolution is null");
+        this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");
     }
 
     @Override
@@ -124,5 +128,11 @@ public class ConnectorContextInstance
     public StandardFunctionResolution getStandardFunctionResolution()
     {
         return functionResolution;
+    }
+
+    @Override
+    public BlockEncodingSerde getBlockEncodingSerde()
+    {
+        return blockEncodingSerde;
     }
 }

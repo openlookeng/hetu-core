@@ -59,6 +59,12 @@
         </dependency>
 
         <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-common</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
             <scope>provided</scope>
@@ -165,6 +171,18 @@
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-main</artifactId>
             <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-metastore</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-filesystem-client</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

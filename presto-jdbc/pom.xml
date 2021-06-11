@@ -68,6 +68,12 @@
         </dependency>
 
         <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-common</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
             <exclusions>
@@ -190,6 +196,18 @@
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-filesystem-client</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-metastore</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

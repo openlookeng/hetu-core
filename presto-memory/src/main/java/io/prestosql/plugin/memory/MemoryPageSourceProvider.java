@@ -13,6 +13,7 @@
  */
 package io.prestosql.plugin.memory;
 
+import io.prestosql.plugin.memory.data.MemoryTableManager;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
@@ -24,6 +25,7 @@ import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.FixedPageSource;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
+import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeUtils;
 
@@ -40,12 +42,14 @@ import static java.util.stream.Collectors.toList;
 public final class MemoryPageSourceProvider
         implements ConnectorPageSourceProvider
 {
-    private final MemoryPagesStore pagesStore;
+    private final TypeManager typeManager;
+    private final MemoryTableManager pagesStore;
 
     @Inject
-    public MemoryPageSourceProvider(MemoryPagesStore pagesStore, TypeManager typeManager, MemoryMetadata memoryMetadata)
+    public MemoryPageSourceProvider(MemoryTableManager pagesStore, TypeManager typeManager, MemoryMetadata memoryMetadata)
     {
         this.pagesStore = requireNonNull(pagesStore, "pagesStore is null");
+        this.typeManager = requireNonNull(typeManager, "typeManager is null");
     }
 
     @Override
@@ -76,11 +80,12 @@ public final class MemoryPageSourceProvider
         MemoryTableHandle memoryTable = (MemoryTableHandle) table;
         OptionalDouble sampleRatio = memoryTable.getSampleRatio();
 
+        TupleDomain<ColumnHandle> predicate = memoryTable.getPredicate();
         // Commenting for Dynamic filter changes
 
         List<Integer> columnIndexes = columns.stream()
-                                             .map(MemoryColumnHandle.class::cast)
-                                             .map(MemoryColumnHandle::getColumnIndex).collect(toList());
+                .map(MemoryColumnHandle.class::cast)
+                .map(MemoryColumnHandle::getColumnIndex).collect(toList());
         List<Page> pages = pagesStore.getPages(
                 tableId,
                 partNumber,
@@ -88,10 +93,17 @@ public final class MemoryPageSourceProvider
                 columnIndexes,
                 expectedRows,
                 memorySplit.getLimit(),
-                sampleRatio);
-        return new FixedPageSource(pages.stream()
-                                        .map(page -> applyFilter(page, dynamicFilterSupplier, columns))
-                                        .collect(toList()));
+                sampleRatio,
+                predicate);
+
+        if (dynamicFilterSupplier.isPresent()) {
+            return new FixedPageSource(pages.stream()
+                    .map(page -> applyFilter(page, dynamicFilterSupplier, columns))
+                    .collect(toList()));
+        }
+        else {
+            return new FixedPageSource(pages);
+        }
     }
 
     private Page applyFilter(Page page, Optional<DynamicFilterSupplier> dynamicFilters, List<ColumnHandle> columns)
@@ -108,7 +120,7 @@ public final class MemoryPageSourceProvider
                 for (Map.Entry<ColumnHandle, DynamicFilter> entry : filter.entrySet()) {
                     MemoryColumnHandle columnHandle = (MemoryColumnHandle) entry.getKey();
                     DynamicFilter dynamicFilter = entry.getValue();
-                    Object value = TypeUtils.readNativeValue(columnHandle.getType(), page.getBlock(columns.indexOf(columnHandle)), i);
+                    Object value = TypeUtils.readNativeValue(columnHandle.getType(typeManager), page.getBlock(columns.indexOf(columnHandle)), i);
                     if (!dynamicFilter.contains(value)) {
                         match = false;
                     }

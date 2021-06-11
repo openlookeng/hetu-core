@@ -14,10 +14,9 @@
 package io.prestosql.plugin.memory;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
+import io.airlift.json.JsonCodec;
 import io.airlift.slice.Slice;
+import io.prestosql.plugin.memory.data.MemoryTableManager;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.Node;
 import io.prestosql.spi.NodeManager;
@@ -34,242 +33,366 @@ import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.ConnectorTableProperties;
 import io.prestosql.spi.connector.ConnectorViewDefinition;
-import io.prestosql.spi.connector.LimitApplicationResult;
-import io.prestosql.spi.connector.SampleType;
+import io.prestosql.spi.connector.Constraint;
+import io.prestosql.spi.connector.ConstraintApplicationResult;
 import io.prestosql.spi.connector.SchemaNotFoundException;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SchemaTablePrefix;
+import io.prestosql.spi.connector.TableNotFoundException;
 import io.prestosql.spi.connector.ViewNotFoundException;
+import io.prestosql.spi.metastore.HetuMetastore;
+import io.prestosql.spi.metastore.model.CatalogEntity;
+import io.prestosql.spi.metastore.model.DatabaseEntity;
+import io.prestosql.spi.metastore.model.TableEntity;
+import io.prestosql.spi.metastore.model.TableEntityType;
 import io.prestosql.spi.statistics.ComputedStatistics;
+import io.prestosql.spi.type.TypeManager;
 
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
 
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalDouble;
-import java.util.OptionalLong;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.base.Verify.verify;
-import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.airlift.json.JsonCodec.jsonCodec;
 import static io.prestosql.spi.StandardErrorCode.ALREADY_EXISTS;
-import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
+import static io.prestosql.spi.StandardErrorCode.INVALID_TABLE_PROPERTY;
 import static io.prestosql.spi.StandardErrorCode.SCHEMA_NOT_EMPTY;
-import static io.prestosql.spi.connector.SampleType.SYSTEM;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 
 @ThreadSafe
 public class MemoryMetadata
         implements ConnectorMetadata
 {
-    public static final String SCHEMA_NAME = "default";
+    public static final String MEM_KEY = "memory";
+    public static final String DEFAULT_SCHEMA = "default";
+    public static final String ID_KEY = "id";
+    public static final String NEXT_ID_KEY = "_NEXT_ID_";
+    private static final JsonCodec<ConnectorViewDefinition> VIEW_CODEC = jsonCodec(ConnectorViewDefinition.class);
 
     private final NodeManager nodeManager;
-    private final List<String> schemas = new ArrayList<>();
-    private final AtomicLong nextTableId = new AtomicLong();
-    private final Map<SchemaTableName, Long> tableIds = new HashMap<>();
-    private final Map<Long, TableInfo> tables = new HashMap<>();
-    private final Map<SchemaTableName, ConnectorViewDefinition> views = new HashMap<>();
+    private final TypeManager typeManager;
+    private final AtomicLong nextTableId;
+    private final Map<Long, TableInfo> tables = new ConcurrentHashMap<>();
+    private final Map<SchemaTableName, ConnectorViewDefinition> views = new ConcurrentHashMap<>();
+    private final HetuMetastore metastore;
 
     @Inject
-    public MemoryMetadata(NodeManager nodeManager)
+    public MemoryMetadata(TypeManager typeManager, NodeManager nodeManager, HetuMetastore metastore, MemoryTableManager tableManager)
     {
+        this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
-        this.schemas.add(SCHEMA_NAME);
+        this.metastore = metastore;
+        Optional<CatalogEntity> oldCatalog = metastore.getCatalog(MEM_KEY);
+        if (!oldCatalog.isPresent()) {
+            CatalogEntity newCatalog = CatalogEntity.builder()
+                    .setCatalogName(MEM_KEY)
+                    .setComment(Optional.of("Hetu memory connector"))
+                    .build();
+            metastore.createCatalogIfNotExist(newCatalog);
+            this.nextTableId = new AtomicLong();
+        }
+        else {
+            this.nextTableId = new AtomicLong(Long.parseLong(oldCatalog.get().getParameters().getOrDefault(NEXT_ID_KEY, "0")));
+        }
+        DatabaseEntity.Builder databaseBuilder = DatabaseEntity.builder()
+                .setCatalogName(MEM_KEY)
+                .setDatabaseName(DEFAULT_SCHEMA);
+        metastore.createDatabaseIfNotExist(databaseBuilder.build());
     }
 
     @Override
     public synchronized List<String> listSchemaNames(ConnectorSession session)
     {
-        return ImmutableList.copyOf(schemas);
+        ImmutableList.Builder<String> schemaNames = ImmutableList.builder();
+        metastore.getAllDatabases(MEM_KEY).forEach(databaseEntity -> schemaNames.add(databaseEntity.getName()));
+        return schemaNames.build();
     }
 
     @Override
     public synchronized void createSchema(ConnectorSession session, String schemaName, Map<String, Object> properties)
     {
-        if (schemas.contains(schemaName)) {
-            throw new PrestoException(ALREADY_EXISTS, format("Schema [%s] already exists", schemaName));
-        }
-        schemas.add(schemaName);
+        checkSchemaExists(schemaName, false);
+
+        DatabaseEntity.Builder databaseBuilder = DatabaseEntity.builder()
+                .setCatalogName(MEM_KEY)
+                .setDatabaseName(schemaName)
+                .setCreateTime(session.getStartTime())
+                .setOwner(session.getUser());
+        metastore.createDatabaseIfNotExist(databaseBuilder.build());
     }
 
     @Override
     public synchronized void dropSchema(ConnectorSession session, String schemaName)
     {
-        if (!schemas.contains(schemaName)) {
-            throw new PrestoException(NOT_FOUND, format("Schema [%s] does not exist", schemaName));
-        }
+        checkSchemaExists(schemaName, true);
 
-        boolean tablesExist = tables.values().stream()
-                .anyMatch(table -> table.getSchemaName().equals(schemaName));
-
-        if (tablesExist) {
+        if (!metastore.getAllTables(MEM_KEY, schemaName).isEmpty()) {
             throw new PrestoException(SCHEMA_NOT_EMPTY, "Schema not empty: " + schemaName);
         }
 
-        verify(schemas.remove(schemaName));
+        metastore.dropDatabase(MEM_KEY, schemaName);
     }
 
     @Override
-    public synchronized ConnectorTableHandle getTableHandle(ConnectorSession session, SchemaTableName schemaTableName)
+    public ConnectorTableHandle getTableHandle(ConnectorSession session, SchemaTableName schemaTableName)
     {
-        Long id = tableIds.get(schemaTableName);
-        if (id == null) {
+        Optional<TableEntity> tableEntity = metastore.getTable(MEM_KEY, schemaTableName.getSchemaName(), schemaTableName.getTableName());
+        if (!tableEntity.isPresent()) {
             return null;
         }
 
-        return new MemoryTableHandle(id);
+        String idStr = tableEntity.get().getParameters().get(ID_KEY);
+        if (idStr == null) {
+            return null;
+        }
+
+        return new MemoryTableHandle(Long.parseLong(idStr));
     }
 
     @Override
-    public synchronized ConnectorTableMetadata getTableMetadata(ConnectorSession session, ConnectorTableHandle tableHandle)
+    public ConnectorTableMetadata getTableMetadata(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         MemoryTableHandle handle = (MemoryTableHandle) tableHandle;
-        return tables.get(handle.getId()).getMetadata();
+        return getTableInfo((handle).getId()).getMetadata(typeManager);
     }
 
     @Override
     public synchronized List<SchemaTableName> listTables(ConnectorSession session, Optional<String> schemaName)
     {
-        return tables.values().stream()
-                .filter(table -> schemaName.map(table.getSchemaName()::equals).orElse(true))
-                .map(TableInfo::getSchemaTableName)
-                .collect(toList());
+        return getTableStream(schemaName, false)
+                .collect(Collectors.toList());
     }
 
     @Override
-    public synchronized Map<String, ColumnHandle> getColumnHandles(ConnectorSession session, ConnectorTableHandle tableHandle)
+    public Map<String, ColumnHandle> getColumnHandles(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         MemoryTableHandle handle = (MemoryTableHandle) tableHandle;
-        return tables.get(handle.getId())
+        return getTableInfo(handle.getId())
                 .getColumns().stream()
                 .collect(toMap(ColumnInfo::getName, ColumnInfo::getHandle));
     }
 
     @Override
-    public synchronized ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle)
+    public ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle)
     {
         MemoryTableHandle handle = (MemoryTableHandle) tableHandle;
-        return tables.get(handle.getId())
+        return getTableInfo(handle.getId())
                 .getColumn(columnHandle)
-                .getMetadata();
+                .getMetadata(typeManager);
     }
 
     @Override
-    public synchronized Map<SchemaTableName, List<ColumnMetadata>> listTableColumns(ConnectorSession session, SchemaTablePrefix prefix)
+    public Map<SchemaTableName, List<ColumnMetadata>> listTableColumns(ConnectorSession session, SchemaTablePrefix prefix)
     {
-        return tables.values().stream()
+        return getMemoryCatalogEntity().getParameters().entrySet().stream()
+                .filter(entry -> !entry.getKey().equals(NEXT_ID_KEY))
+                .map(entry -> TableInfo.deserialize(entry.getValue()))
                 .filter(table -> prefix.matches(table.getSchemaTableName()))
-                .collect(toMap(TableInfo::getSchemaTableName, handle -> handle.getMetadata().getColumns()));
+                .collect(toMap(TableInfo::getSchemaTableName, handle -> handle.getMetadata(typeManager).getColumns()));
     }
 
     @Override
-    public synchronized void dropTable(ConnectorSession session, ConnectorTableHandle tableHandle)
+    public void dropTable(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         MemoryTableHandle handle = (MemoryTableHandle) tableHandle;
-        TableInfo info = tables.remove(handle.getId());
-        if (info != null) {
-            tableIds.remove(info.getSchemaTableName());
-        }
+        TableInfo info = getTableInfo(handle.getId());
+        metastore.dropTable(MEM_KEY, info.getSchemaName(), info.getTableName());
+        updateTableInfo(handle.getId(), null);
     }
 
+    // CONTINUE HERE
+
     @Override
-    public synchronized void renameTable(ConnectorSession session, ConnectorTableHandle tableHandle, SchemaTableName newTableName)
+    public void renameTable(ConnectorSession session, ConnectorTableHandle tableHandle, SchemaTableName newTableName)
     {
-        checkSchemaExists(newTableName.getSchemaName());
-        checkTableNotExists(newTableName);
+        checkSchemaExists(newTableName.getSchemaName(), true);
+        checkTableNotExists(newTableName, false);
 
         MemoryTableHandle handle = (MemoryTableHandle) tableHandle;
         long tableId = handle.getId();
 
-        TableInfo oldInfo = tables.get(tableId);
-        tables.put(tableId, new TableInfo(tableId, newTableName.getSchemaName(), newTableName.getTableName(), oldInfo.getColumns(), oldInfo.getDataFragments()));
+        TableInfo oldInfo = getTableInfo(tableId);
+        updateTableInfo(tableId, new TableInfo(
+                tableId,
+                newTableName.getSchemaName(),
+                newTableName.getTableName(),
+                oldInfo.getColumns(),
+                oldInfo.getDataFragments()));
 
-        tableIds.remove(oldInfo.getSchemaTableName());
-        tableIds.put(newTableName, tableId);
+        metastore.alterTable(MEM_KEY, oldInfo.getSchemaName(), oldInfo.getTableName(),
+                TableEntity.builder()
+                        .setCatalogName(MEM_KEY)
+                        .setDatabaseName(newTableName.getSchemaName())
+                        .setTableName(newTableName.getTableName())
+                        .setTableType(TableEntityType.TABLE.toString())
+                        .setParameter(ID_KEY, String.valueOf(tableId))
+                        .build());
     }
 
     @Override
-    public synchronized void createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, boolean ignoreExisting)
+    public void createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, boolean ignoreExisting)
     {
         ConnectorOutputTableHandle outputTableHandle = beginCreateTable(session, tableMetadata, Optional.empty());
         finishCreateTable(session, outputTableHandle, ImmutableList.of(), ImmutableList.of());
     }
 
     @Override
-    public synchronized MemoryOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout)
+    public MemoryOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout)
     {
-        checkSchemaExists(tableMetadata.getTable().getSchemaName());
-        checkTableNotExists(tableMetadata.getTable());
+        checkSchemaExists(tableMetadata.getTable().getSchemaName(), true);
+        checkTableNotExists(tableMetadata.getTable(), false);
+
+        List<SortingColumn> sortedBy = MemoryTableProperties.getSortedBy(tableMetadata.getProperties());
+        if (sortedBy == null) {
+            sortedBy = Collections.emptyList();
+        }
+
+        if (sortedBy.size() > 1) {
+            throw new PrestoException(INVALID_TABLE_PROPERTY, "sorted_by property currently only supports one column");
+        }
+
+        Set<String> sortedByColumnNames = new HashSet<>();
+        for (SortingColumn s : sortedBy) {
+            if (!sortedByColumnNames.add(s.getColumnName())) {
+                throw new PrestoException(INVALID_TABLE_PROPERTY, "duplicate column(s) in sorted_by property");
+            }
+        }
+
+        List<String> indexColumns = MemoryTableProperties.getIndexedColumns(tableMetadata.getProperties());
+        if (indexColumns == null) {
+            indexColumns = Collections.emptyList();
+        }
+
+        Set<String> indexColumnNames = new HashSet<>();
+        for (String c : indexColumns) {
+            if (!indexColumnNames.add(c)) {
+                throw new PrestoException(INVALID_TABLE_PROPERTY, "duplicate column(s) in index_columns property");
+            }
+
+            if (sortedByColumnNames.contains(c)) {
+                throw new PrestoException(INVALID_TABLE_PROPERTY, "duplicate column(s) in sorted_by and index_columns, sorted_by columns are automatically indexed");
+            }
+        }
+
+        ImmutableList.Builder<ColumnInfo> columns = ImmutableList.builder();
+        Map<String, ColumnMetadata> columnNames = new HashMap<>();
+        for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
+            ColumnMetadata column = tableMetadata.getColumns().get(i);
+            columns.add(new ColumnInfo(new MemoryColumnHandle(i, column.getType().getTypeSignature()), column.getName()));
+            columnNames.put(column.getName(), column);
+        }
+
+        for (String sortedByColumnName : sortedByColumnNames) {
+            if (!columnNames.containsKey(sortedByColumnName)) {
+                throw new PrestoException(INVALID_TABLE_PROPERTY, "column " + sortedByColumnName + " in sorted_by does not exist");
+            }
+            if (!columnNames.get(sortedByColumnName).getType().isComparable()) {
+                throw new PrestoException(INVALID_TABLE_PROPERTY, "column " + sortedByColumnName + " in sorted_by is not comparable");
+            }
+        }
+
+        for (String indexColumnName : indexColumnNames) {
+            if (!columnNames.containsKey(indexColumnName)) {
+                throw new PrestoException(INVALID_TABLE_PROPERTY, "column " + indexColumnName + " in index_columns does not exist");
+            }
+        }
+
         long nextId = nextTableId.getAndIncrement();
+        metastore.alterCatalogParameter(MEM_KEY, NEXT_ID_KEY, String.valueOf(nextTableId.get()));
         Set<Node> nodes = nodeManager.getRequiredWorkerNodes();
         checkState(!nodes.isEmpty(), "No Memory nodes available");
 
-        long tableId = nextId;
+        boolean spillCompressionEnabled = MemoryTableProperties.getSpillCompressionEnabled(tableMetadata.getProperties());
 
-        ImmutableList.Builder<ColumnInfo> columns = ImmutableList.builder();
-        for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
-            ColumnMetadata column = tableMetadata.getColumns().get(i);
-            columns.add(new ColumnInfo(new MemoryColumnHandle(i, column.getType()), column.getName(), column.getType()));
-        }
-
-        tableIds.put(tableMetadata.getTable(), tableId);
-        tables.put(tableId, new TableInfo(
-                tableId,
+        return new MemoryOutputTableHandle(
+                nextId,
                 tableMetadata.getTable().getSchemaName(),
                 tableMetadata.getTable().getTableName(),
+                spillCompressionEnabled,
+                getTableIdSet(nextId),
                 columns.build(),
-                new HashMap<>()));
-
-        return new MemoryOutputTableHandle(tableId, ImmutableSet.copyOf(tableIds.values()));
+                sortedBy,
+                indexColumns);
     }
 
-    private void checkSchemaExists(String schemaName)
+    private void checkSchemaExists(String schemaName, boolean expectExist)
     {
-        if (!schemas.contains(schemaName)) {
+        Optional<DatabaseEntity> databaseEntity = metastore.getDatabase(MEM_KEY, schemaName);
+        if (expectExist && !databaseEntity.isPresent()) {
             throw new SchemaNotFoundException(schemaName);
         }
+        if (!expectExist && databaseEntity.isPresent()) {
+            throw new PrestoException(ALREADY_EXISTS, format("Schema already exists %s", schemaName));
+        }
     }
 
-    private void checkTableNotExists(SchemaTableName tableName)
+    private void checkTableNotExists(SchemaTableName tableName, boolean isView)
     {
-        if (tableIds.containsKey(tableName)) {
-            throw new PrestoException(ALREADY_EXISTS, format("Table [%s] already exists", tableName.toString()));
+        if (metastore.getTable(MEM_KEY, tableName.getSchemaName(), tableName.getTableName()).isPresent()) {
+            throw new PrestoException(ALREADY_EXISTS, format("%s [%s] already exists", isView ? "View" : "Table", tableName));
         }
-        if (views.containsKey(tableName)) {
-            throw new PrestoException(ALREADY_EXISTS, format("View [%s] already exists", tableName.toString()));
+    }
+
+    private TableEntity getTableEntity(SchemaTableName tableName, boolean isView)
+    {
+        Optional<TableEntity> tableEntity = metastore.getTable(MEM_KEY, tableName.getSchemaName(), tableName.getTableName());
+        if (!tableEntity.isPresent()) {
+            throw isView ? new ViewNotFoundException(tableName) : new TableNotFoundException(tableName);
         }
+        return tableEntity.get();
     }
 
     @Override
-    public synchronized Optional<ConnectorOutputMetadata> finishCreateTable(ConnectorSession session, ConnectorOutputTableHandle tableHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
+    public Optional<ConnectorOutputMetadata> finishCreateTable(ConnectorSession session, ConnectorOutputTableHandle tableHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
     {
         requireNonNull(tableHandle, "tableHandle is null");
         MemoryOutputTableHandle memoryOutputHandle = (MemoryOutputTableHandle) tableHandle;
+
+        List<ColumnInfo> columnInfos = memoryOutputHandle.getColumns();
+        long tableId = memoryOutputHandle.getTable();
+        metastore.createTable(TableEntity.builder()
+                .setCatalogName(MEM_KEY)
+                .setDatabaseName(memoryOutputHandle.getSchemaName())
+                .setTableName(memoryOutputHandle.getTableName())
+                .setTableType(TableEntityType.TABLE.toString())
+                .setParameter(ID_KEY, String.valueOf(tableId))
+                .build());
+        updateTableInfo(tableId, new TableInfo(
+                tableId,
+                memoryOutputHandle.getSchemaName(),
+                memoryOutputHandle.getTableName(),
+                columnInfos,
+                new HashMap<>()));
 
         updateRowsOnHosts(memoryOutputHandle.getTable(), fragments);
         return Optional.empty();
     }
 
     @Override
-    public synchronized MemoryInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
+    public MemoryInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         MemoryTableHandle memoryTableHandle = (MemoryTableHandle) tableHandle;
-        return new MemoryInsertTableHandle(memoryTableHandle.getId(), ImmutableSet.copyOf(tableIds.values()));
+        return new MemoryInsertTableHandle(memoryTableHandle.getId(), getTableIdSet());
     }
 
     @Override
-    public synchronized Optional<ConnectorOutputMetadata> finishInsert(ConnectorSession session, ConnectorInsertTableHandle insertHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
+    public Optional<ConnectorOutputMetadata> finishInsert(ConnectorSession session, ConnectorInsertTableHandle insertHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
     {
         requireNonNull(insertHandle, "insertHandle is null");
         MemoryInsertTableHandle memoryInsertHandle = (MemoryInsertTableHandle) insertHandle;
@@ -279,53 +402,50 @@ public class MemoryMetadata
     }
 
     @Override
-    public synchronized void createView(ConnectorSession session, SchemaTableName viewName, ConnectorViewDefinition definition, boolean replace)
+    public void createView(ConnectorSession session, SchemaTableName viewName, ConnectorViewDefinition definition, boolean replace)
     {
-        checkSchemaExists(viewName.getSchemaName());
-        if (tableIds.containsKey(viewName)) {
-            throw new PrestoException(ALREADY_EXISTS, "Table already exists: " + viewName);
-        }
+        checkSchemaExists(viewName.getSchemaName(), true);
 
-        if (replace) {
-            views.put(viewName, definition);
+        if (!replace) {
+            checkTableNotExists(viewName, true);
         }
-        else if (views.putIfAbsent(viewName, definition) != null) {
-            throw new PrestoException(ALREADY_EXISTS, "View already exists: " + viewName);
-        }
+        updateViewDef(viewName, definition);
     }
 
     @Override
-    public synchronized void dropView(ConnectorSession session, SchemaTableName viewName)
+    public void dropView(ConnectorSession session, SchemaTableName viewName)
     {
-        if (views.remove(viewName) == null) {
-            throw new ViewNotFoundException(viewName);
-        }
+        getTableEntity(viewName, true);
+        updateViewDef(viewName, null);
     }
 
     @Override
-    public synchronized List<SchemaTableName> listViews(ConnectorSession session, Optional<String> schemaName)
+    public List<SchemaTableName> listViews(ConnectorSession session, Optional<String> schemaName)
     {
-        return views.keySet().stream()
-                .filter(viewName -> schemaName.map(viewName.getSchemaName()::equals).orElse(true))
-                .collect(toImmutableList());
+        return getTableStream(schemaName, true)
+                .collect(Collectors.toList());
     }
 
     @Override
-    public synchronized Map<SchemaTableName, ConnectorViewDefinition> getViews(ConnectorSession session, Optional<String> schemaName)
+    public Map<SchemaTableName, ConnectorViewDefinition> getViews(ConnectorSession session, Optional<String> schemaName)
     {
         SchemaTablePrefix prefix = schemaName.map(SchemaTablePrefix::new).orElseGet(SchemaTablePrefix::new);
-        return ImmutableMap.copyOf(Maps.filterKeys(views, prefix::matches));
+        return getTableStream(schemaName, true)
+                .filter(prefix::matches)
+                .collect(Collectors.toMap(
+                        name -> name,
+                        this::getViewDef));
     }
 
     @Override
-    public synchronized Optional<ConnectorViewDefinition> getView(ConnectorSession session, SchemaTableName viewName)
+    public Optional<ConnectorViewDefinition> getView(ConnectorSession session, SchemaTableName viewName)
     {
-        return Optional.ofNullable(views.get(viewName));
+        return Optional.ofNullable(getViewDef(viewName));
     }
 
     private void updateRowsOnHosts(long tableId, Collection<Slice> fragments)
     {
-        TableInfo info = tables.get(tableId);
+        TableInfo info = getTableInfo(tableId);
         checkState(
                 info != null,
                 "Uninitialized tableId [%s.%s]",
@@ -338,7 +458,7 @@ public class MemoryMetadata
             dataFragments.merge(memoryDataFragment.getHostAddress(), memoryDataFragment, MemoryDataFragment::merge);
         }
 
-        tables.put(tableId, new TableInfo(tableId, info.getSchemaName(), info.getTableName(), info.getColumns(), dataFragments));
+        updateTableInfo(tableId, new TableInfo(tableId, info.getSchemaName(), info.getTableName(), info.getColumns(), dataFragments));
     }
 
     @Override
@@ -355,32 +475,159 @@ public class MemoryMetadata
 
     public List<MemoryDataFragment> getDataFragments(long tableId)
     {
-        return ImmutableList.copyOf(tables.get(tableId).getDataFragments().values());
+        return ImmutableList.copyOf(getTableInfo(tableId).getDataFragments().values());
     }
 
-    @Override
-    public Optional<LimitApplicationResult<ConnectorTableHandle>> applyLimit(ConnectorSession session, ConnectorTableHandle handle, long limit)
-    {
-        MemoryTableHandle table = (MemoryTableHandle) handle;
+    // TODO: disabled for now
+//    @Override
+//    public Optional<LimitApplicationResult<ConnectorTableHandle>> applyLimit(ConnectorSession session, ConnectorTableHandle handle, long limit)
+//    {
+//        MemoryTableHandle table = (MemoryTableHandle) handle;
+//
+//        if (table.getLimit().isPresent() && table.getLimit().getAsLong() <= limit) {
+//            return Optional.empty();
+//        }
+//
+//        return Optional.of(new LimitApplicationResult<>(
+//                new MemoryTableHandle(table.getId(), OptionalLong.of(limit), OptionalDouble.empty(), table.getPredicate()),
+//                true));
+//    }
 
-        if (table.getLimit().isPresent() && table.getLimit().getAsLong() <= limit) {
+    // TODO: disabled for now
+//    @Override
+//    public Optional<ConnectorTableHandle> applySample(ConnectorSession session, ConnectorTableHandle handle, SampleType sampleType, double sampleRatio)
+//    {
+//        MemoryTableHandle table = (MemoryTableHandle) handle;
+//
+//        if ((table.getSampleRatio().isPresent() && table.getSampleRatio().getAsDouble() == sampleRatio) || sampleType != SYSTEM || table.getLimit().isPresent()) {
+//            return Optional.empty();
+//        }
+//
+//        return Optional.of(new MemoryTableHandle(table.getId(), table.getLimit(), OptionalDouble.of(table.getSampleRatio().orElse(1) * sampleRatio), table.getPredicate()));
+//    }
+
+    @Override
+    public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle handle, Constraint constraint)
+    {
+        if (constraint.getSummary().isAll()) {
             return Optional.empty();
         }
 
-        return Optional.of(new LimitApplicationResult<>(
-                new MemoryTableHandle(table.getId(), OptionalLong.of(limit), OptionalDouble.empty(), table.getPredicate()),
-                true));
+        MemoryTableHandle memoryTableHandle = (MemoryTableHandle) handle;
+
+        MemoryTableHandle newMemoryTableHandle = new MemoryTableHandle(
+                memoryTableHandle.getId(),
+                memoryTableHandle.getLimit(),
+                memoryTableHandle.getSampleRatio(),
+                constraint.getSummary());
+
+        return Optional.of(new ConstraintApplicationResult<>(newMemoryTableHandle, constraint.getSummary()));
     }
 
-    @Override
-    public Optional<ConnectorTableHandle> applySample(ConnectorSession session, ConnectorTableHandle handle, SampleType sampleType, double sampleRatio)
+    /**
+     * Get all tables in the given schema (if present) or all tables in memory catalog.
+     */
+    private Stream<SchemaTableName> getTableStream(Optional<String> schemaName, boolean isView)
     {
-        MemoryTableHandle table = (MemoryTableHandle) handle;
+        Stream<TableEntity> tables = schemaName.isPresent() ?
+                metastore.getAllTables(MEM_KEY, schemaName.get()).stream() :
+                metastore.getAllDatabases(MEM_KEY).stream()
+                        .flatMap(databaseEntity -> metastore.getAllTables(MEM_KEY, databaseEntity.getName()).stream());
+        return tables
+                .filter(tableEntity -> isView(tableEntity) == isView)
+                .map(tableEntity -> new SchemaTableName(tableEntity.getDatabaseName(), tableEntity.getName()));
+    }
 
-        if ((table.getSampleRatio().isPresent() && table.getSampleRatio().getAsDouble() == sampleRatio) || sampleType != SYSTEM || table.getLimit().isPresent()) {
-            return Optional.empty();
+    private TableInfo getTableInfo(Long tableId)
+    {
+        // cache tableInfo in the map to avoid deserializing it on every visit
+        TableInfo tableInfo = tables.get(tableId);
+        if (tableInfo == null) {
+            tableInfo = TableInfo.deserialize(getMemoryCatalogEntity().getParameters().get(tableId.toString()));
+            tables.put(tableId, tableInfo);
         }
+        return tableInfo;
+    }
 
-        return Optional.of(new MemoryTableHandle(table.getId(), table.getLimit(), OptionalDouble.of(table.getSampleRatio().orElse(1) * sampleRatio), table.getPredicate()));
+    /**
+     * Update catalog parameter map. remove entry if {@code null} tableInfo passed in.
+     */
+    private void updateTableInfo(Long tableId, TableInfo newTableInfo)
+    {
+        if (newTableInfo == null) {
+            metastore.alterCatalogParameter(MEM_KEY, String.valueOf(tableId), null);
+        }
+        else {
+            metastore.alterCatalogParameter(MEM_KEY, String.valueOf(tableId), newTableInfo.serialize());
+        }
+        tables.remove(tableId);
+    }
+
+    private ConnectorViewDefinition getViewDef(SchemaTableName viewName)
+    {
+        // cache view def in the map to avoid deserializing it on every visit
+        ConnectorViewDefinition view = views.get(viewName);
+        if (view == null) {
+            try {
+                TableEntity tableEntity = getTableEntity(viewName, true);
+                if (isView(tableEntity)) {
+                    view = VIEW_CODEC.fromJson(Base64.getDecoder().decode(tableEntity.getViewOriginalText()));
+                    views.put(viewName, view);
+                }
+            }
+            catch (Exception e) {
+                views.remove(viewName);
+            }
+        }
+        return view;
+    }
+
+    private void updateViewDef(SchemaTableName viewName, ConnectorViewDefinition newViewDef)
+    {
+        views.remove(viewName);
+        if (newViewDef == null) {
+            metastore.dropTable(MEM_KEY, viewName.getSchemaName(), viewName.getTableName());
+        }
+        else {
+            String encoded = Base64.getEncoder().encodeToString(VIEW_CODEC.toJsonBytes(newViewDef));
+            Optional<TableEntity> tableEntity = metastore.getTable(MEM_KEY, viewName.getSchemaName(), viewName.getTableName());
+            if (!tableEntity.isPresent()) {
+                metastore.createTable(
+                        TableEntity.builder()
+                                .setCatalogName(MEM_KEY)
+                                .setDatabaseName(viewName.getSchemaName())
+                                .setTableName(viewName.getTableName())
+                                .setViewOriginalText(Optional.ofNullable(encoded))
+                                .setTableType(TableEntityType.TABLE.toString())
+                                .build());
+            }
+            else {
+                TableEntity newTableEntity = tableEntity.get();
+                newTableEntity.setViewOriginalText(encoded);
+                metastore.alterTable(MEM_KEY, viewName.getSchemaName(), viewName.getTableName(), newTableEntity);
+            }
+        }
+    }
+
+    private CatalogEntity getMemoryCatalogEntity()
+    {
+        Optional<CatalogEntity> catalogEntity = metastore.getCatalog(MEM_KEY);
+        if (!catalogEntity.isPresent()) {
+            throw new IllegalStateException("Metastore catalog " + MEM_KEY + " does not exist");
+        }
+        return catalogEntity.get();
+    }
+
+    private boolean isView(TableEntity tableEntity)
+    {
+        return tableEntity.getViewOriginalText() != null;
+    }
+
+    private Set<Long> getTableIdSet(Long... ids)
+    {
+        Set<Long> res = new HashSet<>();
+        getMemoryCatalogEntity().getParameters().keySet().stream().filter(e -> !NEXT_ID_KEY.equals(e)).map(Long::valueOf).forEach(res::add);
+        res.addAll(Arrays.asList(ids));
+        return res;
     }
 }

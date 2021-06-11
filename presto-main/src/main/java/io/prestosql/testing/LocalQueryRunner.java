@@ -259,6 +259,7 @@ public class LocalQueryRunner
     private final FileSingleStreamSpillerFactory singleStreamSpillerFactory;
     private final SpillerFactory spillerFactory;
     private final PartitioningSpillerFactory partitioningSpillerFactory;
+    private final HetuMetaStoreManager hetuMetaStoreManager;
 
     private final PageFunctionCompiler pageFunctionCompiler;
     private final ExpressionCompiler expressionCompiler;
@@ -359,7 +360,7 @@ public class LocalQueryRunner
 
         NodeInfo nodeInfo = new NodeInfo("test");
         FileSystemClientManager fileSystemClientManager = new FileSystemClientManager();
-        HetuMetaStoreManager hetuMetaStoreManager = new HetuMetaStoreManager();
+        this.hetuMetaStoreManager = new HetuMetaStoreManager();
         heuristicIndexerManager = new HeuristicIndexerManager(fileSystemClientManager, hetuMetaStoreManager);
         this.cubeManager = new CubeManager(featuresConfig, hetuMetaStoreManager);
         this.connectorManager = new ConnectorManager(
@@ -492,6 +493,12 @@ public class LocalQueryRunner
     public static LocalQueryRunner queryRunnerWithFakeNodeCountForStats(Session defaultSession, int nodeCount)
     {
         return new LocalQueryRunner(defaultSession, new FeaturesConfig(), new NodeSpillConfig(), false, false, nodeCount);
+    }
+
+    public void loadMetastore(Map<String, String> config)
+            throws IOException
+    {
+        hetuMetaStoreManager.loadHetuMetastore(new FileSystemClientManager(), config);
     }
 
     @Override

@@ -13,43 +13,81 @@
  */
 package io.prestosql.plugin.memory;
 
-import io.prestosql.spi.connector.ColumnHandle;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.airlift.json.JsonCodec;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeManager;
+
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 
 import static java.util.Objects.requireNonNull;
 
 public class ColumnInfo
+        implements Serializable
 {
-    private final ColumnHandle handle;
-    private final String name;
-    private final Type type;
+    private static final long serialVersionUID = 7527394454813793397L;
+    private static final JsonCodec<MemoryColumnHandle> MEMORY_COLUMN_HANDLE_JSON_CODEC = JsonCodec.jsonCodec(MemoryColumnHandle.class);
+    private MemoryColumnHandle handle;
+    private String name;
 
-    public ColumnInfo(ColumnHandle handle, String name, Type type)
+    @JsonCreator
+    public ColumnInfo(
+            @JsonProperty("handle") MemoryColumnHandle handle,
+            @JsonProperty("name") String name)
     {
         this.handle = requireNonNull(handle, "handle is null");
         this.name = requireNonNull(name, "name is null");
-        this.type = requireNonNull(type, "type is null");
     }
 
-    public ColumnHandle getHandle()
+    @JsonProperty
+    public MemoryColumnHandle getHandle()
     {
         return handle;
     }
 
+    @JsonProperty
     public String getName()
     {
         return name;
     }
 
-    public ColumnMetadata getMetadata()
+    public Type getType(TypeManager typeManager)
     {
-        return new ColumnMetadata(name, type);
+        return handle.getType(typeManager);
+    }
+
+    public ColumnMetadata getMetadata(TypeManager typeManager)
+    {
+        return new ColumnMetadata(name, getType(typeManager));
+    }
+
+    public int getIndex()
+    {
+        return handle.getColumnIndex();
+    }
+
+    private void readObject(ObjectInputStream in)
+            throws ClassNotFoundException, IOException
+    {
+        this.handle = MEMORY_COLUMN_HANDLE_JSON_CODEC.fromJson(in.readUTF());
+        this.name = in.readUTF();
+    }
+
+    private void writeObject(ObjectOutputStream out)
+            throws IOException
+    {
+        out.writeUTF(MEMORY_COLUMN_HANDLE_JSON_CODEC.toJson(handle));
+        out.writeUTF(name);
     }
 
     @Override
     public String toString()
     {
-        return name + "::" + type;
+        return name + "::" + handle.getTypeSignature();
     }
 }

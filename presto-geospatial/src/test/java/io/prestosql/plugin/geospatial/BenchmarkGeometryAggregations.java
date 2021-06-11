@@ -14,6 +14,9 @@
 package io.prestosql.plugin.geospatial;
 
 import com.google.common.collect.ImmutableMap;
+import io.hetu.core.common.filesystem.TempFolder;
+import io.hetu.core.filesystem.HetuFileSystemClientPlugin;
+import io.hetu.core.metastore.HetuMetastorePlugin;
 import io.prestosql.plugin.memory.MemoryConnectorFactory;
 import io.prestosql.testing.LocalQueryRunner;
 import io.prestosql.testing.MaterializedResult;
@@ -36,6 +39,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.stream.Collectors;
 
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
@@ -69,8 +73,19 @@ public class BenchmarkGeometryAggregations
                     .setCatalog("memory")
                     .setSchema("default")
                     .build());
+            queryRunner.installPlugin(new HetuFileSystemClientPlugin());
+            queryRunner.installPlugin(new HetuMetastorePlugin());
             queryRunner.installPlugin(new GeoPlugin());
-            queryRunner.createCatalog("memory", new MemoryConnectorFactory(), ImmutableMap.of());
+
+            TempFolder folder = new TempFolder().create();
+            Runtime.getRuntime().addShutdownHook(new Thread(folder::close));
+            HashMap<String, String> metastoreConfig = new HashMap<>();
+            metastoreConfig.put("hetu.metastore.type", "hetufilesystem");
+            metastoreConfig.put("hetu.metastore.hetufilesystem.profile-name", "default");
+            metastoreConfig.put("hetu.metastore.hetufilesystem.path", folder.newFolder("metastore").getAbsolutePath());
+            queryRunner.loadMetastore(metastoreConfig);
+            queryRunner.createCatalog("memory", new MemoryConnectorFactory(),
+                    ImmutableMap.of("memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath()));
 
             Path path = Paths.get(BenchmarkGeometryAggregations.class.getClassLoader().getResource("us-states.tsv").getPath());
             String polygonValues = Files.lines(path)

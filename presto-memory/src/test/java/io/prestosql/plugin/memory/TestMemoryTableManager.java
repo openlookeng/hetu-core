@@ -16,6 +16,9 @@ package io.prestosql.plugin.memory;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.units.DataSize;
+import io.prestosql.PagesIndexPageSorter;
+import io.prestosql.operator.PagesIndex;
+import io.prestosql.plugin.memory.data.MemoryTableManager;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
@@ -24,10 +27,14 @@ import io.prestosql.spi.connector.ConnectorInsertTableHandle;
 import io.prestosql.spi.connector.ConnectorOutputTableHandle;
 import io.prestosql.spi.connector.ConnectorPageSink;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.type.testing.TestingTypeManager;
 import io.prestosql.testing.TestingConnectorSession;
+import io.prestosql.testing.TestingPagesSerdeFactory;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.OptionalDouble;
 import java.util.OptionalLong;
 
@@ -37,18 +44,27 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 @Test(singleThreaded = true)
-public class TestMemoryPagesStore
+public class TestMemoryTableManager
 {
+    private static final PagesIndexPageSorter sorter = new PagesIndexPageSorter(new PagesIndex.TestingFactory(false));
     public static final ConnectorSession SESSION = new TestingConnectorSession(ImmutableList.of());
     private static final int POSITIONS_PER_PAGE = 0;
 
-    private MemoryPagesStore pagesStore;
+    private MemoryTableManager pagesStore;
     private MemoryPageSinkProvider pageSinkProvider;
 
     @BeforeMethod
     public void setUp()
+            throws IOException
     {
-        pagesStore = new MemoryPagesStore(new MemoryConfig().setMaxDataPerNode(new DataSize(1, DataSize.Unit.MEGABYTE)));
+        if (!MemoryThreadManager.isSharedThreadPoolInitilized()) {
+            MemoryThreadManager.initSharedThreadPool(4);
+        }
+        pagesStore = new MemoryTableManager(
+                new MemoryConfig().setMaxDataPerNode(new DataSize(1, DataSize.Unit.MEGABYTE)).setSpillRoot(Files.createTempDirectory("test-memory-table").toString()),
+                sorter,
+                new TestingTypeManager(),
+                new TestingPagesSerdeFactory().createPagesSerde());
         pageSinkProvider = new MemoryPageSinkProvider(pagesStore, HostAddress.fromString("localhost:8080"));
     }
 
@@ -164,7 +180,7 @@ public class TestMemoryPagesStore
     private static Page createOneMegaBytePage()
     {
         BlockBuilder blockBuilder = BIGINT.createFixedSizeBlockBuilder(POSITIONS_PER_PAGE);
-        while (blockBuilder.getRetainedSizeInBytes() < 1024 * 1024) {
+        while (blockBuilder.getSizeInBytes() < 1024 * 1024) {
             BIGINT.writeLong(blockBuilder, 42L);
         }
         return new Page(0, blockBuilder.build());

@@ -17,6 +17,7 @@ import io.prestosql.spi.NodeManager;
 import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.VersionEmbedder;
+import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.function.FunctionMetadataManager;
 import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.heuristicindex.IndexClient;
@@ -72,6 +73,11 @@ public interface ConnectorContext
     }
 
     default StandardFunctionResolution getStandardFunctionResolution()
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default BlockEncodingSerde getBlockEncodingSerde()
     {
         throw new UnsupportedOperationException();
     }

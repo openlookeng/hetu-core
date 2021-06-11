@@ -86,9 +86,9 @@ public class TestMemorySmoke
         assertQueryResult("SELECT COUNT() FROM orders WHERE totalprice < 0", 0L);
 
         Session session = Session.builder(getSession())
-                                 .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "true")
-                                 .setSystemProperty(JOIN_DISTRIBUTION_TYPE, FeaturesConfig.JoinDistributionType.BROADCAST.name())
-                                 .build();
+                .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "true")
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, FeaturesConfig.JoinDistributionType.BROADCAST.name())
+                .build();
         DistributedQueryRunner runner = (DistributedQueryRunner) getQueryRunner();
         ResultWithQueryId<MaterializedResult> result = runner.executeWithQueryId(session, "SELECT * FROM lineitem JOIN orders " +
                 "ON lineitem.orderkey = orders.orderkey AND orders.totalprice < 0");
@@ -98,10 +98,10 @@ public class TestMemorySmoke
         // Note that because of the Global Dynamic Filter not being applied in the Memory Connector, we have changed this test
         QueryStats stats = runner.getCoordinator().getQueryManager().getFullQueryInfo(result.getQueryId()).getQueryStats();
         Set rowsRead = stats.getOperatorSummaries()
-                            .stream()
-                            .filter(summary -> summary.getOperatorType().equals("ScanFilterAndProjectOperator"))
-                            .map(summary -> summary.getInputPositions())
-                            .collect(toImmutableSet());
+                .stream()
+                .filter(summary -> summary.getOperatorType().equals("ScanFilterAndProjectOperator"))
+                .map(summary -> summary.getInputPositions())
+                .collect(toImmutableSet());
         assertEquals(rowsRead, ImmutableSet.of(0L, buildSideRowsCount));
     }
 
@@ -111,18 +111,18 @@ public class TestMemorySmoke
         final long buildSideRowsCount = 15_000L;
 
         assertQueryResult("SELECT COUNT() FROM orders",
-                          buildSideRowsCount);
+                buildSideRowsCount);
         assertQueryResult("SELECT COUNT() FROM orders WHERE comment = 'nstructions sleep furiously among '",
-                          1L);
+                1L);
         assertQueryResult("SELECT orderkey FROM orders WHERE comment = 'nstructions sleep furiously among '",
-                          1L);
+                1L);
         assertQueryResult("SELECT COUNT() FROM lineitem WHERE orderkey = 1",
-                          6L);
+                6L);
 
         Session session = Session.builder(getSession())
-                                 .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "true")
-                                 .setSystemProperty(JOIN_DISTRIBUTION_TYPE, FeaturesConfig.JoinDistributionType.BROADCAST.name())
-                                 .build();
+                .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "true")
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, FeaturesConfig.JoinDistributionType.BROADCAST.name())
+                .build();
         DistributedQueryRunner runner = (DistributedQueryRunner) getQueryRunner();
         ResultWithQueryId<MaterializedResult> result = runner.executeWithQueryId(session, "SELECT * FROM lineitem JOIN orders " +
                 "ON lineitem.orderkey = orders.orderkey AND orders.comment = 'nstructions sleep furiously among '");
@@ -132,10 +132,10 @@ public class TestMemorySmoke
         // Note: because the global dynamic filter is not applied in the memory connector, we have changed the assert value for this test
         QueryStats stats = runner.getCoordinator().getQueryManager().getFullQueryInfo(result.getQueryId()).getQueryStats();
         Set rowsRead = stats.getOperatorSummaries()
-                            .stream()
-                            .filter(summary -> summary.getOperatorType().equals("ScanFilterAndProjectOperator"))
-                            .map(summary -> summary.getInputPositions())
-                            .collect(toImmutableSet());
+                .stream()
+                .filter(summary -> summary.getOperatorType().equals("ScanFilterAndProjectOperator"))
+                .map(summary -> summary.getInputPositions())
+                .collect(toImmutableSet());
         assertEquals(rowsRead, ImmutableSet.of(6L, buildSideRowsCount));
     }
 
@@ -272,12 +272,13 @@ public class TestMemorySmoke
         assertUpdate("ALTER TABLE test_table_to_be_renamed RENAME TO test_table_renamed");
         assertQueryResult("SELECT count(*) FROM test_table_renamed", 0L);
 
-        assertUpdate("CREATE SCHEMA test_different_schema");
-        assertUpdate("ALTER TABLE test_table_renamed RENAME TO test_different_schema.test_table_renamed");
-        assertQueryResult("SELECT count(*) FROM test_different_schema.test_table_renamed", 0L);
-
-        assertUpdate("DROP TABLE test_different_schema.test_table_renamed");
-        assertUpdate("DROP SCHEMA test_different_schema");
+        // TODO: rename to a different schema is no longer supported after switching to HetuMetastore
+//        assertUpdate("CREATE SCHEMA test_different_schema");
+//        assertUpdate("ALTER TABLE test_table_renamed RENAME TO test_different_schema.test_table_renamed");
+//        assertQueryResult("SELECT count(*) FROM test_different_schema.test_table_renamed", 0L);
+//
+//        assertUpdate("DROP TABLE test_different_schema.test_table_renamed");
+//        assertUpdate("DROP SCHEMA test_different_schema");
     }
 
     @Test
@@ -288,8 +289,8 @@ public class TestMemorySmoke
         assertUpdate("CREATE VIEW test_view AS SELECT 123 x");
         assertUpdate("CREATE OR REPLACE VIEW test_view AS " + query);
 
-        assertQueryFails("CREATE TABLE test_view (x date)", "View \\[default.test_view] already exists");
-        assertQueryFails("CREATE VIEW test_view AS SELECT 123 x", "View already exists: default.test_view");
+        assertQueryFails("CREATE TABLE test_view (x date)", "Table \\[default.test_view] already exists");
+        assertQueryFails("CREATE VIEW test_view AS SELECT 123 x", "View \\[default.test_view] already exists");
 
         assertQuery("SELECT * FROM test_view", query);
 
