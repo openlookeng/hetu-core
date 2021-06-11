@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.node.NodeInfo;
 import io.prestosql.execution.ManagedQueryExecution;
+import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.server.ResourceGroupInfo;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.memory.ClusterMemoryPoolManager;
@@ -62,6 +63,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.QUERY_REJECTED;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -79,6 +81,7 @@ public final class InternalResourceGroupManager<C>
     private static final String RESOURCE_GROUP_QUERY_PROGRESS_MARGIN_PERCENT = "resource-groups.query-progress-margin-percent";
     // default status refresh interval
     private static final long DEFAULT_STATUS_REFRESH_INTERVAL = 1L;
+    private static final long MILLISECONDS_PER_TEN_SECONDS = 10000L;
 
     private final ScheduledExecutorService refreshExecutor = newSingleThreadScheduledExecutor(daemonThreadsNamed("ResourceGroupManager"));
     private final List<BaseResourceGroup> rootGroups = new CopyOnWriteArrayList<>();
@@ -96,6 +99,7 @@ public final class InternalResourceGroupManager<C>
     private final StateStoreProvider stateStoreProvider;
     private int memoryMarginPercent;
     private int queryProgressMarginPercent;
+    private InternalNodeManager internalNodeManager;
 
     @Inject
     public InternalResourceGroupManager(LegacyResourceGroupConfigurationManager legacyManager,
@@ -103,7 +107,8 @@ public final class InternalResourceGroupManager<C>
             ClusterMemoryPoolManager memoryPoolManager,
             NodeInfo nodeInfo,
             MBeanExporter exporter,
-            HetuConfig hetuConfig)
+            HetuConfig hetuConfig,
+            InternalNodeManager internalNodeManager)
     {
         this.exporter = requireNonNull(exporter, "exporter is null");
         this.configurationManagerContext = new ResourceGroupConfigurationManagerContextInstance(memoryPoolManager, nodeInfo.getEnvironment());
@@ -115,6 +120,7 @@ public final class InternalResourceGroupManager<C>
         this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
         this.memoryMarginPercent = 10;
         this.queryProgressMarginPercent = 5;
+        this.internalNodeManager = internalNodeManager;
     }
 
     @Override
@@ -139,8 +145,35 @@ public final class InternalResourceGroupManager<C>
         // Update shared resource group states before submitting new query
         if (isMultiCoordinatorEnabled) {
             DistributedResourceGroupUtils.mapCachedStates();
+            BaseResourceGroup currentRoot = groups.get(selectionContext.getResourceGroupId().getRoot());
+            checkState(currentRoot != null, "currentRoot should not be null");
+            synchronized (currentRoot) {
+                Lock lock = stateStoreProvider.getStateStore().getLock(selectionContext.getResourceGroupId().toString());
+                boolean locked = false;
+                try {
+                    locked = Thread.holdsLock(lock) || lock.tryLock(MILLISECONDS_PER_TEN_SECONDS, TimeUnit.MILLISECONDS);
+                    if (locked) {
+                        groups.get(selectionContext.getResourceGroupId()).run(queryExecution);
+                    }
+                    else {
+                        throw new PrestoException(GENERIC_INTERNAL_ERROR,
+                                String.format("Query: %s submitted failed! Coordinator probably too busy, please try again later",
+                                        queryExecution.getBasicQueryInfo().getQueryId()));
+                    }
+                }
+                catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                finally {
+                    if (locked) {
+                        lock.unlock();
+                    }
+                }
+            }
         }
-        groups.get(selectionContext.getResourceGroupId()).run(queryExecution);
+        else {
+            groups.get(selectionContext.getResourceGroupId()).run(queryExecution);
+        }
     }
 
     @Override
@@ -219,32 +252,7 @@ public final class InternalResourceGroupManager<C>
 
     private void refreshAndStartQueries()
     {
-        //single coordinator
-        if (!isMultiCoordinatorEnabled) {
-            long nanoTime = System.nanoTime();
-            long elapsedSeconds = NANOSECONDS.toSeconds(nanoTime - lastCpuQuotaGenerationNanos.get());
-            if (elapsedSeconds > 0) {
-                // Only advance our clock on second boundaries to avoid calling generateCpuQuota() too frequently, and because it would be a no-op for zero seconds.
-                lastCpuQuotaGenerationNanos.addAndGet(elapsedSeconds * 1_000_000_000L);
-            }
-            else if (elapsedSeconds < 0) {
-                // nano time has overflowed
-                lastCpuQuotaGenerationNanos.set(nanoTime);
-            }
-            for (BaseResourceGroup group : rootGroups) {
-                try {
-                    if (elapsedSeconds > 0) {
-                        group.generateCpuQuota(elapsedSeconds);
-                    }
-                }
-                catch (RuntimeException e) {
-                    log.error(e, "Exception while generation cpu quota for %s", group);
-                }
-            }
-        }
-
-        //multiple coordinator
-        else {
+        if (isMultiCoordinatorEnabled) {
             try {
                 DistributedResourceGroupUtils.mapCachedStates();
             }
@@ -274,12 +282,25 @@ public final class InternalResourceGroupManager<C>
         }
 
         //for both single and multiple coordinator
+        long nanoTime = System.nanoTime();
+        long elapsedSeconds = NANOSECONDS.toSeconds(nanoTime - lastCpuQuotaGenerationNanos.get());
+        if (elapsedSeconds > 0) {
+            // Only advance our clock on second boundaries to avoid calling generateCpuQuota() too frequently, and because it would be a no-op for zero seconds.
+            lastCpuQuotaGenerationNanos.addAndGet(elapsedSeconds * 1_000_000_000L);
+        }
+        else if (elapsedSeconds < 0) {
+            // nano time has overflowed
+            lastCpuQuotaGenerationNanos.set(nanoTime);
+        }
         for (BaseResourceGroup group : rootGroups) {
             try {
+                if (elapsedSeconds > 0) {
+                    group.generateCpuQuota(elapsedSeconds);
+                }
                 group.processQueuedQueries();
             }
             catch (RuntimeException e) {
-                log.error(e, "Exception while processing queued queries for %s", group);
+                log.error(e, "Exception while refreshing for group %s", group);
             }
         }
     }
@@ -382,7 +403,7 @@ public final class InternalResourceGroupManager<C>
     private BaseResourceGroup createNewRootGroup(String name, Executor executor)
     {
         if (isMultiCoordinatorEnabled) {
-            return new DistributedResourceGroup(Optional.empty(), name, this::exportGroup, executor, stateStoreProvider.getStateStore());
+            return new DistributedResourceGroupTemp(Optional.empty(), name, this::exportGroup, executor, stateStoreProvider.getStateStore(), internalNodeManager);
         }
         else {
             return new InternalResourceGroup(Optional.empty(), name, this::exportGroup, executor);

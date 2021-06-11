@@ -124,7 +124,7 @@ public class HazelcastStateStore
                         "State collection type: " + type.name() + " not supported");
         }
         collections.putIfAbsent(collectionName, collection);
-        return collection;
+        return collections.get(collectionName);
     }
 
     @Override
@@ -144,7 +144,7 @@ public class HazelcastStateStore
             collection = new EncryptedStateMap(collection, createCipherService(encryptionType));
         }
         collections.putIfAbsent(name, collection);
-        return collection;
+        return (StateMap<K, V>) collections.get(name);
     }
 
     @Override

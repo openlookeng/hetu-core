@@ -39,7 +39,6 @@ import io.prestosql.spi.QueryId;
 import io.prestosql.spi.resourcegroups.SelectionContext;
 import io.prestosql.spi.resourcegroups.SelectionCriteria;
 import io.prestosql.spi.service.PropertyService;
-import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.statestore.SharedQueryState;
 import io.prestosql.statestore.StateCacheStore;
 import io.prestosql.statestore.StateFetcher;
@@ -55,22 +54,18 @@ import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
-import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
-import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.QUERY_TEXT_TOO_LARGE;
 import static io.prestosql.util.StatementUtils.getQueryType;
 import static io.prestosql.util.StatementUtils.isTransactionControlStatement;
@@ -237,17 +232,25 @@ public class DispatchManager
 
             boolean queryAdded = queryCreated(dispatchQuery);
             if (queryAdded && !dispatchQuery.isDone()) {
-                if (!PropertyService.getBooleanProperty(HetuConstant.MULTI_COORDINATOR_ENABLED)) {
-                    try {
-                        resourceGroupManager.submit(dispatchQuery, selectionContext, queryExecutor);
+                try {
+                    resourceGroupManager.submit(dispatchQuery, selectionContext, queryExecutor);
+
+                    if (PropertyService.getBooleanProperty(HetuConstant.MULTI_COORDINATOR_ENABLED) && stateUpdater != null) {
+                        stateUpdater.registerQuery(StateStoreConstants.QUERY_STATE_COLLECTION_NAME, dispatchQuery);
                     }
-                    catch (Throwable e) {
-                        // dispatch query has already been registered, so just fail it directly
-                        dispatchQuery.fail(e);
+
+                    if (LOG.isDebugEnabled()) {
+                        long now = System.currentTimeMillis();
+                        LOG.debug("query:%s submission started at %s, ended at %s, total time use: %sms",
+                                dispatchQuery.getQueryId(),
+                                new SimpleDateFormat("HH:mm:ss:SSS").format(dispatchQuery.getCreateTime().toDate()),
+                                new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(now)),
+                                now - dispatchQuery.getCreateTime().getMillis());
                     }
                 }
-                else {
-                    submitQuerySync(dispatchQuery, selectionContext);
+                catch (Throwable e) {
+                    // dispatch query has already been registered, so just fail it directly
+                    dispatchQuery.fail(e);
                 }
             }
         }
@@ -417,58 +420,6 @@ public class DispatchManager
 
         if (stateFetcher != null) {
             stateFetcher.stop();
-        }
-    }
-
-    // Submit query synchronously to the distributed resource group
-    private synchronized void submitQuerySync(DispatchQuery dispatchQuery, SelectionContext selectionContext)
-            throws InterruptedException, PrestoException
-    {
-        StateStore stateStore = stateStoreProvider.getStateStore();
-        if (stateStore == null) {
-            LOG.error("StateStore is not loaded yet");
-            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Coordinator is not ready to accept queries");
-        }
-
-        Lock lock = stateStore.getLock(StateStoreConstants.SUBMIT_QUERY_LOCK_NAME);
-        // Make sure query submission is synchronized
-        boolean locked = lock.tryLock(hetuConfig.getQuerySubmitTimeout().toMillis(), TimeUnit.MILLISECONDS);
-        long start = 0L;
-        if (locked) {
-            try {
-                start = System.currentTimeMillis();
-                LOG.debug("Get submit-query-lock, will submit query:%s, at current time milliseconds: %s, at format HH:mm:ss:SSS:%s",
-                        dispatchQuery.getQueryId(),
-                        start,
-                        new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(start)));
-                stateFetcher.fetchRunningQueryStates(stateStore);
-                resourceGroupManager.submit(dispatchQuery, selectionContext, queryExecutor);
-                // Register dispatch query to StateUpdater
-                if (PropertyService.getBooleanProperty(HetuConstant.MULTI_COORDINATOR_ENABLED) && stateUpdater != null) {
-                    stateUpdater.registerQuery(StateStoreConstants.QUERY_STATE_COLLECTION_NAME, dispatchQuery);
-                }
-                stateUpdater.updateStates();
-            }
-            catch (IOException e) {
-                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to fetch states from or update states to state store: " + e.getMessage());
-            }
-            catch (Throwable e) {
-                // dispatch query has already been registered, so just fail it directly
-                dispatchQuery.fail(e);
-            }
-            finally {
-                lock.unlock();
-                long end = System.currentTimeMillis();
-                LOG.debug("Release submit-query-lock, query:%s, at current time milliseconds: %s, at format HH:mm:ss:SSS:%s, total time use: %s",
-                        dispatchQuery.getQueryId(),
-                        end,
-                        new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(end)),
-                        end - start);
-            }
-        }
-        else {
-            // TODO maybe just queue the query if the queue size is not a problem
-            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Coordinator probably too busy at the moment, please try again in a few minutes");
         }
     }
 }
