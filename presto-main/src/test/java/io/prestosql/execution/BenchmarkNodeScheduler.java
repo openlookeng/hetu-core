@@ -172,7 +172,7 @@ public class BenchmarkNodeScheduler
             InMemoryNodeManager nodeManager = new InMemoryNodeManager();
             nodeManager.addNode(CONNECTOR_ID, nodes);
             NodeScheduler nodeScheduler = new NodeScheduler(getNetworkTopology(), nodeManager, getNodeSchedulerConfig(), nodeTaskMap);
-            nodeSelector = nodeScheduler.createNodeSelector(CONNECTOR_ID);
+            nodeSelector = nodeScheduler.createNodeSelector(CONNECTOR_ID, false, null);
         }
 
         @TearDown

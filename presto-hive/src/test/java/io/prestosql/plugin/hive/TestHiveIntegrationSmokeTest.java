@@ -261,7 +261,7 @@ public class TestHiveIntegrationSmokeTest
         NodeScheduler nodeScheduler = new NodeScheduler(new LegacyNetworkTopology(), nodeManager, nodeSchedulerConfig, nodeTaskMap);
         // contents of taskMap indicate the node-task map for the current stage
         taskMap = new HashMap<>();
-        nodeSelector = nodeScheduler.createNodeSelector(CONNECTOR_ID);
+        nodeSelector = nodeScheduler.createNodeSelector(CONNECTOR_ID, false, null);
     }
 
     @Test

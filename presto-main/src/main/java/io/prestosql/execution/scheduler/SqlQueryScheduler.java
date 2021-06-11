@@ -71,6 +71,7 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -154,6 +155,7 @@ public class SqlQueryScheduler
     private int currentTimerLevel;
 
     private final QuerySnapshotManager snapshotManager;
+    private final Map<PlanNodeId, FixedNodeScheduleData> feederScheduledNodes = new ConcurrentHashMap<>();
 
     public static SqlQueryScheduler createSqlQueryScheduler(
             QueryStateMachine queryStateMachine,
@@ -446,6 +448,7 @@ public class SqlQueryScheduler
 
         Optional<int[]> bucketToPartition;
         PartitioningHandle partitioningHandle = plan.getFragment().getPartitioning();
+        boolean keepConsumerOnFeederNodes = !plan.getFragment().getFeederCTEId().isPresent() && plan.getFragment().getFeederCTEParentId().isPresent();
         if (partitioningHandle.equals(SOURCE_DISTRIBUTION)) {
             // nodes are selected dynamically based on the constraints of the splits and the system load
             Entry<PlanNodeId, SplitSource> entry = Iterables.getOnlyElement(plan.getSplitSources().entrySet());
@@ -455,7 +458,7 @@ public class SqlQueryScheduler
             if (isInternalSystemConnector(catalogName)) {
                 catalogName = null;
             }
-            NodeSelector nodeSelector = nodeScheduler.createNodeSelector(catalogName);
+            NodeSelector nodeSelector = nodeScheduler.createNodeSelector(catalogName, keepConsumerOnFeederNodes, feederScheduledNodes);
             if (isSnapshotEnabled) {
                 // When snapshot is enabled, then no task can be added after the query started running,
                 // otherwise assumptions about how many "input channels" may be broken.
@@ -495,7 +498,7 @@ public class SqlQueryScheduler
                     // no remote source
                     boolean dynamicLifespanSchedule = plan.getFragment().getStageExecutionDescriptor().isDynamicLifespanSchedule();
                     if (isSnapshotEnabled) {
-                        NodeSelector nodeSelector = nodeScheduler.createNodeSelector(catalogName);
+                        NodeSelector nodeSelector = nodeScheduler.createNodeSelector(catalogName, keepConsumerOnFeederNodes, feederScheduledNodes);
                         int nodeCount;
                         if (stageTaskCounts != null) {
                             // Resuming: need to create same number of tasks as old stage.
@@ -512,7 +515,7 @@ public class SqlQueryScheduler
                     }
                     else {
                         bucketNodeMap = nodePartitioningManager.getBucketNodeMap(session, partitioningHandle, dynamicLifespanSchedule);
-                        stageNodeList = new ArrayList<>(nodeScheduler.createNodeSelector(catalogName).allNodes());
+                        stageNodeList = new ArrayList<>(nodeScheduler.createNodeSelector(catalogName, keepConsumerOnFeederNodes, feederScheduledNodes).allNodes());
                     }
 
                     // verify execution is consistent with planner's decision on dynamic lifespan schedule
@@ -545,7 +548,7 @@ public class SqlQueryScheduler
                         bucketNodeMap,
                         splitBatchSize,
                         getConcurrentLifespansPerNode(session),
-                        nodeScheduler.createNodeSelector(catalogName),
+                        nodeScheduler.createNodeSelector(catalogName, keepConsumerOnFeederNodes, feederScheduledNodes),
                         connectorPartitionHandles,
                         session,
                         heuristicIndexerManager));
@@ -623,7 +626,7 @@ public class SqlQueryScheduler
                     stage,
                     sourceTasksProvider,
                     writerTasksProvider,
-                    nodeScheduler.createNodeSelector(null),
+                    nodeScheduler.createNodeSelector(null, keepConsumerOnFeederNodes, feederScheduledNodes),
                     schedulerExecutor,
                     getWriterMinSize(session),
                     isSnapshotEnabled,

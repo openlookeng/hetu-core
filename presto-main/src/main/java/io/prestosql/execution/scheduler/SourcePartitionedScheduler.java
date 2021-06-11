@@ -553,7 +553,7 @@ public class SourcePartitionedScheduler
     private Set<RemoteTask> finalizeTaskCreationIfNecessary()
     {
         // only lock down tasks if there is a sub stage that could block waiting for this stage to create all tasks
-        if (stage.getFragment().isLeaf()) {
+        if (stage.getFragment().isLeaf() || (!stage.getFragment().getFeederCTEId().isPresent() && stage.getFragment().getFeederCTEParentId().isPresent())) {
             return ImmutableSet.of();
         }
 

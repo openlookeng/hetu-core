@@ -29,6 +29,7 @@ import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.connector.CatalogName;
+import io.prestosql.spi.plan.PlanNodeId;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -58,6 +59,7 @@ public class SplitCacheAwareNodeSelector
     private final int maxSplitsPerNode;
     private final int maxPendingSplitsPerTask;
     private final NodeSelector defaultNodeSelector;
+    private final Map<PlanNodeId, FixedNodeScheduleData> feederScheduledNodes;
 
     public SplitCacheAwareNodeSelector(
             InternalNodeManager nodeManager,
@@ -67,7 +69,8 @@ public class SplitCacheAwareNodeSelector
             int minCandidates,
             int maxSplitsPerNode,
             int maxPendingSplitsPerTask,
-            NodeSelector defaultNodeSelector)
+            NodeSelector defaultNodeSelector,
+            Map<PlanNodeId, FixedNodeScheduleData> feederScheduledNodes)
     {
         this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
         this.nodeTaskMap = requireNonNull(nodeTaskMap, "nodeTaskMap is null");
@@ -77,6 +80,7 @@ public class SplitCacheAwareNodeSelector
         this.maxSplitsPerNode = maxSplitsPerNode;
         this.maxPendingSplitsPerTask = maxPendingSplitsPerTask;
         this.defaultNodeSelector = defaultNodeSelector;
+        this.feederScheduledNodes = feederScheduledNodes;
     }
 
     @Override
@@ -176,7 +180,27 @@ public class SplitCacheAwareNodeSelector
         }));
         assignment.putAll(defaultSplitPlacementResult.getAssignments());
 
+        // Check if its CTE node and its feeder
+        if (stage.isPresent() && stage.get().getFragment().getFeederCTEId().isPresent()) {
+            updateFeederNodeAndSplitCount(stage.get(), assignment);
+        }
+
         return new SplitPlacementResult(defaultSplitPlacementResult.getBlocked(), assignment);
+    }
+
+    private void updateFeederNodeAndSplitCount(SqlStageExecution stage, Multimap<InternalNode, Split> assignment)
+    {
+        FixedNodeScheduleData data;
+        if (feederScheduledNodes.containsKey(stage.getFragment().getFeederCTEParentId().get())) {
+            data = feederScheduledNodes.get(stage.getFragment().getFeederCTEParentId().get());
+            data.updateSplitCount(assignment.size());
+            data.updateAssignedNodes(assignment.keys().stream().collect(Collectors.toSet()));
+        }
+        else {
+            data = new FixedNodeScheduleData(assignment.size(), assignment.keys().stream().collect(Collectors.toSet()));
+        }
+
+        feederScheduledNodes.put(stage.getFragment().getFeederCTEParentId().get(), data);
     }
 
     private SplitKey createSplitKey(Split split)

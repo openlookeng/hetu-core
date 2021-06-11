@@ -34,6 +34,7 @@ import io.prestosql.metadata.Split;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.connector.CatalogName;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.service.PropertyService;
 
 import javax.annotation.PreDestroy;
@@ -133,7 +134,7 @@ public class NodeScheduler
         return counters.build();
     }
 
-    public NodeSelector createNodeSelector(CatalogName catalogName)
+    public NodeSelector createNodeSelector(CatalogName catalogName, boolean keepConsumerOnFeederNodes, Map<PlanNodeId, FixedNodeScheduleData> feederScheduledNodes)
     {
         // this supplier is thread-safe. TODO: this logic should probably move to the scheduler since the choice of which node to run in should be
         // done as close to when the the split is about to be scheduled
@@ -179,6 +180,10 @@ public class NodeScheduler
             return new NodeMap(byHostAndPort.build(), byHost.build(), workersByNetworkPath.build(), coordinatorNodeIds);
         }, 2, TimeUnit.SECONDS);
 
+        if (keepConsumerOnFeederNodes) {
+            return new SimpleFixedNodeSelector(nodeManager, nodeTaskMap, includeCoordinator, nodeMap, minCandidates, maxSplitsPerNode, maxPendingSplitsPerTask, optimizedLocalScheduling, feederScheduledNodes);
+        }
+
         NodeSelector defaultNodeSelector = null;
         if (useNetworkTopology) {
             defaultNodeSelector = new TopologyAwareNodeSelector(
@@ -191,10 +196,11 @@ public class NodeScheduler
                     maxPendingSplitsPerTask,
                     topologicalSplitCounters,
                     networkLocationSegmentNames,
-                    networkLocationCache);
+                    networkLocationCache,
+                    feederScheduledNodes);
         }
         else {
-            defaultNodeSelector = new SimpleNodeSelector(nodeManager, nodeTaskMap, includeCoordinator, nodeMap, minCandidates, maxSplitsPerNode, maxPendingSplitsPerTask, optimizedLocalScheduling);
+            defaultNodeSelector = new SimpleNodeSelector(nodeManager, nodeTaskMap, includeCoordinator, nodeMap, minCandidates, maxSplitsPerNode, maxPendingSplitsPerTask, optimizedLocalScheduling, feederScheduledNodes);
         }
 
         if (PropertyService.getBooleanProperty(HetuConstant.SPLIT_CACHE_MAP_ENABLED)) {
@@ -206,7 +212,8 @@ public class NodeScheduler
                     minCandidates,
                     maxSplitsPerNode,
                     maxPendingSplitsPerTask,
-                    defaultNodeSelector);
+                    defaultNodeSelector,
+                    feederScheduledNodes);
         }
         else {
             return defaultNodeSelector;
