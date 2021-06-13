@@ -1527,6 +1527,14 @@ public final class MetadataManager
         return metadata.canPerformSortBasedAggregation(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle(), keyNames);
     }
 
+    @Override
+    public void refreshMetadataCache(Session session)
+    {
+        Optional<CatalogMetadata> catalog = getOptionalCatalogMetadata(session, session.getCatalog().get());
+        ConnectorMetadata metadata = getMetadata(session, catalog.get().getCatalogName());
+        metadata.refreshMetadataCache();
+    }
+
     //
     // Helpers
     //

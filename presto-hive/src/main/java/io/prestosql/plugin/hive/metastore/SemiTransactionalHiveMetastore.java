@@ -1391,6 +1391,11 @@ public class SemiTransactionalHiveMetastore
         }
     }
 
+    public void refreshMetastoreCache()
+    {
+        delegate.refreshMetastoreCache();
+    }
+
     private class Committer
     {
         private final AtomicBoolean fileRenameCancelled = new AtomicBoolean(false);

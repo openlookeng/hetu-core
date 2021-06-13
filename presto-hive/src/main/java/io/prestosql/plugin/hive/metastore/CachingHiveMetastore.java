@@ -229,6 +229,15 @@ public class CachingHiveMetastore
                         key.getPrincipal())), executor));
     }
 
+    @Override
+    public void refreshMetastoreCache()
+    {
+        if (skipCache) {
+            delegate.refreshMetastoreCache();
+        }
+        flushCache();
+    }
+
     @Managed
     public void flushCache()
     {

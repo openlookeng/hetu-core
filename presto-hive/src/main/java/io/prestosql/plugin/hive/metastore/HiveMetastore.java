@@ -193,4 +193,8 @@ public interface HiveMetastore
     }
 
     boolean isImpersonationEnabled();
+
+    default void refreshMetastoreCache()
+    {
+    }
 }

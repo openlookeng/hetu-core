@@ -98,9 +98,9 @@ public class MetastoreHiveStatisticsProvider
 
     private final PartitionsStatisticsProvider statisticsProvider;
     private static Map<String, TableColumnStatistics> statsCache;
-    private static Map<String, List<HivePartition>> samplePartitionCache;
+    private static Map<String, SamplePartition> samplePartitionCache;
 
-    public MetastoreHiveStatisticsProvider(SemiTransactionalHiveMetastore metastore, Map<String, TableColumnStatistics> statsCache, Map<String, List<HivePartition>> samplePartitionCache)
+    public MetastoreHiveStatisticsProvider(SemiTransactionalHiveMetastore metastore, Map<String, TableColumnStatistics> statsCache, Map<String, SamplePartition> samplePartitionCache)
     {
         requireNonNull(metastore, "metastore is null");
         this.statsCache = requireNonNull(statsCache, "statsCache is null");
@@ -147,10 +147,14 @@ public class MetastoreHiveStatisticsProvider
             return createZeroStatistics(columns, columnTypes);
         }
         int sampleSize = getPartitionStatisticsSampleSize(session);
-        List<HivePartition> partitionsSample = samplePartitionCache.get(schemaTableName.getTableName());
-        if (includeColumnStatistics || partitionsSample == null) {
+        List<HivePartition> partitionsSample = null;
+        SamplePartition sample = samplePartitionCache.get(schemaTableName.getTableName());
+        if (includeColumnStatistics || sample == null || sample.partitionCount != partitions.size()) {
             partitionsSample = getPartitionsSample(partitions, sampleSize);
-            samplePartitionCache.put(schemaTableName.getTableName(), partitionsSample);
+            samplePartitionCache.put(schemaTableName.getTableName(), new SamplePartition(partitions.size(), partitionsSample));
+        }
+        else if (sample != null) {
+            partitionsSample = sample.partitionsSample;
         }
         try {
             Map<String, PartitionStatistics> statisticsSample = statisticsProvider.getPartitionsStatistics(session, schemaTableName, partitionsSample, table);
@@ -175,6 +179,18 @@ public class MetastoreHiveStatisticsProvider
                 return TableStatistics.empty();
             }
             throw e;
+        }
+    }
+
+    public class SamplePartition
+    {
+        long partitionCount;
+        List<HivePartition> partitionsSample;
+
+        public SamplePartition(long partitionCount, List<HivePartition> partitionsSample)
+        {
+            this.partitionCount = partitionCount;
+            this.partitionsSample = partitionsSample;
         }
     }
 
@@ -440,7 +456,7 @@ public class MetastoreHiveStatisticsProvider
             TableColumnStatistics tableColumnStatistics;
             if (columnHandle.isPartitionKey()) {
                 tableColumnStatistics = statsCache.get(partitions.get(0).getTableName().getTableName() + columnName);
-                if (tableColumnStatistics == null || invalidateStatsCache(partitions.get(0).getTableName().getTableName() + columnName, Estimate.of(rowCount), fileCount, totalOnDiskSize)) {
+                if (tableColumnStatistics == null || invalidateStatsCache(tableColumnStatistics, Estimate.of(rowCount), fileCount, totalOnDiskSize)) {
                     columnStatistics = createPartitionColumnStatistics(columnHandle, columnType, partitions, statistics, averageRowsPerPartition, rowCount);
                     TableStatistics tableStatistics = new TableStatistics(Estimate.of(rowCount), fileCount, totalOnDiskSize, ImmutableMap.of());
                     tableColumnStatistics = new TableColumnStatistics(tableStatistics, columnStatistics);
@@ -458,11 +474,11 @@ public class MetastoreHiveStatisticsProvider
         return result.build();
     }
 
-    private static boolean invalidateStatsCache(String tableNameColumName, Estimate rowCount, long fileCount, long totalOnDisk)
+    private static boolean invalidateStatsCache(TableColumnStatistics tableColumnStatistics, Estimate rowCount, long fileCount, long totalOnDisk)
     {
-        if (statsCache.get(tableNameColumName).tableStatistics.getOnDiskDataSizeInBytes() != totalOnDisk
-                || statsCache.get(tableNameColumName).tableStatistics.getFileCount() != fileCount
-                || !statsCache.get(tableNameColumName).tableStatistics.getRowCount().equals(rowCount)) {
+        if (tableColumnStatistics.tableStatistics.getOnDiskDataSizeInBytes() != totalOnDisk
+                || tableColumnStatistics.tableStatistics.getFileCount() != fileCount
+                || !tableColumnStatistics.tableStatistics.getRowCount().equals(rowCount)) {
             return true;
         }
         return false;

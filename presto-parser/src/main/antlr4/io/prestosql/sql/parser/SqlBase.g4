@@ -150,6 +150,7 @@ statement
     | SET PATH pathSpecification                                       #setPath
     | VACUUM TABLE qualifiedName (FULL (UNIFY)?)? (PARTITION partition=string)?
         (AND_WAIT)?                                                    #vacuumTable
+    | REFRESH META CACHE                                               #refreshMetadataCache
     ;
 
 assignmentList
@@ -864,6 +865,8 @@ BITMAP: 'BITMAP';
 BLOOM: 'BLOOM';
 MINMAX: 'MINMAX';
 BTREE: 'BTREE';
+REFRESH: 'REFRESH';
+META: 'META';
 
 EQ  : '=';
 NEQ : '<>' | '!=';

@@ -3154,4 +3154,10 @@ public class HiveMetadata
         }
         return false;
     }
+
+    @Override
+    public void refreshMetadataCache()
+    {
+        metastore.refreshMetastoreCache();
+    }
 }

@@ -801,4 +801,10 @@ public class ClassLoaderSafeConnectorMetadata
             return delegate.canPerformSortBasedAggregation(session, tableHandle, keyNames);
         }
     }
+
+    @Override
+    public void refreshMetadataCache()
+    {
+        delegate.refreshMetadataCache();
+    }
 }

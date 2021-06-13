@@ -983,4 +983,9 @@ public interface ConnectorMetadata
     {
         return false;
     }
+
+    default void refreshMetadataCache()
+    {
+        throw new UnsupportedOperationException("This connector does not support refreshing metadata cache");
+    }
 }
