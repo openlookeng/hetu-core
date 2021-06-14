@@ -652,9 +652,9 @@ public class PlanOptimizers
         builder.add(pushdownDeleteRule);
 
         builder.add(new AddSortBasedAggregation(metadata, statsCalculator, costCalculator, costComparator));
+        builder.add(new AddExchangeAboveCTENode());
         // Optimizers above this don't understand local exchanges, so be careful moving this.
         builder.add(new AddLocalExchanges(metadata, typeAnalyzer));
-        builder.add(new AddExchangeAboveCTENode());
 
         // Optimizers above this do not need to care about aggregations with the type other than SINGLE
         // This optimizer must be run after all exchange-related optimizers
