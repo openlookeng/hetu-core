@@ -792,6 +792,8 @@ class StatementAnalyzer
                         .ifPresent(identifier -> {
                             throw new SemanticException(NOT_SUPPORTED, node, "Column '%s' not allowed in source filter predicate. Source filter predicate cannot contain any of the columns defined in Group property", identifier);
                         });
+                //analyze expression to identify if coercions required
+                analyzeExpression(predicate, queryScope);
             });
             return createAndAssignScope(node, scope, outputFields.build());
         }
