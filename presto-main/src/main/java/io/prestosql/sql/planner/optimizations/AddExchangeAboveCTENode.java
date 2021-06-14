@@ -16,9 +16,12 @@ package io.prestosql.sql.planner.optimizations;
 
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.CTEScanNode;
+import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.ExchangeNode;
@@ -27,9 +30,10 @@ import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
-import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.LOCAL;
+import static io.prestosql.spi.plan.JoinNode.DistributionType.REPLICATED;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.REMOTE;
 import static io.prestosql.sql.planner.plan.ExchangeNode.gatheringExchange;
 import static io.prestosql.sql.planner.plan.ExchangeNode.partitionedExchange;
@@ -52,7 +56,7 @@ public class AddExchangeAboveCTENode
 
         if (isCTEReuseEnabled(session)) {
             OptimizedPlanRewriter optimizedPlanRewriter = new OptimizedPlanRewriter(idAllocator);
-            PlanNode newNode = SimplePlanRewriter.rewriteWith(optimizedPlanRewriter, plan, new ExchangeProperties(ExchangeNode.Type.GATHER));
+            PlanNode newNode = SimplePlanRewriter.rewriteWith(optimizedPlanRewriter, plan, new ExchangeProperties(ExchangeNode.Type.GATHER, new ArrayList<>()));
             return newNode;
         }
         else {
@@ -74,10 +78,20 @@ public class AddExchangeAboveCTENode
         public PlanNode visitExchange(ExchangeNode node, RewriteContext<ExchangeProperties> context)
         {
             context.get().setType(node.getType());
-            if (node.getScope().equals(LOCAL)) {
-                return visitPlan(node, context);
-            }
             return context.defaultRewrite(node, context.get());
+        }
+
+        @Override
+        public PlanNode visitJoin(JoinNode node, RewriteContext<ExchangeProperties> context)
+        {
+            if (node.getDistributionType().get().equals(REPLICATED)) {
+                context.get().setType(ExchangeNode.Type.REPLICATE);
+            }
+            List<Symbol> leftSymbols = node.getCriteria().stream()
+                    .map(JoinNode.EquiJoinClause::getLeft)
+                    .collect(Collectors.toList());
+            context.get().setJoinCriteriaSymbols(leftSymbols);
+            return visitPlan(node, context);
         }
 
         @Override
@@ -96,6 +110,18 @@ public class AddExchangeAboveCTENode
                                     source);
                             break;
                         default:
+                            if (((CTEScanNode) source).getSource() instanceof AggregationNode) {
+                                if (!((AggregationNode) ((CTEScanNode) source).getSource()).getGroupingKeys().isEmpty()
+                                        && ((AggregationNode) ((CTEScanNode) source).getSource()).getGroupingKeys().containsAll(context.get().joinCriteriaSymbols)) {
+                                    rewrittenNode = partitionedExchange(
+                                            idAllocator.getNextId(),
+                                            REMOTE,
+                                            source,
+                                            ((AggregationNode) ((CTEScanNode) source).getSource()).getGroupingKeys(),
+                                            Optional.empty());
+                                    break;
+                                }
+                            }
                             rewrittenNode = partitionedExchange(
                                     idAllocator.getNextId(),
                                     REMOTE,
@@ -118,9 +144,12 @@ public class AddExchangeAboveCTENode
     {
         private ExchangeNode.Type type;
 
-        public ExchangeProperties(ExchangeNode.Type type)
+        private List<Symbol> joinCriteriaSymbols;
+
+        public ExchangeProperties(ExchangeNode.Type type, List<Symbol> joinCriteriaSymbols)
         {
             this.type = type;
+            this.joinCriteriaSymbols = joinCriteriaSymbols;
         }
 
         public ExchangeNode.Type getType()
@@ -131,6 +160,11 @@ public class AddExchangeAboveCTENode
         public void setType(ExchangeNode.Type type)
         {
             this.type = type;
+        }
+
+        public void setJoinCriteriaSymbols(List<Symbol> joinCriteriaSymbols)
+        {
+            this.joinCriteriaSymbols = joinCriteriaSymbols;
         }
     }
 }

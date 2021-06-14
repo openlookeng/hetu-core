@@ -115,7 +115,7 @@ public final class MemoryPageSourceProvider
                 }
                 union = union || match;
             }
-            if (union) {
+            if (dynamicFilters.get().getDynamicFilters().isEmpty() || union) {
                 positions[length++] = i;
             }
         }
