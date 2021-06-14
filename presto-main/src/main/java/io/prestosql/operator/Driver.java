@@ -396,7 +396,7 @@ public class Driver
                 Operator next = activeOperators.get(i + 1);
 
                 if (log.isDebugEnabled()) {
-                    if (getBlockedFuture(current).isPresent() || current.isFinished() || getBlockedFuture(next).isPresent() || !next.needsInput()) {
+                    if (getBlockedFuture(current).isPresent() || getBlockedFuture(next).isPresent()) {
                         log.debug("Blocking info next=%s: getBlockedFuture(current)=%b; current.isFinished=%b; getBlockedFuture(next)=%b; next.needsInput=%b",
                                 next.getOperatorContext().getUniqueId(), getBlockedFuture(current).isPresent(), current.isFinished(), getBlockedFuture(next).isPresent(), next.needsInput());
                     }
