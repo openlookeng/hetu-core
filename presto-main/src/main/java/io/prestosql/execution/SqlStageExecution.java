@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
+import io.airlift.http.client.HttpStatus;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
@@ -78,6 +79,7 @@ import static io.prestosql.SystemSessionProperties.isSnapshotEnabled;
 import static io.prestosql.failuredetector.FailureDetector.State.GONE;
 import static io.prestosql.operator.ExchangeOperator.REMOTE_CONNECTOR_ID;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
+import static io.prestosql.spi.StandardErrorCode.PAGE_TRANSPORT_ERROR;
 import static io.prestosql.spi.StandardErrorCode.REMOTE_HOST_GONE;
 import static java.util.Objects.requireNonNull;
 
@@ -593,11 +595,16 @@ public final class SqlStageExecution
                         .map(this::rewriteTransportFailure)
                         .map(ExecutionFailureInfo::toException)
                         .orElse(new PrestoException(GENERIC_INTERNAL_ERROR, "A task failed for an unknown reason"));
-                // Snapshot: if remote task failed because they received 5xx from other tasks, then we treat it as resumable.
-                if (failure.getMessage() != null && failure.getMessage().contains("to be 200, but was 5")) {
-                    log.debug(failure, "Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
-                    stateMachine.transitionToResumableFailure();
-                    return;
+                // Snapshot: if remote task failed because they received unexpecte response (5xx or missing/wrong header), then we treat it as resumable.
+                if (isSnapshotEnabled && failure instanceof Failure && ((Failure) failure).getErrorCode().equals(PAGE_TRANSPORT_ERROR.toErrorCode())) {
+                    String message = failure.getMessage();
+                    // message ends with "(response status code %d)"
+                    int responseCode = Integer.parseInt(message.substring(message.lastIndexOf(' ') + 1, message.lastIndexOf(')')));
+                    if (responseCode >= 500 || responseCode == HttpStatus.OK.code()) {
+                        log.debug(failure, "Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
+                        stateMachine.transitionToResumableFailure();
+                        return;
+                    }
                 }
                 stateMachine.transitionToFailed(failure);
             }

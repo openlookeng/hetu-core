@@ -383,7 +383,6 @@ public class MultiInputSnapshotState
             // First time a marker is received for a snapshot. Store operator state and make marker available.
             snapshot = new SnapshotState(marker);
             pendingMarkers.add(marker);
-            // No need to take snapshot if not all input channels are known. The snapshot won't be complete.
             try {
                 snapshot.states.add(restorable.capture(pagesSerde));
             }

@@ -121,6 +121,7 @@ public class TestTaskSnapshotManager
         QuerySnapshotManager querySnapshotManager = new QuerySnapshotManager(queryId, snapshotUtils, TEST_SNAPSHOT_SESSION);
         querySnapshotManager.addNewTask(taskId);
         querySnapshotManager.updateQueryCapture(taskId, Collections.singletonMap(1L, SnapshotResult.SUCCESSFUL));
+        querySnapshotManager.getResumeSnapshotId();
 
         SnapshotStateId newStateId = stateId.withSnapshotId(2);
         Optional<Object> loadedState = snapshotManager.loadState(newStateId);
@@ -187,13 +188,17 @@ public class TestTaskSnapshotManager
 
         // Try2: Previous snapshots are setup, so load should be successful
         querySnapshotManager.updateQueryCapture(taskId, Collections.singletonMap(2L, SnapshotResult.SUCCESSFUL));
+        querySnapshotManager.getResumeSnapshotId();
         assertTrue(snapshotManager.loadFile(id4load, targetPath));
 
         String output = Files.readAllLines(targetPath).get(0);
         Assert.assertEquals(output, fileContent);
 
         // Try3: Previous snapshot failed
+        querySnapshotManager.updateQueryRestore(taskId, Optional.of(new RestoreResult(2, SnapshotResult.SUCCESSFUL)));
         querySnapshotManager.updateQueryCapture(taskId, Collections.singletonMap(2L, SnapshotResult.FAILED));
+        querySnapshotManager.updateQueryCapture(taskId, Collections.singletonMap(3L, SnapshotResult.SUCCESSFUL));
+        querySnapshotManager.getResumeSnapshotId();
         assertFalse(snapshotManager.loadFile(id4load, targetPath));
     }
 

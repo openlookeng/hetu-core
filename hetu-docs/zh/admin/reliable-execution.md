@@ -30,7 +30,6 @@
 - **与其他功能的交互**：分布式快照目前无法与以下功能一起使用：
   - 重用交换，即`optimizer.reuse-table-scan`
   - 重用公用表表达式（CTE），即`optimizer.cte-reuse-enabled`
-  - 溢出，即`experimental.spill-enabled`
 
 在启用分布式快照的情况下提交不满足上述要求的查询时，查询按未启用分布式快照功能的场景执行。
 
