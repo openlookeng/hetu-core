@@ -50,6 +50,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import static io.prestosql.execution.scheduler.NodeScheduler.calculateLowWatermark;
 import static io.prestosql.execution.scheduler.NodeScheduler.randomizedNodes;
@@ -68,14 +69,15 @@ public class SimpleNodeSelector
     private static final Logger log = Logger.get(SimpleNodeSelector.class);
 
     private final InternalNodeManager nodeManager;
-    private final NodeTaskMap nodeTaskMap;
+    protected final NodeTaskMap nodeTaskMap;
     private final boolean includeCoordinator;
-    private final AtomicReference<Supplier<NodeMap>> nodeMap;
+    protected final AtomicReference<Supplier<NodeMap>> nodeMap;
     private final int minCandidates;
-    private final int maxSplitsPerNode;
-    private final int maxPendingSplitsPerTask;
+    protected final int maxSplitsPerNode;
+    protected final int maxPendingSplitsPerTask;
     private final boolean optimizedLocalScheduling;
     private final TableSplitAssignmentInfo tableSplitAssignmentInfo;
+    private final Map<PlanNodeId, FixedNodeScheduleData> feederScheduledNodes;
 
     public SimpleNodeSelector(
             InternalNodeManager nodeManager,
@@ -85,7 +87,8 @@ public class SimpleNodeSelector
             int minCandidates,
             int maxSplitsPerNode,
             int maxPendingSplitsPerTask,
-            boolean optimizedLocalScheduling)
+            boolean optimizedLocalScheduling,
+            Map<PlanNodeId, FixedNodeScheduleData> feederScheduledNodes)
     {
         this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
         this.nodeTaskMap = requireNonNull(nodeTaskMap, "nodeTaskMap is null");
@@ -96,6 +99,7 @@ public class SimpleNodeSelector
         this.maxPendingSplitsPerTask = maxPendingSplitsPerTask;
         this.optimizedLocalScheduling = optimizedLocalScheduling;
         tableSplitAssignmentInfo = TableSplitAssignmentInfo.getInstance();
+        this.feederScheduledNodes = feederScheduledNodes;
     }
 
     @Override
@@ -267,7 +271,28 @@ public class SimpleNodeSelector
             // if node exists, get the TableScanNode and annotate it as producer
             saveProducerScanNodeAssignment(stage, assignment, assignmentStats);
         }
+
+        // Check if its CTE node and its feeder
+        if (stage.isPresent() && stage.get().getFragment().getFeederCTEId().isPresent()) {
+            updateFeederNodeAndSplitCount(stage.get(), assignment);
+        }
+
         return new SplitPlacementResult(blocked, assignment);
+    }
+
+    private void updateFeederNodeAndSplitCount(SqlStageExecution stage, Multimap<InternalNode, Split> assignment)
+    {
+        FixedNodeScheduleData data;
+        if (feederScheduledNodes.containsKey(stage.getFragment().getFeederCTEParentId().get())) {
+            data = feederScheduledNodes.get(stage.getFragment().getFeederCTEParentId().get());
+            data.updateSplitCount(assignment.size());
+            data.updateAssignedNodes(assignment.keys().stream().collect(Collectors.toSet()));
+        }
+        else {
+            data = new FixedNodeScheduleData(assignment.size(), assignment.keys().stream().collect(Collectors.toSet()));
+        }
+
+        feederScheduledNodes.put(stage.getFragment().getFeederCTEParentId().get(), data);
     }
 
     private Multimap createConsumerScanNodeAssignment(QualifiedObjectName tableName, Set<Split> splits, Set<SplitKey> splitKeySet,

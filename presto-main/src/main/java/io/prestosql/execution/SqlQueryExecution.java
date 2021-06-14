@@ -756,7 +756,7 @@ public class SqlQueryExecution
         }
 
         // Must have more than 1 worker
-        if (nodeScheduler.createNodeSelector(null).selectableNodeCount() == 1) {
+        if (nodeScheduler.createNodeSelector(null, false, null).selectableNodeCount() == 1) {
             reasons.add("Requires more than 1 worker nodes");
         }
 

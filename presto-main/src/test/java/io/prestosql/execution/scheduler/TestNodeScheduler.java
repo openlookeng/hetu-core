@@ -153,7 +153,7 @@ public class TestNodeScheduler
         NodeScheduler nodeScheduler = new NodeScheduler(new LegacyNetworkTopology(), nodeManager, nodeSchedulerConfig, nodeTaskMap);
         // contents of taskMap indicate the node-task map for the current stage
         taskMap = new HashMap<>();
-        nodeSelector = nodeScheduler.createNodeSelector(CONNECTOR_ID);
+        nodeSelector = nodeScheduler.createNodeSelector(CONNECTOR_ID, false, null);
         remoteTaskExecutor = newCachedThreadPool(daemonThreadsNamed("remoteTaskExecutor-%s"));
         remoteTaskScheduledExecutor = newScheduledThreadPool(2, daemonThreadsNamed("remoteTaskScheduledExecutor-%s"));
 
@@ -240,7 +240,7 @@ public class TestNodeScheduler
             }
         };
         NodeScheduler nodeScheduler = new NodeScheduler(locationCache, topology, nodeManager, nodeSchedulerConfig, nodeTaskMap);
-        NodeSelector nodeSelector = nodeScheduler.createNodeSelector(CONNECTOR_ID);
+        NodeSelector nodeSelector = nodeScheduler.createNodeSelector(CONNECTOR_ID, false, null);
 
         // Fill up the nodes with non-local data
         ImmutableSet.Builder<Split> nonRackLocalBuilder = ImmutableSet.builder();
@@ -391,7 +391,7 @@ public class TestNodeScheduler
                 .setMaxPendingSplitsPerTask(10);
 
         NodeScheduler nodeScheduler = new NodeScheduler(locationCache, topology, nodeManager, nodeSchedulerConfig, nodeTaskMap);
-        NodeSelector nodeSelector = nodeScheduler.createNodeSelector(CONNECTOR_ID);
+        NodeSelector nodeSelector = nodeScheduler.createNodeSelector(CONNECTOR_ID, false, null);
 
         assertTrue(nodeSelector instanceof SplitCacheAwareNodeSelector);
         Multimap<InternalNode, Split> assignment1 = nodeSelector.computeAssignments(splits, ImmutableList.copyOf(taskMap.values()), Optional.empty()).getAssignments();

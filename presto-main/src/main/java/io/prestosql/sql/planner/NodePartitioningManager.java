@@ -144,7 +144,7 @@ public class NodePartitioningManager
             bucketToNode = getFixedMapping(connectorBucketNodeMap);
         }
         else {
-            NodeSelector nodeSelector = nodeScheduler.createNodeSelector(catalogName);
+            NodeSelector nodeSelector = nodeScheduler.createNodeSelector(catalogName, false, null);
             List<InternalNode> nodes;
             if (isSnapshotEnabled) {
                 if (nodeCount == null) {
@@ -204,7 +204,7 @@ public class NodePartitioningManager
 
         // Snapshot: only need to make sure this use the supplied node list if any
         if (nodes == null) {
-            nodes = nodeScheduler.createNodeSelector(partitioningHandle.getConnectorId().get()).allNodes();
+            nodes = nodeScheduler.createNodeSelector(partitioningHandle.getConnectorId().get(), false, null).allNodes();
         }
         return new FixedBucketNodeMap(
                 getSplitToBucket(session, partitioningHandle),
