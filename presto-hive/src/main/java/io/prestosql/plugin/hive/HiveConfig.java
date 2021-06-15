@@ -86,8 +86,8 @@ public class HiveConfig
     private Duration metastoreCacheTtl = new Duration(0, TimeUnit.SECONDS);
     private Duration metastoreRefreshInterval = new Duration(1, TimeUnit.SECONDS);
 
-    private Duration metastoreTableCacheTtl = new Duration(0, TimeUnit.SECONDS);
-    private Duration metastoreTableRefreshInterval = new Duration(1, TimeUnit.SECONDS);
+    private Duration metastoreDBCacheTtl = new Duration(0, TimeUnit.SECONDS);
+    private Duration metastoreDBRefreshInterval = new Duration(1, TimeUnit.SECONDS);
 
     private long metastoreCacheMaximumSize = 10000;
     private long perTransactionMetastoreCacheMaximumSize = 1000;
@@ -451,28 +451,28 @@ public class HiveConfig
     }
 
     @NotNull
-    public @MinDuration("0ms") Duration getMetastoreTableCacheTtl()
+    public @MinDuration("0ms") Duration getMetastoreDBCacheTtl()
     {
-        return metastoreTableCacheTtl;
+        return metastoreDBCacheTtl;
     }
 
-    @Config("hive.metastore-table-cache-ttl")
-    public HiveConfig setMetastoreTableCacheTtl(Duration metastoreCacheTtl)
+    @Config("hive.metastore-db-cache-ttl")
+    public HiveConfig setMetastoreDBCacheTtl(Duration metastoreCacheTtl)
     {
-        this.metastoreTableCacheTtl = metastoreCacheTtl;
+        this.metastoreDBCacheTtl = metastoreCacheTtl;
         return this;
     }
 
     @NotNull
-    public @MinDuration("1ms") Duration getMetastoreTableRefreshInterval()
+    public @MinDuration("1ms") Duration getMetastoreDBRefreshInterval()
     {
-        return metastoreTableRefreshInterval;
+        return metastoreDBRefreshInterval;
     }
 
-    @Config("hive.metastore-table-refresh-interval")
-    public HiveConfig setMetastoreTableRefreshInterval(Duration metastoreTableRefreshInterval)
+    @Config("hive.metastore-db-refresh-interval")
+    public HiveConfig setMetastoreDBRefreshInterval(Duration metastoreDBRefreshInterval)
     {
-        this.metastoreTableRefreshInterval = metastoreTableRefreshInterval;
+        this.metastoreDBRefreshInterval = metastoreDBRefreshInterval;
         return this;
     }
 

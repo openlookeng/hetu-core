@@ -125,6 +125,10 @@ Please see the [Hive Security Configuration](./hive-security.md) section for a m
 | `hive.metastore-client-service-threads` | Number of threads for metastore clients to operate in parallel to communicate with hive metastore. | 4 |
 | `hive.worker-metastore-cache-enabled` | Enable the caching of the hive metastore on the worker nodes also. | `false` |
 | `hive.metastore-write-batch-size` | Number of partitions sent to meta store in per request. | `8` |
+| `hive.metastore-cache-ttl` | Metastore Cache eviction time for table & partition metadata. | `0s` |
+| `hive.metastore-refresh-interval` | Time after which metastore cache entries for table and partition metadata are refreshed from Hive metastore. | `1s` |
+| `hive.metastore-db-cache-ttl` | Metastore Cache eviction time for DB, Roles, Configs, Table & Views list objects. | `0s` |
+| `hive.metastore-db-refresh-interval` | Time after which metastore cache entry is refreshed from Hive metastore for DB, Table List, View List, Roles objects. | `1s` |
 
 
 
@@ -709,6 +713,28 @@ Drop a schema:
 DROP SCHEMA hive.web
 ```
 
+## Metastore Cache:
+
+Hive connector maintains a metastore cache to service the metastore request faster to various operations. Loading, reloading and retention times of the cache entries can be configured in `hive.properties`.
+
+  ```properties
+  # Table & Partition Cache specific configurations
+  hive.metastore-cache-ttl=24h
+  hive.metastore-refresh-interval=23h
+
+  # DB, Table & View list, Roles, configurations related cache configuration
+  hive.metastore-db-cache-ttl=4m
+  hive.metastore-db-refresh-interval=3m
+  ```
+
+**Note:** In cases where user operates on the data directly and if hive metastore is modified externally (eg. directly by Hive, Spark), there is a possibility of cache having older data. For the same user should configure the cache refresh and eviction times accordingly.
+
+In order reduce the inconsistency, hive connector also validates the partition & its statistics cache entries `on read` against table and partition-names cache (which refreshes at higher frequency) in case the table refresh time is higher than `5mins`.
+
+```sql
+REFRESH META CACHE
+```
+Additionally, metadata cache refresh command can be used to reload the metastore cache by user.
 
 
 ## Performance tuning notes:
