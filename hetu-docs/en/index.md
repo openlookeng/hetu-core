@@ -88,6 +88,7 @@ headless: true
     - [Oracle]({{< relref "./docs/connector/oracle.md" >}})
     - [MongoDB]({{< relref "./docs/connector/mongodb.md" >}})
     - [openGauss]({{< relref "./docs/connector/opengauss.md" >}})
+    - [ClickHouse]({{< relref "./docs/connector/clickhouse.md" >}})
 
 - [Functions and Operators]("#")
     - [Logical Operators]({{< relref "./docs/functions/logical.md" >}})

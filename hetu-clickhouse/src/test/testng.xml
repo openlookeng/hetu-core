@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd" >
+<suite name="TestGroupSuite">
+    <test name="GroupTest">
+        <classes>
+            <class name="io.hetu.core.plugin.clickhouse.ClickHouseConfigTest"/>
+            <class name="io.hetu.core.plugin.clickhouse.ClickHouseClientTest"/>
+            <class name="io.hetu.core.plugin.clickhouse.ClickHousePluginTest"/>
+        </classes>
+    </test>
+</suite>
