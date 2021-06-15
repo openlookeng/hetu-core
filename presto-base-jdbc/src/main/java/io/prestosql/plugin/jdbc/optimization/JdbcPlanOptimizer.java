@@ -286,7 +286,8 @@ public class JdbcPlanOptimizer
                             context.getSchemaTableName().get().getTableName(),
                             TupleDomain.all(),
                             OptionalLong.empty(),
-                            Optional.of(new GeneratedSql(sql, true))),
+                            Optional.of(new GeneratedSql(sql, true)),
+                            false),
                     context.getTransaction().get(),
                     Optional.empty());
             return Optional.of(

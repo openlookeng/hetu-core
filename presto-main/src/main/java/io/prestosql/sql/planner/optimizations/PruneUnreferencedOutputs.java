@@ -74,6 +74,7 @@ import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
+import io.prestosql.sql.planner.plan.UpdateNode;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -776,6 +777,13 @@ public class PruneUnreferencedOutputs
         {
             PlanNode source = context.rewrite(node.getSource(), ImmutableSet.of(node.getRowId()));
             return new DeleteNode(node.getId(), source, node.getTarget(), node.getRowId(), node.getOutputSymbols());
+        }
+
+        @Override
+        public PlanNode visitUpdate(UpdateNode node, RewriteContext<Set<Symbol>> context)
+        {
+            PlanNode source = context.rewrite(node.getSource(), ImmutableSet.copyOf(node.getColumnValueAndRowIdSymbols()));
+            return new UpdateNode(node.getId(), source, node.getTarget(), node.getRowId(), node.getColumnValueAndRowIdSymbols(), node.getOutputSymbols(), node.getUpdateColumnExpression());
         }
 
         @Override

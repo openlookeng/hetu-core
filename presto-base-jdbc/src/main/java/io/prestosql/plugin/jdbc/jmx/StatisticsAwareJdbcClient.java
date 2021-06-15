@@ -13,6 +13,7 @@
  */
 package io.prestosql.plugin.jdbc.jmx;
 
+import io.airlift.slice.Slice;
 import io.prestosql.plugin.jdbc.ColumnMapping;
 import io.prestosql.plugin.jdbc.ForwardingJdbcClient;
 import io.prestosql.plugin.jdbc.JdbcClient;
@@ -23,10 +24,12 @@ import io.prestosql.plugin.jdbc.JdbcSplit;
 import io.prestosql.plugin.jdbc.JdbcTableHandle;
 import io.prestosql.plugin.jdbc.JdbcTypeHandle;
 import io.prestosql.plugin.jdbc.WriteMapping;
+import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplitSource;
+import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -39,8 +42,10 @@ import org.weakref.jmx.Nested;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
@@ -236,6 +241,90 @@ public class StatisticsAwareJdbcClient
         return stats.getTableStatistics.wrap(() -> getDelegate().getTableStatistics(session, handle, tupleDomain));
     }
 
+    @Override
+    public ColumnHandle getDeleteRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        return stats.getDeleteRowIdColumnHandle.wrap(() -> getDelegate().getDeleteRowIdColumnHandle(session, tableHandle));
+    }
+
+    @Override
+    public Optional<ConnectorTableHandle> applyDelete(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return stats.applyDelete.wrap(() -> getDelegate().applyDelete(session, handle));
+    }
+
+    @Override
+    public OptionalLong executeDelete(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return stats.executeDelete.wrap(() -> getDelegate().executeDelete(session, handle));
+    }
+
+    @Override
+    public OptionalLong executeUpdate(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return stats.executeUpdate.wrap(() -> getDelegate().executeUpdate(session, handle));
+    }
+
+    @Override
+    public OptionalLong deleteTable(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return stats.deleteTable.wrap(() -> getDelegate().deleteTable(session, handle));
+    }
+
+    @Override
+    public ConnectorTableHandle beginDelete(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        return stats.beginDelete.wrap(() -> getDelegate().beginDelete(session, tableHandle));
+    }
+
+    @Override
+    public void finishDelete(ConnectorSession session, ConnectorTableHandle tableHandle, Collection<Slice> fragments)
+    {
+        stats.finishDelete.wrap(() -> getDelegate().finishDelete(session, tableHandle, fragments));
+    }
+
+    @Override
+    public ConnectorTableHandle beginUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, List<Type> updatedColumnTypes)
+    {
+        return stats.finishDelete.wrap(() -> getDelegate().beginUpdate(session, tableHandle, updatedColumnTypes));
+    }
+
+    @Override
+    public void finishUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, Collection<Slice> fragments)
+    {
+        stats.finishDelete.wrap(() -> getDelegate().finishUpdate(session, tableHandle, fragments));
+    }
+
+    @Override
+    public String buildDeleteSql(ConnectorTableHandle handle)
+    {
+        return stats.buildDeleteSql.wrap(() -> getDelegate().buildDeleteSql(handle));
+    }
+
+    @Override
+    public String buildUpdateSql(ConnectorTableHandle handle, int updateColumnNum, List<String> updatedColumns)
+    {
+        return stats.buildDeleteSql.wrap(() -> getDelegate().buildUpdateSql(handle, updateColumnNum, updatedColumns));
+    }
+
+    @Override
+    public void setDeleteSql(PreparedStatement statement, Block rowIds, int position)
+    {
+        stats.setDeleteSql.wrap(() -> getDelegate().setDeleteSql(statement, rowIds, position));
+    }
+
+    @Override
+    public void setUpdateSql(PreparedStatement statement, List<Block> columnValueAndRowIdBlock, int position, List<String> updatedColumns)
+    {
+        stats.setDeleteSql.wrap(() -> getDelegate().setUpdateSql(statement, columnValueAndRowIdBlock, position, updatedColumns));
+    }
+
+    @Override
+    public ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle, List<ColumnHandle> updatedColumns)
+    {
+        return stats.getUpdateRowIdColumnHandle.wrap(() -> getDelegate().getUpdateRowIdColumnHandle(session, tableHandle, updatedColumns));
+    }
+
     public static final class JdbcClientStats
     {
         private final JdbcApiStats schemaExists = new JdbcApiStats();
@@ -264,6 +353,16 @@ public class StatisticsAwareJdbcClient
         private final JdbcApiStats renameColumn = new JdbcApiStats();
         private final JdbcApiStats renameTable = new JdbcApiStats();
         private final JdbcApiStats createTable = new JdbcApiStats();
+        public final JdbcApiStats deleteTable = new JdbcApiStats();
+        public final JdbcApiStats getDeleteRowIdColumnHandle = new JdbcApiStats();
+        public final JdbcApiStats applyDelete = new JdbcApiStats();
+        public final JdbcApiStats executeDelete = new JdbcApiStats();
+        public final JdbcApiStats beginDelete = new JdbcApiStats();
+        public final JdbcApiStats finishDelete = new JdbcApiStats();
+        public final JdbcApiStats buildDeleteSql = new JdbcApiStats();
+        public final JdbcApiStats setDeleteSql = new JdbcApiStats();
+        public final JdbcApiStats getUpdateRowIdColumnHandle = new JdbcApiStats();
+        public final JdbcApiStats executeUpdate = new JdbcApiStats();
 
         @Managed
         @Nested

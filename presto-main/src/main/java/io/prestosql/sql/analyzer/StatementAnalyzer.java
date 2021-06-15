@@ -14,6 +14,7 @@
 package io.prestosql.sql.analyzer;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.VerifyException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
@@ -174,7 +175,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -192,6 +192,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Iterables.getLast;
 import static com.google.common.collect.Iterables.transform;
@@ -333,7 +334,20 @@ class StatementAnalyzer
 
     public Scope analyze(Node node, Optional<Scope> outerQueryScope)
     {
-        return new Visitor(outerQueryScope, warningCollector).process(node, Optional.empty());
+        return new Visitor(outerQueryScope, warningCollector, Optional.empty())
+                .process(node, Optional.empty());
+    }
+
+    public Scope analyzeForUpdate(Table table, Optional<Scope> outerQueryScope, UpdateKind updateKind)
+    {
+        return new Visitor(outerQueryScope, warningCollector, Optional.of(updateKind))
+                .process(table, Optional.empty());
+    }
+
+    private enum UpdateKind
+    {
+        DELETE,
+        UPDATE;
     }
 
     /**
@@ -346,11 +360,13 @@ class StatementAnalyzer
     {
         private final Optional<Scope> outerQueryScope;
         private final WarningCollector warningCollector;
+        private final Optional<UpdateKind> updateKind;
 
-        private Visitor(Optional<Scope> outerQueryScope, WarningCollector warningCollector)
+        private Visitor(Optional<Scope> outerQueryScope, WarningCollector warningCollector, Optional<UpdateKind> updateKind)
         {
             this.outerQueryScope = requireNonNull(outerQueryScope, "outerQueryScope is null");
             this.warningCollector = requireNonNull(warningCollector, "warningCollector is null");
+            this.updateKind = requireNonNull(updateKind, "updateKind is null");
         }
 
         @Override
@@ -562,6 +578,8 @@ class StatementAnalyzer
                 throw new SemanticException(NOT_SUPPORTED, node, "Deleting from views is not supported");
             }
 
+            accessControl.checkCanDeleteFromTable(session.getRequiredTransactionId(), session.getIdentity(), tableName);
+
             Optional<CubeMetaStore> optionalCubeMetaStore = cubeManager.getMetaStore(STAR_TREE);
             if (optionalCubeMetaStore.isPresent() && optionalCubeMetaStore.get().getMetadataFromCubeName(tableName.toString()).isPresent()) {
                 throw new SemanticException(NOT_SUPPORTED, node, "%s is a star-tree cube, DELETE is not supported", tableName);
@@ -577,12 +595,10 @@ class StatementAnalyzer
                     session,
                     warningCollector);
 
-            Scope tableScope = analyzer.analyze(table, scope);
+            Scope tableScope = analyzer.analyzeForUpdate(table, scope, UpdateKind.DELETE);
             node.getWhere().ifPresent(where -> analyzeWhere(node, tableScope, where));
 
             analysis.setUpdateType("DELETE", tableName);
-
-            accessControl.checkCanDeleteFromTable(session.getRequiredTransactionId(), session.getIdentity(), tableName);
 
             return createAndAssignScope(node, scope, Field.newUnqualified("rows", BIGINT));
         }
@@ -596,6 +612,9 @@ class StatementAnalyzer
                 throw new SemanticException(NOT_SUPPORTED, node, "Updating view is not supported");
             }
 
+            // check access right
+            accessControl.checkCanUpdateTable(session.getRequiredTransactionId(), session.getIdentity(), tableName);
+
             Optional<CubeMetaStore> optionalCubeMetaStore = cubeManager.getMetaStore(STAR_TREE);
             if (optionalCubeMetaStore.isPresent() && optionalCubeMetaStore.get().getMetadataFromCubeName(tableName.toString()).isPresent()) {
                 throw new SemanticException(NOT_SUPPORTED, node, "%s is a star-tree cube, UPDATE is not supported", tableName);
@@ -608,17 +627,23 @@ class StatementAnalyzer
             }
 
             TableMetadata tableMetadata = metadata.getTableMetadata(session, targetTableHandle.get());
-            List<String> tableColumns = tableMetadata.getColumns().stream()
+            Set<String> tableColumns = tableMetadata.getColumns().stream()
                     .filter(column -> !column.isHidden())
                     .map(ColumnMetadata::getName)
+                    .collect(toImmutableSet());
+
+            List<ColumnMetadata> tableColumnMeta = tableMetadata.getColumns().stream().collect(toImmutableList());
+            Map<String, Type> tableColumnsTypeMap = tableColumnMeta.stream().collect(toImmutableMap(ColumnMetadata::getName, ColumnMetadata::getType));
+
+            Set<String> assignmentTargets = node.getAssignmentItems().stream()
+                    .map(assignment -> assignment.getName().toString())
+                    .collect(toImmutableSet());
+
+            List<ColumnMetadata> updatedColumns = tableColumnMeta.stream()
+                    .filter(column -> assignmentTargets.contains(column.getName()))
                     .collect(toImmutableList());
 
-            int tableColumnsCount = tableMetadata.getColumns().size();
-            List<ColumnMetadata> tableColumnMeta = tableMetadata.getColumns().stream().collect(toImmutableList());
-            Map<String, Type> tableColumnsTypeMap = new HashMap<>();
-            for (int i = 0; i < tableColumnsCount; i++) {
-                tableColumnsTypeMap.put(tableColumnMeta.get(i).getName(), tableColumnMeta.get(i).getType());
-            }
+            analysis.setUpdatedColumns(updatedColumns);
 
             // get immutableColumns from connector
             List<String> immutableColumns = new ArrayList<>();
@@ -636,7 +661,7 @@ class StatementAnalyzer
                     session,
                     warningCollector);
 
-            Scope tableScope = analyzer.analyze(table, scope);
+            Scope tableScope = analyzer.analyzeForUpdate(table, scope, UpdateKind.UPDATE);
             // validate the columns and set values
             if (node.getAssignmentItems().size() > 0) {
                 Set<String> updateColumnNames = new HashSet<>();
@@ -657,9 +682,14 @@ class StatementAnalyzer
                     ExpressionAnalysis expressionAnalysis = analyzeExpression(setValue, tableScope);
                     Type tableColumnType = tableColumnsTypeMap.get(updateColumnName);
                     Type setValueType = expressionAnalysis.getExpressionTypes().get(NodeRef.of(setValue));
-                    if (!typeCoercion.canCoerce(setValueType, tableColumnType)) {
+                    if (targetTableHandle.get().getConnectorHandle().isUpdateAsInsertSupported()
+                            && !typeCoercion.canCoerce(setValueType, tableColumnType)) {
                         throw new SemanticException(MISMATCHED_SET_COLUMN_TYPES, node, "Update column value %s has mismatched column type: %s ", setValue, tableColumnType);
                     }
+                    if (!tableColumnType.equals(setValueType)) {
+                        analysis.addCoercion(setValue, tableColumnType, typeCoercion.isTypeOnlyCoercion(setValueType, tableColumnType));
+                    }
+                    analysis.recordSubqueries(node, expressionAnalysis);
                 }
             }
             else {
@@ -673,9 +703,6 @@ class StatementAnalyzer
             node.getWhere().ifPresent(where -> analyzeWhere(node, tableScope, where));
 
             analysis.setUpdateType("UPDATE", tableName);
-
-            // check access right
-            accessControl.checkCanUpdateTable(session.getRequiredTransactionId(), session.getIdentity(), tableName);
 
             return createAndAssignScope(node, scope, Field.newUnqualified("rows", BIGINT));
         }
@@ -1384,7 +1411,44 @@ class StatementAnalyzer
 
             analysis.registerTable(table, tableHandle.get());
 
-            return createAndAssignScope(table, scope, fields.build());
+            if (updateKind.isPresent()) {
+                // Add the row id field
+                ColumnHandle rowIdColumnHandle;
+                switch (updateKind.get()) {
+                    case DELETE:
+                        rowIdColumnHandle = metadata.getDeleteRowIdColumnHandle(session, tableHandle.get());
+                        break;
+                    case UPDATE:
+                        List<ColumnMetadata> updatedColumnMetadata = analysis.getUpdatedColumns()
+                                .orElseThrow(() -> new VerifyException("updated columns not set"));
+                        Set<String> updatedColumnNames = updatedColumnMetadata.stream().map(ColumnMetadata::getName).collect(toImmutableSet());
+                        List<ColumnHandle> updatedColumns = columnHandles.entrySet().stream()
+                                .filter(entry -> updatedColumnNames.contains(entry.getKey()))
+                                .map(Map.Entry::getValue)
+                                .collect(toImmutableList());
+                        rowIdColumnHandle = metadata.getUpdateRowIdColumnHandle(session, tableHandle.get(), updatedColumns);
+                        break;
+                    default:
+                        throw new UnsupportedOperationException("Unknown UpdateKind " + updateKind.get());
+                }
+
+                Type type = metadata.getColumnMetadata(session, tableHandle.get(), rowIdColumnHandle).getType();
+                Field field = Field.newUnqualified(rowIdColumnHandle.getColumnName(), type);
+                fields.add(field);
+                analysis.setColumn(field, rowIdColumnHandle);
+                analysis.setRowIdHandle(table, rowIdColumnHandle);
+            }
+
+            List<Field> newOutputFields = fields.build();
+            Scope tableScope = createAndAssignScope(table, scope, newOutputFields);
+
+            if (updateKind.isPresent()) {
+                FieldReference reference = new FieldReference(newOutputFields.size() - 1);
+                analyzeExpression(reference, tableScope);
+                analysis.setRowIdField(table, reference);
+            }
+
+            return tableScope;
         }
 
         @Override

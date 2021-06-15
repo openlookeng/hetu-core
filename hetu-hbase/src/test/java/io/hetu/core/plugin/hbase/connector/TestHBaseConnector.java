@@ -215,10 +215,10 @@ public class TestHBaseConnector
     @Test
     public void testHBaseColumnHandle()
     {
-        // test GetUpdateRowIdColumnHandle
-        if (hcm.getUpdateRowIdColumnHandle(session, TestUtils.createHBaseTableHandle()) instanceof HBaseColumnHandle) {
+        // test getDeleteRowIdColumnHandle
+        if (hcm.getDeleteRowIdColumnHandle(session, TestUtils.createHBaseTableHandle()) instanceof HBaseColumnHandle) {
             HBaseColumnHandle hBaseColumnHandle =
-                    (HBaseColumnHandle) hcm.getUpdateRowIdColumnHandle(session, TestUtils.createHBaseTableHandle());
+                    (HBaseColumnHandle) hcm.getDeleteRowIdColumnHandle(session, TestUtils.createHBaseTableHandle());
             assertEquals("rowkey", hBaseColumnHandle.getName());
 
             // test HBaseColumnHandle Equals

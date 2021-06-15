@@ -387,7 +387,7 @@ public class CarbondataMetadata
     }
 
     @Override
-    public CarbondataUpdateTableHandle beginUpdate(ConnectorSession session, ConnectorTableHandle tableHandle)
+    public CarbondataUpdateTableHandle beginUpdateAsInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         currentState = State.UPDATE;
         HiveInsertTableHandle parent = super.beginInsert(session, tableHandle);
@@ -515,10 +515,10 @@ public class CarbondataMetadata
     }
 
     @Override
-    public Optional<ConnectorOutputMetadata> finishUpdate(ConnectorSession session,
-                                                          ConnectorUpdateTableHandle updateHandle,
-                                                          Collection<Slice> fragments,
-                                                          Collection<ComputedStatistics> computedStatistics)
+    public Optional<ConnectorOutputMetadata> finishUpdateAsInsert(ConnectorSession session,
+                                                                  ConnectorUpdateTableHandle updateHandle,
+                                                                  Collection<Slice> fragments,
+                                                                  Collection<ComputedStatistics> computedStatistics)
     {
         HiveUpdateTableHandle updateTableHandle = (HiveUpdateTableHandle) updateHandle;
         HiveInsertTableHandle insertTableHandle = new HiveInsertTableHandle(
@@ -735,13 +735,21 @@ public class CarbondataMetadata
     }
 
     @Override
-    public ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
+    public ColumnHandle getDeleteRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         // Hive connector only supports metadata delete. It does not support generic row-by-row deletion.
         // Metadata delete is implemented in Hetu by generating a plan for row-by-row delete first,
         // and then optimize it into metadata delete. As a result, Hive connector must provide partial
         // plan-time support for row-by-row delete so that planning doesn't fail. This is why we need
         // rowid handle. Note that in Hive connector, rowid handle is not implemented beyond plan-time.
+        return new HiveColumnHandle(CarbonCommonConstants.CARBON_IMPLICIT_COLUMN_TUPLEID,
+                HIVE_STRING, HIVE_STRING.getTypeSignature(), -13, SYNTHESIZED,
+                Optional.empty());
+    }
+
+    @Override
+    public ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle, List<ColumnHandle> updatedColumns)
+    {
         return new HiveColumnHandle(CarbonCommonConstants.CARBON_IMPLICIT_COLUMN_TUPLEID,
                 HIVE_STRING, HIVE_STRING.getTypeSignature(), -13, SYNTHESIZED,
                 Optional.empty());

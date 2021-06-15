@@ -800,34 +800,6 @@ public class TestAnalyzer
     }
 
     @Test
-    public void testUpdate()
-    {
-        analyze("UPDATE t1 SET a=1 WHERE b=1");
-        analyze("UPDATE t1 SET a=1");
-        analyze("UPDATE t1 SET a=1,b=2,c=3 WHERE d=1");
-        analyze("UPDATE t1 SET a=1,b=2 WHERE c=3 AND d=4");
-
-        // update with sub query
-        analyze("UPDATE t1 SET a=(SELECT a FROM t2 WHERE b=1) WHERE c=3 AND d=4");
-        analyze("UPDATE t1 SET a=1 WHERE c=(SELECT a FROM t2 WHERE b=1)");
-        analyze("UPDATE t1 SET a=(CAST('1' AS BIGINT)) WHERE c=1");
-
-        // table not found
-        assertFails(MISSING_TABLE, "UPDATE t_nobody SET c1=1 WHERE c2=2");
-        // table column not found
-        assertFails(MISSING_COLUMN, "UPDATE t1 SET e=1 WHERE a=1");
-        assertFails(MISSING_ATTRIBUTE, "UPDATE t1 SET a=1 WHERE e=1");
-        // update with duplicate set column
-        assertFails(DUPLICATE_COLUMN_NAME, "UPDATE t1 SET a=1,b=2,a=2 WHERE c=1");
-        // update with Column type not match
-        assertFails(MISMATCHED_SET_COLUMN_TYPES, "UPDATE t1 SET a='1' WHERE b=1");
-
-        // b is bigint, while a is double, coercion from b to a is possible
-        analyze("UPDATE t7 SET b=(SELECT (a) FROM t7 WHERE a=1) WHERE a=2");
-        assertFails(MISMATCHED_SET_COLUMN_TYPES, "UPDATE t7 SET a=(SELECT (b) FROM t7 WHERE a=1) WHERE a=2");
-    }
-
-    @Test
     public void testInsert()
     {
         assertFails(MISMATCHED_SET_COLUMN_TYPES, "INSERT INTO t6 (a) SELECT b from t6");

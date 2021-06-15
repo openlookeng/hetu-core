@@ -88,6 +88,11 @@ public interface ConnectorTableHandle
         return false;
     }
 
+    default boolean isUpdateAsInsertSupported()
+    {
+        return false;
+    }
+
     default boolean isSuitableForPushdown()
     {
         return false;

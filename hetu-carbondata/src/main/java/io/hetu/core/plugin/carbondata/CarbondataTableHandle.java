@@ -42,4 +42,10 @@ public class CarbondataTableHandle
     {
         return false;
     }
+
+    @Override
+    public boolean isUpdateAsInsertSupported()
+    {
+        return true;
+    }
 }

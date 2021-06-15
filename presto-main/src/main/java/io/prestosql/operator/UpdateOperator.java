@@ -13,41 +13,48 @@
  */
 package io.prestosql.operator;
 
+import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.Page;
-import io.prestosql.spi.block.Block;
 import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.snapshot.RestorableConfig;
+
+import java.util.List;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
-//TODO-cp-I38S9Q: Operator currently not supported for Snapshot
+// Table delete doesn't need snapshot support
 @RestorableConfig(unsupported = true)
-public class DeleteOperator
+public class UpdateOperator
         extends AbstractRowChangeOperator
 {
-    public static class DeleteOperatorFactory
+    public static class UpdateOperatorFactory
             implements OperatorFactory
     {
         private final int operatorId;
         private final PlanNodeId planNodeId;
-        private final int rowIdChannel;
+        private final List<Integer> columnValueAndRowIdChannels;
+        private final List<String> updatedColumns;
         private boolean closed;
 
-        public DeleteOperatorFactory(int operatorId, PlanNodeId planNodeId, int rowIdChannel)
+        public UpdateOperatorFactory(
+                int operatorId,
+                PlanNodeId planNodeId,
+                List<Integer> columnValueAndRowIdChannels,
+                List<String> updatedColumns)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
-            this.rowIdChannel = rowIdChannel;
+            this.columnValueAndRowIdChannels = ImmutableList.copyOf(requireNonNull(columnValueAndRowIdChannels, "columnValueAndRowIdChannels is null"));
+            this.updatedColumns = ImmutableList.copyOf(requireNonNull(updatedColumns, "columnValueAndRowIdSymbols is null"));
         }
 
         @Override
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext context = driverContext.addOperatorContext(operatorId, planNodeId, DeleteOperator.class.getSimpleName());
-            return new DeleteOperator(context, rowIdChannel);
+            OperatorContext context = driverContext.addOperatorContext(operatorId, planNodeId, UpdateOperator.class.getSimpleName());
+            return new UpdateOperator(context, columnValueAndRowIdChannels, updatedColumns);
         }
 
         @Override
@@ -59,16 +66,18 @@ public class DeleteOperator
         @Override
         public OperatorFactory duplicate()
         {
-            return new DeleteOperatorFactory(operatorId, planNodeId, rowIdChannel);
+            return new UpdateOperatorFactory(operatorId, planNodeId, columnValueAndRowIdChannels, updatedColumns);
         }
     }
 
-    private final int rowIdChannel;
+    private final List<Integer> columnValueAndRowIdChannels;
+    private final List<String> updatedColumns;
 
-    public DeleteOperator(OperatorContext operatorContext, int rowIdChannel)
+    public UpdateOperator(OperatorContext operatorContext, List<Integer> columnValueAndRowIdChannels, List<String> columnValueAndRowIdSymbols)
     {
         super(operatorContext);
-        this.rowIdChannel = rowIdChannel;
+        this.columnValueAndRowIdChannels = columnValueAndRowIdChannels;
+        this.updatedColumns = columnValueAndRowIdSymbols;
     }
 
     @Override
@@ -77,20 +86,14 @@ public class DeleteOperator
         requireNonNull(page, "page is null");
         checkState(state == State.RUNNING, "Operator is %s", state);
 
-        //TODO-cp-I38S9Q: Operator currently not supported for Snapshot
-        if (page instanceof MarkerPage) {
-            throw new UnsupportedOperationException("Operator doesn't support snapshotting.");
-        }
-
-        Block rowIds = page.getBlock(rowIdChannel);
-        pageSource().deleteRows(rowIds);
-        rowCount += rowIds.getPositionCount();
+        // Call the UpdatablePageSource to update rows in the page supplied.
+        pageSource().updateRows(page, columnValueAndRowIdChannels, updatedColumns);
+        rowCount += page.getPositionCount();
     }
 
     @Override
     public Page pollMarker()
     {
-        //TODO-cp-I38S9Q: Operator currently not supported for Snapshot
         return null;
     }
 }

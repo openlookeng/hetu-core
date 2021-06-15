@@ -13,12 +13,16 @@
  */
 package io.prestosql.plugin.jdbc;
 
+import io.airlift.slice.Slice;
 import io.prestosql.plugin.jdbc.optimization.JdbcConverterContext;
 import io.prestosql.plugin.jdbc.optimization.JdbcQueryGeneratorResult;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplitSource;
+import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.function.ExternalFunctionHub;
@@ -39,7 +43,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
+
+import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 
 public interface JdbcClient
 {
@@ -166,5 +173,75 @@ public interface JdbcClient
     default Optional<ExternalFunctionHub> getExternalFunctionHub()
     {
         return Optional.empty();
+    }
+
+    default ColumnHandle getDeleteRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support updates or deletes");
+    }
+
+    default Optional<ConnectorTableHandle> applyDelete(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return Optional.empty();
+    }
+
+    default OptionalLong executeDelete(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return OptionalLong.empty();
+    }
+
+    default OptionalLong executeUpdate(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return OptionalLong.empty();
+    }
+
+    default OptionalLong deleteTable(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return OptionalLong.empty();
+    }
+
+    default ConnectorTableHandle beginDelete(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support beginDelete");
+    }
+
+    default void finishDelete(ConnectorSession session, ConnectorTableHandle tableHandle, Collection<Slice> fragments)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support finishDelete");
+    }
+
+    default ConnectorTableHandle beginUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, List<Type> updatedColumnTypes)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support beginDelete");
+    }
+
+    default void finishUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, Collection<Slice> fragments)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support finishUpdate");
+    }
+
+    default String buildDeleteSql(ConnectorTableHandle handle)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support buildDeleteSql");
+    }
+
+    default String buildUpdateSql(ConnectorTableHandle handle, int setNum, List<String> updatedColumns)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support buildUpdateSql");
+    }
+
+    default void setDeleteSql(PreparedStatement statement, Block rowIds, int position)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support setDeleteSql");
+    }
+
+    default void setUpdateSql(PreparedStatement statement, List<Block> columnValueAndRowIdBlock, int position, List<String> updatedColumns)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support setUpdateSql");
+    }
+
+    default ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle, List<ColumnHandle> updatedColumns)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support updates or deletes");
     }
 }

@@ -52,6 +52,7 @@ public class JdbcModule
         binder.bind(JdbcRecordSetProvider.class).in(Scopes.SINGLETON);
         binder.bind(JdbcPageSinkProvider.class).in(Scopes.SINGLETON);
         binder.bind(JdbcConnector.class).in(Scopes.SINGLETON);
+        binder.bind(JdbcPageSourceProvider.class).in(Scopes.SINGLETON);
         configBinder(binder).bindConfig(JdbcMetadataConfig.class);
 
         newExporter(binder).export(Key.get(JdbcClient.class, InternalBaseJdbc.class))

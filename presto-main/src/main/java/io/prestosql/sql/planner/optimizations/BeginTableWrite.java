@@ -14,7 +14,6 @@
 package io.prestosql.sql.planner.optimizations;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
@@ -47,12 +46,14 @@ import io.prestosql.sql.planner.plan.TableWriterNode.UpdateTarget;
 import io.prestosql.sql.planner.plan.TableWriterNode.VacuumTarget;
 import io.prestosql.sql.planner.plan.TableWriterNode.VacuumTargetReference;
 import io.prestosql.sql.planner.plan.TableWriterNode.WriterTarget;
+import io.prestosql.sql.planner.plan.UpdateNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 
 import java.util.Optional;
 import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.sql.planner.optimizations.QueryCardinalityUtil.isAtMostScalar;
 import static io.prestosql.sql.planner.plan.ChildReplacer.replaceChildren;
 import static java.util.stream.Collectors.toSet;
@@ -129,13 +130,27 @@ public class BeginTableWrite
         @Override
         public PlanNode visitDelete(DeleteNode node, RewriteContext<Context> context)
         {
-            DeleteTarget deleteTarget = (DeleteTarget) context.get().getMaterializedHandle(node.getTarget()).get();
+            DeleteTarget deleteTarget = (DeleteTarget) context.get().handle.get();
             return new DeleteNode(
                     node.getId(),
-                    rewriteDeleteTableScan(node.getSource(), deleteTarget.getHandle()),
+                    rewriteModifyTableScan(node.getSource(), deleteTarget.getHandle()),
                     deleteTarget,
                     node.getRowId(),
                     node.getOutputSymbols());
+        }
+
+        @Override
+        public PlanNode visitUpdate(UpdateNode node, RewriteContext<Context> context)
+        {
+            UpdateTarget updateTarget = (UpdateTarget) context.get().handle.get();
+            return new UpdateNode(
+                    node.getId(),
+                    rewriteModifyTableScan(node.getSource(), updateTarget.getHandle()),
+                    updateTarget,
+                    node.getRowId(),
+                    node.getColumnValueAndRowIdSymbols(),
+                    node.getOutputSymbols(),
+                    node.getUpdateColumnExpression());
         }
 
         @Override
@@ -185,13 +200,26 @@ public class BeginTableWrite
                 return ((VacuumTableNode) node).getTarget();
             }
             if (node instanceof DeleteNode) {
-                return ((DeleteNode) node).getTarget();
+                DeleteNode deleteNode = (DeleteNode) node;
+                DeleteTarget delete = deleteNode.getTarget();
+                return new DeleteTarget(
+                        locateTableScanHandle(deleteNode.getSource()),
+                        delete.getSchemaTableName());
+            }
+            if (node instanceof UpdateNode) {
+                UpdateNode updateNode = (UpdateNode) node;
+                UpdateTarget update = updateNode.getTarget();
+                return new UpdateTarget(
+                        locateTableScanHandle(updateNode.getSource()),
+                        update.getSchemaTableName(),
+                        update.getUpdatedColumns(),
+                        update.getUpdatedColumnTypes());
             }
             if (node instanceof ExchangeNode || node instanceof UnionNode) {
                 Set<WriterTarget> writerTargets = node.getSources().stream()
                         .map(this::getTarget)
                         .collect(toSet());
-                return Iterables.getOnlyElement(writerTargets);
+                return getOnlyElement(writerTargets);
             }
             throw new IllegalArgumentException("Invalid child for TableCommitNode: " + node.getClass().getSimpleName());
         }
@@ -212,13 +240,21 @@ public class BeginTableWrite
                 DeleteTarget delete = (DeleteTarget) target;
                 return new DeleteTarget(metadata.beginDelete(session, delete.getHandle()), delete.getSchemaTableName());
             }
+            if (target instanceof UpdateTarget) {
+                UpdateTarget update = (UpdateTarget) target;
+                return new UpdateTarget(
+                        metadata.beginUpdate(session, update.getHandle(), ImmutableList.copyOf(update.getUpdatedColumnTypes())),
+                        update.getSchemaTableName(),
+                        update.getUpdatedColumns(),
+                        update.getUpdatedColumnTypes());
+            }
             if (target instanceof DeleteAsInsertReference) {
                 DeleteAsInsertReference delete = (DeleteAsInsertReference) target;
                 return new DeleteAsInsertTarget(metadata.beginDeletAsInsert(session, delete.getHandle()), metadata.getTableMetadata(session, delete.getHandle()).getTable());
             }
             if (target instanceof UpdateReference) {
                 UpdateReference update = (UpdateReference) target;
-                return new UpdateTarget(metadata.beginUpdate(session, update.getHandle()), metadata.getTableMetadata(session, update.getHandle()).getTable());
+                return new TableWriterNode.UpdateAsInsertTarget(metadata.beginUpdateAsInsert(session, update.getHandle()), metadata.getTableMetadata(session, update.getHandle()).getTable());
             }
             if (target instanceof VacuumTargetReference) {
                 VacuumTargetReference vacuum = (VacuumTargetReference) target;
@@ -228,7 +264,30 @@ public class BeginTableWrite
             throw new IllegalArgumentException("Unhandled target type: " + target.getClass().getSimpleName());
         }
 
-        private PlanNode rewriteDeleteTableScan(PlanNode node, TableHandle handle)
+        private TableHandle locateTableScanHandle(PlanNode node)
+        {
+            if (node instanceof TableScanNode) {
+                return ((TableScanNode) node).getTable();
+            }
+            if (node instanceof FilterNode) {
+                return locateTableScanHandle(((FilterNode) node).getSource());
+            }
+            if (node instanceof ProjectNode) {
+                return locateTableScanHandle(((ProjectNode) node).getSource());
+            }
+            if (node instanceof SemiJoinNode) {
+                return locateTableScanHandle(((SemiJoinNode) node).getSource());
+            }
+            if (node instanceof JoinNode) {
+                JoinNode joinNode = (JoinNode) node;
+                if (joinNode.getType() == JoinNode.Type.INNER && isAtMostScalar(joinNode.getRight())) {
+                    return locateTableScanHandle(joinNode.getLeft());
+                }
+            }
+            throw new IllegalArgumentException("Invalid descendant for DeleteNode or UpdateNode" + node.getClass().getName());
+        }
+
+        private PlanNode rewriteModifyTableScan(PlanNode node, TableHandle handle)
         {
             if (node instanceof TableScanNode) {
                 TableScanNode scan = (TableScanNode) node;
@@ -243,25 +302,25 @@ public class BeginTableWrite
             }
 
             if (node instanceof FilterNode) {
-                PlanNode source = rewriteDeleteTableScan(((FilterNode) node).getSource(), handle);
+                PlanNode source = rewriteModifyTableScan(((FilterNode) node).getSource(), handle);
                 return replaceChildren(node, ImmutableList.of(source));
             }
             if (node instanceof ProjectNode) {
-                PlanNode source = rewriteDeleteTableScan(((ProjectNode) node).getSource(), handle);
+                PlanNode source = rewriteModifyTableScan(((ProjectNode) node).getSource(), handle);
                 return replaceChildren(node, ImmutableList.of(source));
             }
             if (node instanceof SemiJoinNode) {
-                PlanNode source = rewriteDeleteTableScan(((SemiJoinNode) node).getSource(), handle);
+                PlanNode source = rewriteModifyTableScan(((SemiJoinNode) node).getSource(), handle);
                 return replaceChildren(node, ImmutableList.of(source, ((SemiJoinNode) node).getFilteringSource()));
             }
             if (node instanceof JoinNode) {
                 JoinNode joinNode = (JoinNode) node;
-                if (joinNode.getType() == JoinNode.Type.INNER && isAtMostScalar(joinNode.getRight())) {
-                    PlanNode source = rewriteDeleteTableScan(joinNode.getLeft(), handle);
+                if (joinNode.getType() == JoinNode.Type.INNER) {
+                    PlanNode source = rewriteModifyTableScan(joinNode.getLeft(), handle);
                     return replaceChildren(node, ImmutableList.of(source, joinNode.getRight()));
                 }
             }
-            throw new IllegalArgumentException("Invalid descendant for DeleteNode: " + node.getClass().getName());
+            throw new IllegalArgumentException("Invalid descendant for DeleteNode or UpdateNode: " + node.getClass().getName());
         }
     }
 

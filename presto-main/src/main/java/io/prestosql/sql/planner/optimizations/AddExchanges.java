@@ -71,6 +71,7 @@ import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
+import io.prestosql.sql.planner.plan.TableUpdateNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
@@ -612,6 +613,16 @@ public class AddExchanges
             }
 
             return rebaseAndDeriveProperties(node, child);
+        }
+
+        @Override
+        public PlanWithProperties visitTableUpdate(TableUpdateNode node, PreferredProperties context)
+        {
+            return new PlanWithProperties(
+                    node,
+                    ActualProperties.builder()
+                            .global(singleStreamPartition())
+                            .build());
         }
 
         @Override

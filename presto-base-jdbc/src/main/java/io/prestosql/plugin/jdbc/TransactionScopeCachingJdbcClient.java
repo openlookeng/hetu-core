@@ -13,11 +13,20 @@
  */
 package io.prestosql.plugin.jdbc;
 
+import io.airlift.slice.Slice;
+import io.prestosql.spi.block.Block;
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.connector.ConnectorTableHandle;
+import io.prestosql.spi.type.Type;
 
+import java.sql.PreparedStatement;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Objects.requireNonNull;
@@ -71,5 +80,89 @@ public class TransactionScopeCachingJdbcClient
     {
         getColumnsCache.remove(handle);
         super.dropColumn(identity, handle, column);
+    }
+
+    @Override
+    public ColumnHandle getDeleteRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        return super.getDeleteRowIdColumnHandle(session, tableHandle);
+    }
+
+    @Override
+    public Optional<ConnectorTableHandle> applyDelete(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return super.applyDelete(session, handle);
+    }
+
+    @Override
+    public OptionalLong executeDelete(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return super.executeDelete(session, handle);
+    }
+
+    @Override
+    public OptionalLong executeUpdate(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return super.executeUpdate(session, handle);
+    }
+
+    @Override
+    public OptionalLong deleteTable(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return super.deleteTable(session, handle);
+    }
+
+    @Override
+    public ConnectorTableHandle beginDelete(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        return super.beginDelete(session, tableHandle);
+    }
+
+    @Override
+    public void finishDelete(ConnectorSession session, ConnectorTableHandle tableHandle, Collection<Slice> fragments)
+    {
+        super.finishDelete(session, tableHandle, fragments);
+    }
+
+    @Override
+    public ConnectorTableHandle beginUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, List<Type> updatedColumnTypes)
+    {
+        return super.beginUpdate(session, tableHandle, updatedColumnTypes);
+    }
+
+    @Override
+    public void finishUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, Collection<Slice> fragments)
+    {
+        super.finishUpdate(session, tableHandle, fragments);
+    }
+
+    @Override
+    public String buildDeleteSql(ConnectorTableHandle handle)
+    {
+        return super.buildDeleteSql(handle);
+    }
+
+    @Override
+    public String buildUpdateSql(ConnectorTableHandle handle, int updateColumnNum, List<String> updatedColumns)
+    {
+        return super.buildUpdateSql(handle, updateColumnNum, updatedColumns);
+    }
+
+    @Override
+    public void setDeleteSql(PreparedStatement statement, Block rowIds, int position)
+    {
+        super.setDeleteSql(statement, rowIds, position);
+    }
+
+    @Override
+    public void setUpdateSql(PreparedStatement statement, List<Block> columnValueAndRowIdBlock, int position, List<String> updatedColumns)
+    {
+        super.setUpdateSql(statement, columnValueAndRowIdBlock, position, updatedColumns);
+    }
+
+    @Override
+    public ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle, List<ColumnHandle> updatedColumns)
+    {
+        return super.getUpdateRowIdColumnHandle(session, tableHandle, updatedColumns);
     }
 }

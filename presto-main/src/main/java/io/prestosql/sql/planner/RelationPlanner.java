@@ -247,7 +247,7 @@ class RelationPlanner
         TranslationMap translations = new TranslationMap(plan, analysis, lambdaDeclarationToSymbolMap);
         translations.setFieldMappings(mappings);
 
-        PlanBuilder planBuilder = new PlanBuilder(translations, root, analysis.getParameters());
+        PlanBuilder planBuilder = new PlanBuilder(translations, root);
 
         for (int i = 0; i < plan.getDescriptor().getAllFieldCount(); i++) {
             Field field = plan.getDescriptor().getFieldByIndex(i);
@@ -482,7 +482,7 @@ class RelationPlanner
 
         if (node.getType() == INNER) {
             // rewrite all the other conditions using output symbols from left + right plan node.
-            PlanBuilder rootPlanBuilder = new PlanBuilder(translationMap, root, analysis.getParameters());
+            PlanBuilder rootPlanBuilder = new PlanBuilder(translationMap, root);
             rootPlanBuilder = subqueryPlanner.handleSubqueries(rootPlanBuilder, complexJoinExpressions, node);
 
             for (Expression expression : complexJoinExpressions) {
@@ -990,7 +990,7 @@ class RelationPlanner
         // This makes it possible to rewrite FieldOrExpressions that reference fields from the underlying tuple directly
         translations.setFieldMappings(relationPlan.getFieldMappings());
 
-        return new PlanBuilder(translations, relationPlan.getRoot(), analysis.getParameters());
+        return new PlanBuilder(translations, relationPlan.getRoot());
     }
 
     private PlanNode distinct(PlanNode node)

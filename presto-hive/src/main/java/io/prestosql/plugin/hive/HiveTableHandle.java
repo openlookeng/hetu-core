@@ -360,6 +360,12 @@ public class HiveTableHandle
     }
 
     @Override
+    public boolean isUpdateAsInsertSupported()
+    {
+        return true;
+    }
+
+    @Override
     public boolean isSuitableForPushdown()
     {
         return this.suitableToPush;

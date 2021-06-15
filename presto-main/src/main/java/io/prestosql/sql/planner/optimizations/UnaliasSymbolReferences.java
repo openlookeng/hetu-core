@@ -79,9 +79,11 @@ import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
+import io.prestosql.sql.planner.plan.TableUpdateNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
+import io.prestosql.sql.planner.plan.UpdateNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 import io.prestosql.sql.relational.Expressions;
 import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
@@ -422,9 +424,22 @@ public class UnaliasSymbolReferences
         }
 
         @Override
+        public PlanNode visitTableUpdate(TableUpdateNode node, RewriteContext<Void> context)
+        {
+            return node;
+        }
+
+        @Override
         public PlanNode visitDelete(DeleteNode node, RewriteContext<Void> context)
         {
             return new DeleteNode(node.getId(), context.rewrite(node.getSource()), node.getTarget(), canonicalize(node.getRowId()), node.getOutputSymbols());
+        }
+
+        @Override
+        public PlanNode visitUpdate(UpdateNode node, RewriteContext<Void> context)
+        {
+            // Update keeps the symbol of update columns and rowId column, can't unalias symbol
+            return node;
         }
 
         @Override

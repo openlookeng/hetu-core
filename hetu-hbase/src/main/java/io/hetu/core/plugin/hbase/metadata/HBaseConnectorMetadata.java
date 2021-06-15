@@ -440,7 +440,7 @@ public class HBaseConnectorMetadata
     }
 
     @Override
-    public ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
+    public ColumnHandle getDeleteRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         HBaseTableHandle hBaseTableHandle = (HBaseTableHandle) tableHandle;
         HBaseTable table = hbaseConn.getTable(hBaseTableHandle.getFullTableName());

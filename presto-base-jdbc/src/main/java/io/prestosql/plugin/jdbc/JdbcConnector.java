@@ -25,8 +25,8 @@ import io.prestosql.spi.connector.ConnectorAccessControl;
 import io.prestosql.spi.connector.ConnectorCapabilities;
 import io.prestosql.spi.connector.ConnectorMetadata;
 import io.prestosql.spi.connector.ConnectorPageSinkProvider;
+import io.prestosql.spi.connector.ConnectorPageSourceProvider;
 import io.prestosql.spi.connector.ConnectorPlanOptimizerProvider;
-import io.prestosql.spi.connector.ConnectorRecordSetProvider;
 import io.prestosql.spi.connector.ConnectorSplitManager;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.function.ExternalFunctionHub;
@@ -60,7 +60,7 @@ public class JdbcConnector
     private final LifeCycleManager lifeCycleManager;
     private final JdbcMetadataFactory jdbcMetadataFactory;
     private final JdbcSplitManager jdbcSplitManager;
-    private final JdbcRecordSetProvider jdbcRecordSetProvider;
+    private final JdbcPageSourceProvider jdbcPageSourceProvider;
     private final JdbcPageSinkProvider jdbcPageSinkProvider;
     private final Optional<ConnectorAccessControl> accessControl;
     private final Set<Procedure> procedures;
@@ -78,7 +78,7 @@ public class JdbcConnector
             LifeCycleManager lifeCycleManager,
             JdbcMetadataFactory jdbcMetadataFactory,
             JdbcSplitManager jdbcSplitManager,
-            JdbcRecordSetProvider jdbcRecordSetProvider,
+            JdbcPageSourceProvider jdbcPageSourceProvider,
             JdbcPageSinkProvider jdbcPageSinkProvider,
             Optional<ConnectorAccessControl> accessControl,
             Set<Procedure> procedures,
@@ -92,7 +92,7 @@ public class JdbcConnector
         this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
         this.jdbcMetadataFactory = requireNonNull(jdbcMetadataFactory, "jdbcMetadataFactory is null");
         this.jdbcSplitManager = requireNonNull(jdbcSplitManager, "jdbcSplitManager is null");
-        this.jdbcRecordSetProvider = requireNonNull(jdbcRecordSetProvider, "jdbcRecordSetProvider is null");
+        this.jdbcPageSourceProvider = requireNonNull(jdbcPageSourceProvider, "jdbcPageSinkProvider is null");
         this.jdbcPageSinkProvider = requireNonNull(jdbcPageSinkProvider, "jdbcPageSinkProvider is null");
         this.accessControl = requireNonNull(accessControl, "accessControl is null");
         this.procedures = ImmutableSet.copyOf(requireNonNull(procedures, "procedures is null"));
@@ -165,9 +165,9 @@ public class JdbcConnector
     }
 
     @Override
-    public ConnectorRecordSetProvider getRecordSetProvider()
+    public ConnectorPageSourceProvider getPageSourceProvider()
     {
-        return jdbcRecordSetProvider;
+        return jdbcPageSourceProvider;
     }
 
     @Override

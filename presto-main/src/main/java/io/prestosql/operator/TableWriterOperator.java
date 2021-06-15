@@ -61,7 +61,7 @@ import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.sql.planner.plan.TableWriterNode.CreateTarget;
 import static io.prestosql.sql.planner.plan.TableWriterNode.DeleteAsInsertTarget;
 import static io.prestosql.sql.planner.plan.TableWriterNode.InsertTarget;
-import static io.prestosql.sql.planner.plan.TableWriterNode.UpdateTarget;
+import static io.prestosql.sql.planner.plan.TableWriterNode.UpdateAsInsertTarget;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
@@ -101,8 +101,8 @@ public class TableWriterOperator
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.columnChannels = requireNonNull(columnChannels, "columnChannels is null");
             this.pageSinkManager = requireNonNull(pageSinkManager, "pageSinkManager is null");
-            checkArgument(writerTarget instanceof CreateTarget || writerTarget instanceof InsertTarget || writerTarget instanceof TableWriterNode.UpdateTarget
-                    || writerTarget instanceof TableWriterNode.DeleteAsInsertTarget, "writerTarget must be CreateTarget or InsertTarget or UpdateTarget");
+            checkArgument(writerTarget instanceof CreateTarget || writerTarget instanceof InsertTarget || writerTarget instanceof UpdateAsInsertTarget
+                    || writerTarget instanceof TableWriterNode.DeleteAsInsertTarget, "writerTarget must be CreateTarget or InsertTarget or UpdateAsInsertTarget or DeleteAsInsertTarget");
             this.target = requireNonNull(writerTarget, "writerTarget is null");
             this.session = session;
             this.taskId = taskId;
@@ -129,8 +129,8 @@ public class TableWriterOperator
             if (target instanceof InsertTarget) {
                 return pageSinkManager.createPageSink(session, driverTaskId, ((InsertTarget) target).getHandle());
             }
-            if (target instanceof UpdateTarget) {
-                return pageSinkManager.createPageSink(session, driverTaskId, ((UpdateTarget) target).getHandle());
+            if (target instanceof UpdateAsInsertTarget) {
+                return pageSinkManager.createPageSink(session, driverTaskId, ((UpdateAsInsertTarget) target).getHandle());
             }
             if (target instanceof DeleteAsInsertTarget) {
                 return pageSinkManager.createPageSink(session, driverTaskId, ((DeleteAsInsertTarget) target).getHandle());

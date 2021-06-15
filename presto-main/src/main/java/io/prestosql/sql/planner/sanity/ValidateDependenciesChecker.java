@@ -66,9 +66,11 @@ import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
+import io.prestosql.sql.planner.plan.TableUpdateNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
+import io.prestosql.sql.planner.plan.UpdateNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 
 import java.util.Collection;
@@ -578,7 +580,25 @@ public final class ValidateDependenciesChecker
         }
 
         @Override
+        public Void visitUpdate(UpdateNode node, Set<Symbol> boundSymbols)
+        {
+            PlanNode source = node.getSource();
+            source.accept(this, boundSymbols); // visit child
+
+            checkArgument(source.getOutputSymbols().contains(node.getRowId()), "Invalid node. Row ID symbol (%s) is not in source plan output (%s)", node.getRowId(), node.getSource().getOutputSymbols());
+            checkArgument(source.getOutputSymbols().containsAll(node.getColumnValueAndRowIdSymbols()), "Invalid node. Some UPDATE SET expression symbols (%s) are not contained in the outputSymbols (%s)", node.getColumnValueAndRowIdSymbols(), source.getOutputSymbols());
+
+            return null;
+        }
+
+        @Override
         public Void visitTableDelete(TableDeleteNode node, Set<Symbol> boundSymbols)
+        {
+            return null;
+        }
+
+        @Override
+        public Void visitTableUpdate(TableUpdateNode node, Set<Symbol> boundSymbols)
         {
             return null;
         }

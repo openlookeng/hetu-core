@@ -157,6 +157,7 @@ import io.prestosql.sql.planner.optimizations.PredicatePushDown;
 import io.prestosql.sql.planner.optimizations.PruneCTENodes;
 import io.prestosql.sql.planner.optimizations.PruneUnreferencedOutputs;
 import io.prestosql.sql.planner.optimizations.ReplicateSemiJoinInDelete;
+import io.prestosql.sql.planner.optimizations.ReplicateSemiJoinInUpdate;
 import io.prestosql.sql.planner.optimizations.SetFlatteningOptimizer;
 import io.prestosql.sql.planner.optimizations.StarTreeAggregationRule;
 import io.prestosql.sql.planner.optimizations.StatsRecordingPlanOptimizer;
@@ -584,6 +585,7 @@ public class PlanOptimizers
 
         if (!forceSingleNode) {
             builder.add(new ReplicateSemiJoinInDelete()); // Must run before AddExchanges
+            builder.add(new ReplicateSemiJoinInUpdate()); // Must run before AddExchanges
             builder.add((new IterativeOptimizer(
                     ruleStats,
                     statsCalculator,

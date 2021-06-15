@@ -75,6 +75,7 @@ import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.VacuumTargetReference;
+import io.prestosql.sql.planner.plan.UpdateNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 import io.prestosql.sql.planner.sanity.PlanSanityChecker;
 import io.prestosql.sql.relational.OriginalExpressionUtils;
@@ -732,26 +733,41 @@ public class LogicalPlanner
         }
     }
 
-    private RelationPlan createUpdatePlan(Analysis analysis, Update updateStatement)
+    private RelationPlan createUpdatePlan(Analysis analysis, Update node)
     {
-        QueryPlanner.UpdateDeleteRelationPlan updatePlan = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session, namedSubPlan, uniqueIdAllocator)
-                .plan(updateStatement);
-        RelationPlan plan = updatePlan.getPlan();
-        Analysis.Update update = analysis.getUpdate().get();
-        TableMetadata tableMetadata = metadata.getTableMetadata(session, update.getTarget());
-        Optional<NewTableLayout> newTableLayout = metadata.getUpdateLayout(session, update.getTarget());
-        String catalogName = update.getTarget().getCatalogName().getCatalogName();
-        // TableStatisticsMetadata statisticsMetadata = metadata.getStatisticsCollectionMetadataForWrite(session, catalogName, tableMetadata.getMetadata());
-        Optional<Expression> constraint = updatePlan.getPredicate().isPresent() ? Optional.of(OriginalExpressionUtils.castToExpression(updatePlan.getPredicate().get())) : Optional.empty();
-        TableStatisticsMetadata statisticsMetadata = TableStatisticsMetadata.empty();
+        TableHandle handle = analysis.getTableHandle(node.getTable());
+        if (handle.getConnectorHandle().isUpdateAsInsertSupported()) {
+            QueryPlanner.UpdateDeleteRelationPlan updatePlan = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session, namedSubPlan, uniqueIdAllocator)
+                    .planUpdateRowAsInsert(node);
+            RelationPlan plan = updatePlan.getPlan();
+            Analysis.Update update = analysis.getUpdate().get();
+            TableMetadata tableMetadata = metadata.getTableMetadata(session, update.getTarget());
+            Optional<NewTableLayout> newTableLayout = metadata.getUpdateLayout(session, update.getTarget());
+            String catalogName = update.getTarget().getCatalogName().getCatalogName();
+            TableStatisticsMetadata statisticsMetadata = metadata.getStatisticsCollectionMetadataForWrite(session, catalogName, tableMetadata.getMetadata());
+            Optional<Expression> constraint = updatePlan.getPredicate().isPresent() ? Optional.of(OriginalExpressionUtils.castToExpression(updatePlan.getPredicate().get())) : Optional.empty();
 
-        return createTableWriterPlan(
-                analysis,
-                plan,
-                new TableWriterNode.UpdateReference(update.getTarget(), constraint, updatePlan.getColumnAssignments()),
-                updatePlan.getColumNames(),
-                newTableLayout,
-                statisticsMetadata);
+            return createTableWriterPlan(
+                    analysis,
+                    plan,
+                    new TableWriterNode.UpdateReference(update.getTarget(), constraint, updatePlan.getColumnAssignments()),
+                    updatePlan.getColumNames(),
+                    newTableLayout,
+                    statisticsMetadata);
+        }
+
+        UpdateNode updateNode = new QueryPlanner(analysis, planSymbolAllocator, idAllocator, buildLambdaDeclarationToSymbolMap(analysis, planSymbolAllocator), metadata, session, namedSubPlan, uniqueIdAllocator)
+                .plan(node);
+
+        TableFinishNode commitNode = new TableFinishNode(
+                idAllocator.getNextId(),
+                updateNode,
+                updateNode.getTarget(),
+                planSymbolAllocator.newSymbol("rows", BIGINT),
+                Optional.empty(),
+                Optional.empty());
+
+        return new RelationPlan(commitNode, analysis.getScope(node), commitNode.getOutputSymbols());
     }
 
     private RelationPlan createVacuumTablePlan(Analysis analysis, VacuumTable vacuumTable)
@@ -769,7 +785,7 @@ public class LogicalPlanner
                 .map(c -> planSymbolAllocator.newSymbol(c.getName(), c.getType()))
                 .collect(Collectors.toList());
 
-        ColumnHandle rowIdHandle = metadata.getUpdateRowIdColumnHandle(session, handle);
+        ColumnHandle rowIdHandle = metadata.getDeleteRowIdColumnHandle(session, handle);
         ColumnMetadata rowIdColumnMetadata = metadata.getColumnMetadata(session, handle, rowIdHandle);
 
         Type rowIdType = rowIdColumnMetadata.getType();
