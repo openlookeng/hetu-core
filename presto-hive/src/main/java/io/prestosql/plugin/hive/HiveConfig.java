@@ -85,6 +85,10 @@ public class HiveConfig
 
     private Duration metastoreCacheTtl = new Duration(0, TimeUnit.SECONDS);
     private Duration metastoreRefreshInterval = new Duration(1, TimeUnit.SECONDS);
+
+    private Duration metastoreTableCacheTtl = new Duration(0, TimeUnit.SECONDS);
+    private Duration metastoreTableRefreshInterval = new Duration(1, TimeUnit.SECONDS);
+
     private long metastoreCacheMaximumSize = 10000;
     private long perTransactionMetastoreCacheMaximumSize = 1000;
     private int maxMetastoreRefreshThreads = 100;
@@ -443,6 +447,32 @@ public class HiveConfig
     public HiveConfig setMetastoreRefreshInterval(Duration metastoreRefreshInterval)
     {
         this.metastoreRefreshInterval = metastoreRefreshInterval;
+        return this;
+    }
+
+    @NotNull
+    public @MinDuration("0ms") Duration getMetastoreTableCacheTtl()
+    {
+        return metastoreTableCacheTtl;
+    }
+
+    @Config("hive.metastore-table-cache-ttl")
+    public HiveConfig setMetastoreTableCacheTtl(Duration metastoreCacheTtl)
+    {
+        this.metastoreTableCacheTtl = metastoreCacheTtl;
+        return this;
+    }
+
+    @NotNull
+    public @MinDuration("1ms") Duration getMetastoreTableRefreshInterval()
+    {
+        return metastoreTableRefreshInterval;
+    }
+
+    @Config("hive.metastore-table-refresh-interval")
+    public HiveConfig setMetastoreTableRefreshInterval(Duration metastoreTableRefreshInterval)
+    {
+        this.metastoreTableRefreshInterval = metastoreTableRefreshInterval;
         return this;
     }
 
