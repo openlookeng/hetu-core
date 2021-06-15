@@ -702,4 +702,10 @@ public abstract class AbstractMockMetadata
     {
         throw new UnsupportedOperationException();
     }
+
+    @Override
+    public void refreshMetadataCache(Session session)
+    {
+        throw new UnsupportedOperationException();
+    }
 }

@@ -132,6 +132,7 @@ import io.prestosql.sql.tree.QuantifiedComparisonExpression;
 import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.QueryBody;
 import io.prestosql.sql.tree.QuerySpecification;
+import io.prestosql.sql.tree.RefreshMetadataCache;
 import io.prestosql.sql.tree.Relation;
 import io.prestosql.sql.tree.RenameColumn;
 import io.prestosql.sql.tree.RenameIndex;
@@ -482,6 +483,12 @@ class AstBuilder
         else {
             return new ShowCache(getLocation(context));
         }
+    }
+
+    @Override
+    public Node visitRefreshMetadataCache(SqlBaseParser.RefreshMetadataCacheContext context)
+    {
+        return new RefreshMetadataCache(getLocation(context));
     }
 
     @Override

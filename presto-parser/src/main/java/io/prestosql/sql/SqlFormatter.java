@@ -83,6 +83,7 @@ import io.prestosql.sql.tree.Property;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.QuerySpecification;
+import io.prestosql.sql.tree.RefreshMetadataCache;
 import io.prestosql.sql.tree.Relation;
 import io.prestosql.sql.tree.RenameColumn;
 import io.prestosql.sql.tree.RenameIndex;
@@ -238,6 +239,13 @@ public final class SqlFormatter
         protected Void visitShowCache(ShowCache node, Integer context)
         {
             append(context, "SHOW CACHE ");
+            return null;
+        }
+
+        @Override
+        protected Void visitRefreshMetadataCache(RefreshMetadataCache node, Integer context)
+        {
+            append(context, "REFRESH META CACHE");
             return null;
         }
 

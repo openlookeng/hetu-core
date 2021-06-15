@@ -26,7 +26,6 @@ import io.prestosql.spi.type.TypeManager;
 
 import javax.inject.Inject;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -40,7 +39,7 @@ public class HiveMetadataFactory
         implements Supplier<TransactionalMetadata>
 {
     protected final Map<String, TableColumnStatistics> statsCache = new ConcurrentHashMap();
-    protected final Map<String, List<HivePartition>> samplePartitionCache = new ConcurrentHashMap();
+    protected final Map<String, MetastoreHiveStatisticsProvider.SamplePartition> samplePartitionCache = new ConcurrentHashMap();
 
     private final boolean skipDeletionForAlter;
     private final boolean skipTargetCleanupOnRollback;

@@ -570,4 +570,6 @@ public interface Metadata
     boolean isPreAggregationSupported(Session session, CatalogName catalogName);
 
     boolean canPerformSortBasedAggregation(Session session, TableHandle tableHandle, List<String> keyNames);
+
+    void refreshMetadataCache(Session session);
 }

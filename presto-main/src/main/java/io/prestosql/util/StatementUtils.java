@@ -47,6 +47,7 @@ import io.prestosql.sql.tree.Insert;
 import io.prestosql.sql.tree.InsertCube;
 import io.prestosql.sql.tree.Prepare;
 import io.prestosql.sql.tree.Query;
+import io.prestosql.sql.tree.RefreshMetadataCache;
 import io.prestosql.sql.tree.RenameColumn;
 import io.prestosql.sql.tree.RenameIndex;
 import io.prestosql.sql.tree.RenameSchema;
@@ -123,6 +124,7 @@ public final class StatementUtils
         builder.put(ShowIndex.class, QueryType.DESCRIBE);
         builder.put(DescribeInput.class, QueryType.DESCRIBE);
         builder.put(DescribeOutput.class, QueryType.DESCRIBE);
+        builder.put(RefreshMetadataCache.class, QueryType.DESCRIBE);
 
         builder.put(CreateSchema.class, QueryType.DATA_DEFINITION);
         builder.put(DropSchema.class, QueryType.DATA_DEFINITION);

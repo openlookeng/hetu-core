@@ -110,6 +110,7 @@ import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.QuantifiedComparisonExpression;
 import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.QuerySpecification;
+import io.prestosql.sql.tree.RefreshMetadataCache;
 import io.prestosql.sql.tree.RenameColumn;
 import io.prestosql.sql.tree.RenameSchema;
 import io.prestosql.sql.tree.RenameTable;
@@ -830,6 +831,12 @@ public class TestSqlParser
     {
         assertStatement("SHOW CACHE", new ShowCache(Optional.empty(), Optional.empty()));
         assertStatement("SHOW CACHE a", new ShowCache(new NodeLocation(0, 0), QualifiedName.of("a")));
+    }
+
+    @Test
+    public void testRefreshMetastoreCache()
+    {
+        assertStatement("REFRESH META CACHE", new RefreshMetadataCache(Optional.empty()));
     }
 
     @Test

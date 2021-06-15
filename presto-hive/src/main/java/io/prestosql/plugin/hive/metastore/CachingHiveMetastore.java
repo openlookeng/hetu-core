@@ -260,6 +260,15 @@ public class CachingHiveMetastore
                 .build(asyncReloading(CacheLoader.from(this::loadConfigValue), executor));
     }
 
+    @Override
+    public void refreshMetastoreCache()
+    {
+        if (skipCache) {
+            delegate.refreshMetastoreCache();
+        }
+        flushCache();
+    }
+
     @Managed
     public void flushCache()
     {

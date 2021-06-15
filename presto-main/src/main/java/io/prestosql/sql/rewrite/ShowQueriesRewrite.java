@@ -79,6 +79,7 @@ import io.prestosql.sql.tree.Node;
 import io.prestosql.sql.tree.Property;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.Query;
+import io.prestosql.sql.tree.RefreshMetadataCache;
 import io.prestosql.sql.tree.Relation;
 import io.prestosql.sql.tree.RoutineCharacteristics;
 import io.prestosql.sql.tree.ShowCache;
@@ -915,6 +916,13 @@ final class ShowQueriesRewrite
                             ImmutableList.of("index_name", "user", "table_name", "index_columns", "index_type", "partitions", "index_props", "include")),
                     identifier("include"),
                     ordering(ascending("index_name")));
+        }
+
+        @Override
+        protected Node visitRefreshMetadataCache(RefreshMetadataCache node, Void context)
+        {
+            metadata.refreshMetadataCache(session);
+            return simpleQuery(selectList(ImmutableList.of()));
         }
 
         @Override
