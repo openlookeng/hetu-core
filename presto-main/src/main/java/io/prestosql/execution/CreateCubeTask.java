@@ -43,6 +43,7 @@ import io.prestosql.sql.analyzer.Analyzer;
 import io.prestosql.sql.analyzer.Field;
 import io.prestosql.sql.analyzer.SemanticException;
 import io.prestosql.sql.parser.SqlParser;
+import io.prestosql.sql.planner.Coercer;
 import io.prestosql.sql.tree.CreateCube;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.FunctionCall;
@@ -239,6 +240,7 @@ public class CreateCubeTask
         builder.setCubeStatus(CubeStatus.INACTIVE);
         builder.setTableLastUpdatedTime(-1L);
         statement.getSourceFilter().ifPresent(sourceTablePredicate -> {
+            sourceTablePredicate = Coercer.addCoercions(sourceTablePredicate, analysis);
             builder.withCubeFilter(new CubeFilter(ExpressionFormatter.formatExpression(sourceTablePredicate, Optional.empty())));
         });
         builder.setCubeLastUpdatedTime(System.currentTimeMillis());

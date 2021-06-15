@@ -596,6 +596,36 @@ public abstract class AbstractTestStarTreeQueries
         assertUpdate("DROP TABLE orders_table_source_data_filter");
     }
 
+    @Test
+    public void testSourceFilterWithVarchar()
+    {
+        computeActual("CREATE TABLE orders_table_source_filter_varchar AS SELECT * FROM orders");
+        computeActual("CREATE CUBE orders_cube_source_filter_varchar ON orders_table_source_filter_varchar WITH (AGGREGATIONS = (sum(totalprice), count(distinct orderkey)), GROUP = (custkey, orderdate), FILTER = (orderpriority = '1-URGENT'))");
+        assertQuerySucceeds("INSERT INTO CUBE orders_cube_source_filter_varchar WHERE orderdate BETWEEN date '1992-01-01' AND date '1992-01-10'");
+        assertQuery(sessionStarTree,
+                "SELECT custkey, orderdate, sum(totalprice) FROM orders_table_source_filter_varchar WHERE orderpriority = '1-URGENT' AND orderdate BETWEEN date '1992-01-01' AND date '1992-01-10' group by custkey, orderdate",
+                "SELECT custkey, orderdate, sum(totalprice) FROM orders WHERE orderpriority = '1-URGENT' AND orderdate BETWEEN '1992-01-01' AND '1992-01-10' group by custkey, orderdate",
+                assertTableScan("orders_cube_source_filter_varchar"));
+        assertUpdate("DROP TABLE orders_table_source_filter_varchar");
+    }
+
+    @Test
+    public void testSourceFilterWithCast()
+    {
+        computeActual("CREATE TABLE orders_table_source_filter_cast AS SELECT * FROM orders");
+        computeActual("CREATE CUBE orders_cube_source_filter_cast ON orders_table_source_filter_cast WITH (AGGREGATIONS = (count(*)), GROUP = (orderdate), FILTER = (custkey BETWEEN BIGINT '1' AND BIGINT '100'))");
+        assertQuerySucceeds("INSERT INTO CUBE orders_cube_source_filter_cast WHERE orderdate BETWEEN date '1992-01-01' AND date '1992-01-10'");
+        assertQuery(sessionStarTree,
+                "SELECT orderdate, count(*) FROM orders_table_source_filter_cast WHERE custkey BETWEEN BIGINT '1' AND BIGINT '200' AND orderdate BETWEEN date '1992-01-01' AND date '1992-01-10' group by orderdate",
+                "SELECT orderdate, count(*) FROM orders WHERE custkey BETWEEN 1 AND 200 AND orderdate BETWEEN '1992-01-01' AND '1992-01-10' group by orderdate",
+                assertTableScan("orders_table_source_filter_cast"));
+        assertQuery(sessionStarTree,
+                "SELECT orderdate, count(*) FROM orders_table_source_filter_cast WHERE custkey BETWEEN BIGINT '1' AND BIGINT '100' AND orderdate BETWEEN date '1992-01-01' AND date '1992-01-10' group by orderdate",
+                "SELECT orderdate, count(*) FROM orders WHERE custkey BETWEEN 1 AND 100 AND orderdate BETWEEN '1992-01-01' AND '1992-01-10' group by orderdate",
+                assertTableScan("orders_cube_source_filter_cast"));
+        assertUpdate("DROP TABLE orders_table_source_filter_cast");
+    }
+
     private Consumer<Plan> assertInTableScans(String tableName)
     {
         return plan ->
