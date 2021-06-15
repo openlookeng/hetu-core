@@ -30,7 +30,6 @@ To be able to resume execution from a previously saved snapshot, there must be a
 - **Interaction with other features**: distributed snapshot does not yet work with the following features:
    - Reuse exchange, i.e. `optimizer.reuse-table-scan`
    - Reuse common table expression (CTE), i.e. `optimizer.cte-reuse-enabled`
-   - Spill, i.e. `experimental.spill-enabled`
 
 When a query that does not meet the above requirements is submitted with distributed snapshot enabled, the query will be executed as if the distributed snapshot feature is _not_ turned on.
 

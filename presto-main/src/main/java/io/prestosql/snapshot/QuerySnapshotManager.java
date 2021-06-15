@@ -193,7 +193,14 @@ public class QuerySnapshotManager
                 }
             }
 
-            saveQuerySnapshotResult();
+            try {
+                saveQuerySnapshotResult();
+            }
+            catch (Exception e) {
+                LOG.warn(e, "Failed to save query snapshot state for %s: %s", queryId, e.getMessage());
+                invalidateAllSnapshots();
+                result = OptionalLong.empty();
+            }
         }
 
         if (result.isPresent()) {
@@ -211,7 +218,6 @@ public class QuerySnapshotManager
             for (Long snapshotId : captureResults.keySet()) {
                 captureResults.put(snapshotId, SnapshotResult.NA);
             }
-            saveQuerySnapshotResult();
         }
     }
 
@@ -415,8 +421,6 @@ public class QuerySnapshotManager
                     SnapshotResult oldResult = captureResults.put(snapshotId, snapshotResult);
                     if (snapshotResult != oldResult && snapshotResult.isDone()) {
                         LOG.debug("Finished capturing snapshot %d for query %s. Result is %s.", snapshotId, queryId.getId(), snapshotResult);
-                        // Store snapshot information for this query in filesystem, so it can be accessed by tasks, e.g. during backtrack state loading.
-                        saveQuerySnapshotResult();
                     }
                 }
             }

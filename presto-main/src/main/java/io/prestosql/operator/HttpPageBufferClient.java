@@ -638,7 +638,7 @@ public final class HttpPageBufferClient
                         return createEmptyPagesResponse(0, 0, false);
                     }
                 }
-                throw new PageTransportErrorException(format("Error fetching %s: %s", request.getUri().toASCIIString(), e.getMessage()), e);
+                throw new PageTransportErrorException(format("Error fetching %s: %s (response status code %d)", request.getUri().toASCIIString(), e.getMessage(), response.getStatusCode()), e);
             }
         }
 
