@@ -47,7 +47,7 @@ jdbc.pushdown-module=FULL_PUSHDOWN
 
 ### Multiple Oracle Databases or Servers
 
-If you want to connect to multiple Oracle databases, configure another instance of the Oracle plugin as a separate catalog. To add another Oracle catalog, create a new property file with a different name (the file name extension is .properties) in **../conf/catalog**. For example, if a file named **hana2.properties** is created in **../conf/catalog**, add a connector named **oracle2**.
+If you want to connect to multiple Oracle databases, configure another instance of the Oracle plugin as a separate catalog. To add another Oracle catalog, create a new property file with a different name (the file name extension is .properties) in **../conf/catalog**. For example, if a file named **oracle2.properties** is created in **../conf/catalog**, add a connector named **oracle2**.
 
 ## Querying Oracle Using openLooKeng
 
@@ -69,6 +69,95 @@ You can access the **hello** table in the **data** schema:
     SELECT * FROM oracle.data.hello;
 
 The connector's permissions in these schemas are your permissions configured in the connection property file. If you cannot access the tables, a specific connector cannot access them.
+
+## Oracle Update/Delete Support
+
+### Create Oracle Table
+
+Example：
+
+```sql
+CREATE TABLE oracle_table (
+    id int,
+    name varchar(255));
+```
+
+### INSERT on Oracle tables
+
+Example：
+
+```sql
+INSERT INTO oracle_table
+  VALUES
+     (1, 'foo'),
+     (2, 'bar');
+```
+
+### UPDATE on Oracle tables
+
+Example：
+
+```sql
+UPDATE oracle_table
+  SET name='john'
+  WHERE id=2;
+```
+
+Above example updates the column ` name`'s value to `john` of row with column `id` having value `2`.
+
+SELECT result before UPDATE:
+
+```sql
+lk:default> SELECT * FROM oracle_table;
+id | name
+----+------
+  2 | bar
+  1 | foo
+(2 rows)
+```
+
+SELECT result after UPDATE
+
+```sql
+lk:default> SELECT * FROM oracle_table;
+ id | name
+----+------
+  2 | john
+  1 | foo
+(2 rows)
+```
+
+### DELETE on Oracle tables
+
+Example：
+
+```sql
+DELETE FROM oracle_table
+  WHERE id=2;
+```
+
+Above example delete the row with column `id` having value `2`.
+
+SELECT result before DELETE:
+
+```sql
+lk:default> SELECT * FROM oracle_table;
+ id | name
+----+------
+  2 | john
+  1 | foo
+(2 rows)
+```
+
+SELECT result after DELETE:
+
+```sql
+lk:default> SELECT * FROM oracle_table;
+ id | name
+----+------
+  1 | foo
+(1 row)
+```
 
 ## Mapping Data Types Between openLooKeng and Oracle
 
@@ -193,7 +282,9 @@ oracle.synonyms.enabled=true
 
 ## Restrictions on the Oracle Connector
 
-The openLooKeng can connect to Oracle Database 11g and Oracle Database 12c.
+- The openLooKeng can connect to Oracle Database 11g and Oracle Database 12c.
+
+- The Oracle Connector does not support query pushdown for Oracle Update yet.
 
 ### Oracle Number Type
 

@@ -48,7 +48,7 @@ jdbc.pushdown-module=FULL_PUSHDOWN
 
 ### 多套Oracle数据库或服务器
 
-如果要连接到多个Oracle数据库，请将Oracle插件的另一个实例配置为一个单独的目录。如需添加其他Oracle目录，请在 **../conf/catalog** 下添加不同名称的另一属性文件（注意结尾为 **.properties** ）。例如，在 **../conf/catalog** 目录下新增一个名称为 **hana2.properties** 的文件，则新增一个名称为oracle2的连接器。
+如果要连接到多个Oracle数据库，请将Oracle插件的另一个实例配置为一个单独的目录。如需添加其他Oracle目录，请在 **../conf/catalog** 下添加不同名称的另一属性文件（注意结尾为 **.properties** ）。例如，在 **../conf/catalog** 目录下新增一个名称为 **oracle2.properties** 的文件，则新增一个名称为oracle2的连接器。
 
 ## 通过openLooKeng查询Oracle
 
@@ -70,6 +70,95 @@ jdbc.pushdown-module=FULL_PUSHDOWN
     SELECT * FROM oracle.data.hello;
 
 连接器在这些模式中的权限是在连接属性文件中配置的用户的权限。如果用户无法访问这些表，则特定的连接器将无法访问这些表。
+
+## Oracle Update/Delete 支持
+
+### 使用Oracle连接器创建表
+
+示例：
+
+```sql
+CREATE TABLE oracle_table (
+    id int,
+    name varchar(255));
+```
+
+### 对表执行INSERT
+
+示例：
+
+```sql
+INSERT INTO oracle_table
+  VALUES
+     (1, 'foo'),
+     (2, 'bar');
+```
+
+### 对表执行UPDATE
+
+示例：
+
+```sql
+UPDATE oracle_table
+  SET name='john'
+  WHERE id=2;
+```
+
+上述示例将值为`2`的列`id`的行的列`name`的值更新为`john`。
+
+UPDATE前的SELECT结果：
+
+```sql
+lk:default> SELECT * FROM oracle_table;
+id | name
+----+------
+  2 | bar
+  1 | foo
+(2 rows)
+```
+
+UPDATE后的SELECT结果
+
+```sql
+lk:default> SELECT * FROM oracle_table;
+ id | name
+----+------
+  2 | john
+  1 | foo
+(2 rows)
+```
+
+### 对表执行DELETE
+
+示例：
+
+```sql
+DELETE FROM oracle_table
+  WHERE id=2;
+```
+
+以上示例删除了值为`2`的列`id`的行。
+
+DELETE前的SELECT结果：
+
+```sql
+lk:default> SELECT * FROM oracle_table;
+ id | name
+----+------
+  2 | john
+  1 | foo
+(2 rows)
+```
+
+DELETE后的SELECT结果：
+
+```sql
+lk:default> SELECT * FROM oracle_table;
+ id | name
+----+------
+  1 | foo
+(1 row)
+```
 
 ## openLooKeng和Oracle之间的数据类型映射
 
@@ -192,7 +281,9 @@ oracle.synonyms.enabled=true
 
 ## Oracle连接器的限制
 
-openLooKeng支持连接Oracle 11g和Oracle 12c。
+- openLooKeng支持连接Oracle 11g和Oracle 12c。
+
+- Oracle连接器暂不支持Update下推功能。
 
 ### Oralce的number数据类型
 
