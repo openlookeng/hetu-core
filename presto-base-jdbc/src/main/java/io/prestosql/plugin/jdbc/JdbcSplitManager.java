@@ -13,6 +13,7 @@
  */
 package io.prestosql.plugin.jdbc;
 
+import io.prestosql.plugin.splitmanager.DataSourceTableSplitManager;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplitManager;
 import io.prestosql.spi.connector.ConnectorSplitSource;
@@ -28,15 +29,25 @@ public class JdbcSplitManager
 {
     private final JdbcClient jdbcClient;
 
+    private boolean tableSplitEnable;
+    private DataSourceTableSplitManager tableSplitManager;
+
     @Inject
-    public JdbcSplitManager(@InternalBaseJdbc JdbcClient jdbcClient)
+    public JdbcSplitManager(@InternalBaseJdbc JdbcClient jdbcClient, BaseJdbcConfig config, DataSourceTableSplitManager tableSplitManager)
     {
         this.jdbcClient = requireNonNull(jdbcClient, "client is null");
+        this.tableSplitEnable = requireNonNull(config, "config is null").getTableSplitEnable();
+        this.tableSplitManager = requireNonNull(tableSplitManager, "tableSplitManager is null");
     }
 
     @Override
     public ConnectorSplitSource getSplits(ConnectorTransactionHandle transaction, ConnectorSession session, ConnectorTableHandle table, SplitSchedulingStrategy splitSchedulingStrategy)
     {
-        return jdbcClient.getSplits(JdbcIdentity.from(session), (JdbcTableHandle) table);
+        JdbcTableHandle tableHandle = (JdbcTableHandle) table;
+        //table split eanble and no pushdown operator
+        if (tableSplitEnable && !tableHandle.getGeneratedSql().isPresent()) {
+            return tableSplitManager.getSplits(JdbcIdentity.from(session), tableHandle);
+        }
+        return jdbcClient.getSplits(JdbcIdentity.from(session), tableHandle);
     }
 }

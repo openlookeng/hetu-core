@@ -16,6 +16,8 @@ package io.prestosql.plugin.jdbc;
 import io.airlift.slice.Slice;
 import io.prestosql.plugin.jdbc.optimization.JdbcConverterContext;
 import io.prestosql.plugin.jdbc.optimization.JdbcQueryGeneratorResult;
+import io.prestosql.plugin.splitmanager.SplitStatLog;
+import io.prestosql.plugin.splitmanager.TableSplitConfig;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -243,5 +245,15 @@ public interface JdbcClient
     default ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle, List<ColumnHandle> updatedColumns)
     {
         throw new PrestoException(NOT_SUPPORTED, "This connector does not support updates or deletes");
+    }
+
+    default List<SplitStatLog> getSplitStatic(JdbcIdentity identity, List<JdbcSplit> jdbcSplitList)
+    {
+        return Collections.emptyList();
+    }
+
+    default Long[] getSplitFieldMinAndMaxValue(TableSplitConfig conf, Connection connection, JdbcTableHandle tableHandle)
+    {
+        return null;
     }
 }

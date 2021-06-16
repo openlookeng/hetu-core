@@ -28,6 +28,7 @@ import javax.validation.constraints.NotNull;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import static io.prestosql.sql.builder.functioncall.BaseFunctionUtil.parserExternalFunctionCatalogSchema;
 import static io.prestosql.sql.builder.functioncall.BaseFunctionUtil.parserPushDownSupportedRemoteCatalogSchema;
@@ -69,6 +70,13 @@ public class BaseJdbcConfig
 
     private String pushDownExternalFunctionNamespaces;
     private String connectorRegistryFunctionNamespace;
+
+    private boolean fieldSplitEnable;
+
+    private String tableSplitFields;
+
+    private Duration stepCalcRefreshInterval = new Duration(5, TimeUnit.MINUTES);
+    private int stepCalcThreads = 4;
 
     public Optional<CatalogSchemaName> getConnectorRegistryFunctionNamespace()
     {
@@ -457,5 +465,56 @@ public class BaseJdbcConfig
     {
         this.pushDownModule = pushDownModule;
         return this;
+    }
+
+    @Config("jdbc.table-split-enabled")
+    @ConfigDescription("table spilt function switch")
+    public BaseJdbcConfig setTableSplitEnable(boolean fieldSplitEnable)
+    {
+        this.fieldSplitEnable = fieldSplitEnable;
+        return this;
+    }
+
+    public boolean getTableSplitEnable()
+    {
+        return this.fieldSplitEnable;
+    }
+
+    //jdbc.table-split-fields =[{"catalogName":"mysqldb","schemaName":"","tableName":"hetu_data","splitField":"id","calcStepEnable":"false","dataReadOnly":"false","scanNodes":"2","fieldMinValue":"-1","fieldMaxValue":"3"},{"catalogName":"mysqldb","schemaName":"","tableName":"hetu_catalog_params","splitField":"catalog_id","calcStepEnable":"false","dataReadOnly":"false","scanNodes":"2","fieldMinValue":"-1","fieldMaxValue":"3"}]
+    @Config("jdbc.table-split-fields")
+    @ConfigDescription("Allow multi split by one of table filed, this filed must be integer like value")
+    public BaseJdbcConfig setTableSplitFields(String tableSplitFields)
+    {
+        this.tableSplitFields = tableSplitFields;
+        return this;
+    }
+
+    public String getTableSplitFields()
+    {
+        return this.tableSplitFields;
+    }
+
+    @Config("jdbc.table-split-stepCalc-refresh-interval")
+    public BaseJdbcConfig setTableSplitStepCalcRefreshInterval(Duration stepCalcRefreshInterval)
+    {
+        this.stepCalcRefreshInterval = stepCalcRefreshInterval;
+        return this;
+    }
+
+    public Duration getTableSplitStepCalcRefreshInterval()
+    {
+        return stepCalcRefreshInterval;
+    }
+
+    @Config("jdbc.table-split-stepCalc-threads")
+    public BaseJdbcConfig setTableSplitStepCalcCalcThreads(int stepCalcThreads)
+    {
+        this.stepCalcThreads = stepCalcThreads;
+        return this;
+    }
+
+    public int getTableSplitStepCalcCalcThreads()
+    {
+        return stepCalcThreads;
     }
 }

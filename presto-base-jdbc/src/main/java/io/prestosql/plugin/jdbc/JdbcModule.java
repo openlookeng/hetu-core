@@ -22,6 +22,7 @@ import com.google.inject.Singleton;
 import io.prestosql.plugin.jdbc.jmx.StatisticsAwareConnectionFactory;
 import io.prestosql.plugin.jdbc.jmx.StatisticsAwareJdbcClient;
 import io.prestosql.plugin.jdbc.optimization.JdbcPlanOptimizer;
+import io.prestosql.plugin.splitmanager.DataSourceTableSplitManager;
 import io.prestosql.spi.connector.ConnectorAccessControl;
 import io.prestosql.spi.procedure.Procedure;
 
@@ -53,6 +54,7 @@ public class JdbcModule
         binder.bind(JdbcPageSinkProvider.class).in(Scopes.SINGLETON);
         binder.bind(JdbcConnector.class).in(Scopes.SINGLETON);
         binder.bind(JdbcPageSourceProvider.class).in(Scopes.SINGLETON);
+        binder.bind(DataSourceTableSplitManager.class).in(Scopes.SINGLETON);
         configBinder(binder).bindConfig(JdbcMetadataConfig.class);
 
         newExporter(binder).export(Key.get(JdbcClient.class, InternalBaseJdbc.class))

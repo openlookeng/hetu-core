@@ -17,6 +17,8 @@ import io.airlift.slice.Slice;
 import io.prestosql.plugin.jdbc.optimization.BaseJdbcQueryGenerator;
 import io.prestosql.plugin.jdbc.optimization.JdbcConverterContext;
 import io.prestosql.plugin.jdbc.optimization.JdbcQueryGeneratorResult;
+import io.prestosql.plugin.splitmanager.SplitStatLog;
+import io.prestosql.plugin.splitmanager.TableSplitConfig;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -367,5 +369,17 @@ public abstract class ForwardingJdbcClient
     public ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle, List<ColumnHandle> updatedColumns)
     {
         return getDelegate().getUpdateRowIdColumnHandle(session, tableHandle, updatedColumns);
+    }
+
+    @Override
+    public List<SplitStatLog> getSplitStatic(JdbcIdentity identity, List<JdbcSplit> jdbcSplitList)
+    {
+        return getDelegate().getSplitStatic(identity, jdbcSplitList);
+    }
+
+    @Override
+    public Long[] getSplitFieldMinAndMaxValue(TableSplitConfig conf, Connection connection, JdbcTableHandle tableHandle)
+    {
+        return getDelegate().getSplitFieldMinAndMaxValue(conf, connection, tableHandle);
     }
 }
