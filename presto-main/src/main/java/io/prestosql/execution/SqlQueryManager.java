@@ -30,6 +30,7 @@ import io.prestosql.memory.ClusterMemoryManager;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.queryeditorui.QueryEditorUIModule;
 import io.prestosql.server.BasicQueryInfo;
+import io.prestosql.spi.ErrorType;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.statestore.StateMap;
@@ -53,6 +54,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -67,8 +69,8 @@ import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static io.airlift.concurrent.Threads.threadsNamed;
 import static io.prestosql.SystemSessionProperties.getQueryMaxCpuTime;
 import static io.prestosql.execution.QueryState.RUNNING;
-import static io.prestosql.spi.StandardErrorCode.EXCEEDED_TIME_LIMIT;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
+import static io.prestosql.spi.StandardErrorCode.QUERY_EXPIRE;
 import static io.prestosql.utils.StateUtils.isMultiCoordinatorEnabled;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -445,9 +447,15 @@ public class SqlQueryManager
 
         Map<String, SharedQueryState> queries = StateCacheStore.get().getCachedStates(StateStoreConstants.FINISHED_QUERY_STATE_COLLECTION_NAME);
         if (queries != null) {
-            for (QueryExecution localQuery : localRunningQueries) {
-                if (queries.containsKey(localQuery.getQueryId().getId())) {
-                    localQuery.fail(new PrestoException(EXCEEDED_TIME_LIMIT, "Query killed because the query has expired. Please try again in a few minutes."));
+            Set<String> expiredQueryIds = queries.entrySet().stream()
+                    .filter(entry -> isQueryExpired(entry.getValue()))
+                    .map(entry -> entry.getKey())
+                    .collect(Collectors.toSet());
+            if (!expiredQueryIds.isEmpty()) {
+                for (QueryExecution localQuery : localRunningQueries) {
+                    if (expiredQueryIds.contains(localQuery.getQueryId().getId())) {
+                        localQuery.fail(new PrestoException(QUERY_EXPIRE, "Query killed because the query has expired. Please try again in a few minutes."));
+                    }
                 }
             }
         }
@@ -468,5 +476,11 @@ public class SqlQueryManager
     private boolean isIndexCreationQuery(QueryInfo queryInfo)
     {
         return queryInfo.getQuery().toUpperCase(Locale.ROOT).startsWith("CREATE INDEX");
+    }
+
+    private static boolean isQueryExpired(SharedQueryState state)
+    {
+        BasicQueryInfo info = state.getBasicQueryInfo();
+        return info.getState() == QueryState.FAILED && info.getErrorType() == ErrorType.INTERNAL_ERROR && info.getErrorCode().equals(QUERY_EXPIRE.toErrorCode());
     }
 }
