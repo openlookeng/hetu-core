@@ -44,7 +44,7 @@ import java.util.concurrent.locks.Lock;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.concurrent.Threads.threadsNamed;
-import static io.prestosql.spi.StandardErrorCode.SERVER_SHUTTING_DOWN;
+import static io.prestosql.spi.StandardErrorCode.QUERY_EXPIRE;
 import static io.prestosql.statestore.StateStoreConstants.CPU_USAGE_STATE_COLLECTION_NAME;
 import static io.prestosql.statestore.StateStoreConstants.DEFAULT_ACQUIRED_LOCK_TIME_MS;
 import static io.prestosql.statestore.StateStoreConstants.FINISHED_QUERY_STATE_COLLECTION_NAME;
@@ -269,7 +269,7 @@ public class StateFetcher
                     String queryState = ((StateMap<String, String>) stateCollection).get(state.getBasicQueryInfo().getQueryId().getId());
                     if (queryState != null) {
                         BasicQueryInfo oldQueryInfo = state.getBasicQueryInfo();
-                        SharedQueryState newState = createNewState(oldQueryInfo, state);
+                        SharedQueryState newState = createExpiredState(oldQueryInfo, state);
 
                         String stateJson = MAPPER.writeValueAsString(newState);
                         ((StateMap) finishStateCollection).put(newState.getBasicQueryInfo().getQueryId().getId(), stateJson);
@@ -288,7 +288,7 @@ public class StateFetcher
         }
     }
 
-    private SharedQueryState createNewState(BasicQueryInfo oldQueryInfo, SharedQueryState oldState)
+    private SharedQueryState createExpiredState(BasicQueryInfo oldQueryInfo, SharedQueryState oldState)
     {
         BasicQueryInfo newQueryInfo = new BasicQueryInfo(
                 oldQueryInfo.getQueryId(),
@@ -302,11 +302,11 @@ public class StateFetcher
                 oldQueryInfo.getPreparedQuery(),
                 oldQueryInfo.getQueryStats(),
                 ErrorType.INTERNAL_ERROR,
-                SERVER_SHUTTING_DOWN.toErrorCode()); // now query expired only if coordinator shutdown
+                QUERY_EXPIRE.toErrorCode());
 
         SharedQueryState newState = new SharedQueryState(
                 newQueryInfo,
-                Optional.of(SERVER_SHUTTING_DOWN.toErrorCode()),
+                Optional.of(QUERY_EXPIRE.toErrorCode()),
                 oldState.getUserMemoryReservation(),
                 oldState.getTotalMemoryReservation(),
                 oldState.getTotalCpuTime(),

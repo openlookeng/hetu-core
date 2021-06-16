@@ -47,7 +47,7 @@ public class TestHetuConfig
                 .setStateFetchInterval(new Duration(100, TimeUnit.MILLISECONDS))
                 .setStateUpdateInterval(new Duration(100, TimeUnit.MILLISECONDS))
                 .setQuerySubmitTimeout(new Duration(10, TimeUnit.SECONDS))
-                .setStateExpireTime(new Duration(10, TimeUnit.SECONDS))
+                .setStateExpireTime(new Duration(60, TimeUnit.SECONDS))
                 .setDataCenterSplits(5)
                 .setDataCenterConsumerTimeout(new Duration(10, TimeUnit.MINUTES))
                 .setSplitCacheMapEnabled(false)

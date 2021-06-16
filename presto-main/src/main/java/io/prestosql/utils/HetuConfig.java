@@ -48,7 +48,7 @@ public class HetuConfig
     private Duration stateUpdateInterval = new Duration(100, TimeUnit.MILLISECONDS);
     private Duration stateFetchInterval = new Duration(100, TimeUnit.MILLISECONDS);
     private Duration querySubmitTimeout = new Duration(10, TimeUnit.SECONDS);
-    private Duration stateExpireTime = new Duration(10, TimeUnit.SECONDS);
+    private Duration stateExpireTime = new Duration(60, TimeUnit.SECONDS);
     private int dataCenterSplits = 5;
     private Duration dataCenterConsumerTimeout = new Duration(10, TimeUnit.MINUTES);
     private boolean executionPlanCacheEnabled;
