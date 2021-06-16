@@ -77,6 +77,11 @@ public class Constants
     public static final String ROWKEY_TAIL = "|";
 
     /**
+     * HBASE_ROWID_NAME
+     */
+    public static final String HBASE_ROWID_NAME = "$rowId";
+
+    /**
      * DEFAULT
      */
     public static final String DEFAULT = "default";

@@ -23,16 +23,11 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
 import org.apache.hadoop.hbase.client.Result;
-import org.joda.time.chrono.ISOChronology;
-import org.joda.time.format.ISODateTimeFormat;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
-import java.sql.Date;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +43,6 @@ import static io.prestosql.spi.type.TimeType.TIME;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.concurrent.TimeUnit.DAYS;
 
 /**
  * StringRowSerializer
@@ -168,7 +162,7 @@ public class StringRowSerializer
             return ((Boolean) (value.equals(Boolean.TRUE))).toString().getBytes(UTF_8);
         }
         else if (type.equals(DATE)) {
-            return new Date(DAYS.toMillis((Long) value)).toString().getBytes(UTF_8);
+            return ((Long) value).toString().getBytes(UTF_8);
         }
         else if (type.equals(DOUBLE)) {
             return value.toString().getBytes(UTF_8);
@@ -183,15 +177,13 @@ public class StringRowSerializer
             return ((Long) value).toString().getBytes(UTF_8);
         }
         else if (type.equals(TIME)) {
-            org.joda.time.format.DateTimeFormatter formatter = ISODateTimeFormat.hourMinuteSecondMillis().withChronology(ISOChronology.getInstanceUTC());
-            return formatter.print((Long) value).getBytes(UTF_8);
+            return ((Long) value).toString().getBytes(UTF_8);
         }
         else if (type.equals(TINYINT)) {
             return ((Long) value).toString().getBytes(UTF_8);
         }
         else if (type.equals(TIMESTAMP)) {
-            org.joda.time.format.DateTimeFormatter formatter = ISODateTimeFormat.dateHourMinuteSecondMillis().withChronology(ISOChronology.getInstanceUTC());
-            return formatter.print((Long) value).getBytes(UTF_8);
+            return ((Long) value).toString().getBytes(UTF_8);
         }
         else if (type instanceof VarcharType && value instanceof String) {
             return ((String) value).getBytes(UTF_8);
@@ -224,8 +216,7 @@ public class StringRowSerializer
             return (T) (Boolean) Boolean.parseBoolean(fieldValue);
         }
         else if (type.equals(DATE)) {
-            LocalDate end = LocalDate.parse(fieldValue, DateTimeFormatter.ofPattern("yyy-MM-dd"));
-            return (T) Long.valueOf(end.toEpochDay());
+            return (T) ((Long) (Long.parseLong(fieldValue)));
         }
         else if (type.equals(DOUBLE)) {
             return (T) (Double) Double.parseDouble(fieldValue);
@@ -237,12 +228,10 @@ public class StringRowSerializer
             return (T) ((Long) ((Short) Short.parseShort(fieldValue)).longValue());
         }
         else if (type.equals(TIME)) {
-            org.joda.time.format.DateTimeFormatter formatter = ISODateTimeFormat.hourMinuteSecondMillis().withChronology(ISOChronology.getInstanceUTC());
-            return (T) (Long) formatter.parseMillis(fieldValue);
+            return (T) ((Long) (Long.parseLong(fieldValue)));
         }
         else if (type.equals(TIMESTAMP)) {
-            org.joda.time.format.DateTimeFormatter formatter = ISODateTimeFormat.dateHourMinuteSecondMillis().withChronology(ISOChronology.getInstanceUTC());
-            return (T) (Long) formatter.parseMillis(fieldValue);
+            return (T) ((Long) (Long.parseLong(fieldValue)));
         }
         else if (type.equals(TINYINT)) {
             return (T) ((Long) ((Byte) Byte.parseByte(fieldValue)).longValue());

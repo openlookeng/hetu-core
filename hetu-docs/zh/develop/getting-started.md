@@ -41,6 +41,10 @@ openLooKeng Core附带的样例配置可以直接用于开发。使用以下选�
 
 工作目录应该是`presto-main`子目录。在IntelliJ中，使用`$MODULE_DIR$`可以自动完成该设置。
 
+在config.properties文件中，替换plugin.bundles为plugin.dir，并指向plugin目录
+
+plugin.dir=../hetu-server/target/hetu-server-{VERSION}/plugin
+
 此外，必须使用您的Hive元存储Thrift服务的位置对Hive插件进行配置。使用正确的主机和端口（如果您没有Hive元存储，则使用下面的值）替换`localhost:9083`，将以下内容添加到虚拟机选项列表中：
 
     -Dhive.metastore.uri=thrift://localhost:9083

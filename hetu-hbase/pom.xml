@@ -52,11 +52,6 @@
             <artifactId>hadoop-apache</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>joda-time</groupId>
-            <artifactId>joda-time</artifactId>
-        </dependency>
-
         <!-- Presto SPI -->
         <dependency>
             <groupId>io.hetu.core</groupId>

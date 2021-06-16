@@ -23,6 +23,7 @@ import io.airlift.slice.Slice;
 import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
 import io.hetu.core.plugin.hbase.connector.HBaseConnection;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
+import io.hetu.core.plugin.hbase.utils.Constants;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorInsertTableHandle;
@@ -446,13 +447,13 @@ public class HBaseConnectorMetadata
         HBaseTable table = hbaseConn.getTable(hBaseTableHandle.getFullTableName());
         HBaseColumnHandle handle = table.getColumns().get(table.getRowIdOrdinal());
         return new HBaseColumnHandle(
-                handle.getName(),
+                Constants.HBASE_ROWID_NAME,
                 handle.getFamily(),
                 handle.getQualifier(),
                 handle.getType(),
                 handle.getOrdinal(),
                 handle.getComment(),
-                true);
+                handle.isIndexed());
     }
 
     @Override
