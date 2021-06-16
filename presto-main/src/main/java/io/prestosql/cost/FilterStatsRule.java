@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
 import static io.prestosql.SystemSessionProperties.isDefaultFilterFactorEnabled;
 import static io.prestosql.cost.FilterStatsCalculator.UNKNOWN_FILTER_COEFFICIENT;
 import static io.prestosql.sql.planner.plan.Patterns.filter;
@@ -66,7 +65,7 @@ public class FilterStatsRule
             }
             estimate = filterStatsCalculator.filterStats(sourceStats, node.getPredicate(), session, types, layout);
         }
-        if ((isDefaultFilterFactorEnabled(session) || isCTEReuseEnabled(session)) && estimate.isOutputRowCountUnknown()) {
+        if ((isDefaultFilterFactorEnabled(session) || statsProvider.isEnforceDefaultFilterFactor()) && estimate.isOutputRowCountUnknown()) {
             estimate = sourceStats.mapOutputRowCount(sourceRowCount -> sourceStats.getOutputRowCount() * UNKNOWN_FILTER_COEFFICIENT);
         }
         return Optional.of(estimate);

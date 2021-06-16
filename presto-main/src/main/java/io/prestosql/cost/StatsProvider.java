@@ -17,5 +17,10 @@ import io.prestosql.spi.plan.PlanNode;
 
 public interface StatsProvider
 {
+    default boolean isEnforceDefaultFilterFactor()
+    {
+        return false;
+    }
+
     PlanNodeStatsEstimate getStats(PlanNode node);
 }
