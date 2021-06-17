@@ -120,8 +120,8 @@ public class CachingHiveMetastore
                 executor,
                 hiveConfig.getMetastoreCacheTtl(),
                 hiveConfig.getMetastoreRefreshInterval(),
-                hiveConfig.getMetastoreTableCacheTtl(),
-                hiveConfig.getMetastoreTableRefreshInterval(),
+                hiveConfig.getMetastoreDBCacheTtl(),
+                hiveConfig.getMetastoreDBRefreshInterval(),
                 hiveConfig.getMetastoreCacheMaximumSize(),
                 !(nodeManager.getCurrentNode().isCoordinator() || hiveConfig.getWorkerMetaStoreCacheEnabled()));
     }
@@ -156,16 +156,16 @@ public class CachingHiveMetastore
     }
 
     private CachingHiveMetastore(HiveMetastore delegate, Executor executor,
-                                 OptionalLong expiresAfterWriteMillis, OptionalLong refreshMills,
                                  OptionalLong expiresAfterWriteMillisTable, OptionalLong refreshMillsTable,
+                                 OptionalLong expiresAfterWriteMillisDB, OptionalLong refreshMillsDB,
                                  long maximumSize, boolean skipCache)
     {
         this.delegate = requireNonNull(delegate, "delegate is null");
         requireNonNull(executor, "executor is null");
 
-        // if refreshMills is present and is 0 , keeps cache unrefreshed.
+        // if refreshMillsDB is present and is 0 , keeps cache unrefreshed.
         this.skipCache = skipCache
-                || (refreshMills.isPresent() && refreshMills.getAsLong() == 0);
+                || (refreshMillsDB.isPresent() && refreshMillsDB.getAsLong() == 0);
         this.skipTableCache = skipCache
                 || (refreshMillsTable.isPresent() && refreshMillsTable.getAsLong() == 0);
 
@@ -184,16 +184,16 @@ public class CachingHiveMetastore
             tableRefreshTtl = refreshMillsTable;
         }
 
-        databaseNamesCache = newCacheBuilder(expiresAfterWriteMillis, refreshMills, maximumSize)
+        databaseNamesCache = newCacheBuilder(expiresAfterWriteMillisDB, refreshMillsDB, maximumSize)
                 .build(asyncReloading(CacheLoader.from(this::loadAllDatabases), executor));
 
-        databaseCache = newCacheBuilder(expiresAfterWriteMillis, refreshMills, maximumSize)
+        databaseCache = newCacheBuilder(expiresAfterWriteMillisDB, refreshMillsDB, maximumSize)
                 .build(asyncReloading(CacheLoader.from(this::loadDatabase), executor));
 
-        tableNamesCache = newCacheBuilder(expiresAfterWriteMillisTable, refreshMills, maximumSize)
+        tableNamesCache = newCacheBuilder(expiresAfterWriteMillisTable, refreshMillsDB, maximumSize)
                 .build(asyncReloading(CacheLoader.from(this::loadAllTables), executor));
 
-        viewNamesCache = newCacheBuilder(expiresAfterWriteMillisTable, refreshMills, maximumSize)
+        viewNamesCache = newCacheBuilder(expiresAfterWriteMillisTable, refreshMillsDB, maximumSize)
                 .build(asyncReloading(CacheLoader.from(this::loadAllViews), executor));
 
         tableCache = newCacheBuilder(tableCacheTtl, tableRefreshTtl, maximumSize)
@@ -250,13 +250,13 @@ public class CachingHiveMetastore
                     }
                 }, executor));
 
-        rolesCache = newCacheBuilder(expiresAfterWriteMillis, refreshMills, maximumSize)
+        rolesCache = newCacheBuilder(expiresAfterWriteMillisDB, refreshMillsDB, maximumSize)
                 .build(asyncReloading(CacheLoader.from(() -> loadRoles()), executor));
 
-        roleGrantsCache = newCacheBuilder(expiresAfterWriteMillis, refreshMills, maximumSize)
+        roleGrantsCache = newCacheBuilder(expiresAfterWriteMillisDB, refreshMillsDB, maximumSize)
                 .build(asyncReloading(CacheLoader.from(this::loadRoleGrants), executor));
 
-        configValuesCache = newCacheBuilder(expiresAfterWriteMillis, refreshMills, maximumSize)
+        configValuesCache = newCacheBuilder(expiresAfterWriteMillisDB, refreshMillsDB, maximumSize)
                 .build(asyncReloading(CacheLoader.from(this::loadConfigValue), executor));
     }
 
