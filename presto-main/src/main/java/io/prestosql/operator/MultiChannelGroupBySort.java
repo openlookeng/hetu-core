@@ -19,19 +19,23 @@ import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
+import io.prestosql.operator.scalar.CombineHashFunction;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
-import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.block.Block;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
+import io.prestosql.sql.planner.optimizations.HashGenerationOptimizer;
+import io.prestosql.type.TypeUtils;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.IntFunction;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.slice.SizeOf.sizeOf;
@@ -39,13 +43,12 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 
 // This implementation assumes arrays used in the hash are always a power of 2
 @RestorableConfig(uncapturedFields = {"types", "hashTypes", "channels", "hashStrategy",
-        "inputHashChannel", "hashGenerator", "updateMemory", "channelBuilders", "dictionaryLookBack", "processDictionary",
-        "currentPageBuilder", "completedPagesMemorySize", "rawPrevHash", "nextSortBasedGroupId", "maxGroupId", "nextGroupIdStartingRange",
-        "currentGroupIdStartingRange", "newGroupId", "sliceIndex", "step"})
+        "inputHashChannel", "hashGenerator", "updateMemory", "processDictionary"})
 public class MultiChannelGroupBySort
         extends MultiChannelGroupBy implements GroupBySort
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(MultiChannelGroupBySort.class).instanceSize();
+    private static final long NULL_HASH_VALUE = 1;
 
     private PageBuilder currentPageBuilder;
     private long completedPagesMemorySize;
@@ -56,7 +59,7 @@ public class MultiChannelGroupBySort
     private int currentGroupIdStartingRange;
     private int newGroupId;
     private int sliceIndex;
-    AggregationNode.Step step;
+    private long rawPrevNullHash;
 
     public MultiChannelGroupBySort(
             List<? extends Type> hashTypes,
@@ -64,19 +67,18 @@ public class MultiChannelGroupBySort
             Optional<Integer> inputHashChannel,
             int expectedSize,
             boolean processDictionary,
-            JoinCompiler joinCompiler,
-            AggregationNode.Step step)
+            JoinCompiler joinCompiler)
     {
         super(hashTypes, hashChannels, inputHashChannel, expectedSize, processDictionary, joinCompiler);
         startNewPage();
 
         this.rawPrevHash = -1;
+        this.rawPrevNullHash = -1;
         this.maxGroupId = new ArrayList<>();
         this.currentGroupIdStartingRange = Integer.MAX_VALUE;
         this.nextGroupIdStartingRange = Integer.MAX_VALUE;
         this.newGroupId = 0;
         this.sliceIndex = 0;
-        this.step = step;
     }
 
     @Override
@@ -168,6 +170,37 @@ public class MultiChannelGroupBySort
         return false;
     }
 
+    public boolean isNullHashPosition(int position, Page page)
+    {
+        for (int i = 0; i < channels.length; i++) {
+            if (page.getBlock(channels[i]).isNull(position)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public long getHashValueForNullAndZeroPosition(int position, Page page)
+    {
+        return getHashValueForNullAndZeroPosition(position, page::getBlock);
+    }
+
+    public long getHashValueForNullAndZeroPosition(int position, IntFunction<Block> blockProvider)
+    {
+        // this method is called when hash channel have only Null and Zero values
+        long result = HashGenerationOptimizer.INITIAL_HASH_VALUE;
+        for (int i = 0; i < channels.length; i++) {
+            Type type = hashTypes.get(i);
+            Block block = blockProvider.apply(channels[i]);
+            if (block.isNull(position)) {
+                // for null we will set 1. So that we can differentiate between Null and 0
+                result = CombineHashFunction.getHash(result, NULL_HASH_VALUE);
+            }
+            result = CombineHashFunction.getHash(result, TypeUtils.hashPosition(type, blockProvider.apply(channels[i]), position));
+        }
+        return result;
+    }
+
     public int putIfAbsent(int position, Page page)
     {
         long rawHash = hashGenerator.hashPosition(position, page);
@@ -177,6 +210,18 @@ public class MultiChannelGroupBySort
     public int putIfAbsent(int position, Page page, long rawHash)
     {
         int groupId;
+        if (rawHash == 0 && isNullHashPosition(position, page)) {
+            long rawNullHash = getHashValueForNullAndZeroPosition(position, page);
+            if (rawPrevNullHash == rawNullHash) {
+                return nextSortBasedGroupId - 1;
+            }
+            else {
+                rawPrevNullHash = rawNullHash;
+                groupId = addNewGroup(position, page, rawHash);
+                return groupId;
+            }
+        }
+
         if (rawPrevHash == -1) {
             groupId = addNewGroup(position, page, rawHash);
             rawPrevHash = rawHash;
@@ -245,7 +290,7 @@ public class MultiChannelGroupBySort
         MultiChannelGroupBySortState myState = new MultiChannelGroupBySortState();
         myState.currentPageBuilder = currentPageBuilder.capture(serdeProvider);
         myState.completedPagesMemorySize = completedPagesMemorySize;
-        myState.nextGroupId = nextSortBasedGroupId;
+        myState.nextSortBasedGroupId = nextSortBasedGroupId;
         if (dictionaryLookBack != null) {
             myState.dictionaryLookBack = dictionaryLookBack.capture(serdeProvider);
         }
@@ -262,6 +307,13 @@ public class MultiChannelGroupBySort
                 }
             }
         }
+        myState.rawPrevHash = rawPrevHash;
+        myState.maxGroupId = maxGroupId;
+        myState.nextGroupIdStartingRange = nextGroupIdStartingRange;
+        myState.currentGroupIdStartingRange = currentGroupIdStartingRange;
+        myState.sliceIndex = sliceIndex;
+        myState.rawPrevNullHash = rawPrevNullHash;
+        myState.newGroupId = newGroupId;
         return myState;
     }
 
@@ -272,7 +324,7 @@ public class MultiChannelGroupBySort
         this.currentPageBuilder.restore(myState.currentPageBuilder, serdeProvider);
         this.completedPagesMemorySize = myState.completedPagesMemorySize;
         myState.currentPageSizeInBytes = currentPageSizeInBytes;
-        this.newGroupId = myState.nextGroupId;
+        this.nextSortBasedGroupId = myState.nextSortBasedGroupId;
         if (myState.dictionaryLookBack != null) {
             Slice input = Slices.wrappedBuffer(((DictionaryLookBack.DictionaryLookBackState) myState.dictionaryLookBack).dictionary);
             this.dictionaryLookBack = new DictionaryLookBack(serdeProvider.getBlockEncodingSerde().readBlock(input.getInput()));
@@ -294,6 +346,13 @@ public class MultiChannelGroupBySort
                 this.channelBuilders.get(i).add(this.currentPageBuilder.getBlockBuilder(i));
             }
         }
+        this.rawPrevHash = myState.rawPrevHash;
+        this.maxGroupId = myState.maxGroupId;
+        this.nextGroupIdStartingRange = myState.nextGroupIdStartingRange;
+        this.currentGroupIdStartingRange = myState.currentGroupIdStartingRange;
+        this.sliceIndex = myState.sliceIndex;
+        this.rawPrevNullHash = myState.rawPrevNullHash;
+        this.newGroupId = myState.newGroupId;
     }
 
     private static class MultiChannelGroupBySortState
@@ -301,9 +360,16 @@ public class MultiChannelGroupBySort
     {
         private Object currentPageBuilder;
         private long completedPagesMemorySize;
-        private int nextGroupId;
+        private int nextSortBasedGroupId;
         private Object dictionaryLookBack;
         private long currentPageSizeInBytes;
         private byte[][][] channelBuilders;
+        private long rawPrevHash;
+        private List<Integer> maxGroupId;
+        private int nextGroupIdStartingRange;
+        private int currentGroupIdStartingRange;
+        private int sliceIndex;
+        private long rawPrevNullHash;
+        private int newGroupId;
     }
 }

@@ -81,6 +81,9 @@ public class SortBasedAggregationPartitioningExchanger
         if (numberOfHashPartitionLocations == 0) {
             numberOfHashPartitionLocations = 1;
         }
+        else {
+            numberOfHashPartitionLocations = roundOffToPowerOfTwo(numberOfHashPartitionLocations);
+        }
         this.numberOfSortBasedPartitionLocations = numberOfPartitions - numberOfHashPartitionLocations;
         hashPartitionLocationsMapping = new int[numberOfHashPartitionLocations];
         sortBasedPartitionLocationsMapping = new int[numberOfSortBasedPartitionLocations];
@@ -102,7 +105,7 @@ public class SortBasedAggregationPartitioningExchanger
         }
         else {
             for (int i = 0; i < numberOfPartitions; i++) {
-                if (hashPartitionIndexStartPosition >= i) {
+                if (hashPartitionIndexStartPosition <= i) {
                     // stores location of hash partition
                     hashPartitionLocationsMapping[hashArrayIndex] = i;
                     hashArrayIndex++;
@@ -174,5 +177,19 @@ public class SortBasedAggregationPartitioningExchanger
     public ListenableFuture<?> waitForWriting()
     {
         return memoryManager.getNotFullFuture();
+    }
+
+    int roundOffToPowerOfTwo(int n)
+    {
+        if ((n & (n - 1)) == 0) {
+            return n;
+        }
+        n |= n >> 1;
+        n |= n >> 2;
+        n |= n >> 4;
+        n |= n >> 8;
+        n |= n >> 16;
+        n = n + 1;
+        return (n >> 1);
     }
 }

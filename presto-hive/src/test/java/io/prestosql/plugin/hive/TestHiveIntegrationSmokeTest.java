@@ -219,6 +219,10 @@ public class TestHiveIntegrationSmokeTest
     private final Session autoVacuumSession;
     private final TypeTranslator typeTranslator;
 
+    private Session testSessionSort;
+    private Session testSessionSortPrcntDrv50;
+    private Session testSessionSortPrcntDrv25;
+    private Session testSessionSortPrcntDrv40;
     private FinalizerService finalizerService;
     private NodeTaskMap nodeTaskMap;
     private InMemoryNodeManager nodeManager;
@@ -5655,9 +5659,36 @@ public class TestHiveIntegrationSmokeTest
         assertEquals(false, true);
     }
 
+    private void initSortBasedAggregation()
+    {
+        synchronized (TestHiveIntegrationSmokeTest.this) {
+            if (null == testSessionSort) {
+                this.testSessionSort = Session.builder(getSession())
+                        .setSystemProperty("sort_based_aggregation_enabled", "true")
+                        .build();
+
+                this.testSessionSortPrcntDrv50 = Session.builder(getSession())
+                        .setSystemProperty("sort_based_aggregation_enabled", "true")
+                        .setSystemProperty("prcnt_drivers_for_partial_aggr", "33")
+                        .build();
+
+                this.testSessionSortPrcntDrv25 = Session.builder(getSession())
+                        .setSystemProperty("sort_based_aggregation_enabled", "true")
+                        .setSystemProperty("prcnt_drivers_for_partial_aggr", "25")
+                        .build();
+
+                this.testSessionSortPrcntDrv40 = Session.builder(getSession())
+                        .setSystemProperty("sort_based_aggregation_enabled", "true")
+                        .setSystemProperty("prcnt_drivers_for_partial_aggr", "25")
+                        .build();
+            }
+        }
+    }
+
     @Test
     public void sortAggSingleSort()
     {
+        initSortBasedAggregation();
         assertUpdate("drop table if exists unsorttable");
         assertUpdate("drop table if exists sorttable");
         computeActual("create table unsorttable (orderkey int, year int) WITH (transactional = true , " +
@@ -5673,21 +5704,15 @@ public class TestHiveIntegrationSmokeTest
         computeActual("create table sorttable  with(transactional = false, " +
                 "format = 'ORC',  bucketed_by=array['year'], bucket_count=1, sorted_by = ARRAY['year'])  as select * from unsorttable order by year");
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-
-        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
+        MaterializedResult sortResult = computeActual(testSessionSort, "select avg(orderkey), count(year)," +
                 "year from sorttable  group by year order by year");
-
-        assertUpdate("set session sort_based_aggregation_enabled=false");
 
         MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
                 "year from sorttable  group by year order by year");
-        assertEquals(sortResult.toString(), hashResult.toString());
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
-        sortResult = computeActual("select avg(orderkey), count(year), year from sorttable  group by year order by year");
-        assertEquals(sortResult.toString(), hashResult.toString());
+        sortResult = computeActual(testSessionSortPrcntDrv50, "select avg(orderkey), count(year), year from sorttable  group by year order by year");
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
         assertUpdate("DROP TABLE sorttable");
         assertUpdate("DROP TABLE unsorttable");
@@ -5696,6 +5721,7 @@ public class TestHiveIntegrationSmokeTest
     @Test
     public void sortAggSingleSortNoAggregation()
     {
+        initSortBasedAggregation();
         assertUpdate("drop table if exists unsorttable1");
         assertUpdate("drop table if exists sorttable1");
         computeActual("create table unsorttable1 (orderkey int, year bigint) WITH (transactional = true , " +
@@ -5711,20 +5737,12 @@ public class TestHiveIntegrationSmokeTest
         computeActual("create table sorttable1  with(transactional = false, " +
                 "format = 'ORC',  bucketed_by=array['year'], bucket_count=1, sorted_by = ARRAY['year'])  as select * from unsorttable1 order by year");
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-
-        MaterializedResult sortResult = computeActual("select year from sorttable1 group by year order by year");
-
-        assertUpdate("set session sort_based_aggregation_enabled=false");
-
+        MaterializedResult sortResult = computeActual(testSessionSort, "select year from sorttable1 group by year order by year");
         MaterializedResult hashResult = computeActual("select year from sorttable1 group by year order by year");
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
-        assertEquals(sortResult.toString(), hashResult.toString());
-
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
-        sortResult = computeActual("select year from sorttable1 group by year order by year");
-        assertEquals(sortResult.toString(), hashResult.toString());
+        sortResult = computeActual(testSessionSortPrcntDrv50, "select year from sorttable1 group by year order by year");
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
         assertUpdate("DROP TABLE sorttable1");
         assertUpdate("DROP TABLE unsorttable1");
@@ -5733,6 +5751,7 @@ public class TestHiveIntegrationSmokeTest
     @Test
     public void sortAggBigint()
     {
+        initSortBasedAggregation();
         assertUpdate("drop table if exists unsorttable2");
         assertUpdate("drop table if exists sorttable2");
         computeActual("create table unsorttable2 (orderkey int, year bigint) WITH (transactional = true , " +
@@ -5749,16 +5768,12 @@ public class TestHiveIntegrationSmokeTest
                 "format = 'ORC',  bucketed_by=array['year'], bucket_count=10, sorted_by = ARRAY['year'])  as select * from unsorttable2 order by year");
 
         assertUpdate("set session sort_based_aggregation_enabled=true");
-        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year), year from sorttable2 group by year order by year");
-
-        assertUpdate("set session sort_based_aggregation_enabled=false");
-
+        MaterializedResult sortResult = computeActual(testSessionSort, "select avg(orderkey), count(year), year from sorttable2 group by year order by year");
         MaterializedResult hashResult = computeActual("select avg(orderkey), count(year), year from sorttable2 group by year order by year");
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
-        sortResult = computeActual("select avg(orderkey), count(year), year from sorttable2 group by year order by year");
-        assertEquals(sortResult.toString(), hashResult.toString());
+        sortResult = computeActual(testSessionSortPrcntDrv50, "select avg(orderkey), count(year), year from sorttable2 group by year order by year");
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
         assertUpdate("DROP TABLE sorttable2");
         assertUpdate("DROP TABLE unsorttable2");
@@ -5767,6 +5782,7 @@ public class TestHiveIntegrationSmokeTest
     @Test
     public void sortAggMultipleSort()
     {
+        initSortBasedAggregation();
         assertUpdate("drop table if exists unsorttable3");
         assertUpdate("drop table if exists sorttable3");
         computeActual("create table unsorttable3 (number int, orderkey double, year double) WITH (transactional = true , " +
@@ -5783,35 +5799,24 @@ public class TestHiveIntegrationSmokeTest
         computeActual("create table sorttable3  with(transactional = false, " +
                 "format = 'ORC',  bucketed_by=array['orderkey', 'year'], bucket_count=2, sorted_by = ARRAY['orderkey', 'year'])  as select * from unsorttable3 order by orderkey,year");
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-
-        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
+        MaterializedResult sortResult = computeActual(testSessionSort, "select avg(orderkey), count(year)," +
                 "year from sorttable3  group by orderkey,year order by orderkey,year");
-
-        assertUpdate("set session sort_based_aggregation_enabled=false");
 
         MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
                 "year from sorttable3  group by orderkey,year order by orderkey,year");
 
-        assertEquals(sortResult.toString(), hashResult.toString());
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
-        // with  group by year
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-
-        sortResult = computeActual("select avg(orderkey), count(year)," +
+        sortResult = computeActual(testSessionSort, "select avg(orderkey), count(year)," +
                 "year from sorttable3 group by year order by year");
-
-        assertUpdate("set session sort_based_aggregation_enabled=false");
 
         hashResult = computeActual("select avg(orderkey), count(year)," +
                 "year from sorttable3 group by year order by year");
 
-        assertEquals(sortResult.toString(), hashResult.toString());
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
-        sortResult = computeActual("select avg(orderkey), count(year), year from sorttable3 group by year order by year");
-        assertEquals(sortResult.toString(), hashResult.toString());
+        sortResult = computeActual(testSessionSortPrcntDrv50, "select avg(orderkey), count(year), year from sorttable3 group by year order by year");
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
         assertUpdate("DROP TABLE sorttable3");
         assertUpdate("DROP TABLE unsorttable3");
@@ -5820,6 +5825,7 @@ public class TestHiveIntegrationSmokeTest
     @Test
     public void sortAggDateType()
     {
+        initSortBasedAggregation();
         assertUpdate("drop table if exists unsorttable4");
         assertUpdate("drop table if exists sorttable4");
         computeActual("create table unsorttable4 (number int, orderkey decimal(10,4), year date) WITH (transactional = true , " +
@@ -5834,23 +5840,14 @@ public class TestHiveIntegrationSmokeTest
 
         computeActual("create table sorttable4  with(transactional = false, " +
                 "format = 'ORC',  bucketed_by=array['year'], bucket_count=2, sorted_by = ARRAY['year'])  as select * from unsorttable4 order by year");
-
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-
-        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
-                "year from sorttable4  group by year order by year");
-
-        assertUpdate("set session sort_based_aggregation_enabled=false");
-
-        MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
-                "year from sorttable4  group by year order by year");
-
-        assertEquals(sortResult.toString(), hashResult.toString());
-
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
-        sortResult = computeActual("select avg(orderkey), count(year), year from sorttable4  group by year order by year");
-        assertEquals(sortResult.toString(), hashResult.toString());
+        String query = "select avg(orderkey), count(year), year from sorttable4  group by year order by year";
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv40, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
         assertUpdate("DROP TABLE sorttable4");
         assertUpdate("DROP TABLE unsorttable4");
@@ -5859,6 +5856,7 @@ public class TestHiveIntegrationSmokeTest
     @Test
     public void sortAggVarchar()
     {
+        initSortBasedAggregation();
         assertUpdate("drop table if exists unsorttable5");
         assertUpdate("drop table if exists sorttable5");
         computeActual("create table unsorttable5 (number int, orderkey decimal(10,4), year varchar) WITH (transactional = true , " +
@@ -5874,22 +5872,16 @@ public class TestHiveIntegrationSmokeTest
         computeActual("create table sorttable5  with(transactional = false, " +
                 "format = 'ORC',  bucketed_by=array['year'], bucket_count=2, sorted_by = ARRAY['year'])  as select * from unsorttable5 order by year");
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-
-        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
+        MaterializedResult sortResult = computeActual(testSessionSort, "select avg(orderkey), count(year)," +
                 "year from sorttable5  group by year order by year");
-
-        assertUpdate("set session sort_based_aggregation_enabled=false");
 
         MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
                 "year from sorttable5  group by year order by year");
 
-        assertEquals(sortResult.toString(), hashResult.toString());
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
-        sortResult = computeActual("select avg(orderkey), count(year), year from sorttable5  group by year order by year");
-        assertEquals(sortResult.toString(), hashResult.toString());
+        sortResult = computeActual(testSessionSortPrcntDrv50, "select avg(orderkey), count(year), year from sorttable5  group by year order by year");
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
         assertUpdate("DROP TABLE sorttable5");
         assertUpdate("DROP TABLE unsorttable5");
@@ -5898,6 +5890,7 @@ public class TestHiveIntegrationSmokeTest
     @Test
     public void sortAggSmallint()
     {
+        initSortBasedAggregation();
         assertUpdate("drop table if exists unsorttable6");
         assertUpdate("drop table if exists sorttable6");
         computeActual("create table unsorttable6 (orderkey int, year smallint) WITH (transactional = true , " +
@@ -5913,22 +5906,16 @@ public class TestHiveIntegrationSmokeTest
         computeActual("create table sorttable6  with(transactional = false, " +
                 "format = 'ORC',  bucketed_by=array['year'], bucket_count=1, sorted_by = ARRAY['year'])  as select * from unsorttable6 order by year");
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-
-        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
+        MaterializedResult sortResult = computeActual(testSessionSort, "select avg(orderkey), count(year)," +
                 "year from sorttable6  group by year order by year");
-
-        assertUpdate("set session sort_based_aggregation_enabled=false");
 
         MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
                 "year from sorttable6  group by year order by year");
 
-        assertEquals(sortResult.toString(), hashResult.toString());
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
-        sortResult = computeActual("select avg(orderkey), count(year), year from sorttable6  group by year order by year");
-        assertEquals(sortResult.toString(), hashResult.toString());
+        sortResult = computeActual(testSessionSortPrcntDrv50, "select avg(orderkey), count(year), year from sorttable6  group by year order by year");
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
         assertUpdate("DROP TABLE sorttable6");
         assertUpdate("DROP TABLE unsorttable6");
@@ -5937,6 +5924,7 @@ public class TestHiveIntegrationSmokeTest
     @Test
     public void sortAggBoolean()
     {
+        initSortBasedAggregation();
         assertUpdate("drop table if exists unsorttable7");
         assertUpdate("drop table if exists sorttable7");
         computeActual("create table unsorttable7 (orderkey int, year int, iscurrentemployee boolean ) WITH (transactional = true , " +
@@ -5953,22 +5941,16 @@ public class TestHiveIntegrationSmokeTest
                 "format = 'ORC',  bucketed_by=array['iscurrentemployee'], bucket_count=1, sorted_by = ARRAY['iscurrentemployee'])" +
                 "  as select * from unsorttable7 order by iscurrentemployee");
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-
-        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
+        MaterializedResult sortResult = computeActual(testSessionSort, "select avg(orderkey), count(year)," +
                 "iscurrentemployee from sorttable7  group by iscurrentemployee order by iscurrentemployee");
-
-        assertUpdate("set session sort_based_aggregation_enabled=false");
 
         MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
                 "iscurrentemployee from sorttable7  group by iscurrentemployee order by iscurrentemployee");
 
-        assertEquals(sortResult.toString(), hashResult.toString());
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
-        sortResult = computeActual("select avg(orderkey), count(year), iscurrentemployee from sorttable7  group by iscurrentemployee order by iscurrentemployee");
-        assertEquals(sortResult.toString(), hashResult.toString());
+        sortResult = computeActual(testSessionSortPrcntDrv50, "select avg(orderkey), count(year), iscurrentemployee from sorttable7  group by iscurrentemployee order by iscurrentemployee");
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
         assertUpdate("DROP TABLE sorttable7");
         assertUpdate("DROP TABLE unsorttable7");
@@ -5977,6 +5959,7 @@ public class TestHiveIntegrationSmokeTest
     @Test
     public void sortAggSplitWithMultiplePagesBigint()
     {
+        initSortBasedAggregation();
         // this Test case we will insert many rows , so that single split will yield many pages, groub & sort by bigint
 
         assertUpdate("drop table if exists unsorttable8");
@@ -5991,29 +5974,21 @@ public class TestHiveIntegrationSmokeTest
         computeActual("create table sorttable8  with(transactional = false, " +
                 "format = 'ORC',  bucketed_by=array['year'], bucket_count=1, sorted_by = ARRAY['year'])  as select * from unsorttable8 order by year");
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-
-        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
+        MaterializedResult sortResult = computeActual(testSessionSort, "select avg(orderkey), count(year)," +
                 "year from sorttable8  group by year order by year");
-
-        assertUpdate("set session sort_based_aggregation_enabled=false");
 
         MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
                 "year from sorttable8  group by year order by year");
 
-        assertEquals(sortResult.toString(), hashResult.toString());
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
-        sortResult = computeActual("select avg(orderkey), count(year)," +
+        sortResult = computeActual(testSessionSortPrcntDrv50, "select avg(orderkey), count(year)," +
                 "year from sorttable8  group by year order by year");
-        assertEquals(sortResult.toString(), hashResult.toString());
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-        assertUpdate("set session prcnt_drivers_for_partial_aggr=25");
-        sortResult = computeActual("select avg(orderkey), count(year)," +
+        sortResult = computeActual(testSessionSortPrcntDrv25, "select avg(orderkey), count(year)," +
                 "year from sorttable8  group by year order by year");
-        assertEquals(sortResult.toString(), hashResult.toString());
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
         assertUpdate("DROP TABLE sorttable8");
         assertUpdate("DROP TABLE unsorttable8");
@@ -6035,27 +6010,19 @@ public class TestHiveIntegrationSmokeTest
         computeActual("create table sorttable9  with(transactional = false, " +
                 "format = 'ORC',  bucketed_by=array['year'], bucket_count=10, sorted_by = ARRAY['year', 'orderkey'])  as select * from unsorttable9");
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-
-        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
+        MaterializedResult sortResult = computeActual(testSessionSort, "select avg(orderkey), count(year)," +
                 "year from sorttable9  group by year order by year");
-
-        assertUpdate("set session sort_based_aggregation_enabled=false");
 
         MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
                 "year from sorttable9  group by year order by year");
 
-        assertEquals(sortResult.toString(), hashResult.toString());
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
-        sortResult = computeActual("select avg(orderkey), count(year), year from sorttable9  group by year order by year");
-        assertEquals(sortResult.toString(), hashResult.toString());
+        sortResult = computeActual(testSessionSortPrcntDrv50, "select avg(orderkey), count(year), year from sorttable9  group by year order by year");
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-        assertUpdate("set session prcnt_drivers_for_partial_aggr=25");
-        sortResult = computeActual("select avg(orderkey), count(year), year from sorttable9  group by year order by year");
-        assertEquals(sortResult.toString(), hashResult.toString());
+        sortResult = computeActual(testSessionSortPrcntDrv25, "select avg(orderkey), count(year), year from sorttable9  group by year order by year");
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
         assertUpdate("DROP TABLE sorttable9");
         assertUpdate("DROP TABLE unsorttable9");
@@ -6064,6 +6031,7 @@ public class TestHiveIntegrationSmokeTest
     @Test
     public void sortAggSplitWithMultiplePagesInt()
     {
+        initSortBasedAggregation();
         // this Test case we will insert many rows , so that single split will yield many pages, groub & sort by int
         assertUpdate("drop table if exists unsorttable10");
         assertUpdate("drop table if exists sorttable10");
@@ -6077,32 +6045,66 @@ public class TestHiveIntegrationSmokeTest
         computeActual("create table sorttable10  with(transactional = false, " +
                 "format = 'ORC',  bucketed_by=array['year'], bucket_count=1, sorted_by = ARRAY['year'])  as select * from unsorttable10 order by year");
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-
-        MaterializedResult sortResult = computeActual("select avg(orderkey), count(year)," +
+        MaterializedResult sortResult = computeActual(testSessionSort, "select count(orderkey), count(year)," +
                 "year from sorttable10  group by year order by year");
 
-        assertUpdate("set session sort_based_aggregation_enabled=false");
-
-        MaterializedResult hashResult = computeActual("select avg(orderkey), count(year)," +
+        MaterializedResult hashResult = computeActual("select count(orderkey), count(year), " +
                 "year from sorttable10  group by year order by year");
 
-        assertEquals(sortResult.toString(), hashResult.toString());
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-        assertUpdate("set session prcnt_drivers_for_partial_aggr=50");
-        sortResult = computeActual("select avg(orderkey), count(year)," +
+        sortResult = computeActual(testSessionSortPrcntDrv25, "select count(orderkey), count(year)," +
             "year from sorttable10  group by year order by year");
-        assertEquals(sortResult.toString(), hashResult.toString());
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
-        assertUpdate("set session sort_based_aggregation_enabled=true");
-        assertUpdate("set session prcnt_drivers_for_partial_aggr=25");
-        sortResult = computeActual("select avg(orderkey), count(year)," +
+        sortResult = computeActual(testSessionSortPrcntDrv50, "select count(orderkey), count(year)," +
                 "year from sorttable10  group by year order by year");
-        assertEquals(sortResult.toString(), hashResult.toString());
-
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
         assertUpdate("DROP TABLE sorttable10");
         assertUpdate("DROP TABLE unsorttable10");
+    }
+
+    @Test
+    public void sortAggNullAndZero()
+    {
+        initSortBasedAggregation();
+        assertUpdate("drop table if exists unsorttable11");
+        assertUpdate("drop table if exists sorttable11");
+        computeActual("create table unsorttable11 (number int, orderkey int, year int) WITH (transactional = true , " +
+                "format = 'ORC')");
+        assertUpdate("insert into unsorttable11 values (1, null, null)", 1);
+        assertUpdate("insert into unsorttable11 values (1, null, null)", 1);
+        assertUpdate("insert into unsorttable11 values (2, 0, null)", 1);
+        assertUpdate("insert into unsorttable11 values (2, 0, null)", 1);
+        assertUpdate("insert into unsorttable11 values (3, null, 0)", 1);
+        assertUpdate("insert into unsorttable11 values (3, null, 0)", 1);
+        assertUpdate("insert into unsorttable11 values (4, 33, 66)", 1);
+        assertUpdate("insert into unsorttable11 values (5, 55, 77 )", 1);
+        assertUpdate("insert into unsorttable11 values (6, 66, 88)", 1);
+        assertUpdate("insert into unsorttable11 values (7, 77, 99)", 1);
+
+        computeActual("create table sorttable11  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['year', 'orderkey'], bucket_count=1, sorted_by = ARRAY['year', 'orderkey'])  as select * from unsorttable11 order by year");
+        String query = "select avg(orderkey), count(year)," +
+                "year from sorttable11  group by year order by year";
+
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+
+        query = "select avg(orderkey), count(year)," +
+                "year from sorttable11  group by year, orderkey order by year, orderkey";
+
+        sortResult = computeActual(testSessionSort, query);
+        hashResult = computeActual(query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+
+        assertUpdate("DROP TABLE sorttable11");
+        assertUpdate("DROP TABLE unsorttable11");
     }
 
     private String generateNumberOfRowsForTwoColumns(int numberOfRows, int numberOfNullRows)
@@ -6197,5 +6199,196 @@ public class TestHiveIntegrationSmokeTest
         List<Split> splitList = result.build();
         Set<Split> set = splitList.stream().collect(Collectors.toSet());
         return set;
+    }
+
+    @Test
+    public void sortAggBasicAggreTestOnTpch()
+    {
+        initSortBasedAggregation();
+        assertUpdate("drop table if exists sortLineitem");
+        assertUpdate("drop table if exists orders_orderkey_totalprice");
+
+        computeActual("create table sortLineitem  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['orderkey', 'partkey'], bucket_count=4, sorted_by = ARRAY['orderkey', 'partkey'])" +
+                "  as select * from tpch.tiny.lineitem");
+
+        String query = "select count(partkey), count(orderkey), orderkey from sortLineitem  group by orderkey, partkey order by orderkey, partkey";
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        computeActual("create table orders_orderkey_totalprice  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['orderkey', 'totalprice'], bucket_count=4, sorted_by = ARRAY['orderkey', 'totalprice'])" +
+                "  as select * from tpch.tiny.orders");
+
+        sortResult = computeActual(testSessionSortPrcntDrv50, "select count(totalprice), count(orderkey)," +
+                "orderkey from orders_orderkey_totalprice  group by orderkey, totalprice order by orderkey, totalprice");
+
+        hashResult = computeActual("select count(totalprice), count(orderkey)," +
+                "orderkey from orders_orderkey_totalprice group by orderkey, totalprice order by orderkey, totalprice");
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("DROP TABLE sortLineitem");
+        assertUpdate("DROP TABLE orders_orderkey_totalprice");
+    }
+
+    @Test
+    public void sortAggInnerJoin()
+    {
+        initSortBasedAggregation();
+        assertUpdate("drop table if exists lineitemSortBy_orderkey_inner");
+        assertUpdate("drop table if exists ordersSortBy_orderkey_inner");
+        computeActual("create table lineitemSortBy_orderkey_inner  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['orderkey'], bucket_count=1, sorted_by = ARRAY['orderkey'])" +
+                "  as select * from tpch.tiny.lineitem");
+
+        computeActual("create table ordersSortBy_orderkey_inner  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['orderkey'], bucket_count=1, sorted_by = ARRAY['orderkey'])" +
+                "  as select * from tpch.tiny.orders");
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+        String query = "select avg(lineitemSortBy_orderkey_inner.orderkey),lineitemSortBy_orderkey_inner.orderkey from lineitemSortBy_orderkey_inner " +
+                "INNER JOIN ordersSortBy_orderkey_inner ON lineitemSortBy_orderkey_inner.orderkey = ordersSortBy_orderkey_inner.orderkey " +
+                "group by lineitemSortBy_orderkey_inner.orderkey " +
+                "order by lineitemSortBy_orderkey_inner.orderkey";
+
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.toString(), hashResult.toString());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.toString(), hashResult.toString());
+        sortResult = computeActual(testSessionSortPrcntDrv25, query);
+        assertEquals(sortResult.toString(), hashResult.toString());
+
+        assertUpdate("DROP TABLE lineitemSortBy_orderkey_inner");
+        assertUpdate("DROP TABLE ordersSortBy_orderkey_inner");
+    }
+
+    @Test
+    public void sortAggLeftJoin()
+    {
+        initSortBasedAggregation();
+        assertUpdate("drop table if exists lineitemSortBy_orderkey_left");
+        assertUpdate("drop table if exists ordersSortBy_orderkey_left");
+        computeActual("create table lineitemSortBy_orderkey_left  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['orderkey'], bucket_count=1, sorted_by = ARRAY['orderkey'])" +
+                "  as select * from tpch.tiny.lineitem");
+
+        computeActual("create table ordersSortBy_orderkey_left  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['orderkey'], bucket_count=1, sorted_by = ARRAY['orderkey'])" +
+                "  as select * from tpch.tiny.orders");
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+        String query = "select avg(lineitemSortBy_orderkey_left.orderkey),lineitemSortBy_orderkey_left.orderkey from lineitemSortBy_orderkey_left " +
+                "LEFT JOIN " +
+                "ordersSortBy_orderkey_left ON lineitemSortBy_orderkey_left.orderkey = ordersSortBy_orderkey_left.orderkey " +
+                "group by lineitemSortBy_orderkey_left.orderkey " +
+                "order by lineitemSortBy_orderkey_left.orderkey";
+
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv25, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv40, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+
+        assertUpdate("DROP TABLE lineitemSortBy_orderkey_left");
+        assertUpdate("DROP TABLE ordersSortBy_orderkey_left");
+    }
+
+    @Test
+    public void sortAggRightJoin()
+    {
+        initSortBasedAggregation();
+        assertUpdate("drop table if exists lineitemSortBy_orderkey_right");
+
+        computeActual("create table lineitemSortBy_orderkey_right  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['orderkey'], bucket_count=1, sorted_by = ARRAY['orderkey'])" +
+                "  as select * from tpch.tiny.lineitem");
+        assertUpdate("set session sort_based_aggregation_enabled=true");
+        String query = "select count(lineitemSortBy_orderkey_right.orderkey), lineitemSortBy_orderkey_right.orderkey from lineitemSortBy_orderkey_right " +
+                "RIGHT JOIN " +
+                "tpch.tiny.orders ON lineitemSortBy_orderkey_right.orderkey = tpch.tiny.orders.orderkey " +
+                "group by " +
+                "lineitemSortBy_orderkey_right.orderkey " +
+                "order by " +
+                "lineitemSortBy_orderkey_right.orderkey";
+
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv25, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv40, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+
+        assertUpdate("DROP TABLE lineitemSortBy_orderkey_right");
+    }
+
+    @Test
+    public void sortAggInnerLeftJoin()
+    {
+        initSortBasedAggregation();
+        computeActual("create table lineitem_orderkey_partkey_InnerLeftJoin  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['orderkey', 'partkey'], bucket_count=1, sorted_by = ARRAY['orderkey', 'partkey'])" +
+                "  as select * from tpch.tiny.lineitem");
+
+        computeActual("create table shortlineitem_InnerLeftJoin  with(transactional = false, format = 'ORC') as select * from tpch.tiny.lineitem limit 10000");
+        String query = "select avg(lineitem_orderkey_partkey_InnerLeftJoin.orderkey), lineitem_orderkey_partkey_InnerLeftJoin.orderkey " +
+                "from " +
+                "lineitem_orderkey_partkey_InnerLeftJoin " +
+                "INNER JOIN  " +
+                "shortlineitem_InnerLeftJoin ON lineitem_orderkey_partkey_InnerLeftJoin.orderkey = shortlineitem_InnerLeftJoin.orderkey " +
+                "Left JOIN " +
+                " tpch.tiny.orders ON lineitem_orderkey_partkey_InnerLeftJoin.orderkey = tpch.tiny.orders.orderkey " +
+                "group by lineitem_orderkey_partkey_InnerLeftJoin.orderkey, lineitem_orderkey_partkey_InnerLeftJoin.partkey " +
+                "order by lineitem_orderkey_partkey_InnerLeftJoin.orderkey, lineitem_orderkey_partkey_InnerLeftJoin.partkey";
+
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv40, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+
+        assertUpdate("DROP TABLE lineitem_orderkey_partkey_InnerLeftJoin");
+        assertUpdate("DROP TABLE shortlineitem_InnerLeftJoin");
+    }
+
+    @Test
+    public void sortAggInnerRightJoin()
+    {
+        initSortBasedAggregation();
+        computeActual("create table lineitem_orderkey_partkey_innerRight  with(transactional = false, " +
+                "format = 'ORC',  bucketed_by=array['orderkey', 'partkey'], bucket_count=4, sorted_by = ARRAY['orderkey', 'partkey'])" +
+                "  as select * from tpch.tiny.lineitem");
+
+        computeActual("create table shortlineitem_InnerRightJoin  with(transactional = false, format = 'ORC') as select * from tpch.tiny.lineitem limit 10000");
+        String query = "select avg(lineitem_orderkey_partkey_innerRight.orderkey), lineitem_orderkey_partkey_innerRight.orderkey " +
+                "from lineitem_orderkey_partkey_innerRight " +
+                "INNER JOIN " +
+                "shortlineitem_InnerRightJoin ON lineitem_orderkey_partkey_innerRight.orderkey = shortlineitem_InnerRightJoin.orderkey " +
+                "RIGHT JOIN " +
+                "tpch.tiny.orders ON lineitem_orderkey_partkey_innerRight.orderkey = tpch.tiny.orders.orderkey " +
+                "group by " +
+                "lineitem_orderkey_partkey_innerRight.orderkey, lineitem_orderkey_partkey_innerRight.partkey " +
+                "order by " +
+                "lineitem_orderkey_partkey_innerRight.orderkey, lineitem_orderkey_partkey_innerRight.partkey";
+
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv40, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+
+        assertUpdate("DROP TABLE lineitem_orderkey_partkey_innerRight");
+        assertUpdate("DROP TABLE shortlineitem_InnerRightJoin");
     }
 }

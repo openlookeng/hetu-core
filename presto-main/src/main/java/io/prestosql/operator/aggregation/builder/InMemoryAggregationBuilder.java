@@ -111,8 +111,7 @@ public abstract class InMemoryAggregationBuilder
                     expectedGroups,
                     isDictionaryAggregationEnabled(operatorContext.getSession()),
                     joinCompiler,
-                    updateMemory,
-                    step);
+                    updateMemory);
         }
         else {
             this.groupBy = createGroupByHash(

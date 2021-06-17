@@ -14,7 +14,6 @@
  */
 package io.prestosql.operator;
 
-import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinCompiler;
 
@@ -33,12 +32,11 @@ public interface GroupBySort
             int expectedSize,
             boolean processDictionary,
             JoinCompiler joinCompiler,
-            UpdateMemory updateMemory,
-            AggregationNode.Step step)
+            UpdateMemory updateMemory)
     {
         if (hashTypes.size() == 1 && hashTypes.get(0).equals(BIGINT) && hashChannels.length == 1) {
             return new BigintGroupBySort(hashChannels[0], inputHashChannel.isPresent(), expectedSize, updateMemory);
         }
-        return new MultiChannelGroupBySort(hashTypes, hashChannels, inputHashChannel, expectedSize, processDictionary, joinCompiler, step);
+        return new MultiChannelGroupBySort(hashTypes, hashChannels, inputHashChannel, expectedSize, processDictionary, joinCompiler);
     }
 }
