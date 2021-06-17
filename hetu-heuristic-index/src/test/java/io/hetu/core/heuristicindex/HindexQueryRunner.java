@@ -47,10 +47,23 @@ public final class HindexQueryRunner
             throws Exception
     {
         TempFolder folder = new TempFolder();
-        TestingMySqlServer mysqlServer = new TestingMySqlServer("test", "mysql", "metastore1");
+        int trial = 0;
+        TestingMySqlServer mysqlServer = null;
+        while (mysqlServer == null) {
+            try {
+                mysqlServer = new TestingMySqlServer("test", "mysql", "metastore1");
+            }
+            catch (Exception e) {
+                trial++;
+                if (trial == 3) {
+                    throw new RuntimeException("Can't start TestingMySqlServer. Maximum retry limit hit.", e);
+                }
+            }
+        }
+        TestingMySqlServer finalMysqlServer = mysqlServer;
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             folder.close();
-            mysqlServer.close();
+            finalMysqlServer.close();
         }));
 
         DistributedQueryRunner queryRunner; // Use this to return if no exceptions
