@@ -107,7 +107,10 @@ public final class SnapshotTestUtil
         for (Field field : obj.getClass().getDeclaredFields()) {
             field.setAccessible(true);
             try {
-                result.put(field.getName(), toFullSnapshotMapping(field.get(obj)));
+                // Too complex to compare groupBy content
+                if (!field.getName().equals("groupBy")) {
+                    result.put(field.getName(), toFullSnapshotMapping(field.get(obj)));
+                }
             }
             catch (IllegalAccessException e) {
                 e.printStackTrace();

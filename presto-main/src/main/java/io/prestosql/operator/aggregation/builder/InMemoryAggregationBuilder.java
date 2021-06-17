@@ -51,7 +51,7 @@ import static io.prestosql.operator.GroupByHash.createGroupByHash;
 import static io.prestosql.operator.GroupBySort.createGroupBySort;
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(uncapturedFields = {"groupBy", "updateMemory"})
+@RestorableConfig(uncapturedFields = {"updateMemory"})
 public abstract class InMemoryAggregationBuilder
         implements AggregationBuilder, Restorable
 {
@@ -363,6 +363,7 @@ public abstract class InMemoryAggregationBuilder
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         InMemoryAggregationBuilderState myState = new InMemoryAggregationBuilderState();
+        myState.groupBy = groupBy.capture(serdeProvider);
         List<Object> aggregators = new ArrayList<>();
         for (Aggregator aggregator : this.aggregators) {
             aggregators.add(aggregator.capture(serdeProvider));
@@ -376,6 +377,7 @@ public abstract class InMemoryAggregationBuilder
     public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
     {
         InMemoryAggregationBuilderState myState = (InMemoryAggregationBuilderState) state;
+        this.groupBy.restore(myState.groupBy, serdeProvider);
         for (int i = 0; i < this.aggregators.size(); i++) {
             this.aggregators.get(i).restore(myState.aggregators.get(i), serdeProvider);
         }
@@ -391,6 +393,7 @@ public abstract class InMemoryAggregationBuilder
     private static class InMemoryAggregationBuilderState
             implements Serializable
     {
+        private Object groupBy;
         private List<Object> aggregators;
         private boolean full;
     }
