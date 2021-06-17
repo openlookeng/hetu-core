@@ -41,6 +41,7 @@ public final class CachingStatsProvider
     private final Lookup lookup;
     private final Session session;
     private final TypeProvider types;
+    private final boolean enforceDefaultFilterFactor;
 
     private final Map<PlanNode, PlanNodeStatsEstimate> cache = new IdentityHashMap<>();
 
@@ -56,6 +57,22 @@ public final class CachingStatsProvider
         this.lookup = requireNonNull(lookup, "lookup is null");
         this.session = requireNonNull(session, "session is null");
         this.types = requireNonNull(types, "types is null");
+        this.enforceDefaultFilterFactor = false;
+    }
+
+    public CachingStatsProvider(StatsCalculator statsCalculator, Optional<Memo> memo, Lookup lookup, Session session, TypeProvider types, boolean enforceDefaultFilterFactor)
+    {
+        this.statsCalculator = requireNonNull(statsCalculator, "statsCalculator is null");
+        this.memo = requireNonNull(memo, "memo is null");
+        this.lookup = requireNonNull(lookup, "lookup is null");
+        this.session = requireNonNull(session, "session is null");
+        this.types = requireNonNull(types, "types is null");
+        this.enforceDefaultFilterFactor = enforceDefaultFilterFactor;
+    }
+
+    public boolean isEnforceDefaultFilterFactor()
+    {
+        return enforceDefaultFilterFactor;
     }
 
     @Override

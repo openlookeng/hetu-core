@@ -168,7 +168,7 @@ public class PredicatePushDown
         Memo memo = new Memo(idAllocator, plan);
         Lookup lookup = Lookup.from(planNode -> Stream.of(memo.resolve(planNode)));
 
-        StatsProvider statsProvider = new CachingStatsProvider(costCalculationHandle.getStatsCalculator(), Optional.of(memo), lookup, session, planSymbolAllocator.getTypes());
+        StatsProvider statsProvider = new CachingStatsProvider(costCalculationHandle.getStatsCalculator(), Optional.of(memo), lookup, session, planSymbolAllocator.getTypes(), true);
         CostProvider costProvider = new CachingCostProvider(costCalculationHandle.getCostCalculator(), statsProvider, Optional.of(memo), session, planSymbolAllocator.getTypes());
         FilterPushdownForCTEHandler filterPushdownForCTEHandler = new FilterPushdownForCTEHandler(pushdownForCTE, costProvider, costCalculationHandle.getCostComparator());
         Rewriter rewriter = new Rewriter(planSymbolAllocator, idAllocator, metadata, predicateExtractor, typeAnalyzer, session, dynamicFiltering, filterPushdownForCTEHandler);
