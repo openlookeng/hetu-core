@@ -42,6 +42,10 @@ openLooKeng Core comes with sample configuration that should work out-of-the-box
 
 The working directory should be the `presto-main` subdirectory. In IntelliJ, using `$MODULE_DIR$` accomplishes this automatically.
 
+In the config.properties file, replace plugin.bundles with plugin.dir pointing to your plugin folder
+
+    plugin.dir=../hetu-server/target/hetu-server-{VERSION}/plugin
+
 Additionally, the Hive plugin must be configured with location of your Hive metastore Thrift service. Add the following to the list of VM options, replacing `localhost:9083` with the correct host and port (or use the below value if you do not have a Hive metastore):
 
     -Dhive.metastore.uri=thrift://localhost:9083
