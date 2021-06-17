@@ -219,14 +219,14 @@ public class TestHBaseConnector
         if (hcm.getDeleteRowIdColumnHandle(session, TestUtils.createHBaseTableHandle()) instanceof HBaseColumnHandle) {
             HBaseColumnHandle hBaseColumnHandle =
                     (HBaseColumnHandle) hcm.getDeleteRowIdColumnHandle(session, TestUtils.createHBaseTableHandle());
-            assertEquals("rowkey", hBaseColumnHandle.getName());
+            assertEquals("$rowId", hBaseColumnHandle.getName());
 
             // test HBaseColumnHandle Equals
             assertEquals(true, hBaseColumnHandle.equals(hBaseColumnHandle));
             assertEquals(false, hBaseColumnHandle.equals(null));
             HBaseColumnHandle hbCH =
                     new HBaseColumnHandle(
-                            "rowkey",
+                            "$rowId",
                             Optional.ofNullable("name"),
                             Optional.ofNullable("nick_name"),
                             VARCHAR,
@@ -235,7 +235,7 @@ public class TestHBaseConnector
                             true);
             HBaseColumnHandle hBCH =
                     new HBaseColumnHandle(
-                            "rowkey",
+                            "$rowId",
                             Optional.ofNullable("name"),
                             Optional.ofNullable("nick_name"),
                             VARCHAR,

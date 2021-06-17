@@ -39,14 +39,12 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 import java.io.IOException;
-import java.sql.Date;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.concurrent.TimeUnit.DAYS;
 import static org.testng.Assert.assertEquals;
 
 /**
@@ -243,8 +241,8 @@ public class TestHBaseConnection
         Long longs = Long.valueOf(12);
         put.addColumn("age".getBytes(UTF_8), "lit_age".getBytes(UTF_8), longs.toString().getBytes(UTF_8));
         Integer ints = Integer.valueOf(17832);
-        byte[] gender = new Date(DAYS.toMillis(ints.longValue())).toString().getBytes(UTF_8);
-        put.addColumn("gender".getBytes(UTF_8), "gender".getBytes(UTF_8), gender);
+        Long gender = ints.longValue();
+        put.addColumn("gender".getBytes(UTF_8), "gender".getBytes(UTF_8), gender.toString().getBytes(UTF_8));
         put.addColumn("t".getBytes(UTF_8), "t".getBytes(UTF_8), longs.toString().getBytes(UTF_8));
         List<Put> expected = new ArrayList<>();
         expected.add(put);
