@@ -1,4 +1,5 @@
 
+
 Data Types
 ==========
 
@@ -126,8 +127,6 @@ String
 
 Date and Time
 -------------
-
-See also [Legacy and New Timestamp](./timestamp.md).
 
 ### `DATE`
 
