@@ -320,6 +320,7 @@ public class MarkerSplitSource
         // Don't send a resume marker if resuming from the beginning
         resumingSnapshotId = snapshotId == 0 ? OptionalLong.empty() : OptionalLong.of(snapshotId);
 
+        sentInitialMarker = false;
         sentFinalMarker = false;
         remainingDependencies.addAll(allDependencies);
         remainingUnionSources.addAll(unionSources);

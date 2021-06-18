@@ -13,9 +13,11 @@
  */
 package io.prestosql.operator;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.airlift.http.client.HttpClient;
 import io.airlift.http.client.testing.TestingHttpClient;
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
@@ -50,6 +52,7 @@ import static io.prestosql.testing.TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -193,6 +196,42 @@ public class TestExchangeClient
 
         // client should have sent only 2 requests: one to get all pages and once to get the done signal
         assertStatus(status.getPageBufferClientStatuses().get(0), location, "closed", 3, 3, 3, "not scheduled");
+    }
+
+    @Test
+    public void testAddTarget()
+    {
+        @SuppressWarnings("resource")
+        ExchangeClient exchangeClient = new ExchangeClient(
+                new DataSize(32, Unit.MEGABYTE),
+                new DataSize(10, Unit.MEGABYTE),
+                1,
+                new Duration(1, TimeUnit.MINUTES),
+                true,
+                mock(HttpClient.class),
+                scheduler,
+                new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
+                pageBufferClientCallbackExecutor);
+        exchangeClient.setSnapshotEnabled(NOOP_SNAPSHOT_UTILS.getQuerySnapshotManager(new QueryId("query")));
+
+        String origin1 = "location1";
+        String origin2 = "location2";
+        final String target1 = "target1";
+        final String target2 = "target2";
+
+        PagesSerde serde = testingPagesSerde();
+        exchangeClient.addTarget(target1);
+        exchangeClient.addPages(ImmutableList.of(serde.serialize(createPage(1))), origin1);
+        MarkerPage marker = MarkerPage.snapshotPage(1);
+        exchangeClient.addPages(ImmutableList.of(SerializedPage.forMarker(marker)), origin1);
+        exchangeClient.addPages(ImmutableList.of(serde.serialize(createPage(2))), origin2);
+
+        assertPageEquals(getNextPage(exchangeClient, target1), createPage(1));
+        assertPageEquals(getNextPage(exchangeClient, target1), marker);
+
+        exchangeClient.addTarget(target2);
+        assertPageEquals(getNextPage(exchangeClient, target2, origin1), marker);
+        assertPageEquals(getNextPage(exchangeClient, target1, origin2), createPage(2));
     }
 
     @Test(timeOut = 10000)
@@ -410,6 +449,16 @@ public class TestExchangeClient
     private static SerializedPage getNextPage(ExchangeClient exchangeClient, String target)
     {
         ListenableFuture<SerializedPage> futurePage = Futures.transform(exchangeClient.isBlocked(), ignored -> exchangeClient.pollPage(target).getLeft(), directExecutor());
+        return tryGetFutureValue(futurePage, 100, TimeUnit.SECONDS).orElse(null);
+    }
+
+    private static SerializedPage getNextPage(ExchangeClient exchangeClient, String target, String expectedOrigin)
+    {
+        ListenableFuture<SerializedPage> futurePage = Futures.transform(exchangeClient.isBlocked(), ignored -> {
+            Pair<SerializedPage, String> result = exchangeClient.pollPage(target);
+            assertEquals(result.getRight(), expectedOrigin);
+            return result.getLeft();
+        }, directExecutor());
         return tryGetFutureValue(futurePage, 100, TimeUnit.SECONDS).orElse(null);
     }
 

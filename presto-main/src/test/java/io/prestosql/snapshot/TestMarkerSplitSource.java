@@ -236,6 +236,23 @@ public class TestMarkerSplitSource
         getNextBatchIgnoreMarkerZero(null, lifespan, 2);
     }
 
+    @Test
+    public void testResumeFromBeginning()
+            throws Exception
+    {
+        Future<SplitBatch> result = markerSource.getNextBatch(null, lifespan, 3);
+        assertTrue(containsMarkerZero(result.get()));
+        when(announcer.shouldGenerateMarker(anyObject())).thenReturn(OptionalLong.of(5));
+        result = markerSource.getNextBatch(null, lifespan, 3);
+        assertFalse(containsMarkerZero(result.get()));
+        markerSource.resumeSnapshot(3);
+        result = markerSource.getNextBatch(null, lifespan, 3);
+        assertFalse(containsMarkerZero(result.get()));
+        markerSource.resumeSnapshot(0);
+        result = markerSource.getNextBatch(null, lifespan, 3);
+        assertTrue(containsMarkerZero(result.get()));
+    }
+
     private void getAndResume(boolean exhaust)
             throws Exception
     {

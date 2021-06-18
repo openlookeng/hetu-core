@@ -32,11 +32,11 @@ import javax.validation.constraints.NotNull;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
@@ -59,9 +59,9 @@ public class LocalExchangeSource
 
     private final Consumer<LocalExchangeSource> onFinish;
 
-    private final BlockingQueue<PageReference> buffer = new LinkedBlockingDeque<>();
+    private final Queue<PageReference> buffer = new LinkedList<>();
     // originBuffer mirrors buffer, but keeps track of the origin of each page
-    private final BlockingQueue<Optional<String>> originBuffer = new LinkedBlockingDeque<>();
+    private final Queue<Optional<String>> originBuffer = new LinkedList<>();
     private final AtomicLong bufferedBytes = new AtomicLong();
 
     private final Object lock = new Object();
@@ -216,14 +216,18 @@ public class LocalExchangeSource
     {
         checkNotHoldsLock();
 
-        // NOTE: there is no need to acquire a lock here. The buffer is concurrent
-        // and buffered bytes is not expected to be consistent with the buffer (only
-        // best effort).
-        PageReference pageReference = buffer.poll();
-        Optional<String> origin = originBuffer.poll();
+        PageReference pageReference;
+        Optional<String> origin;
+        // NOTE: need a lock to poll from the buffers. Lock not needed when updating buffered bytes,
+        // as it is not expected to be consistent with the buffer (only best effort).
+        synchronized (lock) {
+            pageReference = buffer.poll();
+            origin = originBuffer.poll();
+        }
         if (pageReference == null) {
             return Pair.of(null, null);
         }
+        checkState(origin != null, "pageReference is not null, but origin is");
 
         // dereference the page outside of lock, since may trigger a callback
         Page page = pageReference.removePage();
@@ -279,12 +283,14 @@ public class LocalExchangeSource
     {
         checkNotHoldsLock();
 
-        List<PageReference> remainingPages = new ArrayList<>();
+        List<PageReference> remainingPages;
         SettableFuture<?> notEmptyFuture;
         synchronized (lock) {
             finishing = true;
 
-            buffer.drainTo(remainingPages);
+            remainingPages = new ArrayList<>(buffer);
+            buffer.clear();
+            originBuffer.clear();
             bufferedBytes.addAndGet(-remainingPages.stream().mapToLong(PageReference::getRetainedSizeInBytes).sum());
 
             notEmptyFuture = this.notEmptyFuture;
