@@ -43,6 +43,7 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
+import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.Constraint;
 import io.prestosql.spi.metadata.TableHandle;
@@ -86,11 +87,14 @@ import io.prestosql.transaction.TransactionId;
 import io.prestosql.utils.OptimizerUtils;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -212,13 +216,15 @@ public class CachedSqlQueryExecution
         if (plan != null && cachedPlan.getTimeZoneKey().equals(session.getTimeZoneKey()) &&
                 cachedPlan.getStatement().equals(statement) && session.getTransactionId().isPresent() && cachedPlan.getIdentity().getUser().equals(session.getIdentity().getUser())) { // TODO: traverse the statement and accept partial match
             root = plan.getRoot();
+            boolean isValidCachePlan = tablesMatch(root, analysis.getTables());
             try {
-                if (!isEqualBasicStatistics(cachedPlan.getTableStatistics(), tableStatistics, tableNames)) {
+                if (!isEqualBasicStatistics(cachedPlan.getTableStatistics(), tableStatistics, tableNames) || !isValidCachePlan) {
                     for (TableHandle tableHandle : analysis.getTables()) {
                         tableStatistics.replace(tableHandle.getFullyQualifiedName(), metadata.getTableStatistics(session, tableHandle, Constraint.alwaysTrue(), true));
                     }
-                    if (!cachedPlan.getTableStatistics().equals(tableStatistics)) {
+                    if (!cachedPlan.getTableStatistics().equals(tableStatistics) || !isValidCachePlan) {
                         // TableStatistics have changed, therefore the cached plan may no longer be applicable
+                        // Table have changed, therfore the cached plan may no longer be applicable
                         throw new NoSuchElementException();
                     }
                 }
@@ -495,5 +501,40 @@ public class CachedSqlQueryExecution
                 return tableHandle.getTransaction();
             }
         }
+    }
+
+    private static List<PlanNode> getTableScanNodes(PlanNode planNode)
+    {
+        List<PlanNode> result = new LinkedList<>();
+
+        Queue<PlanNode> queue = new LinkedList<>();
+        queue.add(planNode);
+
+        while (!queue.isEmpty()) {
+            PlanNode node = queue.poll();
+            if (node instanceof TableScanNode) {
+                result.add(node);
+            }
+
+            queue.addAll(node.getSources());
+        }
+
+        return result;
+    }
+
+    private static boolean tablesMatch(PlanNode planNode, Collection<TableHandle> tableHandles)
+    {
+        List<PlanNode> planNodes = getTableScanNodes(planNode);
+        Map<String, ConnectorTableHandle> cachedTableHandleMap = new HashMap<>();
+        for (PlanNode root : planNodes) {
+            TableScanNode tableScanNode = (TableScanNode) root;
+            cachedTableHandleMap.put(tableScanNode.getTable().getConnectorHandle().getSchemaPrefixedTableName(), tableScanNode.getTable().getConnectorHandle());
+        }
+        for (TableHandle tableHandle : tableHandles) {
+            if (!cachedTableHandleMap.get(tableHandle.getConnectorHandle().getSchemaPrefixedTableName()).equals(tableHandle.getConnectorHandle())) {
+                return false;
+            }
+        }
+        return true;
     }
 }

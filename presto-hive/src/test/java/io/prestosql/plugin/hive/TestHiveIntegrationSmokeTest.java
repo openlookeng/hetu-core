@@ -6391,4 +6391,23 @@ public class TestHiveIntegrationSmokeTest
         assertUpdate("DROP TABLE lineitem_orderkey_partkey_innerRight");
         assertUpdate("DROP TABLE shortlineitem_InnerRightJoin");
     }
+
+    @Test
+    public void testCachedPlanTableValidation()
+    {
+        assertUpdate("CREATE TABLE table_plan_cache_001 (id int)");
+        assertUpdate("INSERT INTO table_plan_cache_001 VALUES(1)", 1);
+        assertUpdate("INSERT INTO table_plan_cache_001 VALUES(2)", 1);
+        assertUpdate("INSERT INTO table_plan_cache_001 VALUES(3)", 1);
+        MaterializedResult result = computeActual("SELECT * from table_plan_cache_001 where id = 1");
+        assertEquals(result.getRowCount(), 1);
+        assertUpdate("DROP TABLE table_plan_cache_001");
+        assertUpdate("CREATE TABLE table_plan_cache_001 (id int) with (transactional=true)");
+        assertUpdate("INSERT INTO table_plan_cache_001 VALUES(1)", 1);
+        assertUpdate("INSERT INTO table_plan_cache_001 VALUES(2)", 1);
+        assertUpdate("INSERT INTO table_plan_cache_001 VALUES(3)", 1);
+        result = computeActual("SELECT * from table_plan_cache_001 where id = 1");
+        assertEquals(result.getRowCount(), 1);
+        assertUpdate("DROP TABLE table_plan_cache_001");
+    }
 }
