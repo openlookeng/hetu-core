@@ -10,7 +10,7 @@ local exchange (GATHER, SINGLE, [])
                         local exchange (GATHER, SINGLE, [])
                             remote exchange (REPARTITION, HASH, ["sr_customer_sk"])
                                 join (INNER, REPLICATED):
-                                    remote exchange (REPARTITION, HASH, ["sr_customer_sk", "sr_store_sk"])
+                                    remote exchange (REPARTITION, HASH, ["sr_customer_sk", "sr_store_sk", "sum"])
                                         cte customer_total_return
                                             final aggregation over (sr_customer_sk, sr_store_sk)
                                                 local exchange (GATHER, SINGLE, [])

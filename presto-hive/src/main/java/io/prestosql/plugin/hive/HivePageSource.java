@@ -325,7 +325,7 @@ public class HivePageSource
         boolean[] result = new boolean[page.getPositionCount()];
         Arrays.fill(result, Boolean.FALSE);
         // loop to handle union of filters if any
-        for (int j = 0; j < dynamicFilters.size(); j++) {
+        for (int j = 0; j < eligibleColumns.size(); j++) {
             boolean[] filterResult = new boolean[page.getPositionCount()];
             Arrays.fill(filterResult, Boolean.TRUE);
             for (Map.Entry<Integer, ColumnHandle> column : eligibleColumns.get(j).entrySet()) {

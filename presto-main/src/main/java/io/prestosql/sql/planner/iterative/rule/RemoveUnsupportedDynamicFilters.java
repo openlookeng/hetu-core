@@ -182,6 +182,8 @@ public class RemoveUnsupportedDynamicFilters
 
             PlanNode left = leftResult.getNode();
             PlanNode right = rightResult.getNode();
+            Set<String> removedIdsFromJoin = node.getDynamicFilters().keySet().stream().filter(id -> !dynamicFilters.containsKey(id)).collect(Collectors.toSet());
+            removedDynamicFilterIds.addAll(removedIdsFromJoin);
             if (!left.equals(node.getLeft()) || !right.equals(node.getRight()) || !dynamicFilters.equals(node.getDynamicFilters())) {
                 return new PlanWithConsumedDynamicFilters(new JoinNode(
                         node.getId(),
@@ -226,6 +228,7 @@ public class RemoveUnsupportedDynamicFilters
             }
             else {
                 newFilterId = Optional.empty();
+                removedDynamicFilterIds.add(node.getDynamicFilterId().get());
             }
 
             PlanNode newSource = sourceResult.getNode();

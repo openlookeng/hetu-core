@@ -266,6 +266,7 @@ public class PredicatePushDown
                     if (dynamicFiltering) {
                         expressions.add(dynamicConjuncts);
                         cteFilterMap.put(commonCTERefNum, expressions);
+                        return node;
                     }
                     else {
                         expressions.add(expression);
@@ -279,6 +280,7 @@ public class PredicatePushDown
                         // store the union of filter for pushdown later
                         existing.add(rewriteExpression(node, dynamicConjuncts));
                         cteFilterMap.put(commonCTERefNum, existing);
+                        return node;
                     }
                     else {
                         List<RowExpression> existing = cteFilterMap.get(commonCTERefNum);
@@ -301,9 +303,7 @@ public class PredicatePushDown
                 if (dynamicFiltering) {
                     rewrittenNode = new CTEScanNode(rewrittenNode.getId(), rewrittenNode.getSource(), rewrittenNode.getOutputSymbols(), Optional.of(rewrittenExpression),
                                         rewrittenNode.getCteRefName(), rewrittenNode.getConsumerPlans(), rewrittenNode.getCommonCTERefNum());
-                    RowExpression staticConjuncts = logicalRowExpressions.filterConjuncts(context.get(), s -> !getDescriptor(s).isPresent());
-                    PlanNode filterNode = new FilterNode(idAllocator.getNextId(), rewrittenNode, staticConjuncts);
-                    return filterNode;
+                    return rewrittenNode;
                 }
                 PlanNode filterNode = new FilterNode(idAllocator.getNextId(), rewrittenNode, context.get());
                 //pushdown disjuncts if cost is better
@@ -519,6 +519,9 @@ public class PredicatePushDown
         public PlanNode visitFilter(FilterNode node, RewriteContext<RowExpression> context)
         {
             PlanNode rewrittenPlan = context.rewrite(node.getSource(), logicalRowExpressions.combineConjuncts(node.getPredicate(), context.get()));
+            if (dynamicFiltering && isFilterNodeAboveCTEScan(node)) {
+                return new FilterNode(idAllocator.getNextId(), rewrittenPlan, node.getPredicate());
+            }
             // handles CTEScanNode rewrite before exchanges are added
             if (node.getSource() instanceof CTEScanNode) {
                 return rewrittenPlan;
@@ -1809,6 +1812,18 @@ public class PredicatePushDown
                 }
             }
             return expression;
+        }
+
+        private boolean isFilterNodeAboveCTEScan(FilterNode filterNode)
+        {
+            PlanNode source = filterNode.getSource();
+            while (source instanceof ProjectNode || source instanceof ExchangeNode) {
+                if (source.getSources().get(0) instanceof CTEScanNode) {
+                    return true;
+                }
+                source = source.getSources().get(0);
+            }
+            return false;
         }
     }
 

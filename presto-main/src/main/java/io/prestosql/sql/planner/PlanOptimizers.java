@@ -31,6 +31,7 @@ import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.planner.iterative.IterativeOptimizer;
 import io.prestosql.sql.planner.iterative.Rule;
+import io.prestosql.sql.planner.iterative.rule.AddExchangeAboveCTENode;
 import io.prestosql.sql.planner.iterative.rule.AddExchangesBelowPartialAggregationOverGroupIdRuleSet;
 import io.prestosql.sql.planner.iterative.rule.AddIntermediateAggregations;
 import io.prestosql.sql.planner.iterative.rule.CanonicalizeExpressions;
@@ -138,7 +139,6 @@ import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedInPredicateS
 import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedLateralToJoin;
 import io.prestosql.sql.planner.iterative.rule.TranslateExpressions;
 import io.prestosql.sql.planner.iterative.rule.UnwrapCastInComparison;
-import io.prestosql.sql.planner.optimizations.AddExchangeAboveCTENode;
 import io.prestosql.sql.planner.optimizations.AddExchanges;
 import io.prestosql.sql.planner.optimizations.AddLocalExchanges;
 import io.prestosql.sql.planner.optimizations.AddReuseExchange;
@@ -635,6 +635,11 @@ public class PlanOptimizers
         builder.add(new StatsRecordingPlanOptimizer(optimizerStats, new PredicatePushDown(metadata, typeAnalyzer, costCalculationHandle, true, true, true))); // Run predicate push down one more time in case we can leverage new information from layouts' effective predicate
         builder.add(new RemoveUnsupportedDynamicFilters(metadata, statsCalculator));
         builder.add(simplifyRowExpressionOptimizer); // Should be always run after PredicatePushDown
+        builder.add(new IterativeOptimizer(
+                ruleStats,
+                statsCalculator,
+                costCalculator,
+                ImmutableSet.of(new AddExchangeAboveCTENode())));
         builder.add(projectionPushDown);
         builder.add(inlineProjections);
         builder.add(new UnaliasSymbolReferences(metadata)); // Run unalias after merging projections to simplify projections more efficiently
@@ -654,7 +659,6 @@ public class PlanOptimizers
         builder.add(pushdownDeleteRule);
 
         builder.add(new AddSortBasedAggregation(metadata, statsCalculator, costCalculator, costComparator));
-        builder.add(new AddExchangeAboveCTENode());
         // Optimizers above this don't understand local exchanges, so be careful moving this.
         builder.add(new AddLocalExchanges(metadata, typeAnalyzer));
 
