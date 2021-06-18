@@ -5459,23 +5459,23 @@ public class TestHiveIntegrationSmokeTest
     @Test
     public void testVacuumForBooleanColumn()
     {
-        assertUpdate("DROP TABLE IF EXISTS tab_bkt_009");
-        assertUpdate(autoVacuumSession, "CREATE TABLE tab_bkt_009 (aa tinyint, bb smallint, cc int, " +
+        assertUpdate("DROP TABLE IF EXISTS tab_bkt_010");
+        assertUpdate(autoVacuumSession, "CREATE TABLE tab_bkt_010 (aa tinyint, bb smallint, cc int, " +
                 "dd bigint, ee boolean, ff real, gg double, hh varchar(10), ii varbinary, jj timestamp, kk decimal,ll decimal(10, 8),mm date,nn char(6)) " +
                 "with (bucket_count=2, bucketed_by=array ['dd'], format='orc', transactional=true)");
 
-        assertUpdate("insert into tab_bkt_009 values (tinyint'23', smallint'33', 830, 999930, boolean'0', 3.3, 3.03," +
+        assertUpdate("insert into tab_bkt_010 values (tinyint'23', smallint'33', 830, 999930, boolean'0', 3.3, 3.03," +
                 "'hello_3', varbinary'/', timestamp'2019-09-13 15:00:03', 53, 30.33, date '2019-09-13', 'work_3')", 1);
-        assertUpdate("insert into tab_bkt_009 values (tinyint'24', smallint'34', 840, 999940, boolean'1', 4.4, 4.04," +
+        assertUpdate("insert into tab_bkt_010 values (tinyint'24', smallint'34', 840, 999940, boolean'1', 4.4, 4.04," +
                 "'hello_4', varbinary'/', timestamp'2019-09-14 15:00:04', 54, 40.34, date '2019-09-14', 'work_4')", 1);
-        assertUpdate("insert into tab_bkt_009 values (tinyint'23', smallint'33', 830, 999930, boolean'0', 3.3, 3.03," +
+        assertUpdate("insert into tab_bkt_010 values (tinyint'23', smallint'33', 830, 999930, boolean'0', 3.3, 3.03," +
                 "'hello_3', varbinary'/', timestamp'2019-09-13 15:00:03', 53, 30.33, date '2019-09-13', 'work_3')", 1);
-        assertUpdate("insert into tab_bkt_009 values (tinyint'24', smallint'34', 840, 999940, boolean'1', 4.4, 4.04," +
+        assertUpdate("insert into tab_bkt_010 values (tinyint'24', smallint'34', 840, 999940, boolean'1', 4.4, 4.04," +
                 "'hello_4', varbinary'/', timestamp'2019-09-14 15:00:04', 54, 40.34, date '2019-09-14', 'work_4')", 1);
-        assertUpdate(String.format("VACUUM TABLE tab_bkt_009 AND WAIT"), 4);
-        assertUpdate("delete from tab_bkt_009 where mm=date'2019-09-14'", 2);
+        assertUpdate(String.format("VACUUM TABLE tab_bkt_010 AND WAIT"), 4);
+        assertUpdate("delete from tab_bkt_010 where mm=date'2019-09-14'", 2);
 
-        assertUpdate(String.format("DROP TABLE tab_bkt_009"));
+        assertUpdate(String.format("DROP TABLE tab_bkt_010"));
     }
 
     @Test
