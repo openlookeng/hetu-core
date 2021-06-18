@@ -19,6 +19,8 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.connector.ConnectorSplit;
 
+import javax.annotation.Nullable;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -27,19 +29,93 @@ import static java.util.Objects.requireNonNull;
 public class JdbcSplit
         implements ConnectorSplit
 {
+    private final String catalogName;
+    private final String schemaName;
+    private final String tableName;
+    private final String splitField;
+    private final String rangeStart;
+    private final String rangEnd;
+    private final long timeStamp;
+    private final int scanNodes;
     private final Optional<String> additionalPredicate;
 
     @JsonCreator
     public JdbcSplit(
+            @JsonProperty("catalogName") @Nullable String catalogName,
+            @JsonProperty("schemaName") @Nullable String schemaName,
+            @JsonProperty("tableName") String tableName,
+            @JsonProperty("splitField") String splitField,
+            @JsonProperty("beginIndex") String rangeStart,
+            @JsonProperty("endIndex") String rangEnd,
+            @JsonProperty("timeStamp") long timeStamp,
+            @JsonProperty("scanNodes") int scanNodes,
             @JsonProperty("additionalPredicate") Optional<String> additionalPredicate)
     {
+        this.catalogName = catalogName;
+        this.schemaName = schemaName;
+        this.tableName = requireNonNull(tableName, "table name is null");
+        this.rangeStart = rangeStart;
+        this.rangEnd = rangEnd;
+        this.splitField = splitField;
+        this.timeStamp = timeStamp;
+        this.scanNodes = scanNodes;
         this.additionalPredicate = requireNonNull(additionalPredicate, "additionalPredicate is null");
+    }
+
+    @JsonProperty
+    @Nullable
+    public String getCatalogName()
+    {
+        return catalogName;
+    }
+
+    @JsonProperty
+    @Nullable
+    public String getSchemaName()
+    {
+        return schemaName;
+    }
+
+    @JsonProperty
+    public String getTableName()
+    {
+        return tableName;
+    }
+
+    @JsonProperty
+    public String getRangeStart()
+    {
+        return rangeStart;
+    }
+
+    @JsonProperty
+    public String getRangEnd()
+    {
+        return rangEnd;
+    }
+
+    @JsonProperty
+    public long getTimeStamp()
+    {
+        return timeStamp;
+    }
+
+    @JsonProperty
+    public int getScanNodes()
+    {
+        return scanNodes;
     }
 
     @JsonProperty
     public Optional<String> getAdditionalPredicate()
     {
         return additionalPredicate;
+    }
+
+    @JsonProperty
+    public String getSplitField()
+    {
+        return splitField;
     }
 
     @Override

@@ -21,6 +21,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
+import io.prestosql.plugin.splitmanager.SplitStatLog;
+import io.prestosql.plugin.splitmanager.TableSplitConfig;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -95,6 +97,7 @@ import static io.prestosql.spi.type.Varchars.isVarcharType;
 import static java.lang.String.format;
 import static java.lang.String.join;
 import static java.sql.DatabaseMetaData.columnNoNulls;
+import static java.util.Collections.emptyList;
 import static java.util.Collections.nCopies;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
@@ -322,7 +325,12 @@ public class BaseJdbcClient
     @Override
     public ConnectorSplitSource getSplits(JdbcIdentity identity, JdbcTableHandle tableHandle)
     {
-        return new FixedSplitSource(ImmutableList.of(new JdbcSplit(Optional.empty())));
+        return new FixedSplitSource(ImmutableList.of(new JdbcSplit(tableHandle.getCatalogName(),
+                tableHandle.getSchemaName(),
+                tableHandle.getTableName(),
+                "", "", "",
+                System.nanoTime(), 1,
+                Optional.empty())));
     }
 
     @Override
@@ -880,5 +888,84 @@ public class BaseJdbcClient
                 escapeNamePattern(Optional.ofNullable(tableHandle.getSchemaName()), escape).orElse(null),
                 escapeNamePattern(Optional.ofNullable(tableHandle.getTableName()), escape).orElse(null),
                 null);
+    }
+
+    @Override
+    public List<SplitStatLog> getSplitStatic(JdbcIdentity identity, List<JdbcSplit> jdbcSplitList)
+    {
+        if (jdbcSplitList.isEmpty()) {
+            return emptyList();
+        }
+
+        List<SplitStatLog> splitStatLogList = new ArrayList<>(jdbcSplitList.size());
+        try (Connection connection = this.getConnection(identity, (JdbcSplit) null)) {
+            long timeStamp = System.nanoTime();
+            Statement statement = connection.createStatement();
+            for (JdbcSplit split : jdbcSplitList) {
+                String sql = format(
+                        "select count(*) from %s where %s",
+                        quoted(jdbcSplitList.get(0).getCatalogName(), jdbcSplitList.get(0).getSchemaName(), jdbcSplitList.get(0).getTableName()),
+                        split.getAdditionalPredicate().get());
+                ResultSet result = statement.executeQuery(sql);
+                //only one row
+                if (result.next()) {
+                    SplitStatLog log = new SplitStatLog();
+                    log.setCatalogName(split.getCatalogName());
+                    log.setSchemaName(split.getSchemaName());
+                    log.setTableName(split.getTableName());
+                    log.setSplitField(split.getSplitField());
+                    log.setBeginIndex(Long.parseLong(split.getRangeStart()));
+                    log.setEndIndex(Long.parseLong(split.getRangEnd()));
+                    log.setRows(result.getLong(1));
+                    log.setRecordFlag(SplitStatLog.LogState.STATE_NEW);
+                    log.setTimeStamp(timeStamp);
+                    log.setScanNodes(split.getScanNodes());
+                    result.close();
+                    splitStatLogList.add(log);
+                }
+            }
+            statement.close();
+        }
+        catch (SQLException e) {
+            log.error("" + e.getMessage());
+        }
+        return splitStatLogList;
+    }
+
+    @Override
+    public Long[] getSplitFieldMinAndMaxValue(TableSplitConfig conf, Connection connection, JdbcTableHandle tableHandle)
+    {
+        Long[] value = new Long[2];
+        if (conf.getFieldMaxValue() != null && conf.getFieldMinValue() != null && conf.getFieldMaxValue() >= conf.getFieldMinValue()) {
+            value[0] = conf.getFieldMaxValue();
+            value[1] = conf.getFieldMinValue();
+            return value;
+        }
+        String sql = format(
+                "SELECT MAX(%s),MIN(%s) FROM %s",
+                conf.getSplitField(), conf.getSplitField(),
+                quoted(conf.getCatalogName(), conf.getSchemaName(), conf.getTableName()));
+        Statement stat = null;
+        ResultSet rs = null;
+        try {
+            stat = connection.createStatement();
+            rs = stat.executeQuery(sql);
+            while (rs.next()) {
+                value[0] = rs.getLong(1);
+                value[1] = rs.getLong(2);
+
+                //if table no data, getLong still return 0, check this condition for null
+                if (rs.wasNull()) {
+                    return null;
+                }
+            }
+            rs.close();
+            stat.close();
+        }
+        catch (SQLException e) {
+            log.error("SQL : " + sql + ",getSplitFieldMinAndMaxValue error : " + e.getMessage());
+            return null;
+        }
+        return value;
     }
 }

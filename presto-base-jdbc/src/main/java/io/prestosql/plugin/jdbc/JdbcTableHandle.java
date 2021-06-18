@@ -45,6 +45,9 @@ public class JdbcTableHandle
     private final Optional<GeneratedSql> generatedSql;
     private boolean deleteOrUpdate;
 
+    private String tableSplitField;
+    private boolean isTableSplitFieldValidated;
+
     public JdbcTableHandle(SchemaTableName schemaTableName, @Nullable String catalogName, @Nullable String schemaName, String tableName)
     {
         this(schemaTableName, catalogName, schemaName, tableName, TupleDomain.all(), OptionalLong.empty());
@@ -68,7 +71,20 @@ public class JdbcTableHandle
             TupleDomain<ColumnHandle> constraint,
             OptionalLong limit)
     {
-        this(schemaTableName, catalogName, schemaName, tableName, constraint, limit, Optional.empty(), false);
+        this(schemaTableName, catalogName, schemaName, tableName, constraint, limit, Optional.empty(), false, null, false);
+    }
+
+    public JdbcTableHandle(
+            SchemaTableName schemaTableName,
+            @Nullable String catalogName,
+            @Nullable String schemaName,
+            String tableName,
+            TupleDomain<ColumnHandle> constraint,
+            OptionalLong limit,
+            Optional<GeneratedSql> generatedSql,
+            boolean deleteOrUpdate)
+    {
+        this(schemaTableName, catalogName, schemaName, tableName, constraint, limit, generatedSql, deleteOrUpdate, null, false);
     }
 
     @JsonCreator
@@ -80,7 +96,9 @@ public class JdbcTableHandle
             @JsonProperty("constraint") TupleDomain<ColumnHandle> constraint,
             @JsonProperty("limit") OptionalLong limit,
             @JsonProperty("sql") Optional<GeneratedSql> generatedSql,
-            @JsonProperty("deleteOrUpdate") boolean deleteOrUpdate)
+            @JsonProperty("deleteOrUpdate") boolean deleteOrUpdate,
+            @JsonProperty("tableSplitField") @Nullable String tableSplitField,
+            @JsonProperty("tableSplitFieldValidated") boolean tableSplitFieldValidated)
     {
         this.schemaTableName = requireNonNull(schemaTableName, "schemaTableName is null");
         this.catalogName = catalogName;
@@ -90,6 +108,8 @@ public class JdbcTableHandle
         this.limit = requireNonNull(limit, "limit is null");
         this.generatedSql = generatedSql;
         this.deleteOrUpdate = deleteOrUpdate;
+        this.tableSplitField = tableSplitField;
+        this.isTableSplitFieldValidated = tableSplitFieldValidated;
     }
 
     @JsonProperty
@@ -147,6 +167,29 @@ public class JdbcTableHandle
         this.deleteOrUpdate = deleteOrUpdate;
     }
 
+    @JsonProperty
+    @Nullable
+    public String getTableSplitField()
+    {
+        return tableSplitField;
+    }
+
+    public void setTableSplitField(String tableSplitField)
+    {
+        this.tableSplitField = tableSplitField;
+    }
+
+    @JsonProperty
+    public Boolean getTableSplitFieldValidated()
+    {
+        return isTableSplitFieldValidated;
+    }
+
+    public void setTableSplitFieldValidated(boolean validated)
+    {
+        this.isTableSplitFieldValidated = validated;
+    }
+
     /**
      * Hetu DC Connector uses {@link JdbcTableHandle}.
      * Overriding this method makes all JdbcConnectors using {@link JdbcTableHandle}
@@ -178,7 +221,8 @@ public class JdbcTableHandle
     {
         JdbcTableHandle oldJdbcTableHandle = (JdbcTableHandle) oldConnectorTableHandle;
         return new JdbcTableHandle(schemaTableName, catalogName, schemaName, tableName, oldJdbcTableHandle.getConstraint(),
-                oldJdbcTableHandle.getLimit(), oldJdbcTableHandle.getGeneratedSql(), oldJdbcTableHandle.getDeleteOrUpdate());
+                oldJdbcTableHandle.getLimit(), oldJdbcTableHandle.getGeneratedSql(), oldJdbcTableHandle.getDeleteOrUpdate(),
+                oldJdbcTableHandle.getTableSplitField(), oldJdbcTableHandle.getTableSplitFieldValidated());
     }
 
     @Override

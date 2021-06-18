@@ -17,6 +17,7 @@ import com.google.inject.Injector;
 import com.google.inject.Module;
 import io.airlift.bootstrap.Bootstrap;
 import io.prestosql.plugin.base.jmx.MBeanServerModule;
+import io.prestosql.spi.NodeManager;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
 import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorContext;
@@ -76,6 +77,7 @@ public class JdbcConnectorFactory
                         binder.bind(TypeManager.class).toInstance(context.getTypeManager());
                         binder.bind(RowExpressionService.class).toInstance(context.getRowExpressionService());
                         binder.bind(DeterminismEvaluator.class).toInstance(context.getRowExpressionService().getDeterminismEvaluator());
+                        binder.bind(NodeManager.class).toInstance(context.getNodeManager());
                     },
                     new JdbcModule(catalogName),
                     new MBeanServerModule(),

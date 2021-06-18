@@ -61,7 +61,11 @@ public class TestBaseJdbcConfig
                 .setMaxWaitMillis(-1L)
                 .setCaseInsensitiveNameMatchingCacheTtl(new Duration(1, MINUTES))
                 .setPushDownEnable(true)
-                .setPushDownModule(DEFAULT));
+                .setPushDownModule(DEFAULT)
+                .setTableSplitEnable(false)
+                .setTableSplitFields(null)
+                .setTableSplitStepCalcRefreshInterval(new Duration(5, MINUTES))
+                .setTableSplitStepCalcCalcThreads(4));
     }
 
     @Test
@@ -97,6 +101,10 @@ public class TestBaseJdbcConfig
                 .put("jdbc.pushdown-enabled", "false")
                 .put("use-connection-pool", "true")
                 .put("jdbc.pushdown-module", "BASE_PUSHDOWN")
+                .put("jdbc.table-split-enabled", "true")
+                .put("jdbc.table-split-fields", "test_field")
+                .put("jdbc.table-split-stepCalc-refresh-interval", "20s")
+                .put("jdbc.table-split-stepCalc-threads", "2")
                 .build();
 
         BaseJdbcConfig expected = new BaseJdbcConfig()
@@ -128,7 +136,11 @@ public class TestBaseJdbcConfig
                 .setMaxWaitMillis(1000)
                 .setCaseInsensitiveNameMatchingCacheTtl(new Duration(1, SECONDS))
                 .setPushDownEnable(false)
-                .setPushDownModule(BASE_PUSHDOWN);
+                .setPushDownModule(BASE_PUSHDOWN)
+                .setTableSplitEnable(true)
+                .setTableSplitFields("test_field")
+                .setTableSplitStepCalcRefreshInterval(new Duration(20, SECONDS))
+                .setTableSplitStepCalcCalcThreads(2);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

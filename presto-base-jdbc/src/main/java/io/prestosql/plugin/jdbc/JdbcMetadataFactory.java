@@ -13,6 +13,9 @@
  */
 package io.prestosql.plugin.jdbc;
 
+import io.prestosql.plugin.splitmanager.DataSourceTableSplitManager;
+import io.prestosql.plugin.splitmanager.TableSplitFieldCheck;
+
 import javax.inject.Inject;
 
 import static java.util.Objects.requireNonNull;
@@ -21,11 +24,13 @@ public class JdbcMetadataFactory
 {
     private final JdbcClient jdbcClient;
     private final boolean allowDropTable;
+    private final DataSourceTableSplitManager tableSplitManager;
 
     @Inject
-    public JdbcMetadataFactory(@InternalBaseJdbc JdbcClient jdbcClient, JdbcMetadataConfig config)
+    public JdbcMetadataFactory(@InternalBaseJdbc JdbcClient jdbcClient, JdbcMetadataConfig config, DataSourceTableSplitManager tableSplitManager)
     {
         this.jdbcClient = requireNonNull(jdbcClient, "jdbcClient is null");
+        this.tableSplitManager = requireNonNull(tableSplitManager, "tableSplitManager is null");
         requireNonNull(config, "config is null");
         this.allowDropTable = config.isAllowDropTable();
     }
@@ -43,6 +48,6 @@ public class JdbcMetadataFactory
 
     public JdbcMetadata create()
     {
-        return new JdbcMetadata(new TransactionScopeCachingJdbcClient(jdbcClient), allowDropTable);
+        return new JdbcMetadata(new TableSplitFieldCheck(new TransactionScopeCachingJdbcClient(jdbcClient), tableSplitManager), allowDropTable);
     }
 }
