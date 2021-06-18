@@ -17,6 +17,7 @@ package io.hetu.core.plugin.hbase.query;
 import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
 import io.hetu.core.plugin.hbase.connector.HBaseConnection;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
+import io.hetu.core.plugin.hbase.utils.Constants;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorPageSourceProvider;
@@ -29,6 +30,7 @@ import io.prestosql.spi.connector.RecordSet;
 
 import javax.inject.Inject;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
@@ -59,12 +61,33 @@ public class HBasePageSourceProvider
             ConnectorTableHandle table,
             List<ColumnHandle> columns)
     {
-        RecordSet recordSet = recordSetProvider.getRecordSet(transactionHandle, session, split, table, columns);
+        // if delete rows, we should replace $rowId -> real rowkey name
+        List<ColumnHandle> columnsReplaceRowKey = new ArrayList<>();
+        columns.forEach(ch -> {
+            if (Constants.HBASE_ROWID_NAME.equals(ch.getColumnName())) {
+                if (ch instanceof HBaseColumnHandle && table instanceof HBaseTableHandle) {
+                    HBaseColumnHandle rowColumnHandle = (HBaseColumnHandle) ch;
+                    columnsReplaceRowKey.add(new HBaseColumnHandle(
+                            ((HBaseTableHandle) table).getRowId(),
+                            rowColumnHandle.getFamily(),
+                            rowColumnHandle.getQualifier(),
+                            rowColumnHandle.getType(),
+                            rowColumnHandle.getOrdinal(),
+                            rowColumnHandle.getComment(),
+                            rowColumnHandle.isIndexed()));
+                }
+            }
+            else {
+                columnsReplaceRowKey.add(ch);
+            }
+        });
+
+        RecordSet recordSet = recordSetProvider.getRecordSet(transactionHandle, session, split, table, columnsReplaceRowKey);
         HBaseRecordSet hbaseRecordSet = null;
         if (recordSet instanceof HBaseRecordSet) {
             hbaseRecordSet = (HBaseRecordSet) recordSet;
         }
-        if (columns.stream()
+        if (columnsReplaceRowKey.stream()
                 .anyMatch(
                         ch -> (ch instanceof HBaseColumnHandle)
                                 && (table instanceof HBaseTableHandle)
