@@ -2278,8 +2278,8 @@ public class SemiTransactionalHiveMetastore
             Path target,
             List<DirectoryCleanUpTask> cleanUpTasksForAbort)
     {
-        try (FileSystem fs = hdfsEnvironment.getFileSystem(context, source)) {
-            if (fs.rename(source, target)) {
+        try {
+            if (hdfsEnvironment.getFileSystem(context, source).rename(source, target)) {
                 cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, target, true));
             }
             else {
