@@ -93,7 +93,14 @@ public class DynamicFiltersChecker
             @Override
             public Set<String> visitSemiJoin(SemiJoinNode node, List<String> context)
             {
+                if (node.getDynamicFilterId().isPresent()) {
+                    Set<String> currentJoinDynamicFilters = ImmutableSet.of(node.getDynamicFilterId().get());
+                    context.addAll(currentJoinDynamicFilters);
+                }
                 Set<String> consumedSourceSide = node.getSource().accept(this, context);
+                if (node.getDynamicFilterId().isPresent()) {
+                    context.remove(node.getDynamicFilterId().get());
+                }
                 Set<String> consumedFilteringSourceSide = node.getFilteringSource().accept(this, context);
 
                 Set<String> unmatched = new HashSet<>(consumedSourceSide);

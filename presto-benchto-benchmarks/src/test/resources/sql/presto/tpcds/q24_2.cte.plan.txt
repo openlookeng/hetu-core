@@ -6,7 +6,7 @@ remote exchange (GATHER, SINGLE, [])
                     remote exchange (REPARTITION, HASH, ["c_first_name", "c_last_name", "s_store_name"])
                         partial aggregation over (c_first_name, c_last_name, s_store_name)
                             Filter
-                                remote exchange (REPARTITION, HASH, ["c_first_name", "c_last_name", "ca_state", "i_color", "i_current_price", "i_manager_id", "i_size", "i_units", "s_state", "s_store_name"])
+                                remote exchange (REPARTITION, HASH, ["c_first_name", "c_last_name", "ca_state", "i_color", "i_current_price", "i_manager_id", "i_size", "i_units", "s_state", "s_store_name", "sum"])
                                     cte ssales
                                         final aggregation over (c_first_name, c_last_name, ca_state, i_color, i_current_price, i_manager_id, i_size, i_units, s_state, s_store_name)
                                             local exchange (GATHER, SINGLE, [])
@@ -44,7 +44,7 @@ remote exchange (GATHER, SINGLE, [])
                         local exchange (GATHER, SINGLE, [])
                             remote exchange (GATHER, SINGLE, [])
                                 partial aggregation over ()
-                                    remote exchange (GATHER, SINGLE, [])
+                                    remote exchange (REPARTITION, HASH, ["c_first_name_181", "c_last_name_182", "ca_state_199", "i_color_168", "i_current_price_156", "i_manager_id_171", "i_size_166", "i_units_169", "s_state_146", "s_store_name_127", "sum_225"])
                                         cte ssales
                                             final aggregation over (c_first_name_181, c_last_name_182, ca_state_199, i_color_168, i_current_price_156, i_manager_id_171, i_size_166, i_units_169, s_state_146, s_store_name_127)
                                                 local exchange (GATHER, SINGLE, [])

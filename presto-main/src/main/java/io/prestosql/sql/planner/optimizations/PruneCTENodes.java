@@ -17,12 +17,14 @@ package io.prestosql.sql.planner.optimizations;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
@@ -140,6 +142,18 @@ public class PruneCTENodes
                     node = (CTEScanNode) visitPlan(node, context);
                     return node.getSource();
                 }
+
+                // If there is a self join below CTE node, then CTE should be removed.
+                if (node.getSource() instanceof JoinNode) {
+                    // check if this join is self join
+                    TableHandle left = getTableHandle(((JoinNode) node.getSource()).getLeft());
+                    TableHandle right = getTableHandle(((JoinNode) node.getSource()).getRight());
+                    if (left != null && right != null && left.getConnectorHandle().equals(right.getConnectorHandle())) {
+                        // both tables are same, means it is self join.
+                        node = (CTEScanNode) visitPlan(node, context);
+                        return node.getSource();
+                    }
+                }
             }
             if (!isNodeAlreadyVisited) {
                 cteUsageMap.merge(commonCTERefNum, 1, Integer::sum);
@@ -151,6 +165,23 @@ public class PruneCTENodes
                 }
             }
             return visitPlan(node, context);
+        }
+
+        private TableHandle getTableHandle(PlanNode node)
+        {
+            if (node instanceof TableScanNode) {
+                return ((TableScanNode) node).getTable();
+            }
+            else if (node instanceof ProjectNode) {
+                return getTableHandle(((ProjectNode) node).getSource());
+            }
+            else if (node instanceof FilterNode) {
+                return getTableHandle(((FilterNode) node).getSource());
+            }
+            else if (node.getSources().size() == 1 && node instanceof ExchangeNode) {
+                return getTableHandle(node.getSources().get(0));
+            }
+            return null;
         }
 
         // If only there was any CTE with just one usage, we need to traverse again to remove CTE node otherwise no need.

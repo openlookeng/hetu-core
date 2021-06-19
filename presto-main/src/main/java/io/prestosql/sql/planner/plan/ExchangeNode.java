@@ -87,6 +87,17 @@ public class ExchangeNode
     {
         super(id);
 
+        // CTEScanNode adds one exchange node on top of it,
+        // so if upper node going to have another ExchangeNode then we should omit previous one.
+        // In order to find this, we check if child node is already exchange node and it has only one source
+        // and that source CTE node.
+        if (sources.size() == 1) {
+            PlanNode child = sources.get(0);
+            if (scope == REMOTE && child instanceof ExchangeNode && child.getSources().size() == 1 && child.getSources().get(0) instanceof CTEScanNode) {
+                sources = ImmutableList.of(child.getSources().get(0));
+            }
+        }
+
         requireNonNull(type, "type is null");
         requireNonNull(scope, "scope is null");
         requireNonNull(sources, "sources is null");
