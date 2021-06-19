@@ -704,7 +704,7 @@ public abstract class AbstractMockMetadata
     }
 
     @Override
-    public void refreshMetadataCache(Session session)
+    public void refreshMetadataCache(Session session, Optional<String> catalogName)
     {
         throw new UnsupportedOperationException();
     }

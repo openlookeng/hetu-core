@@ -24,14 +24,23 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 public class RefreshMetadataCache
         extends Statement
 {
-    public RefreshMetadataCache(NodeLocation location)
+    private Optional<Identifier> catalog;
+
+    public RefreshMetadataCache(NodeLocation location, Optional<Identifier> catalog)
     {
         super(Optional.of(location));
+        this.catalog = catalog;
     }
 
-    public RefreshMetadataCache(Optional<NodeLocation> location)
+    public Optional<Identifier> getCatalog()
+    {
+        return catalog;
+    }
+
+    public RefreshMetadataCache(Optional<NodeLocation> location, Optional<Identifier> catalog)
     {
         super(location);
+        this.catalog = catalog;
     }
 
     @Override

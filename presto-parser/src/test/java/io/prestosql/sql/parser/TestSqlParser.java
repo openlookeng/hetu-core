@@ -836,7 +836,8 @@ public class TestSqlParser
     @Test
     public void testRefreshMetastoreCache()
     {
-        assertStatement("REFRESH META CACHE", new RefreshMetadataCache(Optional.empty()));
+        assertStatement("REFRESH META CACHE", new RefreshMetadataCache(Optional.empty(), Optional.empty()));
+        assertStatement("REFRESH META CACHE FOR foo", new RefreshMetadataCache(Optional.empty(), Optional.of(new Identifier("foo"))));
     }
 
     @Test

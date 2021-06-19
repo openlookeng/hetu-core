@@ -150,7 +150,7 @@ statement
     | SET PATH pathSpecification                                       #setPath
     | VACUUM TABLE qualifiedName (FULL (UNIFY)?)? (PARTITION partition=string)?
         (AND_WAIT)?                                                    #vacuumTable
-    | REFRESH META CACHE                                               #refreshMetadataCache
+    | REFRESH META CACHE (FOR (catalog=identifier))?                   #refreshMetadataCache
     ;
 
 assignmentList

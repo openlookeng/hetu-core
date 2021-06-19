@@ -921,7 +921,12 @@ final class ShowQueriesRewrite
         @Override
         protected Node visitRefreshMetadataCache(RefreshMetadataCache node, Void context)
         {
-            metadata.refreshMetadataCache(session);
+            if (!node.getCatalog().isPresent() && !session.getCatalog().isPresent()) {
+                throw new SemanticException(CATALOG_NOT_SPECIFIED, node, "Catalog must be specified when session catalog is not set");
+            }
+
+            String catalog = node.getCatalog().map(Identifier::getValue).orElseGet(() -> session.getCatalog().get());
+            metadata.refreshMetadataCache(session, Optional.of(catalog));
             return simpleQuery(selectList(ImmutableList.of()));
         }
 

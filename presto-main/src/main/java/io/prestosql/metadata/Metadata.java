@@ -571,5 +571,5 @@ public interface Metadata
 
     boolean canPerformSortBasedAggregation(Session session, TableHandle tableHandle, List<String> keyNames);
 
-    void refreshMetadataCache(Session session);
+    void refreshMetadataCache(Session session, Optional<String> catalogName);
 }

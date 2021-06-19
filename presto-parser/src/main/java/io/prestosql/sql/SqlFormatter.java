@@ -246,6 +246,10 @@ public final class SqlFormatter
         protected Void visitRefreshMetadataCache(RefreshMetadataCache node, Integer context)
         {
             append(context, "REFRESH META CACHE");
+            if (node.getCatalog().isPresent()) {
+                builder.append(" FOR ")
+                        .append(node.getCatalog().get());
+            }
             return null;
         }
 

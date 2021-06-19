@@ -104,6 +104,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.prestosql.metadata.MetadataUtil.convertFromSchemaTableName;
 import static io.prestosql.metadata.MetadataUtil.toSchemaTableName;
 import static io.prestosql.spi.StandardErrorCode.INVALID_VIEW;
+import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.StandardErrorCode.SYNTAX_ERROR;
 import static io.prestosql.spi.connector.ConnectorViewDefinition.ViewColumn;
@@ -1562,11 +1563,16 @@ public final class MetadataManager
     }
 
     @Override
-    public void refreshMetadataCache(Session session)
+    public void refreshMetadataCache(Session session, Optional<String> catalogName)
     {
-        Optional<CatalogMetadata> catalog = getOptionalCatalogMetadata(session, session.getCatalog().get());
-        ConnectorMetadata metadata = getMetadata(session, catalog.get().getCatalogName());
-        metadata.refreshMetadataCache();
+        Optional<CatalogMetadata> catalog = getOptionalCatalogMetadata(session, catalogName.get());
+        if (catalog.isPresent()) {
+            ConnectorMetadata metadata = getMetadata(session, catalog.get().getCatalogName());
+            metadata.refreshMetadataCache();
+        }
+        else {
+            throw new PrestoException(NOT_FOUND, "Catalog does not exist:" + catalogName.get());
+        }
     }
 
     //
