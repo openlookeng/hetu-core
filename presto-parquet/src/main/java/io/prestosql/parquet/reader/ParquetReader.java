@@ -39,6 +39,7 @@ import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.ColumnPath;
 import org.apache.parquet.io.MessageColumnIO;
 import org.apache.parquet.io.PrimitiveColumnIO;
+import org.joda.time.DateTimeZone;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -67,6 +68,7 @@ public class ParquetReader
     private final List<BlockMetaData> blocks;
     private final List<PrimitiveColumnIO> columns;
     private final ParquetDataSource dataSource;
+    private final DateTimeZone timeZone;
     private final AggregatedMemoryContext systemMemoryContext;
 
     private int currentBlock;
@@ -87,11 +89,13 @@ public class ParquetReader
     public ParquetReader(MessageColumnIO messageColumnIO,
             List<BlockMetaData> blocks,
             ParquetDataSource dataSource,
+            DateTimeZone timeZone,
             AggregatedMemoryContext systemMemoryContext,
             DataSize maxReadBlockSize)
     {
         this.blocks = blocks;
         this.dataSource = requireNonNull(dataSource, "dataSource is null");
+        this.timeZone = requireNonNull(timeZone, "timeZone is null");
         this.systemMemoryContext = requireNonNull(systemMemoryContext, "systemMemoryContext is null");
         this.currentRowGroupMemoryContext = systemMemoryContext.newAggregatedMemoryContext();
         this.maxReadBlockBytes = requireNonNull(maxReadBlockSize, "maxReadBlockSize is null").toBytes();
@@ -257,7 +261,7 @@ public class ParquetReader
     {
         for (PrimitiveColumnIO columnIO : columns) {
             RichColumnDescriptor column = new RichColumnDescriptor(columnIO.getColumnDescriptor(), columnIO.getType().asPrimitiveType());
-            columnReaders[columnIO.getId()] = PrimitiveColumnReader.createReader(column);
+            columnReaders[columnIO.getId()] = PrimitiveColumnReader.createReader(column, timeZone);
         }
     }
 

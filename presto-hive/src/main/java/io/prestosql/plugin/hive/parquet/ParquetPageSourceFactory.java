@@ -213,6 +213,7 @@ public class ParquetPageSourceFactory
                     messageColumnIO,
                     blocks.build(),
                     dataSource,
+                    timeZone,
                     systemMemoryContext,
                     maxReadBlockSize);
 

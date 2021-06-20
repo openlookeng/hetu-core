@@ -41,7 +41,6 @@ import org.testng.annotations.Test;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -1772,7 +1771,7 @@ public abstract class AbstractTestParquetReader
         if (input == null) {
             return null;
         }
-        Timestamp timestamp = new Timestamp();
+
         long seconds = (input / 1000);
         int nanos = ((input % 1000) * 1_000_000);
 
@@ -1787,9 +1786,7 @@ public abstract class AbstractTestParquetReader
             nanos -= 1_000_000_000;
             seconds += 1;
         }
-        timestamp.setTimeInMillis(seconds * 1000);
-        timestamp.setNanos(nanos);
-        return timestamp;
+        return Timestamp.ofEpochSecond(seconds, nanos);
     }
 
     private static SqlTimestamp intToSqlTimestamp(Integer input)
@@ -1797,7 +1794,7 @@ public abstract class AbstractTestParquetReader
         if (input == null) {
             return null;
         }
-        return sqlTimestampOf(input);
+        return sqlTimestampOf((long) input);
     }
 
     private static Date intToDate(Integer input)
@@ -1805,7 +1802,7 @@ public abstract class AbstractTestParquetReader
         if (input == null) {
             return null;
         }
-        return Date.valueOf(LocalDate.ofEpochDay(input).toString());
+        return Date.ofEpochDay(input);
     }
 
     private static SqlDate intToSqlDate(Integer input)

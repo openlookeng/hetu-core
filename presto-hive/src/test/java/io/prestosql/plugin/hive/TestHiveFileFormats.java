@@ -447,8 +447,10 @@ public class TestHiveFileFormats
         // TODO: empty arrays or maps with null keys don't seem to work
         // Parquet does not support DATE
         return TEST_COLUMNS.stream()
-                .filter(column -> !ImmutableSet.of("t_null_array_int", "t_array_empty", "t_map_null_key", "t_map_null_key_complex_value", "t_map_null_key_complex_key_value")
-                        .contains(column.getName()))
+                .filter(TestHiveFileFormats::withoutTimestamps)
+                .filter(TestHiveFileFormats::withoutNullMapKeyTests)
+                .filter(column -> !column.getName().equals("t_null_array_int"))
+                .filter(column -> !column.getName().equals("t_array_empty"))
                 .filter(column -> column.isPartitionKey() || (
                         !hasType(column.getObjectInspector(), PrimitiveCategory.DATE)) &&
                         !hasType(column.getObjectInspector(), PrimitiveCategory.SHORT) &&
