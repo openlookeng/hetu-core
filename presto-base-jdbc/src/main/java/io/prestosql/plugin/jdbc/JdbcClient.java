@@ -237,7 +237,7 @@ public interface JdbcClient
         throw new PrestoException(NOT_SUPPORTED, "This connector does not support setDeleteSql");
     }
 
-    default void setUpdateSql(PreparedStatement statement, List<Block> columnValueAndRowIdBlock, int position, List<String> updatedColumns)
+    default void setUpdateSql(ConnectorSession session, ConnectorTableHandle tableHandle, PreparedStatement statement, List<Block> columnValueAndRowIdBlock, int position, List<String> updatedColumns)
     {
         throw new PrestoException(NOT_SUPPORTED, "This connector does not support setUpdateSql");
     }

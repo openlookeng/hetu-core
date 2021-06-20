@@ -219,12 +219,6 @@ public class OracleClient
      */
     private final boolean synonymsEnabled;
 
-    private List<Type> updatedColumnTypes;
-
-    private List<WriteFunction> columnWriters;
-
-    private List<WriteNullFunction> nullWriters;
-
     /**
      * Create Oracle client using the configurations.
      *
@@ -808,7 +802,18 @@ public class OracleClient
     @Override
     public ConnectorTableHandle beginUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, List<Type> updatedColumnTypes)
     {
-        this.updatedColumnTypes = updatedColumnTypes;
+        JdbcTableHandle jdbcTableHandle = (JdbcTableHandle) tableHandle;
+        jdbcTableHandle.setUpdatedColumnTypes(updatedColumnTypes);
+        jdbcTableHandle.setDeleteOrUpdate(true);
+        return jdbcTableHandle;
+    }
+
+    public void setStatement(ConnectorSession session, ConnectorTableHandle tableHandle, PreparedStatement statement, Block block, int position, int channel)
+            throws SQLException
+    {
+        JdbcTableHandle jdbcTableHandle = (JdbcTableHandle) tableHandle;
+        List<Type> updatedColumnTypes = jdbcTableHandle.getUpdatedColumnTypes();
+
         List<WriteMapping> writeMappings = updatedColumnTypes.stream()
                 .map(type ->
                 {
@@ -824,22 +829,14 @@ public class OracleClient
                 })
                 .collect(toImmutableList());
 
-        this.columnWriters = writeMappings.stream()
+        List<WriteFunction> columnWriters = writeMappings.stream()
                 .map(WriteMapping::getWriteFunction)
                 .collect(toImmutableList());
 
-        this.nullWriters = writeMappings.stream()
+        List<WriteNullFunction> nullWriters = writeMappings.stream()
                 .map(WriteMapping::getWriteNullFunction)
                 .collect(toImmutableList());
 
-        JdbcTableHandle jdbcTableHandle = (JdbcTableHandle) tableHandle;
-        jdbcTableHandle.setDeleteOrUpdate(true);
-        return jdbcTableHandle;
-    }
-
-    public void setStatement(PreparedStatement statement, Block block, int position, int channel)
-            throws SQLException
-    {
         int parameterIndex = channel + 1;
 
         if (block.isNull(position)) {
@@ -847,7 +844,7 @@ public class OracleClient
             return;
         }
 
-        Type type = updatedColumnTypes.get(channel);
+        Type type = jdbcTableHandle.getUpdatedColumnTypes().get(channel);
         Class<?> javaType = type.getJavaType();
         WriteFunction writeFunction = columnWriters.get(channel);
         if (javaType == boolean.class) {
@@ -914,13 +911,13 @@ public class OracleClient
     }
 
     @Override
-    public void setUpdateSql(PreparedStatement statement, List<Block> columnValueAndRowIdBlock, int position, List<String> updatedColumns)
+    public void setUpdateSql(ConnectorSession session, ConnectorTableHandle tableHandle, PreparedStatement statement, List<Block> columnValueAndRowIdBlock, int position, List<String> updatedColumns)
     {
         Block rowIds = columnValueAndRowIdBlock.get(columnValueAndRowIdBlock.size() - 1);
 
         try {
             for (int i = 0; i < updatedColumns.size(); i++) {
-                setStatement(statement, columnValueAndRowIdBlock.get(i), position, i);
+                setStatement(session, tableHandle, statement, columnValueAndRowIdBlock.get(i), position, i);
             }
             String rowId = rowIds.getString(position, position, 18);
             statement.setString(updatedColumns.size() + 1, rowId);
