@@ -46,19 +46,28 @@ class OverviewMain extends React.Component{
                 obj.ip = key.slice(key.indexOf("[") + 1, key.indexOf("]"))
                 obj.count = data.memoryData[key].availableProcessors;
                 let totalMemory = data.memoryData[key].totalNodeMemory.slice(0, -1);
-                obj.nodeMemory = totalMemory;
-                obj.freeMemory = data.memoryData[key].pools.general.freeBytes + (data.memoryData[key].pools.reserved ? data.memoryData[key].pools.reserved.freeBytes : 0);
+                obj.nodeMemory = Number(totalMemory);
+                obj.freeMemory = Number(totalMemory);
+                if (typeof (data.memoryData[key].pools.general) != "undefined"){
+                    obj.freeMemory = 0;
+                    obj.freeMemory += data.memoryData[key].pools.general.freeBytes;
+                    if (typeof (data.memoryData[key].pools.reserved) != "undefined"){
+                        obj.freeMemory += data.memoryData[key].pools.reserved.freeBytes;
+                    }
+                }
                 table.push(obj);
             })
         }
-        this.setState({
-            totalNodes:data.memoryData ? Object.keys(data.memoryData).length : '',
-            totalMemory:data.lineData.totalMemory,
-            memoryUsed:data.lineData.reservedMemory,
-            processCpuLoad:(data.lineData.processCpuLoad*100).toFixed(2)+'%',
-            systemCpuLoad:(data.lineData.systemCpuLoad*100).toFixed(2)+'%',
-            tableData:table
-        })
+        if (typeof (data.memoryData) != "undefined" && typeof (data.lineData) != "undefined") {
+            this.setState({
+                totalNodes: data.memoryData ? Object.keys(data.memoryData).length : '',
+                totalMemory: data.lineData.totalMemory,
+                memoryUsed: data.lineData.reservedMemory,
+                processCpuLoad: (data.lineData.processCpuLoad * 100).toFixed(2) + '%',
+                systemCpuLoad: (data.lineData.systemCpuLoad * 100).toFixed(2) + '%',
+                tableData: table
+            })
+        }
     }
 
     render() {

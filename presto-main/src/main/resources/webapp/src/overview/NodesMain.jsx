@@ -59,9 +59,18 @@ class NodesMain extends React.Component {
                 obj.role = data.memoryData[key].role;
                 obj.count = data.memoryData[key].availableProcessors;
                 let totalMemory = data.memoryData[key].totalNodeMemory.slice(0, -1);
-                obj.nodeMemory = totalMemory;
-                obj.freeMemory = data.memoryData[key].pools.general.freeBytes + (data.memoryData[key].pools.reserved ? data.memoryData[key].pools.reserved.freeBytes : 0);
-                obj.usedMemory = data.memoryData[key].pools.general.reservedBytes + (data.memoryData[key].pools.reserved ? data.memoryData[key].pools.reserved.reservedBytes : 0);
+                obj.nodeMemory = Number(totalMemory);
+                obj.freeMemory = Number(totalMemory);
+                obj.usedMemory = 0;
+                if (typeof (data.memoryData[key].pools.general) != "undefined"){
+                    obj.freeMemory = 0;
+                    obj.freeMemory += data.memoryData[key].pools.general.freeBytes;
+                    obj.usedMemory += data.memoryData[key].pools.general.reservedBytes;
+                    if (typeof (data.memoryData[key].pools.reserved) != "undefined"){
+                        obj.freeMemory += data.memoryData[key].pools.reserved.freeBytes;
+                        obj.usedMemory += data.memoryData[key].pools.reserved.reservedBytes;
+                    }
+                }
                 obj.state = data.memoryData[key].state;
                 table.push(obj);
             })

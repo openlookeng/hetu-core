@@ -625,11 +625,6 @@ public class ClusterMemoryManager
             try {
                 MemoryInfo activeInfo = new MemoryInfo(0, 0, 0, new DataSize(0,
                         DataSize.Unit.BYTE), new HashMap<>());
-                for (Entry<String, RemoteNodeMemory> activeEntry : nodes.entrySet()) {
-                    activeInfo = activeEntry.getValue().getInfo().orElse(new MemoryInfo(0, 0, 0, new DataSize(0,
-                            DataSize.Unit.BYTE), new HashMap<>()));
-                    break;
-                }
                 MemoryInfo info = entry.getValue().getInfo().orElse(activeInfo);
                 String memoryInfoJson = new ObjectMapper().writeValueAsString(info);
                 StringBuilder memoryAndStateInfo = new StringBuilder(memoryInfoJson).insert(memoryInfoJson.length() - 1, ",\"state\":" + state + ",\"id\":" + id + ",\"role\":" + role);

@@ -70,7 +70,7 @@ class AddCatalog extends React.Component {
 
     componentDidMount() {
         ConnectorStore.listen(this._onChange);
-        this._fetchConnectors();
+        this._fetchOriginalSupportedConnectors();
     }
 
     componentWillUnmount() {
@@ -79,6 +79,10 @@ class AddCatalog extends React.Component {
 
     _fetchConnectors() {
         ConnectorActions.fetchSupportedConnectors();
+    }
+
+    _fetchOriginalSupportedConnectors() {
+        ConnectorActions.fetchOriginalSupportedConnectors();
     }
 
     _onChange() {
@@ -351,7 +355,6 @@ class AddCatalog extends React.Component {
                     newState.errors["submissionError"] = "Error while adding catalog: " + result.message.split('\n', 1)[0];
                     this.setState(newState)
                 }
-                ConnectorActions.fetchOriginalSupportedConnectors();
             }
             else {
                 newState.errors["submissionSuccess"] = "Add catalog successful; Server message: " + result.message

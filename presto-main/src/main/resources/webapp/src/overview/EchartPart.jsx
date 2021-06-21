@@ -309,7 +309,13 @@ class EchartPart extends React.Component{
                 let id = data.memoryData[key].id;
                 let name = key;
                 let index = _.findIndex(heatMapMemoryData, {id: id});
-                let newDataPoint = data.memoryData[key].pools.general.freeBytes + (data.memoryData[key].pools.reserved ? data.memoryData[key].pools.reserved.freeBytes : 0);
+                let newDataPoint = 0;
+                if (typeof (data.memoryData[key].pools.general) != "undefined"){
+                    newDataPoint += data.memoryData[key].pools.general.freeBytes;
+                    if (typeof (data.memoryData[key].pools.reserved) != "undefined"){
+                        newDataPoint += data.memoryData[key].pools.reserved.freeBytes;
+                    }
+                }
                 newDataPoint = Number(newDataPoint);
                 if (index == -1) {
                     let newData = {};
