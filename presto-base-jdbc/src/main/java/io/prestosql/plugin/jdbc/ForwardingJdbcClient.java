@@ -360,9 +360,9 @@ public abstract class ForwardingJdbcClient
     }
 
     @Override
-    public void setUpdateSql(PreparedStatement statement, List<Block> columnValueAndRowIdBlock, int position, List<String> updatedColumns)
+    public void setUpdateSql(ConnectorSession session, ConnectorTableHandle tableHandle, PreparedStatement statement, List<Block> columnValueAndRowIdBlock, int position, List<String> updatedColumns)
     {
-        getDelegate().setUpdateSql(statement, columnValueAndRowIdBlock, position, updatedColumns);
+        getDelegate().setUpdateSql(session, tableHandle, statement, columnValueAndRowIdBlock, position, updatedColumns);
     }
 
     @Override

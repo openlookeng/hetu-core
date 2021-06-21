@@ -304,7 +304,7 @@ public class StatisticsAwareJdbcClient
     @Override
     public String buildUpdateSql(ConnectorTableHandle handle, int updateColumnNum, List<String> updatedColumns)
     {
-        return stats.buildDeleteSql.wrap(() -> getDelegate().buildUpdateSql(handle, updateColumnNum, updatedColumns));
+        return stats.buildUpdateSql.wrap(() -> getDelegate().buildUpdateSql(handle, updateColumnNum, updatedColumns));
     }
 
     @Override
@@ -314,9 +314,9 @@ public class StatisticsAwareJdbcClient
     }
 
     @Override
-    public void setUpdateSql(PreparedStatement statement, List<Block> columnValueAndRowIdBlock, int position, List<String> updatedColumns)
+    public void setUpdateSql(ConnectorSession session, ConnectorTableHandle tableHandle, PreparedStatement statement, List<Block> columnValueAndRowIdBlock, int position, List<String> updatedColumns)
     {
-        stats.setDeleteSql.wrap(() -> getDelegate().setUpdateSql(statement, columnValueAndRowIdBlock, position, updatedColumns));
+        stats.setUpdateSql.wrap(() -> getDelegate().setUpdateSql(session, tableHandle, statement, columnValueAndRowIdBlock, position, updatedColumns));
     }
 
     @Override
@@ -360,7 +360,9 @@ public class StatisticsAwareJdbcClient
         public final JdbcApiStats beginDelete = new JdbcApiStats();
         public final JdbcApiStats finishDelete = new JdbcApiStats();
         public final JdbcApiStats buildDeleteSql = new JdbcApiStats();
+        public final JdbcApiStats buildUpdateSql = new JdbcApiStats();
         public final JdbcApiStats setDeleteSql = new JdbcApiStats();
+        public final JdbcApiStats setUpdateSql = new JdbcApiStats();
         public final JdbcApiStats getUpdateRowIdColumnHandle = new JdbcApiStats();
         public final JdbcApiStats executeUpdate = new JdbcApiStats();
 

@@ -118,7 +118,7 @@ public class JdbcUpdatablePageSource
             PreparedStatement statement = connection.prepareStatement(jdbcClient.buildUpdateSql(handle, updatedColumns.size(), updatedColumns));
             int batchSize = 0;
             for (int position = 0; position < rowIds.getPositionCount(); position++) {
-                jdbcClient.setUpdateSql(statement, columnValueAndRowIdBlock, position, updatedColumns);
+                jdbcClient.setUpdateSql(this.session, this.handle, statement, columnValueAndRowIdBlock, position, updatedColumns);
                 statement.addBatch();
                 batchSize++;
 

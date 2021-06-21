@@ -21,9 +21,11 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.type.Type;
 
 import javax.annotation.Nullable;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -44,6 +46,7 @@ public class JdbcTableHandle
     // Hetu: If query is push down use pushDown sql to build sql and use columnHandles directly
     private final Optional<GeneratedSql> generatedSql;
     private boolean deleteOrUpdate;
+    private List<Type> updatedColumnTypes;
 
     private String tableSplitField;
     private boolean isTableSplitFieldValidated;
@@ -71,7 +74,7 @@ public class JdbcTableHandle
             TupleDomain<ColumnHandle> constraint,
             OptionalLong limit)
     {
-        this(schemaTableName, catalogName, schemaName, tableName, constraint, limit, Optional.empty(), false, null, false);
+        this(schemaTableName, catalogName, schemaName, tableName, constraint, limit, Optional.empty(), false, null, null, false);
     }
 
     public JdbcTableHandle(
@@ -84,7 +87,7 @@ public class JdbcTableHandle
             Optional<GeneratedSql> generatedSql,
             boolean deleteOrUpdate)
     {
-        this(schemaTableName, catalogName, schemaName, tableName, constraint, limit, generatedSql, deleteOrUpdate, null, false);
+        this(schemaTableName, catalogName, schemaName, tableName, constraint, limit, generatedSql, deleteOrUpdate, null, null, false);
     }
 
     @JsonCreator
@@ -97,6 +100,7 @@ public class JdbcTableHandle
             @JsonProperty("limit") OptionalLong limit,
             @JsonProperty("sql") Optional<GeneratedSql> generatedSql,
             @JsonProperty("deleteOrUpdate") boolean deleteOrUpdate,
+            @JsonProperty("updatedColumnTypes") @Nullable List<Type> updatedColumnTypes,
             @JsonProperty("tableSplitField") @Nullable String tableSplitField,
             @JsonProperty("tableSplitFieldValidated") boolean tableSplitFieldValidated)
     {
@@ -108,6 +112,7 @@ public class JdbcTableHandle
         this.limit = requireNonNull(limit, "limit is null");
         this.generatedSql = generatedSql;
         this.deleteOrUpdate = deleteOrUpdate;
+        this.updatedColumnTypes = updatedColumnTypes;
         this.tableSplitField = tableSplitField;
         this.isTableSplitFieldValidated = tableSplitFieldValidated;
     }
@@ -169,6 +174,18 @@ public class JdbcTableHandle
 
     @JsonProperty
     @Nullable
+    public List<Type> getUpdatedColumnTypes()
+    {
+        return updatedColumnTypes;
+    }
+
+    public void setUpdatedColumnTypes(List<Type> updatedColumnTypes)
+    {
+        this.updatedColumnTypes = updatedColumnTypes;
+    }
+
+    @JsonProperty
+    @Nullable
     public String getTableSplitField()
     {
         return tableSplitField;
@@ -221,7 +238,8 @@ public class JdbcTableHandle
     {
         JdbcTableHandle oldJdbcTableHandle = (JdbcTableHandle) oldConnectorTableHandle;
         return new JdbcTableHandle(schemaTableName, catalogName, schemaName, tableName, oldJdbcTableHandle.getConstraint(),
-                oldJdbcTableHandle.getLimit(), oldJdbcTableHandle.getGeneratedSql(), oldJdbcTableHandle.getDeleteOrUpdate(),
+                oldJdbcTableHandle.getLimit(), oldJdbcTableHandle.getGeneratedSql(),
+                oldJdbcTableHandle.getDeleteOrUpdate(), oldJdbcTableHandle.getUpdatedColumnTypes(),
                 oldJdbcTableHandle.getTableSplitField(), oldJdbcTableHandle.getTableSplitFieldValidated());
     }
 

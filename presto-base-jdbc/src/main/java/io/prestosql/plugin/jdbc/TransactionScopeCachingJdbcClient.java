@@ -155,9 +155,9 @@ public class TransactionScopeCachingJdbcClient
     }
 
     @Override
-    public void setUpdateSql(PreparedStatement statement, List<Block> columnValueAndRowIdBlock, int position, List<String> updatedColumns)
+    public void setUpdateSql(ConnectorSession session, ConnectorTableHandle tableHandle, PreparedStatement statement, List<Block> columnValueAndRowIdBlock, int position, List<String> updatedColumns)
     {
-        super.setUpdateSql(statement, columnValueAndRowIdBlock, position, updatedColumns);
+        super.setUpdateSql(session, tableHandle, statement, columnValueAndRowIdBlock, position, updatedColumns);
     }
 
     @Override
