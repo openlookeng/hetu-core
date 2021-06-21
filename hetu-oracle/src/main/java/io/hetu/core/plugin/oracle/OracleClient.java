@@ -808,7 +808,7 @@ public class OracleClient
         return jdbcTableHandle;
     }
 
-    public void setStatement(ConnectorSession session, ConnectorTableHandle tableHandle, PreparedStatement statement, Block block, int position, int channel)
+    private void setStatement(ConnectorSession session, ConnectorTableHandle tableHandle, PreparedStatement statement, Block block, int position, int channel)
             throws SQLException
     {
         JdbcTableHandle jdbcTableHandle = (JdbcTableHandle) tableHandle;
@@ -877,8 +877,7 @@ public class OracleClient
     {
         JdbcTableHandle tableHandle = (JdbcTableHandle) handle;
         return format(
-                "DELETE FROM %s WHERE ROWID=%s",
-                quoted(tableHandle.getCatalogName(), tableHandle.getSchemaName(), tableHandle.getTableName()), "?");
+                "DELETE FROM %s WHERE ROWID=%s", tableHandle.getSchemaPrefixedTableName(), "?");
     }
 
     @Override
@@ -886,7 +885,7 @@ public class OracleClient
     {
         JdbcTableHandle tableHandle = (JdbcTableHandle) handle;
         StringBuilder sqlBuilder = new StringBuilder();
-        sqlBuilder.append(format("UPDATE %s SET ", quoted(tableHandle.getCatalogName(), tableHandle.getSchemaName(), tableHandle.getTableName())));
+        sqlBuilder.append(format("UPDATE %s SET ", tableHandle.getSchemaPrefixedTableName()));
         for (int i = 0; i < setNum; i++) {
             sqlBuilder.append(updatedColumns.get(i));
             sqlBuilder.append(" = ? ");

@@ -16,10 +16,6 @@ package io.hetu.core.plugin.oracle.optimization;
 
 import io.prestosql.plugin.jdbc.optimization.BaseJdbcSqlStatementWriter;
 import io.prestosql.plugin.jdbc.optimization.JdbcPushDownParameter;
-import io.prestosql.spi.sql.expression.Selection;
-
-import java.util.List;
-import java.util.StringJoiner;
 
 public class OracleSqlStatementWriter
         extends BaseJdbcSqlStatementWriter
@@ -41,33 +37,5 @@ public class OracleSqlStatementWriter
     public String limit(String table, long count)
     {
         return "SELECT * FROM (" + table + ") WHERE ROWNUM <= " + count;
-    }
-
-    @Override
-    public String from(String selections, String from)
-    {
-        if (from.contains(")")) {
-            return selections + " FROM " + from.substring(0, from.lastIndexOf(")"));
-        }
-        else {
-            return selections + " FROM " + from;
-        }
-    }
-
-    @Override
-    public String select(List<Selection> selections)
-    {
-        StringBuilder builder = new StringBuilder("SELECT ");
-        if (selections == null || selections.size() == 0) {
-            builder.append("null");
-        }
-        else {
-            StringJoiner joiner = new StringJoiner(", ");
-            for (Selection selection : selections) {
-                joiner.add(selection.getExpression());
-            }
-            builder.append(joiner);
-        }
-        return builder.toString();
     }
 }
