@@ -203,7 +203,7 @@ public class ExchangeClient
             else {
                 pageBuffer.addFirst(page);
                 targetBuffer.addFirst(Sets.newHashSet(target));
-                originBuffer.add(origin);
+                originBuffer.addFirst(origin);
             }
             bufferRetainedSizeInBytes += page.getRetainedSizeInBytes();
         }
@@ -505,7 +505,8 @@ public class ExchangeClient
         return future;
     }
 
-    private synchronized boolean addPages(List<SerializedPage> pages, String location)
+    @VisibleForTesting
+    synchronized boolean addPages(List<SerializedPage> pages, String location)
     {
         if (isClosed() || isFailed()) {
             return false;
