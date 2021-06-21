@@ -52,7 +52,7 @@ public class TestStepCalcManage
         tableConfig.setTableName("test_table");
         tableConfig.setCalcStepEnable(true);
         tableConfig.setSplitField("test_field");
-        tableConfig.setScanNodes(scanNodes);
+        tableConfig.setSplitCount(scanNodes);
 
         tableLogs = new ArrayList<SplitStatLog>();
         for (int i = 0; i < (scanNodes + 2); i++) {
@@ -60,7 +60,7 @@ public class TestStepCalcManage
             tableLog.setCatalogName(tableConfig.getCatalogName())
                     .setSchemaName(tableConfig.getSchemaName())
                     .setTableName(tableConfig.getTableName())
-                    .setScanNodes(tableConfig.getScanNodes())
+                    .setSplitCount(tableConfig.getSplitCount())
                     .setSplitField(tableConfig.getSplitField())
                     .setTimeStamp(timeStamp)
                     .setRecordFlag(SplitStatLog.LogState.STATE_NEW);
@@ -80,7 +80,7 @@ public class TestStepCalcManage
             assertTrue(splitLog.getEndIndex() == rangeArray[i][1]);
             assertTrue(splitLog.getRows() == rangeArray[i][2]);
             assertEquals(splitLog.getSplitField(), tableConfig.getSplitField());
-            assertEquals(splitLog.getScanNodes(), tableConfig.getScanNodes());
+            assertEquals(splitLog.getSplitCount(), tableConfig.getSplitCount());
             assertEquals(splitLog.getRecordFlag(), SplitStatLog.LogState.STATE_FINISH);
             i++;
         }
@@ -121,7 +121,7 @@ public class TestStepCalcManage
         tableConfig.setTableName("test_table");
         tableConfig.setCalcStepEnable(true);
         tableConfig.setSplitField("test_field");
-        tableConfig.setScanNodes(scanNodes);
+        tableConfig.setSplitCount(scanNodes);
 
         tableLogs = new ArrayList<SplitStatLog>();
         for (int i = 0; i < (scanNodes + 2); i++) {
@@ -129,7 +129,7 @@ public class TestStepCalcManage
             tableLog.setCatalogName(tableConfig.getCatalogName())
                     .setSchemaName(tableConfig.getSchemaName())
                     .setTableName(tableConfig.getTableName())
-                    .setScanNodes(tableConfig.getScanNodes())
+                    .setSplitCount(tableConfig.getSplitCount())
                     .setSplitField(tableConfig.getSplitField())
                     .setTimeStamp(timeStamp)
                     .setRecordFlag(SplitStatLog.LogState.STATE_NEW);
@@ -149,7 +149,7 @@ public class TestStepCalcManage
             assertTrue(splitLog.getEndIndex() == resRangeArray[i][1]);
             assertTrue(splitLog.getRows() == resRangeArray[i][2]);
             assertEquals(splitLog.getSplitField(), tableConfig.getSplitField());
-            assertEquals(splitLog.getScanNodes(), tableConfig.getScanNodes());
+            assertEquals(splitLog.getSplitCount(), tableConfig.getSplitCount());
             assertEquals(splitLog.getRecordFlag(), SplitStatLog.LogState.STATE_FINISH);
             i++;
         }
@@ -190,7 +190,7 @@ public class TestStepCalcManage
         tableConfig.setTableName("test_table");
         tableConfig.setCalcStepEnable(true);
         tableConfig.setSplitField("test_field");
-        tableConfig.setScanNodes(scanNodes);
+        tableConfig.setSplitCount(scanNodes);
 
         tableLogs = new ArrayList<SplitStatLog>();
         for (int i = 0; i < (scanNodes + 2); i++) {
@@ -198,7 +198,7 @@ public class TestStepCalcManage
             tableLog.setCatalogName(tableConfig.getCatalogName())
                     .setSchemaName(tableConfig.getSchemaName())
                     .setTableName(tableConfig.getTableName())
-                    .setScanNodes(tableConfig.getScanNodes())
+                    .setSplitCount(tableConfig.getSplitCount())
                     .setSplitField(tableConfig.getSplitField())
                     .setTimeStamp(timeStamp)
                     .setRecordFlag(SplitStatLog.LogState.STATE_NEW);
@@ -218,7 +218,7 @@ public class TestStepCalcManage
             assertTrue(splitLog.getEndIndex() == resRangeArray[i][1]);
             assertTrue(splitLog.getRows() == resRangeArray[i][2]);
             assertEquals(splitLog.getSplitField(), tableConfig.getSplitField());
-            assertEquals(splitLog.getScanNodes(), tableConfig.getScanNodes());
+            assertEquals(splitLog.getSplitCount(), tableConfig.getSplitCount());
             assertEquals(splitLog.getRecordFlag(), SplitStatLog.LogState.STATE_FINISH);
             i++;
         }
@@ -259,7 +259,7 @@ public class TestStepCalcManage
         tableConfig.setTableName("test_table");
         tableConfig.setCalcStepEnable(true);
         tableConfig.setSplitField("test_field");
-        tableConfig.setScanNodes(scanNodes);
+        tableConfig.setSplitCount(scanNodes);
 
         tableLogs = new ArrayList<SplitStatLog>();
         for (int i = 0; i < (scanNodes + 2); i++) {
@@ -267,7 +267,7 @@ public class TestStepCalcManage
             tableLog.setCatalogName(tableConfig.getCatalogName())
                     .setSchemaName(tableConfig.getSchemaName())
                     .setTableName(tableConfig.getTableName())
-                    .setScanNodes(tableConfig.getScanNodes())
+                    .setSplitCount(tableConfig.getSplitCount())
                     .setSplitField(tableConfig.getSplitField())
                     .setTimeStamp(timeStamp)
                     .setRecordFlag(SplitStatLog.LogState.STATE_NEW);
@@ -287,7 +287,7 @@ public class TestStepCalcManage
             assertTrue(splitLog.getEndIndex() == resRangeArray[i][1]);
             assertTrue(splitLog.getRows() == resRangeArray[i][2]);
             assertEquals(splitLog.getSplitField(), tableConfig.getSplitField());
-            assertEquals(splitLog.getScanNodes(), tableConfig.getScanNodes());
+            assertEquals(splitLog.getSplitCount(), tableConfig.getSplitCount());
             assertEquals(splitLog.getRecordFlag(), SplitStatLog.LogState.STATE_FINISH);
             i++;
         }
@@ -328,7 +328,7 @@ public class TestStepCalcManage
         tableConfig.setTableName("test_table");
         tableConfig.setCalcStepEnable(true);
         tableConfig.setSplitField("test_field");
-        tableConfig.setScanNodes(scanNodes);
+        tableConfig.setSplitCount(scanNodes);
 
         tableLogs = new ArrayList<SplitStatLog>();
         for (int i = 0; i < (scanNodes + 2); i++) {
@@ -336,7 +336,7 @@ public class TestStepCalcManage
             tableLog.setCatalogName(tableConfig.getCatalogName())
                     .setSchemaName(tableConfig.getSchemaName())
                     .setTableName(tableConfig.getTableName())
-                    .setScanNodes(tableConfig.getScanNodes())
+                    .setSplitCount(tableConfig.getSplitCount())
                     .setSplitField(tableConfig.getSplitField())
                     .setTimeStamp(timeStamp)
                     .setRecordFlag(SplitStatLog.LogState.STATE_NEW);
@@ -356,7 +356,7 @@ public class TestStepCalcManage
             assertTrue(splitLog.getEndIndex() == resRangeArray[i][1]);
             assertTrue(splitLog.getRows() == resRangeArray[i][2]);
             assertEquals(splitLog.getSplitField(), tableConfig.getSplitField());
-            assertEquals(splitLog.getScanNodes(), tableConfig.getScanNodes());
+            assertEquals(splitLog.getSplitCount(), tableConfig.getSplitCount());
             assertEquals(splitLog.getRecordFlag(), SplitStatLog.LogState.STATE_FINISH);
             i++;
         }
@@ -397,7 +397,7 @@ public class TestStepCalcManage
         tableConfig.setTableName("test_table");
         tableConfig.setCalcStepEnable(true);
         tableConfig.setSplitField("test_field");
-        tableConfig.setScanNodes(scanNodes);
+        tableConfig.setSplitCount(scanNodes);
 
         tableLogs = new ArrayList<SplitStatLog>();
         for (int i = 0; i < (scanNodes + 2); i++) {
@@ -405,7 +405,7 @@ public class TestStepCalcManage
             tableLog.setCatalogName(tableConfig.getCatalogName())
                     .setSchemaName(tableConfig.getSchemaName())
                     .setTableName(tableConfig.getTableName())
-                    .setScanNodes(tableConfig.getScanNodes())
+                    .setSplitCount(tableConfig.getSplitCount())
                     .setSplitField(tableConfig.getSplitField())
                     .setTimeStamp(timeStamp)
                     .setRecordFlag(SplitStatLog.LogState.STATE_NEW);
@@ -425,7 +425,7 @@ public class TestStepCalcManage
             assertTrue(splitLog.getEndIndex() == resRangeArray[i][1]);
             assertTrue(splitLog.getRows() == resRangeArray[i][2]);
             assertEquals(splitLog.getSplitField(), tableConfig.getSplitField());
-            assertEquals(splitLog.getScanNodes(), tableConfig.getScanNodes());
+            assertEquals(splitLog.getSplitCount(), tableConfig.getSplitCount());
             assertEquals(splitLog.getRecordFlag(), SplitStatLog.LogState.STATE_FINISH);
             i++;
         }
@@ -466,7 +466,7 @@ public class TestStepCalcManage
         tableConfig.setTableName("test_table");
         tableConfig.setCalcStepEnable(true);
         tableConfig.setSplitField("test_field");
-        tableConfig.setScanNodes(scanNodes);
+        tableConfig.setSplitCount(scanNodes);
 
         tableLogs = new ArrayList<SplitStatLog>();
         for (int i = 0; i < (scanNodes + 2); i++) {
@@ -474,7 +474,7 @@ public class TestStepCalcManage
             tableLog.setCatalogName(tableConfig.getCatalogName())
                     .setSchemaName(tableConfig.getSchemaName())
                     .setTableName(tableConfig.getTableName())
-                    .setScanNodes(tableConfig.getScanNodes())
+                    .setSplitCount(tableConfig.getSplitCount())
                     .setSplitField(tableConfig.getSplitField())
                     .setTimeStamp(timeStamp)
                     .setRecordFlag(SplitStatLog.LogState.STATE_NEW);
@@ -531,7 +531,7 @@ public class TestStepCalcManage
         tableConfig.setTableName("test_table");
         tableConfig.setCalcStepEnable(true);
         tableConfig.setSplitField("test_field");
-        tableConfig.setScanNodes(scanNodes);
+        tableConfig.setSplitCount(scanNodes);
 
         tableLogs = new ArrayList<SplitStatLog>();
         for (int i = 0; i < scanNodes; i++) {
@@ -539,7 +539,7 @@ public class TestStepCalcManage
             tableLog.setCatalogName(tableConfig.getCatalogName())
                     .setSchemaName(tableConfig.getSchemaName())
                     .setTableName(tableConfig.getTableName())
-                    .setScanNodes(tableConfig.getScanNodes())
+                    .setSplitCount(tableConfig.getSplitCount())
                     .setSplitField(tableConfig.getSplitField())
                     .setTimeStamp(timeStamp)
                     .setRecordFlag(SplitStatLog.LogState.STATE_NEW);
@@ -561,7 +561,7 @@ public class TestStepCalcManage
             assertTrue(splitLog.getEndIndex() == resRangeArray[i][1]);
             assertTrue(splitLog.getRows() == resRangeArray[i][2]);
             assertEquals(splitLog.getSplitField(), tableConfig.getSplitField());
-            assertEquals(splitLog.getScanNodes(), tableConfig.getScanNodes());
+            assertEquals(splitLog.getSplitCount(), tableConfig.getSplitCount());
             assertEquals(splitLog.getRecordFlag(), SplitStatLog.LogState.STATE_FINISH);
             i++;
         }
@@ -615,7 +615,7 @@ public class TestStepCalcManage
             assertTrue(splitLog.getEndIndex() == resRangeArray[i][1]);
             assertTrue(splitLog.getRows() == resRangeArray[i][2]);
             assertEquals(splitLog.getSplitField(), tableConfig.getSplitField());
-            assertEquals(splitLog.getScanNodes(), tableConfig.getScanNodes());
+            assertEquals(splitLog.getSplitCount(), tableConfig.getSplitCount());
             assertEquals(splitLog.getRecordFlag(), SplitStatLog.LogState.STATE_FINISH);
             i++;
         }
@@ -848,7 +848,7 @@ public class TestStepCalcManage
             assertEquals(splitLog.getEndIndex(), Long.valueOf(resRangeArray[i][1]));
             assertEquals(splitLog.getRows(), Long.valueOf(resRangeArray[i][2]));
             assertEquals(splitLog.getSplitField(), tableConfig.getSplitField());
-            assertEquals(splitLog.getScanNodes(), tableConfig.getScanNodes());
+            assertEquals(splitLog.getSplitCount(), tableConfig.getSplitCount());
             assertEquals(splitLog.getRecordFlag(), SplitStatLog.LogState.STATE_FINISH);
             i++;
         }
@@ -884,7 +884,7 @@ public class TestStepCalcManage
             assertEquals(splitLog.getEndIndex(), Long.valueOf(resRangeArray[i][1]));
             assertEquals(splitLog.getRows(), Long.valueOf(resRangeArray[i][2]));
             assertEquals(splitLog.getSplitField(), tableConfig.getSplitField());
-            assertEquals(splitLog.getScanNodes(), tableConfig.getScanNodes());
+            assertEquals(splitLog.getSplitCount(), tableConfig.getSplitCount());
             assertEquals(splitLog.getRecordFlag(), SplitStatLog.LogState.STATE_FINISH);
             i++;
         }
@@ -912,7 +912,7 @@ public class TestStepCalcManage
         tableConfig.setTableName("test_table");
         tableConfig.setCalcStepEnable(true);
         tableConfig.setSplitField("test_field");
-        tableConfig.setScanNodes(scanNodes);
+        tableConfig.setSplitCount(scanNodes);
 
         return tableConfig;
     }
@@ -937,7 +937,7 @@ public class TestStepCalcManage
             tableLog.setCatalogName(tableConfig.getCatalogName())
                     .setSchemaName(tableConfig.getSchemaName())
                     .setTableName(tableConfig.getTableName())
-                    .setScanNodes(tableConfig.getScanNodes())
+                    .setSplitCount(tableConfig.getSplitCount())
                     .setSplitField(tableConfig.getSplitField())
                     .setTimeStamp(timeStamp)
                     .setRecordFlag(SplitStatLog.LogState.STATE_NEW);

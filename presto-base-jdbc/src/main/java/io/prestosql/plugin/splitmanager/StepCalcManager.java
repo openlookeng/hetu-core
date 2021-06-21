@@ -132,7 +132,7 @@ public class StepCalcManager
                     .setSchemaName(statLog.getSchemaName())
                     .setTableName(statLog.getTableName())
                     .setSplitField(statLog.getSplitField())
-                    .setScanNodes(statLog.getScanNodes())
+                    .setSplitCount(statLog.getSplitCount())
                     .setRows(statLog.getRows())
                     .setBeginIndex(statLog.getBeginIndex())
                     .setEndIndex(statLog.getEndIndex())
@@ -267,16 +267,16 @@ public class StepCalcManager
         int totalSplitNum = tableLogs.size();
         SplitStatLog firstLog = tableLogs.get(0);
 
-        if (firstLog.getScanNodes() == null) {
+        if (firstLog.getSplitCount() == null) {
             log.debug("scan node is null, split run log invalid. table=" + table.getTableName());
             return false;
         }
 
-        if (firstLog.getScanNodes() != totalSplitNum) {
+        if (firstLog.getSplitCount() != totalSplitNum) {
             // scanNodes + upper limit + lower limit
-            if ((firstLog.getScanNodes() + 2) != totalSplitNum) {
+            if ((firstLog.getSplitCount() + 2) != totalSplitNum) {
                 log.debug("split run log invalid. logCount=" + totalSplitNum +
-                        ",expect=" + firstLog.getScanNodes() + ", table=" + table.getTableName());
+                        ",expect=" + firstLog.getSplitCount() + ", table=" + table.getTableName());
                 return false;
             }
         }
@@ -287,9 +287,9 @@ public class StepCalcManager
             return false;
         }
 
-        if (!table.getScanNodes().equals(firstLog.getScanNodes())) {
-            log.debug("split run log invalid. config scanNode=" + table.getScanNodes() +
-                    ",log scanNode=" + firstLog.getScanNodes() + ", table=" + table.getTableName());
+        if (!table.getSplitCount().equals(firstLog.getSplitCount())) {
+            log.debug("split run log invalid. config scanNode=" + table.getSplitCount() +
+                    ",log splitCount=" + firstLog.getSplitCount() + ", table=" + table.getTableName());
             return false;
         }
 
@@ -419,7 +419,7 @@ public class StepCalcManager
                 .setSchemaName(tmp.get(0).getSchemaName())
                 .setTableName(tmp.get(0).getTableName())
                 .setRows(tmp.stream().mapToLong(SplitStatLog::getRows).sum())
-                .setScanNodes(tmp.get(0).getScanNodes())
+                .setSplitCount(tmp.get(0).getSplitCount())
                 .setBeginIndex(tmp.get(0).getBeginIndex())
                 .setEndIndex(tmp.get(tmp.size() - 1).getEndIndex()));
     }
@@ -463,7 +463,7 @@ public class StepCalcManager
                     .setSchemaName(split.getSchemaName())
                     .setTableName(split.getTableName())
                     .setRows(moreRows)
-                    .setScanNodes(split.getScanNodes())
+                    .setSplitCount(split.getSplitCount())
                     .setBeginIndex(beginIndex)
                     .setEndIndex(endIndex)
                     .setRecordFlag(SplitStatLog.LogState.STATE_FINISH);
@@ -494,7 +494,7 @@ public class StepCalcManager
                     .setSchemaName(split.getSchemaName())
                     .setTableName(split.getTableName())
                     .setRows(averageRows)
-                    .setScanNodes(split.getScanNodes())
+                    .setSplitCount(split.getSplitCount())
                     .setBeginIndex(beginIndex)
                     .setEndIndex(endIndex)
                     .setRecordFlag(SplitStatLog.LogState.STATE_FINISH);
@@ -542,7 +542,7 @@ public class StepCalcManager
                     .setSchemaName(split.getSchemaName())
                     .setTableName(split.getTableName())
                     .setRows(modRows)
-                    .setScanNodes(split.getScanNodes())
+                    .setSplitCount(split.getSplitCount())
                     .setBeginIndex(beginIndex)
                     .setEndIndex(endIndex)
                     .setRecordFlag(SplitStatLog.LogState.STATE_FINISH);
@@ -570,7 +570,7 @@ public class StepCalcManager
                     .setSchemaName(split.getSchemaName())
                     .setTableName(split.getTableName())
                     .setRows(averageRows)
-                    .setScanNodes(split.getScanNodes())
+                    .setSplitCount(split.getSplitCount())
                     .setBeginIndex(beginIndex)
                     .setEndIndex(endIndex)
                     .setRecordFlag(SplitStatLog.LogState.STATE_FINISH);

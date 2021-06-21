@@ -101,7 +101,7 @@ public class JdbcSplit
     }
 
     @JsonProperty
-    public int getScanNodes()
+    public int getSplitCount()
     {
         return scanNodes;
     }

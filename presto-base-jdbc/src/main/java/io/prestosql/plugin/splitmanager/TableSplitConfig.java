@@ -91,12 +91,12 @@ public class TableSplitConfig
         isCalcStepEnable = calcStepEnable;
     }
 
-    public Integer getScanNodes()
+    public Integer getSplitCount()
     {
         return scanNodes;
     }
 
-    public void setScanNodes(Integer scanNodes)
+    public void setSplitCount(Integer scanNodes)
     {
         this.scanNodes = scanNodes;
     }
