@@ -626,6 +626,33 @@ public abstract class AbstractTestStarTreeQueries
         assertUpdate("DROP TABLE orders_table_source_filter_cast");
     }
 
+    @Test
+    public void testInsertCubeWithGreaterThanOperator()
+    {
+        computeActual("CREATE TABLE orders_table_insert_cube_greather_than AS SELECT * FROM orders");
+        computeActual("CREATE CUBE orders_cube_insert_cube_greather_than ON orders_table_insert_cube_greather_than WITH (AGGREGATIONS = (max(totalprice)), GROUP = (orderdate,custkey))");
+        assertQuerySucceeds("INSERT INTO CUBE orders_cube_insert_cube_greather_than WHERE custkey > 100");
+        assertQuery(sessionStarTree,
+                "SELECT orderdate, max(totalprice) FROM orders_table_insert_cube_greather_than WHERE custkey = 100 GROUP BY orderdate",
+                "SELECT orderdate, max(totalprice) FROM orders WHERE custkey = 100 GROUP BY orderdate",
+                assertTableScan("orders_table_insert_cube_greather_than"));
+        assertQuery(sessionStarTree,
+                "SELECT orderdate, max(totalprice) FROM orders_table_insert_cube_greather_than WHERE custkey >= 101 GROUP BY orderdate",
+                "SELECT orderdate, max(totalprice) FROM orders WHERE custkey >= 101 GROUP BY orderdate",
+                assertTableScan("orders_cube_insert_cube_greather_than"));
+        assertUpdate("DROP TABLE orders_table_insert_cube_greather_than");
+    }
+
+    @Test
+    public void testWithUnsupportedPredicate()
+    {
+        computeActual("CREATE TABLE orders_table_predicate_unsupported_predicate AS SELECT * FROM orders");
+        computeActual("CREATE CUBE orders_cube_predicate_unsupported_predicate ON orders_table_predicate_unsupported_predicate WITH (AGGREGATIONS=(sum(totalprice)), GROUP=(custkey, orderdate))");
+        assertQueryFails("INSERT INTO CUBE orders_cube_predicate_unsupported_predicate WHERE orderdate = date '1992-01-01' OR custkey = 100", ".*Cannot support predicate.*");
+        assertQueryFails("INSERT OVERWRITE CUBE orders_cube_predicate_unsupported_predicate WHERE orderdate = date '1992-01-01' OR custkey = 100", ".*Cannot support predicate.*");
+        assertUpdate("DROP TABLE orders_table_predicate_unsupported_predicate");
+    }
+
     private Consumer<Plan> assertInTableScans(String tableName)
     {
         return plan ->
