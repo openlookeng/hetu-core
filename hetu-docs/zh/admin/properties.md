@@ -682,7 +682,7 @@
 
 > - 类型：`string`
 >
-> 此属性定义用于存储快照的[文件系统](../develop/filesystem.md)配置文件。对应的配置文件必须存在于`etc/filesystem`中。例如，如果将该属性设置为`hetu.experimental.snapshot.profile=snapshot-hdfs1`，则必须在`etc/filesystem`中创建描述此文件系统的配置文件`snapshot-hdfs1.properties`，其中包含的必要信息包括身份验证类型、配置和密钥表（如适用）。
+> 此属性定义用于存储快照的[文件系统](../develop/filesystem.md)配置文件。对应的配置文件必须存在于`etc/filesystem`中。例如，如果将该属性设置为`hetu.experimental.snapshot.profile=snapshot-hdfs1`，则必须在`etc/filesystem`中创建描述此文件系统的配置文件`snapshot-hdfs1.properties`，其中包含的必要信息包括身份验证类型、配置和密钥表（如适用）。具体细节请参考[文件系统](../develop/filesystem.md)相关章节。
 >
 > 如在打开分布式快照的情况下执行任何查询时，需要配本属性。此属性必须包含在所有协调节点和工作节点的配置文件中。指定的文件系统必须可由所有工作节点访问，且这些工作节点必须能够读取和写入指定文件系统中的`/tmp/hetu/snapshot`文件夹。
 >

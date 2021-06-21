@@ -19,7 +19,8 @@ Distributed snapshot is most useful for long running queries. It is disabled by 
 
 To be able to resume execution from a previously saved snapshot, there must be a sufficient number of workers available so that all previous tasks can be restored. To enable distributed snapshot for a query, the following is required:
 - at least 2 workers
-- at least 80% of previously available nodes still active for the resume to be successful. If not enough workers are available, the query will not be able to resume from any previous snapshot, so the query reruns from the beginning.
+- at least 80% (rounded down) of previously available workers still active for the resume to be successful. If not enough workers are available, the query will not be able to
+  resume from any previous snapshot, so the query reruns from the beginning.
 
 ## Limitations
 
