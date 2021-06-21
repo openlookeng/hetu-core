@@ -94,6 +94,7 @@ public class ParquetPageSourceFactory
             .add("org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe")
             .add("parquet.hive.serde.ParquetHiveSerDe")
             .build();
+    public static final String WRITER_TIME_ZONE_KEY = "writer.time.zone";
 
     private final TypeManager typeManager;
     private final HdfsEnvironment hdfsEnvironment;
@@ -174,6 +175,7 @@ public class ParquetPageSourceFactory
         AggregatedMemoryContext systemMemoryContext = newSimpleAggregatedMemoryContext();
 
         ParquetDataSource dataSource = null;
+        DateTimeZone readerTimeZone = timeZone;
         try {
             FileSystem fileSystem = hdfsEnvironment.getFileSystem(user, path, configuration);
             FSDataInputStream inputStream = hdfsEnvironment.doAs(user, () -> fileSystem.open(path));
@@ -181,6 +183,10 @@ public class ParquetPageSourceFactory
             FileMetaData fileMetaData = parquetMetadata.getFileMetaData();
             MessageType fileSchema = fileMetaData.getSchema();
             dataSource = buildHdfsParquetDataSource(inputStream, path, fileSize, stats);
+            String writerTimeZoneId = fileMetaData.getKeyValueMetaData().get(WRITER_TIME_ZONE_KEY);
+            if (writerTimeZoneId != null && !writerTimeZoneId.equalsIgnoreCase(readerTimeZone.getID())) {
+                readerTimeZone = DateTimeZone.forID(writerTimeZoneId);
+            }
 
             List<org.apache.parquet.schema.Type> fields = columns.stream()
                     .filter(column -> column.getColumnType() == REGULAR)
@@ -213,7 +219,7 @@ public class ParquetPageSourceFactory
                     messageColumnIO,
                     blocks.build(),
                     dataSource,
-                    timeZone,
+                    readerTimeZone,
                     systemMemoryContext,
                     maxReadBlockSize);
 
