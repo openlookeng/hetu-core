@@ -366,8 +366,10 @@ public class StarTreeAggregationRule
             //Cube has no additional predicates to compare with
             return true;
         }
-        if (splitPredicate.getRight() == null) {
-            //No remaining predicate in Query. Can't compare with Cube predicate
+        if (splitPredicate.getRight() == null || !doesCubeContainQueryPredicateColumns(splitPredicate.getRight(), cubeMetadata)) {
+            // Cube has more predicate to match but query does not
+            // OR
+            // Cube does not contain all columns in the remaining predicate
             return false;
         }
         Expression cubePredicate = ExpressionUtils.rewriteIdentifiersToSymbolReferences(sqlParser.createExpression(cubeFilter.getCubePredicate(), new ParsingOptions()));

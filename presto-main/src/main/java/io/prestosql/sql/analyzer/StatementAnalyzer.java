@@ -820,7 +820,11 @@ class StatementAnalyzer
                             throw new SemanticException(NOT_SUPPORTED, node, "Column '%s' not allowed in source filter predicate. Source filter predicate cannot contain any of the columns defined in Group property", identifier);
                         });
                 //analyze expression to identify if coercions required
-                analyzeExpression(predicate, queryScope);
+                ExpressionAnalysis filterAnalysis = analyzeExpression(predicate, queryScope);
+                Type predicateType = filterAnalysis.getType(predicate);
+                if (!predicateType.equals(BOOLEAN) && !predicateType.equals(UNKNOWN)) {
+                    throw new SemanticException(TYPE_MISMATCH, predicate, "Filter property must evaluate to a boolean: actual type '%s'", predicateType);
+                }
             });
             return createAndAssignScope(node, scope, outputFields.build());
         }
