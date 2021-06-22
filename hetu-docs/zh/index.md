@@ -45,6 +45,7 @@ headless: true
     - [元数据存储]({{< relref "./docs/admin/meta-store.md" >}})
     - [审计日志]({{< relref "./docs/admin/audit-log.md" >}})
     - [可靠查询执行]({{< relref "./docs/admin/reliable-execution.md" >}})
+    - [JDBC数据源多分片管理]({{< relref "./docs/admin/multi-split-for-jdbc-data-source.md" >}})
 - [查询优化器]("#")
     - [表统计]({{< relref "./docs/optimizer/statistics.md" >}})
     - [EXPLAIN成本]({{< relref "./docs/optimizer/cost-in-explain.md" >}})
