@@ -898,9 +898,9 @@ public class BaseJdbcClient
         }
 
         List<SplitStatLog> splitStatLogList = new ArrayList<>(jdbcSplitList.size());
-        try (Connection connection = this.getConnection(identity, (JdbcSplit) null)) {
+        try (Connection connection = this.getConnection(identity, (JdbcSplit) null);
+                Statement statement = connection.createStatement()) {
             long timeStamp = System.nanoTime();
-            Statement statement = connection.createStatement();
             for (JdbcSplit split : jdbcSplitList) {
                 String sql = format(
                         "select count(*) from %s where %s",
@@ -924,7 +924,6 @@ public class BaseJdbcClient
                     splitStatLogList.add(log);
                 }
             }
-            statement.close();
         }
         catch (SQLException e) {
             log.error("" + e.getMessage());
@@ -945,11 +944,8 @@ public class BaseJdbcClient
                 "SELECT MAX(%s),MIN(%s) FROM %s",
                 conf.getSplitField(), conf.getSplitField(),
                 quoted(conf.getCatalogName(), conf.getSchemaName(), conf.getTableName()));
-        Statement stat = null;
-        ResultSet rs = null;
-        try {
-            stat = connection.createStatement();
-            rs = stat.executeQuery(sql);
+
+        try (Statement stat = connection.createStatement(); ResultSet rs = stat.executeQuery(sql)) {
             while (rs.next()) {
                 value[0] = rs.getLong(1);
                 value[1] = rs.getLong(2);
@@ -959,8 +955,6 @@ public class BaseJdbcClient
                     return null;
                 }
             }
-            rs.close();
-            stat.close();
         }
         catch (SQLException e) {
             log.error("SQL : " + sql + ",getSplitFieldMinAndMaxValue error : " + e.getMessage());
