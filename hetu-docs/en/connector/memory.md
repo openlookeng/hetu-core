@@ -14,7 +14,7 @@ To configure the Memory connector, create a catalog properties file `etc/catalog
 connector.name=memory
 memory.splits-per-node=10
 memory.max-data-per-node=200GB
-memory.spill-path=/opt/data/spill          
+memory.spill-path=/opt/hetu/data/spill          
 ```   
 
 **Note:**
@@ -77,6 +77,8 @@ Configuration Properties
 | `memory.max-page-size                `  | 512KB         | No      | Memory limit for each page. Default value is recommended.|
 | `memory.logical-part-processing-delay`  | 5s            | No      | The delay between when the table is created/updated and LogicalPart processing starts. Default value is recommended.|
 | `memory.thread-pool-size             `  | Half of threads available to the JVM | No      | Maximum threads to allocate for background processing (e.g. sorting, index creation, cleanup, etc)|
+
+Path whitelist：`["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`
 
 Additonal WITH properties
 --------------

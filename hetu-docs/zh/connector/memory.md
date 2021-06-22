@@ -13,7 +13,7 @@
 connector.name=memory
 memory.splits-per-node=10
 memory.max-data-per-node=200GB
-memory.spill-path=/opt/data/spill    
+memory.spill-path=/opt/hetu/data/spill    
 ```
 
 **提示：**
@@ -68,6 +68,8 @@ memory.spill-path=/opt/data/spill
 | `memory.max-page-size                `  | 1MB           | No      | 每个Page的大小限制 |
 | `memory.logical-part-processing-delay`  | 5s            | No      | 表创建后建立索引和写入磁盘前的等待时间 |
 | `memory.thread-pool-size             `  | Half of threads available to the JVM | No      | 后台线程（排序，清理数据，写入磁盘等）使用的线程池大小 |
+
+路径配置白名单：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", 工作目录]
 
 ## 在创建表时的额外WITH属性
 

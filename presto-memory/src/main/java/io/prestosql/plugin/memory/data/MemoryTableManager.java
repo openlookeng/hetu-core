@@ -17,6 +17,7 @@ package io.prestosql.plugin.memory.data;
 
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
+import io.hetu.core.common.util.SecureObjectInputStream;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.prestosql.plugin.memory.ColumnInfo;
 import io.prestosql.plugin.memory.MemoryConfig;
@@ -37,7 +38,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
@@ -325,7 +325,7 @@ public class MemoryTableManager
             throw new FileNotFoundException("No spill data found for table id " + id);
         }
         try (InputStream inputStream = Files.newInputStream(tablePath.resolve(TABLE_METADATA_SUFFIX))) {
-            ObjectInputStream ois = new ObjectInputStream(inputStream);
+            SecureObjectInputStream ois = new SecureObjectInputStream(inputStream, Table.TYPES_WHITELIST);
             Table table = (Table) ois.readObject();
             table.restoreTransientObjects(pageSorter, typeManager, pagesSerde, tablePath);
             applyForMemory(table.getByteSize(), -1, () -> logNumFormat("Loaded table %s with %s bytes.", id, table.getByteSize()), () -> {});
