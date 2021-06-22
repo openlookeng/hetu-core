@@ -3101,11 +3101,15 @@ public class HiveMetadata
     public boolean canPerformSortBasedAggregation(ConnectorSession session, ConnectorTableHandle tableHandle, List<String> groupKeyNames)
     {
         ConnectorTableMetadata connectorTableMetadata = getTableMetadata(session, ((HiveTableHandle) tableHandle).getSchemaTableName());
-        List<SortingColumn> sortingColumn = (List<SortingColumn>) connectorTableMetadata.getProperties().get("sorted_by");
+        List<SortingColumn> sortingColumn = (List<SortingColumn>) connectorTableMetadata.getProperties().get(HiveTableProperties.SORTED_BY_PROPERTY);
         if ((sortingColumn == null) || (sortingColumn.size() == 0)) {
             return false;
         }
-        connectorTableMetadata.getProperties().get(HiveTableProperties.BUCKET_COUNT_PROPERTY);
+        List<String> partitionedBy = new ArrayList<>();
+        List<String> partitionedBytemp = (List<String>) connectorTableMetadata.getProperties().get(HiveTableProperties.PARTITIONED_BY_PROPERTY);
+        if (null != partitionedBytemp) {
+            partitionedBy.addAll(partitionedBytemp);
+        }
         int bucketCount = 0;
         List<String> bucketedColumns = (List<String>) connectorTableMetadata.getProperties().get(HiveTableProperties.BUCKETED_BY_PROPERTY);
         if (null != bucketedColumns) {
@@ -3113,7 +3117,12 @@ public class HiveMetadata
         }
 
         List<String> sortedColumnNames = sortingColumn.stream().map(column -> column.getColumnName()).collect(Collectors.toList());
-        if (sortedColumnNames.size() < groupKeyNames.size()) {
+        List<String> partitionAndSortedColumnNames = new ArrayList<>();
+        // when there is partition by , sorted data is arranged 'partition by' followed by 'sorted by'
+        partitionAndSortedColumnNames.addAll(partitionedBy);
+        partitionAndSortedColumnNames.addAll(sortedColumnNames);
+
+        if (sortedColumnNames.size() + partitionedBy.size() < groupKeyNames.size()) {
             //sorted columns are less than join criteria columns
             log.debug("number of sorted columns " + sortedColumnNames.size() + "are less join column size " + groupKeyNames.size());
             return false;
@@ -3123,13 +3132,14 @@ public class HiveMetadata
         // or when bucket count should be 1 and bucket column that matches with groupBy
         // or when bucket count is 0 no need to compare buckets
         boolean singleOrZeroBucketedColumn = (((bucketCount == 1) && (bucketedColumns.size() == 1) &&
-                (groupKeyNames.get(0).equals(bucketedColumns.get(0)))) || (bucketCount == 0));
+                (groupKeyNames.get(partitionedBy.size()).equals(bucketedColumns.get(0)))) || (bucketCount == 0));
 
         if ((bucketCount == 1) && (bucketedColumns.size() > 1)) {
             boolean notMatching = false;
-            int minSize = groupKeyNames.size() > bucketedColumns.size() ? bucketedColumns.size() : groupKeyNames.size();
-            for (int numOfComparedKeys = 0; numOfComparedKeys < minSize; numOfComparedKeys++) {
-                if ((!groupKeyNames.get(numOfComparedKeys).equals(bucketedColumns.get(numOfComparedKeys)))) {
+            int minSize = Math.min(groupKeyNames.size() - partitionedBy.size(), bucketedColumns.size());
+            int partSize = partitionedBy.size();
+            for (int keyIdx = 0; keyIdx < minSize; keyIdx++) {
+                if (!groupKeyNames.get(keyIdx + partSize).equals(bucketedColumns.get(keyIdx))) {
                     notMatching = true;
                     break;
                 }
@@ -3138,15 +3148,17 @@ public class HiveMetadata
                 singleOrZeroBucketedColumn = true;
             }
         }
-        if (singleOrZeroBucketedColumn || (groupKeyNames.size() == bucketedColumns.size())) {
+        if (singleOrZeroBucketedColumn || (groupKeyNames.size() == (bucketedColumns.size() + partitionedBy.size()))) {
             for (int numOfComparedKeys = 0; numOfComparedKeys < groupKeyNames.size(); numOfComparedKeys++) {
-                if ((!groupKeyNames.get(numOfComparedKeys).equals(sortedColumnNames.get(numOfComparedKeys))) ||
-                        (!singleOrZeroBucketedColumn && !groupKeyNames.get(numOfComparedKeys).equals(bucketedColumns.get(numOfComparedKeys)))) {
+                boolean bucketedColumnsResult = numOfComparedKeys < partitionedBy.size() ? false : !singleOrZeroBucketedColumn &&
+                        (!groupKeyNames.get(numOfComparedKeys).equals(bucketedColumns.get(numOfComparedKeys - partitionedBy.size())));
+                if ((!groupKeyNames.get(numOfComparedKeys).equals(partitionAndSortedColumnNames.get(numOfComparedKeys))) ||
+                        (!singleOrZeroBucketedColumn && bucketedColumnsResult)) {
                     if (log.isDebugEnabled()) {
                         final String[] dbgGroupKeyNames = {new String("")};
                         groupKeyNames.stream().forEach(k -> dbgGroupKeyNames[0] = dbgGroupKeyNames[0].concat(k + " , "));
                         final String[] dbgSortedColumnNames = {new String("")};
-                        sortedColumnNames.stream().forEach(k -> dbgSortedColumnNames[0] = dbgSortedColumnNames[0].concat(k + " , "));
+                        partitionAndSortedColumnNames.stream().forEach(k -> dbgSortedColumnNames[0] = dbgSortedColumnNames[0].concat(k + " , "));
                         if ((null != bucketedColumns) && (bucketedColumns.size() > 0)) {
                             final String[] dbgbucketedColumns = {new String("")};
                             bucketedColumns.stream().forEach(k -> dbgbucketedColumns[0] = dbgbucketedColumns[0].concat(k + " , "));

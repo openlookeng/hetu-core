@@ -6410,4 +6410,75 @@ public class TestHiveIntegrationSmokeTest
         assertEquals(result.getRowCount(), 1);
         assertUpdate("DROP TABLE table_plan_cache_001");
     }
+
+    @Test
+    public void sortAggPartitionBucketCount1()
+    {
+        initSortBasedAggregation();
+        computeActual("create table lineitem_orderkey_partkey_partition  with(transactional = false, " +
+                "format = 'ORC', partitioned_by = ARRAY['comment'], bucketed_by=array['orderkey'], bucket_count=1, sorted_by = ARRAY['orderkey', 'partkey'])" +
+                "  as select * from tpch.tiny.lineitem limit 100");
+
+        String query = "select avg(lineitem_orderkey_partkey_partition.orderkey), lineitem_orderkey_partkey_partition.orderkey " +
+                "from lineitem_orderkey_partkey_partition " +
+                "group by " +
+                "comment, orderkey, partkey " +
+                "order by " +
+                "comment, orderkey, partkey ";
+
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv40, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        assertUpdate("DROP TABLE lineitem_orderkey_partkey_partition");
+    }
+
+    @Test
+    public void sortAggPartitionBucketCount2()
+    {
+        initSortBasedAggregation();
+        computeActual("create table lineitem_orderkey_partkey_partition2  with(transactional = false, " +
+                "format = 'ORC', partitioned_by = ARRAY['comment'], bucketed_by=array['orderkey',  'partkey'], bucket_count=2, sorted_by = ARRAY['orderkey', 'partkey'])" +
+                "  as select * from tpch.tiny.lineitem limit 100");
+
+        String query = "select avg(lineitem_orderkey_partkey_partition2.orderkey), lineitem_orderkey_partkey_partition2.orderkey " +
+                "from lineitem_orderkey_partkey_partition2 " +
+                "group by comment, orderkey, partkey " +
+                "order by comment, orderkey, partkey ";
+
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv40, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        assertUpdate("DROP TABLE lineitem_orderkey_partkey_partition2");
+    }
+
+    @Test
+    public void sortAggPartitionBucketCount1With2BucketColumns()
+    {
+        initSortBasedAggregation();
+        computeActual("create table lineitem_orderkey_partkey_partition3  with(transactional = false, " +
+                "format = 'ORC', partitioned_by = ARRAY['comment'], bucketed_by=array['orderkey',  'partkey'], bucket_count=1, sorted_by = ARRAY['orderkey', 'partkey'])" +
+                "  as select * from tpch.tiny.lineitem limit 100");
+
+        String query = "select avg(lineitem_orderkey_partkey_partition3.orderkey), lineitem_orderkey_partkey_partition3.orderkey " +
+                "from lineitem_orderkey_partkey_partition3 " +
+                "group by comment, orderkey, partkey " +
+                "order by comment, orderkey, partkey ";
+
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv40, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        assertUpdate("DROP TABLE lineitem_orderkey_partkey_partition3");
+    }
 }
