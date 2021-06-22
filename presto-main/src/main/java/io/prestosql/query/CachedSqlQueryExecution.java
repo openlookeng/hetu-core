@@ -531,7 +531,7 @@ public class CachedSqlQueryExecution
             cachedTableHandleMap.put(tableScanNode.getTable().getConnectorHandle().getSchemaPrefixedTableName(), tableScanNode.getTable().getConnectorHandle());
         }
         for (TableHandle tableHandle : tableHandles) {
-            if (!cachedTableHandleMap.get(tableHandle.getConnectorHandle().getSchemaPrefixedTableName()).equals(tableHandle.getConnectorHandle())) {
+            if (!tableHandle.getConnectorHandle().equals(cachedTableHandleMap.get(tableHandle.getConnectorHandle().getSchemaPrefixedTableName()))) {
                 return false;
             }
         }

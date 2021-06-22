@@ -511,8 +511,13 @@ public class LogicalPlanner
             //Means data some data was inserted before, but trying to insert entire dataset
             throw new PrestoException(QUERY_REJECTED, "Cannot allow insert. Inserting entire dataset but cube already has partial data");
         }
-        else if (!insertCubeStatement.isOverwrite() && insertCubeStatement.getWhere().isPresent() && arePredicatesOverlapping(rewritten, cubeMetadata)) {
-            throw new PrestoException(QUERY_REJECTED, String.format("Cannot allow insert. Cube already contains data for the given predicate '%s'", ExpressionFormatter.formatExpression(insertCubeStatement.getWhere().get(), Optional.empty())));
+        else if (insertCubeStatement.getWhere().isPresent()) {
+            if (!canSupportPredicate(rewritten)) {
+                throw new PrestoException(QUERY_REJECTED, String.format("Cannot support predicate '%s'", ExpressionFormatter.formatExpression(rewritten, Optional.empty())));
+            }
+            if (!insertCubeStatement.isOverwrite() && arePredicatesOverlapping(rewritten, cubeMetadata)) {
+                throw new PrestoException(QUERY_REJECTED, String.format("Cannot allow insert. Cube already contains data for the given predicate '%s'", ExpressionFormatter.formatExpression(insertCubeStatement.getWhere().get(), Optional.empty())));
+            }
         }
         TableHandle sourceTableHandle = insert.getSourceTable();
         //At this point it has been verified that source table has not been updated
@@ -541,9 +546,6 @@ public class LogicalPlanner
         TypeProvider types = planSymbolAllocator.getTypes();
         newDataPredicate = ExpressionUtils.rewriteIdentifiersToSymbolReferences(newDataPredicate);
         ExpressionDomainTranslator.ExtractionResult decomposedNewDataPredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, newDataPredicate, types);
-        if (!BooleanLiteral.TRUE_LITERAL.equals(decomposedNewDataPredicate.getRemainingExpression())) {
-            throw new RuntimeException(String.format("Cannot support predicate '%s'", ExpressionFormatter.formatExpression(newDataPredicate, Optional.empty())));
-        }
         if (cubeMetadata.getCubeStatus() == CubeStatus.INACTIVE) {
             //Inactive cubes are empty. So inserts should be allowed.
             return false;
@@ -559,6 +561,14 @@ public class LogicalPlanner
         cubePredicateAsExpr = ExpressionUtils.rewriteIdentifiersToSymbolReferences(cubePredicateAsExpr);
         ExpressionDomainTranslator.ExtractionResult decomposedCubePredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, cubePredicateAsExpr, types);
         return decomposedCubePredicate.getTupleDomain().overlaps(decomposedNewDataPredicate.getTupleDomain());
+    }
+
+    private boolean canSupportPredicate(Expression newDataPredicate)
+    {
+        TypeProvider types = planSymbolAllocator.getTypes();
+        newDataPredicate = ExpressionUtils.rewriteIdentifiersToSymbolReferences(newDataPredicate);
+        ExpressionDomainTranslator.ExtractionResult decomposedNewDataPredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, newDataPredicate, types);
+        return BooleanLiteral.TRUE_LITERAL.equals(decomposedNewDataPredicate.getRemainingExpression());
     }
 
     private Expression noTruncationCast(Expression expression, Type fromType, Type toType)
