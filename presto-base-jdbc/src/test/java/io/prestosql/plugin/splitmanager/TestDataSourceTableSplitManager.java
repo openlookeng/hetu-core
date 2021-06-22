@@ -93,7 +93,7 @@ public class TestDataSourceTableSplitManager
         config.setPushDownEnable(true)
                 .setTableSplitEnable(true)
                 .setTableSplitFields("[{\"catalogName\":\"" + catalogName + "\",\"schemaName\":\"EXAMPLE\",\"tableName\":\"NUMBERS\"," +
-                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"scanNodes\":\"2\"," +
+                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"splitCount\":\"2\"," +
                         "\"fieldMinValue\":\"\",\"fieldMaxValue\":\"\"}]");
         tableHandle = getTableHandle(new SchemaTableName("example", "numbers"));
         tableHandle.setTableSplitFieldValidated(true);
@@ -125,7 +125,7 @@ public class TestDataSourceTableSplitManager
         config.setPushDownEnable(true)
                 .setTableSplitEnable(true)
                 .setTableSplitFields("[{\"catalogName\":\"" + catalogName + "\",\"schemaName\":\"EXAMPLE\",\"tableName\":\"NUMBERS\"," +
-                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"false\",\"scanNodes\":\"2\"," +
+                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"false\",\"splitCount\":\"2\"," +
                         "\"fieldMinValue\":\"\",\"fieldMaxValue\":\"\"}]");
         tableHandle = getTableHandle(new SchemaTableName("example", "numbers"));
         tableHandle.setTableSplitFieldValidated(true);
@@ -157,7 +157,7 @@ public class TestDataSourceTableSplitManager
         config.setPushDownEnable(true)
                 .setTableSplitEnable(true)
                 .setTableSplitFields("[{\"catalogName\":\"" + catalogName + "\",\"schemaName\":\"EXAMPLE\",\"tableName\":\"NUMBERS\"," +
-                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"false\",\"scanNodes\":\"2\"," +
+                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"false\",\"splitCount\":\"2\"," +
                         "\"fieldMinValue\":\"1\",\"fieldMaxValue\":\"12\"}]");
         tableHandle = getTableHandle(new SchemaTableName("example", "numbers"));
         tableHandle.setTableSplitFieldValidated(true);
@@ -187,7 +187,7 @@ public class TestDataSourceTableSplitManager
         config.setPushDownEnable(true)
                 .setTableSplitEnable(true)
                 .setTableSplitFields("[{\"catalogName\":\"" + catalogName + "\",\"schemaName\":\"EXAMPLE\",\"tableName\":\"NUMBERS\"," +
-                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"scanNodes\":\"2\"," +
+                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"splitCount\":\"2\"," +
                         "\"fieldMinValue\":\"6\",\"fieldMaxValue\":\"2\"}]");
         tableHandle = getTableHandle(new SchemaTableName("example", "numbers"));
         tableHandle.setTableSplitFieldValidated(true);
@@ -219,7 +219,7 @@ public class TestDataSourceTableSplitManager
         config.setPushDownEnable(true)
                 .setTableSplitEnable(true)
                 .setTableSplitFields("[{\"catalogName\":\"" + catalogName + "\",\"schemaName\":\"EXAMPLE\",\"tableName\":\"NUMBERS\"," +
-                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"scanNodes\":\"2\"," +
+                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"splitCount\":\"2\"," +
                         "\"fieldMinValue\":\"1\",\"fieldMaxValue\":\"12\"}]");
         tableHandle = getTableHandle(new SchemaTableName("example", "numbers"));
         tableHandle.setTableSplitFieldValidated(true);
@@ -236,7 +236,7 @@ public class TestDataSourceTableSplitManager
         }
     }
 
-    // scanNodes <= 0
+    // splitCount <= 0
     @Test
     public void testGetTableSplits07()
     {
@@ -244,7 +244,7 @@ public class TestDataSourceTableSplitManager
         config.setPushDownEnable(true)
                 .setTableSplitEnable(true)
                 .setTableSplitFields("[{\"catalogName\":\"" + catalogName + "\",\"schemaName\":\"EXAMPLE\",\"tableName\":\"NUMBERS\"," +
-                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"scanNodes\":\"-1\"," +
+                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"splitCount\":\"-1\"," +
                         "\"fieldMinValue\":\"1\",\"fieldMaxValue\":\"12\"}]");
         tableHandle = getTableHandle(new SchemaTableName("example", "numbers"));
         splitManager = new DataSourceTableSplitManager(config, jdbcClient, nodeManager);
@@ -252,7 +252,7 @@ public class TestDataSourceTableSplitManager
         assertEquals(splitSource.getClass(), FixedSplitSource.class);
     }
 
-    // scanNodes is not exist.
+    // splitCount is not exist.
     @Test
     public void testGetTableSplits08()
     {
@@ -276,7 +276,7 @@ public class TestDataSourceTableSplitManager
         config.setPushDownEnable(true)
                 .setTableSplitEnable(true)
                 .setTableSplitFields("[{\"catalogName\":\"" + catalogName + "\",\"schemaName\":\"EXAMPLE\",\"tableName\":\"NUMBERS\"," +
-                        "\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"scanNodes\":\"2\"," +
+                        "\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"splitCount\":\"2\"," +
                         "\"fieldMinValue\":\"1\",\"fieldMaxValue\":\"12\"}]");
         tableHandle = getTableHandle(new SchemaTableName("example", "numbers"));
         splitManager = new DataSourceTableSplitManager(config, jdbcClient, nodeManager);
@@ -292,7 +292,7 @@ public class TestDataSourceTableSplitManager
         config.setPushDownEnable(true)
                 .setTableSplitEnable(true)
                 .setTableSplitFields("[{\"catalogName\":\"" + catalogName + "\",\"schemaName\":\"EXAMPLE\",\"tableName\":\"SAME_NUMBERS\"," +
-                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"scanNodes\":\"2\"," +
+                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"splitCount\":\"2\"," +
                         "\"fieldMinValue\":\"10\",\"fieldMaxValue\":\"10\"}]");
         tableHandle = getTableHandle(new SchemaTableName("example", "same_numbers"));
         splitManager = new DataSourceTableSplitManager(config, jdbcClient, nodeManager);
@@ -308,7 +308,7 @@ public class TestDataSourceTableSplitManager
         config.setPushDownEnable(true)
                 .setTableSplitEnable(true)
                 .setTableSplitFields("[{\"catalogName\":\"" + catalogName + "\",\"schemaName\":\"EXAMPLE\",\"tableName\":\"NONE_NUMBERS\"," +
-                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"scanNodes\":\"2\"," +
+                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"splitCount\":\"2\"," +
                         "\"fieldMinValue\":\"\",\"fieldMaxValue\":\"\"}]");
         tableHandle = getTableHandle(new SchemaTableName("example", "none_numbers"));
         splitManager = new DataSourceTableSplitManager(config, jdbcClient, nodeManager);
@@ -329,7 +329,7 @@ public class TestDataSourceTableSplitManager
         config.setPushDownEnable(true)
                 .setTableSplitEnable(true)
                 .setTableSplitFields("[{\"catalogName\":\"" + catalogName + "\",\"schemaName\":\"EXAMPLE\",\"tableName\":\"FIVE_NUMBERS\"," +
-                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"scanNodes\":\"3\"," +
+                        "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"splitCount\":\"3\"," +
                         "\"fieldMinValue\":\"1\",\"fieldMaxValue\":\"5\"}]");
         tableHandle = getTableHandle(new SchemaTableName("example", "five_numbers"));
         tableHandle.setTableSplitFieldValidated(true);
@@ -366,7 +366,7 @@ public class TestDataSourceTableSplitManager
         config.setPushDownEnable(true)
                 .setTableSplitEnable(true)
                 .setTableSplitFields("[{\"catalogName\":\"" + catalogName + "\",\"schemaName\":\"EXAMPLE\",\"tableName\":\"NUMBERS\"," +
-                        "\"splitField\":\"\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"scanNodes\":\"2\"," +
+                        "\"splitField\":\"\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"splitCount\":\"2\"," +
                         "\"fieldMinValue\":\"1\",\"fieldMaxValue\":\"12\"}]");
 
         tableHandle = getTableHandle(new SchemaTableName("example", "numbers"));
@@ -383,7 +383,7 @@ public class TestDataSourceTableSplitManager
         config.setPushDownEnable(true)
                 .setTableSplitEnable(true)
                 .setTableSplitFields("[{\"catalogName\":\"" + catalogName + "\",\"schemaName\":\"EXAMPLE\",\"tableName\":\"NUMBERS\"," +
-                        "\"splitField\":\"text_short\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"scanNodes\":\"2\"," +
+                        "\"splitField\":\"text_short\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"splitCount\":\"2\"," +
                         "\"fieldMinValue\":\"1\",\"fieldMaxValue\":\"12\"}]");
 
         tableHandle = getTableHandle(new SchemaTableName("example", "numbers"));

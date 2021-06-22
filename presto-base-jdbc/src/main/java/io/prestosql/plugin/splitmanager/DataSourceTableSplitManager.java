@@ -88,7 +88,7 @@ public class DataSourceTableSplitManager
     private List<TableSplitConfig> loadTableSplitFiledConfig(String jsonConfigContext)
     {
         if (isNullOrEmpty(jsonConfigContext)) {
-            new ArrayList<TableSplitConfig>();
+            return new ArrayList<TableSplitConfig>();
         }
 
         ObjectMapper objectMapper = new ObjectMapper();
@@ -122,7 +122,7 @@ public class DataSourceTableSplitManager
         if (splitConfig == null) {
             return getFixedSplitSource(jdbcTableHandle);
         }
-        if (splitConfig.getScanNodes() == null || isNullOrEmpty(splitConfig.getSplitField()) || splitConfig.getScanNodes() <= 1) {
+        if (splitConfig.getSplitCount() == null || isNullOrEmpty(splitConfig.getSplitField()) || splitConfig.getSplitCount() <= 1) {
             return getFixedSplitSource(jdbcTableHandle);
         }
         //config with wrong split field type
@@ -155,7 +155,7 @@ public class DataSourceTableSplitManager
                         splitLog.getBeginIndex().toString(),
                         splitLog.getEndIndex().toString(),
                         timeStamp,
-                        splitConfig.getScanNodes(),
+                        splitConfig.getSplitCount(),
                         Optional.of(splitPart));
                 jdbcSplitsList.add(jdbcSplit);
             }
@@ -216,7 +216,7 @@ public class DataSourceTableSplitManager
             List<JdbcSplit> splits, TableSplitConfig config, long timeStamp)
     {
         long tableTotalRecords;
-        int scanNodes = config.getScanNodes();
+        int scanNodes = config.getSplitCount();
         tableTotalRecords = fieldMinAndMaxValue[0] - fieldMinAndMaxValue[1] + 1;
         long targetChunkSize = (long) Math.ceil(tableTotalRecords * 1.0 / scanNodes);
         long chunkOffset = 0L;

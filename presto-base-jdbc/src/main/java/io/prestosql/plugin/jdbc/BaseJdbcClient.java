@@ -919,7 +919,7 @@ public class BaseJdbcClient
                     log.setRows(result.getLong(1));
                     log.setRecordFlag(SplitStatLog.LogState.STATE_NEW);
                     log.setTimeStamp(timeStamp);
-                    log.setScanNodes(split.getScanNodes());
+                    log.setSplitCount(split.getSplitCount());
                     result.close();
                     splitStatLogList.add(log);
                 }

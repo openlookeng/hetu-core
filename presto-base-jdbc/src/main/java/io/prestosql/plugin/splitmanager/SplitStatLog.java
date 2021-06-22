@@ -33,7 +33,7 @@ public class SplitStatLog
     private Long endIndex;
     private long timeStamp;
     private LogState recordFlag;
-    private Integer scanNodes;
+    private Integer splitCount;
     private String splitField;
 
     public String getCatalogName()
@@ -113,14 +113,14 @@ public class SplitStatLog
         return this;
     }
 
-    public Integer getScanNodes()
+    public Integer getSplitCount()
     {
-        return scanNodes;
+        return splitCount;
     }
 
-    public SplitStatLog setScanNodes(Integer scanNodes)
+    public SplitStatLog setSplitCount(Integer splitCount)
     {
-        this.scanNodes = scanNodes;
+        this.splitCount = splitCount;
         return this;
     }
 
