@@ -88,6 +88,7 @@ public final class HttpPageBufferClient
         implements Closeable
 {
     private static final Logger log = Logger.get(HttpPageBufferClient.class);
+    public static final String PAGE_TRANSPORT_ERROR_PREFIX = "Page transport error with response status code";
 
     /**
      * For each request, the addPage method will be called zero or more times,
@@ -638,7 +639,8 @@ public final class HttpPageBufferClient
                         return createEmptyPagesResponse(0, 0, false);
                     }
                 }
-                throw new PageTransportErrorException(format("Error fetching %s: %s (response status code %d)", request.getUri().toASCIIString(), e.getMessage(), response.getStatusCode()), e);
+                // SqlStageExecution#updateTaskStatus() depends on the following message format.
+                throw new PageTransportErrorException(format("%s %d! Error fetching %s: %s", PAGE_TRANSPORT_ERROR_PREFIX, response.getStatusCode(), request.getUri().toASCIIString(), e.getMessage()), e);
             }
         }
 

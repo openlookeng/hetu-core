@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.concurrent.Semaphore;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -85,6 +86,12 @@ public class MarkerSplitSource
     // this helps to determine what to do. See "resumeSnapshot" method for details.
     private OptionalLong firstSnapshot = OptionalLong.empty();
 
+    // Lock to ensure resumeSnapshot() doesn't happen while a getNextBatch() call,
+    // including its Future "transformer", is ongoing.
+    // Can't use "synchronized" keyword, because the transformer happens in a separate thread,
+    // but should be considered as part of the getNextBatch() call.
+    private Semaphore lock = new Semaphore(1);
+
     public MarkerSplitSource(SplitSource source, MarkerAnnouncer announcer)
     {
         this.source = source;
@@ -129,6 +136,20 @@ public class MarkerSplitSource
 
     @Override
     public ListenableFuture<SplitBatch> getNextBatch(ConnectorPartitionHandle partitionHandle, Lifespan lifespan, int maxSize)
+    {
+        acquireLock();
+        try {
+            ListenableFuture<SplitBatch> ret = getNextBatchImpl(partitionHandle, lifespan, maxSize);
+            ret.addListener(() -> releaseLock(), directExecutor());
+            return ret;
+        }
+        catch (Throwable t) {
+            releaseLock();
+            throw t;
+        }
+    }
+
+    private ListenableFuture<SplitBatch> getNextBatchImpl(ConnectorPartitionHandle partitionHandle, Lifespan lifespan, int maxSize)
     {
         checkArgument(maxSize > 0, "Cannot fetch a batch of zero size");
 
@@ -296,6 +317,17 @@ public class MarkerSplitSource
 
     public void resumeSnapshot(long snapshotId)
     {
+        acquireLock();
+        try {
+            resumeSnapshotImpl(snapshotId);
+        }
+        finally {
+            releaseLock();
+        }
+    }
+
+    private void resumeSnapshotImpl(long snapshotId)
+    {
         Integer position = snapshotBufferPositions.get(snapshotId);
         if (position != null) {
             bufferPosition = position;
@@ -347,5 +379,20 @@ public class MarkerSplitSource
     public boolean isFinished()
     {
         return sentFinalMarker;
+    }
+
+    private void acquireLock()
+    {
+        try {
+            lock.acquire();
+        }
+        catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void releaseLock()
+    {
+        lock.release();
     }
 }
