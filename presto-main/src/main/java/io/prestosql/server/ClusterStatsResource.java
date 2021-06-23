@@ -101,10 +101,10 @@ public class ClusterStatsResource
                 totalInputRows += query.getQueryStats().getRawInputPositions();
                 totalCpuTimeSecs += query.getQueryStats().getTotalCpuTime().getValue(SECONDS);
 
-                memoryReservation += query.getQueryStats().getUserMemoryReservation().toBytes();
                 runningDrivers += query.getQueryStats().getRunningDrivers();
             }
         }
+        memoryReservation = clusterMemoryManager.getUsedMemory();
 
         return new ClusterStats(
                 runningQueries,

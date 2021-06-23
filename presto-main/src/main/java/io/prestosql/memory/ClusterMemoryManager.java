@@ -605,6 +605,25 @@ public class ClusterMemoryManager
         return memoryInfo;
     }
 
+    public synchronized Long getUsedMemory()
+    {
+        Long usedMemory = 0L;
+        for (Entry<String, RemoteNodeMemory> entry : nodes.entrySet()) {
+            MemoryInfo memoryInfo = entry.getValue().getInfo().orElse(new MemoryInfo(0, 0, 0, new DataSize(0,
+                    DataSize.Unit.BYTE), new HashMap<>()));
+            Map<MemoryPoolId, MemoryPoolInfo> memoryPools = memoryInfo.getPools();
+            MemoryPoolId general = new MemoryPoolId("general");
+            MemoryPoolId reserved = new MemoryPoolId("reserved");
+            if (memoryPools.containsKey(general)) {
+                usedMemory += memoryPools.get(general).getReservedBytes();
+            }
+            if (memoryPools.containsKey(reserved)) {
+                usedMemory += memoryPools.get(reserved).getReservedBytes();
+            }
+        }
+        return usedMemory;
+    }
+
     public synchronized Map<String, JsonNode> getWorkerMemoryAndStateInfo()
     {
         Map<String, JsonNode> memoryInfo = new LinkedHashMap<>();
