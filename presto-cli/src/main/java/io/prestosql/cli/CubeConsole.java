@@ -160,7 +160,10 @@ public class CubeConsole
             CreateCube modifiedCreateCube = new CreateCube(cubeName, sourceTableName, groupingSet, aggregations, notExists, properties, Optional.empty());
             String queryCreateCube = SqlFormatter.formatSql(modifiedCreateCube, Optional.empty());
 
-            console.runQuery(queryRunner, queryCreateCube, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+            boolean success = console.runQuery(queryRunner, queryCreateCube, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+            if (success != true) {
+                return result;
+            }
             //we check whether the create cube expression can be processed
             if (isSupportedExpression(expression)) {
                 if (createCube.getWhere().get() instanceof BetweenPredicate) {
@@ -457,7 +460,7 @@ public class CubeConsole
         //the max rows that can be processed by the cluster
         Long maxRowsProcessLimit = Long.parseLong(console.getClientOptions().maxBatchProcessSize); // this will be user input
 
-        if (valueCountDistinctQuery < maxRowsProcessLimit && valueCountStarQuery < maxRowsProcessLimit) {
+        if (valueCountStarQuery < maxRowsProcessLimit) {
             //this loop process the multiple insert query statements
             Expression equalExpression = new ComparisonExpression(EQUAL, columnName, parser.createExpression(Long.toString(rightValue), new ParsingOptions()));
             String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, equalExpression);

@@ -462,7 +462,7 @@ public class Console
         }
     }
 
-    public void runQuery(QueryRunner queryRunner,
+    public boolean runQuery(QueryRunner queryRunner,
                                   String sql,
                                   ClientOptions.OutputFormat outputFormat,
                                   Runnable schemaChanged,
@@ -472,6 +472,6 @@ public class Console
                                   PrintStream out,
                                   PrintStream errorChannel)
     {
-        process(queryRunner, sql, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+        return process(queryRunner, sql, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
     }
 }
