@@ -36,7 +36,7 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.type.TypeUtils.NULL_HASH_CODE;
 import static java.lang.Math.toIntExact;
 
-@RestorableConfig(uncapturedFields = {"sortedValuesByGroupId", "prevValue", "isNoGroupAdded", "addNewGroup"})
+@RestorableConfig(uncapturedFields = {"sortedValuesByGroupId", "prevValue", "addNewGroup"})
 public class BigintGroupBySort
         extends BigintGroupBy implements GroupBySort
 {

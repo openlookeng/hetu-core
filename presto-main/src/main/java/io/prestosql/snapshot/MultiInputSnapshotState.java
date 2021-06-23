@@ -324,7 +324,13 @@ public class MultiInputSnapshotState
             // First time a marker is received for a snapshot. Clear pending markers and restore Restorable states.
             states.clear();
             try {
-                Optional<Object> storedState = snapshotManager.loadState(componentId);
+                Optional<Object> storedState;
+                if (restorable.supportsConsolidatedWrites()) {
+                    storedState = snapshotManager.loadConsolidatedState(componentId);
+                }
+                else {
+                    storedState = snapshotManager.loadState(componentId);
+                }
                 if (!storedState.isPresent()) {
                     snapshotManager.failedToRestore(componentId, true);
                     LOG.warn("Can't locate saved state for snapshot %d, component %s", snapshotId, restorableId);
@@ -411,7 +417,12 @@ public class MultiInputSnapshotState
                 // Received marker from all channels. Operator state is complete.
                 SnapshotStateId componentId = snapshotStateIdGenerator.apply(snapshotId);
                 try {
-                    snapshotManager.storeState(componentId, snapshot.states);
+                    if (restorable.supportsConsolidatedWrites()) {
+                        snapshotManager.storeConsolidatedState(componentId, snapshot.states);
+                    }
+                    else {
+                        snapshotManager.storeState(componentId, snapshot.states);
+                    }
                     snapshotManager.succeededToCapture(componentId);
                     LOG.debug("Successfully saved state to snapshot %d for %s", snapshotId, restorableId);
                 }

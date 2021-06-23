@@ -1305,6 +1305,12 @@ public class WindowOperator
         }
     }
 
+    @Override
+    public boolean supportsConsolidatedWrites()
+    {
+        return false;
+    }
+
     private static class WindowOperatorState
             implements Serializable
     {

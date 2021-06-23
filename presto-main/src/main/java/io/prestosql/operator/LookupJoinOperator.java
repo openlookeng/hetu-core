@@ -877,6 +877,12 @@ public class LookupJoinOperator
         }
     }
 
+    @Override
+    public boolean supportsConsolidatedWrites()
+    {
+        return false;
+    }
+
     private static class LookupJoinOperatorState
             implements Serializable
     {

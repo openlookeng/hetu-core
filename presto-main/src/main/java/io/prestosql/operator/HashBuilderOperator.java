@@ -771,6 +771,12 @@ public class HashBuilderOperator
         }
     }
 
+    @Override
+    public boolean supportsConsolidatedWrites()
+    {
+        return false;
+    }
+
     private static class HashBuilderOperatorState
             implements Serializable
     {

@@ -43,7 +43,7 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 
 // This implementation assumes arrays used in the hash are always a power of 2
 @RestorableConfig(uncapturedFields = {"types", "hashTypes", "channels", "hashStrategy",
-        "inputHashChannel", "hashGenerator", "updateMemory", "processDictionary"})
+        "inputHashChannel", "hashGenerator", "processDictionary"})
 public class MultiChannelGroupBySort
         extends MultiChannelGroupBy implements GroupBySort
 {

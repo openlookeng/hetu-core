@@ -28,11 +28,14 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.io.File;
 import java.io.FileWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 
@@ -91,6 +94,8 @@ public class TestTaskSnapshotManager
         MockState operatorState = new MockState("operator-state");
         SnapshotStateId operatorStateId = SnapshotStateId.forOperator(1L, taskId1, 3, 4, 5);
         snapshotManager.storeState(operatorStateId, operatorState);
+        snapshotManager.setTotalComponents(1);
+        snapshotManager.succeededToCapture(operatorStateId);
         MockState newOperatorState = (MockState) snapshotManager.loadState(operatorStateId).get();
         Assert.assertEquals(operatorState.getState(), newOperatorState.getState());
 
@@ -99,6 +104,7 @@ public class TestTaskSnapshotManager
         TaskId taskId2 = new TaskId(queryId.getId(), 3, 4);
         SnapshotStateId taskStateId = SnapshotStateId.forOperator(3L, taskId2, 5, 6, 7);
         snapshotManager.storeState(taskStateId, taskState);
+        snapshotManager.succeededToCapture(taskStateId);
         MockState newTaskState = (MockState) snapshotManager.loadState(taskStateId).get();
         Assert.assertEquals(taskState.getState(), newTaskState.getState());
     }
@@ -116,6 +122,8 @@ public class TestTaskSnapshotManager
         MockState state = new MockState("state");
         SnapshotStateId stateId = SnapshotStateId.forOperator(1L, taskId, 3, 4, 5);
         snapshotManager.storeState(stateId, state);
+        snapshotManager.setTotalComponents(1);
+        snapshotManager.succeededToCapture(stateId);
 
         // Make snapshot manager think that snapshot #1 is complete
         QuerySnapshotManager querySnapshotManager = new QuerySnapshotManager(queryId, snapshotUtils, TEST_SNAPSHOT_SESSION);
@@ -272,5 +280,135 @@ public class TestTaskSnapshotManager
         sm.updateFinishedComponents(ImmutableList.of(mock(Operator.class)));
         sm.succeededToCapture(new SnapshotStateId(1, taskId));
         assertEquals(sm.getSnapshotCaptureResult().get(1L), SnapshotResult.SUCCESSFUL);
+    }
+
+    @Test
+    public void testConsolidatedStoreLoadSimple()
+            throws Exception
+    {
+        queryId = new QueryId("consolidatesimplequery");
+        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0);
+        TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId1, snapshotUtils);
+        snapshotManager.setTotalComponents(1);
+
+        MockState state = new MockState("mockstate");
+        SnapshotStateId stateId = SnapshotStateId.forOperator(1L, taskId1, 3, 4, 5);
+        snapshotManager.storeConsolidatedState(stateId, state);
+        snapshotManager.succeededToCapture(stateId);
+        MockState newState = (MockState) snapshotManager.loadConsolidatedState(stateId).get();
+        Assert.assertEquals(state.getState(), newState.getState());
+    }
+
+    @Test
+    public void testConsolidatedBacktrack()
+            throws Exception
+    {
+        queryId = new QueryId("consolidatebacktrackquery");
+        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0);
+        TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId1, snapshotUtils);
+        snapshotManager.setTotalComponents(1);
+
+        QuerySnapshotManager querySnapshotManager = new QuerySnapshotManager(queryId, snapshotUtils, TEST_SNAPSHOT_SESSION);
+        querySnapshotManager.addNewTask(taskId1);
+
+        // first store
+        long firstSnapshotId = 1L;
+        MockState state = new MockState("mockstate");
+        SnapshotStateId stateId = SnapshotStateId.forOperator(firstSnapshotId, taskId1, 3, 4, 5);
+        snapshotManager.storeConsolidatedState(stateId, state);
+        snapshotManager.succeededToCapture(stateId);
+
+        // second store (null)
+        SnapshotStateId secondId = SnapshotStateId.forOperator(2L, taskId1, 3, 4, 5);
+        snapshotManager.storeConsolidatedState(secondId, null);
+        snapshotManager.succeededToCapture(secondId);
+
+        Map<Long, SnapshotResult> queryCaptureResult = new LinkedHashMap<>();
+        queryCaptureResult.put(firstSnapshotId, SnapshotResult.SUCCESSFUL);
+        snapshotUtils.storeSnapshotResult(queryId.getId(), queryCaptureResult);
+
+        MockState newState = (MockState) snapshotManager.loadConsolidatedState(secondId).get();
+        Assert.assertEquals(state.getState(), newState.getState());
+    }
+
+    @Test
+    public void testConsolidatedOverlap()
+            throws Exception
+    {
+        queryId = new QueryId("consolidateoverlapquery");
+        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0);
+        TaskId taskId2 = new TaskId(queryId.getId(), 1, 1);
+        TaskSnapshotManager snapshotManager1 = new TaskSnapshotManager(taskId1, snapshotUtils);
+        TaskSnapshotManager snapshotManager2 = new TaskSnapshotManager(taskId2, snapshotUtils);
+        snapshotManager1.setTotalComponents(1);
+        snapshotManager2.setTotalComponents(1);
+
+        // statexy means task x snapshot y
+        MockState state11 = new MockState("mockstate1.1");
+        MockState state12 = new MockState("mockstate1.2");
+        MockState state21 = new MockState("mockstate2.1");
+        MockState state22 = new MockState("mockstate2.2");
+
+        // similar naming as above
+        SnapshotStateId stateId11 = SnapshotStateId.forOperator(1L, taskId1, 3, 4, 5);
+        SnapshotStateId stateId12 = SnapshotStateId.forOperator(2L, taskId1, 3, 4, 5);
+        SnapshotStateId stateId21 = SnapshotStateId.forOperator(1L, taskId2, 3, 4, 5);
+        SnapshotStateId stateId22 = SnapshotStateId.forOperator(2L, taskId2, 3, 4, 5);
+
+        // save 11 (part of snapshot 1), then 12 and 22 (snapshot 2), then finish snapshot 1 (21)
+        snapshotManager1.storeConsolidatedState(stateId11, state11);
+        snapshotManager2.storeConsolidatedState(stateId22, state22);
+        snapshotManager1.storeConsolidatedState(stateId12, state12);
+        snapshotManager1.succeededToCapture(stateId12);
+        snapshotManager2.succeededToCapture(stateId22);
+        snapshotManager2.storeConsolidatedState(stateId21, state21);
+        snapshotManager1.succeededToCapture(stateId11);
+        snapshotManager2.succeededToCapture(stateId21);
+
+        // similar naming as above
+        MockState newState11 = (MockState) snapshotManager1.loadConsolidatedState(stateId11).get();
+        MockState newState12 = (MockState) snapshotManager1.loadConsolidatedState(stateId12).get();
+        MockState newState21 = (MockState) snapshotManager2.loadConsolidatedState(stateId21).get();
+        MockState newState22 = (MockState) snapshotManager2.loadConsolidatedState(stateId22).get();
+
+        Assert.assertEquals(state11.getState(), newState11.getState());
+        Assert.assertEquals(state12.getState(), newState12.getState());
+        Assert.assertEquals(state21.getState(), newState21.getState());
+        Assert.assertEquals(state22.getState(), newState22.getState());
+    }
+
+    @Test
+    public void testDeletedFileLoad()
+            throws Exception
+    {
+        queryId = new QueryId("deletedfileloadquery");
+        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0);
+        TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId1, snapshotUtils);
+        snapshotManager.setTotalComponents(1);
+
+        QuerySnapshotManager querySnapshotManager = new QuerySnapshotManager(queryId, snapshotUtils, TEST_SNAPSHOT_SESSION);
+        querySnapshotManager.addNewTask(taskId1);
+
+        // first store
+        long firstSnapshotId = 1L;
+        MockState state = new MockState("mockstate");
+        SnapshotStateId stateId = SnapshotStateId.forOperator(firstSnapshotId, taskId1, 3, 4, 5);
+        snapshotManager.storeState(stateId, state);
+        snapshotManager.succeededToCapture(stateId);
+
+        // second store, then deleted
+        MockState secondState = new MockState("secondState");
+        SnapshotStateId secondId = SnapshotStateId.forOperator(2L, taskId1, 3, 4, 5);
+        snapshotManager.storeState(secondId, secondState);
+        snapshotManager.succeededToCapture(secondId);
+
+        querySnapshotManager.updateQueryCapture(taskId1, Collections.singletonMap(firstSnapshotId, SnapshotResult.SUCCESSFUL));
+
+        File second = new File("/tmp/test_snapshot_manager/" + queryId + "/2/1/0/3/4/5");
+        assertTrue(second.exists());
+        second.delete();
+        assertFalse(second.exists());
+
+        assertFalse(snapshotManager.loadState(secondId).isPresent());
     }
 }
