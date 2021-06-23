@@ -653,6 +653,40 @@ public abstract class AbstractTestStarTreeQueries
         assertUpdate("DROP TABLE orders_table_predicate_unsupported_predicate");
     }
 
+    @Test
+    public void testCreateCubeWithIncorrectFilterPredicate()
+    {
+        assertQueryFails(sessionStarTree,
+                "CREATE CUBE orders_cube_unsuported_filter_predicate ON orders WITH (AGGREGATIONS=(sum(totalprice)), GROUP=(custkey), FILTER = (orderdate))",
+                ".*Filter property must evaluate to a boolean: actual type 'date'.*");
+        assertQueryFails(sessionStarTree,
+                "CREATE CUBE orders_cube_unsuported_filter_predicate ON orders WITH (AGGREGATIONS=(sum(totalprice)), GROUP=(orderdate), FILTER = (custkey))",
+                ".*Filter property must evaluate to a boolean: actual type 'bigint'.*");
+    }
+
+    @Test
+    public void testCubeInsertWithMultipleCube()
+    {
+        computeActual("CREATE TABLE orders_table_multiple_cube_insert AS SELECT * FROM orders");
+        computeActual("CREATE CUBE orders_cube_mutiple_cube_insert_1 ON orders_table_multiple_cube_insert WITH (AGGREGATIONS = (max(totalprice)), GROUP = (orderdate,custkey))");
+        assertQuerySucceeds("INSERT INTO CUBE orders_cube_mutiple_cube_insert_1 WHERE custkey >= 100");
+        assertQuery(sessionStarTree,
+                "SELECT custkey, max(totalprice) FROM orders_table_multiple_cube_insert WHERE custkey >= 101 GROUP BY custkey",
+                "SELECT custkey, max(totalprice) FROM orders WHERE custkey >= 101 GROUP BY custkey",
+                assertTableScan("orders_cube_mutiple_cube_insert_1"));
+        computeActual("CREATE CUBE orders_cube_mutiple_cube_insert_2 ON orders_table_multiple_cube_insert WITH (AGGREGATIONS = (max(totalprice)), GROUP = (orderdate,custkey), FILTER = (orderkey > 1))");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE orders_cube_mutiple_cube_insert_2 WHERE custkey >= 100");
+        assertQuery(sessionStarTree,
+                "SELECT custkey, max(totalprice) FROM orders_table_multiple_cube_insert WHERE custkey >= 101 GROUP BY custkey",
+                "SELECT custkey, max(totalprice) FROM orders WHERE custkey >= 101 GROUP BY custkey",
+                assertTableScan("orders_cube_mutiple_cube_insert_1"));
+        assertQuery(sessionStarTree,
+                "SELECT custkey, max(totalprice) FROM orders_table_multiple_cube_insert WHERE orderkey > 1 AND custkey >= 101 GROUP BY custkey",
+                "SELECT custkey, max(totalprice) FROM orders WHERE orderkey > 1 AND custkey >= 101 GROUP BY custkey",
+                assertTableScan("orders_cube_mutiple_cube_insert_2"));
+        assertUpdate("DROP TABLE orders_table_multiple_cube_insert");
+    }
+
     private Consumer<Plan> assertInTableScans(String tableName)
     {
         return plan ->
