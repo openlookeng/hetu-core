@@ -14,6 +14,7 @@
 package io.prestosql.execution;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import io.airlift.log.Logger;
 import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.io.CubeMetaStore;
 import io.prestosql.Session;
@@ -23,6 +24,7 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.connector.TableNotFoundException;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.service.PropertyService;
 import io.prestosql.sql.analyzer.SemanticException;
@@ -45,6 +47,7 @@ import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_TABLE;
 public class DropTableTask
         implements DataDefinitionTask<DropTable>
 {
+    private static final Logger LOG = Logger.get(DropTableTask.class);
     private final CubeManager cubeManager;
 
     @Inject
@@ -90,13 +93,20 @@ public class DropTableTask
         }
 
         metadata.dropTable(session, tableHandle.get());
+
         if (optionalCubeMetaStore.isPresent()) {
             List<CubeMetadata> cubes = optionalCubeMetaStore.get().getMetadataList(tableName.toString());
             for (CubeMetadata cube : cubes) {
                 String[] parts = cube.getCubeName().split("\\.");
                 Optional<TableHandle> cubeHandle = metadata.getTableHandle(session, createQualifiedObjectName(session, null, QualifiedName.of(parts[0], parts[1], parts[2])));
-                cubeHandle.ifPresent(cubeTable -> metadata.dropTable(session, cubeTable));
-                optionalCubeMetaStore.get().removeCube(cube);
+                try {
+                    cubeHandle.ifPresent(cubeTable -> metadata.dropTable(session, cubeTable));
+                    optionalCubeMetaStore.get().removeCube(cube);
+                }
+                catch (TableNotFoundException e) {
+                    // Can happen in concurrent drop table and drop cube calls
+                    LOG.debug("Tried dropping cube table but it is already dropped", e);
+                }
             }
         }
 
