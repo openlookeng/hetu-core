@@ -131,7 +131,7 @@ public class AddSortBasedAggregation
 
             //send groupingKeyNames info to below nodes so that, Ex: join nodes can validate it
             TableHandleInfo tableHandleInfo = new TableHandleInfo(groupingKeyNames);
-            context.defaultRewrite(node, tableHandleInfo);
+            node = (AggregationNode) context.defaultRewrite(node, tableHandleInfo);
 
             if ((null != tableHandleInfo.tableHandles) && (tableHandleInfo.isJoinCriteriaOrdered())) {
                 doSortBasedAggregation = metadata.canPerformSortBasedAggregation(session, tableHandleInfo.tableHandles, groupingKeyNames);
@@ -262,7 +262,7 @@ public class AddSortBasedAggregation
             List<String> groupingKeyNames = tableHandleInfo.getGroupingKeyNames();
 
             // only at Source side we select tables for sort aggregation
-            context.rewrite(node.getSource(), tableHandleInfo);
+            PlanNode probe = context.rewrite(node.getSource(), tableHandleInfo);
             if (!groupingKeyNames.get(0).equals(node.getSourceJoinSymbol().getName())) {
                 tableHandleInfo.setJoinCriteriaOrdered(false);
                 LOG.debug("GroupingKeys are different from node Criteria");
@@ -270,8 +270,9 @@ public class AddSortBasedAggregation
 
             //This is FilteringSource Side we will not select table
             context.get().setProbeSide(false);
-            context.rewrite(node.getFilteringSource(), context.get());
+            PlanNode build = context.rewrite(node.getFilteringSource(), context.get());
             context.get().setProbeSide(true);
+            node = (SemiJoinNode) replaceChildren(node, ImmutableList.of(probe, build));
             return node;
         }
 

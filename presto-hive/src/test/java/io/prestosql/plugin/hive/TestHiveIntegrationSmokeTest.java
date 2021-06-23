@@ -6511,4 +6511,25 @@ public class TestHiveIntegrationSmokeTest
         assertUpdate("DROP TABLE lineitem_orderkey_partkey_SemiJoin");
         assertUpdate("DROP TABLE lineitem_semiJoin");
     }
+
+    @Test
+    public void SortAggreDistinct()
+    {
+        initSortBasedAggregation();
+        computeActual("create table lineitem_orderkey_partkey_Distinct  with(transactional = false, " +
+                "format = 'ORC', bucketed_by=array['orderkey', 'partkey'], bucket_count=1, sorted_by = ARRAY['orderkey', 'partkey'])" +
+                "  as select * from tpch.tiny.lineitem");
+
+        String query = "select sum(distinct(partkey)), orderkey from lineitem_orderkey_partkey_Distinct " +
+                "group by orderkey order by orderkey";
+
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv40, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        assertUpdate("DROP TABLE lineitem_orderkey_partkey_Distinct");
+    }
 }
