@@ -319,6 +319,9 @@ public class CubeConsole
         else if (operator.equals(GREATER_THAN) || operator.equals(GREATER_THAN_OR_EQUAL)) {
             processComparisonExpressionOperatorGreater(createCube, queryRunner, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel, parser, comparisonExpression);
         }
+        else if (operator.equals(EQUAL)) {
+            processComparisonExpressionOperatorEqual(createCube, queryRunner, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel, parser, comparisonExpression);
+        }
     }
 
     /**
@@ -401,6 +404,64 @@ public class CubeConsole
                 String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, finalBinaryExpression);
                 console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
             }
+        }
+        else {
+            //if the range is within the processing size limit then we run a single insert query only
+            String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, whereClause);
+            console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+        }
+    }
+
+    /**
+     * Process the Create Cube Query with Comparison Expression with Equal in where clause.
+     *
+     * @param createCube createCube
+     * @param queryRunner queryRunner
+     * @param outputFormat outputFormat
+     * @param schemaChanged schemaChanged
+     * @param usePager usePager
+     * @param showProgress showProgress
+     * @param terminal terminal
+     * @param out out
+     * @param errorChannel errorChannel
+     * @param parser parser
+     * @param comparisonExpression comparisonExpression
+     * @return void
+     */
+    private void processComparisonExpressionOperatorEqual(CreateCube createCube, QueryRunner queryRunner, ClientOptions.OutputFormat outputFormat, Runnable schemaChanged, boolean usePager, boolean showProgress, Terminal terminal, PrintStream out, PrintStream errorChannel, SqlParser parser, ComparisonExpression comparisonExpression)
+    {
+        String whereClause = createCube.getWhere().get().toString();
+        QualifiedName sourceTableName = createCube.getSourceTableName();
+        QualifiedName cubeName = createCube.getCubeName();
+        Expression columnName = comparisonExpression.getLeft();
+        Long rightValue = Long.parseLong(comparisonExpression.getRight().toString());
+
+        //initial query to get the total number of rows in the table
+        String initialQuery = String.format(SELECT_COUNT_STAR_FROM_STRING, sourceTableName.toString(), whereClause);
+        processCubeInitialQuery(queryRunner, initialQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+        Long valueCountStarQuery = INITIAL_QUERY_RESULT_VALUE;
+        String resultInitCubeQuery = getResultInitCubeQuery();
+        if (resultInitCubeQuery != null) {
+            valueCountStarQuery = Long.parseLong(resultInitCubeQuery);
+        }
+
+        //initial query to get the total number of distinct column values in the table
+        String countDistinctQuery = String.format(SELECT_COUNT_DISTINCT_FROM_STRING, columnName, sourceTableName.toString(), whereClause);
+        processCubeInitialQuery(queryRunner, countDistinctQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+        Long valueCountDistinctQuery = INITIAL_QUERY_RESULT_VALUE;
+        resultInitCubeQuery = getResultInitCubeQuery();
+        if (resultInitCubeQuery != null) {
+            valueCountDistinctQuery = Long.parseLong(resultInitCubeQuery);
+        }
+
+        //the max rows that can be processed by the cluster
+        Long maxRowsProcessLimit = Long.parseLong(console.getClientOptions().maxBatchProcessSize); // this will be user input
+
+        if (valueCountDistinctQuery < maxRowsProcessLimit && valueCountStarQuery < maxRowsProcessLimit) {
+            //this loop process the multiple insert query statements
+            Expression equalExpression = new ComparisonExpression(EQUAL, columnName, parser.createExpression(Long.toString(rightValue), new ParsingOptions()));
+            String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, equalExpression);
+            console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
         }
         else {
             //if the range is within the processing size limit then we run a single insert query only
