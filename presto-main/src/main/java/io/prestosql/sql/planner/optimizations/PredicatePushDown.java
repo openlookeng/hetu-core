@@ -298,6 +298,11 @@ public class PredicatePushDown
             }
             // add a filter node above cte node for static conjuncts on second traversal and pushdown their union
             if (cteFilterMap.get(node.getCommonCTERefNum()) != null) {
+                if (!dynamicFiltering && costProvider.getCost(node).hasUnknownComponents() && !(!node.getSource().getSources().isEmpty() && node.getSource().getSources().get(0) instanceof WindowNode) &&
+                        cteFilterMap.get(node.getCommonCTERefNum()).stream().filter(exp -> !exp.equals(TRUE_CONSTANT)).findFirst().isPresent()) {
+                    // remove CTE node if there is no stats
+                    return ((CTEScanNode) context.defaultRewrite(node, context.get())).getSource();
+                }
                 RowExpression rewrittenExpression = rewriteExpression(node, logicalRowExpressions.combineDisjuncts(cteFilterMap.get(commonCTERefNum)));
                 CTEScanNode rewrittenNode = (CTEScanNode) context.defaultRewrite(node, rewrittenExpression);
                 if (dynamicFiltering) {
