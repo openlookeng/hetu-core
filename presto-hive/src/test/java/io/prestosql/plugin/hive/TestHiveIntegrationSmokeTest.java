@@ -6481,4 +6481,34 @@ public class TestHiveIntegrationSmokeTest
         assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
         assertUpdate("DROP TABLE lineitem_orderkey_partkey_partition3");
     }
+
+    @Test
+    public void sortAggSemiJoin()
+    {
+        initSortBasedAggregation();
+
+        computeActual("create table lineitem_orderkey_partkey_SemiJoin  with(transactional = false, " +
+                "format = 'ORC', bucketed_by=array['orderkey', 'partkey'], bucket_count=1, sorted_by = ARRAY['orderkey', 'partkey'])" +
+                "  as select * from tpch.tiny.lineitem");
+
+        computeActual("create table lineitem_semiJoin with(transactional = false, format = 'ORC')" +
+                "  as select * from tpch.tiny.lineitem where partkey is not null");
+
+        String query = "select avg(lineitem_orderkey_partkey_SemiJoin.orderkey), lineitem_orderkey_partkey_SemiJoin.orderkey " +
+                " from lineitem_orderkey_partkey_SemiJoin " +
+                " where orderkey " +
+                " in (select orderkey from lineitem_semiJoin) " +
+                " group by orderkey, partkey " +
+                " order by orderkey, partkey ";
+
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv40, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        assertUpdate("DROP TABLE lineitem_orderkey_partkey_SemiJoin");
+        assertUpdate("DROP TABLE lineitem_semiJoin");
+    }
 }
