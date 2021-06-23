@@ -43,6 +43,7 @@ import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.iterative.Memo;
+import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 
 import java.util.ArrayList;
@@ -248,6 +249,30 @@ public class AddSortBasedAggregation
             context.get().setProbeSide(true);
             PlanNode planNode = replaceChildren(node, ImmutableList.of(probe, build));
             return planNode;
+        }
+
+        @Override
+        public PlanNode visitSemiJoin(SemiJoinNode node, RewriteContext<TableHandleInfo> context)
+        {
+            if (context.get() == null || (context.get().getGroupingKeyNames().size() == 0)) {
+                return visitPlan(node, context);
+            }
+
+            TableHandleInfo tableHandleInfo = context.get();
+            List<String> groupingKeyNames = tableHandleInfo.getGroupingKeyNames();
+
+            // only at Source side we select tables for sort aggregation
+            context.rewrite(node.getSource(), tableHandleInfo);
+            if (!groupingKeyNames.get(0).equals(node.getSourceJoinSymbol().getName())) {
+                tableHandleInfo.setJoinCriteriaOrdered(false);
+                LOG.debug("GroupingKeys are different from node Criteria");
+            }
+
+            //This is FilteringSource Side we will not select table
+            context.get().setProbeSide(false);
+            context.rewrite(node.getFilteringSource(), context.get());
+            context.get().setProbeSide(true);
+            return node;
         }
 
         @Override
