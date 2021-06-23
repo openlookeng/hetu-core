@@ -106,13 +106,12 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- for testing -->
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>hetu-common</artifactId>
-            <scope>test</scope>
         </dependency>
 
+        <!-- for testing -->
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-tests</artifactId>

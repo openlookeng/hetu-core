@@ -14,6 +14,7 @@
  */
 package io.prestosql.plugin.memory.data;
 
+import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.prestosql.plugin.memory.ColumnInfo;
@@ -22,18 +23,25 @@ import io.prestosql.plugin.memory.MemoryThreadManager;
 import io.prestosql.plugin.memory.SortingColumn;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageSorter;
+import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.TypeManager;
+import io.prestosql.spi.util.BloomFilter;
 
 import java.io.Serializable;
 import java.nio.file.Path;
+import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.TreeMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Objects.requireNonNull;
 
@@ -54,6 +62,41 @@ public class Table
     private static final Logger LOG = Logger.get(Table.class);
     private static final Long PROCESSING_DELAY = 5000L; // 5s
     private static final ScheduledExecutorService executor = MemoryThreadManager.getSharedThreadPool();
+
+    /* NOTE: MemoryTableManager uses Object serialization on this class
+    but for security it requires a whitelist of accepted classes during de-serialization.
+
+    Below is a list of all classes that are serialized as part of Table's class tree.
+
+    In the future, if a new class is added to this class as a field, de-serialization will fail with an error like:
+    Caused by: java.io.InvalidClassException: io.prestosql.plugin.memory.data.NewClass not supported.
+    the new class must be added to the whitelist below.
+    */
+    public static final String[] TYPES_WHITELIST = ImmutableList.of(
+            Number.class.getCanonicalName(),
+            Integer.class.getCanonicalName(),
+            Long.class.getCanonicalName(),
+            Table.class.getName(),
+            AtomicInteger.class.getName(),
+            List.class.getName(),
+            ArrayList.class.getName(),
+            TableState.class.getName(),
+            ColumnInfo.class.getName(),
+            SortingColumn.class.getName(),
+            SortOrder.class.getName(),
+            Enum.class.getName(),
+            HashMap.class.getName(),
+            HashSet.class.getName(),
+            AbstractMap.SimpleEntry.class.getName(),
+            BloomFilter.class.getName(),
+            BloomFilter.BitSet.class.getName(),
+            LogicalPart.class.getName(),
+            LogicalPart.LogicalPartState.class.getName(),
+            TreeMap.class.getName(),
+            LogicalPart.SparseValue.class.getName(),
+            AtomicReference.class.getName(),
+            long[].class.getName())
+            .toArray(new String[0]);
 
     private final long processingDelay;
     private final int totalSplits;

@@ -21,15 +21,18 @@ import io.airlift.units.MaxDataSize;
 import io.airlift.units.MaxDuration;
 import io.airlift.units.MinDataSize;
 import io.airlift.units.MinDuration;
+import io.hetu.core.common.util.SecurePathWhiteList;
 import io.prestosql.spi.function.Mandatory;
 
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 
 public class MemoryConfig
@@ -60,6 +63,18 @@ public class MemoryConfig
     @NotNull
     public Path getSpillRoot()
     {
+        // if spillRoot is null, let the config manager throw the error, it's more user friendly
+        if (spillRoot != null) {
+            try {
+                checkArgument(!spillRoot.toString().contains("../"),
+                        "memory.spill-path must be absolute and at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+                checkArgument(SecurePathWhiteList.isSecurePath(spillRoot.toString()),
+                        "memory.spill-path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+            }
+            catch (IOException e) {
+                throw new IllegalArgumentException("Failed to get secure path list.", e);
+            }
+        }
         return spillRoot;
     }
 
