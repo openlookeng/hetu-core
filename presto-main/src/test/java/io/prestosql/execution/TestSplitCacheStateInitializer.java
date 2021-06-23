@@ -51,6 +51,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static org.mockito.Matchers.any;
@@ -323,6 +324,12 @@ public class TestSplitCacheStateInitializer
 
         @Override
         public void removeEntryListener(MapListener listener) {}
+
+        @Override
+        public V computeIfAbsent(K key, Function<? super K, ? extends V> mappingFunction)
+        {
+            return null;
+        }
 
         @Override
         public String getName()

@@ -50,6 +50,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.google.common.base.Throwables.throwIfUnchecked;
+import static io.hetu.core.metastore.MetaStoreConstants.LOCAL;
 import static io.prestosql.spi.StandardErrorCode.ALREADY_EXISTS;
 import static io.prestosql.spi.StandardErrorCode.CATALOG_NOT_EMPTY;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
@@ -101,10 +102,12 @@ public class TestHetuFsMetastore
                 client.createDirectories(Paths.get(path));
             }
             client.deleteRecursively(Paths.get(path));
+
+            String type = LOCAL;
             Bootstrap app = new Bootstrap(
                     new MBeanModule(),
                     new MBeanServerModule(),
-                    new HetuFsMetastoreModule(client));
+                    new HetuFsMetastoreModule(client, type));
 
             Injector injector = app
                     .strictConfig()

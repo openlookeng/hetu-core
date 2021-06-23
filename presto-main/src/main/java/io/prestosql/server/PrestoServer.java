@@ -139,8 +139,7 @@ public class PrestoServer
             injector.getInstance(PluginManager.class).loadPlugins();
             FileSystemClientManager fileSystemClientManager = injector.getInstance(FileSystemClientManager.class);
             fileSystemClientManager.loadFactoryConfigs();
-            injector.getInstance(HetuMetaStoreManager.class).loadHetuMetastore(fileSystemClientManager);
-            injector.getInstance(HeuristicIndexerManager.class).buildIndexClient();
+
             injector.getInstance(StaticFunctionNamespaceStore.class).loadFunctionNamespaceManagers();
             injector.getInstance(StaticCatalogStore.class).loadCatalogs();
             injector.getInstance(DynamicCatalogStore.class).loadCatalogStores(fileSystemClientManager);
@@ -156,6 +155,9 @@ public class PrestoServer
             // State Store
             launchEmbeddedStateStore(injector.getInstance(HetuConfig.class), injector.getInstance(StateStoreLauncher.class));
             injector.getInstance(StateStoreProvider.class).loadStateStore();
+
+            injector.getInstance(HetuMetaStoreManager.class).loadHetuMetastore(fileSystemClientManager);
+            injector.getInstance(HeuristicIndexerManager.class).buildIndexClient();
             // preload index (on coordinator only)
             if (injector.getInstance(ServerConfig.class).isCoordinator()) {
                 injector.getInstance(HeuristicIndexerManager.class).preloadIndex();
