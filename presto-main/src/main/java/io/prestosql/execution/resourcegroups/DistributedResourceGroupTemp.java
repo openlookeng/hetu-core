@@ -14,18 +14,25 @@
  */
 package io.prestosql.execution.resourcegroups;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
+import io.airlift.json.ObjectMapperProvider;
 import io.airlift.log.Logger;
 import io.airlift.stats.CounterStat;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.execution.ManagedQueryExecution;
 import io.prestosql.execution.QueryState;
+import io.prestosql.metadata.InternalNode;
+import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.server.QueryStateInfo;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.resourcegroups.KillPolicy;
 import io.prestosql.spi.resourcegroups.ResourceGroupId;
 import io.prestosql.spi.resourcegroups.SchedulingPolicy;
+import io.prestosql.spi.statestore.StateCollection;
+import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.statestore.SharedQueryState;
 import io.prestosql.statestore.SharedResourceGroupState;
@@ -58,7 +65,11 @@ import java.util.stream.Collectors;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.math.LongMath.saturatedAdd;
+import static com.google.common.math.LongMath.saturatedMultiply;
+import static com.google.common.math.LongMath.saturatedSubtract;
 import static io.prestosql.server.QueryStateInfo.createQueryStateInfo;
+import static io.prestosql.spi.ErrorType.USER_ERROR;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INSUFFICIENT_RESOURCES;
 import static java.util.Objects.requireNonNull;
 
@@ -72,33 +83,20 @@ import static java.util.Objects.requireNonNull;
  * state store and check if query can run or can queue using calculated resource usage
  *
  * @since 2019-11-29
- *
- * @deprecated , this class is replaced by DistributedResourceGroupTemp
+ * <p>
+ * TODO: After this class is tested(with HA aggregated stats), it will be renamed to 'DistributedResourceGroup'
  */
-@Deprecated
+
 @ThreadSafe
-public class DistributedResourceGroup
+public class DistributedResourceGroupTemp
         extends BaseResourceGroup
 {
     private static final long MILLISECONDS_PER_SECOND = 1000L;
 
-    private static final Logger LOG = Logger.get(DistributedResourceGroup.class);
+    private static final Logger LOG = Logger.get(DistributedResourceGroupTemp.class);
 
     // Live data structures
     // ====================
-    @GuardedBy("root")
-    private Queue<ManagedQueryExecution> queuedQueries = new LinkedList<>();
-    @GuardedBy("root")
-    private final Set<ManagedQueryExecution> runningQueries = new HashSet<>();
-    @GuardedBy("root")
-    private int descendantRunningQueries;
-    @GuardedBy("root")
-    private int descendantQueuedQueries;
-    // Memory usage is cached because it changes very rapidly while queries are running, and would be expensive to track continuously
-    @GuardedBy("root")
-    private long cachedMemoryUsageBytes;
-    @GuardedBy("root")
-    private long cpuUsageMillis;
     @GuardedBy("root")
     private long lastStartMillis;
     @GuardedBy("root")
@@ -110,14 +108,51 @@ public class DistributedResourceGroup
     // State Store
     private StateStore stateStore;
 
-    protected DistributedResourceGroup(Optional<BaseResourceGroup> parent,
+    private InternalNodeManager internalNodeManager;
+    private static final ObjectMapper MAPPER = new ObjectMapperProvider().get();
+    private static final String DASH = "-";
+    private static final String RESOURCE_AGGR_STATS = "resourceaggrstats";
+
+    // Local variables represent value in the current coordinator
+    @GuardedBy("root")
+    private Queue<ManagedQueryExecution> localQueuedQueries = new LinkedList<>();
+    @GuardedBy("root")
+    private final Set<ManagedQueryExecution> localRunningQueries = new HashSet<>();
+    @GuardedBy("root")
+    private int localDescendantRunningQueries;
+    @GuardedBy("root")
+    private int localDescendantQueuedQueries;
+    // Memory usage is cached because it changes very rapidly while queries are running, and would be expensive to track continuously
+    @GuardedBy("root")
+    private long localCachedMemoryUsageBytes;
+    @GuardedBy("root")
+    private long localCpuUsageMillis;
+
+    // Global variables represent aggregated values among all the coordinators
+    @GuardedBy("root")
+    private int globalTotalQueuedQueries;
+    @GuardedBy("root")
+    private int globalTotalRunningQueries;
+    @GuardedBy("root")
+    private int globalDescendantRunningQueries;
+    @GuardedBy("root")
+    private int globalDescendantQueuedQueries;
+    // Memory usage is cached because it changes very rapidly while queries are running, and would be expensive to track continuously
+    @GuardedBy("root")
+    private long globalCachedMemoryUsageBytes;
+    @GuardedBy("root")
+    private long globalCpuUsageMillis;
+
+    protected DistributedResourceGroupTemp(Optional<BaseResourceGroup> parent,
             String name,
             BiConsumer<BaseResourceGroup, Boolean> jmxExportListener,
             Executor executor,
-            StateStore stateStore)
+            StateStore stateStore,
+            InternalNodeManager internalNodeManager)
     {
         super(parent, name, jmxExportListener, executor);
         this.stateStore = requireNonNull(stateStore, "state store is null");
+        this.internalNodeManager = requireNonNull(internalNodeManager, "internalNodeManager is null");
     }
 
     @Override
@@ -149,9 +184,7 @@ public class DistributedResourceGroup
     public int getRunningQueries()
     {
         synchronized (root) {
-            Optional<SharedResourceGroupState> resourceGroupState = getSharedResourceGroupState();
-            int numRunningQueries = resourceGroupState.isPresent() ? resourceGroupState.get().getRunningQueries().size() : 0;
-            return numRunningQueries + descendantRunningQueries;
+            return getTotalGlobalRunningQueries() + getGlobalDescendantRunningQueries();
         }
     }
 
@@ -160,9 +193,8 @@ public class DistributedResourceGroup
     public int getQueuedQueries()
     {
         synchronized (root) {
-            Optional<SharedResourceGroupState> resourceGroupState = getSharedResourceGroupState();
-            int numQueuedQueries = resourceGroupState.isPresent() ? resourceGroupState.get().getQueuedQueries().size() : 0;
-            return numQueuedQueries + descendantQueuedQueries;
+            refreshGlobalValues();
+            return globalTotalQueuedQueries + globalDescendantQueuedQueries;
         }
     }
 
@@ -272,15 +304,15 @@ public class DistributedResourceGroup
     }
 
     @Override
-    public DistributedResourceGroup getOrCreateSubGroup(String name)
+    public DistributedResourceGroupTemp getOrCreateSubGroup(String name)
     {
         requireNonNull(name, "name is null");
         synchronized (root) {
-            checkArgument(runningQueries.isEmpty() && queuedQueries.isEmpty(), "Cannot add sub group to %s while queries are running", id);
+            checkArgument(localRunningQueries.isEmpty() && localQueuedQueries.isEmpty(), "Cannot add sub group to %s while queries are running", id);
             if (subGroups.containsKey(name)) {
-                return (DistributedResourceGroup) subGroups.get(name);
+                return (DistributedResourceGroupTemp) subGroups.get(name);
             }
-            DistributedResourceGroup subGroup = new DistributedResourceGroup(Optional.of(this), name, jmxExportListener, executor, stateStore);
+            DistributedResourceGroupTemp subGroup = new DistributedResourceGroupTemp(Optional.of(this), name, jmxExportListener, executor, stateStore, internalNodeManager);
             subGroup.setMemoryMarginPercent(memoryMarginPercent);
             subGroup.setQueryProgressMarginPercent(queryProgressMarginPercent);
             subGroups.put(name, subGroup);
@@ -312,7 +344,8 @@ public class DistributedResourceGroup
     {
         checkState(Thread.holdsLock(root), "Must hold lock to enqueue a query");
         synchronized (root) {
-            queuedQueries.add(query);
+            localQueuedQueries.add(query);
+            updateLocalValuesToStateStore();
         }
     }
 
@@ -325,7 +358,9 @@ public class DistributedResourceGroup
             while (query.getBasicQueryInfo().getState() == QueryState.QUEUED) {
                 // wait for query to be started
             }
-            runningQueries.add(query);
+            localQueuedQueries.remove(query);
+            localRunningQueries.add(query);
+            updateLocalValuesToStateStore();
         }
     }
 
@@ -333,17 +368,27 @@ public class DistributedResourceGroup
     protected void queryFinished(ManagedQueryExecution query)
     {
         synchronized (root) {
-            if (!runningQueries.contains(query) && !queuedQueries.contains(query)) {
+            if (!localRunningQueries.contains(query) && !localQueuedQueries.contains(query)) {
                 // Query has already been cleaned up
                 return;
             }
 
-            if (runningQueries.contains(query)) {
-                runningQueries.remove(query);
+            // Only count the CPU time if the query succeeded, or the failure was the fault of the user
+            if (!query.getErrorCode().isPresent() || query.getErrorCode().get().getType() == USER_ERROR) {
+                DistributedResourceGroupTemp group = this;
+                while (group != null) {
+                    group.localCpuUsageMillis = saturatedAdd(group.localCpuUsageMillis, query.getTotalCpuTime().toMillis());
+                    group = (DistributedResourceGroupTemp) group.parent.orElse(null);
+                }
+            }
+
+            if (localRunningQueries.contains(query)) {
+                localRunningQueries.remove(query);
             }
             else {
-                queuedQueries.remove(query);
+                localQueuedQueries.remove(query);
             }
+            updateLocalValuesToStateStore();
         }
     }
 
@@ -358,50 +403,35 @@ public class DistributedResourceGroup
         checkState(Thread.holdsLock(root), "Must hold lock to refresh stats");
         synchronized (root) {
             if (subGroups.isEmpty()) {
-                descendantRunningQueries = 0;
-                descendantQueuedQueries = 0;
-                cachedMemoryUsageBytes = 0;
+                localDescendantRunningQueries = 0;
+                localDescendantQueuedQueries = 0;
+                localCachedMemoryUsageBytes = 0;
 
-                Optional<SharedResourceGroupState> resourceGroupState = getSharedResourceGroupState();
-                if (!resourceGroupState.isPresent()) {
-                    return;
+                for (ManagedQueryExecution query : localRunningQueries) {
+                    localCachedMemoryUsageBytes += query.getTotalMemoryReservation().toBytes();
                 }
-
-                resourceGroupState.ifPresent(state -> this.lastExecutionTime = state.getLastExecutionTime());
-                Set<SharedQueryState> runningQueries = resourceGroupState.get().getRunningQueries();
-                for (SharedQueryState state : runningQueries) {
-                    cachedMemoryUsageBytes += state.getTotalMemoryReservation().toBytes();
-                }
-
-                // get cpuUsageMillis from resourceGroupState
-                cpuUsageMillis = resourceGroupState.get().getCpuUsageMillis();
             }
             else {
-                int tempDescendantRunningQueries = 0;
-                int tempDescendantQueuedQueries = 0;
-                long tempCachedMemoryUsageBytes = 0L;
-                long tempCpuUsageMillis = 0L;
+                int tempLocalDescendantRunningQueries = 0;
+                int tempLocalDescendantQueuedQueries = 0;
+                long tempLocalCachedMemoryUsageBytes = 0L;
+                long tempLocalCpuUsageMillis = 0L;
 
                 for (BaseResourceGroup group : subGroups()) {
                     group.internalRefreshStats();
-                    tempCpuUsageMillis += ((DistributedResourceGroup) group).cpuUsageMillis;
+                    tempLocalCpuUsageMillis += ((DistributedResourceGroupTemp) group).localCpuUsageMillis;
+                    tempLocalDescendantRunningQueries += ((DistributedResourceGroupTemp) group).localDescendantRunningQueries;
+                    tempLocalDescendantQueuedQueries += ((DistributedResourceGroupTemp) group).localDescendantQueuedQueries;
+                    tempLocalCachedMemoryUsageBytes += ((DistributedResourceGroupTemp) group).localCachedMemoryUsageBytes;
                 }
 
-                // Sub-groups are created on demand, so need to also check stats in sub-groups created on other coordinators
-                for (SharedResourceGroupState state : getSharedSubGroups()) {
-                    tempDescendantRunningQueries += state.getRunningQueries().size();
-                    tempDescendantQueuedQueries += state.getQueuedQueries().size();
-                    tempCachedMemoryUsageBytes += state.getRunningQueries().stream()
-                            .mapToLong(query -> query.getTotalMemoryReservation().toBytes())
-                            .reduce(0, (memoryUsage1, memoryUsage2) -> memoryUsage1 + memoryUsage2);
-                }
-
-                descendantRunningQueries = tempDescendantRunningQueries;
-                descendantQueuedQueries = tempDescendantQueuedQueries;
-                cachedMemoryUsageBytes = tempCachedMemoryUsageBytes;
-                cpuUsageMillis = tempCpuUsageMillis;
+                localDescendantRunningQueries = tempLocalDescendantRunningQueries;
+                localDescendantQueuedQueries = tempLocalDescendantQueuedQueries;
+                localCachedMemoryUsageBytes = tempLocalCachedMemoryUsageBytes;
+                localCpuUsageMillis = tempLocalCpuUsageMillis;
             }
             lastUpdateTime = new DateTime();
+            updateLocalValuesToStateStore();
         }
     }
 
@@ -411,13 +441,14 @@ public class DistributedResourceGroup
         synchronized (root) {
             if (!subGroups.isEmpty()) {
                 for (BaseResourceGroup group : subGroups()) {
-                    ((DistributedResourceGroup) group).internalCancelQuery();
+                    ((DistributedResourceGroupTemp) group).internalCancelQuery();
                 }
 
                 return;
             }
 
-            if (cachedMemoryUsageBytes <= softMemoryLimitBytes) {
+            long globalCachedMemoryUsageBytes = getGlobalCachedMemoryUsageBytes();
+            if (globalCachedMemoryUsageBytes <= softMemoryLimitBytes) {
                 return;
             }
 
@@ -472,8 +503,8 @@ public class DistributedResourceGroup
                             sortedQueryList = new ArrayList<>();
                     }
 
-                    long tempGlobalCachedMemoryUsage = cachedMemoryUsageBytes;
-                    long tempLocalCachedMemoryUsage = cachedMemoryUsageBytes;
+                    long tempGlobalCachedMemoryUsage = globalCachedMemoryUsageBytes;
+                    long tempLocalCachedMemoryUsage = localCachedMemoryUsageBytes;
 
                     // As per the kill policy, top queries are selected across all coordinators but we kill only local queries
                     // till memory reaches with-in required limit.
@@ -482,7 +513,7 @@ public class DistributedResourceGroup
                     //              where only Q1 and Q7 are local queries and only combined memory of Q1 and Q10 brings memory within the desired limit.
                     //              So in this case only Q1 will be killed from local coordinator.
                     for (SharedQueryState query : sortedQueryList) {
-                        for (ManagedQueryExecution localQuery : runningQueries) {
+                        for (ManagedQueryExecution localQuery : localRunningQueries) {
                             if (query.getBasicQueryInfo().getQueryId().equals(localQuery.getBasicQueryInfo().getQueryId())) {
                                 LOG.info("Query " + localQuery.getBasicQueryInfo().getQueryId() + " is getting killed for resource group " + this + " query will be killed with policy " + killPolicy);
                                 localQuery.fail(new PrestoException(GENERIC_INSUFFICIENT_RESOURCES, "Memory consumption " + tempLocalCachedMemoryUsage + " exceed the limit " + softMemoryLimitBytes + "for resource group " + this));
@@ -526,11 +557,11 @@ public class DistributedResourceGroup
             // Only start the query if it exists locally
             Optional<SharedResourceGroupState> resourceGroupState = getSharedResourceGroupState();
             PriorityQueue<SharedQueryState> globalQueuedQueries = resourceGroupState.isPresent() ? resourceGroupState.get().getQueuedQueries() : new PriorityQueue<>();
-            if (!globalQueuedQueries.isEmpty() && !queuedQueries.isEmpty()) {
+            if (!globalQueuedQueries.isEmpty() && !localQueuedQueries.isEmpty()) {
                 // Get queued query with longest queued time from state cache store.
                 // Remove it if local queued queries contains it.
                 SharedQueryState nextQuery = globalQueuedQueries.peek();
-                for (ManagedQueryExecution localQuery : queuedQueries) {
+                for (ManagedQueryExecution localQuery : localQueuedQueries) {
                     if (nextQuery.getBasicQueryInfo().getQueryId().equals(localQuery.getBasicQueryInfo().getQueryId())) {
                         Lock lock = stateStore.getLock(id.toString());
                         boolean locked = false;
@@ -542,7 +573,6 @@ public class DistributedResourceGroup
                                 // Make sure queued query start is synchronized
                                 DistributedResourceGroupUtils.mapCachedStates();
                                 if (canRunMore()) {
-                                    queuedQueries.remove(localQuery);
                                     startInBackground(localQuery);
                                     return true;
                                 }
@@ -562,7 +592,7 @@ public class DistributedResourceGroup
             }
 
             // Try to find least recently used eligible group
-            DistributedResourceGroup chosenGroup = findLeastRecentlyExecutedSubgroup();
+            DistributedResourceGroupTemp chosenGroup = findLeastRecentlyExecutedSubgroup();
             if (chosenGroup == null) {
                 return false;
             }
@@ -593,58 +623,69 @@ public class DistributedResourceGroup
     protected boolean canRunMore()
     {
         checkState(Thread.holdsLock(root), "Must hold lock");
-        Optional<SharedResourceGroupState> resourceGroupState = getSharedResourceGroupState();
-        int numRunningQueries = resourceGroupState.isPresent() ? resourceGroupState.get().getRunningQueries().size() : 0;
         synchronized (root) {
-            if (cpuUsageMillis >= hardCpuLimitMillis) {
+            refreshGlobalValues();
+            if (globalCpuUsageMillis >= hardCpuLimitMillis) {
                 return false;
             }
-
             int hardConcurrencyLimit = this.hardConcurrencyLimit;
-            return hasCapacity(numRunningQueries, adjustHardConcurrency(hardConcurrencyLimit, cpuUsageMillis));
+            return hasCapacity(globalTotalRunningQueries, adjustHardConcurrency(hardConcurrencyLimit, globalCpuUsageMillis));
         }
     }
 
     private boolean hasCapacity(int numRunningQueries, int hardConcurrencyLimit)
     {
-        if (numRunningQueries + descendantRunningQueries >= hardConcurrencyLimit ||
-                cachedMemoryUsageBytes > softMemoryLimitBytes) {
+        if (numRunningQueries + globalDescendantRunningQueries >= hardConcurrencyLimit ||
+                globalCachedMemoryUsageBytes > softMemoryLimitBytes) {
             return false;
         }
         if (parent.isPresent()) {
             // Check if hardConcurrencyLimit of the parent is reached with reserved concurrency for each peer group
-            if (numRunningQueries + descendantRunningQueries >= hardReservedConcurrency) {
+            if (numRunningQueries + globalDescendantRunningQueries >= hardReservedConcurrency) {
                 int peerTotalQuerySize = 0;
-                for (DistributedResourceGroup group : (Collection<DistributedResourceGroup>) parent.get().subGroups()) {
-                    Optional<SharedResourceGroupState> peerGroupState = group.getSharedResourceGroupState();
-                    int peerRunningQueries = peerGroupState.isPresent() ? peerGroupState.get().getRunningQueries().size() : 0;
-                    peerTotalQuerySize += Math.max(peerRunningQueries + group.descendantQueuedQueries, group.hardReservedConcurrency);
+                for (DistributedResourceGroupTemp group : (Collection<DistributedResourceGroupTemp>) parent.get().subGroups()) {
+                    group.refreshGlobalValues();
+                    peerTotalQuerySize += Math.max(group.globalTotalRunningQueries + group.globalDescendantRunningQueries, group.hardReservedConcurrency);
                 }
                 if (parent.get().hardConcurrencyLimit <= peerTotalQuerySize) {
                     return false;
                 }
             }
             // Check if the softMemoryLimit of parent is reached with reserved memory for each peer group
-            if (cachedMemoryUsageBytes >= softReservedMemory) {
+            if (globalCachedMemoryUsageBytes >= softReservedMemory) {
                 long peerGroupTotalUsage = 0L;
-                for (DistributedResourceGroup group : (Collection<DistributedResourceGroup>) parent.get().subGroups()) {
-                    Optional<SharedResourceGroupState> peerGroupState = group.getSharedResourceGroupState();
-                    long peerGroupUsage = peerGroupState.isPresent() ? peerGroupState.get().getRunningQueries().stream()
-                            .mapToLong(query -> query.getTotalMemoryReservation().toBytes())
-                            .reduce(0, (memoryUsage1, memoryUsage2) -> memoryUsage1 + memoryUsage2)
-                            : group.cachedMemoryUsageBytes;
-                    peerGroupTotalUsage += Math.max(peerGroupUsage, group.softReservedMemory);
+                for (DistributedResourceGroupTemp group : (Collection<DistributedResourceGroupTemp>) parent.get().subGroups()) {
+                    peerGroupTotalUsage += Math.max(group.globalCachedMemoryUsageBytes, group.softReservedMemory);
                 }
                 if (parent.get().softMemoryLimitBytes <= peerGroupTotalUsage) {
                     LOG.debug("No capacity to run more queries in the resource group: %s, with following reasons: \n" +
                                     "cachedMemoryUsageBytes:%s >= softReservedMemory:%s and \n" +
                                     "softMemoryLimitBytes:%s <= peerGroupTotalUsage:%s",
-                            parent.get().id, cachedMemoryUsageBytes, softReservedMemory, softMemoryLimitBytes, peerGroupTotalUsage);
+                            parent.get().id, globalCachedMemoryUsageBytes, softReservedMemory, softMemoryLimitBytes, peerGroupTotalUsage);
                     return false;
                 }
             }
         }
         return true;
+    }
+
+    protected void internalGenerateCpuQuota(long elapsedSeconds)
+    {
+        checkState(Thread.holdsLock(root), "Must hold lock to generate cpu quota");
+        synchronized (root) {
+            // Bug fix in cases when the CPU usage is initially higher than the cpu quota, but after a while,
+            // when the CPU usage is then lower than the CPU quota, queued queries are still not run. This fix was
+            long newQuota = saturatedMultiply(elapsedSeconds, cpuQuotaGenerationMillisPerSecond);
+            localCpuUsageMillis = saturatedSubtract(localCpuUsageMillis, newQuota);
+
+            if (localCpuUsageMillis < 0 || localCpuUsageMillis == Long.MAX_VALUE) {
+                localCpuUsageMillis = 0;
+            }
+            updateLocalValuesToStateStore();
+            for (BaseResourceGroup group : subGroups.values()) {
+                ((InternalResourceGroup) group).internalGenerateCpuQuota(elapsedSeconds);
+            }
+        }
     }
 
     /**
@@ -675,35 +716,21 @@ public class DistributedResourceGroup
     }
 
     /**
-     * Get all sub groups belong to current group based on cached resource group states
-     *
-     * @return List of SharedResourceGroupState
-     */
-    private List<SharedResourceGroupState> getSharedSubGroups()
-    {
-        Map<ResourceGroupId, SharedResourceGroupState> cachedStates = StateCacheStore.get().getCachedStates(StateStoreConstants.RESOURCE_GROUP_STATE_COLLECTION_NAME);
-        if (cachedStates == null) {
-            return ImmutableList.of();
-        }
-        return cachedStates.values().stream().filter(state -> id.isAncestorOf(state.getId())).collect(Collectors.toList());
-    }
-
-    /**
      * Find the sub group that's least recently used that has queued queries and can run more
      *
      * @return The chosen group or null if no eligible group
      */
-    private DistributedResourceGroup findLeastRecentlyExecutedSubgroup()
+    private DistributedResourceGroupTemp findLeastRecentlyExecutedSubgroup()
     {
-        List<DistributedResourceGroup> eligibleGroups = subGroups().stream()
+        List<DistributedResourceGroupTemp> eligibleGroups = subGroups().stream()
                 .filter(group -> group.getQueuedQueries() > 0 && group.canRunMore())
                 .sorted(Comparator.comparing(group -> group.getId().toString()))
-                .map(DistributedResourceGroup.class::cast)
+                .map(DistributedResourceGroupTemp.class::cast)
                 .collect(Collectors.toList());
 
         DateTime leastRecentlyExecutionTime = null;
-        DistributedResourceGroup chosenGroup = null;
-        for (DistributedResourceGroup group : eligibleGroups) {
+        DistributedResourceGroupTemp chosenGroup = null;
+        for (DistributedResourceGroupTemp group : eligibleGroups) {
             // If the group has never executed any query just use it
             if (!group.getLastExecutionTime().isPresent()) {
                 return group;
@@ -732,14 +759,126 @@ public class DistributedResourceGroup
     }
 
     @Override
-    public void generateCpuQuota(long elapsedSeconds)
+    public synchronized void generateCpuQuota(long elapsedSeconds)
     {
-        return;
+        if (elapsedSeconds > 0) {
+            internalGenerateCpuQuota(elapsedSeconds);
+        }
     }
 
     @Override
     public long getCachedMemoryUsageBytes()
     {
-        return cachedMemoryUsageBytes;
+        return getGlobalCachedMemoryUsageBytes();
+    }
+
+    public int getGlobalDescendantRunningQueries()
+    {
+        synchronized (root) {
+            refreshGlobalValues();
+            return globalDescendantRunningQueries;
+        }
+    }
+
+    public int getGlobalDescendantQueuedQueries()
+    {
+        synchronized (root) {
+            refreshGlobalValues();
+            return globalDescendantQueuedQueries;
+        }
+    }
+
+    public long getGlobalCachedMemoryUsageBytes()
+    {
+        synchronized (root) {
+            refreshGlobalValues();
+            return globalCachedMemoryUsageBytes;
+        }
+    }
+
+    public long getGlobalCpuUsageMillis()
+    {
+        synchronized (root) {
+            refreshGlobalValues();
+            return globalCpuUsageMillis;
+        }
+    }
+
+    public int getTotalGlobalQueuedQueries()
+    {
+        synchronized (root) {
+            refreshGlobalValues();
+            return globalTotalQueuedQueries;
+        }
+    }
+
+    public int getTotalGlobalRunningQueries()
+    {
+        synchronized (root) {
+            refreshGlobalValues();
+            return globalTotalRunningQueries;
+        }
+    }
+
+    private String createCoordinatorCollectionName(InternalNode coordinator)
+    {
+        return coordinator.getHostAndPort() + DASH + RESOURCE_AGGR_STATS;
+    }
+
+    private void updateLocalValuesToStateStore()
+    {
+        synchronized (root) {
+            try {
+                StateMap<String, String> resourceGroupMap = ((StateMap) stateStore.getOrCreateStateCollection(createCoordinatorCollectionName(internalNodeManager.getCurrentNode()), StateCollection.Type.MAP));
+                DistributedResourceGroupAggrStats groupAggrStats = new DistributedResourceGroupAggrStats(
+                        getId(),
+                        localRunningQueries.size(),
+                        localQueuedQueries.size(),
+                        localDescendantRunningQueries,
+                        localDescendantQueuedQueries,
+                        localCpuUsageMillis,
+                        localCachedMemoryUsageBytes);
+                String json = MAPPER.writeValueAsString(groupAggrStats);
+                resourceGroupMap.put(getId().toString(), json);
+            }
+            catch (JsonProcessingException e) {
+                throw new RuntimeException(String.format("Error updating resource group state with group id = %s, caused by ObjectMapper: %s", id, e.getMessage()));
+            }
+        }
+    }
+
+    private void refreshGlobalValues()
+    {
+        synchronized (root) {
+            globalTotalRunningQueries = localRunningQueries.size();
+            globalTotalQueuedQueries = localQueuedQueries.size();
+            globalDescendantQueuedQueries = localDescendantQueuedQueries;
+            globalDescendantRunningQueries = localDescendantRunningQueries;
+            globalCachedMemoryUsageBytes = localCachedMemoryUsageBytes;
+            globalCpuUsageMillis = localCpuUsageMillis;
+
+            internalNodeManager.refreshNodes();
+            try {
+                for (InternalNode coordinator : internalNodeManager.getCoordinators()) {
+                    if (coordinator.equals(internalNodeManager.getCurrentNode())) {
+                        continue;
+                    }
+                    StateMap<String, String> resourceGroupMap = ((StateMap) stateStore.getOrCreateStateCollection(createCoordinatorCollectionName(coordinator), StateCollection.Type.MAP));
+                    DistributedResourceGroupAggrStats groupAggrStats = resourceGroupMap.containsKey(getId().toString()) ? MAPPER.readerFor(DistributedResourceGroupAggrStats.class)
+                            .readValue(resourceGroupMap.get(getId().toString())) : null;
+                    if (groupAggrStats != null) {
+                        globalTotalRunningQueries += groupAggrStats.getRunningQueries();
+                        globalTotalQueuedQueries += groupAggrStats.getQueuedQueries();
+                        globalDescendantQueuedQueries += groupAggrStats.getDescendantQueuedQueries();
+                        globalDescendantRunningQueries += groupAggrStats.getDescendantRunningQueries();
+                        globalCachedMemoryUsageBytes += groupAggrStats.getCachedMemoryUsageBytes();
+                        globalCpuUsageMillis += groupAggrStats.getCachedMemoryUsageBytes();
+                    }
+                }
+            }
+            catch (JsonProcessingException e) {
+                throw new RuntimeException(String.format("Error fetching resource group state with group id = %s, caused by ObjectMapper: %s", id, e.getMessage()));
+            }
+        }
     }
 }

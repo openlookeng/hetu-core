@@ -14,15 +14,22 @@
  */
 package io.prestosql.execution.resourcegroups;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.json.ObjectMapperProvider;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
+import io.prestosql.client.NodeVersion;
 import io.prestosql.execution.MockManagedQueryExecution;
+import io.prestosql.metadata.InternalNode;
+import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.server.QueryStateInfo;
 import io.prestosql.server.ResourceGroupInfo;
 import io.prestosql.spi.resourcegroups.KillPolicy;
 import io.prestosql.spi.resourcegroups.ResourceGroupId;
 import io.prestosql.spi.statestore.StateStore;
+import io.prestosql.statestore.MockStateMap;
 import io.prestosql.statestore.SharedQueryState;
 import io.prestosql.statestore.SharedResourceGroupState;
 import io.prestosql.statestore.StateCacheStore;
@@ -34,6 +41,7 @@ import org.mockito.internal.stubbing.answers.Returns;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.net.URI;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -57,6 +65,7 @@ import static io.prestosql.spi.resourcegroups.SchedulingPolicy.WEIGHTED;
 import static io.prestosql.spi.resourcegroups.SchedulingPolicy.WEIGHTED_FAIR;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -72,17 +81,53 @@ public class TestDistributedResourceGroup
     // To ensure that test cases are run sequentially
     private final Object lock = new Object();
     private StateStore statestore;
+    private InternalNodeManager internalNodeManager;
     private static final DataSize ONE_BYTE = new DataSize(1, BYTE);
     private static final DataSize FIVE_BYTE = new DataSize(5, BYTE);
     private static final DataSize TEN_BYTE = new DataSize(10, BYTE);
     private static final DataSize ONE_MEGABYTE = new DataSize(1, MEGABYTE);
     private static final DataSize ONE_GIGABYTE = new DataSize(1, GIGABYTE);
+    private static final ObjectMapper MAPPER = new ObjectMapperProvider().get();
 
     @BeforeClass
     public void setup()
     {
         statestore = Mockito.mock(StateStore.class);
         when(statestore.getLock(anyString())).then(new Returns(new ReentrantLock()));
+        internalNodeManager = Mockito.mock(InternalNodeManager.class);
+    }
+
+    @Test
+    public void testStateStoreFetchAndUpdate()
+            throws JsonProcessingException
+    {
+        synchronized (lock) {
+            DistributedResourceGroupTemp root = new DistributedResourceGroupTemp(Optional.empty(), "root", (group, export) -> {}, directExecutor(), statestore, internalNodeManager);
+            resourceGroupBasicSetUp(root, ONE_MEGABYTE, 1, 1);
+            MockManagedQueryExecution query1 = new MockManagedQueryExecution(100);
+            query1.setResourceGroupId(root.getId());
+            MockManagedQueryExecution query2 = new MockManagedQueryExecution(0);
+            query2.setResourceGroupId(root.getId());
+            Map<String, String> mockMap = new HashMap<>();
+            MockStateMap<String, String> mockStateMap = new MockStateMap<>("127.0.0.1-resourceaggrstats", mockMap);
+            when(statestore.getOrCreateStateCollection(anyString(), anyObject())).thenReturn(mockStateMap);
+            when(internalNodeManager.getCurrentNode())
+                    .thenReturn(new InternalNode("node1", URI.create("local://127.0.0.1"), NodeVersion.UNKNOWN, true));
+            when(internalNodeManager.getCoordinators())
+                    .thenReturn(ImmutableSet.of(new InternalNode("node1", URI.create("local://127.0.0.1"), NodeVersion.UNKNOWN, true)));
+            root.run(query1);
+            DistributedResourceGroupAggrStats rootStats = MAPPER.readerFor(DistributedResourceGroupAggrStats.class)
+                    .readValue(mockMap.get("root"));
+            assertEquals(rootStats.getRunningQueries(), 1);
+            root.run(query2);
+            rootStats = MAPPER.readerFor(DistributedResourceGroupAggrStats.class)
+                    .readValue(mockMap.get("root"));
+            assertEquals(rootStats.getQueuedQueries(), 1);
+            assertEquals(rootStats.getCachedMemoryUsageBytes(), 100);
+            when(internalNodeManager.getCurrentNode())
+                    .thenReturn(new InternalNode("node2", URI.create("local://127.0.0.2"), NodeVersion.UNKNOWN, true));
+            assertEquals(root.getGlobalCachedMemoryUsageBytes(), 200);
+        }
     }
 
     @Test
@@ -704,7 +749,8 @@ public class TestDistributedResourceGroup
     }
 
     @Test
-    public void testQueryKillFinishPercent() throws InterruptedException
+    public void testQueryKillFinishPercent()
+            throws InterruptedException
     {
         synchronized (lock) {
             DistributedResourceGroup root = new DistributedResourceGroup(Optional.empty(), "root", (group, export) -> {}, directExecutor(), statestore);
@@ -752,6 +798,13 @@ public class TestDistributedResourceGroup
         Map<ResourceGroupId, SharedResourceGroupState> resourceGroupStates = StateCacheStore.get().getCachedStates(StateStoreConstants.RESOURCE_GROUP_STATE_COLLECTION_NAME);
         resourceGroupStates.get(group.getId()).setCpuUsageMillis(cpuUsageMillis);
         StateCacheStore.get().setCachedStates(StateStoreConstants.RESOURCE_GROUP_STATE_COLLECTION_NAME, resourceGroupStates);
+    }
+
+    private void resourceGroupBasicSetUp(DistributedResourceGroupTemp group, DataSize softMemoryLimit, int hardConcurrencyLimit, int maxQueued)
+    {
+        group.setSoftMemoryLimit(softMemoryLimit);
+        group.setMaxQueuedQueries(maxQueued);
+        group.setHardConcurrencyLimit(hardConcurrencyLimit);
     }
 
     // Set up mandatory fields for DistributedResourceGroup
