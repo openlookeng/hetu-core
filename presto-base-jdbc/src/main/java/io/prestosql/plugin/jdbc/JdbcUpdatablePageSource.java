@@ -75,28 +75,29 @@ public class JdbcUpdatablePageSource
             int batchSize = 0;
             boolean autoCommitFlag = connection.getAutoCommit();
             connection.setAutoCommit(false);
-            PreparedStatement statement = connection.prepareStatement(jdbcClient.buildDeleteSql(handle));
-            for (int position = 0; position < rowIds.getPositionCount(); position++) {
-                jdbcClient.setDeleteSql(statement, rowIds, position);
-                statement.addBatch();
-                batchSize++;
+            try (PreparedStatement statement = connection.prepareStatement(jdbcClient.buildDeleteSql(handle))) {
+                for (int position = 0; position < rowIds.getPositionCount(); position++) {
+                    jdbcClient.setDeleteSql(statement, rowIds, position);
+                    statement.addBatch();
+                    batchSize++;
 
-                if (batchSize >= batchSizeLimit) {
-                    statement.executeBatch();
-                    batchSize = 0;
-                    if (!dmlStatementsCommittedAsAnTransaction) {
-                        connection.commit();
-                        connection.setAutoCommit(false);
+                    if (batchSize >= batchSizeLimit) {
+                        statement.executeBatch();
+                        batchSize = 0;
+                        if (!dmlStatementsCommittedAsAnTransaction) {
+                            connection.commit();
+                            connection.setAutoCommit(false);
+                        }
                     }
                 }
+                if (batchSize > 0) {
+                    statement.executeBatch();
+                }
+                if (dmlStatementsCommittedAsAnTransaction || batchSize > 0) {
+                    connection.commit();
+                }
+                connection.setAutoCommit(autoCommitFlag);
             }
-            if (batchSize > 0) {
-                statement.executeBatch();
-            }
-            if (dmlStatementsCommittedAsAnTransaction || batchSize > 0) {
-                connection.commit();
-            }
-            connection.setAutoCommit(autoCommitFlag);
         }
         catch (SQLException e) {
             throw new PrestoException(JDBC_ERROR, e);
@@ -115,29 +116,30 @@ public class JdbcUpdatablePageSource
 
             boolean autoCommitFlag = connection.getAutoCommit();
             connection.setAutoCommit(false);
-            PreparedStatement statement = connection.prepareStatement(jdbcClient.buildUpdateSql(handle, updatedColumns.size(), updatedColumns));
-            int batchSize = 0;
-            for (int position = 0; position < rowIds.getPositionCount(); position++) {
-                jdbcClient.setUpdateSql(this.session, this.handle, statement, columnValueAndRowIdBlock, position, updatedColumns);
-                statement.addBatch();
-                batchSize++;
+            try (PreparedStatement statement = connection.prepareStatement(jdbcClient.buildUpdateSql(handle, updatedColumns.size(), updatedColumns))) {
+                int batchSize = 0;
+                for (int position = 0; position < rowIds.getPositionCount(); position++) {
+                    jdbcClient.setUpdateSql(this.session, this.handle, statement, columnValueAndRowIdBlock, position, updatedColumns);
+                    statement.addBatch();
+                    batchSize++;
 
-                if (batchSize >= 1000) {
-                    statement.executeBatch();
-                    batchSize = 0;
-                    if (!dmlStatementsCommittedAsAnTransaction) {
-                        connection.commit();
-                        connection.setAutoCommit(false);
+                    if (batchSize >= 1000) {
+                        statement.executeBatch();
+                        batchSize = 0;
+                        if (!dmlStatementsCommittedAsAnTransaction) {
+                            connection.commit();
+                            connection.setAutoCommit(false);
+                        }
                     }
                 }
+                if (batchSize > 0) {
+                    statement.executeBatch();
+                }
+                if (dmlStatementsCommittedAsAnTransaction || batchSize > 0) {
+                    connection.commit();
+                }
+                connection.setAutoCommit(autoCommitFlag);
             }
-            if (batchSize > 0) {
-                statement.executeBatch();
-            }
-            if (dmlStatementsCommittedAsAnTransaction || batchSize > 0) {
-                connection.commit();
-            }
-            connection.setAutoCommit(autoCommitFlag);
         }
         catch (SQLException e) {
             throw new PrestoException(JDBC_ERROR, e);

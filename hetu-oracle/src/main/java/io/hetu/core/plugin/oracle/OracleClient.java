@@ -772,13 +772,15 @@ public class OracleClient
             if (oracleHandle.getGeneratedSql().isPresent()) {
                 String subQuery = oracleHandle.getGeneratedSql().get().getSql();
                 sql = String.format("%s %s", sql, extractSubQuery(subQuery));
-                PreparedStatement statement = connection.prepareStatement(sql);
-                return OptionalLong.of(statement.executeUpdate());
+                try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                    return OptionalLong.of(statement.executeUpdate());
+                }
             }
             else {
-                PreparedStatement statement = connection.prepareStatement(sql);
-                log.debug("Execute: %s", sql);
-                return OptionalLong.of(statement.executeUpdate());
+                try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                    log.debug("Execute: %s", sql);
+                    return OptionalLong.of(statement.executeUpdate());
+                }
             }
         }
         catch (SQLException e) {
