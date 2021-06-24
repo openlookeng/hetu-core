@@ -838,6 +838,8 @@ public class ClassLoaderSafeConnectorMetadata
     @Override
     public void refreshMetadataCache()
     {
-        delegate.refreshMetadataCache();
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            delegate.refreshMetadataCache();
+        }
     }
 }
