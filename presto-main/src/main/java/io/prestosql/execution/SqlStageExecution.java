@@ -32,6 +32,7 @@ import io.prestosql.execution.scheduler.SplitSchedulerStats;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
+import io.prestosql.operator.HttpPageBufferClient;
 import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
@@ -79,7 +80,6 @@ import static io.prestosql.SystemSessionProperties.isSnapshotEnabled;
 import static io.prestosql.failuredetector.FailureDetector.State.GONE;
 import static io.prestosql.operator.ExchangeOperator.REMOTE_CONNECTOR_ID;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
-import static io.prestosql.spi.StandardErrorCode.PAGE_TRANSPORT_ERROR;
 import static io.prestosql.spi.StandardErrorCode.REMOTE_HOST_GONE;
 import static java.util.Objects.requireNonNull;
 
@@ -596,14 +596,19 @@ public final class SqlStageExecution
                         .map(ExecutionFailureInfo::toException)
                         .orElse(new PrestoException(GENERIC_INTERNAL_ERROR, "A task failed for an unknown reason"));
                 // Snapshot: if remote task failed because they received unexpecte response (5xx or missing/wrong header), then we treat it as resumable.
-                if (isSnapshotEnabled && failure instanceof Failure && ((Failure) failure).getErrorCode().equals(PAGE_TRANSPORT_ERROR.toErrorCode())) {
+                if (isSnapshotEnabled && failure.getMessage() != null) {
                     String message = failure.getMessage();
-                    // message ends with "(response status code %d)"
-                    int responseCode = Integer.parseInt(message.substring(message.lastIndexOf(' ') + 1, message.lastIndexOf(')')));
-                    if (responseCode >= 500 || responseCode == HttpStatus.OK.code()) {
-                        log.debug(failure, "Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
-                        stateMachine.transitionToResumableFailure();
-                        return;
+                    // message contains "<HttpPageBufferClient.PAGE_TRANSPORT_ERROR_PREFIX> <code>!"
+                    // See HttpPageBufferClient.java, PageResponseHandler#handle() method
+                    int index = message.indexOf(HttpPageBufferClient.PAGE_TRANSPORT_ERROR_PREFIX);
+                    if (index >= 0) {
+                        index += HttpPageBufferClient.PAGE_TRANSPORT_ERROR_PREFIX.length() + 1;  // point to numeric response code; skip over space
+                        int responseCode = Integer.parseInt(message.substring(index, message.indexOf('!', index)));
+                        if (responseCode >= 500 || responseCode == HttpStatus.OK.code()) {
+                            log.debug(failure, "Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
+                            stateMachine.transitionToResumableFailure();
+                            return;
+                        }
                     }
                 }
                 stateMachine.transitionToFailed(failure);
