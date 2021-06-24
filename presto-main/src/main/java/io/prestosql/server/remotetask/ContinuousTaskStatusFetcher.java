@@ -29,6 +29,7 @@ import io.prestosql.protocol.Codec;
 import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.snapshot.RestoreResult;
 import io.prestosql.snapshot.SnapshotResult;
+import io.prestosql.spi.PrestoException;
 
 import javax.annotation.concurrent.GuardedBy;
 
@@ -51,6 +52,9 @@ import static io.prestosql.protocol.AdaptingJsonResponseHandler.createAdaptingJs
 import static io.prestosql.protocol.FullSmileResponseHandler.createFullSmileResponseHandler;
 import static io.prestosql.protocol.JsonCodecWrapper.unwrapJsonCodec;
 import static io.prestosql.protocol.RequestHelpers.setContentTypeHeaders;
+import static io.prestosql.spi.StandardErrorCode.REMOTE_TASK_MISMATCH;
+import static io.prestosql.util.Failures.REMOTE_TASK_MISMATCH_ERROR;
+import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 class ContinuousTaskStatusFetcher
@@ -78,6 +82,8 @@ class ContinuousTaskStatusFetcher
 
     @GuardedBy("this")
     private ListenableFuture<BaseResponse<TaskStatus>> future;
+
+    private String expectedConfirmationInstanceId;
 
     private final QuerySnapshotManager snapshotManager;
 
@@ -193,6 +199,12 @@ class ContinuousTaskStatusFetcher
     public void success(TaskStatus value)
     {
         try (SetThreadName ignored = new SetThreadName("ContinuousTaskStatusFetcher-%s", taskId)) {
+            if (expectedConfirmationInstanceId == null) {
+                expectedConfirmationInstanceId = value.getConfirmationInstanceId();
+            }
+            else if (!expectedConfirmationInstanceId.equals(value.getConfirmationInstanceId())) {
+                onFail.accept(new PrestoException(REMOTE_TASK_MISMATCH, format("%s (%s)", REMOTE_TASK_MISMATCH_ERROR, value.getTaskId())));
+            }
             updateStats(currentRequestStartNanos.get());
             try {
                 updateTaskStatus(value);

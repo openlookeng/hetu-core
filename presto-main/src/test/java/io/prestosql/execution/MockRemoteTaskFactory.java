@@ -265,6 +265,7 @@ public class MockRemoteTaskFactory
             return new TaskInfo(
                     new TaskStatus(
                             taskStateMachine.getTaskId(),
+                            "fakeConfirmationInstanceId",
                             nextTaskInfoVersion.getAndIncrement(),
                             state,
                             location,
@@ -294,6 +295,7 @@ public class MockRemoteTaskFactory
         {
             TaskStats stats = taskContext.getTaskStats();
             return new TaskStatus(taskStateMachine.getTaskId(),
+                    "fakeConfirmationInstanceId",
                     nextTaskInfoVersion.get(),
                     taskStateMachine.getState(),
                     location,

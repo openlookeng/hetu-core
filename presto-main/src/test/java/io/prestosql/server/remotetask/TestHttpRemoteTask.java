@@ -486,6 +486,7 @@ public class TestHttpRemoteTask
 
             return new TaskStatus(
                     initialTaskStatus.getTaskId(),
+                    initialTaskStatus.getConfirmationInstanceId(),
                     ++version,
                     taskState,
                     initialTaskStatus.getSelf(),

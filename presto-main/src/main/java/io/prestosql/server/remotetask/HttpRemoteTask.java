@@ -103,6 +103,7 @@ import static io.prestosql.protocol.JsonCodecWrapper.unwrapJsonCodec;
 import static io.prestosql.protocol.RequestHelpers.setContentTypeHeaders;
 import static io.prestosql.server.remotetask.RequestErrorTracker.logError;
 import static io.prestosql.spi.StandardErrorCode.REMOTE_HOST_GONE;
+import static io.prestosql.spi.StandardErrorCode.REMOTE_TASK_MISMATCH;
 import static io.prestosql.spi.StandardErrorCode.TOO_MANY_REQUESTS_FAILED;
 import static io.prestosql.util.Failures.WORKER_NODE_ERROR;
 import static io.prestosql.util.Failures.toFailure;
@@ -829,6 +830,7 @@ public final class HttpRemoteTask
     {
         return failureInfo.getErrorCode().equals(TOO_MANY_REQUESTS_FAILED.toErrorCode())
                 || failureInfo.getErrorCode().equals(REMOTE_HOST_GONE.toErrorCode())
+                || failureInfo.getErrorCode().equals(REMOTE_TASK_MISMATCH.toErrorCode())
                 || failureInfo.getMessage() != null && failureInfo.getMessage().contains(WORKER_NODE_ERROR);
     }
 

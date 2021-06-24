@@ -54,6 +54,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -79,6 +80,9 @@ public class SqlTask
 
     private final TaskId taskId;
     private final String taskInstanceId;
+    // confirmationInstanceId is generated from the task, and is used confirm in ContinuousTaskStatusFetcher that
+    // we are continuing to talk to the same task
+    private final String confirmationInstanceId;
     private final URI location;
     private final String nodeId;
     private final TaskStateMachine taskStateMachine;
@@ -126,6 +130,7 @@ public class SqlTask
     {
         this.taskId = requireNonNull(taskId, "taskId is null");
         this.taskInstanceId = requireNonNull(instanceId, "instanceId is null");
+        this.confirmationInstanceId = UUID.randomUUID().toString();
         this.location = requireNonNull(location, "location is null");
         this.nodeId = requireNonNull(nodeId, "nodeId is null");
         this.queryContext = requireNonNull(queryContext, "queryContext is null");
@@ -305,6 +310,7 @@ public class SqlTask
         }
 
         return new TaskStatus(taskStateMachine.getTaskId(),
+                confirmationInstanceId,
                 versionNumber,
                 state,
                 location,
