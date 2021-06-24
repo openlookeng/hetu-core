@@ -144,7 +144,7 @@ public class CubeConsole
      */
     public boolean createCubeCommand(String query, QueryRunner queryRunner, ClientOptions.OutputFormat outputFormat, Runnable schemaChanged, boolean usePager, boolean showProgress, Terminal terminal, PrintStream out, PrintStream errorChannel)
     {
-        boolean result = false;
+        boolean success = true;
         SqlParser parser = new SqlParser();
         QualifiedName cubeName = null;
         try {
@@ -160,27 +160,31 @@ public class CubeConsole
             CreateCube modifiedCreateCube = new CreateCube(cubeName, sourceTableName, groupingSet, aggregations, notExists, properties, Optional.empty(), createCube.getSourceFilter().orElse(null));
             String queryCreateCube = SqlFormatter.formatSql(modifiedCreateCube, Optional.empty());
 
-            boolean success = console.runQuery(queryRunner, queryCreateCube, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
-            if (success != true) {
-                return result;
+            success = console.runQuery(queryRunner, queryCreateCube, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+            if (!success) {
+                return success;
             }
             //we check whether the create cube expression can be processed
             if (isSupportedExpression(expression)) {
                 if (createCube.getWhere().get() instanceof BetweenPredicate) {
                     //we process the between predicate in the create cube query where clause
-                    processBetweenPredicate(createCube, queryRunner, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel, parser);
+                    success = processBetweenPredicate(createCube, queryRunner, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel, parser);
                 }
                 if (createCube.getWhere().get() instanceof ComparisonExpression) {
                     //we process the comparison expression in the create cube query where clause
-                    processComparisonExpression(createCube, queryRunner, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel, parser);
+                    success = processComparisonExpression(createCube, queryRunner, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel, parser);
                 }
             }
             else {
                 //if we donot support processing the create cube query with multiple inserts, then only a single insert is run internally.
                 String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, whereClause);
-                console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+                success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
             }
-            result = true;
+            if (!success) {
+                //roll back mechanism for unsuccessful create cube query
+                String dropCubeQuery = String.format(DROP_CUBE_STRING, cubeName);
+                console.runQuery(queryRunner, dropCubeQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+            }
         }
         catch (ParsingException e) {
             if (cubeName != null) {
@@ -190,7 +194,7 @@ public class CubeConsole
             }
             System.out.println(e.getMessage());
             Query.renderErrorLocation(query, new ErrorLocation(e.getLineNumber(), e.getColumnNumber()), errorChannel);
-            result = false;
+            success = false;
         }
         catch (Exception e) {
             if (cubeName != null) {
@@ -201,9 +205,9 @@ public class CubeConsole
             // Add blank line after progress bar
             System.out.println();
             System.out.println(e.getMessage());
-            result = false;
+            success = false;
         }
-        return result;
+        return success;
     }
 
     /**
@@ -219,9 +223,9 @@ public class CubeConsole
      * @param out out
      * @param errorChannel errorChannel
      * @param parser parser
-     * @return void
+     * @return boolean
      */
-    private void processBetweenPredicate(CreateCube createCube, QueryRunner queryRunner, ClientOptions.OutputFormat outputFormat, Runnable schemaChanged, boolean usePager, boolean showProgress, Terminal terminal, PrintStream out, PrintStream errorChannel, SqlParser parser)
+    private boolean processBetweenPredicate(CreateCube createCube, QueryRunner queryRunner, ClientOptions.OutputFormat outputFormat, Runnable schemaChanged, boolean usePager, boolean showProgress, Terminal terminal, PrintStream out, PrintStream errorChannel, SqlParser parser)
     {
         String whereClause = createCube.getWhere().get().toString();
         QualifiedName sourceTableName = createCube.getSourceTableName();
@@ -231,6 +235,7 @@ public class CubeConsole
         Long minValue = Long.parseLong(betweenPredicate.getMin().toString());
         Long maxValue = Long.parseLong(betweenPredicate.getMax().toString());
         Long rangeValue = maxValue - minValue;
+        boolean success = true;
 
         //initial query to get the total number of rows in the table
         String initialQuery = String.format(SELECT_COUNT_STAR_FROM_STRING, sourceTableName.toString(), whereClause);
@@ -258,32 +263,36 @@ public class CubeConsole
 
         if ((minValue + rangePartitionValue) < maxValue) {
             //this loop process the multiple insert query statements
-            while ((minValue + rangePartitionValue) < maxValue) {
+            while (((minValue + rangePartitionValue) < maxValue) && success) {
                 Expression lowerBound = new ComparisonExpression(GREATER_THAN_OR_EQUAL, betweenPredicate.getValue(), parser.createExpression(Long.toString(minValue), new ParsingOptions()));
                 Expression upperBound = new ComparisonExpression(LESS_THAN, betweenPredicate.getValue(), parser.createExpression(Long.toString(minValue + rangePartitionValue), new ParsingOptions()));
                 minValue = minValue + rangePartitionValue;
                 Expression finalBinaryExpression = and(lowerBound, upperBound);
                 String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, finalBinaryExpression);
-                console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+                success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+            }
+            if (!success) {
+                return success;
             }
             if (minValue == maxValue) {
                 Expression equalExpression = new ComparisonExpression(EQUAL, betweenPredicate.getValue(), parser.createExpression(Long.toString(minValue), new ParsingOptions()));
                 String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, equalExpression);
-                console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+                success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
             }
             else if (minValue < maxValue) {
                 Expression lowerBound = new ComparisonExpression(GREATER_THAN_OR_EQUAL, betweenPredicate.getValue(), parser.createExpression(Long.toString(minValue), new ParsingOptions()));
                 Expression upperBound = new ComparisonExpression(LESS_THAN_OR_EQUAL, betweenPredicate.getValue(), parser.createExpression(Long.toString(maxValue), new ParsingOptions()));
                 Expression finalBinaryExpression = and(lowerBound, upperBound);
                 String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, finalBinaryExpression);
-                console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+                success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
             }
         }
         else {
             //if the range is within the processing size limit then we run a single insert query only
             String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, whereClause);
-            console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+            success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
         }
+        return success;
     }
 
     /**
@@ -299,9 +308,9 @@ public class CubeConsole
      * @param out out
      * @param errorChannel errorChannel
      * @param parser parser
-     * @return void
+     * @return boolean
      */
-    private void processComparisonExpression(CreateCube createCube, QueryRunner queryRunner, ClientOptions.OutputFormat outputFormat, Runnable schemaChanged, boolean usePager, boolean showProgress, Terminal terminal, PrintStream out, PrintStream errorChannel, SqlParser parser)
+    private boolean processComparisonExpression(CreateCube createCube, QueryRunner queryRunner, ClientOptions.OutputFormat outputFormat, Runnable schemaChanged, boolean usePager, boolean showProgress, Terminal terminal, PrintStream out, PrintStream errorChannel, SqlParser parser)
     {
         ComparisonExpression comparisonExpression = (ComparisonExpression) (createCube.getWhere().get());
         ComparisonExpression.Operator operator = comparisonExpression.getOperator();
@@ -317,14 +326,15 @@ public class CubeConsole
         }
         operator = comparisonExpression.getOperator();
         if (operator.equals(LESS_THAN) || operator.equals(LESS_THAN_OR_EQUAL)) {
-            processComparisonExpressionOperatorLess(createCube, queryRunner, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel, parser, comparisonExpression);
+            return processComparisonExpressionOperatorLess(createCube, queryRunner, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel, parser, comparisonExpression);
         }
         else if (operator.equals(GREATER_THAN) || operator.equals(GREATER_THAN_OR_EQUAL)) {
-            processComparisonExpressionOperatorGreater(createCube, queryRunner, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel, parser, comparisonExpression);
+            return processComparisonExpressionOperatorGreater(createCube, queryRunner, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel, parser, comparisonExpression);
         }
         else if (operator.equals(EQUAL)) {
-            processComparisonExpressionOperatorEqual(createCube, queryRunner, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel, parser, comparisonExpression);
+            return processComparisonExpressionOperatorEqual(createCube, queryRunner, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel, parser, comparisonExpression);
         }
+        return true;
     }
 
     /**
@@ -341,9 +351,9 @@ public class CubeConsole
      * @param errorChannel errorChannel
      * @param parser parser
      * @param comparisonExpression comparisonExpression
-     * @return void
+     * @return boolean
      */
-    private void processComparisonExpressionOperatorGreater(CreateCube createCube, QueryRunner queryRunner, ClientOptions.OutputFormat outputFormat, Runnable schemaChanged, boolean usePager, boolean showProgress, Terminal terminal, PrintStream out, PrintStream errorChannel, SqlParser parser, ComparisonExpression comparisonExpression)
+    private boolean processComparisonExpressionOperatorGreater(CreateCube createCube, QueryRunner queryRunner, ClientOptions.OutputFormat outputFormat, Runnable schemaChanged, boolean usePager, boolean showProgress, Terminal terminal, PrintStream out, PrintStream errorChannel, SqlParser parser, ComparisonExpression comparisonExpression)
     {
         String whereClause = createCube.getWhere().get().toString();
         QualifiedName sourceTableName = createCube.getSourceTableName();
@@ -351,6 +361,7 @@ public class CubeConsole
         Expression columnName = comparisonExpression.getLeft();
         ComparisonExpression.Operator operator = comparisonExpression.getOperator();
         Long rightValue = Long.parseLong(comparisonExpression.getRight().toString());
+        boolean success = true;
 
         //initial query to get the total number of rows in the table
         String initialQuery = String.format(SELECT_COUNT_STAR_FROM_STRING, sourceTableName.toString(), whereClause);
@@ -387,32 +398,36 @@ public class CubeConsole
 
         if ((rightValue + rangePartitionValue) < maxValueQueryResult) {
             //this loop process the multiple insert query statements
-            while ((rightValue + rangePartitionValue) < maxValueQueryResult) {
+            while (((rightValue + rangePartitionValue) < maxValueQueryResult) && success) {
                 Expression lowerBound = new ComparisonExpression(GREATER_THAN_OR_EQUAL, columnName, parser.createExpression(Long.toString(rightValue), new ParsingOptions()));
                 Expression upperBound = new ComparisonExpression(LESS_THAN, columnName, parser.createExpression(Long.toString(rightValue + rangePartitionValue), new ParsingOptions()));
                 rightValue = rightValue + rangePartitionValue;
                 Expression finalBinaryExpression = and(lowerBound, upperBound);
                 String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, finalBinaryExpression);
-                console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+                success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+            }
+            if (!success) {
+                return success;
             }
             if (rightValue == maxValueQueryResult && operator.equals(GREATER_THAN_OR_EQUAL)) {
                 Expression equalExpression = new ComparisonExpression(EQUAL, columnName, parser.createExpression(Long.toString(rightValue), new ParsingOptions()));
                 String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, equalExpression);
-                console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+                success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
             }
             else if (rightValue < maxValueQueryResult) {
                 Expression lowerBound = new ComparisonExpression(GREATER_THAN_OR_EQUAL, columnName, parser.createExpression(Long.toString(rightValue), new ParsingOptions()));
                 Expression upperBound = new ComparisonExpression(LESS_THAN_OR_EQUAL, columnName, parser.createExpression(Long.toString(maxValueQueryResult), new ParsingOptions()));
                 Expression finalBinaryExpression = and(lowerBound, upperBound);
                 String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, finalBinaryExpression);
-                console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+                success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
             }
         }
         else {
             //if the range is within the processing size limit then we run a single insert query only
             String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, whereClause);
-            console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+            success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
         }
+        return success;
     }
 
     /**
@@ -429,15 +444,16 @@ public class CubeConsole
      * @param errorChannel errorChannel
      * @param parser parser
      * @param comparisonExpression comparisonExpression
-     * @return void
+     * @return boolean
      */
-    private void processComparisonExpressionOperatorEqual(CreateCube createCube, QueryRunner queryRunner, ClientOptions.OutputFormat outputFormat, Runnable schemaChanged, boolean usePager, boolean showProgress, Terminal terminal, PrintStream out, PrintStream errorChannel, SqlParser parser, ComparisonExpression comparisonExpression)
+    private boolean processComparisonExpressionOperatorEqual(CreateCube createCube, QueryRunner queryRunner, ClientOptions.OutputFormat outputFormat, Runnable schemaChanged, boolean usePager, boolean showProgress, Terminal terminal, PrintStream out, PrintStream errorChannel, SqlParser parser, ComparisonExpression comparisonExpression)
     {
         String whereClause = createCube.getWhere().get().toString();
         QualifiedName sourceTableName = createCube.getSourceTableName();
         QualifiedName cubeName = createCube.getCubeName();
         Expression columnName = comparisonExpression.getLeft();
         Long rightValue = Long.parseLong(comparisonExpression.getRight().toString());
+        boolean success = true;
 
         //initial query to get the total number of rows in the table
         String initialQuery = String.format(SELECT_COUNT_STAR_FROM_STRING, sourceTableName.toString(), whereClause);
@@ -464,13 +480,14 @@ public class CubeConsole
             //this loop process the multiple insert query statements
             Expression equalExpression = new ComparisonExpression(EQUAL, columnName, parser.createExpression(Long.toString(rightValue), new ParsingOptions()));
             String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, equalExpression);
-            console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+            success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
         }
         else {
             //if the range is within the processing size limit then we run a single insert query only
             String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, whereClause);
-            console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+            success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
         }
+        return success;
     }
 
     /**
@@ -487,9 +504,9 @@ public class CubeConsole
      * @param errorChannel errorChannel
      * @param parser parser
      * @param comparisonExpression comparisonExpression
-     * @return void
+     * @return boolean
      */
-    private void processComparisonExpressionOperatorLess(CreateCube createCube, QueryRunner queryRunner, ClientOptions.OutputFormat outputFormat, Runnable schemaChanged, boolean usePager, boolean showProgress, Terminal terminal, PrintStream out, PrintStream errorChannel, SqlParser parser, ComparisonExpression comparisonExpression)
+    private boolean processComparisonExpressionOperatorLess(CreateCube createCube, QueryRunner queryRunner, ClientOptions.OutputFormat outputFormat, Runnable schemaChanged, boolean usePager, boolean showProgress, Terminal terminal, PrintStream out, PrintStream errorChannel, SqlParser parser, ComparisonExpression comparisonExpression)
     {
         String whereClause = createCube.getWhere().get().toString();
         QualifiedName sourceTableName = createCube.getSourceTableName();
@@ -533,35 +550,40 @@ public class CubeConsole
         Long rangeDivider = max(min(valueCountDistinctQuery, (valueCountStarQuery / maxRowsProcessLimit)), RANGE_DIVIDER_MINIMUM_VALUE);
         Long rangeValue = rightValue - minValueQueryResult;
         Long rangePartitionValue = rangeValue / rangeDivider;
+        boolean success = true;
 
         if ((minValueQueryResult + rangePartitionValue) < rightValue) {
             //this loop process the multiple insert query statements
-            while ((minValueQueryResult + rangePartitionValue) < rightValue) {
+            while (((minValueQueryResult + rangePartitionValue) < rightValue) && success) {
                 Expression lowerBound = new ComparisonExpression(GREATER_THAN_OR_EQUAL, columnName, parser.createExpression(Long.toString(minValueQueryResult), new ParsingOptions()));
                 Expression upperBound = new ComparisonExpression(LESS_THAN, columnName, parser.createExpression(Long.toString(minValueQueryResult + rangePartitionValue), new ParsingOptions()));
                 minValueQueryResult = minValueQueryResult + rangePartitionValue;
                 Expression finalBinaryExpression = and(lowerBound, upperBound);
                 String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, finalBinaryExpression);
-                console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+                success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+            }
+            if (!success) {
+                return success;
             }
             if (minValueQueryResult == rightValue && operator.equals(LESS_THAN_OR_EQUAL)) {
                 Expression equalExpression = new ComparisonExpression(EQUAL, columnName, parser.createExpression(Long.toString(minValueQueryResult), new ParsingOptions()));
                 String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, equalExpression);
-                console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+                success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
             }
             else if (minValueQueryResult < rightValue) {
                 Expression lowerBound = new ComparisonExpression(GREATER_THAN_OR_EQUAL, columnName, parser.createExpression(Long.toString(minValueQueryResult), new ParsingOptions()));
                 Expression upperBound = new ComparisonExpression(LESS_THAN_OR_EQUAL, columnName, parser.createExpression(Long.toString(rightValue), new ParsingOptions()));
                 Expression finalBinaryExpression = and(lowerBound, upperBound);
                 String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, finalBinaryExpression);
-                console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+                success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
             }
         }
         else {
             //if the range is within the processing size limit then we run a single insert query only
             String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, whereClause);
-            console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+            success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
         }
+        return success;
     }
 
     /**
