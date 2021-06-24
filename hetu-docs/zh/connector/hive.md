@@ -107,6 +107,9 @@ Hive连接器安全需要的属性在[Hive配置属性](./hive.md#hive配置属�
 | `hive.s3select-pushdown.max-connections`| [S3 Select下推](#s3-select下推)同时打开到S3的最大连接数。| 500|
 | `hive.orc.use-column-names`| 为了支持alter表drop列，建议在Hive属性中添加`hive.orc.use-column-names=true`，否则drop列可能无法正常工作。| false|
 | `hive.orc-predicate-pushdown-enabled`| 在读取ORC文件时启用算子下推（predicates pushdown）处理。| `false`|
+| `hive.orc.time-zone`                      | 为未声明时区的旧ORC文件设置默认时区。 | JVM默认值 |
+| `hive.parquet.time-zone`                  | 将时间戳值调整到特定的时区。对于Hive 3.1+，该值应设置为UTC。 | JVM默认值 |
+| `hive.rcfile.time-zone`                   | 将二进制编码的时间戳值调整到特定的时区。对于Hive 3.1+，该值应设置为UTC。| JVM默认值 |
 | `hive.vacuum-service-threads`| 清空服务中运行的线程数。| 2|
 | `hive.auto-vacuum-enabled`| 对Hive表启用自动清空功能。要在引擎侧启用自动清空，请在协调节点的config.properties中添加`auto-vacuum.enabled=true`。| `false`|
 | `hive.vacuum-delta-num-threshold`| 允许不压缩的增量目录的最大数量。最小值为2。| 10|
