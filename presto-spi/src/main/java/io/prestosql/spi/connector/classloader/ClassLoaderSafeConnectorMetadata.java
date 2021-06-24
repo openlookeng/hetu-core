@@ -770,7 +770,9 @@ public class ClassLoaderSafeConnectorMetadata
     @Override
     public boolean isExecutionPlanCacheSupported(ConnectorSession session, ConnectorTableHandle handle)
     {
-        return delegate.isExecutionPlanCacheSupported(session, handle);
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.isExecutionPlanCacheSupported(session, handle);
+        }
     }
 
     /**
@@ -800,31 +802,41 @@ public class ClassLoaderSafeConnectorMetadata
     @Override
     public boolean isSnapshotSupportedAsInput(ConnectorSession session, ConnectorTableHandle table)
     {
-        return delegate.isSnapshotSupportedAsInput(session, table);
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.isSnapshotSupportedAsInput(session, table);
+        }
     }
 
     @Override
     public boolean isSnapshotSupportedAsOutput(ConnectorSession session, ConnectorTableHandle table)
     {
-        return delegate.isSnapshotSupportedAsOutput(session, table);
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.isSnapshotSupportedAsOutput(session, table);
+        }
     }
 
     @Override
     public boolean isSnapshotSupportedAsNewTable(ConnectorSession session, Map<String, Object> tableProperties)
     {
-        return delegate.isSnapshotSupportedAsNewTable(session, tableProperties);
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.isSnapshotSupportedAsNewTable(session, tableProperties);
+        }
     }
 
     @Override
     public void resetInsertForRerun(ConnectorSession session, ConnectorInsertTableHandle tableHandle, OptionalLong snapshotIndex)
     {
-        delegate.resetInsertForRerun(session, tableHandle, snapshotIndex);
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            delegate.resetInsertForRerun(session, tableHandle, snapshotIndex);
+        }
     }
 
     @Override
     public void resetCreateForRerun(ConnectorSession session, ConnectorOutputTableHandle tableHandle, OptionalLong snapshotIndex)
     {
-        delegate.resetCreateForRerun(session, tableHandle, snapshotIndex);
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            delegate.resetCreateForRerun(session, tableHandle, snapshotIndex);
+        }
     }
 
     @Override
