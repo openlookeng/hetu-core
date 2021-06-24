@@ -27,7 +27,16 @@ public interface MultiInputRestorable
 {
     /**
      * Retrieve all input channel identifiers
+     *
      * @return A set of channel identifiers; empty if it cannot be determined at this point
      */
     Optional<Set<String>> getInputChannels();
+
+    @Override
+    default boolean supportsConsolidatedWrites()
+    {
+        // Multi-input restorable objects may potentially store a large number of pages
+        // as part of their states. It's safer to not include these in the consolidated state file.
+        return false;
+    }
 }

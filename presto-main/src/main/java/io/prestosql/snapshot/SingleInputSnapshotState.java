@@ -94,7 +94,13 @@ public class SingleInputSnapshotState
         SnapshotStateId componentId = snapshotStateIdGenerator.apply(snapshotId);
         if (marker.isResuming()) {
             try {
-                Optional<Object> state = snapshotManager.loadState(componentId);
+                Optional<Object> state;
+                if (restorable.supportsConsolidatedWrites()) {
+                    state = snapshotManager.loadConsolidatedState(componentId);
+                }
+                else {
+                    state = snapshotManager.loadState(componentId);
+                }
                 if (!state.isPresent()) {
                     snapshotManager.failedToRestore(componentId, true);
                     LOG.warn("Can't locate saved state for snapshot %d, component %s", snapshotId, restorableId);
@@ -149,7 +155,12 @@ public class SingleInputSnapshotState
     {
         SnapshotStateId componentId = snapshotStateIdGenerator.apply(snapshotId);
         try {
-            snapshotManager.storeState(componentId, restorable.capture(pagesSerde));
+            if (restorable.supportsConsolidatedWrites()) {
+                snapshotManager.storeConsolidatedState(componentId, restorable.capture(pagesSerde));
+            }
+            else {
+                snapshotManager.storeState(componentId, restorable.capture(pagesSerde));
+            }
             if (restorable instanceof Spillable && ((Spillable) restorable).isSpilled()) {
                 storeSpilledFiles(snapshotId, (Spillable) restorable);
             }

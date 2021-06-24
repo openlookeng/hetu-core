@@ -72,6 +72,7 @@ public class TestPartitionedOutputOperator
         PartitionedOutputBuffer buffer = mock(PartitionedOutputBuffer.class);
 
         PartitionedOutputOperator operator = createPartitionedOutputOperator(snapshotUtils, buffer);
+        operator.getOperatorContext().getDriverContext().getPipelineContext().getTaskContext().getSnapshotManager().setTotalComponents(1);
         List<Page> input = rowPagesBuilder(BIGINT)
                 .addSequencePage(1, 1)
                 .addSequencePage(2, 4)
@@ -96,14 +97,16 @@ public class TestPartitionedOutputOperator
         operator.addInput(marker2);
         verify(snapshotUtils, times(2)).storeState(anyObject(), stateArgument.capture());
         snapshot = stateArgument.getValue();
-        assertEquals(SnapshotTestUtil.toFullSnapshotMapping(snapshot), createExpectedMappingBeforeFinish());
+        Object snapshotEntry = ((Map<String, Object>) snapshot).get("query/2/1/1/0/0/0");
+        assertEquals(SnapshotTestUtil.toFullSnapshotMapping(snapshotEntry), createExpectedMappingBeforeFinish());
 
         operator.addInput(input.get(1));
         operator.finish();
         operator.addInput(marker3);
         verify(snapshotUtils, times(3)).storeState(anyObject(), stateArgument.capture());
         snapshot = stateArgument.getValue();
-        assertEquals(SnapshotTestUtil.toFullSnapshotMapping(snapshot), createExpectedMappingAfterFinish());
+        snapshotEntry = ((Map<String, Object>) snapshot).get("query/3/1/1/0/0/0");
+        assertEquals(SnapshotTestUtil.toFullSnapshotMapping(snapshotEntry), createExpectedMappingAfterFinish());
 
         ArgumentCaptor<List> pagesArgument = ArgumentCaptor.forClass(List.class);
         verify(buffer, times(9)).enqueue(anyInt(), pagesArgument.capture(), anyString());

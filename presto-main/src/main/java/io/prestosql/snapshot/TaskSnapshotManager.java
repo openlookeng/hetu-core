@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,7 @@ public class TaskSnapshotManager
 {
     private static final Logger LOG = Logger.get(TaskSnapshotManager.class);
     public static final Object NO_STATE = new Object();
+    private static final String CONSOLIDATED_STATE_COMPONENT = "ConsolidatedState";
 
     private final TaskId taskId;
     private final SnapshotUtils snapshotUtils;
@@ -50,6 +52,12 @@ public class TaskSnapshotManager
     private final Map<Long, SnapshotResult> captureResults = new LinkedHashMap<>();
     private final Map<Long, SnapshotComponentCounter<SnapshotStateId>> restoreComponentCounters = Collections.synchronizedMap(new LinkedHashMap<>());
     private final RestoreResult restoreResult = new RestoreResult();
+
+    // We cannot use Maps.newConcurrentMap() since that doesn't allow null values
+    // For simple operators, storeCache stores the actual values. For complex, it stores key as value
+    // for each entry that is saved.
+    private final Map<Long, Map<String, Object>> storeCache = Collections.synchronizedMap(new HashMap<>());
+    private final Map<Long, Map<String, Object>> loadCache = Collections.synchronizedMap(new HashMap<>());
 
     public TaskSnapshotManager(TaskId taskId, SnapshotUtils snapshotUtils)
     {
@@ -62,6 +70,12 @@ public class TaskSnapshotManager
         return snapshotUtils.getQuerySnapshotManager(taskId.getQueryId());
     }
 
+    public void storeConsolidatedState(SnapshotStateId snapshotStateId, Object state)
+    {
+        Map<String, Object> map = storeCache.computeIfAbsent(snapshotStateId.getSnapshotId(), (x) -> Collections.synchronizedMap(new HashMap<>()));
+        map.put(snapshotStateId.toString(), state);
+    }
+
     /**
      * Store the state of snapshotStateId in snapshot store
      */
@@ -69,28 +83,44 @@ public class TaskSnapshotManager
             throws Exception
     {
         snapshotUtils.storeState(snapshotStateId, state);
+        // store dummy value
+        Map<String, Object> map = storeCache.computeIfAbsent(snapshotStateId.getSnapshotId(), (x) -> Collections.synchronizedMap(new HashMap<>()));
+        map.put(snapshotStateId.toString(), snapshotStateId.toString());
     }
 
-    /**
-     * Load the state of snapshotStateId from snapshot store. Returns:
-     * - Empty: state file doesn't exist
-     * - NO_STATE: bug situation
-     * - Other object: previously saved state
-     */
-    public Optional<Object> loadState(SnapshotStateId snapshotStateId)
+    private void loadMapIfNecessary(long snapshotId, TaskId taskId)
             throws Exception
     {
+        if (!loadCache.containsKey(snapshotId)) {
+            synchronized (loadCache) {
+                // double-check to make sure only 1 thread attempts load
+                if (!loadCache.containsKey(snapshotId)) {
+                    Object map = snapshotUtils.loadState(SnapshotStateId.forTaskComponent(snapshotId, taskId, CONSOLIDATED_STATE_COMPONENT)).orElse(Collections.emptyMap());
+                    loadCache.put(snapshotId, (Map<String, Object>) map);
+                }
+            }
+        }
+    }
+
+    private Optional<Object> loadWithBacktrack(SnapshotStateId snapshotStateId)
+            throws Exception
+    {
+        TaskId taskId = snapshotStateId.getTaskId();
+        long snapshotId = snapshotStateId.getSnapshotId();
+
         // Operators may have finished when a snapshot is taken, then in the snapshot the operator won't have a corresponding state,
         // but they still needs to be restored to rebuild their internal states.
         // Need to check previous snapshots for their stored states.
-        Optional<Object> state = snapshotUtils.loadState(snapshotStateId);
+        Optional<Object> state;
+        loadMapIfNecessary(snapshotId, taskId);
+        state = Optional.ofNullable(loadCache.get(snapshotId).get(snapshotStateId.toString()));
         Map<Long, SnapshotResult> snapshotToSnapshotResultMap = null;
         while (!state.isPresent()) {
+            // Snapshot is complete but no entry for this id, then the component must have finished
+            // before the snapshot was taken. Look at previous complete snapshots for last saved state.
             if (snapshotToSnapshotResultMap == null) {
                 snapshotToSnapshotResultMap = snapshotUtils.loadSnapshotResult(snapshotStateId.getTaskId().getQueryId().getId());
             }
-            // Snapshot is complete but no entry for this id, then the component must have finished
-            // before the snapshot was taken. Look at previous complete snapshots for last saved state.
             OptionalLong prevSnapshotId = getPreviousSnapshotIdIfComplete(snapshotToSnapshotResultMap, snapshotStateId.getSnapshotId());
             if (!prevSnapshotId.isPresent()) {
                 return state;
@@ -102,10 +132,34 @@ public class TaskSnapshotManager
                 // Return empty so an error can be reported.
                 return Optional.of(NO_STATE);
             }
-            snapshotStateId = snapshotStateId.withSnapshotId(prevSnapshotId.getAsLong());
-            state = snapshotUtils.loadState(snapshotStateId);
+            snapshotId = prevSnapshotId.getAsLong();
+            snapshotStateId = snapshotStateId.withSnapshotId(snapshotId);
+            loadMapIfNecessary(snapshotId, taskId);
+            state = Optional.ofNullable(loadCache.get(snapshotId).get(snapshotStateId.toString()));
         }
         return state;
+    }
+
+    public Optional<Object> loadConsolidatedState(SnapshotStateId snapshotStateId)
+            throws Exception
+    {
+        return loadWithBacktrack(snapshotStateId);
+    }
+
+    /**
+     * Load the state of snapshotStateId from snapshot store. Returns:
+     * - Empty: state file doesn't exist
+     * - NO_STATE: bug situation
+     * - Other object: previously saved state
+     */
+    public Optional<Object> loadState(SnapshotStateId snapshotStateId)
+            throws Exception
+    {
+        Optional<Object> loadedValue = loadWithBacktrack(snapshotStateId);
+        if (loadedValue.isPresent() && loadedValue.get() != NO_STATE) {
+            return snapshotUtils.loadState(SnapshotStateId.fromString((String) loadedValue.get()));
+        }
+        return loadedValue;
     }
 
     public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile)
@@ -234,6 +288,22 @@ public class TaskSnapshotManager
             synchronized (captureResults) {
                 SnapshotResult oldResult = captureResults.put(snapshotId, snapshotResult);
                 if (snapshotResult != oldResult && snapshotResult.isDone()) {
+                    if (snapshotResult == SnapshotResult.SUCCESSFUL) {
+                        // All components for the task have captured their states successfully.
+                        // Save the consolidated state.
+                        SnapshotStateId newId = SnapshotStateId.forTaskComponent(snapshotId, taskId, CONSOLIDATED_STATE_COMPONENT);
+                        try {
+                            Map<String, Object> map = storeCache.remove(snapshotId);
+                            if (map == null) {
+                                map = Collections.emptyMap();
+                            }
+                            snapshotUtils.storeState(newId, map);
+                        }
+                        catch (Exception e) {
+                            LOG.error(e, "Failed to store state for " + newId);
+                            snapshotResult = SnapshotResult.FAILED;
+                        }
+                    }
                     if (snapshotUtils.isCoordinator()) {
                         // Results on coordinator won't be reported through remote task. Send to the query side.
                         QuerySnapshotManager querySnapshotManager = snapshotUtils.getQuerySnapshotManager(taskId.getQueryId());
@@ -267,6 +337,9 @@ public class TaskSnapshotManager
                             querySnapshotManager.updateQueryRestore(taskId, Optional.of(restoreResult));
                         }
                     }
+                    // All components for the task have restored their states successfully.
+                    // The loadCache won't be used again.
+                    loadCache.clear();
                     LOG.debug("Finished restoring snapshot %d for task %s. Result is %s.", snapshotId, taskId.toString(), snapshotResult);
                 }
             }

@@ -24,6 +24,7 @@ import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.testing.assertions.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -238,10 +239,54 @@ public class TestSingleInputSnapshotState
         verify(snapshotManager, times(2)).failedToRestore(anyObject(), anyBoolean());
     }
 
+    @Test
+    public void testStoreLoadConsolidatedSnapshot()
+            throws Exception
+    {
+        TestingRestorable restorable = new TestingRestorable();
+        restorable.setSupportsConsolidatedWrites(true);
+        SingleInputSnapshotState state = new SingleInputSnapshotState(
+                restorable,
+                snapshotManager,
+                null,
+                TestSingleInputSnapshotState::createSnapshotStateId,
+                TestSingleInputSnapshotState::createSnapshotStateId);
+        state.processPage(marker1);
+        when(snapshotManager.loadConsolidatedState(anyObject())).thenReturn(Optional.of(0));
+        state.processPage(resume1);
+        verify(snapshotManager, times(0)).storeState(anyObject(), anyObject());
+        verify(snapshotManager, times(1)).storeConsolidatedState(anyObject(), anyObject());
+        verify(snapshotManager, times(0)).loadState(anyObject());
+        verify(snapshotManager, times(1)).loadConsolidatedState(anyObject());
+    }
+
+    @Test
+    public void testStoreLoadComplexSnapshot()
+            throws Exception
+    {
+        TestingRestorable restorable = new TestingRestorable();
+        restorable.setSupportsConsolidatedWrites(false);
+        SingleInputSnapshotState state = new SingleInputSnapshotState(
+                restorable,
+                snapshotManager,
+                null,
+                TestSingleInputSnapshotState::createSnapshotStateId,
+                TestSingleInputSnapshotState::createSnapshotStateId);
+        state.processPage(marker1);
+        when(snapshotManager.loadState(anyObject())).thenReturn(Optional.of(0));
+        state.processPage(resume1);
+        verify(snapshotManager, times(0)).storeConsolidatedState(anyObject(), anyObject());
+        verify(snapshotManager, times(1)).storeState(anyObject(), anyObject());
+        verify(snapshotManager, times(0)).loadConsolidatedState(anyObject());
+        verify(snapshotManager, times(1)).loadState(anyObject());
+    }
+
+    @RestorableConfig(uncapturedFields = {"supportsConsolidatedWrites"})
     private static class TestingRestorable
             implements Restorable
     {
         int state;
+        boolean supportsConsolidatedWrites;
 
         @Override
         public Object capture(BlockEncodingSerdeProvider serdeProvider)
@@ -253,6 +298,17 @@ public class TestSingleInputSnapshotState
         public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
         {
             this.state = (Integer) state;
+        }
+
+        @Override
+        public boolean supportsConsolidatedWrites()
+        {
+            return this.supportsConsolidatedWrites;
+        }
+
+        public void setSupportsConsolidatedWrites(boolean supportsConsolidatedWrites)
+        {
+            this.supportsConsolidatedWrites = supportsConsolidatedWrites;
         }
     }
 

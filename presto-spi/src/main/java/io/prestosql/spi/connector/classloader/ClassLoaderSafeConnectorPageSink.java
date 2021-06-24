@@ -133,4 +133,12 @@ public class ClassLoaderSafeConnectorPageSink
             delegate.restore(state, serdeProvider);
         }
     }
+
+    @Override
+    public boolean supportsConsolidatedWrites()
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.supportsConsolidatedWrites();
+        }
+    }
 }

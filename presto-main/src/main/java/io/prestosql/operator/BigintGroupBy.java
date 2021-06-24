@@ -16,7 +16,6 @@ package io.prestosql.operator;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
-import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 
 import java.util.List;
@@ -26,7 +25,6 @@ import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(uncapturedFields = {"hashChannel", "outputRawHash"})
 public abstract class BigintGroupBy
 {
     protected static final float FILL_RATIO = 0.75f;

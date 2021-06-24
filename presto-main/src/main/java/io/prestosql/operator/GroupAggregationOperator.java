@@ -453,6 +453,12 @@ public class GroupAggregationOperator
         finished = myState.finished;
     }
 
+    @Override
+    public boolean supportsConsolidatedWrites()
+    {
+        return false;
+    }
+
     public static class GroupAggregationOperatorState
             implements Serializable
     {

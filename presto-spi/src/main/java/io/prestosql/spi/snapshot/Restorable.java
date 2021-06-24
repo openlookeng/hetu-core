@@ -40,4 +40,14 @@ public interface Restorable
     {
         throw new UnsupportedOperationException(getClass().getName() + " does not support restore()");
     }
+
+    /**
+     * Indicates if an object's internal state snapshot can be written into a consolidated file
+     *
+     * @return A boolean value representing whether or not this snapshot result can be consolidated
+     */
+    default boolean supportsConsolidatedWrites()
+    {
+        return true;
+    }
 }

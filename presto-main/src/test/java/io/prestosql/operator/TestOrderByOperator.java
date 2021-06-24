@@ -405,6 +405,7 @@ public class TestOrderByOperator
                 new OrderingCompiler());
 
         DriverContext driverContext = createDriverContext(8, TEST_SNAPSHOT_SESSION);
+        driverContext.getPipelineContext().getTaskContext().getSnapshotManager().setTotalComponents(1);
         OrderByOperator orderByOperator = (OrderByOperator) operatorFactory.createOperator(driverContext);
 
         // Step1: add the first 2 pages

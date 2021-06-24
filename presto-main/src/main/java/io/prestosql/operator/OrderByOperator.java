@@ -475,6 +475,12 @@ public class OrderByOperator
         }
     }
 
+    @Override
+    public boolean supportsConsolidatedWrites()
+    {
+        return false;
+    }
+
     private static class OrderByOperatorState
             implements Serializable
     {

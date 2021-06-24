@@ -48,6 +48,7 @@ import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -448,10 +449,48 @@ public class TestMultiInputSnapshotState
         verify(snapshotManager, never()).loadState(anyObject());
     }
 
+    @Test
+    public void testStoreLoadConsolidatedSnapshot()
+            throws Exception
+    {
+        // make sure to process each source from getInputChannels() in TestingRestorable
+        // since store isn't called until every source has given the marker
+        restorable.setSupportsConsolidatedWrites(true);
+        processPage(state, source1, marker1);
+        processPage(state, source2, marker1);
+        verify(snapshotManager, never()).storeState(anyObject(), anyObject());
+        verify(snapshotManager, times(1)).storeConsolidatedState(anyObject(), argument.capture());
+
+        when(snapshotManager.loadConsolidatedState(anyObject())).thenReturn(Optional.of(argument.getValue()));
+        processPage(state, source1, resume1);
+        verify(snapshotManager, times(0)).loadState(anyObject());
+        verify(snapshotManager, times(1)).loadConsolidatedState(anyObject());
+    }
+
+    @Test
+    public void testStoreLoadComplexSnapshot()
+            throws Exception
+    {
+        // make sure to process each source from getInputChannels() in TestingRestorable
+        // since store isn't called until every source has given the marker
+        restorable.setSupportsConsolidatedWrites(false);
+        processPage(state, source1, marker1);
+        processPage(state, source2, marker1);
+        verify(snapshotManager, times(0)).storeConsolidatedState(anyObject(), anyObject());
+        verify(snapshotManager, times(1)).storeState(anyObject(), argument.capture());
+
+        when(snapshotManager.loadState(anyObject())).thenReturn(Optional.of(argument.getValue()));
+        processPage(state, source1, resume1);
+        verify(snapshotManager, times(0)).loadConsolidatedState(anyObject());
+        verify(snapshotManager, times(1)).loadState(anyObject());
+    }
+
+    @RestorableConfig(uncapturedFields = {"supportsConsolidatedWrites"})
     private static class TestingRestorable
             implements MultiInputRestorable
     {
         int state;
+        boolean supportsConsolidatedWrites;
 
         @Override
         public Object capture(BlockEncodingSerdeProvider serdeProvider)
@@ -470,9 +509,19 @@ public class TestMultiInputSnapshotState
         {
             return Optional.of(Sets.newHashSet(source1, source2));
         }
+
+        @Override
+        public boolean supportsConsolidatedWrites()
+        {
+            return this.supportsConsolidatedWrites;
+        }
+
+        public void setSupportsConsolidatedWrites(boolean supportsConsolidatedWrites)
+        {
+            this.supportsConsolidatedWrites = supportsConsolidatedWrites;
+        }
     }
 
-    @RestorableConfig(unsupported = true)
     private static class TestingRestorableUndeterminedInputs
             extends TestingRestorable
     {

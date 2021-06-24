@@ -20,6 +20,7 @@ import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.TaskContext;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -44,9 +45,24 @@ public class SnapshotStateId
         return new SnapshotStateId(snapshotId, taskId);
     }
 
+    public static SnapshotStateId fromString(String str)
+    {
+        String[] components = str.split(SLASH);
+        // the 4 first components are queryId, snapshotId, stageId, and taskId, according to generateHierarchy
+        TaskId taskId = new TaskId(components[0], Integer.parseInt(components[2]), Integer.parseInt(components[3]));
+        long snapshotId = Long.parseLong(components[1]);
+        List<String> parts = Arrays.asList(components);
+        return new SnapshotStateId(snapshotId, taskId, parts);
+    }
+
     public static SnapshotStateId forTaskComponent(long snapshotId, TaskContext taskContext, String component)
     {
         TaskId taskId = taskContext.getTaskId();
+        return new SnapshotStateId(snapshotId, taskId, component);
+    }
+
+    public static SnapshotStateId forTaskComponent(long snapshotId, TaskId taskId, String component)
+    {
         return new SnapshotStateId(snapshotId, taskId, component);
     }
 

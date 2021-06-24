@@ -95,4 +95,19 @@ public class TestSnapshotStateId
         Assert.assertFalse(set.contains(stateId3));
         Assert.assertFalse(stateId1.equals(this));
     }
+
+    @Test
+    public void testFromString()
+    {
+        String testQueryId = "testingquery";
+        long snapshotId = 18L;
+        int stageId = 500;
+        int taskInt = 600;
+
+        TaskId taskId = new TaskId(testQueryId, stageId, taskInt);
+        SnapshotStateId notString = new SnapshotStateId(snapshotId, taskId);
+        String str = notString.toString();
+        SnapshotStateId withString = SnapshotStateId.fromString(str);
+        Assert.assertTrue(notString.equals(withString));
+    }
 }
