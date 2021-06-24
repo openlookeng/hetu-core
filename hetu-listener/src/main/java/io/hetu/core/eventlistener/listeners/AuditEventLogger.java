@@ -25,6 +25,7 @@ import io.prestosql.spi.eventlistener.QueryCreatedEvent;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.ZoneId;
 import java.util.logging.FileHandler;
 import java.util.logging.SimpleFormatter;
 
@@ -65,7 +66,7 @@ class AuditEventLogger
     protected void onQueryCreatedEvent(QueryCreatedEvent queryCreatedEvent)
     {
         QueryContext queryContext = queryCreatedEvent.getContext();
-        logger.info(queryCreatedEvent.getCreateTime().toString() +
+        logger.info(queryCreatedEvent.getCreateTime().atZone(ZoneId.systemDefault()) +
                 " UserName=" + queryContext.getUser() +
                 " UserIp=" + queryContext.getRemoteClientAddress().orElse(null) +
                 " queryId=" + queryCreatedEvent.getMetadata().getQueryId() +
@@ -79,7 +80,7 @@ class AuditEventLogger
     protected void onQueryCompletedEvent(QueryCompletedEvent queryCompletedEvent)
     {
         QueryContext queryContext = queryCompletedEvent.getContext();
-        logger.info(queryCompletedEvent.getCreateTime().toString() +
+        logger.info(queryCompletedEvent.getCreateTime().atZone(ZoneId.systemDefault()) +
                 " UserName=" + queryContext.getUser() +
                 " UserIp=" + queryContext.getRemoteClientAddress().orElse(null) +
                 " queryId=" + queryCompletedEvent.getMetadata().getQueryId() +
