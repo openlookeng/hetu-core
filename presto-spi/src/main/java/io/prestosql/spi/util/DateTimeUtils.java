@@ -64,6 +64,9 @@ public final class DateTimeUtils
     static {
         DateTimeParser[] timestampWithoutTimeZoneParser = {
                 DateTimeFormat.forPattern("yyyy-M-d").getParser(),
+                DateTimeFormat.forPattern("yyyy-M-d'T'H:m").getParser(),
+                DateTimeFormat.forPattern("yyyy-M-d'T'H:m:s").getParser(),
+                DateTimeFormat.forPattern("yyyy-M-d'T'H:m:s.SSS").getParser(),
                 DateTimeFormat.forPattern("yyyy-M-d H:m").getParser(),
                 DateTimeFormat.forPattern("yyyy-M-d H:m:s").getParser(),
                 DateTimeFormat.forPattern("yyyy-M-d H:m:s.SSS").getParser()};
