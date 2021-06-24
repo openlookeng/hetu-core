@@ -45,6 +45,7 @@ headless: true
     - [Meta Store]({{< relref "./docs/admin/meta-store.md" >}})
     - [Audit Log]({{< relref "./docs/admin/audit-log.md" >}})
     - [Reliable Execution]({{< relref "./docs/admin/reliable-execution.md" >}})
+    - [JDBC Data Source Multi-Split Management]({{< relref "./docs/admin/multi-split-for-jdbc-data-source.md" >}})
 
 - [Query Optimizer]("#")
     - [Table Statistics]({{< relref "./docs/optimizer/statistics.md" >}})
