@@ -114,6 +114,18 @@ public class TestSortBasedAggregationPlan
                     " bucketed_by=array['data_102', 'data_101'], bucket_count = 1," +
                     "sorted_by = ARRAY['data_102', 'data_101']) as select  ss_customer_sk, ss_sold_date_sk, ss_item_sk from tpcds.tiny.store_sales");
 
+            queryRunner.execute("create table web_returns_partition_bucketCount1 with (" +
+                    "bucketed_by=array['wr_return_quantity'], bucket_count = 1, " +
+                    "partitioned_by = ARRAY['wr_net_loss'], " +
+                    "sorted_by = ARRAY['wr_return_quantity','wr_returned_time_sk']) " +
+                    "as select * from tpcds.tiny.web_returns limit 100");
+
+            queryRunner.execute("create table web_returns_partition_bucketCount32 with (" +
+                    "bucketed_by=array['wr_return_quantity'], bucket_count = 1, " +
+                    "partitioned_by = ARRAY['wr_net_loss'], " +
+                    "sorted_by = ARRAY['wr_return_quantity','wr_returned_time_sk']) " +
+                    "as select * from tpcds.tiny.web_returns limit 100");
+
             return queryRunner;
         }, false, false, false, true);
     }
@@ -121,11 +133,10 @@ public class TestSortBasedAggregationPlan
     @Override
     protected Stream<String> getQueryResourcePaths()
     {
-        //1,2,5,7,10,14,15,20,23,26,33,37,43,44,45,50,56,93
         return Stream.of("q_InnerJoin", "q_leftJoin", "q_rightjoin", "q_rightjoin_wrong_order", "q_Inner_LeftJoin", "q_sort_groupby_notsameOrder",
                 "q_sort_groupby_notsameOrder1", "q_groupByHavingMore", "q_InnerJoinWrongOrder", "q_InnerJoinLessCriterias",
                 "q_InnerJoinGroupLessCriterias", "q_bucketAndSortDifferentOrder", "BucketAndGroupSameSortIsMore", "BucketGroupAreDifferent",
-                "groupsAreMoreThanBucket", "ColNameEndWithInt")
+                "groupsAreMoreThanBucket", "ColNameEndWithInt", "q_PartitionBucketCount1", "q_PartitionBucketCount32")
                 .flatMap(i -> {
                     String queryId = format("%s", i);
                     System.out.println("query ID: " + queryId);

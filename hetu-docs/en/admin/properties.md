@@ -520,6 +520,8 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > - 2) Joins case probe side table should be sorted and join criteria should be same or less than sorted columns and it should be in the same order.
 > - 3) bucket_count is 1 bucketed_by columns should be same or less than Grouping columns and it should be in the same order.
 > - 4) bucket_count is more than 1 bucketed_by columns should be same as Grouping columns and it should be in the same order.
+> - 5) In case of partition table, Grouping columns should contain all partitions in same order following by the subset of sorted by columns.
+> - 6) When distinct is used, Grouping columns followed by a distinct column should be subset of sorted by columns.
 >
 > This can also be specified on a per-query basis using the `sort_based_aggregation_enabled` session property.
 >
