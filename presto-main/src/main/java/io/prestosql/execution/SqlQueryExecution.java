@@ -524,6 +524,10 @@ public class SqlQueryExecution
 
     private void resumeQuery(PlanRoot plan)
     {
+        String resumeMessage = "Query encountered failures. Recovering using the distributed-snapshot feature. This is the "
+                + (snapshotManager.getResumeCount() + 1) + "-th attempt.";
+        warningCollector.add(new PrestoWarning(StandardWarningCode.SNAPSHOT_RECOVERY, resumeMessage));
+
         SqlQueryScheduler oldScheduler = queryScheduler.get();
         try {
             // Wait for previous scheduler to finish.

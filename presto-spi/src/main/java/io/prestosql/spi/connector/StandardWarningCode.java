@@ -24,7 +24,8 @@ public enum StandardWarningCode
     EXPIRED_CUBE(0x0000_0003),
     CUBE_NOT_FOUND(0x0000_0004),
     PARSER_WARNING(0x0000_0005),
-    SNAPSHOT_NOT_SUPPORTED(0x0000_0006)
+    SNAPSHOT_NOT_SUPPORTED(0x0000_0006),
+    SNAPSHOT_RECOVERY(0X000_007)
     /**/;
     private final WarningCode warningCode;
 
