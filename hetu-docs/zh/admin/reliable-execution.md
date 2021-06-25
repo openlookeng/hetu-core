@@ -25,7 +25,7 @@
 
 - **支持的语句**：仅支持`INSERT`和`CREATE TABLE AS SELECT`类型的语句
   - 不包括类似`INSERT INTO CUBE`的语句。
-- **源表**：只能从`Hive`、`TPCDS`和`TPCH`目录中的表读取。
+- **源表**：只能从`Hive`目录中的表读取。
 - **目标表**：只能写入`Hive`目录中的表，格式为`ORC`。
 - **与其他功能的交互**：分布式快照目前无法与以下功能一起使用：
   - 重用交换，即`optimizer.reuse-table-scan`
