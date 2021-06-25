@@ -252,7 +252,12 @@ public class QuerySnapshotManager
         }
 
         if (restoreResult.getSnapshotResult() == SnapshotResult.SUCCESSFUL) {
-            lastTriedId = OptionalLong.empty();
+            if (lastTriedId.isPresent()) {
+                // Successfully resumed from this snapshot id. Avoid resuming from it again.
+                // See HashBuilderOperator#finish(), which depends on this behavior.
+                captureResults.put(lastTriedId.getAsLong(), SnapshotResult.FAILED);
+                lastTriedId = OptionalLong.empty();
+            }
         }
         else {
             LOG.warn("Failed to restore snapshot for %s, snapshot %d", queryId.getId(), restoreResult.getSnapshotId());
