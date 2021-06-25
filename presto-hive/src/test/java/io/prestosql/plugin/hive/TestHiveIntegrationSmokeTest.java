@@ -6076,16 +6076,26 @@ public class TestHiveIntegrationSmokeTest
         assertUpdate("insert into unsorttable11 values (1, null, null)", 1);
         assertUpdate("insert into unsorttable11 values (2, 0, null)", 1);
         assertUpdate("insert into unsorttable11 values (2, 0, null)", 1);
-        assertUpdate("insert into unsorttable11 values (3, null, 0)", 1);
-        assertUpdate("insert into unsorttable11 values (3, null, 0)", 1);
-        assertUpdate("insert into unsorttable11 values (4, 33, 66)", 1);
-        assertUpdate("insert into unsorttable11 values (5, 55, 77 )", 1);
-        assertUpdate("insert into unsorttable11 values (6, 66, 88)", 1);
-        assertUpdate("insert into unsorttable11 values (7, 77, 99)", 1);
+        assertUpdate("insert into unsorttable11 values (4, null, 0)", 1);
+        assertUpdate("insert into unsorttable11 values (5, null, 0)", 1);
+        assertUpdate("insert into unsorttable11 values (6, 0, 33)", 1);
+        assertUpdate("insert into unsorttable11 values (7, 0, 33)", 1);
+        assertUpdate("insert into unsorttable11 values (8, 33, 0)", 1);
+        assertUpdate("insert into unsorttable11 values (9, 33, 0)", 1);
+        assertUpdate("insert into unsorttable11 values (10, 33, null)", 1);
+        assertUpdate("insert into unsorttable11 values (11, 33, null)", 1);
+        assertUpdate("insert into unsorttable11 values (12, 33, null)", 1);
+        assertUpdate("insert into unsorttable11 values (13, null, 33)", 1);
+        assertUpdate("insert into unsorttable11 values (13, null, 33)", 1);
+        assertUpdate("insert into unsorttable11 values (12, null, 33)", 1);
+        assertUpdate("insert into unsorttable11 values (14, 33, 66)", 1);
+        assertUpdate("insert into unsorttable11 values (15, 55, 77 )", 1);
+        assertUpdate("insert into unsorttable11 values (16, 66, 88)", 1);
+        assertUpdate("insert into unsorttable11 values (17, 77, 99)", 1);
 
         computeActual("create table sorttable11  with(transactional = false, " +
                 "format = 'ORC',  bucketed_by=array['year', 'orderkey'], bucket_count=1, sorted_by = ARRAY['year', 'orderkey'])  as select * from unsorttable11 order by year");
-        String query = "select avg(orderkey), count(year)," +
+        String query = "select sum (number), avg(orderkey  ), count(year)," +
                 "year from sorttable11  group by year order by year";
 
         MaterializedResult sortResult = computeActual(testSessionSort, query);
@@ -6094,7 +6104,7 @@ public class TestHiveIntegrationSmokeTest
         sortResult = computeActual(testSessionSortPrcntDrv50, query);
         assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
-        query = "select avg(orderkey), count(year)," +
+        query = "select sum (number), avg(CASE WHEN orderkey IS NULL THEN 0 ELSE orderkey END), count(CASE WHEN year IS NULL THEN 0 ELSE year END)," +
                 "year from sorttable11  group by year, orderkey order by year, orderkey";
 
         sortResult = computeActual(testSessionSort, query);
@@ -6480,6 +6490,29 @@ public class TestHiveIntegrationSmokeTest
         sortResult = computeActual(testSessionSortPrcntDrv40, query);
         assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
         assertUpdate("DROP TABLE lineitem_orderkey_partkey_partition3");
+    }
+
+    @Test
+    public void sortAggPartition2BucketCount1With2BucketColumns()
+    {
+        initSortBasedAggregation();
+        computeActual("create table lineitem_orderkey_partkey_partition4  with(transactional = false, " +
+                "format = 'ORC', partitioned_by = ARRAY['shipmode', 'comment'], bucketed_by=array['orderkey',  'partkey'], bucket_count=1, sorted_by = ARRAY['orderkey', 'partkey'])" +
+                "  as select * from tpch.tiny.lineitem limit 100");
+
+        String query = "select avg(lineitem_orderkey_partkey_partition4.orderkey), lineitem_orderkey_partkey_partition4.orderkey " +
+                "from lineitem_orderkey_partkey_partition4 " +
+                "group by shipmode, comment, orderkey, partkey " +
+                "order by shipmode, comment, orderkey, partkey ";
+
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv40, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        assertUpdate("DROP TABLE lineitem_orderkey_partkey_partition4");
     }
 
     @Test

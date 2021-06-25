@@ -33,6 +33,7 @@ import org.openjdk.jol.info.ClassLayout;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.IntFunction;
@@ -43,7 +44,7 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 
 // This implementation assumes arrays used in the hash are always a power of 2
 @RestorableConfig(uncapturedFields = {"types", "hashTypes", "channels", "hashStrategy",
-        "inputHashChannel", "hashGenerator", "processDictionary"})
+        "inputHashChannel", "hashGenerator", "processDictionary", "localNullBitset"})
 public class MultiChannelGroupBySort
         extends MultiChannelGroupBy implements GroupBySort
 {
@@ -60,6 +61,8 @@ public class MultiChannelGroupBySort
     private int newGroupId;
     private int sliceIndex;
     private long rawPrevNullHash;
+    private BitSet rawPrevNullBitSet;
+    private BitSet localNullBitset;
 
     public MultiChannelGroupBySort(
             List<? extends Type> hashTypes,
@@ -79,6 +82,8 @@ public class MultiChannelGroupBySort
         this.nextGroupIdStartingRange = Integer.MAX_VALUE;
         this.newGroupId = 0;
         this.sliceIndex = 0;
+        this.rawPrevNullBitSet = new BitSet(hashChannels.length);
+        this.localNullBitset = new BitSet(hashChannels.length);
     }
 
     @Override
@@ -170,14 +175,13 @@ public class MultiChannelGroupBySort
         return false;
     }
 
-    public boolean isNullHashPosition(int position, Page page)
+    public void getNullPosition(int position, Page page, BitSet localNullBitset)
     {
         for (int i = 0; i < channels.length; i++) {
             if (page.getBlock(channels[i]).isNull(position)) {
-                return true;
+                localNullBitset.set(i);
             }
         }
-        return false;
     }
 
     public long getHashValueForNullAndZeroPosition(int position, Page page)
@@ -196,7 +200,9 @@ public class MultiChannelGroupBySort
                 // for null we will set 1. So that we can differentiate between Null and 0
                 result = CombineHashFunction.getHash(result, NULL_HASH_VALUE);
             }
-            result = CombineHashFunction.getHash(result, TypeUtils.hashPosition(type, blockProvider.apply(channels[i]), position));
+            else {
+                result = CombineHashFunction.getHash(result, TypeUtils.hashPosition(type, blockProvider.apply(channels[i]), position));
+            }
         }
         return result;
     }
@@ -210,13 +216,16 @@ public class MultiChannelGroupBySort
     public int putIfAbsent(int position, Page page, long rawHash)
     {
         int groupId;
-        if (rawHash == 0 && isNullHashPosition(position, page)) {
+        localNullBitset.clear();
+        getNullPosition(position, page, localNullBitset);
+        if (localNullBitset.cardinality() > 0) {
             long rawNullHash = getHashValueForNullAndZeroPosition(position, page);
-            if (rawPrevNullHash == rawNullHash) {
+            if (rawPrevNullHash == rawNullHash && rawPrevNullBitSet.intersects(localNullBitset)) {
                 return nextSortBasedGroupId - 1;
             }
             else {
                 rawPrevNullHash = rawNullHash;
+                rawPrevNullBitSet = localNullBitset;
                 groupId = addNewGroup(position, page, rawHash);
                 return groupId;
             }
@@ -314,6 +323,7 @@ public class MultiChannelGroupBySort
         myState.sliceIndex = sliceIndex;
         myState.rawPrevNullHash = rawPrevNullHash;
         myState.newGroupId = newGroupId;
+        myState.rawPrevNullBitSet = rawPrevNullBitSet;
         return myState;
     }
 
@@ -353,6 +363,7 @@ public class MultiChannelGroupBySort
         this.sliceIndex = myState.sliceIndex;
         this.rawPrevNullHash = myState.rawPrevNullHash;
         this.newGroupId = myState.newGroupId;
+        this.rawPrevNullBitSet = myState.rawPrevNullBitSet;
     }
 
     private static class MultiChannelGroupBySortState
@@ -371,5 +382,6 @@ public class MultiChannelGroupBySort
         private int sliceIndex;
         private long rawPrevNullHash;
         private int newGroupId;
+        private BitSet rawPrevNullBitSet;
     }
 }

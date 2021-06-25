@@ -1,0 +1,5 @@
+remote exchange (GATHER, SINGLE, [])
+    final aggregation over (wr_return_quantity)
+        local exchange (GATHER, SINGLE, [])
+            partial aggregation over (wr_return_quantity)
+                scan web_returns_partition_bucketcount1

@@ -3122,7 +3122,9 @@ public class HiveMetadata
         partitionAndSortedColumnNames.addAll(partitionedBy);
         partitionAndSortedColumnNames.addAll(sortedColumnNames);
 
-        if (sortedColumnNames.size() + partitionedBy.size() < groupKeyNames.size()) {
+        //grouping key should be sub set of sorted By and it should match all partition by columns
+        if ((sortedColumnNames.size() + partitionedBy.size() < groupKeyNames.size()) ||
+                (partitionedBy.size() > groupKeyNames.size())) {
             //sorted columns are less than join criteria columns
             log.debug("number of sorted columns " + sortedColumnNames.size() + "are less join column size " + groupKeyNames.size());
             return false;
@@ -3131,8 +3133,9 @@ public class HiveMetadata
         // bucketby columns and groupby Columns should be same.
         // or when bucket count should be 1 and bucket column that matches with groupBy
         // or when bucket count is 0 no need to compare buckets
+        int partitionedByCount = partitionedBy.size() == 0 ? 0 : partitionedBy.size() - 1;
         boolean singleOrZeroBucketedColumn = (((bucketCount == 1) && (bucketedColumns.size() == 1) &&
-                (groupKeyNames.get(partitionedBy.size()).equals(bucketedColumns.get(0)))) || (bucketCount == 0));
+                (groupKeyNames.get(partitionedByCount).equals(bucketedColumns.get(0)))) || (bucketCount == 0));
 
         if ((bucketCount == 1) && (bucketedColumns.size() > 1)) {
             boolean notMatching = false;
