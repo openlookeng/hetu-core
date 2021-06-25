@@ -54,7 +54,8 @@ public class TestHetuConnection
         server.installPlugin(new MemoryPlugin());
         server.loadMetastore(metastoreConfig);
         server.createCatalog("memory", "memory",
-                ImmutableMap.of("memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath()));
+                ImmutableMap.of("memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath(),
+                        "memory.splits-per-node", "1"));
 
         try (Connection connection = createConnection();
                 Statement statement = connection.createStatement()) {

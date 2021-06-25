@@ -67,7 +67,7 @@ public class TestMemoryMetadata
         Runtime.getRuntime().addShutdownHook(new Thread(tmp::close));
         metadata = new MemoryMetadata(new TestingTypeManager(), new TestingNodeManager(),
                 new HetuFsMetastore(new HetuFsMetastoreConfig().setHetuFileSystemMetastorePath(tmp.getRoot().getCanonicalPath()),
-                        new HetuLocalFileSystemClient(new LocalConfig(null), Paths.get(tmp.getRoot().getCanonicalPath()))), null);
+                        new HetuLocalFileSystemClient(new LocalConfig(null), Paths.get(tmp.getRoot().getCanonicalPath()))), null, new MemoryConfig());
     }
 
     @Test
@@ -157,7 +157,7 @@ public class TestMemoryMetadata
                 Optional.empty());
 
         List<SchemaTableName> tableNames = metadata.listTables(SESSION, Optional.empty());
-        assertEquals(tableNames.size(), 0, "Expected zero table");
+        assertEquals(tableNames.size(), 1, "Expected exactly one table");
 
         metadata.finishCreateTable(SESSION, table, ImmutableList.of(), ImmutableList.of());
         tableNames = metadata.listTables(SESSION, Optional.empty());

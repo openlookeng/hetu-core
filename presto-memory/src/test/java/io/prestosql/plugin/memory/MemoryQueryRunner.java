@@ -18,6 +18,7 @@ import io.airlift.log.Logger;
 import io.airlift.log.Logging;
 import io.airlift.testing.mysql.TestingMySqlServer;
 import io.airlift.tpch.TpchTable;
+import io.hetu.core.common.filesystem.TempFolder;
 import io.hetu.core.metastore.HetuMetastorePlugin;
 import io.prestosql.Session;
 import io.prestosql.plugin.tpch.TpchPlugin;
@@ -78,11 +79,15 @@ public final class MemoryQueryRunner
                 }
             });
 
+            TempFolder folder = new TempFolder();
+            folder.create();
+            Runtime.getRuntime().addShutdownHook(new Thread(folder::close));
+
             queryRunner.installPlugin(new MemoryPlugin());
             queryRunner.createCatalog(CATALOG, "memory",
                     ImmutableMap.of("memory.max-data-per-node", "1GB",
                             "memory.splits-per-node", "2",
-                            "memory.spill-path", "/tmp/",
+                            "memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath(),
                             "memory.logical-part-processing-delay", PROCESSING_DELAY + "ms",
                             "memory.max-page-size", "50kB"));
 

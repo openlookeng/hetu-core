@@ -117,11 +117,11 @@ public class Table
     private transient PageSorter pageSorter;
     private transient TypeManager typeManager;
 
-    public Table(long id, boolean compressionEnabled, Path tableDataRoot, List<ColumnInfo> columns, List<SortingColumn> sortedBy,
+    public Table(long id, boolean compressionEnabled, int splitsPerNode, Path tableDataRoot, List<ColumnInfo> columns, List<SortingColumn> sortedBy,
             List<String> indexColumns, PageSorter pageSorter, MemoryConfig config, TypeManager typeManager, PagesSerde pagesSerde)
     {
         this.tableDataRoot = tableDataRoot;
-        this.totalSplits = config.getSplitsPerNode();
+        this.totalSplits = splitsPerNode;
         this.maxLogicalPartBytes = config.getMaxLogicalPartSize().toBytes();
         this.maxPageSizeBytes = Long.valueOf(config.getMaxPageSize().toBytes()).intValue();
         this.processingDelay = config.getProcessingDelay().toMillis();
@@ -133,8 +133,8 @@ public class Table
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.pagesSerde = requireNonNull(pagesSerde, "pagesSerde is null");
 
-        this.splits = new ArrayList<>(totalSplits);
-        for (int i = 0; i < totalSplits; i++) {
+        this.splits = new ArrayList<>(splitsPerNode);
+        for (int i = 0; i < splitsPerNode; i++) {
             this.splits.add(new ArrayList<>());
         }
         this.nextSplit = new AtomicInteger(0);
@@ -238,7 +238,10 @@ public class Table
         tableState = TableState.COMMITTED;
         for (List<LogicalPart> spilt : splits) {
             for (LogicalPart logicalPart : spilt) {
-                logicalPart.finishAdding();
+                // for all new logical parts, set state to finished adding pages
+                if (logicalPart.getProcessingState().get() == LogicalPart.LogicalPartState.ACCEPTING_PAGES) {
+                    logicalPart.finishAdding();
+                }
             }
         }
     }

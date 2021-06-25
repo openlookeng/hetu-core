@@ -89,7 +89,8 @@ public class TestSpatialJoinPlanning
         metastoreConfig.put("hetu.metastore.hetufilesystem.path", folder.newFolder("metastore").getAbsolutePath());
         queryRunner.loadMetastore(metastoreConfig);
         queryRunner.createCatalog("memory", new MemoryConnectorFactory(),
-                ImmutableMap.of("memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath()));
+                ImmutableMap.of("memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath(),
+                        "memory.splits-per-node", "1"));
 
         queryRunner.execute(format("CREATE TABLE kdb_tree AS SELECT '%s' AS v", KDB_TREE_JSON));
         queryRunner.execute("CREATE TABLE points (lng, lat, name) AS (VALUES (2.1e0, 2.1e0, 'x'))");
