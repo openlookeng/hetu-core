@@ -26,7 +26,7 @@ To be able to resume execution from a previously saved snapshot, there must be a
 
 - **Supported Statements**: only `INSERT` and `CREATE TABLE AS SELECT` types of statements are supported
    - This does *not* include statements like `INSERT INTO CUBE`
-- **Source tables**: can only read from tables in `Hive`, `TPCDS`, and `TPCH` catalogs
+- **Source tables**: can only read from tables in `Hive` catalog
 - **Target table**: can only write to tables in `Hive` catalogs, with `ORC` format
 - **Interaction with other features**: distributed snapshot does not yet work with the following features:
    - Reuse exchange, i.e. `optimizer.reuse-table-scan`
