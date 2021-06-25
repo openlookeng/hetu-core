@@ -34,7 +34,7 @@ import static io.airlift.units.DataSize.Unit.MEGABYTE;
 
 public class MemoryConfig
 {
-    private int splitsPerNode = 1;
+    private int splitsPerNode = Math.max(Runtime.getRuntime().availableProcessors(), 1);
     private DataSize maxDataPerNode = new DataSize(256, DataSize.Unit.MEGABYTE);
     private DataSize maxLogicalPartSize = new DataSize(256, MEGABYTE);
     private DataSize maxPageSize = new DataSize(512, DataSize.Unit.KILOBYTE);
@@ -48,8 +48,8 @@ public class MemoryConfig
     }
 
     @Mandatory(name = "memory.splits-per-node",
-            description = "Number of splits to create per node, should be set to the same value on all nodes",
-            required = true)
+            description = "Number of splits to create per node. Default value is number of available processors on the coordinator." +
+                    " Value is ignored on the workers.")
     @Config("memory.splits-per-node")
     public MemoryConfig setSplitsPerNode(int splitsPerNode)
     {

@@ -121,10 +121,20 @@ public class MemoryTableManager
         }, 0, 3000);
     }
 
-    public synchronized void initialize(long tableId, boolean compressionEnabled, List<ColumnInfo> columns, List<SortingColumn> sortedBy, List<String> indexColumns)
+    public synchronized void initialize(long tableId, boolean compressionEnabled, int splitsPerNode, List<ColumnInfo> columns, List<SortingColumn> sortedBy, List<String> indexColumns)
     {
         if (!tables.containsKey(tableId)) {
-            tables.put(tableId, new Table(tableId, compressionEnabled, spillRoot.resolve(String.valueOf(tableId)), columns, sortedBy, indexColumns, pageSorter, config, typeManager, pagesSerde));
+            tables.put(tableId, new Table(tableId,
+                    compressionEnabled,
+                    splitsPerNode,
+                    spillRoot.resolve(String.valueOf(tableId)),
+                    columns,
+                    sortedBy,
+                    indexColumns,
+                    pageSorter,
+                    config,
+                    typeManager,
+                    pagesSerde));
         }
     }
 

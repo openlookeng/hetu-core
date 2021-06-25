@@ -94,7 +94,8 @@ public class TestDynamicHiveScalarFunction
             metastoreConfig.put("hetu.metastore.hetufilesystem.path", folder.newFolder("metastore").getAbsolutePath());
             queryRunner.getCoordinator().loadMetastore(metastoreConfig);
             queryRunner.createCatalog("memory", "memory",
-                    ImmutableMap.of("memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath()));
+                    ImmutableMap.of("memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath(),
+                            "memory.splits-per-node", "1"));
         }
         catch (Exception e) {
             closeAllSuppress(e, queryRunner);

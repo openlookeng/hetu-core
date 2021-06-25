@@ -15,6 +15,8 @@ package io.prestosql.plugin.memory;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.annotations.VisibleForTesting;
+import io.prestosql.spi.connector.ConnectorInsertTableHandle;
 import io.prestosql.spi.connector.ConnectorOutputTableHandle;
 
 import java.util.Collections;
@@ -25,8 +27,8 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static io.prestosql.plugin.memory.MemoryTableProperties.SPILL_COMPRESSION_DEFAULT_VALUE;
 import static java.util.Objects.requireNonNull;
 
-public final class MemoryOutputTableHandle
-        implements ConnectorOutputTableHandle
+public final class MemoryWriteTableHandle
+        implements ConnectorOutputTableHandle, ConnectorInsertTableHandle
 {
     private final long table;
     private final boolean compressionEnabled;
@@ -36,9 +38,10 @@ public final class MemoryOutputTableHandle
     private final List<String> indexColumns;
     private final String schemaName;
     private final String tableName;
+    private final int splitsPerNode;
 
     @JsonCreator
-    public MemoryOutputTableHandle(
+    public MemoryWriteTableHandle(
             @JsonProperty("table") long table,
             @JsonProperty("schemaName") String schemaName,
             @JsonProperty("tableName") String tableName,
@@ -46,21 +49,24 @@ public final class MemoryOutputTableHandle
             @JsonProperty("activeTableIds") Set<Long> activeTableIds,
             @JsonProperty("columns") List<ColumnInfo> columns,
             @JsonProperty("sortedBy") List<SortingColumn> sortedBy,
-            @JsonProperty("indexColumns") List<String> indexColumns)
+            @JsonProperty("indexColumns") List<String> indexColumns,
+            @JsonProperty("splitsPerNode") int splitsPerNode)
     {
         this.table = table;
         this.schemaName = schemaName;
         this.tableName = tableName;
         this.compressionEnabled = compressionEnabled;
+        this.splitsPerNode = splitsPerNode;
         this.activeTableIds = requireNonNull(activeTableIds, "activeTableIds is null");
         this.columns = requireNonNull(columns, "columns is null");
         this.sortedBy = requireNonNull(sortedBy, "sortedBy is null");
         this.indexColumns = requireNonNull(indexColumns, "indexColumns is null");
     }
 
-    public MemoryOutputTableHandle(long table, Set<Long> activeTableIds)
+    @VisibleForTesting
+    MemoryWriteTableHandle(long table, Set<Long> activeTableIds)
     {
-        this(table, "", "", SPILL_COMPRESSION_DEFAULT_VALUE, activeTableIds, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+        this(table, "", "", SPILL_COMPRESSION_DEFAULT_VALUE, activeTableIds, Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), 1);
     }
 
     @JsonProperty
@@ -109,6 +115,12 @@ public final class MemoryOutputTableHandle
     public String getTableName()
     {
         return tableName;
+    }
+
+    @JsonProperty
+    public int getSplitsPerNode()
+    {
+        return splitsPerNode;
     }
 
     @Override

@@ -69,6 +69,7 @@ import java.util.stream.Stream;
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.json.JsonCodec.jsonCodec;
 import static io.prestosql.spi.StandardErrorCode.ALREADY_EXISTS;
+import static io.prestosql.spi.StandardErrorCode.GENERIC_USER_ERROR;
 import static io.prestosql.spi.StandardErrorCode.INVALID_TABLE_PROPERTY;
 import static io.prestosql.spi.StandardErrorCode.SCHEMA_NOT_EMPTY;
 import static java.lang.String.format;
@@ -81,9 +82,11 @@ public class MemoryMetadata
 {
     public static final String MEM_KEY = "memory";
     public static final String DEFAULT_SCHEMA = "default";
-    public static final String ID_KEY = "id";
-    public static final String NEXT_ID_KEY = "_NEXT_ID_";
+    public static final String TABLE_ID_KEY = "id"; // used as param key in TableEntity
+    public static final String TABLE_OUTPUT_HANDLE = "output_handle"; // used as param key in TableEntity
+    public static final String NEXT_ID_KEY = "_NEXT_ID_"; // used as param key in CatalogEntity
     private static final JsonCodec<ConnectorViewDefinition> VIEW_CODEC = jsonCodec(ConnectorViewDefinition.class);
+    private static final JsonCodec<MemoryWriteTableHandle> OUTPUT_TABLE_HANDLE_JSON_CODEC = jsonCodec(MemoryWriteTableHandle.class);
 
     private final NodeManager nodeManager;
     private final TypeManager typeManager;
@@ -91,12 +94,14 @@ public class MemoryMetadata
     private final Map<Long, TableInfo> tables = new ConcurrentHashMap<>();
     private final Map<SchemaTableName, ConnectorViewDefinition> views = new ConcurrentHashMap<>();
     private final HetuMetastore metastore;
+    private final MemoryConfig config;
 
     @Inject
-    public MemoryMetadata(TypeManager typeManager, NodeManager nodeManager, HetuMetastore metastore, MemoryTableManager tableManager)
+    public MemoryMetadata(TypeManager typeManager, NodeManager nodeManager, HetuMetastore metastore, MemoryTableManager tableManager, MemoryConfig memoryConfig)
     {
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
+        this.config = requireNonNull(memoryConfig, "memoryConfig is null");
         this.metastore = metastore;
         Optional<CatalogEntity> oldCatalog = metastore.getCatalog(MEM_KEY);
         if (!oldCatalog.isPresent()) {
@@ -157,7 +162,7 @@ public class MemoryMetadata
             return null;
         }
 
-        String idStr = tableEntity.get().getParameters().get(ID_KEY);
+        String idStr = tableEntity.get().getParameters().get(TABLE_ID_KEY);
         if (idStr == null) {
             return null;
         }
@@ -241,7 +246,7 @@ public class MemoryMetadata
                         .setDatabaseName(newTableName.getSchemaName())
                         .setTableName(newTableName.getTableName())
                         .setTableType(TableEntityType.TABLE.toString())
-                        .setParameter(ID_KEY, String.valueOf(tableId))
+                        .setParameter(TABLE_ID_KEY, String.valueOf(tableId))
                         .build());
     }
 
@@ -253,7 +258,7 @@ public class MemoryMetadata
     }
 
     @Override
-    public MemoryOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout)
+    public synchronized MemoryWriteTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout)
     {
         checkSchemaExists(tableMetadata.getTable().getSchemaName(), true);
         checkTableNotExists(tableMetadata.getTable(), false);
@@ -318,9 +323,26 @@ public class MemoryMetadata
         Set<Node> nodes = nodeManager.getRequiredWorkerNodes();
         checkState(!nodes.isEmpty(), "No Memory nodes available");
 
+        long tableId = nextId;
+
+        List<ColumnInfo> columnInfos = columns.build();
+        metastore.createTable(TableEntity.builder()
+                .setCatalogName(MEM_KEY)
+                .setDatabaseName(tableMetadata.getTable().getSchemaName())
+                .setTableName(tableMetadata.getTable().getTableName())
+                .setTableType(TableEntityType.TABLE.toString())
+                .setParameter(TABLE_ID_KEY, String.valueOf(tableId))
+                .build());
+        updateTableInfo(tableId, new TableInfo(
+                tableId,
+                tableMetadata.getTable().getSchemaName(),
+                tableMetadata.getTable().getTableName(),
+                columnInfos,
+                new HashMap<>()));
+
         boolean spillCompressionEnabled = MemoryTableProperties.getSpillCompressionEnabled(tableMetadata.getProperties());
 
-        return new MemoryOutputTableHandle(
+        return new MemoryWriteTableHandle(
                 nextId,
                 tableMetadata.getTable().getSchemaName(),
                 tableMetadata.getTable().getTableName(),
@@ -328,7 +350,8 @@ public class MemoryMetadata
                 getTableIdSet(nextId),
                 columns.build(),
                 sortedBy,
-                indexColumns);
+                indexColumns,
+                config.getSplitsPerNode());
     }
 
     private void checkSchemaExists(String schemaName, boolean expectExist)
@@ -362,40 +385,37 @@ public class MemoryMetadata
     public Optional<ConnectorOutputMetadata> finishCreateTable(ConnectorSession session, ConnectorOutputTableHandle tableHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
     {
         requireNonNull(tableHandle, "tableHandle is null");
-        MemoryOutputTableHandle memoryOutputHandle = (MemoryOutputTableHandle) tableHandle;
+        MemoryWriteTableHandle memoryOutputHandle = (MemoryWriteTableHandle) tableHandle;
 
-        List<ColumnInfo> columnInfos = memoryOutputHandle.getColumns();
-        long tableId = memoryOutputHandle.getTable();
-        metastore.createTable(TableEntity.builder()
-                .setCatalogName(MEM_KEY)
-                .setDatabaseName(memoryOutputHandle.getSchemaName())
-                .setTableName(memoryOutputHandle.getTableName())
-                .setTableType(TableEntityType.TABLE.toString())
-                .setParameter(ID_KEY, String.valueOf(tableId))
-                .build());
-        updateTableInfo(tableId, new TableInfo(
-                tableId,
+        metastore.alterTableParameter(MEM_KEY,
                 memoryOutputHandle.getSchemaName(),
                 memoryOutputHandle.getTableName(),
-                columnInfos,
-                new HashMap<>()));
+                TABLE_OUTPUT_HANDLE,
+                Base64.getEncoder().encodeToString(OUTPUT_TABLE_HANDLE_JSON_CODEC.toJsonBytes(memoryOutputHandle)));
 
         updateRowsOnHosts(memoryOutputHandle.getTable(), fragments);
         return Optional.empty();
     }
 
     @Override
-    public MemoryInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
+    public MemoryWriteTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         MemoryTableHandle memoryTableHandle = (MemoryTableHandle) tableHandle;
-        return new MemoryInsertTableHandle(memoryTableHandle.getId(), getTableIdSet());
+        TableInfo tableInfo = getTableInfo(memoryTableHandle.getId());
+        String creationHandleStr = getTableEntity(tableInfo.getSchemaTableName(), false).getParameters().get(TABLE_OUTPUT_HANDLE);
+
+        if (creationHandleStr == null) {
+            throw new PrestoException(GENERIC_USER_ERROR, "Table is in an invalid state and should be dropped and recreated.");
+        }
+
+        return OUTPUT_TABLE_HANDLE_JSON_CODEC.fromJson(Base64.getDecoder().decode(creationHandleStr));
     }
 
     @Override
     public Optional<ConnectorOutputMetadata> finishInsert(ConnectorSession session, ConnectorInsertTableHandle insertHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
     {
         requireNonNull(insertHandle, "insertHandle is null");
-        MemoryInsertTableHandle memoryInsertHandle = (MemoryInsertTableHandle) insertHandle;
+        MemoryWriteTableHandle memoryInsertHandle = (MemoryWriteTableHandle) insertHandle;
 
         updateRowsOnHosts(memoryInsertHandle.getTable(), fragments);
         return Optional.empty();

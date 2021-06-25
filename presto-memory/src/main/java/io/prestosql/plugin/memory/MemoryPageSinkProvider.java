@@ -30,11 +30,9 @@ import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import javax.inject.Inject;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 
 import static com.google.common.base.Preconditions.checkState;
-import static io.prestosql.plugin.memory.MemoryTableProperties.SPILL_COMPRESSION_DEFAULT_VALUE;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 
@@ -57,28 +55,35 @@ public class MemoryPageSinkProvider
         this.currentHostAddress = requireNonNull(currentHostAddress, "currentHostAddress is null");
     }
 
+    /**
+     * This method is used for CTAS (CREATE TABLE AS)
+     */
     @Override
     public ConnectorPageSink createPageSink(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorOutputTableHandle outputTableHandle)
     {
-        MemoryOutputTableHandle memoryOutputTableHandle = (MemoryOutputTableHandle) outputTableHandle;
+        // MemoryWriteTableHandle is used for both CTAS and inserts
+        MemoryWriteTableHandle memoryOutputTableHandle = (MemoryWriteTableHandle) outputTableHandle;
         long tableId = memoryOutputTableHandle.getTable();
         checkState(memoryOutputTableHandle.getActiveTableIds().contains(tableId));
 
         pagesStore.refreshTables(memoryOutputTableHandle.getActiveTableIds());
-        pagesStore.initialize(tableId, memoryOutputTableHandle.isCompressionEnabled(), memoryOutputTableHandle.getColumns(), memoryOutputTableHandle.getSortedBy(), memoryOutputTableHandle.getIndexColumns());
+        pagesStore.initialize(tableId,
+                memoryOutputTableHandle.isCompressionEnabled(),
+                memoryOutputTableHandle.getSplitsPerNode(),
+                memoryOutputTableHandle.getColumns(),
+                memoryOutputTableHandle.getSortedBy(),
+                memoryOutputTableHandle.getIndexColumns());
         return new MemoryPageSink(pagesStore, currentHostAddress, tableId);
     }
 
+    /**
+     * This method is used when inserting data after table has already been created
+     */
     @Override
     public ConnectorPageSink createPageSink(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorInsertTableHandle insertTableHandle)
     {
-        MemoryInsertTableHandle memoryInsertTableHandle = (MemoryInsertTableHandle) insertTableHandle;
-        long tableId = memoryInsertTableHandle.getTable();
-        checkState(memoryInsertTableHandle.getActiveTableIds().contains(tableId));
-
-        pagesStore.refreshTables(memoryInsertTableHandle.getActiveTableIds());
-        pagesStore.initialize(tableId, SPILL_COMPRESSION_DEFAULT_VALUE, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
-        return new MemoryPageSink(pagesStore, currentHostAddress, tableId);
+        // MemoryWriteTableHandle is used for both CTAS and inserts
+        return createPageSink(transactionHandle, session, (ConnectorOutputTableHandle) insertTableHandle);
     }
 
     private static class MemoryPageSink

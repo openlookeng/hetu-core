@@ -162,12 +162,12 @@ public class TestMemoryTableManager
 
     private static ConnectorOutputTableHandle createMemoryOutputTableHandle(long tableId, Long... activeTableIds)
     {
-        return new MemoryOutputTableHandle(tableId, ImmutableSet.copyOf(activeTableIds));
+        return new MemoryWriteTableHandle(tableId, ImmutableSet.copyOf(activeTableIds));
     }
 
     private static ConnectorInsertTableHandle createMemoryInsertTableHandle(long tableId, Long[] activeTableIds)
     {
-        return new MemoryInsertTableHandle(tableId, ImmutableSet.copyOf(activeTableIds));
+        return new MemoryWriteTableHandle(tableId, ImmutableSet.copyOf(activeTableIds));
     }
 
     private static Page createPage()

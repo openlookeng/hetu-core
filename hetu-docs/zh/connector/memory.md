@@ -17,7 +17,6 @@ memory.spill-path=/opt/data/spill
 ```
 
 **提示：**
-- `splits-per-node` 须小于节点上处理器核心的数量，并且必须*在所有节点上都相同*！
 - `spill-path`必须设置为一个有充足存储空间的路径。推荐使用SSD以获得更好性能。 可以依照需求自定义。 
 - 关于更多详细信息与其他可选配置项，请参见**配置属性** 章节。
 - 在`etc/config.properties`中，请确保`task.writer-count`的数字不小于配置的openLooKeng集群的节点个数。这会帮助把所有数据更均匀地分配到各个节点上。
@@ -61,7 +60,7 @@ memory.spill-path=/opt/data/spill
 
 | 属性名称                         | 默认值   | 是否必要 | 描述               |
 |---------------------------------------|-----------------|---------|---------------------------|
-| `memory.splits-per-node              `  | None          | Yes     | 每个节点的并行split个数 |
+| `memory.splits-per-node              `  | coordinator上可用的处理器数          | No     | 每个节点上的分片(Split)数量。默认值为coordinator上可用的处理器数。在worker上的设置该值会被忽略。当并发度高时，将该值调低可以提高性能。 |
 | `memory.spill-path                   `  | None          | Yes     | 在磁盘上持久化数据的位置。优先使用位于SSD的路径 |
 | `memory.max-data-per-node            `  | 256MB         | Yes     | 每个节点的内存大小使用限制 |
 | `memory.max-logical-part-size        `  | 256MB         | No      | 每个逻辑分片(LogicalPart)的大小限制 |
@@ -131,4 +130,5 @@ memory.spill-path=/opt/data/spill
 - `DROP TABLE`之后，worker上的内存没有立即释放。内存在下一次对内存连接器进行创建操作后释放。
     - 可以通过创建一个临时的表来在worker上强制清理，如`CREATE TABLE memory.default.tmp AS SELECT * FROM tpch.tiny.nation;`
 - 当前`sorted_by`只支持按一个列排序。
-- 当前`memory.splits-per-node`必须在所有节点上都设为相同值。未来的优化将自动配置该项。
+- 如果一个CTAS (CREATE TABLE AS)查询失败或被取消，一个无效的表的记录会留在系统中。该表将需要被手动删除。
+

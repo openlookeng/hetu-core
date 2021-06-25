@@ -18,8 +18,6 @@ memory.spill-path=/opt/data/spill
 ```   
 
 **Note:**
-- `splits-per-node` should be set to a value less than the number of cores on
- the nodes and must be set to the *same value on all nodes*!
 - `spill-path` should be set to a directory with enough free space to hold
  the table data.
 - See **Configuration Properties** section for additional properties and
@@ -70,7 +68,7 @@ Configuration Properties
 
 | Property Name                         | Default Value   | Required| Description               |
 |---------------------------------------|-----------------|---------|---------------------------|
-| `memory.splits-per-node              `  | None          | Yes     | Number of splits per node. All nodes must have the same value set. Value should be less than the number of cores on the node.|
+| `memory.splits-per-node              `  | Available processors on the coordinator          | No     | Number of splits to create per node. Default value is number of available processors on the coordinator. Value is ignored on the workers. In high concurrency, setting this value to a lower number will improve performance.|
 | `memory.spill-path                   `  | None          | Yes     | Directory where memory data will be spilled to. Must have enough free space to store the tables. SSD preferred.|
 | `memory.max-data-per-node            `  | 256MB         | Yes     | Memory limit for total data stored on this node  |
 | `memory.max-logical-part-size        `  | 256MB         | No      | Memory limit for each LogicalPart. Default value is recommended.|
@@ -153,4 +151,4 @@ Memory Connector Limitations and known Issues
 - After `DROP TABLE`, memory is not released immediately. It is released on next `CREATE TABLE` operation.
     - A simple workaround is to create a small temporary table to trigger a cleanup `CREATE TABLE memory.default.tmp AS SELECT * FROM tpch.tiny.nation;`
 - Currently only a single column in ascending order is supported by `sorted_by`
-- `memory.splits-per-node` must be set to the same value on all nodes. Future enhancements will automate this.
+- If a CTAS (CREATE TABLE AS) query fails or is cancelled, an invalid table will remain. This table must be dropped manually.

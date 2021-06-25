@@ -85,7 +85,8 @@ public class BenchmarkGeometryAggregations
             metastoreConfig.put("hetu.metastore.hetufilesystem.path", folder.newFolder("metastore").getAbsolutePath());
             queryRunner.loadMetastore(metastoreConfig);
             queryRunner.createCatalog("memory", new MemoryConnectorFactory(),
-                    ImmutableMap.of("memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath()));
+                    ImmutableMap.of("memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath(),
+                            "memory.splits-per-node", "1"));
 
             Path path = Paths.get(BenchmarkGeometryAggregations.class.getClassLoader().getResource("us-states.tsv").getPath());
             String polygonValues = Files.lines(path)
