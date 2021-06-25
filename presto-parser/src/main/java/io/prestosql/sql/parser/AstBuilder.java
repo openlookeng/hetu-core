@@ -488,7 +488,7 @@ class AstBuilder
     @Override
     public Node visitRefreshMetadataCache(SqlBaseParser.RefreshMetadataCacheContext context)
     {
-        Optional<Identifier> identifier = createIdentifier(null, context.catalog);
+        Optional<Identifier> identifier = createIdentifier(context.cluster, context.catalog);
         return new RefreshMetadataCache(getLocation(context), identifier);
     }
 

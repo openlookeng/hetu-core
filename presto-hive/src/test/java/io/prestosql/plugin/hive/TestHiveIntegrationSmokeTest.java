@@ -6565,4 +6565,11 @@ public class TestHiveIntegrationSmokeTest
         assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
         assertUpdate("DROP TABLE lineitem_orderkey_partkey_Distinct");
     }
+
+    @Test
+    public void testFailRefreshMetaCache()
+    {
+        assertQueryFails("REFRESH META CACHE FOR abc", "Catalog does not exist:abc");
+        assertQueryFails("REFRESH META CACHE FOR abc.def", "Catalog does not exist:abc.def");
+    }
 }
