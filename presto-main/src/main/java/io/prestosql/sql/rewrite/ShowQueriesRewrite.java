@@ -291,8 +291,11 @@ final class ShowQueriesRewrite
                 QualifiedObjectName qualifiedTableName = QualifiedObjectName.valueOf(cubeMetadata.getSourceTableName());
                 Map<QualifiedObjectName, Long> tableLastModifiedTimeMap = new HashMap<>();
                 long tableLastModifiedTime = tableLastModifiedTimeMap.computeIfAbsent(qualifiedTableName, ignored -> {
-                    TableHandle tableHandle = metadata.getTableHandle(session, qualifiedTableName).get();
-                    LongSupplier lastModifiedTimeSupplier = metadata.getTableLastModifiedTimeSupplier(session, tableHandle);
+                    Optional<TableHandle> tableHandle = metadata.getTableHandle(session, qualifiedTableName);
+                    if (!tableHandle.isPresent()) {
+                        return -1L;
+                    }
+                    LongSupplier lastModifiedTimeSupplier = metadata.getTableLastModifiedTimeSupplier(session, tableHandle.get());
                     return lastModifiedTimeSupplier == null ? -1L : lastModifiedTimeSupplier.getAsLong();
                 });
                 CubeStatus status = cubeMetadata.getCubeStatus();

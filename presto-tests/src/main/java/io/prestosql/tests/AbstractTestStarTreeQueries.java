@@ -650,6 +650,7 @@ public abstract class AbstractTestStarTreeQueries
         computeActual("CREATE CUBE orders_cube_predicate_unsupported_predicate ON orders_table_predicate_unsupported_predicate WITH (AGGREGATIONS=(sum(totalprice)), GROUP=(custkey, orderdate))");
         assertQueryFails("INSERT INTO CUBE orders_cube_predicate_unsupported_predicate WHERE orderdate = date '1992-01-01' OR custkey = 100", ".*Cannot support predicate.*");
         assertQueryFails("INSERT OVERWRITE CUBE orders_cube_predicate_unsupported_predicate WHERE orderdate = date '1992-01-01' OR custkey = 100", ".*Cannot support predicate.*");
+        assertQueryFails("INSERT INTO CUBE orders_cube_predicate_unsupported_predicate WHERE orderdate", ".*WHERE clause must evaluate to a boolean:.*");
         assertUpdate("DROP TABLE orders_table_predicate_unsupported_predicate");
     }
 
