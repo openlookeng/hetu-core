@@ -24,6 +24,7 @@ import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.prestosql.plugin.hive.ForCachingHiveMetastore;
+import io.prestosql.plugin.hive.ForCachingHiveMetastoreTableRefresh;
 import io.prestosql.plugin.hive.HiveBasicStatistics;
 import io.prestosql.plugin.hive.HiveConfig;
 import io.prestosql.plugin.hive.HiveErrorCode;
@@ -113,11 +114,16 @@ public class CachingHiveMetastore
     private final boolean dontVerifyCacheEntry;
 
     @Inject
-    public CachingHiveMetastore(@ForCachingHiveMetastore HiveMetastore delegate, @ForCachingHiveMetastore Executor executor, HiveConfig hiveConfig, NodeManager nodeManager)
+    public CachingHiveMetastore(@ForCachingHiveMetastore HiveMetastore delegate,
+                                @ForCachingHiveMetastore Executor executor,
+                                @ForCachingHiveMetastoreTableRefresh Executor tableRefreshExecutor,
+                                HiveConfig hiveConfig,
+                                NodeManager nodeManager)
     {
         this(
                 delegate,
                 executor,
+                tableRefreshExecutor,
                 hiveConfig.getMetastoreCacheTtl(),
                 hiveConfig.getMetastoreRefreshInterval(),
                 hiveConfig.getMetastoreDBCacheTtl(),
@@ -126,14 +132,14 @@ public class CachingHiveMetastore
                 !(nodeManager.getCurrentNode().isCoordinator() || hiveConfig.getWorkerMetaStoreCacheEnabled()));
     }
 
-    public CachingHiveMetastore(HiveMetastore delegate, Executor executor, Duration cacheTtl, Duration refreshInterval,
+    public CachingHiveMetastore(HiveMetastore delegate, Executor executor, Executor tableRefreshExecutor, Duration cacheTtl, Duration refreshInterval,
                                 Duration tableCacheTtl, Duration tableRefreshInterval,
                                 long maximumSize, boolean skipCache)
     {
         this(
                 delegate,
                 executor,
-                OptionalLong.of(cacheTtl.toMillis()),
+                tableRefreshExecutor, OptionalLong.of(cacheTtl.toMillis()),
                 refreshInterval.toMillis() >= cacheTtl.toMillis() ? OptionalLong.empty() : OptionalLong.of(refreshInterval.toMillis()),
                 OptionalLong.of(tableCacheTtl.toMillis()),
                 tableRefreshInterval.toMillis() >= tableCacheTtl.toMillis() ? OptionalLong.empty() : OptionalLong.of(tableRefreshInterval.toMillis()),
@@ -147,6 +153,7 @@ public class CachingHiveMetastore
         return new CachingHiveMetastore(
                 delegate,
                 newDirectExecutorService(),
+                newDirectExecutorService(),
                 OptionalLong.empty(),
                 OptionalLong.empty(),
                 OptionalLong.empty(),
@@ -155,7 +162,7 @@ public class CachingHiveMetastore
                 false || delegate instanceof CachingHiveMetastore);
     }
 
-    private CachingHiveMetastore(HiveMetastore delegate, Executor executor,
+    private CachingHiveMetastore(HiveMetastore delegate, Executor executor, Executor tableRefreshExecutor,
                                  OptionalLong expiresAfterWriteMillisTable, OptionalLong refreshMillsTable,
                                  OptionalLong expiresAfterWriteMillisDB, OptionalLong refreshMillsDB,
                                  long maximumSize, boolean skipCache)
@@ -197,10 +204,10 @@ public class CachingHiveMetastore
                 .build(asyncReloading(CacheLoader.from(this::loadAllViews), executor));
 
         tableCache = newCacheBuilder(tableCacheTtl, tableRefreshTtl, maximumSize)
-                .build(asyncReloading(CacheLoader.from(this::loadTable), executor));
+                .build(asyncReloading(CacheLoader.from(this::loadTable), tableRefreshExecutor));
 
         partitionNamesCache = newCacheBuilder(tableCacheTtl, tableRefreshTtl, maximumSize)
-                .build(asyncReloading(CacheLoader.from(this::loadPartitionNames), executor));
+                .build(asyncReloading(CacheLoader.from(this::loadPartitionNames), tableRefreshExecutor));
 
         tableStatisticsCache = newCacheBuilder(expiresAfterWriteMillisTable, refreshMillsTable, maximumSize)
                 .build(asyncReloading(new CacheLoader<WithIdentity<HiveTableName>, WithValidation<Table, PartitionStatistics>>()

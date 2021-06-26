@@ -187,7 +187,17 @@ public class HiveModule
     {
         return new BoundedExecutor(
                 newCachedThreadPool(daemonThreadsNamed("hive-metastore-" + catalogName + "-%s")),
-                hiveConfig.getMaxMetastoreRefreshThreads());
+                (int) Math.max(hiveConfig.getMaxMetastoreRefreshThreads() * 0.9, 9));
+    }
+
+    @ForCachingHiveMetastoreTableRefresh
+    @Singleton
+    @Provides
+    public Executor createCachingHiveMetastoreTableRefreshExecutor(HiveCatalogName catalogName, HiveConfig hiveConfig)
+    {
+        return new BoundedExecutor(
+                newCachedThreadPool(daemonThreadsNamed("hive-metastore-refresh-" + catalogName + "-%s")),
+                (int) Math.max(hiveConfig.getMaxMetastoreRefreshThreads() * 0.1, 1));
     }
 
     @Singleton

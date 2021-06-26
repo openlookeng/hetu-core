@@ -67,17 +67,19 @@ public class TestHiveWriterFactory
 {
     private ThriftMetastoreClient mockClient;
     protected ExecutorService executor;
+    protected ExecutorService executorRefresh;
     protected HiveMetastore metastore;
 
     private void setUp()
     {
         mockClient = new MockThriftMetastoreClient();
         executor = newCachedThreadPool(daemonThreadsNamed("hive-%s"));
+        executorRefresh = newCachedThreadPool(daemonThreadsNamed("hive-refresh-%s"));
         MetastoreLocator metastoreLocator = new MockMetastoreLocator(mockClient);
         metastore = new CachingHiveMetastore(
                 new BridgingHiveMetastore(new ThriftHiveMetastore(metastoreLocator, new ThriftHiveMetastoreConfig())),
                 executor,
-                Duration.valueOf("1m"),
+                executorRefresh, Duration.valueOf("1m"),
                 Duration.valueOf("15s"),
                 Duration.valueOf("1m"),
                 Duration.valueOf("15s"),
