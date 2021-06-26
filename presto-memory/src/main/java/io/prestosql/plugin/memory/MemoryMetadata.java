@@ -14,6 +14,7 @@
 package io.prestosql.plugin.memory;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import io.airlift.json.JsonCodec;
 import io.airlift.slice.Slice;
 import io.prestosql.plugin.memory.data.MemoryTableManager;
@@ -174,7 +175,33 @@ public class MemoryMetadata
     public ConnectorTableMetadata getTableMetadata(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         MemoryTableHandle handle = (MemoryTableHandle) tableHandle;
-        return getTableInfo((handle).getId()).getMetadata(typeManager);
+
+        TableInfo info = getTableInfo((handle).getId());
+
+        SchemaTableName schema = new SchemaTableName(info.getSchemaName(), info.getTableName());
+
+        List<ColumnMetadata> columns = info.getColumns().stream()
+                .map(columnInfo -> columnInfo.getMetadata(typeManager))
+                .collect(Collectors.toList());
+
+        ImmutableMap.Builder<String, Object> properties = ImmutableMap.builder();
+
+        String creationHandleStr = getTableEntity(info.getSchemaTableName(), false).getParameters().get(TABLE_OUTPUT_HANDLE);
+
+        if (creationHandleStr == null) {
+            throw new PrestoException(GENERIC_USER_ERROR, "Table is in an invalid state and should be dropped and recreated.");
+        }
+
+        MemoryWriteTableHandle tableWriteHandle = OUTPUT_TABLE_HANDLE_JSON_CODEC.fromJson(Base64.getDecoder().decode(creationHandleStr));
+        if (tableWriteHandle.getSortedBy() != null && !tableWriteHandle.getSortedBy().isEmpty()) {
+            properties.put(MemoryTableProperties.SORTED_BY_PROPERTY, tableWriteHandle.getSortedBy());
+        }
+        if (tableWriteHandle.getIndexColumns() != null && !tableWriteHandle.getIndexColumns().isEmpty()) {
+            properties.put(MemoryTableProperties.INDEX_COLUMNS_PROPERTY, tableWriteHandle.getIndexColumns());
+        }
+        properties.put(MemoryTableProperties.SPILL_COMPRESSION_PROPERTY, tableWriteHandle.isCompressionEnabled());
+
+        return new ConnectorTableMetadata(schema, columns, properties.build());
     }
 
     @Override
@@ -209,7 +236,7 @@ public class MemoryMetadata
                 .filter(entry -> !entry.getKey().equals(NEXT_ID_KEY))
                 .map(entry -> TableInfo.deserialize(entry.getValue()))
                 .filter(table -> prefix.matches(table.getSchemaTableName()))
-                .collect(toMap(TableInfo::getSchemaTableName, handle -> handle.getMetadata(typeManager).getColumns()));
+                .collect(toMap(TableInfo::getSchemaTableName, handle -> handle.getColumns(typeManager)));
     }
 
     @Override
@@ -240,6 +267,24 @@ public class MemoryMetadata
                 oldInfo.getColumns(),
                 oldInfo.getDataFragments()));
 
+        Optional<TableEntity> oldTableEntity = metastore.getTable(MEM_KEY, oldInfo.getSchemaName(), oldInfo.getTableName());
+        String oldOutputTableHandleStr = oldTableEntity.get().getParameters().get(TABLE_OUTPUT_HANDLE);
+        if (oldOutputTableHandleStr == null) {
+            throw new PrestoException(GENERIC_USER_ERROR, "Table is in an invalid state and should be dropped and recreated.");
+        }
+
+        MemoryWriteTableHandle oldTableHandle = OUTPUT_TABLE_HANDLE_JSON_CODEC.fromJson(Base64.getDecoder().decode(oldOutputTableHandleStr));
+        MemoryWriteTableHandle newTableHandle = new MemoryWriteTableHandle(
+                oldTableHandle.getTable(),
+                newTableName.getSchemaName(),
+                newTableName.getTableName(),
+                oldTableHandle.isCompressionEnabled(),
+                oldTableHandle.getActiveTableIds(),
+                oldTableHandle.getColumns(),
+                oldTableHandle.getSortedBy(),
+                oldTableHandle.getIndexColumns(),
+                oldTableHandle.getSplitsPerNode());
+
         metastore.alterTable(MEM_KEY, oldInfo.getSchemaName(), oldInfo.getTableName(),
                 TableEntity.builder()
                         .setCatalogName(MEM_KEY)
@@ -247,6 +292,7 @@ public class MemoryMetadata
                         .setTableName(newTableName.getTableName())
                         .setTableType(TableEntityType.TABLE.toString())
                         .setParameter(TABLE_ID_KEY, String.valueOf(tableId))
+                        .setParameter(TABLE_OUTPUT_HANDLE, Base64.getEncoder().encodeToString(OUTPUT_TABLE_HANDLE_JSON_CODEC.toJsonBytes(newTableHandle)))
                         .build());
     }
 

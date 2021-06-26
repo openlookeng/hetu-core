@@ -20,7 +20,7 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.json.JsonCodec;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.connector.ConnectorTableMetadata;
+import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.type.TypeManager;
 
@@ -80,13 +80,11 @@ public class TableInfo
         return new SchemaTableName(schemaName, tableName);
     }
 
-    public ConnectorTableMetadata getMetadata(TypeManager typeManager)
+    public List<ColumnMetadata> getColumns(TypeManager typeManager)
     {
-        return new ConnectorTableMetadata(
-                new SchemaTableName(schemaName, tableName),
-                columns.stream()
+        return columns.stream()
                         .map(columnInfo -> columnInfo.getMetadata(typeManager))
-                        .collect(Collectors.toList()));
+                        .collect(Collectors.toList());
     }
 
     @JsonProperty
