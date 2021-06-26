@@ -56,11 +56,12 @@ public class TestCachingHiveMetastore
         mockClient = new MockThriftMetastoreClient();
         MetastoreLocator metastoreLocator = new MockMetastoreLocator(mockClient);
         ListeningExecutorService executor = listeningDecorator(newCachedThreadPool(daemonThreadsNamed("test-%s")));
+        ListeningExecutorService executorRefresh = listeningDecorator(newCachedThreadPool(daemonThreadsNamed("test-%s")));
         ThriftHiveMetastore thriftHiveMetastore = new ThriftHiveMetastore(metastoreLocator, new ThriftHiveMetastoreConfig());
         metastore = new CachingHiveMetastore(
                 new BridgingHiveMetastore(thriftHiveMetastore),
                 executor,
-                new Duration(5, TimeUnit.MINUTES),
+                executorRefresh, new Duration(5, TimeUnit.MINUTES),
                 new Duration(1, TimeUnit.MINUTES),
                 new Duration(5, TimeUnit.MINUTES),
                 new Duration(1, TimeUnit.MINUTES),

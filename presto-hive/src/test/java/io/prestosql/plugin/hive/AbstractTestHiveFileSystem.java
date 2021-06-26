@@ -74,6 +74,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -173,6 +174,7 @@ public abstract class AbstractTestHiveFileSystem
 
         MetastoreLocator metastoreLocator = new TestingMetastoreLocator(config, host, port);
         ExecutorService executor = newCachedThreadPool(daemonThreadsNamed("hive-%s"));
+        ExecutorService executorRefresh = newCachedThreadPool(daemonThreadsNamed("hive-refresh-%s"));
         HivePartitionManager hivePartitionManager = new HivePartitionManager(TYPE_MANAGER, config);
 
         HdfsConfiguration hdfsConfiguration = hdfsConfigurationProvider.apply(config);
@@ -181,6 +183,7 @@ public abstract class AbstractTestHiveFileSystem
         metastoreClient = new TestingHiveMetastore(
                 new BridgingHiveMetastore(new ThriftHiveMetastore(metastoreLocator, new ThriftHiveMetastoreConfig())),
                 executor,
+                executorRefresh,
                 config,
                 getBasePath(),
                 hdfsEnvironment);
@@ -472,9 +475,9 @@ public abstract class AbstractTestHiveFileSystem
         private final Path basePath;
         private final HdfsEnvironment hdfsEnvironment;
 
-        public TestingHiveMetastore(HiveMetastore delegate, ExecutorService executor, HiveConfig hiveConfig, Path basePath, HdfsEnvironment hdfsEnvironment)
+        public TestingHiveMetastore(HiveMetastore delegate, ExecutorService executor, Executor executorRefresh, HiveConfig hiveConfig, Path basePath, HdfsEnvironment hdfsEnvironment)
         {
-            super(delegate, executor, hiveConfig, new TestingNodeManager("fake-environment"));
+            super(delegate, executor, executorRefresh, hiveConfig, new TestingNodeManager("fake-environment"));
             this.basePath = basePath;
             this.hdfsEnvironment = hdfsEnvironment;
         }

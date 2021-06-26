@@ -502,7 +502,7 @@ public class HiveConfig
         return this;
     }
 
-    @Min(1)
+    @Min(10)
     public int getMaxMetastoreRefreshThreads()
     {
         return maxMetastoreRefreshThreads;

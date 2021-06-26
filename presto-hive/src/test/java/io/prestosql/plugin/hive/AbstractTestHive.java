@@ -584,6 +584,7 @@ public abstract class AbstractTestHive
     protected ConnectorPageSourceProvider pageSourceProvider;
     protected ConnectorPageSinkProvider pageSinkProvider;
     protected ExecutorService executor;
+    protected ExecutorService executorRefresh;
 
     private ScheduledExecutorService heartbeatService;
     private ScheduledExecutorService vacuumExecutorService;
@@ -593,6 +594,7 @@ public abstract class AbstractTestHive
     public void setupClass()
     {
         executor = newCachedThreadPool(daemonThreadsNamed("hive-%s"));
+        executorRefresh = newCachedThreadPool(daemonThreadsNamed("hive-refresh-%s"));
         heartbeatService = newScheduledThreadPool(1);
         vacuumExecutorService = newScheduledThreadPool(1);
         hiveMetastoreClientService = newScheduledThreadPool(1);
@@ -714,7 +716,7 @@ public abstract class AbstractTestHive
         HiveMetastore metastore = new CachingHiveMetastore(
                 new BridgingHiveMetastore(new ThriftHiveMetastore(metastoreLocator, new ThriftHiveMetastoreConfig())),
                 executor,
-                Duration.valueOf("1m"),
+                executorRefresh, Duration.valueOf("1m"),
                 Duration.valueOf("15s"),
                 Duration.valueOf("1m"),
                 Duration.valueOf("15s"),
