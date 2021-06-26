@@ -49,6 +49,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
 import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -141,8 +142,9 @@ public class BaseJdbcRowExpressionConverter
             return handleOperator(call, functionMetadata, context);
         }
         if (functionMetadata.getName().getObjectName().equals(TIMESTAMP_LITERAL)) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
             long time = (long) ((ConstantExpression) call.getArguments().get(0)).getValue();
-            return format("TIMESTAMP '%s'", Instant.ofEpochMilli(time).atZone(UTC).toLocalDateTime());
+            return format("TIMESTAMP '%s'", formatter.format(Instant.ofEpochMilli(time).atZone(UTC).toLocalDateTime()));
         }
         return handleFunction(call, functionMetadata, context);
     }
@@ -252,8 +254,9 @@ public class BaseJdbcRowExpressionConverter
             return StandardTypes.DATE + " " + ExpressionFormatter.formatStringLiteral(date);
         }
         if (type instanceof TimestampType) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
             Long time = (Long) literal.getValue();
-            return format("TIMESTAMP '%s'", Instant.ofEpochMilli(time).atZone(UTC).toLocalDateTime());
+            return format("TIMESTAMP '%s'", formatter.format(Instant.ofEpochMilli(time).atZone(UTC).toLocalDateTime()));
         }
         throw new PrestoException(NOT_SUPPORTED, String.format("Cannot handle the constant expression %s with value of type %s", literal.getValue(), type));
     }
