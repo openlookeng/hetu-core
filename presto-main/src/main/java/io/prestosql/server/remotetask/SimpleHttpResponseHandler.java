@@ -30,6 +30,8 @@ import static java.util.Objects.requireNonNull;
 public class SimpleHttpResponseHandler<T>
         implements FutureCallback<BaseResponse<T>>
 {
+    // Used by SqlStageExecution to detect 5xx failures
+    public static final CharSequence EXPECT_200_SAW_5XX = format("to be %d, but was 5", HttpStatus.OK.code());
     private final SimpleHttpResponseCallback<T> callback;
 
     private final URI uri;
@@ -62,6 +64,7 @@ public class SimpleHttpResponseHandler<T>
                         cause = new PrestoException(REMOTE_TASK_ERROR, format("Expected response from %s is empty", uri));
                     }
                     else {
+                        // CAUTION: keep error message consistent with EXPECT_200_SAW_5XX.
                         cause = new PrestoException(REMOTE_TASK_ERROR, format("Expected response code from %s to be %s, but was %s%n%s",
                                 uri,
                                 HttpStatus.OK.code(),
@@ -84,12 +87,14 @@ public class SimpleHttpResponseHandler<T>
     private String createErrorMessage(BaseResponse<T> response)
     {
         if (response instanceof JsonResponseWrapper) {
+            // CAUTION: keep error message consistent with EXPECT_200_SAW_5XX.
             return format("Expected response code from %s to be %s, but was %s%n%s",
                     uri,
                     OK.code(),
                     response.getStatusCode(),
                     unwrapJsonResponse(response).getResponseBody());
         }
+        // CAUTION: keep error message consistent with EXPECT_200_SAW_5XX.
         return format("Expected response code from %s to be %s, but was %s: %s",
                 uri,
                 OK.code(),

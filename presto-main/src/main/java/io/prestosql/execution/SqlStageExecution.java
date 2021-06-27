@@ -33,6 +33,7 @@ import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 import io.prestosql.operator.HttpPageBufferClient;
+import io.prestosql.server.remotetask.SimpleHttpResponseHandler;
 import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
@@ -609,6 +610,12 @@ public final class SqlStageExecution
                             stateMachine.transitionToResumableFailure();
                             return;
                         }
+                    }
+                    else if (message.contains(SimpleHttpResponseHandler.EXPECT_200_SAW_5XX)) {
+                        // SimpleHttpResponseHandler can also produce errors that are resumable
+                        log.debug(failure, "Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
+                        stateMachine.transitionToResumableFailure();
+                        return;
                     }
                 }
                 stateMachine.transitionToFailed(failure);

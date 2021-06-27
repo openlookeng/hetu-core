@@ -88,9 +88,11 @@ public class ExchangeClient
     private boolean noMoreTargets;
     private final Set<String> allTargets = new HashSet<>();
     // Markers received before all targets are known. These markers will be sent to all new targets.
-    private final List<SerializedPage> pendingMarkers = Collections.synchronizedList(new ArrayList<>());
+    @GuardedBy("this")
+    private final List<SerializedPage> pendingMarkers = new ArrayList<>();
     // pendingOrigins keeps track of the origins in pendingMarkers
-    private final List<Optional<String>> pendingOrigins = Collections.synchronizedList(new ArrayList<>());
+    @GuardedBy("this")
+    private final List<Optional<String>> pendingOrigins = new ArrayList<>();
 
     @GuardedBy("this")
     private final Deque<HttpPageBufferClient> queuedClients = new LinkedList<>();
@@ -209,7 +211,7 @@ public class ExchangeClient
         }
     }
 
-    public void noMoreTargets()
+    public synchronized void noMoreTargets()
     {
         noMoreTargets = true;
         pendingMarkers.clear();

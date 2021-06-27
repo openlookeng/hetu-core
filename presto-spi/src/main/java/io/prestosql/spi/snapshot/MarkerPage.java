@@ -14,7 +14,6 @@
  */
 package io.prestosql.spi.snapshot;
 
-import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import io.prestosql.spi.Page;
 
@@ -90,7 +89,7 @@ public class MarkerPage
 
     public byte[] serialize()
     {
-        final int size = Longs.BYTES + Ints.BYTES + 1;
+        final int size = Longs.BYTES + 1;
         return ByteBuffer.allocate(size)
                 .putLong(snapshotId)
                 .put((byte) (isResuming ? 1 : 0))
