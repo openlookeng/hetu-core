@@ -120,7 +120,6 @@ headless: true
 - [SQL语言]("#")
     - [数据类型]({{< relref "./docs/language/types.md" >}})
     - [预留关键字]({{< relref "./docs/language/reserved.md" >}})
-    - [旧时间戳和新时间戳]({{< relref "./docs/language/timestamp.md" >}})
 
 - [SQL语法介绍]({{< relref "./docs/sql/_index.md" >}})
     - [ALTER SCHEMA]({{< relref "./docs/sql/alter-schema.md" >}})
