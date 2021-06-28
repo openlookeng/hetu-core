@@ -121,7 +121,6 @@ headless: true
 - [SQL Language]("#")
     - [Data Types]({{< relref "./docs/language/types.md" >}})
     - [Reserved Keywords]({{< relref "./docs/language/reserved.md" >}})
-    - [Legacy and New Timestamp]({{< relref "./docs/language/timestamp.md" >}})
 
 - [SQL Statement Syntax]({{< relref "./docs/sql/_index.md" >}})
     - [ALTER SCHEMA]({{< relref "./docs/sql/alter-schema.md" >}})
