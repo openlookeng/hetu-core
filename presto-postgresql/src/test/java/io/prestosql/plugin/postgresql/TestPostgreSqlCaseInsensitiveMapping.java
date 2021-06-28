@@ -37,6 +37,7 @@ public class TestPostgreSqlCaseInsensitiveMapping
         extends AbstractTestQueryFramework
 {
     private final TestingPostgreSqlServer postgreSqlServer;
+    protected final TestPostgreSqlExtendServer extendServer;
 
     public TestPostgreSqlCaseInsensitiveMapping()
             throws Exception
@@ -51,13 +52,26 @@ public class TestPostgreSqlCaseInsensitiveMapping
                 ImmutableMap.of("case-insensitive-name-matching", "true"),
                 ImmutableSet.of()));
         this.postgreSqlServer = postgreSqlServer;
+        this.extendServer = null;
+    }
+
+    protected TestPostgreSqlCaseInsensitiveMapping(QueryRunnerSupplier supplier, TestPostgreSqlExtendServer postgreSqlServer)
+    {
+        super(supplier);
+        this.postgreSqlServer = null;
+        this.extendServer = postgreSqlServer;
     }
 
     @AfterClass(alwaysRun = true)
-    public final void destroy()
+    public void destroy()
             throws IOException
     {
-        postgreSqlServer.close();
+        if (this.extendServer != null) {
+            extendServer.close();
+        }
+        else {
+            postgreSqlServer.close();
+        }
     }
 
     @Test
@@ -163,13 +177,13 @@ public class TestPostgreSqlCaseInsensitiveMapping
         }
     }
 
-    private AutoCloseable withSchema(String schemaName)
+    protected AutoCloseable withSchema(String schemaName)
     {
         execute("CREATE SCHEMA " + schemaName);
         return () -> execute("DROP SCHEMA " + schemaName);
     }
 
-    private AutoCloseable withTable(String tableName, String tableDefinition)
+    protected AutoCloseable withTable(String tableName, String tableDefinition)
     {
         execute(format("CREATE TABLE %s %s", tableName, tableDefinition));
         return () -> execute(format("DROP TABLE %s", tableName));
@@ -177,9 +191,16 @@ public class TestPostgreSqlCaseInsensitiveMapping
 
     private void execute(String sql)
     {
-        try (Connection connection = DriverManager.getConnection(postgreSqlServer.getJdbcUrl());
-                Statement statement = connection.createStatement()) {
-            statement.execute(sql);
+        Connection connection;
+        try {
+            if (extendServer != null) {
+                extendServer.execute(sql);
+            }
+            else {
+                connection = DriverManager.getConnection(postgreSqlServer.getJdbcUrl());
+                Statement statement = connection.createStatement();
+                statement.execute(sql);
+            }
         }
         catch (Exception e) {
             throw new RuntimeException("Failed to execute statement: " + sql, e);

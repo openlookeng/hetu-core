@@ -14,9 +14,9 @@
 
 package io.hetu.core.plugin.opengauss;
 
-import io.prestosql.plugin.postgresql.TestPostgreSqlConfig;
+import io.prestosql.plugin.postgresql.TestPostgreSqlPlugin;
 
-public class TestOpenGaussConfig
-        extends TestPostgreSqlConfig
+public class TestOpenGaussPlugin
+        extends TestPostgreSqlPlugin
 {
 }
