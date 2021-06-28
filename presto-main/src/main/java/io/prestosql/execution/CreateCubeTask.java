@@ -72,9 +72,9 @@ import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.sql.NodeUtils.mapFromProperties;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.CUBE_ALREADY_EXISTS;
+import static io.prestosql.sql.analyzer.SemanticErrorCode.CUBE_OR_TABLE_ALREADY_EXISTS;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_COLUMN;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_TABLE;
-import static io.prestosql.sql.analyzer.SemanticErrorCode.TABLE_ALREADY_EXISTS;
 import static java.lang.String.format;
 import static java.util.Locale.ENGLISH;
 
@@ -122,10 +122,9 @@ public class CreateCubeTask
             }
             return immediateFuture(null);
         }
-
         if (cubeHandle.isPresent()) {
             if (!statement.isNotExists()) {
-                throw new SemanticException(TABLE_ALREADY_EXISTS, statement, "Table '%s' already exists", cubeName);
+                throw new SemanticException(CUBE_OR_TABLE_ALREADY_EXISTS, statement, "Cube or Table '%s' already exists", cubeName);
             }
             return immediateFuture(null);
         }

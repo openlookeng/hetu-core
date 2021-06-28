@@ -266,7 +266,7 @@ public abstract class AbstractTestStarTreeQueries
         computeActual("CREATE TABLE nation_table_create_cube_test_1 AS SELECT * FROM nation");
         assertQueryFails("CREATE CUBE nation ON nation " +
                 "WITH (AGGREGATIONS=(count(*))," +
-                " group=(nationkey), format= 'orc', partitioned_by = ARRAY['nationkey'])", "line 1:1: Table 'hive.tpch.nation' already exists");
+                " group=(nationkey), format= 'orc', partitioned_by = ARRAY['nationkey'])", "line 1:1: Cube or Table 'hive.tpch.nation' already exists");
         assertQueryFails("CREATE CUBE nation_create_cube_1 ON abcd " +
                 "WITH (AGGREGATIONS=(count(*), count(nationkey))," +
                 " group=(nationkey), format= 'orc', partitioned_by = ARRAY['nationkey'])", "line 1:1: Table 'hive.tpch.abcd' does not exist");
