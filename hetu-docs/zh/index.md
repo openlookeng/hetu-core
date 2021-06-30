@@ -197,7 +197,6 @@ headless: true
     - [密码验证器]({{< relref "./docs/develop/password-authenticator.md" >}})
     - [事件侦听器]({{< relref "./docs/develop/event-listener.md" >}})
     - [文件系统访问实用程序]({{< relref "./docs/develop/filesystem.md" >}})
-    - [启发式索引]({{< relref "./docs/develop/indexer.md" >}})
     - [Hive ORC Cache]({{< relref "./docs/develop/hive-orc-cache.md" >}})
     - [外部函数注册和下推]({{< relref "./docs/develop/externalfunction-registration-pushdown.md" >}})
     - [Star-tree多维数据集]({{< relref "./docs/develop/star-tree-cube.md" >}})
