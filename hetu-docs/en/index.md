@@ -203,7 +203,6 @@ headless: true
     - [Password Authenticator]({{< relref "./docs/develop/password-authenticator.md" >}})
     - [Event Listener]({{< relref "./docs/develop/event-listener.md" >}})
     - [Filesystem Access Utilities]({{< relref "./docs/develop/filesystem.md" >}})
-    - [Heuristic indexer]({{< relref "./docs/develop/indexer.md" >}})
     - [Hive ORC Cache]({{< relref "./docs/develop/hive-orc-cache.md" >}})
     - [External Function Registration and Push Down]({{< relref "./docs/develop/externalfunction-registration-pushdown.md" >}})
     - [Star Tree Cube]({{< relref "./docs/develop/star-tree-cube.md" >}})
