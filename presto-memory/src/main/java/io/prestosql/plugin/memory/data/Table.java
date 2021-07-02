@@ -246,6 +246,11 @@ public class Table
         }
     }
 
+    public void offLoadPages()
+    {
+        splits.forEach(logicalParts -> logicalParts.forEach(LogicalPart::unloadPages));
+    }
+
     public void setState(TableState state)
     {
         tableState = state;

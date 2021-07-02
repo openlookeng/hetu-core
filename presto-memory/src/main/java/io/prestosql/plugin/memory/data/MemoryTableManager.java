@@ -72,6 +72,7 @@ public class MemoryTableManager
 {
     private static final Logger LOG = Logger.get(MemoryTableManager.class);
     private static final String TABLE_METADATA_SUFFIX = "_tabledata";
+    private static final int CREATION_SCALE_FACTOR = 4;
     private static final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
     private final Path spillRoot;
@@ -115,7 +116,7 @@ public class MemoryTableManager
         }
     }
 
-    public void finishUpdatingTable(long id)
+    public synchronized void finishUpdatingTable(long id)
     {
         tables.get(id).finishCreation();
 
@@ -129,8 +130,11 @@ public class MemoryTableManager
                     try {
                         if (tables.get(id).isSpilled()) {
                             timer.cancel();
+                            return;
                         }
                         spillTable(id);
+                        // processing has finished. Creation overhead can be released
+                        releaseMemory(tables.get(id).getByteSize() * (CREATION_SCALE_FACTOR - 1), "Finish processing table " + id);
                     }
                     catch (Exception e) {
                         LOG.error("Failed to serialize table " + id, e);
@@ -166,7 +170,7 @@ public class MemoryTableManager
         page.compact();
 
         Table table = tables.get(tableId); // get current table to make sure it's not LRU
-        applyForMemory(page.getSizeInBytes(), tableId, () -> {}, () -> releaseMemory(table.rollBackUncommitted(), "Rolling back."));
+        applyForMemory(page.getSizeInBytes() * CREATION_SCALE_FACTOR, tableId, () -> {}, () -> releaseMemory(table.rollBackUncommitted() * CREATION_SCALE_FACTOR, "Rolling back."));
         table.add(page);
     }
 
@@ -253,7 +257,9 @@ public class MemoryTableManager
     {
         if (tables.containsKey(tableId)) {
             try {
-                releaseMemory(tables.get(tableId).getByteSize(), "Cleaning table");
+                Table table = tables.get(tableId);
+                long toRelease = table.isSpilled() ? table.getByteSize() : table.getByteSize() * CREATION_SCALE_FACTOR;
+                releaseMemory(toRelease, "Cleaning table");
                 tables.remove(tableId);
             }
             catch (Exception e) {
@@ -397,6 +403,7 @@ public class MemoryTableManager
             if (lru != null && lru.getKey() != reserved && lru.getValue().isSpilled()) {
                 // if there is any LRU table available to be dropped, evict it to make space for current
                 releaseMemory(lru.getValue().getByteSize(), "Offloading LRU");
+                tables.get(lru.getKey()).offLoadPages(); // clean reference and help GC
                 tables.remove(lru.getKey());
                 logNumFormat("Released %s bytes by offloading LRU table %s. Current bytes after offloading: %s", lru.getValue().getByteSize(), lru.getKey(), currentBytes.get());
                 newSize = currentBytes.get() + bytes;
