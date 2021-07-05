@@ -17,7 +17,7 @@ package io.prestosql.plugin.memory.data;
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
-import io.prestosql.plugin.memory.ColumnInfo;
+import io.prestosql.plugin.memory.MemoryColumnHandle;
 import io.prestosql.plugin.memory.MemoryConfig;
 import io.prestosql.plugin.memory.MemoryThreadManager;
 import io.prestosql.plugin.memory.SortingColumn;
@@ -81,7 +81,7 @@ public class Table
             List.class.getName(),
             ArrayList.class.getName(),
             TableState.class.getName(),
-            ColumnInfo.class.getName(),
+            MemoryColumnHandle.class.getName(),
             SortingColumn.class.getName(),
             SortOrder.class.getName(),
             Enum.class.getName(),
@@ -101,7 +101,7 @@ public class Table
     private final long processingDelay;
     private final int totalSplits;
     private final AtomicInteger nextSplit;
-    private final List<ColumnInfo> columns;
+    private final List<MemoryColumnHandle> columns;
     private final List<SortingColumn> sortedBy;
     private final List<String> indexColumns;
     private final long maxLogicalPartBytes;
@@ -117,7 +117,7 @@ public class Table
     private transient PageSorter pageSorter;
     private transient TypeManager typeManager;
 
-    public Table(long id, boolean compressionEnabled, int splitsPerNode, Path tableDataRoot, List<ColumnInfo> columns, List<SortingColumn> sortedBy,
+    public Table(long id, boolean compressionEnabled, int splitsPerNode, Path tableDataRoot, List<MemoryColumnHandle> columns, List<SortingColumn> sortedBy,
             List<String> indexColumns, PageSorter pageSorter, MemoryConfig config, TypeManager typeManager, PagesSerde pagesSerde)
     {
         this.tableDataRoot = tableDataRoot;

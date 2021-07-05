@@ -25,7 +25,6 @@ import io.airlift.slice.SliceOutput;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.PagesSerdeUtil;
-import io.prestosql.plugin.memory.ColumnInfo;
 import io.prestosql.plugin.memory.MemoryColumnHandle;
 import io.prestosql.plugin.memory.SortingColumn;
 import io.prestosql.spi.Page;
@@ -136,7 +135,7 @@ public class LogicalPart
     private transient List<Page> pages;
 
     public LogicalPart(
-            List<ColumnInfo> columns,
+            List<MemoryColumnHandle> columns,
             List<SortingColumn> sortedBy,
             List<String> indexColumns,
             Path tableDataRoot,
@@ -162,7 +161,7 @@ public class LogicalPart
         requireNonNull(sortedBy, "sortedBy is null");
 
         types = new ArrayList<>();
-        for (ColumnInfo column : columns) {
+        for (MemoryColumnHandle column : columns) {
             types.add(column.getType(typeManager));
         }
 
@@ -172,20 +171,20 @@ public class LogicalPart
 
         for (SortingColumn sortingColumn : sortedBy) {
             String sortColumnName = sortingColumn.getColumnName();
-            for (ColumnInfo column : columns) {
-                if (column.getName().equalsIgnoreCase(sortColumnName)) {
-                    sortChannels.add(column.getIndex());
+            for (MemoryColumnHandle column : columns) {
+                if (column.getColumnName().equalsIgnoreCase(sortColumnName)) {
+                    sortChannels.add(column.getColumnIndex());
                     sortOrders.add(sortingColumn.getOrder());
-                    indexChannels.add(column.getIndex());
+                    indexChannels.add(column.getColumnIndex());
                     break;
                 }
             }
         }
 
         for (String indexColumn : indexColumns) {
-            for (ColumnInfo column : columns) {
-                if (column.getName().equalsIgnoreCase(indexColumn)) {
-                    indexChannels.add(column.getIndex());
+            for (MemoryColumnHandle column : columns) {
+                if (column.getColumnName().equalsIgnoreCase(indexColumn)) {
+                    indexChannels.add(column.getColumnIndex());
                 }
             }
         }

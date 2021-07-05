@@ -168,7 +168,7 @@ public class MemoryMetadata
             return null;
         }
 
-        return new MemoryTableHandle(Long.parseLong(idStr));
+        return new MemoryTableHandle(Long.parseLong(idStr), schemaTableName.getSchemaName(), schemaTableName.getTableName());
     }
 
     @Override
@@ -217,7 +217,7 @@ public class MemoryMetadata
         MemoryTableHandle handle = (MemoryTableHandle) tableHandle;
         return getTableInfo(handle.getId())
                 .getColumns().stream()
-                .collect(toMap(ColumnInfo::getName, ColumnInfo::getHandle));
+                .collect(toMap(MemoryColumnHandle::getColumnName, memoryColumnHandle -> memoryColumnHandle));
     }
 
     @Override
@@ -265,7 +265,8 @@ public class MemoryMetadata
                 newTableName.getSchemaName(),
                 newTableName.getTableName(),
                 oldInfo.getColumns(),
-                oldInfo.getDataFragments()));
+                oldInfo.getDataFragments(),
+                System.currentTimeMillis()));
 
         Optional<TableEntity> oldTableEntity = metastore.getTable(MEM_KEY, oldInfo.getSchemaName(), oldInfo.getTableName());
         String oldOutputTableHandleStr = oldTableEntity.get().getParameters().get(TABLE_OUTPUT_HANDLE);
@@ -341,11 +342,11 @@ public class MemoryMetadata
             }
         }
 
-        ImmutableList.Builder<ColumnInfo> columns = ImmutableList.builder();
+        ImmutableList.Builder<MemoryColumnHandle> columns = ImmutableList.builder();
         Map<String, ColumnMetadata> columnNames = new HashMap<>();
         for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
             ColumnMetadata column = tableMetadata.getColumns().get(i);
-            columns.add(new ColumnInfo(new MemoryColumnHandle(i, column.getType().getTypeSignature()), column.getName()));
+            columns.add(new MemoryColumnHandle(column.getName(), i, column.getType().getTypeSignature()));
             columnNames.put(column.getName(), column);
         }
 
@@ -371,7 +372,7 @@ public class MemoryMetadata
 
         long tableId = nextId;
 
-        List<ColumnInfo> columnInfos = columns.build();
+        List<MemoryColumnHandle> columnHandles = columns.build();
         metastore.createTable(TableEntity.builder()
                 .setCatalogName(MEM_KEY)
                 .setDatabaseName(tableMetadata.getTable().getSchemaName())
@@ -383,8 +384,9 @@ public class MemoryMetadata
                 tableId,
                 tableMetadata.getTable().getSchemaName(),
                 tableMetadata.getTable().getTableName(),
-                columnInfos,
-                new HashMap<>()));
+                columnHandles,
+                new HashMap<>(),
+                System.currentTimeMillis()));
 
         boolean spillCompressionEnabled = MemoryTableProperties.getSpillCompressionEnabled(tableMetadata.getProperties());
 
@@ -394,7 +396,7 @@ public class MemoryMetadata
                 tableMetadata.getTable().getTableName(),
                 spillCompressionEnabled,
                 getTableIdSet(nextId),
-                columns.build(),
+                columnHandles,
                 sortedBy,
                 indexColumns,
                 config.getSplitsPerNode());
@@ -425,6 +427,12 @@ public class MemoryMetadata
             throw isView ? new ViewNotFoundException(tableName) : new TableNotFoundException(tableName);
         }
         return tableEntity.get();
+    }
+
+    @Override
+    public boolean isPreAggregationSupported(ConnectorSession session)
+    {
+        return true;
     }
 
     @Override
@@ -524,7 +532,7 @@ public class MemoryMetadata
             dataFragments.merge(memoryDataFragment.getHostAddress(), memoryDataFragment, MemoryDataFragment::merge);
         }
 
-        updateTableInfo(tableId, new TableInfo(tableId, info.getSchemaName(), info.getTableName(), info.getColumns(), dataFragments));
+        updateTableInfo(tableId, new TableInfo(tableId, info.getSchemaName(), info.getTableName(), info.getColumns(), dataFragments, System.currentTimeMillis()));
     }
 
     @Override
@@ -578,16 +586,25 @@ public class MemoryMetadata
         if (constraint.getSummary().isAll()) {
             return Optional.empty();
         }
-
         MemoryTableHandle memoryTableHandle = (MemoryTableHandle) handle;
+
+        TableInfo tableInfo = getTableInfo(memoryTableHandle.getId());
 
         MemoryTableHandle newMemoryTableHandle = new MemoryTableHandle(
                 memoryTableHandle.getId(),
+                tableInfo.getSchemaName(),
+                tableInfo.getTableName(),
                 memoryTableHandle.getLimit(),
                 memoryTableHandle.getSampleRatio(),
                 constraint.getSummary());
 
         return Optional.of(new ConstraintApplicationResult<>(newMemoryTableHandle, constraint.getSummary()));
+    }
+
+    @Override
+    public long getTableModificationTime(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        return getTableInfo(((MemoryTableHandle) tableHandle).getId()).getModificationTime();
     }
 
     /**
