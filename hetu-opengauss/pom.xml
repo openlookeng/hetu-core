@@ -172,7 +172,7 @@
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-postgresql</artifactId>
-            <version>1.3.0-SNAPSHOT</version>
+            <version>1.4.0-SNAPSHOT</version>
             <classifier>tests</classifier>
             <scope>test</scope>
             <exclusions>
