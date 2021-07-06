@@ -252,6 +252,11 @@ public class ClientOptions
         return builder.build();
     }
 
+    public String getMaxBatchProcessSize()
+    {
+        return maxBatchProcessSize;
+    }
+
     public static final class ClientResourceEstimate
     {
         private final String resource;

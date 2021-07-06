@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -20,7 +21,9 @@ import io.airlift.log.Logger;
 import io.prestosql.client.ClientSelectedRole;
 import io.prestosql.client.Column;
 import io.prestosql.client.ErrorLocation;
+import io.prestosql.client.QueryData;
 import io.prestosql.client.QueryError;
+import io.prestosql.client.QueryResults;
 import io.prestosql.client.QueryStatusInfo;
 import io.prestosql.client.StatementClient;
 import io.prestosql.client.Warning;
@@ -53,7 +56,7 @@ import static org.jline.utils.AttributedStyle.CYAN;
 import static org.jline.utils.AttributedStyle.DEFAULT;
 import static org.jline.utils.AttributedStyle.RED;
 
-public class Query
+public class CubeQuery
         implements Closeable
 {
     private static final Signal SIGINT = new Signal("INT");
@@ -63,12 +66,14 @@ public class Query
     private final AtomicBoolean ignoreUserInterrupt = new AtomicBoolean();
     private final StatementClient client;
     private final boolean debug;
+    private final CubeConsole cubeConsole;
     private String cubeInitQueryResult;
 
-    public Query(StatementClient client, boolean debug)
+    public CubeQuery(StatementClient client, boolean debug, CubeConsole cubeConsole)
     {
         this.client = requireNonNull(client, "client is null");
         this.debug = debug;
+        this.cubeConsole = requireNonNull(cubeConsole, "cubeConsole is null");
     }
 
     public Optional<String> getSetCatalog()
@@ -116,12 +121,17 @@ public class Query
         return client.getStartedTransactionId();
     }
 
+    public StatementClient getClient()
+    {
+        return client;
+    }
+
     public boolean isClearTransactionId()
     {
         return client.isClearTransactionId();
     }
 
-    public boolean renderOutput(Terminal terminal, PrintStream out, PrintStream errorChannel, ClientOptions.OutputFormat outputFormat, boolean usePager, boolean showProgress)
+    public boolean renderCubeOutput(Terminal terminal, PrintStream out, PrintStream errorChannel, ClientOptions.OutputFormat outputFormat, boolean usePager, boolean showProgress)
     {
         Thread clientThread = Thread.currentThread();
         SignalHandler oldHandler = Signal.handle(SIGINT, signal -> {
@@ -132,7 +142,7 @@ public class Query
             clientThread.interrupt();
         });
         try {
-            return renderQueryOutput(terminal, out, errorChannel, outputFormat, usePager, showProgress);
+            return resultsCubeInitialQuery(terminal, out, errorChannel, outputFormat, usePager, showProgress);
         }
         finally {
             Signal.handle(SIGINT, oldHandler);
@@ -140,7 +150,7 @@ public class Query
         }
     }
 
-    private boolean renderQueryOutput(Terminal terminal, PrintStream out, PrintStream errorChannel, ClientOptions.OutputFormat outputFormat, boolean usePager, boolean showProgress)
+    private boolean resultsCubeInitialQuery(Terminal terminal, PrintStream out, PrintStream errorChannel, ClientOptions.OutputFormat outputFormat, boolean usePager, boolean showProgress)
     {
         StatusPrinter statusPrinter = null;
         WarningsPrinter warningsPrinter = new PrintStreamWarningsPrinter(errorChannel);
@@ -164,6 +174,15 @@ public class Query
             }
             else {
                 renderResults(out, outputFormat, usePager, results.getColumns());
+                ///populate results from here
+                if (client.isFinished() && client.finalStatusInfo().getError() == null) {
+                    QueryData queryData = ((QueryResults) results);
+                    if (queryData.getData().iterator().hasNext()) {
+                        if (queryData.getData().iterator().next().iterator().hasNext()) {
+                            cubeInitQueryResult = queryData.getData().iterator().next().iterator().next().toString();
+                        }
+                    }
+                }
             }
         }
 
@@ -227,8 +246,9 @@ public class Query
 
     private void discardResults()
     {
-        try (OutputHandler handler = new OutputHandler(new NullPrinter())) {
+        try (CubeOutputHandler handler = new CubeOutputHandler(new NullPrinter())) {
             handler.processRows(client);
+            handler.getRowBuffer();
         }
         catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -266,7 +286,7 @@ public class Query
         try (Pager pager = Pager.create();
                 ThreadInterruptor clientThread = new ThreadInterruptor();
                 Writer writer = createWriter(pager);
-                OutputHandler handler = createOutputHandler(format, writer, columns)) {
+                CubeOutputHandler handler = createCubeOutputHandler(format, writer, columns)) {
             if (!pager.isNullPager()) {
                 // ignore the user pressing ctrl-C while in the pager
                 ignoreUserInterrupt.set(true);
@@ -277,6 +297,10 @@ public class Query
                 });
             }
             handler.processRows(client);
+            List<List<?>> rowBuffer = handler.getRowBuffer();
+            RowBufferHandler rowBufferHandler = new RowBufferHandler(cubeConsole, rowBuffer);
+            rowBufferHandler.processIterationIndex();
+            cubeConsole.setListRowBufferIterationItems(rowBufferHandler.getRowBufferIterationItems());
         }
         catch (RuntimeException | IOException e) {
             if (client.isClientAborted() && !(e instanceof QueryAbortedException)) {
@@ -289,14 +313,19 @@ public class Query
     private void sendOutput(PrintStream out, ClientOptions.OutputFormat format, List<Column> fieldNames)
             throws IOException
     {
-        try (OutputHandler handler = createOutputHandler(format, createWriter(out), fieldNames)) {
+        try (CubeOutputHandler handler = createCubeOutputHandler(format, createWriter(out), fieldNames)) {
             handler.processRows(client);
+            //new method
+            List<List<?>> rowBuffer = handler.getRowBuffer();
+            RowBufferHandler rowBufferHandler = new RowBufferHandler(cubeConsole, rowBuffer);
+            rowBufferHandler.processIterationIndex();
+            cubeConsole.setListRowBufferIterationItems(rowBufferHandler.getRowBufferIterationItems());
         }
     }
 
-    private static OutputHandler createOutputHandler(ClientOptions.OutputFormat format, Writer writer, List<Column> columns)
+    private static CubeOutputHandler createCubeOutputHandler(ClientOptions.OutputFormat format, Writer writer, List<Column> columns)
     {
-        return new OutputHandler(createOutputPrinter(format, writer, columns));
+        return new CubeOutputHandler(createOutputPrinter(format, writer, columns));
     }
 
     private static OutputPrinter createOutputPrinter(ClientOptions.OutputFormat format, Writer writer, List<Column> columns)

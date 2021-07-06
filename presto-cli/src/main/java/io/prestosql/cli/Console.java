@@ -143,6 +143,7 @@ public class Console
             if (hasQuery) {
                 if (createCubePattern.matcher(query).matches()) {
                     CubeConsole cubeConsole = new CubeConsole(this);
+                    queryRunner.setCubeConsole(cubeConsole);
                     return cubeConsole.executeCubeCommand(
                             queryRunner,
                             exiting,
@@ -278,7 +279,8 @@ public class Console
                         PrintStream out = System.out;
                         PrintStream errorChannel = System.out;
                         CubeConsole cubeConsole = new CubeConsole(this);
-                        cubeConsole.createCubeCommand(split.statement(), queryRunner, ClientOptions.OutputFormat.NULL, tableNameCompleter::populateCache, true, true, reader.getTerminal(), out, errorChannel);
+                        queryRunner.setCubeConsole(cubeConsole);
+                        cubeConsole.createCubeCommand(split.statement(), queryRunner, ClientOptions.OutputFormat.NULL, tableNameCompleter::populateCache, false, true, reader.getTerminal(), out, errorChannel);
                     }
                     else {
                         process(queryRunner, split.statement(), outputFormat, tableNameCompleter::populateCache, true, true, reader.getTerminal(), System.out, System.out);
