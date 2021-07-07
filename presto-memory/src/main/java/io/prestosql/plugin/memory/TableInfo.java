@@ -39,22 +39,25 @@ public class TableInfo
     private final long id;
     private final String schemaName;
     private final String tableName;
-    private final List<ColumnInfo> columns;
+    private final List<MemoryColumnHandle> columns;
     private final Map<HostAddress, MemoryDataFragment> dataFragments;
+    private final long modificationTime;
 
     @JsonCreator
     public TableInfo(
             @JsonProperty("id") long id,
             @JsonProperty("schemaName") String schemaName,
             @JsonProperty("tableName") String tableName,
-            @JsonProperty("columns") List<ColumnInfo> columns,
-            @JsonProperty("dataFragments") Map<HostAddress, MemoryDataFragment> dataFragments)
+            @JsonProperty("columns") List<MemoryColumnHandle> columns,
+            @JsonProperty("dataFragments") Map<HostAddress, MemoryDataFragment> dataFragments,
+            @JsonProperty("modificationTime") long modificationTime)
     {
         this.id = requireNonNull(id, "handle is null");
         this.schemaName = requireNonNull(schemaName, "schemaName is null");
         this.tableName = requireNonNull(tableName, "tableName is null");
         this.columns = ImmutableList.copyOf(columns);
         this.dataFragments = ImmutableMap.copyOf(dataFragments);
+        this.modificationTime = modificationTime;
     }
 
     @JsonProperty
@@ -83,20 +86,20 @@ public class TableInfo
     public List<ColumnMetadata> getColumns(TypeManager typeManager)
     {
         return columns.stream()
-                        .map(columnInfo -> columnInfo.getMetadata(typeManager))
-                        .collect(Collectors.toList());
+                .map(columnInfo -> columnInfo.getMetadata(typeManager))
+                .collect(Collectors.toList());
     }
 
     @JsonProperty
-    public List<ColumnInfo> getColumns()
+    public List<MemoryColumnHandle> getColumns()
     {
         return columns;
     }
 
-    public ColumnInfo getColumn(ColumnHandle handle)
+    public MemoryColumnHandle getColumn(ColumnHandle handle)
     {
         return columns.stream()
-                .filter(column -> column.getHandle().equals(handle))
+                .filter(column -> column.equals(handle))
                 .findFirst()
                 .get();
     }
@@ -105,6 +108,12 @@ public class TableInfo
     public Map<HostAddress, MemoryDataFragment> getDataFragments()
     {
         return dataFragments;
+    }
+
+    @JsonProperty
+    public long getModificationTime()
+    {
+        return modificationTime;
     }
 
     public String serialize()

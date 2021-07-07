@@ -33,7 +33,7 @@ public final class MemoryWriteTableHandle
     private final long table;
     private final boolean compressionEnabled;
     private final Set<Long> activeTableIds;
-    private final List<ColumnInfo> columns;
+    private final List<MemoryColumnHandle> columns;
     private final List<SortingColumn> sortedBy;
     private final List<String> indexColumns;
     private final String schemaName;
@@ -47,7 +47,7 @@ public final class MemoryWriteTableHandle
             @JsonProperty("tableName") String tableName,
             @JsonProperty("compressEnabled") boolean compressionEnabled,
             @JsonProperty("activeTableIds") Set<Long> activeTableIds,
-            @JsonProperty("columns") List<ColumnInfo> columns,
+            @JsonProperty("columns") List<MemoryColumnHandle> columns,
             @JsonProperty("sortedBy") List<SortingColumn> sortedBy,
             @JsonProperty("indexColumns") List<String> indexColumns,
             @JsonProperty("splitsPerNode") int splitsPerNode)
@@ -94,7 +94,7 @@ public final class MemoryWriteTableHandle
     }
 
     @JsonProperty
-    public List<ColumnInfo> getColumns()
+    public List<MemoryColumnHandle> getColumns()
     {
         return columns;
     }

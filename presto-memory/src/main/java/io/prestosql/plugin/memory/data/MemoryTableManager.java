@@ -19,7 +19,7 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.hetu.core.common.util.SecureObjectInputStream;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
-import io.prestosql.plugin.memory.ColumnInfo;
+import io.prestosql.plugin.memory.MemoryColumnHandle;
 import io.prestosql.plugin.memory.MemoryConfig;
 import io.prestosql.plugin.memory.SortingColumn;
 import io.prestosql.spi.Page;
@@ -140,7 +140,7 @@ public class MemoryTableManager
         }, 0, 3000);
     }
 
-    public synchronized void initialize(long tableId, boolean compressionEnabled, int splitsPerNode, List<ColumnInfo> columns, List<SortingColumn> sortedBy, List<String> indexColumns)
+    public synchronized void initialize(long tableId, boolean compressionEnabled, int splitsPerNode, List<MemoryColumnHandle> columns, List<SortingColumn> sortedBy, List<String> indexColumns)
     {
         if (!tables.containsKey(tableId)) {
             tables.put(tableId, new Table(tableId,

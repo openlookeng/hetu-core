@@ -15,24 +15,36 @@ package io.prestosql.plugin.memory;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.airlift.json.JsonCodec;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeSignature;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.util.Objects;
 
 public final class MemoryColumnHandle
-        implements ColumnHandle
+        implements ColumnHandle, Serializable
 {
-    private final int columnIndex;
-    private final TypeSignature typeSignature;
+    private static final long serialVersionUID = 7527394454813793397L;
+    private static final JsonCodec<TypeSignature> TYPE_SIGNATURE_JSON_CODEC = JsonCodec.jsonCodec(TypeSignature.class);
+    private String columnName;
+    private int columnIndex;
+    private TypeSignature typeSignature;
     private transient Type typeCache;
 
     @JsonCreator
-    public MemoryColumnHandle(@JsonProperty("columnIndex") int columnIndex,
+    public MemoryColumnHandle(
+            @JsonProperty("columnName") String columnName,
+            @JsonProperty("columnIndex") int columnIndex,
             @JsonProperty("typeSignature") TypeSignature typeSignature)
     {
+        this.columnName = columnName;
         this.columnIndex = columnIndex;
         this.typeSignature = typeSignature;
     }
@@ -41,6 +53,13 @@ public final class MemoryColumnHandle
     public int getColumnIndex()
     {
         return columnIndex;
+    }
+
+    @JsonProperty
+    @Override
+    public String getColumnName()
+    {
+        return columnName;
     }
 
     @JsonProperty
@@ -55,6 +74,27 @@ public final class MemoryColumnHandle
             typeCache = typeManager.getType(getTypeSignature());
         }
         return typeCache;
+    }
+
+    public ColumnMetadata getMetadata(TypeManager typeManager)
+    {
+        return new ColumnMetadata(columnName, getType(typeManager));
+    }
+
+    private void readObject(ObjectInputStream in)
+            throws ClassNotFoundException, IOException
+    {
+        this.columnName = in.readUTF();
+        this.columnIndex = in.readInt();
+        this.typeSignature = TYPE_SIGNATURE_JSON_CODEC.fromJson(in.readUTF());
+    }
+
+    private void writeObject(ObjectOutputStream out)
+            throws IOException
+    {
+        out.writeUTF(columnName);
+        out.writeInt(columnIndex);
+        out.writeUTF(TYPE_SIGNATURE_JSON_CODEC.toJson(typeSignature));
     }
 
     @Override
@@ -73,7 +113,8 @@ public final class MemoryColumnHandle
             return false;
         }
         MemoryColumnHandle other = (MemoryColumnHandle) obj;
-        return Objects.equals(this.columnIndex, other.columnIndex);
+        return Objects.equals(this.columnName, other.columnName) &&
+                Objects.equals(this.columnIndex, other.columnIndex);
     }
 
     @Override
