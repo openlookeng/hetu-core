@@ -20,6 +20,7 @@ import io.prestosql.plugin.memory.data.MemoryTableManager;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.NodeManager;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorInsertTableHandle;
 import io.prestosql.spi.connector.ConnectorOutputTableHandle;
 import io.prestosql.spi.connector.ConnectorPageSink;
@@ -33,6 +34,7 @@ import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 
 import static com.google.common.base.Preconditions.checkState;
+import static io.prestosql.spi.StandardErrorCode.GENERIC_USER_ERROR;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 
@@ -73,6 +75,14 @@ public class MemoryPageSinkProvider
                 memoryOutputTableHandle.getColumns(),
                 memoryOutputTableHandle.getSortedBy(),
                 memoryOutputTableHandle.getIndexColumns());
+
+        try {
+            pagesStore.validateSpillRoot();
+        }
+        catch (Exception e) {
+            throw new PrestoException(GENERIC_USER_ERROR, "Failed writing data to memory.spill-path, ensure directory has correct permissions and free space is available.", e);
+        }
+
         return new MemoryPageSink(pagesStore, currentHostAddress, tableId);
     }
 
