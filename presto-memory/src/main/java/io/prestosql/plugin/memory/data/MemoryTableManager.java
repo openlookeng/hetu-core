@@ -40,6 +40,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,6 +57,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
@@ -94,6 +96,23 @@ public class MemoryTableManager
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.spillRoot = config.getSpillRoot();
         this.pagesSerde = requireNonNull(pagesSerde, "pagesSerde is null");
+    }
+
+    public void validateSpillRoot() throws IOException
+    {
+        RandomAccessFile testFile;
+        String name = UUID.randomUUID().toString();
+        Path testPath = spillRoot.resolve(name);
+        try {
+            // create a new file in the spillRoot that can be written and read from
+            testFile = new RandomAccessFile(testPath.toFile(), "rw");
+            // set its length to 1MB
+            testFile.setLength(1024 * 1024);
+        }
+        finally {
+            // delete the test file
+            Files.delete(testPath);
+        }
     }
 
     public void finishUpdatingTable(long id)
