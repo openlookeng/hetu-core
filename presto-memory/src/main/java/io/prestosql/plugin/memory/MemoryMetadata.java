@@ -462,7 +462,10 @@ public class MemoryMetadata
             throw new PrestoException(GENERIC_USER_ERROR, "Table is in an invalid state and should be dropped and recreated.");
         }
 
-        return OUTPUT_TABLE_HANDLE_JSON_CODEC.fromJson(Base64.getDecoder().decode(creationHandleStr));
+        MemoryWriteTableHandle res = OUTPUT_TABLE_HANDLE_JSON_CODEC.fromJson(Base64.getDecoder().decode(creationHandleStr));
+        res.getActiveTableIds().clear();
+        res.getActiveTableIds().addAll(getTableIdSet(res.getTable()));
+        return res;
     }
 
     @Override

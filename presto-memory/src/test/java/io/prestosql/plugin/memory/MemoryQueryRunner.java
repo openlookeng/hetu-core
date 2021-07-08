@@ -24,6 +24,7 @@ import io.prestosql.Session;
 import io.prestosql.plugin.tpch.TpchPlugin;
 import io.prestosql.tests.DistributedQueryRunner;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -38,6 +39,25 @@ public final class MemoryQueryRunner
 
     public static final long PROCESSING_DELAY = 1000;
 
+    private static final Map<String, String> DEFAULT_MEMORY_PROPERTIES = ImmutableMap.of("memory.max-data-per-node", "1GB",
+            "memory.splits-per-node", "2",
+            "memory.logical-part-processing-delay", PROCESSING_DELAY + "ms",
+            "memory.max-page-size", "50kB");
+
+    private static final String FOLDER_PROPERTY_KEY = "memory.spill-path";
+
+    private static Map<String, String> createConfig(TempFolder folder, Map<String, String> newConfigs) throws IOException
+    {
+        Map<String, String> memoryProperties = new HashMap(DEFAULT_MEMORY_PROPERTIES);
+
+        memoryProperties.put(FOLDER_PROPERTY_KEY, folder.newFolder("memory-connector").getAbsolutePath());
+        for (Map.Entry<String, String> entry : newConfigs.entrySet()) {
+            memoryProperties.replace(entry.getKey(), entry.getValue());
+        }
+
+        return memoryProperties;
+    }
+
     private MemoryQueryRunner()
     {
     }
@@ -45,10 +65,16 @@ public final class MemoryQueryRunner
     public static DistributedQueryRunner createQueryRunner()
             throws Exception
     {
-        return createQueryRunner(ImmutableMap.of());
+        return createQueryRunner(2, ImmutableMap.of(), ImmutableMap.of(), true);
     }
 
     public static DistributedQueryRunner createQueryRunner(Map<String, String> extraProperties)
+            throws Exception
+    {
+        return createQueryRunner(2, extraProperties, ImmutableMap.of(), true);
+    }
+
+    public static DistributedQueryRunner createQueryRunner(int nodes, Map<String, String> extraProperties, Map<String, String> memoryProperties, Boolean createTpchTables)
             throws Exception
     {
         Session session = testSessionBuilder()
@@ -56,7 +82,7 @@ public final class MemoryQueryRunner
                 .setSchema("default")
                 .build();
 
-        DistributedQueryRunner queryRunner = new DistributedQueryRunner(session, 2, extraProperties);
+        DistributedQueryRunner queryRunner = new DistributedQueryRunner(session, nodes, extraProperties);
 
         try {
             queryRunner.installPlugin(new HetuMetastorePlugin());
@@ -64,11 +90,13 @@ public final class MemoryQueryRunner
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 mysqlServer.close();
             }));
+
             Map<String, String> metastoreConfig = new HashMap<>();
             metastoreConfig.put("hetu.metastore.type", "jdbc");
             metastoreConfig.put("hetu.metastore.db.url", mysqlServer.getJdbcUrl("metastore"));
             metastoreConfig.put("hetu.metastore.db.user", mysqlServer.getUser());
             metastoreConfig.put("hetu.metastore.db.password", mysqlServer.getPassword());
+
             queryRunner.registerCloseable(mysqlServer);
             queryRunner.getServers().forEach(server -> {
                 try {
@@ -79,22 +107,28 @@ public final class MemoryQueryRunner
                 }
             });
 
-            TempFolder folder = new TempFolder();
-            folder.create();
-            Runtime.getRuntime().addShutdownHook(new Thread(folder::close));
-
             queryRunner.installPlugin(new MemoryPlugin());
-            queryRunner.createCatalog(CATALOG, "memory",
-                    ImmutableMap.of("memory.max-data-per-node", "1GB",
-                            "memory.splits-per-node", "2",
-                            "memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath(),
-                            "memory.logical-part-processing-delay", PROCESSING_DELAY + "ms",
-                            "memory.max-page-size", "50kB"));
+
+            queryRunner.getServers().forEach(server -> {
+                try {
+                    TempFolder folder = new TempFolder();
+                    folder.create();
+                    Runtime.getRuntime().addShutdownHook(new Thread(folder::close));
+
+                    //create memory catalog with custom memory properties
+                    server.createCatalog(CATALOG, "memory", createConfig(folder, memoryProperties));
+                }
+                catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
 
             queryRunner.installPlugin(new TpchPlugin());
             queryRunner.createCatalog("tpch", "tpch", ImmutableMap.of());
 
-            copyTpchTables(queryRunner, "tpch", TINY_SCHEMA_NAME, session, TpchTable.getTables());
+            if (createTpchTables) {
+                copyTpchTables(queryRunner, "tpch", TINY_SCHEMA_NAME, session, TpchTable.getTables());
+            }
 
             return queryRunner;
         }
@@ -108,7 +142,7 @@ public final class MemoryQueryRunner
             throws Exception
     {
         Logging.initialize();
-        DistributedQueryRunner queryRunner = createQueryRunner(ImmutableMap.of("http-server.http.port", "8080"));
+        DistributedQueryRunner queryRunner = createQueryRunner(2, ImmutableMap.of(), ImmutableMap.of("http-server.http.port", "8080"), true);
         Thread.sleep(10);
         Logger log = Logger.get(MemoryQueryRunner.class);
         log.info("======== SERVER STARTED ========");
