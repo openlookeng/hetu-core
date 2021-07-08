@@ -30,10 +30,12 @@ import io.prestosql.spi.connector.ConnectorTransactionHandle;
 
 import javax.inject.Inject;
 
+import java.io.FileNotFoundException;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 
 import static com.google.common.base.Preconditions.checkState;
+import static io.prestosql.plugin.memory.MemoryErrorCode.MISSING_DATA;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_USER_ERROR;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.CompletableFuture.completedFuture;
@@ -93,7 +95,42 @@ public class MemoryPageSinkProvider
     public ConnectorPageSink createPageSink(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorInsertTableHandle insertTableHandle)
     {
         // MemoryWriteTableHandle is used for both CTAS and inserts
-        return createPageSink(transactionHandle, session, (ConnectorOutputTableHandle) insertTableHandle);
+        MemoryWriteTableHandle memoryOutputTableHandle = (MemoryWriteTableHandle) insertTableHandle;
+        long tableId = memoryOutputTableHandle.getTable();
+        checkState(memoryOutputTableHandle.getActiveTableIds().contains(tableId));
+
+        pagesStore.refreshTables(memoryOutputTableHandle.getActiveTableIds());
+
+        // Try restore since table was created and may have data
+        // if restore fails, table was never initialized or data was lost from spill
+        // initialize anyways since coordinator sends how many rows to expect and so an error will be reported in the data loss case
+        try {
+            pagesStore.restoreTable(tableId);
+        }
+        catch (PrestoException pe) {
+            throw pe;
+        }
+        catch (FileNotFoundException e) {
+            //
+            pagesStore.initialize(tableId,
+                    memoryOutputTableHandle.isCompressionEnabled(),
+                    memoryOutputTableHandle.getSplitsPerNode(),
+                    memoryOutputTableHandle.getColumns(),
+                    memoryOutputTableHandle.getSortedBy(),
+                    memoryOutputTableHandle.getIndexColumns());
+        }
+        catch (Exception e) {
+            throw new PrestoException(MISSING_DATA, "Failed to find/restore table on a worker", e);
+        }
+
+        try {
+            pagesStore.validateSpillRoot();
+        }
+        catch (Exception e) {
+            throw new PrestoException(GENERIC_USER_ERROR, "Failed writing data to memory.spill-path, ensure directory has correct permissions and free space is available.", e);
+        }
+
+        return new MemoryPageSink(pagesStore, currentHostAddress, tableId);
     }
 
     private static class MemoryPageSink
