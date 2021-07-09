@@ -23,7 +23,7 @@ import org.testng.annotations.Test;
 public class TestMemorySpilling
         extends AbstractTestQueryFramework
 {
-    private static final String maxDataPerNode = "2MB";
+    private static final String maxDataPerNode = "8MB";
     private static final int processingDelay = 10000;
     private static final int numLoops = 3;
 
@@ -37,17 +37,15 @@ public class TestMemorySpilling
     {
         synchronized (this) {
             try {
-                //create a copy of tiny.orders in memory connector, use 1.8MB out of 2MB
+                // create one orders table
                 assertQuerySucceeds("CREATE TABLE test_t1_1 AS SELECT * FROM tpch.tiny.orders");
                 Thread.sleep(processingDelay);
 
-                //without memory eviction this table creation would not succeed, it would take 3.6MB out of 2MB
-                //so memory connector evicts `test_t1_1` to spill_root
-                //and then creates and stores `test_t1_2` in the memory connector
+                // without memory eviction this table creation would not succeed
+                // if this query passes then the eviction is functioning well
                 assertQuerySucceeds("CREATE TABLE test_t1_2 AS SELECT * FROM tpch.tiny.orders");
 
-                //when more data in inserted into `test_t1_1`, it becomes too big to hold within the memory limit
-                //creation fails
+                // creation of a table over total limit. even with eviction this should fail
                 assertQueryFails("CREATE TABLE test_t1_3 AS SELECT * FROM tpch.tiny.lineitem", "Memory limit \\[.+\\] for memory connector exceeded. Current: \\[.+\\]. Requested: \\[.+\\]");
             }
             finally {
@@ -97,7 +95,7 @@ public class TestMemorySpilling
                 QueryThreadExceptionHandler[] threadExceptionHandlers = new QueryThreadExceptionHandler[numTables];
                 // define the query threads
                 for (int i = 0; i < numTables; i++) {
-                    threads[i] = new QueryThread("SELECT COUNT(*) FROM test_t3_" + i + " LIMIT 100");
+                    threads[i] = new QueryThread("SELECT COUNT(*) FROM test_t3_" + i);
                     threadExceptionHandlers[i] = new QueryThreadExceptionHandler();
                     threads[i].setUncaughtExceptionHandler(threadExceptionHandlers[i]);
                 }

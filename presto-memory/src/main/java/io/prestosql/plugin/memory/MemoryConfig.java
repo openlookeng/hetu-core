@@ -101,6 +101,9 @@ public class MemoryConfig
     @Config("memory.max-data-per-node")
     public MemoryConfig setMaxDataPerNode(DataSize maxDataPerNode)
     {
+        if (maxDataPerNode.toBytes() > Runtime.getRuntime().maxMemory()) {
+            throw new IllegalArgumentException("Invalid config for max data per node. Can not exceed heap headroom: " + Runtime.getRuntime().maxMemory());
+        }
         this.maxDataPerNode = maxDataPerNode;
         return this;
     }

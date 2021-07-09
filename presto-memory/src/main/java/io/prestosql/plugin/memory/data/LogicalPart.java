@@ -690,13 +690,13 @@ public class LogicalPart
             bloomIdx.put(indexChannel, filter);
         }
 
-        this.processingState.set(LogicalPartState.COMPLETED);
         try {
             writePages();
         }
         catch (Exception e) {
             LOG.error("Error spilling LogicalPart " + getPageFileName() + " to disk. Restoring will be unavailable.", e);
         }
+        this.processingState.set(LogicalPartState.COMPLETED);
     }
 
     private String getPageFileName()
