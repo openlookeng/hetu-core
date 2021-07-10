@@ -175,6 +175,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -2135,30 +2136,73 @@ class StatementAnalyzer
                 for (GroupingElement groupingElement : node.getGroupBy().get().getGroupingElements()) {
                     if (groupingElement instanceof SimpleGroupBy) {
                         for (Expression column : groupingElement.getExpressions()) {
-                            // simple GROUP BY expressions allow ordinals or arbitrary expressions
-                            if (column instanceof LongLiteral) {
-                                long ordinal = ((LongLiteral) column).getValue();
-                                if (ordinal < 1 || ordinal > outputExpressions.size()) {
-                                    throw new SemanticException(INVALID_ORDINAL, column, "GROUP BY position %s is not in select list", ordinal);
+                            Map<String, String> columnAliasMap = new HashMap<>();
+                            List<SelectItem> selectItemList = node.getSelect().getSelectItems();
+                            if (selectItemList.size() > 0) {
+                                for (SelectItem si : selectItemList) {
+                                    if (si instanceof SingleColumn) {
+                                        Expression ex = ((SingleColumn) si).getExpression();
+                                        if ((ex instanceof DereferenceExpression) && ((SingleColumn) si).getAlias() != null) {
+                                            columnAliasMap.put(((SingleColumn) si).getAlias().get().getValue(), ((DereferenceExpression) ex).getField().getValue());
+                                        }
+                                    }
+                                }
+                            }
+
+                            if ((column instanceof Identifier) && columnAliasMap.containsKey(((Identifier) column).getValue())) {
+                                String columnName = columnAliasMap.get(((Identifier) column).getValue());
+                                Expression newColumn = new Identifier(((Identifier) column).getLocation().get(), columnName, ((Identifier) column).isDelimited());
+                                // simple GROUP BY expressions allow ordinals or arbitrary expressions
+                                if (newColumn instanceof LongLiteral) {
+                                    long ordinal = ((LongLiteral) newColumn).getValue();
+                                    if (ordinal < 1 || ordinal > outputExpressions.size()) {
+                                        throw new SemanticException(INVALID_ORDINAL, newColumn, "GROUP BY position %s is not in select list", ordinal);
+                                    }
+
+                                    newColumn = outputExpressions.get(toIntExact(ordinal - 1));
+                                }
+                                else {
+                                    analyzeExpression(newColumn, scope);
                                 }
 
-                                column = outputExpressions.get(toIntExact(ordinal - 1));
+                                FieldId field = analysis.getColumnReferenceFields().get(NodeRef.of(newColumn));
+                                if (field != null) {
+                                    sets.add(ImmutableList.of(ImmutableSet.of(field)));
+                                }
+                                else {
+                                    verifyNoAggregateWindowOrGroupingFunctions(metadata, newColumn, "GROUP BY clause");
+                                    analysis.recordSubqueries(node, analyzeExpression(newColumn, scope));
+                                    complexExpressions.add(newColumn);
+                                }
+
+                                groupingExpressions.add(newColumn);
                             }
                             else {
-                                analyzeExpression(column, scope);
-                            }
+                                // simple GROUP BY expressions allow ordinals or arbitrary expressions
+                                if (column instanceof LongLiteral) {
+                                    long ordinal = ((LongLiteral) column).getValue();
+                                    if (ordinal < 1 || ordinal > outputExpressions.size()) {
+                                        throw new SemanticException(INVALID_ORDINAL, column, "GROUP BY position %s is not in select list", ordinal);
+                                    }
 
-                            FieldId field = analysis.getColumnReferenceFields().get(NodeRef.of(column));
-                            if (field != null) {
-                                sets.add(ImmutableList.of(ImmutableSet.of(field)));
-                            }
-                            else {
-                                verifyNoAggregateWindowOrGroupingFunctions(metadata, column, "GROUP BY clause");
-                                analysis.recordSubqueries(node, analyzeExpression(column, scope));
-                                complexExpressions.add(column);
-                            }
+                                    column = outputExpressions.get(toIntExact(ordinal - 1));
+                                }
+                                else {
+                                    analyzeExpression(column, scope);
+                                }
 
-                            groupingExpressions.add(column);
+                                FieldId field = analysis.getColumnReferenceFields().get(NodeRef.of(column));
+                                if (field != null) {
+                                    sets.add(ImmutableList.of(ImmutableSet.of(field)));
+                                }
+                                else {
+                                    verifyNoAggregateWindowOrGroupingFunctions(metadata, column, "GROUP BY clause");
+                                    analysis.recordSubqueries(node, analyzeExpression(column, scope));
+                                    complexExpressions.add(column);
+                                }
+
+                                groupingExpressions.add(column);
+                            }
                         }
                     }
                     else {
