@@ -2148,61 +2148,34 @@ class StatementAnalyzer
                                     }
                                 }
                             }
-
-                            if ((column instanceof Identifier) && columnAliasMap.containsKey(((Identifier) column).getValue())) {
-                                String columnName = columnAliasMap.get(((Identifier) column).getValue());
-                                Expression newColumn = new Identifier(((Identifier) column).getLocation().get(), columnName, ((Identifier) column).isDelimited());
-                                // simple GROUP BY expressions allow ordinals or arbitrary expressions
-                                if (newColumn instanceof LongLiteral) {
-                                    long ordinal = ((LongLiteral) newColumn).getValue();
-                                    if (ordinal < 1 || ordinal > outputExpressions.size()) {
-                                        throw new SemanticException(INVALID_ORDINAL, newColumn, "GROUP BY position %s is not in select list", ordinal);
-                                    }
-
-                                    newColumn = outputExpressions.get(toIntExact(ordinal - 1));
-                                }
-                                else {
-                                    analyzeExpression(newColumn, scope);
+                            // simple GROUP BY expressions allow ordinals or arbitrary expressions
+                            if (column instanceof LongLiteral) {
+                                long ordinal = ((LongLiteral) column).getValue();
+                                if (ordinal < 1 || ordinal > outputExpressions.size()) {
+                                    throw new SemanticException(INVALID_ORDINAL, column, "GROUP BY position %s is not in select list", ordinal);
                                 }
 
-                                FieldId field = analysis.getColumnReferenceFields().get(NodeRef.of(newColumn));
-                                if (field != null) {
-                                    sets.add(ImmutableList.of(ImmutableSet.of(field)));
-                                }
-                                else {
-                                    verifyNoAggregateWindowOrGroupingFunctions(metadata, newColumn, "GROUP BY clause");
-                                    analysis.recordSubqueries(node, analyzeExpression(newColumn, scope));
-                                    complexExpressions.add(newColumn);
-                                }
-
-                                groupingExpressions.add(newColumn);
+                                column = outputExpressions.get(toIntExact(ordinal - 1));
                             }
                             else {
-                                // simple GROUP BY expressions allow ordinals or arbitrary expressions
-                                if (column instanceof LongLiteral) {
-                                    long ordinal = ((LongLiteral) column).getValue();
-                                    if (ordinal < 1 || ordinal > outputExpressions.size()) {
-                                        throw new SemanticException(INVALID_ORDINAL, column, "GROUP BY position %s is not in select list", ordinal);
-                                    }
-
-                                    column = outputExpressions.get(toIntExact(ordinal - 1));
+                                if ((column instanceof Identifier) && columnAliasMap.containsKey(((Identifier) column).getValue())) {
+                                    String columnName = columnAliasMap.get(((Identifier) column).getValue());
+                                    column = new Identifier(((Identifier) column).getLocation().get(), columnName, ((Identifier) column).isDelimited());
                                 }
-                                else {
-                                    analyzeExpression(column, scope);
-                                }
-
-                                FieldId field = analysis.getColumnReferenceFields().get(NodeRef.of(column));
-                                if (field != null) {
-                                    sets.add(ImmutableList.of(ImmutableSet.of(field)));
-                                }
-                                else {
-                                    verifyNoAggregateWindowOrGroupingFunctions(metadata, column, "GROUP BY clause");
-                                    analysis.recordSubqueries(node, analyzeExpression(column, scope));
-                                    complexExpressions.add(column);
-                                }
-
-                                groupingExpressions.add(column);
+                                analyzeExpression(column, scope);
                             }
+
+                            FieldId field = analysis.getColumnReferenceFields().get(NodeRef.of(column));
+                            if (field != null) {
+                                sets.add(ImmutableList.of(ImmutableSet.of(field)));
+                            }
+                            else {
+                                verifyNoAggregateWindowOrGroupingFunctions(metadata, column, "GROUP BY clause");
+                                analysis.recordSubqueries(node, analyzeExpression(column, scope));
+                                complexExpressions.add(column);
+                            }
+
+                            groupingExpressions.add(column);
                         }
                     }
                     else {
