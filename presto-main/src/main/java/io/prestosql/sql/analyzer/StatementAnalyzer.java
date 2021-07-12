@@ -175,6 +175,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -2135,6 +2136,21 @@ class StatementAnalyzer
                 for (GroupingElement groupingElement : node.getGroupBy().get().getGroupingElements()) {
                     if (groupingElement instanceof SimpleGroupBy) {
                         for (Expression column : groupingElement.getExpressions()) {
+                            Map<String, String> columnAliasMap = new HashMap<>();
+                            List<SelectItem> selectItemList = node.getSelect().getSelectItems();
+                            if (selectItemList.size() > 0) {
+                                for (SelectItem si : selectItemList) {
+                                    if (si instanceof SingleColumn) {
+                                        Expression ex = ((SingleColumn) si).getExpression();
+                                        if ((ex instanceof DereferenceExpression) && ((SingleColumn) si).getAlias().isPresent()) {
+                                            columnAliasMap.put(((SingleColumn) si).getAlias().get().getValue(), ((DereferenceExpression) ex).getField().getValue());
+                                        }
+                                        if ((ex instanceof Identifier) && ((SingleColumn) si).getAlias().isPresent()) {
+                                            columnAliasMap.put(((SingleColumn) si).getAlias().get().getValue(), ((Identifier) ex).getValue());
+                                        }
+                                    }
+                                }
+                            }
                             // simple GROUP BY expressions allow ordinals or arbitrary expressions
                             if (column instanceof LongLiteral) {
                                 long ordinal = ((LongLiteral) column).getValue();
@@ -2145,6 +2161,10 @@ class StatementAnalyzer
                                 column = outputExpressions.get(toIntExact(ordinal - 1));
                             }
                             else {
+                                if ((column instanceof Identifier) && columnAliasMap.containsKey(((Identifier) column).getValue())) {
+                                    String columnName = columnAliasMap.get(((Identifier) column).getValue());
+                                    column = new Identifier(((Identifier) column).getLocation().get(), columnName, ((Identifier) column).isDelimited());
+                                }
                                 analyzeExpression(column, scope);
                             }
 
