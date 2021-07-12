@@ -28,16 +28,15 @@ public class RowBufferHandler
 
     private static final Logger log = Logger.get(Query.class);
 
-    private static final int MAX_BUFFERED_ROWS = 100000;
-
     private final List<List<?>> rowBuffer;
     private final CubeConsole cubeConsole;
     private int startIteration;
     private int endIteration;
     private boolean isCompleteTraversal;
     private boolean initialIterationProcess = true;
+    private static long minimumRealisticBatchSize = 2L;
 
-    private final List<List<?>> rowBufferIterationItems = new ArrayList<>(MAX_BUFFERED_ROWS);
+    private final List<List<?>> rowBufferIterationItems = new ArrayList<>();
 
     public List<List<?>> getRowBuffer()
     {
@@ -80,6 +79,10 @@ public class RowBufferHandler
         }
 
         Long maxBatchProcessSize = Long.parseLong(cubeConsole.getMaxBatchProcessSize());
+
+        if (maxBatchProcessSize < minimumRealisticBatchSize) {
+            maxBatchProcessSize = minimumRealisticBatchSize;
+        }
 
         int currentIteration;
         if (initialIterationProcess == true) {

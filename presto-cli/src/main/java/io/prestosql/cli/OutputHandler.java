@@ -34,7 +34,7 @@ public final class OutputHandler
     private static final int MAX_BUFFERED_ROWS = 10_000;
 
     private final AtomicBoolean closed = new AtomicBoolean();
-    private final List<List<?>> rowBuffer = new ArrayList<>(MAX_BUFFERED_ROWS);
+    private final List<List<?>> rowBuffer = new ArrayList<>();
     private final OutputPrinter printer;
 
     private long bufferStart;

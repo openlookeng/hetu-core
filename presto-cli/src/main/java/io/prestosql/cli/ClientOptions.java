@@ -150,7 +150,7 @@ public class ClientOptions
     public boolean ignoreErrors;
 
     @Option(name = "--max-batch-process-size", title = "Maximum Batch Process Size (Rows)", description = "Maximum Batch Process Size as the number of Rows which can be processed")
-    public String maxBatchProcessSize = "1000000";
+    public String maxBatchProcessSize = "50000000";
 
     public enum OutputFormat
     {
