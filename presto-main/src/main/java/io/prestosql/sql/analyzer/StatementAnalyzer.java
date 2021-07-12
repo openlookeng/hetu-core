@@ -2142,7 +2142,7 @@ class StatementAnalyzer
                                 for (SelectItem si : selectItemList) {
                                     if (si instanceof SingleColumn) {
                                         Expression ex = ((SingleColumn) si).getExpression();
-                                        if ((ex instanceof DereferenceExpression) && ((SingleColumn) si).getAlias() != null) {
+                                        if ((ex instanceof DereferenceExpression) && ((SingleColumn) si).getAlias().isPresent()) {
                                             columnAliasMap.put(((SingleColumn) si).getAlias().get().getValue(), ((DereferenceExpression) ex).getField().getValue());
                                         }
                                     }
