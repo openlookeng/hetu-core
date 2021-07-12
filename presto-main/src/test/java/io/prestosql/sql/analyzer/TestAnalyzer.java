@@ -408,6 +408,13 @@ public class TestAnalyzer
     }
 
     @Test
+    public void testGroupAlias()
+    {
+        analyze("SELECT a AS a1, sum(c) FROM t1 GROUP BY a1");
+        analyze("SELECT t1.a AS a1, sum(c) FROM t1 GROUP BY a1");
+    }
+
+    @Test
     public void testGroupingNotAllowed()
     {
         assertFails(CANNOT_HAVE_AGGREGATIONS_WINDOWS_OR_GROUPING, "SELECT a, b, sum(c) FROM t1 WHERE grouping(a, b) GROUP BY GROUPING SETS ((a), (a, b))");

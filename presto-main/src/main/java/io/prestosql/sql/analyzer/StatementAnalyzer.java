@@ -2145,6 +2145,9 @@ class StatementAnalyzer
                                         if ((ex instanceof DereferenceExpression) && ((SingleColumn) si).getAlias().isPresent()) {
                                             columnAliasMap.put(((SingleColumn) si).getAlias().get().getValue(), ((DereferenceExpression) ex).getField().getValue());
                                         }
+                                        if ((ex instanceof Identifier) && ((SingleColumn) si).getAlias().isPresent()) {
+                                            columnAliasMap.put(((SingleColumn) si).getAlias().get().getValue(), ((Identifier) ex).getValue());
+                                        }
                                     }
                                 }
                             }
