@@ -61,8 +61,8 @@ public class TestCachingHiveMetastore
         metastore = new CachingHiveMetastore(
                 new BridgingHiveMetastore(thriftHiveMetastore),
                 executor,
-                executorRefresh, new Duration(5, TimeUnit.MINUTES),
-                new Duration(1, TimeUnit.MINUTES),
+                executorRefresh, new Duration(6, TimeUnit.MINUTES),
+                new Duration(6, TimeUnit.MINUTES),
                 new Duration(5, TimeUnit.MINUTES),
                 new Duration(1, TimeUnit.MINUTES),
                 1000,

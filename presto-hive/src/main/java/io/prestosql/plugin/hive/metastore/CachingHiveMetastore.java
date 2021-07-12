@@ -133,7 +133,7 @@ public class CachingHiveMetastore
     }
 
     public CachingHiveMetastore(HiveMetastore delegate, Executor executor, Executor tableRefreshExecutor, Duration cacheTtl, Duration refreshInterval,
-                                Duration tableCacheTtl, Duration tableRefreshInterval,
+                                Duration dbCacheTtl, Duration dbRefreshInterval,
                                 long maximumSize, boolean skipCache)
     {
         this(
@@ -141,8 +141,8 @@ public class CachingHiveMetastore
                 executor,
                 tableRefreshExecutor, OptionalLong.of(cacheTtl.toMillis()),
                 refreshInterval.toMillis() >= cacheTtl.toMillis() ? OptionalLong.empty() : OptionalLong.of(refreshInterval.toMillis()),
-                OptionalLong.of(tableCacheTtl.toMillis()),
-                tableRefreshInterval.toMillis() >= tableCacheTtl.toMillis() ? OptionalLong.empty() : OptionalLong.of(tableRefreshInterval.toMillis()),
+                OptionalLong.of(dbCacheTtl.toMillis()),
+                dbRefreshInterval.toMillis() >= dbCacheTtl.toMillis() ? OptionalLong.empty() : OptionalLong.of(dbRefreshInterval.toMillis()),
                 maximumSize,
                 skipCache);
     }
@@ -167,6 +167,7 @@ public class CachingHiveMetastore
                                  OptionalLong expiresAfterWriteMillisDB, OptionalLong refreshMillsDB,
                                  long maximumSize, boolean skipCache)
     {
+        boolean dontVerifyCache;
         this.delegate = requireNonNull(delegate, "delegate is null");
         requireNonNull(executor, "executor is null");
 
@@ -174,33 +175,38 @@ public class CachingHiveMetastore
         this.skipCache = skipCache
                 || (refreshMillsDB.isPresent() && refreshMillsDB.getAsLong() == 0);
         this.skipTableCache = skipCache
-                || (refreshMillsTable.isPresent() && refreshMillsTable.getAsLong() == 0);
+                || (refreshMillsTable.isPresent() && refreshMillsTable.getAsLong() == 0
+                    && expiresAfterWriteMillisTable.isPresent() && expiresAfterWriteMillisTable.getAsLong() == 0);
 
         OptionalLong tableCacheTtl;
         OptionalLong tableRefreshTtl;
 
-        if (this.skipTableCache == false
-                && refreshMillsTable.isPresent() && refreshMillsTable.getAsLong() >= PASSIVE_CACHE_VERIFICATION_THRESHOLD) {
-            dontVerifyCacheEntry = false;
-            tableCacheTtl = OptionalLong.of(TABLE_CACHE_CLEANUP_TIME);
-            tableRefreshTtl = OptionalLong.of(TABLE_CACHE_REFRESH_TIME);
-        }
-        else {
-            dontVerifyCacheEntry = true;
-            tableCacheTtl = expiresAfterWriteMillisTable;
-            tableRefreshTtl = refreshMillsTable;
+        dontVerifyCache = true;
+        tableCacheTtl = expiresAfterWriteMillisTable;
+        tableRefreshTtl = refreshMillsTable;
+
+        if (this.skipTableCache == false) {
+            long refresh = refreshMillsTable.orElse(0);
+            long ttl = expiresAfterWriteMillisTable.orElse(0);
+            if (refresh > PASSIVE_CACHE_VERIFICATION_THRESHOLD
+                    || (0 == refresh && ttl > PASSIVE_CACHE_VERIFICATION_THRESHOLD)) {
+                dontVerifyCache = false;
+                tableCacheTtl = OptionalLong.of(TABLE_CACHE_CLEANUP_TIME);
+                tableRefreshTtl = OptionalLong.of(TABLE_CACHE_REFRESH_TIME);
+            }
         }
 
+        dontVerifyCacheEntry = dontVerifyCache;
         databaseNamesCache = newCacheBuilder(expiresAfterWriteMillisDB, refreshMillsDB, maximumSize)
                 .build(asyncReloading(CacheLoader.from(this::loadAllDatabases), executor));
 
         databaseCache = newCacheBuilder(expiresAfterWriteMillisDB, refreshMillsDB, maximumSize)
                 .build(asyncReloading(CacheLoader.from(this::loadDatabase), executor));
 
-        tableNamesCache = newCacheBuilder(expiresAfterWriteMillisTable, refreshMillsDB, maximumSize)
+        tableNamesCache = newCacheBuilder(expiresAfterWriteMillisDB, refreshMillsDB, maximumSize)
                 .build(asyncReloading(CacheLoader.from(this::loadAllTables), executor));
 
-        viewNamesCache = newCacheBuilder(expiresAfterWriteMillisTable, refreshMillsDB, maximumSize)
+        viewNamesCache = newCacheBuilder(expiresAfterWriteMillisDB, refreshMillsDB, maximumSize)
                 .build(asyncReloading(CacheLoader.from(this::loadAllViews), executor));
 
         tableCache = newCacheBuilder(tableCacheTtl, tableRefreshTtl, maximumSize)
@@ -353,6 +359,10 @@ public class CachingHiveMetastore
 
     private Table getCacheValidationParams(HiveIdentity identity, String databaseName, String tableName)
     {
+        if (dontVerifyCacheEntry) {
+            return null;
+        }
+
         Table table = getTable(identity, databaseName, tableName)
                 .orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
 
@@ -369,6 +379,10 @@ public class CachingHiveMetastore
 
     private Table getCacheValidationParams(HiveIdentity identity, Table table)
     {
+        if (dontVerifyCacheEntry) {
+            return null;
+        }
+
         if (table.getPartitionColumns().size() > 0) {
             Table.Builder builder = Table.builder(table);
             getPartitionNames(identity, table.getDatabaseName(), table.getTableName())
@@ -382,6 +396,10 @@ public class CachingHiveMetastore
 
     private Table getCacheValidationPartitionParams(Table table, HiveBasicStatistics partition)
     {
+        if (dontVerifyCacheEntry) {
+            return null;
+        }
+
         if (table.getPartitionColumns().size() > 0) {
             Table.Builder builder = Table.builder(table);
             builder.setParameter("partition::rowCount", partition.getRowCount().toString());
@@ -1306,6 +1324,9 @@ public class CachingHiveMetastore
 
         public boolean matches(K key)
         {
+            if (this.key == null) {
+                return true;
+            }
             return Objects.equals(key, this.key);
         }
 
