@@ -1,6 +1,6 @@
 # 概述
 
-openLooKeng的LooKeng取自中国著名数据家华罗庚先生的英文名Loo-keng Hua，同时也有Look的含义，寓意查询分析各种数据，让大数据更简单。
+openLooKeng的LooKeng取自中国著名数据家华罗庚先生的英文名Loo-keng Hua。同时LooKeng的发音也与Looking相近，寓意查询分析各种数据，让大数据更简单。
 
 openLooKeng是一种"开箱即用"的引擎，支持在任何地点（包括地理上的远程数据源）对任何数据进行原位分析。它通过SQL 2003接口提供了所有数据的全局视图。openLooKeng具有高可用性、自动伸缩、内置缓存和索引支持，为企业工作负载提供了所需的可靠性。
 
