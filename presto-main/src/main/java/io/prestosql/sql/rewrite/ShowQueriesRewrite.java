@@ -131,6 +131,9 @@ import static io.prestosql.metadata.MetadataListing.listSchemas;
 import static io.prestosql.metadata.MetadataUtil.createCatalogSchemaName;
 import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
 import static io.prestosql.metadata.MetadataUtil.toCatalogSchemaTableName;
+import static io.prestosql.spi.HetuConstant.INDEX_OK;
+import static io.prestosql.spi.HetuConstant.INDEX_OUT_OF_SYNC;
+import static io.prestosql.spi.HetuConstant.INDEX_TABLE_DELETED;
 import static io.prestosql.spi.StandardErrorCode.FUNCTION_NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_USER_ERROR;
 import static io.prestosql.spi.StandardErrorCode.INVALID_COLUMN_PROPERTY;
@@ -888,12 +891,26 @@ final class ShowQueriesRewrite
                     }
                 }
 
+                QualifiedObjectName indexFullName = QualifiedObjectName.valueOf(v.qualifiedTable);
+
+                String indexStatus;
+                Optional<TableHandle> tableHandle = metadata.getTableHandle(session, indexFullName);
+                if (!tableHandle.isPresent()) {
+                    indexStatus = INDEX_TABLE_DELETED;
+                }
+                else {
+                    LongSupplier lastModifiedTimeSupplier = metadata.getTableLastModifiedTimeSupplier(session, tableHandle.get());
+                    long lastModifiedTime = lastModifiedTimeSupplier.getAsLong();
+                    indexStatus = lastModifiedTime > v.lastModifiedTime ? INDEX_OUT_OF_SYNC : INDEX_OK;
+                }
+
                 rows.add(row(
                         new StringLiteral(v.name),
                         new StringLiteral(v.user),
                         new StringLiteral(v.qualifiedTable),
                         new StringLiteral(String.join(",", v.columns)),
                         new StringLiteral(v.indexType),
+                        new StringLiteral(indexStatus),
                         new StringLiteral(partitionsStrToDisplay.toString()),
                         new StringLiteral(String.join(",", v.properties) + inProgressHint),
                         TRUE_LITERAL));
@@ -901,7 +918,7 @@ final class ShowQueriesRewrite
 
             //bogus row to support empty index
             rows.add(row(new StringLiteral(""), new StringLiteral(""), new StringLiteral(""),
-                    new StringLiteral(""), new StringLiteral(""), new StringLiteral(""), new StringLiteral(""), FALSE_LITERAL));
+                    new StringLiteral(""), new StringLiteral(""), new StringLiteral(""), new StringLiteral(""), new StringLiteral(""), FALSE_LITERAL));
 
             ImmutableList<Expression> expressions = rows.build();
             return simpleQuery(
@@ -911,12 +928,13 @@ final class ShowQueriesRewrite
                             aliasedName("table_name", "Table Name"),
                             aliasedName("index_columns", "Index Columns"),
                             aliasedName("index_type", "Index Type"),
+                            aliasedName("index_status", "Index Status"),
                             aliasedName("partitions", "Partitions"),
                             aliasedName("index_props", "IndexProps")),
                     aliased(
                             new Values(expressions),
                             "Index Result",
-                            ImmutableList.of("index_name", "user", "table_name", "index_columns", "index_type", "partitions", "index_props", "include")),
+                            ImmutableList.of("index_name", "user", "table_name", "index_columns", "index_type", "index_status", "partitions", "index_props", "include")),
                     identifier("include"),
                     ordering(ascending("index_name")));
         }
