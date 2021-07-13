@@ -2026,7 +2026,6 @@ class StatementAnalyzer
                         }
                     }
                 }
-
                 if (predicate instanceof ComparisonExpression) {
                     if (((ComparisonExpression) predicate).getLeft() instanceof Identifier) {
                         Expression leftExpr = (Expression) columnAliasMap.get(((Identifier) ((ComparisonExpression) predicate).getLeft()).getValue());
