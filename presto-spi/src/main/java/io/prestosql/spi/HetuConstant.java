@@ -50,4 +50,7 @@ public class HetuConstant
     public static final String DATASOURCE_STRIPE_LENGTH = "datasource_stripe_length";
     public static final String DATASOURCE_TOTAL_PAGES = "datasource_total_pages";
     public static final String DATASOURCE_PAGE_NUMBER = "datasource_page_number";
+    public static final String INDEX_TABLE_DELETED = "Table Deleted";
+    public static final String INDEX_OUT_OF_SYNC = "Out-of-sync";
+    public static final String INDEX_OK = "OK";
 }
