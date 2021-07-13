@@ -347,7 +347,7 @@ public class MemoryTableManager
         LOG.debug("[Spill] Table " + id + " has been serialized to disk. Time elapsed: " + dur + "ms");
     }
 
-    private synchronized void restoreTable(long id)
+    public synchronized void restoreTable(long id)
             throws IOException, ClassNotFoundException
     {
         if (tables.containsKey(id)) {
