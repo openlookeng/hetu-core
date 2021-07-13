@@ -54,7 +54,6 @@ import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static io.prestosql.sql.planner.optimizations.QueryCardinalityUtil.isAtMostScalar;
 import static io.prestosql.sql.planner.plan.ChildReplacer.replaceChildren;
 import static java.util.stream.Collectors.toSet;
 
@@ -280,7 +279,7 @@ public class BeginTableWrite
             }
             if (node instanceof JoinNode) {
                 JoinNode joinNode = (JoinNode) node;
-                if (joinNode.getType() == JoinNode.Type.INNER && isAtMostScalar(joinNode.getRight())) {
+                if (joinNode.getType() == JoinNode.Type.INNER) {
                     return locateTableScanHandle(joinNode.getLeft());
                 }
             }
