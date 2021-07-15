@@ -6572,4 +6572,20 @@ public class TestHiveIntegrationSmokeTest
         assertQueryFails("REFRESH META CACHE FOR abc", "Catalog does not exist:abc");
         assertQueryFails("REFRESH META CACHE FOR abc.def", "Catalog does not exist:abc.def");
     }
+
+    @Test
+    public void testCachedPlanForTablesWithSameName()
+    {
+        String table = "tab2";
+        String schema = "default";
+        assertUpdate(String.format("CREATE SCHEMA IF NOT EXISTS %s", schema));
+        assertUpdate(String.format("CREATE TABLE %s.%s (a int, b int, c int) with (partitioned_by = ARRAY['c'])", schema, table));
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (1, 1, 1)", schema, table), 1);
+        assertQuery(String.format("SELECT * FROM %s.%s", schema, table), "VALUES (1, 1, 1)");
+        assertUpdate(String.format("DROP TABLE %s.%s", schema, table));
+        assertUpdate(String.format("CREATE TABLE %s.%s (a int, b int, c int)", schema, table));
+        assertUpdate(String.format("INSERT INTO %s.%s VALUES (1, 1, 1)", schema, table), 1);
+        assertQuery(String.format("SELECT * FROM %s.%s", schema, table), "VALUES (1, 1, 1)");
+        assertUpdate(String.format("DROP TABLE %s.%s", schema, table));
+    }
 }
