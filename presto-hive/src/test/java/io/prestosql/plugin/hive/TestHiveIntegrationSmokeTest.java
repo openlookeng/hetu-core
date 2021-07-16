@@ -3201,6 +3201,26 @@ public class TestHiveIntegrationSmokeTest
     }
 
     @Test
+    private void testRenameBucketingColumn()
+    {
+        @Language("SQL") String createTable = "" +
+                "CREATE TABLE test_rename_bucketing_column\n" +
+                "WITH (\n" +
+                "  bucket_count = 5, bucketed_by = ARRAY ['orderstatus']\n" +
+                ")\n" +
+                "AS\n" +
+                "SELECT custkey, orderkey, orderstatus FROM orders";
+
+        assertUpdate(createTable, "SELECT count(*) FROM orders");
+        assertQuery("SELECT orderkey, orderstatus FROM test_rename_bucketing_column", "SELECT orderkey, orderstatus FROM orders");
+
+        assertUpdate("ALTER TABLE test_rename_bucketing_column RENAME COLUMN orderstatus TO orderstatus1");
+        assertQuery("SELECT orderkey, orderstatus1  FROM test_rename_bucketing_column", "SELECT orderkey, orderstatus  FROM orders");
+
+        assertUpdate("DROP TABLE test_rename_bucketing_column");
+    }
+
+    @Test
     public void testAvroTypeValidation()
     {
         assertQueryFails("CREATE TABLE test_avro_types (x map(bigint, bigint)) WITH (format = 'AVRO')", "Column x has a non-varchar map key, which is not supported by Avro");
