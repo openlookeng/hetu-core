@@ -38,6 +38,7 @@ public class TestPostgreSqlIntegrationSmokeTest
         extends AbstractTestIntegrationSmokeTest
 {
     private final TestingPostgreSqlServer postgreSqlServer;
+    private final TestPostgreSqlExtendServer extendServer;
 
     public TestPostgreSqlIntegrationSmokeTest()
             throws Exception
@@ -50,14 +51,27 @@ public class TestPostgreSqlIntegrationSmokeTest
     {
         super(() -> PostgreSqlQueryRunner.createPostgreSqlQueryRunner(postgreSqlServer, ORDERS));
         this.postgreSqlServer = postgreSqlServer;
+        this.extendServer = null;
         execute("CREATE EXTENSION file_fdw");
     }
 
+    public TestPostgreSqlIntegrationSmokeTest(QueryRunnerSupplier supplier, TestPostgreSqlExtendServer postgreSqlServer)
+    {
+        super(supplier);
+        this.postgreSqlServer = null;
+        this.extendServer = postgreSqlServer;
+    }
+
     @AfterClass(alwaysRun = true)
-    public final void destroy()
+    public void destroy()
             throws IOException
     {
-        postgreSqlServer.close();
+        if (extendServer != null) {
+            extendServer.close();
+        }
+        else {
+            postgreSqlServer.close();
+        }
     }
 
     @Test
@@ -298,9 +312,18 @@ public class TestPostgreSqlIntegrationSmokeTest
     private void execute(String sql)
             throws SQLException
     {
-        try (Connection connection = DriverManager.getConnection(postgreSqlServer.getJdbcUrl());
-                Statement statement = connection.createStatement()) {
-            statement.execute(sql);
+        try {
+            if (extendServer != null) {
+                extendServer.execute(sql);
+            }
+            else {
+                Connection connection = DriverManager.getConnection(postgreSqlServer.getJdbcUrl());
+                Statement statement = connection.createStatement();
+                statement.execute(sql);
+            }
+        }
+        catch (Exception e) {
+            throw new RuntimeException("Failed to execute statement: " + sql, e);
         }
     }
 }

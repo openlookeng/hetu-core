@@ -11,12 +11,42 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.prestosql.plugin.postgresql;
 
-package io.hetu.core.plugin.opengauss;
+import java.io.IOException;
 
-import io.prestosql.plugin.postgresql.TestPostgreSqlConfig;
-
-public class TestOpenGaussConfig
-        extends TestPostgreSqlConfig
+public class TestPostgreSqlExtendServer
 {
+    public void execute(String sql) throws Exception
+    {
+    }
+
+    public void close() throws IOException
+    {
+    }
+
+    public String getUser()
+    {
+        return "";
+    }
+
+    public String getPassWd()
+    {
+        return "";
+    }
+
+    public String getDatabase()
+    {
+        return "";
+    }
+
+    public int getPort()
+    {
+        return 0;
+    }
+
+    public String getJdbcUrl()
+    {
+        return "";
+    }
 }
