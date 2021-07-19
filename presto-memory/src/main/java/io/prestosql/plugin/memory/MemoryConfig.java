@@ -37,28 +37,12 @@ import static io.airlift.units.DataSize.Unit.MEGABYTE;
 
 public class MemoryConfig
 {
-    private int splitsPerNode = Math.max(Runtime.getRuntime().availableProcessors(), 1);
     private DataSize maxDataPerNode = new DataSize(256, DataSize.Unit.MEGABYTE);
     private DataSize maxLogicalPartSize = new DataSize(256, MEGABYTE);
     private DataSize maxPageSize = new DataSize(512, DataSize.Unit.KILOBYTE);
     private Duration processingDelay = new Duration(5, TimeUnit.SECONDS);
     private Path spillRoot;
     private int threadPoolSize = Math.max((Runtime.getRuntime().availableProcessors() / 2), 1);
-
-    public int getSplitsPerNode()
-    {
-        return splitsPerNode;
-    }
-
-    @Mandatory(name = "memory.splits-per-node",
-            description = "Number of splits to create per node. Default value is number of available processors on the coordinator." +
-                    " Value is ignored on the workers.")
-    @Config("memory.splits-per-node")
-    public MemoryConfig setSplitsPerNode(int splitsPerNode)
-    {
-        this.splitsPerNode = splitsPerNode;
-        return this;
-    }
 
     @NotNull
     public Path getSpillRoot()

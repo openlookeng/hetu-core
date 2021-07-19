@@ -72,7 +72,7 @@ public class TestMemoryTableManager
     public void testCreateEmptyTable()
     {
         createTable(0L, 0L);
-        assertEquals(pagesStore.getPages(0L, 0, 1, ImmutableList.of(0), 0, OptionalLong.empty(), OptionalDouble.empty()), ImmutableList.of());
+        assertEquals(pagesStore.getPages(0L, 0, ImmutableList.of(0), 0, OptionalLong.empty(), OptionalDouble.empty()), ImmutableList.of());
     }
 
     @Test
@@ -80,28 +80,28 @@ public class TestMemoryTableManager
     {
         createTable(0L, 0L);
         insertToTable(0L, 0L);
-        assertEquals(pagesStore.getPages(0L, 0, 1, ImmutableList.of(0), POSITIONS_PER_PAGE, OptionalLong.empty(), OptionalDouble.empty()).size(), 1);
+        assertEquals(pagesStore.getPages(0L, 0, ImmutableList.of(0), POSITIONS_PER_PAGE, OptionalLong.empty(), OptionalDouble.empty()).size(), 1);
     }
 
     @Test
     public void testInsertPageWithoutCreate()
     {
         insertToTable(0L, 0L);
-        assertEquals(pagesStore.getPages(0L, 0, 1, ImmutableList.of(0), POSITIONS_PER_PAGE, OptionalLong.empty(), OptionalDouble.empty()).size(), 1);
+        assertEquals(pagesStore.getPages(0L, 0, ImmutableList.of(0), POSITIONS_PER_PAGE, OptionalLong.empty(), OptionalDouble.empty()).size(), 1);
     }
 
     @Test(expectedExceptions = PrestoException.class)
     public void testReadFromUnknownTable()
     {
-        pagesStore.getPages(0L, 0, 1, ImmutableList.of(0), 0, OptionalLong.empty(), OptionalDouble.empty());
+        pagesStore.getPages(0L, 0, ImmutableList.of(0), 0, OptionalLong.empty(), OptionalDouble.empty());
     }
 
     @Test(expectedExceptions = PrestoException.class)
     public void testTryToReadFromEmptyTable()
     {
         createTable(0L, 0L);
-        assertEquals(pagesStore.getPages(0L, 0, 1, ImmutableList.of(0), 0, OptionalLong.empty(), OptionalDouble.empty()), ImmutableList.of());
-        pagesStore.getPages(0L, 0, 1, ImmutableList.of(0), 42, OptionalLong.empty(), OptionalDouble.empty());
+        assertEquals(pagesStore.getPages(0L, 0, ImmutableList.of(0), 0, OptionalLong.empty(), OptionalDouble.empty()), ImmutableList.of());
+        pagesStore.getPages(0L, 0, ImmutableList.of(0), 42, OptionalLong.empty(), OptionalDouble.empty());
     }
 
     @Test

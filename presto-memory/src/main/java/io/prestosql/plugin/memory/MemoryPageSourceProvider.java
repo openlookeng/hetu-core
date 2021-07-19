@@ -74,8 +74,7 @@ public final class MemoryPageSourceProvider
     {
         MemorySplit memorySplit = (MemorySplit) split;
         long tableId = memorySplit.getTable();
-        int partNumber = memorySplit.getPartNumber();
-        int totalParts = memorySplit.getTotalPartsPerWorker();
+        int lpNum = memorySplit.getLogicalPartNumber();
         long expectedRows = memorySplit.getExpectedRows();
         MemoryTableHandle memoryTable = (MemoryTableHandle) table;
         OptionalDouble sampleRatio = memoryTable.getSampleRatio();
@@ -88,8 +87,7 @@ public final class MemoryPageSourceProvider
                 .map(MemoryColumnHandle::getColumnIndex).collect(toList());
         List<Page> pages = pagesStore.getPages(
                 tableId,
-                partNumber,
-                totalParts,
+                lpNum,
                 columnIndexes,
                 expectedRows,
                 memorySplit.getLimit(),

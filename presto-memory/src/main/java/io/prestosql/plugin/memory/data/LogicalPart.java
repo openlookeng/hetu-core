@@ -89,8 +89,7 @@ public class LogicalPart
     private final Set<Integer> indexChannels;
     private final long maxLogicalPartBytes;
     private final int maxPageSizeBytes;
-    private final int splitNum;
-    private final int logicalPartNum;
+    private final int lpNum;
     private final boolean compressionEnabled;
 
     // indexes
@@ -144,13 +143,11 @@ public class LogicalPart
             int maxPageSizeBytes,
             TypeManager typeManager,
             PagesSerde pagesSerde,
-            int splitNum,
-            int logicalPartNum,
+            int lpNum,
             boolean compressionEnabled)
     {
         this.tableDataRoot = tableDataRoot;
-        this.splitNum = splitNum;
-        this.logicalPartNum = logicalPartNum;
+        this.lpNum = lpNum;
         this.pages = new ArrayList<>();
         this.maxLogicalPartBytes = maxLogicalPartBytes;
         this.maxPageSizeBytes = maxPageSizeBytes;
@@ -701,7 +698,7 @@ public class LogicalPart
 
     private String getPageFileName()
     {
-        return "split" + splitNum + "lp" + logicalPartNum;
+        return "logicalPart" + lpNum;
     }
 
     private synchronized void readPages()

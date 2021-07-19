@@ -99,14 +99,12 @@ public class Table
             .toArray(new String[0]);
 
     private final long processingDelay;
-    private final int totalSplits;
-    private final AtomicInteger nextSplit;
     private final List<MemoryColumnHandle> columns;
     private final List<SortingColumn> sortedBy;
     private final List<String> indexColumns;
     private final long maxLogicalPartBytes;
     private final int maxPageSizeBytes;
-    private final List<List<LogicalPart>> splits;
+    private final List<LogicalPart> logicalParts;
     private final boolean compressionEnabled;
     private TableState tableState;
     private long lastModified = System.currentTimeMillis();
@@ -117,11 +115,10 @@ public class Table
     private transient PageSorter pageSorter;
     private transient TypeManager typeManager;
 
-    public Table(long id, boolean compressionEnabled, int splitsPerNode, Path tableDataRoot, List<MemoryColumnHandle> columns, List<SortingColumn> sortedBy,
+    public Table(long id, boolean compressionEnabled, Path tableDataRoot, List<MemoryColumnHandle> columns, List<SortingColumn> sortedBy,
             List<String> indexColumns, PageSorter pageSorter, MemoryConfig config, TypeManager typeManager, PagesSerde pagesSerde)
     {
         this.tableDataRoot = tableDataRoot;
-        this.totalSplits = splitsPerNode;
         this.maxLogicalPartBytes = config.getMaxLogicalPartSize().toBytes();
         this.maxPageSizeBytes = Long.valueOf(config.getMaxPageSize().toBytes()).intValue();
         this.processingDelay = config.getProcessingDelay().toMillis();
@@ -133,32 +130,24 @@ public class Table
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.pagesSerde = requireNonNull(pagesSerde, "pagesSerde is null");
 
-        this.splits = new ArrayList<>(splitsPerNode);
-        for (int i = 0; i < splitsPerNode; i++) {
-            this.splits.add(new ArrayList<>());
-        }
-        this.nextSplit = new AtomicInteger(0);
+        this.logicalParts = new ArrayList<>();
 
         MemoryThreadManager.getSharedThreadPool().scheduleWithFixedDelay(() -> {
             if ((System.currentTimeMillis() - lastModified) > processingDelay) {
-                for (int i = 0; i < splits.size(); i++) {
-                    List<LogicalPart> split = splits.get(i);
-                    for (int j = 0; j < split.size(); j++) {
-                        LogicalPart logicalPart = split.get(j);
-                        if (logicalPart.getProcessingState().get() == LogicalPart.LogicalPartState.FINISHED_ADDING) {
-                            int finalI = i;
-                            int finalJ = j;
-                            MemoryThreadManager.getSharedThreadPool().execute(() -> {
-                                LOG.info("Processing Table %d :: Split %d/%d :: LogicalPart %d/%d", id, finalI + 1, splits.size(), finalJ + 1, split.size());
-                                try {
-                                    logicalPart.process();
-                                }
-                                catch (Exception e) {
-                                    LOG.warn("Failed to process Table %d :: Split %d/%d :: LogicalPart %d/%d", id, finalI + 1, splits.size(), finalJ + 1, split.size());
-                                }
-                                LOG.info("Processed Table %d :: Split %d/%d :: LogicalPart %d/%d", id, finalI + 1, splits.size(), finalJ + 1, split.size());
-                            });
-                        }
+                for (int i = 0; i < logicalParts.size(); i++) {
+                    LogicalPart logicalPart = logicalParts.get(i);
+                    if (logicalPart.getProcessingState().get() == LogicalPart.LogicalPartState.FINISHED_ADDING) {
+                        int finalI = i;
+                        MemoryThreadManager.getSharedThreadPool().execute(() -> {
+                            LOG.info("Processing Table %d :: logicalPart %d", id, finalI + 1);
+                            try {
+                                logicalPart.process();
+                            }
+                            catch (Exception e) {
+                                LOG.warn("Failed to process Table %d :: logicalPart %d", id, finalI + 1);
+                            }
+                            LOG.info("Processed Table %d :: logicalPart %d", id, finalI + 1);
+                        });
                     }
                 }
             }
@@ -172,25 +161,17 @@ public class Table
         this.typeManager = typeManager;
         this.pagesSerde = pagesSerde;
         this.tableDataRoot = tableDataRoot;
-        for (List<LogicalPart> split : splits) {
-            for (LogicalPart lp : split) {
-                lp.restoreTransientObjects(pageSorter, typeManager, pagesSerde, tableDataRoot);
-            }
+        for (LogicalPart lp : logicalParts) {
+            lp.restoreTransientObjects(pageSorter, typeManager, pagesSerde, tableDataRoot);
         }
     }
 
     public void add(Page page)
     {
-        int splitNum = nextSplit.getAndIncrement() % totalSplits;
-        List<LogicalPart> splitParts = splits.get(splitNum);
-        if (splitParts.isEmpty() || !splitParts.get(splitParts.size() - 1).canAdd()) {
-            int logicalPartNum = splitParts.size();
-            splitParts.add(new LogicalPart(columns, sortedBy, indexColumns, tableDataRoot, pageSorter, maxLogicalPartBytes, maxPageSizeBytes, typeManager, pagesSerde, splitNum, logicalPartNum, compressionEnabled));
+        if (logicalParts.isEmpty() || !logicalParts.get(logicalParts.size() - 1).canAdd()) {
+            this.logicalParts.add(new LogicalPart(columns, sortedBy, indexColumns, tableDataRoot, pageSorter, maxLogicalPartBytes, maxPageSizeBytes, typeManager, pagesSerde, logicalParts.size(), compressionEnabled));
         }
-
-        LogicalPart currentSplitPart = splitParts.get(splitParts.size() - 1);
-        currentSplitPart.add(page);
-
+        logicalParts.get(logicalParts.size() - 1).add(page);
         byteSize += page.getSizeInBytes();
         lastModified = System.currentTimeMillis();
         tableState = TableState.MODIFIED;
@@ -198,11 +179,9 @@ public class Table
 
     public boolean allProcessed()
     {
-        for (List<LogicalPart> split : splits) {
-            for (LogicalPart logicalPart : split) {
-                if (logicalPart.getProcessingState().get() != LogicalPart.LogicalPartState.COMPLETED) {
-                    return false;
-                }
+        for (LogicalPart logicalPart : logicalParts) {
+            if (logicalPart.getProcessingState().get() != LogicalPart.LogicalPartState.COMPLETED) {
+                return false;
             }
         }
         return true;
@@ -214,14 +193,12 @@ public class Table
     public long rollBackUncommitted()
     {
         int size = 0;
-        for (List<LogicalPart> split : splits) {
-            Iterator<LogicalPart> iterator = split.iterator();
-            while (iterator.hasNext()) {
-                LogicalPart lp = iterator.next();
-                if (lp.getProcessingState().get() == LogicalPart.LogicalPartState.ACCEPTING_PAGES) {
-                    size += lp.getByteSize();
-                    iterator.remove();
-                }
+        Iterator<LogicalPart> iterator = logicalParts.iterator();
+        while (iterator.hasNext()) {
+            LogicalPart lp = iterator.next();
+            if (lp.getProcessingState().get() == LogicalPart.LogicalPartState.ACCEPTING_PAGES) {
+                size += lp.getByteSize();
+                iterator.remove();
             }
         }
         byteSize -= size;
@@ -236,19 +213,17 @@ public class Table
     public void finishCreation()
     {
         tableState = TableState.COMMITTED;
-        for (List<LogicalPart> spilt : splits) {
-            for (LogicalPart logicalPart : spilt) {
-                // for all new logical parts, set state to finished adding pages
-                if (logicalPart.getProcessingState().get() == LogicalPart.LogicalPartState.ACCEPTING_PAGES) {
-                    logicalPart.finishAdding();
-                }
+        for (LogicalPart logicalPart : logicalParts) {
+            // for all new logical parts, set state to finished adding pages
+            if (logicalPart.getProcessingState().get() == LogicalPart.LogicalPartState.ACCEPTING_PAGES) {
+                logicalPart.finishAdding();
             }
         }
     }
 
     public void offLoadPages()
     {
-        splits.forEach(logicalParts -> logicalParts.forEach(LogicalPart::unloadPages));
+        logicalParts.forEach(LogicalPart::unloadPages);
     }
 
     public void setState(TableState state)
@@ -256,26 +231,24 @@ public class Table
         tableState = state;
     }
 
-    protected List<Page> getPages(int split)
+    protected List<Page> getPages(int lpNum)
     {
-        // use for-loop instead of stream to improve performance
         List<Page> list = new ArrayList<>();
-        for (LogicalPart lp : splits.get(split)) {
-            list.addAll(lp.getPages());
+        if (!logicalParts.isEmpty()) {
+            list.addAll(logicalParts.get(lpNum).getPages());
         }
         return list;
     }
 
-    protected List<Page> getPages(int split, TupleDomain<ColumnHandle> predicate)
+    protected List<Page> getPages(int lpNum, TupleDomain<ColumnHandle> predicate)
     {
         if (predicate.isAll()) {
-            return getPages(split);
+            return getPages(lpNum);
         }
 
-        // use for-loop instead of stream to improve performance
         List<Page> list = new ArrayList<>();
-        for (LogicalPart lp : splits.get(split)) {
-            list.addAll(lp.getPages(predicate));
+        if (!logicalParts.isEmpty()) {
+            list.addAll(logicalParts.get(lpNum).getPages(predicate));
         }
         return list;
     }
@@ -283,11 +256,14 @@ public class Table
     protected long getRows()
     {
         int total = 0;
-        for (List<LogicalPart> split : splits) {
-            for (LogicalPart logiPart : split) {
-                total += logiPart.getRows();
-            }
+        for (LogicalPart logicalPart : logicalParts) {
+            total += logicalPart.getRows();
         }
         return total;
+    }
+
+    protected int getLogicalPartCount()
+    {
+        return logicalParts.size() - 1;
     }
 }

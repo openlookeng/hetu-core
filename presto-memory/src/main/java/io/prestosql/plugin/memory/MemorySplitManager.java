@@ -30,13 +30,11 @@ import java.util.OptionalLong;
 public final class MemorySplitManager
         implements ConnectorSplitManager
 {
-    private final int splitsPerNode;
     private final MemoryMetadata metadata;
 
     @Inject
     public MemorySplitManager(MemoryConfig config, MemoryMetadata metadata)
     {
-        this.splitsPerNode = config.getSplitsPerNode();
         this.metadata = metadata;
     }
 
@@ -47,16 +45,15 @@ public final class MemorySplitManager
 
         List<MemoryDataFragment> dataFragments = metadata.getDataFragments(table.getId());
 
-        int totalRows = 0;
-
+        long totalRows = 0;
         ImmutableList.Builder<ConnectorSplit> splits = ImmutableList.builder();
 
         for (MemoryDataFragment dataFragment : dataFragments) {
             long rows = dataFragment.getRows();
+            int lpCount = dataFragment.getLogicalPartCount();
             totalRows += rows;
-
-            for (int i = 0; i < splitsPerNode; i++) {
-                splits.add(new MemorySplit(table.getId(), i, splitsPerNode, dataFragment.getHostAddress(), rows, OptionalLong.empty()));
+            for (int i = 0; i <= lpCount; i++) {
+                splits.add(new MemorySplit(table.getId(), i, dataFragment.getHostAddress(), rows, OptionalLong.empty()));
             }
         }
         return new FixedSplitSource(splits.build());

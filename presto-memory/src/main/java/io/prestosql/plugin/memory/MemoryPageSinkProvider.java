@@ -73,7 +73,6 @@ public class MemoryPageSinkProvider
         pagesStore.refreshTables(memoryOutputTableHandle.getActiveTableIds());
         pagesStore.initialize(tableId,
                 memoryOutputTableHandle.isCompressionEnabled(),
-                memoryOutputTableHandle.getSplitsPerNode(),
                 memoryOutputTableHandle.getColumns(),
                 memoryOutputTableHandle.getSortedBy(),
                 memoryOutputTableHandle.getIndexColumns());
@@ -114,7 +113,6 @@ public class MemoryPageSinkProvider
             //
             pagesStore.initialize(tableId,
                     memoryOutputTableHandle.isCompressionEnabled(),
-                    memoryOutputTableHandle.getSplitsPerNode(),
                     memoryOutputTableHandle.getColumns(),
                     memoryOutputTableHandle.getSortedBy(),
                     memoryOutputTableHandle.getIndexColumns());
@@ -160,7 +158,8 @@ public class MemoryPageSinkProvider
         public CompletableFuture<Collection<Slice>> finish()
         {
             tablesManager.finishUpdatingTable(tableId);
-            return completedFuture(ImmutableList.of(new MemoryDataFragment(currentHostAddress, addedRows).toSlice()));
+            int lpCount = tablesManager.getTableLpCount(tableId);
+            return completedFuture(ImmutableList.of(new MemoryDataFragment(currentHostAddress, addedRows, lpCount).toSlice()));
         }
 
         @Override

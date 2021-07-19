@@ -98,8 +98,7 @@ public class BenchmarkSpatialJoin
             metastoreConfig.put("hetu.metastore.cache.type", "local");
             queryRunner.loadMetastore(metastoreConfig);
             queryRunner.createCatalog("memory", new MemoryConnectorFactory(),
-                    ImmutableMap.of("memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath(),
-                            "memory.splits-per-node", "1"));
+                    ImmutableMap.of("memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath()));
 
             Path path = Paths.get(BenchmarkSpatialJoin.class.getClassLoader().getResource("us-states.tsv").getPath());
             String polygonValues = Files.lines(path)
