@@ -27,10 +27,10 @@ import static java.util.Objects.requireNonNull;
 public final class CubeOutputHandler
         implements Closeable
 {
-    private static final int MAX_BUFFERED_ROWS = 10_0000;
+    private static final long MAX_BUFFERED_ROWS = 10000000000L;
 
     private final AtomicBoolean closed = new AtomicBoolean();
-    private final List<List<?>> rowBuffer = new ArrayList<>(MAX_BUFFERED_ROWS);
+    private final List<List<?>> rowBuffer = new ArrayList<>();
     private final OutputPrinter printer;
 
     private long bufferStart;

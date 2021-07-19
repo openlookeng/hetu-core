@@ -76,6 +76,7 @@ public class CubeConsole
     private static final String DATATYPE_DECIMAL = "decimal";
     private static final String DATATYPE_DATE = "date";
     private static final String DATATYPE_TIMESTAMP = "timestamp";
+    private static final String DATATYPE_VARCHAR = "varchar";
     private static final String QUOTE_STRING = "'";
     private static final String DATATYPE_REAL_QUOTE = "real '";
     private static final String DATATYPE_DATE_QUOTE = "date '";
@@ -89,13 +90,13 @@ public class CubeConsole
     private static final String DATATYPE_SMALLINT = "smallint";
     private static final int INDEX_AT_MIN_POSITION = 0;
     private static final int INDEX_AT_MAX_POSITION = 1;
-    private static final int MAX_BUFFERED_ROWS = 100000;
+    private static final long MAX_BUFFERED_ROWS = 10000000000L;
     private static String resultInitCubeQUery;
     private List<List<?>> rowBufferIterationItems;
     private String cubeColumnDataType;
 
     List<String> supportedDataTypes = new ArrayList<>(Arrays.asList(DATATYPE_INTEGER, DATATYPE_TINYINT,
-            DATATYPE_BIGINT, DATATYPE_SMALLINT, DATATYPE_DATE, DATATYPE_TIMESTAMP, DATATYPE_DOUBLE, DATATYPE_REAL));
+            DATATYPE_BIGINT, DATATYPE_SMALLINT, DATATYPE_DATE, DATATYPE_TIMESTAMP, DATATYPE_DOUBLE, DATATYPE_REAL, DATATYPE_VARCHAR));
 
     public CubeConsole(Console console)
     {
@@ -202,14 +203,7 @@ public class CubeConsole
             if (isSupportedExpression(createCube, queryRunner, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
                 if (createCube.getWhere().get() instanceof BetweenPredicate) {
                     //we process the between predicate in the create cube query where clause
-                    if (cubeColumnDataType.equalsIgnoreCase(DATATYPE_DATE) || cubeColumnDataType.equalsIgnoreCase(DATATYPE_TIMESTAMP) ||
-                            cubeColumnDataType.equalsIgnoreCase(DATATYPE_DOUBLE) || cubeColumnDataType.contains(DATATYPE_DECIMAL)
-                            || cubeColumnDataType.equalsIgnoreCase(DATATYPE_REAL)) {
-                        success = processBetweenPredicate(createCube, queryRunner, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel, parser);
-                    }
-                    else {
-                        success = processBetweenPredicate(createCube, queryRunner, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel, parser);
-                    }
+                    success = processBetweenPredicate(createCube, queryRunner, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel, parser);
                 }
                 if (createCube.getWhere().get() instanceof ComparisonExpression) {
                     //we process the comparison expression in the create cube query where clause
@@ -447,6 +441,12 @@ public class CubeConsole
                                 new ParsingOptions()));
                         break;
                     }
+                    case DATATYPE_VARCHAR: {
+                        finalBetweenPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(QUOTE_STRING + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
+                                new ParsingOptions()), parser.createExpression(QUOTE_STRING + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
+                                new ParsingOptions()));
+                        break;
+                    }
                     default: {
                         finalBetweenPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
                                 new ParsingOptions()), parser.createExpression(rowBufferItems.get(INDEX_AT_MAX_POSITION).toString(),
@@ -501,6 +501,14 @@ public class CubeConsole
                     resultInitCubeQuery = getResultInitCubeQuery();
                     if (resultInitCubeQuery != null) {
                         cubeColumnDataType = resultInitCubeQuery;
+                    }
+
+                    if (cubeColumnDataType.contains(DATATYPE_DECIMAL)) {
+                        cubeColumnDataType = DATATYPE_DECIMAL;
+                    }
+
+                    if (cubeColumnDataType.contains(DATATYPE_VARCHAR)) {
+                        cubeColumnDataType = DATATYPE_VARCHAR;
                     }
 
                     if (!isSupportedDatatype(cubeColumnDataType)) {
@@ -562,6 +570,14 @@ public class CubeConsole
                     resultInitCubeQuery = getResultInitCubeQuery();
                     if (resultInitCubeQuery != null) {
                         cubeColumnDataType = resultInitCubeQuery.toLowerCase(Locale.ENGLISH);
+                    }
+
+                    if (cubeColumnDataType.contains(DATATYPE_DECIMAL)) {
+                        cubeColumnDataType = DATATYPE_DECIMAL;
+                    }
+
+                    if (cubeColumnDataType.contains(DATATYPE_VARCHAR)) {
+                        cubeColumnDataType = DATATYPE_VARCHAR;
                     }
 
                     if (!isSupportedDatatype(cubeColumnDataType)) {
