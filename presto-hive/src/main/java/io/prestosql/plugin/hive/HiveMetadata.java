@@ -1093,8 +1093,14 @@ public class HiveMetadata
     {
         HiveTableHandle handle = (HiveTableHandle) tableHandle;
         failIfAvroSchemaIsSet(session, handle);
+        HiveIdentity hiveIdentity = new HiveIdentity(session);
 
-        metastore.addColumn(new HiveIdentity(session), handle.getSchemaName(), handle.getTableName(), column.getName(), HiveType.toHiveType(typeTranslator, column.getType()), column.getComment());
+        Optional<Table> table = metastore.getTable(hiveIdentity, handle.getSchemaName(), handle.getTableName());
+        if (!table.isPresent()) {
+            throw new TableNotFoundException(handle.getSchemaTableName());
+        }
+        verifyStorageFormatForCatalog(table.get().getStorage().getStorageFormat());
+        metastore.addColumn(hiveIdentity, handle.getSchemaName(), handle.getTableName(), column.getName(), HiveType.toHiveType(typeTranslator, column.getType()), column.getComment());
     }
 
     @Override
@@ -1103,8 +1109,13 @@ public class HiveMetadata
         HiveTableHandle hiveTableHandle = (HiveTableHandle) tableHandle;
         failIfAvroSchemaIsSet(session, hiveTableHandle);
         HiveColumnHandle sourceHandle = (HiveColumnHandle) source;
-
-        metastore.renameColumn(new HiveIdentity(session), hiveTableHandle.getSchemaName(), hiveTableHandle.getTableName(), sourceHandle.getName(), target);
+        HiveIdentity hiveIdentity = new HiveIdentity(session);
+        Optional<Table> table = metastore.getTable(hiveIdentity, hiveTableHandle.getSchemaName(), hiveTableHandle.getTableName());
+        if (!table.isPresent()) {
+            throw new TableNotFoundException(hiveTableHandle.getSchemaTableName());
+        }
+        verifyStorageFormatForCatalog(table.get().getStorage().getStorageFormat());
+        metastore.renameColumn(hiveIdentity, hiveTableHandle.getSchemaName(), hiveTableHandle.getTableName(), sourceHandle.getName(), target);
     }
 
     @Override
@@ -1113,8 +1124,13 @@ public class HiveMetadata
         HiveTableHandle hiveTableHandle = (HiveTableHandle) tableHandle;
         failIfAvroSchemaIsSet(session, hiveTableHandle);
         HiveColumnHandle columnHandle = (HiveColumnHandle) column;
-
-        metastore.dropColumn(new HiveIdentity(session), hiveTableHandle.getSchemaName(), hiveTableHandle.getTableName(), columnHandle.getName());
+        HiveIdentity hiveIdentity = new HiveIdentity(session);
+        Optional<Table> table = metastore.getTable(hiveIdentity, hiveTableHandle.getSchemaName(), hiveTableHandle.getTableName());
+        if (!table.isPresent()) {
+            throw new TableNotFoundException(hiveTableHandle.getSchemaTableName());
+        }
+        verifyStorageFormatForCatalog(table.get().getStorage().getStorageFormat());
+        metastore.dropColumn(hiveIdentity, hiveTableHandle.getSchemaName(), hiveTableHandle.getTableName(), columnHandle.getName());
     }
 
     private void failIfAvroSchemaIsSet(ConnectorSession session, HiveTableHandle handle)
@@ -1130,14 +1146,26 @@ public class HiveMetadata
     public void renameTable(ConnectorSession session, ConnectorTableHandle tableHandle, SchemaTableName newTableName)
     {
         HiveTableHandle handle = (HiveTableHandle) tableHandle;
-        metastore.renameTable(new HiveIdentity(session), handle.getSchemaName(), handle.getTableName(), newTableName.getSchemaName(), newTableName.getTableName());
+        HiveIdentity hiveIdentity = new HiveIdentity(session);
+        Optional<Table> target = metastore.getTable(hiveIdentity, handle.getSchemaName(), handle.getTableName());
+        if (!target.isPresent()) {
+            throw new TableNotFoundException(handle.getSchemaTableName());
+        }
+        verifyStorageFormatForCatalog(target.get().getStorage().getStorageFormat());
+        metastore.renameTable(hiveIdentity, handle.getSchemaName(), handle.getTableName(), newTableName.getSchemaName(), newTableName.getTableName());
     }
 
     @Override
     public void setTableComment(ConnectorSession session, ConnectorTableHandle tableHandle, Optional<String> comment)
     {
         HiveTableHandle handle = (HiveTableHandle) tableHandle;
-        metastore.commentTable(new HiveIdentity(session), handle.getSchemaName(), handle.getTableName(), comment);
+        HiveIdentity hiveIdentity = new HiveIdentity(session);
+        Optional<Table> target = metastore.getTable(hiveIdentity, handle.getSchemaName(), handle.getTableName());
+        if (!target.isPresent()) {
+            throw new TableNotFoundException(handle.getSchemaTableName());
+        }
+        verifyStorageFormatForCatalog(target.get().getStorage().getStorageFormat());
+        metastore.commentTable(hiveIdentity, handle.getSchemaName(), handle.getTableName(), comment);
     }
 
     @Override
@@ -1148,6 +1176,7 @@ public class HiveMetadata
         if (!target.isPresent()) {
             throw new TableNotFoundException(handle.getSchemaTableName());
         }
+        verifyStorageFormatForCatalog(target.get().getStorage().getStorageFormat());
         metastore.dropTable(session, handle.getSchemaName(), handle.getTableName());
     }
 
