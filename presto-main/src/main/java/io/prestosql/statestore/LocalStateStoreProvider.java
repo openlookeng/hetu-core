@@ -17,6 +17,7 @@ package io.prestosql.statestore;
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
+import io.prestosql.metastore.MetaStoreConstants;
 import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
@@ -124,6 +125,13 @@ public class LocalStateStoreProvider
         stateStore.createStateCollection(StateStoreConstants.OOM_QUERY_STATE_COLLECTION_NAME, StateCollection.Type.MAP);
         stateStore.createStateCollection(StateStoreConstants.CPU_USAGE_STATE_COLLECTION_NAME, StateCollection.Type.MAP);
         stateStore.createStateCollection(StateStoreConstants.TRANSACTION_STATE_COLLECTION_NAME, StateCollection.Type.MAP);
+
+        stateStore.createStateCollection(MetaStoreConstants.HETU_META_STORE_CATALOGCACHE_NAME, StateCollection.Type.MAP);
+        stateStore.createStateCollection(MetaStoreConstants.HETU_META_STORE_CATALOGSCACHE_NAME, StateCollection.Type.MAP);
+        stateStore.createStateCollection(MetaStoreConstants.HETU_META_STORE_TABLECACHE_NAME, StateCollection.Type.MAP);
+        stateStore.createStateCollection(MetaStoreConstants.HETU_META_STORE_TABLESCACHE_NAME, StateCollection.Type.MAP);
+        stateStore.createStateCollection(MetaStoreConstants.HETU_META_STORE_DATABASECACHE_NAME, StateCollection.Type.MAP);
+        stateStore.createStateCollection(MetaStoreConstants.HETU_META_STORE_DATABASESCACHE_NAME, StateCollection.Type.MAP);
     }
 
     void handleClusterDisconnection(Object obj)

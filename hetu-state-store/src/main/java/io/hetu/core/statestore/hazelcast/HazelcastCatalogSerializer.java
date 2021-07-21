@@ -14,39 +14,44 @@
  */
 package io.hetu.core.statestore.hazelcast;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.StreamSerializer;
-import io.airlift.slice.Slice;
+import io.prestosql.spi.metastore.model.CatalogEntity;
 
 import java.io.IOException;
 
-import static io.airlift.slice.Slices.wrappedBuffer;
-import static io.hetu.core.statestore.hazelcast.HazelCastSerializationConstants.CONSTANT_TYPE_SLICE;
+import static io.hetu.core.statestore.hazelcast.HazelCastSerializationConstants.CONSTANT_TYPE_CATALOG;
 
-public class HazelCastSliceSerializer
-        implements StreamSerializer<Slice>
+public class HazelcastCatalogSerializer
+        implements StreamSerializer<CatalogEntity>
 {
+    private ObjectMapper mapper = new ObjectMapper();
+
     @Override
-    public void write(ObjectDataOutput objectDataOutput, Slice slice) throws IOException
+    public void write(ObjectDataOutput objectDataOutput, CatalogEntity catalogEntity)
+            throws IOException
     {
-        objectDataOutput.writeByteArray(slice.getBytes());
+        objectDataOutput.writeByteArray(mapper.writeValueAsString(catalogEntity).getBytes());
     }
 
     @Override
-    public Slice read(ObjectDataInput objectDataInput) throws IOException
+    public CatalogEntity read(ObjectDataInput objectDataInput)
+            throws IOException
     {
-        return wrappedBuffer(objectDataInput.readByteArray());
+        return mapper.readValue(objectDataInput.readByteArray(), CatalogEntity.class);
     }
 
     @Override
     public int getTypeId()
     {
-        return CONSTANT_TYPE_SLICE;
+        return CONSTANT_TYPE_CATALOG;
     }
 
     @Override
     public void destroy()
     {
+        StreamSerializer.super.destroy();
     }
 }

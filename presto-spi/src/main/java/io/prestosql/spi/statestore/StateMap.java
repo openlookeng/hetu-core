@@ -18,6 +18,7 @@ import io.prestosql.spi.statestore.listener.MapListener;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * StateMap is a map that stores different states
@@ -130,4 +131,7 @@ public interface StateMap<K, V>
      * @param listener MapListener to be removed
      */
     void removeEntryListener(MapListener listener);
+
+    V computeIfAbsent(K key,
+                      Function<? super K, ? extends V> mappingFunction);
 }

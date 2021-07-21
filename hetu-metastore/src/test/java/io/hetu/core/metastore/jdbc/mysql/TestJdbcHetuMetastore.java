@@ -44,6 +44,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.google.common.base.Throwables.throwIfUnchecked;
+import static io.hetu.core.metastore.MetaStoreConstants.LOCAL;
 import static io.hetu.core.metastore.MetaStoreUtConstants.PROPERTY_FILE_PATH;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.metastore.HetuErrorCode.HETU_METASTORE_CODE;
@@ -109,11 +110,13 @@ public class TestJdbcHetuMetastore
                 .put("hetu.metastore.db.password", password)
                 .build();
 
+        String type = LOCAL;
+
         try {
             Bootstrap app = new Bootstrap(
                     new MBeanModule(),
                     new MBeanServerModule(),
-                    new JdbcMetastoreModule());
+                    new JdbcMetastoreModule(type));
 
             Injector injector = app
                     .strictConfig()

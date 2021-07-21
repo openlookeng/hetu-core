@@ -87,6 +87,7 @@ public class TestSpatialJoinPlanning
         metastoreConfig.put("hetu.metastore.type", "hetufilesystem");
         metastoreConfig.put("hetu.metastore.hetufilesystem.profile-name", "default");
         metastoreConfig.put("hetu.metastore.hetufilesystem.path", folder.newFolder("metastore").getAbsolutePath());
+        metastoreConfig.put("hetu.metastore.cache.type", "local");
         queryRunner.loadMetastore(metastoreConfig);
         queryRunner.createCatalog("memory", new MemoryConnectorFactory(),
                 ImmutableMap.of("memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath(),

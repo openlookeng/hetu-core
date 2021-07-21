@@ -30,6 +30,7 @@ import org.weakref.jmx.guice.MBeanModule;
 import java.util.Map;
 
 import static com.google.common.base.Throwables.throwIfUnchecked;
+import static io.hetu.core.metastore.MetaStoreConstants.LOCAL;
 import static io.prestosql.spi.metastore.HetuErrorCode.HETU_METASTORE_CODE;
 import static org.testng.Assert.assertTrue;
 
@@ -82,10 +83,11 @@ public class TestHetuMetastoreModule
                 .put("hetu.metastore.cache.ttl", "0s")
                 .build();
         try {
+            String type = LOCAL;
             Bootstrap app = new Bootstrap(
                     new MBeanModule(),
                     new MBeanServerModule(),
-                    new JdbcMetastoreModule());
+                    new JdbcMetastoreModule(type));
 
             Injector injector = app
                     .strictConfig()

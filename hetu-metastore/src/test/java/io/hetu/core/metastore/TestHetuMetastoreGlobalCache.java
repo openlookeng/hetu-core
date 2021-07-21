@@ -14,43 +14,67 @@
  */
 package io.hetu.core.metastore;
 
-import com.google.common.cache.Cache;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Resources;
 import com.google.inject.Injector;
 import io.airlift.bootstrap.Bootstrap;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
 import io.hetu.core.metastore.hetufilesystem.HetuFsMetastoreModule;
+import io.hetu.core.statestore.hazelcast.HazelcastStateStoreBootstrapper;
+import io.hetu.core.statestore.hazelcast.HazelcastStateStoreFactory;
 import io.prestosql.plugin.base.jmx.MBeanServerModule;
+import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
+import io.prestosql.spi.metastore.HetuCache;
 import io.prestosql.spi.metastore.HetuMetastore;
 import io.prestosql.spi.metastore.model.CatalogEntity;
 import io.prestosql.spi.metastore.model.DatabaseEntity;
 import io.prestosql.spi.metastore.model.TableEntity;
 import io.prestosql.spi.metastore.model.TableEntityType;
+import io.prestosql.spi.seedstore.Seed;
+import io.prestosql.spi.seedstore.SeedStore;
+import io.prestosql.spi.statestore.StateStore;
+import io.prestosql.spi.statestore.StateStoreBootstrapper;
+import io.prestosql.spi.statestore.StateStoreFactory;
+import io.prestosql.statestore.LocalStateStoreProvider;
+import io.prestosql.statestore.StateStoreProvider;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 import org.weakref.jmx.guice.MBeanModule;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.google.common.base.Throwables.throwIfUnchecked;
+import static io.hetu.core.metastore.MetaStoreConstants.GLOBAL;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_PORT_CONFIG_NAME;
 import static io.prestosql.spi.metastore.HetuErrorCode.HETU_METASTORE_CODE;
+import static io.prestosql.statestore.StateStoreConstants.STATE_STORE_CONFIGURATION_PATH;
 import static java.util.Collections.emptyMap;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
-public class TestHetuMetastoreCache
+public class TestHetuMetastoreGlobalCache
 {
     private HetuMetastore metastore;
     private HetuFileSystemClient client;
@@ -58,18 +82,68 @@ public class TestHetuMetastoreCache
     private DatabaseEntity defaultDatabase;
     private String path = Resources.getResource("").getPath() + File.separator + "metastoreCache";
 
-    private Cache<String, Optional<CatalogEntity>> catalogCache;
-    private Cache<String, List<CatalogEntity>> catalogsCache;
-    private Cache<String, Optional<DatabaseEntity>> databaseCache;
-    private Cache<String, List<DatabaseEntity>> databasesCache;
-    private Cache<String, Optional<TableEntity>> tableCache;
-    private Cache<String, List<TableEntity>> tablesCache;
+    private static final String LOCALHOST = "127.0.0.1";
+    private static final String PORT1 = "7980";
+    private static final String PORT3 = "5991";
+    private StateStoreProvider stateStoreProvider;
+    private StateStoreFactory factory;
+    private String expected;
+    private String actual;
+    private ObjectMapper mapper = new ObjectMapper().registerModule(new Jdk8Module());
+
+    private HetuCache<String, Optional<CatalogEntity>> catalogCache;
+    private HetuCache<String, List<CatalogEntity>> catalogsCache;
+    private HetuCache<String, Optional<DatabaseEntity>> databaseCache;
+    private HetuCache<String, List<DatabaseEntity>> databasesCache;
+    private HetuCache<String, Optional<TableEntity>> tableCache;
+    private HetuCache<String, List<TableEntity>> tablesCache;
 
     /**
      * setUp
      *
      * @throws Exception Exception
      */
+    @BeforeTest
+    private void prepareConfigFiles()
+            throws IOException
+    {
+        File launcherConfigFile = new File(STATE_STORE_CONFIGURATION_PATH);
+        if (!launcherConfigFile.exists()) {
+            launcherConfigFile.createNewFile();
+        }
+        else {
+            launcherConfigFile.delete();
+            launcherConfigFile.createNewFile();
+        }
+        FileWriter configWriter = new FileWriter(STATE_STORE_CONFIGURATION_PATH);
+        configWriter.write("state-store.type=hazelcast\n" +
+                "state-store.name=test\n" +
+                "state-store.cluster=test-cluster\n" +
+                "hazelcast.discovery.mode=tcp-ip\n" +
+                "hazelcast.discovery.port=" + PORT1 + "\n");
+        configWriter.close();
+    }
+
+    @BeforeTest
+    private void setUpHazelcast()
+            throws IOException
+    {
+        Set<Seed> seeds = new HashSet<>();
+        SeedStore mockSeedStore = mock(SeedStore.class);
+        Seed mockSeed = mock(Seed.class);
+        seeds.add(mockSeed);
+
+        SeedStoreManager mockSeedStoreManager = mock(SeedStoreManager.class);
+        when(mockSeedStoreManager.getSeedStore()).thenReturn(mockSeedStore);
+
+        when(mockSeed.getLocation()).thenReturn(LOCALHOST + ":" + PORT3);
+        when(mockSeedStore.get()).thenReturn(seeds);
+
+        factory = new HazelcastStateStoreFactory();
+        stateStoreProvider = new LocalStateStoreProvider(mockSeedStoreManager);
+        stateStoreProvider.addStateStoreFactory(factory);
+    }
+
     @BeforeClass
     public void setUp()
             throws Throwable
@@ -89,10 +163,17 @@ public class TestHetuMetastoreCache
                 client.createDirectories(Paths.get(path));
             }
             client.deleteRecursively(Paths.get(path));
+
+            createStateStoreCluster(PORT3);
+            stateStoreProvider.loadStateStore();
+            StateStore stateStore = stateStoreProvider.getStateStore();
+
+            String type = GLOBAL;
+
             Bootstrap app = new Bootstrap(
                     new MBeanModule(),
                     new MBeanServerModule(),
-                    new HetuFsMetastoreModule(client));
+                    new HetuFsMetastoreModule(client, stateStore, type));
 
             Injector injector = app
                     .strictConfig()
@@ -119,31 +200,31 @@ public class TestHetuMetastoreCache
         metastore.createDatabase(defaultDatabase);
 
         // get metastore catalog cache
-        Field catalogCacheField = metastore.getClass().getDeclaredField("catalogCache");
+        Field catalogCacheField = metastore.getClass().getSuperclass().getDeclaredField("catalogCache");
         catalogCacheField.setAccessible(true);
-        catalogCache = (Cache<String, Optional<CatalogEntity>>) catalogCacheField.get(metastore);
+        catalogCache = (HetuCache<String, Optional<CatalogEntity>>) catalogCacheField.get(metastore);
 
-        Field catalogsCacheField = metastore.getClass().getDeclaredField("catalogsCache");
+        Field catalogsCacheField = metastore.getClass().getSuperclass().getDeclaredField("catalogsCache");
         catalogsCacheField.setAccessible(true);
-        catalogsCache = (Cache<String, List<CatalogEntity>>) catalogsCacheField.get(metastore);
+        catalogsCache = (HetuCache<String, List<CatalogEntity>>) catalogsCacheField.get(metastore);
 
         // get metastore database cache
-        Field databaseCacheField = metastore.getClass().getDeclaredField("databaseCache");
+        Field databaseCacheField = metastore.getClass().getSuperclass().getDeclaredField("databaseCache");
         databaseCacheField.setAccessible(true);
-        databaseCache = (Cache<String, Optional<DatabaseEntity>>) databaseCacheField.get(metastore);
+        databaseCache = (HetuCache<String, Optional<DatabaseEntity>>) databaseCacheField.get(metastore);
 
-        Field databasesCacheField = metastore.getClass().getDeclaredField("databasesCache");
+        Field databasesCacheField = metastore.getClass().getSuperclass().getDeclaredField("databasesCache");
         databasesCacheField.setAccessible(true);
-        databasesCache = (Cache<String, List<DatabaseEntity>>) databasesCacheField.get(metastore);
+        databasesCache = (HetuCache<String, List<DatabaseEntity>>) databasesCacheField.get(metastore);
 
         // get metastore table cache
-        Field tableCacheField = metastore.getClass().getDeclaredField("tableCache");
+        Field tableCacheField = metastore.getClass().getSuperclass().getDeclaredField("tableCache");
         tableCacheField.setAccessible(true);
-        tableCache = (Cache<String, Optional<TableEntity>>) tableCacheField.get(metastore);
+        tableCache = (HetuCache<String, Optional<TableEntity>>) tableCacheField.get(metastore);
 
-        Field tablesCacheField = metastore.getClass().getDeclaredField("tablesCache");
+        Field tablesCacheField = metastore.getClass().getSuperclass().getDeclaredField("tablesCache");
         tablesCacheField.setAccessible(true);
-        tablesCache = (Cache<String, List<TableEntity>>) tablesCacheField.get(metastore);
+        tablesCache = (HetuCache<String, List<TableEntity>>) tablesCacheField.get(metastore);
     }
 
     /**
@@ -224,7 +305,7 @@ public class TestHetuMetastoreCache
         assertTrue(catalogInfo.isPresent());
         assertEquals(catalogInfo.get(), catalogEntity);
 
-        metastore.dropCatalog(catalogEntity .getName());
+        metastore.dropCatalog(catalogEntity.getName());
     }
 
     /**
@@ -232,6 +313,7 @@ public class TestHetuMetastoreCache
      */
     @Test
     public void testGetAllCatalogs()
+            throws JsonProcessingException
     {
         Map<String, String> properties = ImmutableMap.<String, String>builder().build();
         CatalogEntity catalog1 = CatalogEntity.builder()
@@ -253,7 +335,11 @@ public class TestHetuMetastoreCache
         metastore.createCatalog(catalog2);
 
         List<CatalogEntity> catalogEntities = metastore.getCatalogs();
-        assertEquals(catalogsCache.getIfPresent(""), catalogEntities);
+
+        actual = mapper.writeValueAsString(catalogsCache.getIfPresent(""));
+        expected = mapper.writeValueAsString(catalogEntities);
+
+        assertEquals(actual, expected);
 
         metastore.dropCatalog(catalog1.getName());
         metastore.dropCatalog(catalog2.getName());
@@ -343,6 +429,7 @@ public class TestHetuMetastoreCache
      */
     @Test
     public void testGetDatabase()
+            throws JsonProcessingException
     {
         Map<String, String> properties = ImmutableMap.<String, String>builder()
                 .put("desc", "vschema")
@@ -360,7 +447,11 @@ public class TestHetuMetastoreCache
         Optional<DatabaseEntity> databaseEntity2 = metastore.getDatabase(defaultCatalog.getName(), "db4");
 
         assertTrue(databaseEntity2.isPresent());
-        assertEquals(databaseEntity2.get(), databaseEntity);
+
+        actual = mapper.writeValueAsString(databaseEntity2.get());
+        expected = mapper.writeValueAsString(databaseEntity);
+
+        assertEquals(actual, expected);
 
         metastore.dropDatabase(defaultCatalog.getName(), "db4");
     }
@@ -370,6 +461,7 @@ public class TestHetuMetastoreCache
      */
     @Test
     public void testAllDatabases()
+            throws JsonProcessingException
     {
         Map<String, String> properties = ImmutableMap.<String, String>builder()
                 .put("desc", "vschema")
@@ -395,7 +487,11 @@ public class TestHetuMetastoreCache
         metastore.createDatabase(databaseEntity2);
 
         List<DatabaseEntity> databaseEntities = metastore.getAllDatabases(defaultCatalog.getName());
-        assertEquals(databasesCache.getIfPresent(defaultCatalog.getName()), databaseEntities);
+
+        actual = mapper.writeValueAsString(databasesCache.getIfPresent(defaultCatalog.getName()));
+        expected = mapper.writeValueAsString(databaseEntities);
+
+        assertEquals(actual, expected);
 
         metastore.dropDatabase(defaultCatalog.getName(), "db5");
         metastore.dropDatabase(defaultCatalog.getName(), "db6");
@@ -490,6 +586,7 @@ public class TestHetuMetastoreCache
      */
     @Test
     public void testGetTable()
+            throws JsonProcessingException
     {
         String tableName = "table3";
         SchemaTableName schemaTableName = new SchemaTableName(defaultDatabase.getName(), tableName);
@@ -502,9 +599,16 @@ public class TestHetuMetastoreCache
         metastore.createTable(tableEntity);
 
         Optional<TableEntity> tableEntity2 = metastore.getTable(defaultDatabase.getCatalogName(), defaultDatabase.getName(), tableName);
+        Map<String, String> parameter = tableEntity2.get().getParameters();
+        System.out.println(parameter);
 
         String tableKey = defaultDatabase.getCatalogName() + "." + defaultDatabase.getName() + "." + tableName;
-        assertEquals(tableCache.getIfPresent(tableKey).get(), tableEntity2.get());
+
+        tableCache.getIfPresent(tableKey).get().getParameters();
+        actual = mapper.writeValueAsString(tableCache.getIfPresent(tableKey).get());
+        expected = mapper.writeValueAsString(tableEntity2.get());
+
+        assertEquals(actual, expected);
 
         metastore.dropTable(defaultDatabase.getCatalogName(), defaultDatabase.getName(), tableName);
     }
@@ -514,6 +618,7 @@ public class TestHetuMetastoreCache
      */
     @Test
     public void testGetAllTables()
+            throws JsonProcessingException
     {
         String tableName = "table4";
         SchemaTableName schemaTableName = new SchemaTableName(defaultDatabase.getName(), tableName);
@@ -528,7 +633,11 @@ public class TestHetuMetastoreCache
         List<TableEntity> tableEntities = metastore.getAllTables(defaultDatabase.getCatalogName(), defaultDatabase.getName());
 
         String tablesKey = defaultDatabase.getCatalogName() + "." + defaultDatabase.getName();
-        assertEquals(tablesCache.getIfPresent(tablesKey), tableEntities);
+
+        actual = mapper.writeValueAsString(tablesCache.getIfPresent(tablesKey));
+        expected = mapper.writeValueAsString(tableEntities);
+
+        assertEquals(actual, expected);
 
         metastore.dropTable(defaultDatabase.getCatalogName(), defaultDatabase.getName(), tableName);
     }
@@ -566,5 +675,16 @@ public class TestHetuMetastoreCache
         assertEquals(tableCache.getIfPresent(tableKey), null);
 
         metastore.dropTable(defaultDatabase.getCatalogName(), defaultDatabase.getName(), tableName2);
+    }
+
+    private StateStore createStateStoreCluster(String port)
+    {
+        Map<String, String> config = new HashMap<>();
+        config.put("hazelcast.discovery.mode", "tcp-ip");
+        config.put("state-store.cluster", "test-cluster");
+        config.put(DISCOVERY_PORT_CONFIG_NAME, port);
+
+        StateStoreBootstrapper bootstrapper = new HazelcastStateStoreBootstrapper();
+        return bootstrapper.bootstrap(ImmutableSet.of(LOCALHOST + ":" + port), config);
     }
 }

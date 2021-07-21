@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
@@ -198,5 +199,11 @@ public class HazelcastStateMap<K, V>
     public void removeEntryListener(MapListener listener)
     {
         registeredListeners.get(listener).forEach(listenerId -> hzMap.removeEntryListener(listenerId));
+    }
+
+    @Override
+    public V computeIfAbsent(K key, Function<? super K, ? extends V> mappingFunction)
+    {
+        return hzMap.computeIfAbsent(key, mappingFunction);
     }
 }

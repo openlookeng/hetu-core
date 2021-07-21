@@ -18,23 +18,34 @@ import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Provides;
 import com.google.inject.Scopes;
+import io.hetu.core.metastore.BinderStrategy;
 import io.hetu.core.metastore.ForHetuMetastoreCache;
-import io.hetu.core.metastore.HetuMetastoreCache;
 import io.hetu.core.metastore.HetuMetastoreCacheConfig;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.metastore.HetuMetastore;
+import io.prestosql.spi.statestore.StateStore;
 
 import static io.airlift.configuration.ConfigBinder.configBinder;
-import static org.weakref.jmx.guice.ExportBinder.newExporter;
 
 public class HetuFsMetastoreModule
         implements Module
 {
     private final HetuFileSystemClient client;
+    private final String type;
+    private final BinderStrategy binderStrategy = new BinderStrategy();
+    private StateStore stateStore;
 
-    public HetuFsMetastoreModule(HetuFileSystemClient client)
+    public HetuFsMetastoreModule(HetuFileSystemClient client, StateStore stateStore, String type)
     {
         this.client = client;
+        this.stateStore = stateStore;
+        this.type = type;
+    }
+
+    public HetuFsMetastoreModule(HetuFileSystemClient client, String type)
+    {
+        this.client = client;
+        this.type = type;
     }
 
     @Override
@@ -44,9 +55,7 @@ public class HetuFsMetastoreModule
         configBinder(binder).bindConfig(HetuMetastoreCacheConfig.class);
         binder.bind(HetuMetastore.class).annotatedWith(ForHetuMetastoreCache.class)
                 .to(HetuFsMetastore.class).in(Scopes.SINGLETON);
-        binder.bind(HetuMetastore.class).to(HetuMetastoreCache.class).in(Scopes.SINGLETON);
-        newExporter(binder).export(HetuMetastore.class)
-                .as(generator -> generator.generatedNameOf(HetuMetastoreCache.class));
+        binderStrategy.getBinderByType(binder, stateStore, type);
     }
 
     @Provides

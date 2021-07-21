@@ -36,6 +36,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Throwables.throwIfUnchecked;
+import static io.hetu.core.metastore.MetaStoreConstants.LOCAL;
 import static io.prestosql.spi.metastore.HetuErrorCode.HETU_METASTORE_CODE;
 
 public class TestingHetuMetastore
@@ -78,10 +79,11 @@ public class TestingHetuMetastore
                     .put("hetu.metastore.cache.ttl", "0s")
                     .build();
 
+            String type = LOCAL;
             Bootstrap app = new Bootstrap(
                     new MBeanModule(),
                     new MBeanServerModule(),
-                    new JdbcMetastoreModule());
+                    new JdbcMetastoreModule(type));
 
             Injector injector = app
                     .strictConfig()

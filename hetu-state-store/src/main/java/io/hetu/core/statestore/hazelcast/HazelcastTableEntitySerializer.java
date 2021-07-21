@@ -14,39 +14,39 @@
  */
 package io.hetu.core.statestore.hazelcast;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.StreamSerializer;
-import io.airlift.slice.Slice;
+import io.prestosql.spi.metastore.model.TableEntity;
 
 import java.io.IOException;
 
-import static io.airlift.slice.Slices.wrappedBuffer;
-import static io.hetu.core.statestore.hazelcast.HazelCastSerializationConstants.CONSTANT_TYPE_SLICE;
+import static io.hetu.core.statestore.hazelcast.HazelCastSerializationConstants.CONSTANT_TYPE_TABLEENTITY;
 
-public class HazelCastSliceSerializer
-        implements StreamSerializer<Slice>
+public class HazelcastTableEntitySerializer
+        implements StreamSerializer<TableEntity>
 {
+    private ObjectMapper mapper = new ObjectMapper().registerModule(new Jdk8Module());
+
     @Override
-    public void write(ObjectDataOutput objectDataOutput, Slice slice) throws IOException
+    public void write(ObjectDataOutput objectDataOutput, TableEntity tableEntity)
+            throws IOException
     {
-        objectDataOutput.writeByteArray(slice.getBytes());
+        objectDataOutput.writeByteArray(mapper.writeValueAsString(tableEntity).getBytes());
     }
 
     @Override
-    public Slice read(ObjectDataInput objectDataInput) throws IOException
+    public TableEntity read(ObjectDataInput objectDataInput)
+            throws IOException
     {
-        return wrappedBuffer(objectDataInput.readByteArray());
+        return mapper.readValue(objectDataInput.readByteArray(), TableEntity.class);
     }
 
     @Override
     public int getTypeId()
     {
-        return CONSTANT_TYPE_SLICE;
-    }
-
-    @Override
-    public void destroy()
-    {
+        return CONSTANT_TYPE_TABLEENTITY;
     }
 }

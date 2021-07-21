@@ -14,6 +14,7 @@ hetu.metastore.type=jdbc
 hetu.metastore.db.url=jdbc:mysql://....
 hetu.metastore.db.user=root
 hetu.metastore.db.password=123456
+hetu.metastore.cache.type=local
 ```
 
 上述属性说明如下：
@@ -22,6 +23,7 @@ hetu.metastore.db.password=123456
 - `hetu.metastore.db.url`：连接RDBMS的URL。
 - `hetu.metastore.db.user` :连接RDBMS的用户名。 
 - `hetu.metastore.db.password` :连接RDBMS的密码。
+- `hetu.metastore.cache.type` :选择缓存模型,其中local为本地缓存,global为分布式缓存。
 
 ### 使用HDFS存储
 

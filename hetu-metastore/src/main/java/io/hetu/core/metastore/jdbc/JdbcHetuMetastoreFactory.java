@@ -20,6 +20,7 @@ import io.prestosql.spi.classloader.ThreadContextClassLoader;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.metastore.HetuMetaStoreFactory;
 import io.prestosql.spi.metastore.HetuMetastore;
+import io.prestosql.spi.statestore.StateStore;
 
 import java.util.Map;
 
@@ -30,6 +31,7 @@ public class JdbcHetuMetastoreFactory
         implements HetuMetaStoreFactory
 {
     private static final String FACTORY_TYPE = "jdbc";
+    private static final String HETU_METASTORE_CACHE_TYPE_DEFAULT = "local";
     private ClassLoader classLoader;
 
     public JdbcHetuMetastoreFactory(ClassLoader classLoader)
@@ -38,11 +40,20 @@ public class JdbcHetuMetastoreFactory
     }
 
     @Override
-    public HetuMetastore create(String name, Map<String, String> config, HetuFileSystemClient client)
+    public HetuMetastore create(String name, Map<String, String> config, HetuFileSystemClient client,
+            StateStore stateStore, String type)
     {
         requireNonNull(config, "config is null");
+        Bootstrap app;
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
-            Bootstrap app = new Bootstrap(new JdbcMetastoreModule());
+            if (stateStore == null) {
+                type = HETU_METASTORE_CACHE_TYPE_DEFAULT;
+                app = new Bootstrap(new JdbcMetastoreModule(type));
+            }
+            else {
+                app = new Bootstrap(new JdbcMetastoreModule(stateStore, type));
+            }
+
             Injector injector =
                     app.strictConfig().doNotInitializeLogging().setRequiredConfigurationProperties(config).initialize();
 

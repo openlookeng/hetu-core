@@ -16,6 +16,7 @@ hetu.metastore.type=jdbc
 hetu.metastore.db.url=jdbc:mysql://....
 hetu.metastore.db.user=root
 hetu.metastore.db.password=123456
+hetu.metastore.cache.type=local
 ```
 
 The above properties are described below:
@@ -24,6 +25,7 @@ The above properties are described below:
 - `hetu.metastore.db.url`：URL of RDBMS to connect to.
 - `hetu.metastore.db.user` :User name of RDBMS to connect to. 
 - `hetu.metastore.db.password` :Password of RDBMS to connect to.
+- `hetu.metastore.cache.type` : Select the cache model, where local is the local cache and global is the distributed cache.
 
 ### HDFS Storage
 

@@ -17,36 +17,42 @@ package io.hetu.core.statestore.hazelcast;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.StreamSerializer;
-import io.airlift.slice.Slice;
 
 import java.io.IOException;
+import java.util.Optional;
 
-import static io.airlift.slice.Slices.wrappedBuffer;
-import static io.hetu.core.statestore.hazelcast.HazelCastSerializationConstants.CONSTANT_TYPE_SLICE;
+import static io.hetu.core.statestore.hazelcast.HazelCastSerializationConstants.CONSTANT_TYPE_OPTIONAL;
 
-public class HazelCastSliceSerializer
-        implements StreamSerializer<Slice>
+public class HazelcastOptionalSerializer
+        implements StreamSerializer<Optional>
 {
     @Override
-    public void write(ObjectDataOutput objectDataOutput, Slice slice) throws IOException
+    public void write(ObjectDataOutput out, Optional optional)
+            throws IOException
     {
-        objectDataOutput.writeByteArray(slice.getBytes());
+        if (optional.isPresent()) {
+            out.writeBoolean(true);
+            out.writeObject(optional.get());
+        }
+        else {
+            out.writeBoolean(false);
+        }
     }
 
     @Override
-    public Slice read(ObjectDataInput objectDataInput) throws IOException
+    public Optional read(ObjectDataInput in)
+            throws IOException
     {
-        return wrappedBuffer(objectDataInput.readByteArray());
+        final boolean present = in.readBoolean();
+        if (present) {
+            return Optional.of(in.readObject());
+        }
+        return Optional.empty();
     }
 
     @Override
     public int getTypeId()
     {
-        return CONSTANT_TYPE_SLICE;
-    }
-
-    @Override
-    public void destroy()
-    {
+        return CONSTANT_TYPE_OPTIONAL;
     }
 }
