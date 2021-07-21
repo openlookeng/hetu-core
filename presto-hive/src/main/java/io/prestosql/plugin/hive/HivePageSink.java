@@ -1011,7 +1011,7 @@ public class HivePageSink
         // TODO-cp-I2BZ0A: ClassNotFoundException when using "State" class, because Hive classes are from a different classloader
         Map<String, Object> state = new HashMap<>();
         state.put("pagePartitioner", pagePartitioner.pageIndexer.capture(serdeProvider));
-        state.put("writerFactory", writerFactory.capture(serdeProvider));
+        state.put("writerFactory", writerFactory.capture());
         state.put("writerParams", new ArrayList<>(writerParams.stream().map(p -> {
             Map<String, Object> map = new HashMap<>();
             map.put("partitionValues", p.partitionValues);
@@ -1027,13 +1027,13 @@ public class HivePageSink
     }
 
     @Override
-    public void restore(Object obj, BlockEncodingSerdeProvider serdeProvider)
+    public void restore(Object obj, BlockEncodingSerdeProvider serdeProvider, long resumeCount)
     {
         checkState(writers.isEmpty());
         // TODO-cp-I2BZ0A: ClassNotFoundException when using "State" class, because Hive classes are from a different classloader
         Map<String, Object> state = (Map<String, Object>) obj;
         pagePartitioner.pageIndexer.restore(state.get("pagePartitioner"), serdeProvider);
-        writerFactory.restore(state.get("writerFactory"), serdeProvider);
+        writerFactory.restore(state.get("writerFactory"), resumeCount);
         writerParams.clear();
         writerParams.addAll(((List<Map<String, Object>>) state.get("writerParams")).stream().map(p -> {
             return new WriterParam(

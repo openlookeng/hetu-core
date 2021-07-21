@@ -127,18 +127,10 @@ public class ClassLoaderSafeConnectorPageSink
     }
 
     @Override
-    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider, long resumeCount)
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
-            delegate.restore(state, serdeProvider);
-        }
-    }
-
-    @Override
-    public boolean supportsConsolidatedWrites()
-    {
-        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
-            return delegate.supportsConsolidatedWrites();
+            delegate.restore(state, serdeProvider, resumeCount);
         }
     }
 }

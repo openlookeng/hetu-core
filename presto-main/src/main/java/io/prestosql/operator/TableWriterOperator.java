@@ -540,7 +540,8 @@ public class TableWriterOperator
         this.operatorContext.restore(myState.operatorContext, serdeProvider);
         this.pageSinkMemoryContext.setBytes(myState.pageSinkMemoryContext);
         this.pageSinkPeakMemoryUsage.set(myState.pageSinkPeakMemoryUsage);
-        this.pageSink.restore(myState.pageSink, serdeProvider);
+        long resumeCount = operatorContext.getDriverContext().getPipelineContext().getTaskContext().getSnapshotManager().getResumeCount();
+        this.pageSink.restore(myState.pageSink, serdeProvider, resumeCount);
         this.statisticAggregationOperator.restore(myState.statisticAggregationOperator, serdeProvider);
         this.state = State.valueOf(myState.state);
         this.rowCount = myState.rowCount;
