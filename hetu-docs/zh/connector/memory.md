@@ -1,17 +1,17 @@
 
 # 内存连接器
 
-内存连接器将所有数据和元数据存储在工作节点上的内存中来获得更好性能。同时元数据和数据也被后台写入磁盘并在需要时自动读取。
+内存连接器将所有数据和元数据存储在工作节点上的内存中来获得更好的性能。
+同时元数据和数据也被后台写入磁盘并在需要时自动读取。
 
 ## 配置
 
 ### 内存连接器配置
 
-要配置内存连接器，创建一个具有以下内容的目录属性文件`etc/catalog/memory.properties`：
+配置内存连接器时，创建或修改具有以下内容的目录属性文件`etc/catalog/memory.properties`：
 
 ``` properties
 connector.name=memory
-memory.splits-per-node=10
 memory.max-data-per-node=200GB
 memory.spill-path=/opt/hetu/data/spill    
 ```
@@ -60,7 +60,6 @@ memory.spill-path=/opt/hetu/data/spill
 
 | 属性名称                         | 默认值   | 是否必要 | 描述               |
 |---------------------------------------|-----------------|---------|---------------------------|
-| `memory.splits-per-node              `  | coordinator上可用的处理器数          | No     | 每个节点上的分片(Split)数量。默认值为coordinator上可用的处理器数。在worker上的设置该值会被忽略。当并发度高时，将该值调低可以提高性能。 |
 | `memory.spill-path                   `  | None          | Yes     | 在磁盘上持久化数据的位置。优先使用位于SSD的路径 |
 | `memory.max-data-per-node            `  | 256MB         | Yes     | 每个节点的内存大小使用限制 |
 | `memory.max-logical-part-size        `  | 256MB         | No      | 每个逻辑分片(LogicalPart)的大小限制 |
@@ -93,23 +92,35 @@ memory.spill-path=/opt/hetu/data/spill
 
 下图展示了内存连接器的总体设计：
 
-![Memory Connector Overall Design](../images/memory-connector-overall-design.png)
+![Memory Connector Overall Design](../images/memory-connector-design.png)
 
-数据被切分为分片（Split）分布到各个worker节点上。这些分片又被组合为逻辑分片（LogicalPart）。每个逻辑分片包含索引和数据。表数据会自动写入到磁盘。如果没有足够的内存来保存整个表是，则可以从内存中释放表。数据在额外的后台进程中进行排序和索引，从而可以更快地创建表。该表在此期间仍可查询处理，但查询效率不高（索引尚未启用）。Hetu Metastore用于持久化表元数据。
 
-### 分片（Split）
+### 调度流程
 
-在表创建期间，page被分发给每个worker。每个worker将有相同数量的分片。分片以循环方式填充page。当调度Table Scan时，将在每一个分片上调度查询。将拆分数设置为小于节点上内核数的值可实现最大并行度。并非所有表都能完整放在内存中，因此在内存限制被达到时引擎会依据LRU规则自动释放最近不使用的表。最大单个表大小是内存连接器限制的最大内存大小。表在创建后会在后台进程中自动持久化到磁盘。
+要处理的数据存储在page中，这些page被分发到openLooKeng中的不同工作节点(worker)。
+在内存连接器中，每个worker都有若干个LogicalParts。
+在表创建期间，worker中的LogicalParts以循环方式根据page内容被填充。
+数据内容也将作为后台进程的一部分自动持久化到磁盘。
+如果没有足够的内存来保存整个数据，则依据LRU规则从内存中释放最近不使用的表。 
+HetuMetastore用于持久化表元数据。在查询时，当调度Tablescan操作时，将调度查询LogicalParts。
 
 ### 逻辑分片（LogicalPart）
 
-多个分片被进一步组织成逻辑分片。逻辑分片有一个可配置的最大容量（默认为 256 MB）。一旦最后一个可用的逻辑分片被填满，就会创建新的逻辑分片。作为表创建后的后台处理的一部分，数据在每一个逻辑分片中被排序和创建索引。基于下推的谓词，可以使用布隆过滤器和 MinMax 索引过滤掉不需要的逻辑分片。同时稀疏索引（Sparse Index）可以提供逻辑分片内部的更细致的过滤。
+如设计图的下半部分所示，LogicalPart是包含索引和原始数据内容的数据结构。
+作为表创建后的后台处理的一部分，数据在每一个逻辑分片中被排序和创建索引，以实现更快的查询，但在处理过程中已插入的数据仍然是可查询的。 
+LogicalParts 具有最大可配置大小（默认为 256 MB）。一旦前一个逻辑部分已满，就会创建新的逻辑部分。
 
-### 稀疏索引 （Sparse Index）
+### 索引
 
-首先对页面进行排序，最后创建一个稀疏索引。稀疏索引不会记录所有的数据值而只会间隔抽取一些。这使得索引更小。稀疏索引有助于减少输入行，但不能执行完美的过滤。进一步的过滤会由 openLooKeng的Filter Operator完成。
+LogicalPart 中创建了布隆过滤器、稀疏索引和 MinMax 索引。
+基于下推的predicate，可以使用布隆过滤器和 MinMax 索引过滤掉整个 LogicalParts。
+进一步的页面过滤是使用稀疏索引完成的。
+首先对页面进行排序，然后进行优化，最后创建一个稀疏索引。
+稀疏索引不会记录所有的数据值而只会间隔抽取一些。这使得索引更小。
+稀疏索引有助于减少输入行，但不能执行完美的过滤。
+进一步的过滤是由 openLooKeng 的 Filter Operator 完成的。
+参考上面的稀疏索引示例，这是内存连接器为不同查询过滤数据的方式：
 
-参考图中的稀疏索引示例，这是内存连接器为不同查询过滤数据的方式：
 
 ```
 查询: column=a.
