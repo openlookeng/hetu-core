@@ -140,6 +140,12 @@ public class PrestoServer
             FileSystemClientManager fileSystemClientManager = injector.getInstance(FileSystemClientManager.class);
             fileSystemClientManager.loadFactoryConfigs();
 
+            injector.getInstance(SeedStoreManager.class).loadSeedStore();
+            launchEmbeddedStateStore(injector.getInstance(HetuConfig.class), injector.getInstance(StateStoreLauncher.class));
+            injector.getInstance(StateStoreProvider.class).loadStateStore();
+            injector.getInstance(HetuMetaStoreManager.class).loadHetuMetastore(fileSystemClientManager); // relies on state-store
+
+            injector.getInstance(HeuristicIndexerManager.class).buildIndexClient(); // relies on metastore
             injector.getInstance(StaticFunctionNamespaceStore.class).loadFunctionNamespaceManagers();
             injector.getInstance(StaticCatalogStore.class).loadCatalogs();
             injector.getInstance(DynamicCatalogStore.class).loadCatalogStores(fileSystemClientManager);
@@ -150,14 +156,6 @@ public class PrestoServer
             injector.getInstance(PasswordAuthenticatorManager.class).loadPasswordAuthenticator();
             injector.getInstance(EventListenerManager.class).loadConfiguredEventListener();
 
-            // Seed Store
-            injector.getInstance(SeedStoreManager.class).loadSeedStore();
-            // State Store
-            launchEmbeddedStateStore(injector.getInstance(HetuConfig.class), injector.getInstance(StateStoreLauncher.class));
-            injector.getInstance(StateStoreProvider.class).loadStateStore();
-
-            injector.getInstance(HetuMetaStoreManager.class).loadHetuMetastore(fileSystemClientManager);
-            injector.getInstance(HeuristicIndexerManager.class).buildIndexClient();
             // preload index (on coordinator only)
             if (injector.getInstance(ServerConfig.class).isCoordinator()) {
                 injector.getInstance(HeuristicIndexerManager.class).preloadIndex();
