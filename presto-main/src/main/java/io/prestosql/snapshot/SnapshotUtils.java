@@ -41,6 +41,7 @@ import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -183,6 +184,18 @@ public class SnapshotUtils
             throws Exception
     {
         return snapshotStoreClient.loadSnapshotResult(queryId);
+    }
+
+    public void storeConsolidatedFileList(String queryId, Set<String> path)
+            throws Exception
+    {
+        snapshotStoreClient.storeConsolidatedFileList(queryId, path);
+    }
+
+    public Set<String> loadConsolidatedFiles(String queryId)
+            throws Exception
+    {
+        return snapshotStoreClient.loadConsolidatedFiles(queryId);
     }
 
     /**

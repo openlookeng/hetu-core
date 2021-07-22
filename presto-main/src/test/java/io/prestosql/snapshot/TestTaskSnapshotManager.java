@@ -24,6 +24,7 @@ import io.prestosql.metadata.InMemoryNodeManager;
 import io.prestosql.operator.Operator;
 import io.prestosql.spi.QueryId;
 import io.prestosql.testing.assertions.Assert;
+import org.apache.commons.io.FileUtils;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -41,6 +42,7 @@ import java.util.Properties;
 
 import static io.prestosql.SessionTestUtils.TEST_SNAPSHOT_SESSION;
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -90,6 +92,8 @@ public class TestTaskSnapshotManager
         TaskId taskId1 = new TaskId(queryId.getId(), 1, 2);
         TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId1, snapshotUtils);
 
+        snapshotUtils.getOrCreateQuerySnapshotManager(queryId, TEST_SNAPSHOT_SESSION);
+
         // Test operator state
         MockState operatorState = new MockState("operator-state");
         SnapshotStateId operatorStateId = SnapshotStateId.forOperator(1L, taskId1, 3, 4, 5);
@@ -118,6 +122,8 @@ public class TestTaskSnapshotManager
         TaskId taskId = new TaskId(stageId, 0);
         TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId, snapshotUtils);
 
+        snapshotUtils.getOrCreateQuerySnapshotManager(queryId, TEST_SNAPSHOT_SESSION);
+
         // Save operator state
         MockState state = new MockState("state");
         SnapshotStateId stateId = SnapshotStateId.forOperator(1L, taskId, 3, 4, 5);
@@ -145,6 +151,7 @@ public class TestTaskSnapshotManager
         queryId = new QueryId("file");
         TaskId taskId = new TaskId(queryId.getId(), 1, 5);
         TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId, snapshotUtils);
+        snapshotManager.setTotalComponents(1);
 
         // Create a file
         Path sourcePath = Paths.get(SNAPSHOT_FILE_SYSTEM_DIR + "/source/spill-test.txt");
@@ -157,6 +164,7 @@ public class TestTaskSnapshotManager
 
         SnapshotStateId snapshotStateId = new SnapshotStateId(1, taskId, "component1");
         snapshotManager.storeFile(snapshotStateId, sourcePath);
+        snapshotManager.succeededToCapture(snapshotStateId);
 
         Path targetPath = Paths.get(SNAPSHOT_FILE_SYSTEM_DIR + "/target/spill-test.txt");
         assertTrue(snapshotManager.loadFile(snapshotStateId, targetPath));
@@ -172,6 +180,7 @@ public class TestTaskSnapshotManager
         queryId = new QueryId("filebacktrack");
         TaskId taskId = new TaskId(queryId.getId(), 2, 3);
         TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId, snapshotUtils);
+        snapshotManager.setTotalComponents(1);
 
         // Create a file
         Path sourcePath = Paths.get(SNAPSHOT_FILE_SYSTEM_DIR + "/source/spill-test.txt");
@@ -187,6 +196,7 @@ public class TestTaskSnapshotManager
 
         SnapshotStateId id4save = new SnapshotStateId(2, taskId, "component1");
         snapshotManager.storeFile(id4save, sourcePath);
+        snapshotManager.succeededToCapture(id4save);
 
         SnapshotStateId id4load = new SnapshotStateId(3, taskId, "component1");
         Path targetPath = Paths.get(SNAPSHOT_FILE_SYSTEM_DIR + "/target/spill-test.txt");
@@ -214,12 +224,15 @@ public class TestTaskSnapshotManager
     public void testCapture()
             throws Exception
     {
-        TaskId taskId1 = new TaskId("query", 1, 1);
-        TaskId taskId2 = new TaskId("query", 1, 2);
+        queryId = new QueryId("query");
+        TaskId taskId1 = new TaskId(queryId.getId(), 1, 1);
+        TaskId taskId2 = new TaskId(queryId.getId(), 1, 2);
         TaskSnapshotManager snapshotManager1 = new TaskSnapshotManager(taskId1, snapshotUtils);
         TaskSnapshotManager snapshotManager2 = new TaskSnapshotManager(taskId2, snapshotUtils);
         snapshotManager1.setTotalComponents(2);
         snapshotManager2.setTotalComponents(2);
+
+        snapshotUtils.getOrCreateQuerySnapshotManager(queryId, TEST_SNAPSHOT_SESSION);
 
         // Test capture successfully
         snapshotManager1.succeededToCapture(new SnapshotStateId(1, taskId1, "component1"));
@@ -273,9 +286,12 @@ public class TestTaskSnapshotManager
     @Test
     public void testUpdateFinishedQueryComponents()
     {
-        TaskId taskId = new TaskId("query", 1, 1);
+        queryId = new QueryId("query");
+        TaskId taskId = new TaskId(queryId.getId(), 1, 1);
         TaskSnapshotManager sm = new TaskSnapshotManager(taskId, snapshotUtils);
         sm.setTotalComponents(2);
+
+        snapshotUtils.getOrCreateQuerySnapshotManager(queryId, TEST_SNAPSHOT_SESSION);
 
         sm.updateFinishedComponents(ImmutableList.of(mock(Operator.class)));
         sm.succeededToCapture(new SnapshotStateId(1, taskId));
@@ -290,6 +306,8 @@ public class TestTaskSnapshotManager
         TaskId taskId1 = new TaskId(queryId.getId(), 1, 0);
         TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId1, snapshotUtils);
         snapshotManager.setTotalComponents(1);
+
+        snapshotUtils.getOrCreateQuerySnapshotManager(queryId, TEST_SNAPSHOT_SESSION);
 
         MockState state = new MockState("mockstate");
         SnapshotStateId stateId = SnapshotStateId.forOperator(1L, taskId1, 3, 4, 5);
@@ -307,6 +325,8 @@ public class TestTaskSnapshotManager
         TaskId taskId1 = new TaskId(queryId.getId(), 1, 0);
         TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId1, snapshotUtils);
         snapshotManager.setTotalComponents(1);
+
+        snapshotUtils.getOrCreateQuerySnapshotManager(queryId, TEST_SNAPSHOT_SESSION);
 
         QuerySnapshotManager querySnapshotManager = new QuerySnapshotManager(queryId, snapshotUtils, TEST_SNAPSHOT_SESSION);
         querySnapshotManager.addNewTask(taskId1);
@@ -342,6 +362,8 @@ public class TestTaskSnapshotManager
         TaskSnapshotManager snapshotManager2 = new TaskSnapshotManager(taskId2, snapshotUtils);
         snapshotManager1.setTotalComponents(1);
         snapshotManager2.setTotalComponents(1);
+
+        snapshotUtils.getOrCreateQuerySnapshotManager(queryId, TEST_SNAPSHOT_SESSION);
 
         // statexy means task x snapshot y
         MockState state11 = new MockState("mockstate1.1");
@@ -389,6 +411,8 @@ public class TestTaskSnapshotManager
         QuerySnapshotManager querySnapshotManager = new QuerySnapshotManager(queryId, snapshotUtils, TEST_SNAPSHOT_SESSION);
         querySnapshotManager.addNewTask(taskId1);
 
+        snapshotUtils.getOrCreateQuerySnapshotManager(queryId, TEST_SNAPSHOT_SESSION);
+
         // first store
         long firstSnapshotId = 1L;
         MockState state = new MockState("mockstate");
@@ -404,11 +428,86 @@ public class TestTaskSnapshotManager
 
         querySnapshotManager.updateQueryCapture(taskId1, Collections.singletonMap(firstSnapshotId, SnapshotResult.SUCCESSFUL));
 
+        assertTrue(snapshotManager.loadState(secondId).isPresent());
         File second = new File("/tmp/test_snapshot_manager/" + queryId + "/2/1/0/3/4/5");
         assertTrue(second.exists());
         second.delete();
         assertFalse(second.exists());
 
         assertFalse(snapshotManager.loadState(secondId).isPresent());
+
+        // delete entire snapshot
+        FileUtils.deleteDirectory(new File("/tmp/test_snapshot_manager/" + queryId));
+        assertFalse(snapshotManager.loadState(secondId).isPresent());
+    }
+
+    @Test
+    public void testFailedStoreConsolidated()
+            throws Exception
+    {
+        queryId = new QueryId("failedstoreconsolidatedquery");
+
+        SnapshotUtils faultySnapshotUtils = mock(SnapshotUtils.class);
+        doThrow(new NullPointerException()).when(faultySnapshotUtils).storeState(any(), any());
+
+        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0);
+        TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId1, faultySnapshotUtils);
+        snapshotManager.setTotalComponents(1);
+
+        MockState state = new MockState("mockstate");
+        SnapshotStateId stateId = SnapshotStateId.forOperator(1L, taskId1, 3, 4, 5);
+
+        snapshotManager.storeConsolidatedState(stateId, state);
+        // Error messages will print. This is normal because we are failing the store on purpose
+        snapshotManager.succeededToCapture(stateId);
+
+        Assert.assertEquals(snapshotManager.getSnapshotCaptureResult().get(1L), SnapshotResult.FAILED);
+    }
+
+    @Test
+    public void testSpilledDeleted()
+            throws Exception
+    {
+        queryId = new QueryId("spilleddeletedquery");
+        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0);
+        TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId1, snapshotUtils);
+        snapshotManager.setTotalComponents(1);
+
+        QuerySnapshotManager querySnapshotManager = new QuerySnapshotManager(queryId, snapshotUtils, TEST_SNAPSHOT_SESSION);
+        querySnapshotManager.addNewTask(taskId1);
+
+        snapshotUtils.getOrCreateQuerySnapshotManager(queryId, TEST_SNAPSHOT_SESSION);
+
+        // first store
+        long firstSnapshotId = 1L;
+        File dirs = new File("/tmp/test_snapshot_manager/" + queryId + "/");
+        File firstFile = new File("/tmp/test_snapshot_manager/" + queryId + "/firstFile");
+        dirs.mkdirs();
+        firstFile.createNewFile();
+        FileWriter fw1 = new FileWriter(firstFile);
+        String firstStr = "first string";
+        fw1.write(firstStr);
+        SnapshotStateId stateId = SnapshotStateId.forOperator(firstSnapshotId, taskId1, 3, 4, 5);
+        snapshotManager.storeFile(stateId, firstFile.toPath());
+        snapshotManager.succeededToCapture(stateId);
+
+        // second store, then deleted
+        File secondFile = new File("/tmp/test_snapshot_manager/" + queryId + "/secondFile");
+        secondFile.createNewFile();
+        FileWriter fw2 = new FileWriter(secondFile);
+        String secondStr = "second string";
+        fw2.write(secondStr);
+        SnapshotStateId secondId = SnapshotStateId.forOperator(2L, taskId1, 3, 4, 5);
+        snapshotManager.storeFile(secondId, secondFile.toPath());
+        snapshotManager.succeededToCapture(secondId);
+
+        querySnapshotManager.updateQueryCapture(taskId1, Collections.singletonMap(firstSnapshotId, SnapshotResult.SUCCESSFUL));
+
+        File secondFileOperator = new File("/tmp/test_snapshot_manager/" + queryId + "/2/1/0/3/4/5/secondFile");
+        assertTrue(secondFileOperator.exists());
+        secondFileOperator.delete();
+        assertFalse(secondFileOperator.exists());
+
+        assertFalse(snapshotManager.loadFile(secondId, secondFile.toPath()));
     }
 }
