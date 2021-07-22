@@ -80,6 +80,7 @@ import io.prestosql.sql.tree.AssignmentItem;
 import io.prestosql.sql.tree.Call;
 import io.prestosql.sql.tree.Comment;
 import io.prestosql.sql.tree.Commit;
+import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.CreateCube;
 import io.prestosql.sql.tree.CreateIndex;
 import io.prestosql.sql.tree.CreateSchema;
@@ -2014,6 +2015,25 @@ class StatementAnalyzer
         {
             if (node.getHaving().isPresent()) {
                 Expression predicate = node.getHaving().get();
+
+                Map<String, Object> columnAliasMap = new HashMap<>();
+                List<SelectItem> selectItemList = node.getSelect().getSelectItems();
+                if (selectItemList.size() > 0) {
+                    for (SelectItem si : selectItemList) {
+                        if (si instanceof SingleColumn && (((SingleColumn) si).getAlias().isPresent())) {
+                            Expression ex = ((SingleColumn) si).getExpression();
+                            columnAliasMap.put(((SingleColumn) si).getAlias().get().getValue(), ex);
+                        }
+                    }
+                }
+                if (predicate instanceof ComparisonExpression) {
+                    if (((ComparisonExpression) predicate).getLeft() instanceof Identifier) {
+                        Expression leftExpr = (Expression) columnAliasMap.get(((Identifier) ((ComparisonExpression) predicate).getLeft()).getValue());
+                        if (leftExpr != null) {
+                            ((ComparisonExpression) predicate).setLeft(leftExpr);
+                        }
+                    }
+                }
 
                 ExpressionAnalysis expressionAnalysis = analyzeExpression(predicate, scope);
 

@@ -230,7 +230,10 @@ public class TestAnalyzer
     @Test
     public void testHavingReferencesOutputAlias()
     {
-        assertFails(MISSING_ATTRIBUTE, "SELECT sum(a) x FROM t1 HAVING x > 5");
+        analyze("SELECT sum(a) x FROM t1 HAVING x > 5");
+        analyze("SELECT t1.a as a1, count(b) total FROM t1  group by a1 HAVING a1 > 2");
+        analyze("SELECT a as riqi, count(b) total FROM t1 group by riqi HAVING total > 2");
+        analyze("SELECT a as riqi, count(b) total FROM t1 group by riqi HAVING a > 2");
     }
 
     @Test
