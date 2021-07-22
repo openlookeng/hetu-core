@@ -55,6 +55,8 @@ import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MOD
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MULTICAST_STRATEGY_CLASS_NAME;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_TCPIP_SEEDS;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.HAZELCAST_SSL_ENABLED;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.HEARTBEAT_INTERVAL_SECONDS;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.HEARTBEAT_TIMEOUT_SECONDS;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.JAAS_CONFIG_FILE;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.KERBEROS_ENABLED;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.KERBEROS_LOGIN_CONTEXT_NAME;
@@ -148,8 +150,14 @@ public class HazelcastStateStoreFactory
         }
 
         // Set heartbeat config
-        clientConfig.setProperty(CLIENT_HEARTBEAT_TIMEOUT, String.valueOf(HazelcastConstants.HEARTBEAT_TIMEOUT_SECONDS * 1000));
-        clientConfig.setProperty(CLIENT_HEARTBEAT_INTERVAL, String.valueOf(HazelcastConstants.HEARTBEAT_INTERVAL_SECONDS * 1000));
+        final String heartbeatInterval = properties.get(HEARTBEAT_INTERVAL_SECONDS);
+        final String heartbeatTimeout = properties.get(HEARTBEAT_TIMEOUT_SECONDS);
+        if (heartbeatInterval != null) {
+            clientConfig.setProperty(CLIENT_HEARTBEAT_INTERVAL, String.valueOf(Integer.parseInt(heartbeatInterval) * 1000));
+        }
+        if (heartbeatTimeout != null) {
+            clientConfig.setProperty(CLIENT_HEARTBEAT_TIMEOUT, String.valueOf(Integer.parseInt(heartbeatTimeout) * 1000));
+        }
 
         final String discoveryMode = properties.get(DISCOVERY_MODE_CONFIG_NAME);
 

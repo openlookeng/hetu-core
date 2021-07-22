@@ -240,7 +240,12 @@ public class LocalDynamicFilter
                 for (Map.Entry<String, Set> entry : result.entrySet()) {
                     dynamicFilterResult.put(entry.getKey(), entry.getValue());
                 }
-                addPartialFilterToStateStore();
+                try {
+                    addPartialFilterToStateStore();
+                }
+                catch (RuntimeException e) {
+                    log.warn("Cannot add partial filter to state store with following message: " + e.getMessage());
+                }
             }
             dynamicFilterResultFuture.set(dynamicFilterResult);
         }
