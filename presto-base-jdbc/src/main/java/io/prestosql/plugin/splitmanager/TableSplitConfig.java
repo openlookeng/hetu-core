@@ -25,6 +25,7 @@ public class TableSplitConfig
     private String schemaName;
     private String tableName;
     private String splitField;
+    private boolean isSplitFieldValid;
     private boolean isCalcStepEnable;
     private boolean isDataReadOnly;
     private Integer scanNodes;
@@ -69,6 +70,16 @@ public class TableSplitConfig
     public void setSplitField(String splitField)
     {
         this.splitField = splitField;
+    }
+
+    public void setTableSplitFieldValid(boolean valid)
+    {
+        this.isSplitFieldValid = valid;
+    }
+
+    public boolean isTableSplitFieldValid()
+    {
+        return this.isSplitFieldValid;
     }
 
     public boolean isDataReadOnly()

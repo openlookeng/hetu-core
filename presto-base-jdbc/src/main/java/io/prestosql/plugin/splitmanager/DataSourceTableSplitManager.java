@@ -126,9 +126,9 @@ public class DataSourceTableSplitManager
             return getFixedSplitSource(jdbcTableHandle);
         }
         //config with wrong split field type
-        if (!jdbcTableHandle.getTableSplitFieldValidated()) {
+        if (!splitConfig.isTableSplitFieldValid()) {
             log.warn("Table(%s) split field(%s) NOT integer like value type.", generateTableFullName(jdbcTableHandle.getCatalogName(), jdbcTableHandle.getSchemaName(), jdbcTableHandle.getTableName()),
-                    jdbcTableHandle.getTableSplitField());
+                    splitConfig.getSplitField());
             return getFixedSplitSource(jdbcTableHandle);
         }
         long timeStamp = System.nanoTime();
@@ -176,7 +176,7 @@ public class DataSourceTableSplitManager
         }
 
         //submit static log, and filter fixed split source
-        if (jdbcSplitsList.size() > 1) {
+        if (splitConfig.isCalcStepEnable() && (jdbcSplitsList.size() > 1)) {
             Thread collectStaticLogs = new Thread(new Runnable()
             {
                 @Override
