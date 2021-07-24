@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.plugin.hive.HiveBucketing.BucketingVersion;
 
 import java.util.List;
+import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
@@ -79,5 +80,27 @@ public class HiveBucketHandle
                 bucketingVersion,
                 tableBucketCount,
                 ImmutableList.of());
+    }
+
+    @Override
+    public boolean equals(Object o)
+    {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        HiveBucketHandle that = (HiveBucketHandle) o;
+        return Objects.equals(this.columns, that.columns) &&
+                Objects.equals(this.tableBucketCount, that.tableBucketCount) &&
+                Objects.equals(this.readBucketCount, that.readBucketCount) &&
+                Objects.equals(this.bucketingVersion, that.bucketingVersion);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(columns, bucketingVersion, tableBucketCount, readBucketCount);
     }
 }
