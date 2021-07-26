@@ -102,6 +102,7 @@ import io.prestosql.operator.TaskContext;
 import io.prestosql.operator.TaskOutputOperator.TaskOutputFactory;
 import io.prestosql.operator.TopNOperator.TopNOperatorFactory;
 import io.prestosql.operator.TopNRankingNumberOperator;
+import io.prestosql.operator.UpdateIndexOperator;
 import io.prestosql.operator.UpdateOperator;
 import io.prestosql.operator.VacuumTableOperator;
 import io.prestosql.operator.ValuesOperator.ValuesOperatorFactory;
@@ -214,6 +215,7 @@ import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.DeleteTarget;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
+import io.prestosql.sql.planner.plan.UpdateIndexNode;
 import io.prestosql.sql.planner.plan.UpdateNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 import io.prestosql.sql.relational.FunctionResolution;
@@ -2924,6 +2926,20 @@ public class LocalExecutionPlanner
                     .build();
 
             return new PhysicalOperation(operatorFactory, layout, context, source);
+        }
+
+        @Override
+        public PhysicalOperation visitUpdateIndex(UpdateIndexNode node, LocalExecutionPlanContext context)
+        {
+            PhysicalOperation source = node.getSource().accept(this, context);
+
+            OperatorFactory operatorFactory = new UpdateIndexOperator.UpdateIndexOperatorFactory(
+                    context.getNextOperatorId(),
+                    node.getId(),
+                    node.getUpdateIndexMetadata(),
+                    heuristicIndexerManager);
+
+            return new PhysicalOperation(operatorFactory, source.getLayout(), context, source);
         }
 
         @Override

@@ -85,6 +85,7 @@ import io.prestosql.sql.planner.plan.TableUpdateNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
+import io.prestosql.sql.planner.plan.UpdateIndexNode;
 import io.prestosql.sql.planner.plan.UpdateNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 import io.prestosql.sql.relational.RowExpressionDomainTranslator;
@@ -820,6 +821,12 @@ public class PropertyDerivations
 
         @Override
         public ActualProperties visitCreateIndex(CreateIndexNode node, List<ActualProperties> inputProperties)
+        {
+            return Iterables.getOnlyElement(inputProperties);
+        }
+
+        @Override
+        public ActualProperties visitUpdateIndex(UpdateIndexNode node, List<ActualProperties> inputProperties)
         {
             return Iterables.getOnlyElement(inputProperties);
         }

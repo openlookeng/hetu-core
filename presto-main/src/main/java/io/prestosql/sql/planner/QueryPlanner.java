@@ -26,6 +26,7 @@ import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.CreateIndexMetadata;
+import io.prestosql.spi.connector.UpdateIndexMetadata;
 import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
@@ -62,6 +63,7 @@ import io.prestosql.sql.planner.plan.OffsetNode;
 import io.prestosql.sql.planner.plan.SortNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.DeleteTarget;
+import io.prestosql.sql.planner.plan.UpdateIndexNode;
 import io.prestosql.sql.planner.plan.UpdateNode;
 import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.AssignmentItem;
@@ -91,6 +93,7 @@ import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.sql.tree.Table;
 import io.prestosql.sql.tree.Update;
+import io.prestosql.sql.tree.UpdateIndex;
 import io.prestosql.sql.tree.Window;
 import io.prestosql.sql.tree.WindowFrame;
 import io.prestosql.type.TypeCoercion;
@@ -246,6 +249,7 @@ class QueryPlanner
         builder = limit(builder, node.getLimit(), orderingScheme);
         builder = project(builder, outputs);
         builder = createIndex(builder, analysis.getOriginalStatement());
+        builder = updateIndex(builder, analysis.getOriginalStatement());
 
         return new RelationPlan(
                 builder.getRoot(),
@@ -737,6 +741,37 @@ class QueryPlanner
                         indexProperties,
                         session.getUser(),
                         indexCreationLevel)));
+    }
+
+    private PlanBuilder updateIndex(PlanBuilder subPlan, Statement originalStatement)
+    {
+        if (!(originalStatement instanceof UpdateIndex)) {
+            return subPlan;
+        }
+
+        // rewrite sub queries
+        UpdateIndex updateIndex = (UpdateIndex) originalStatement;
+
+        Map<String, Type> columnTypes = new HashMap<>();
+        for (Field field : analysis.getRootScope().getRelationType().getAllFields()) {
+            columnTypes.put(field.getOriginColumnName().get(), field.getType());
+        }
+
+        Properties indexProperties = new Properties();
+
+        for (Property property : updateIndex.getProperties()) {
+            String key = extractPropertyValue(property.getName());
+            String val = extractPropertyValue(property.getValue()).toUpperCase(Locale.ENGLISH);
+            indexProperties.setProperty(key, val);
+        }
+
+        return subPlan.withNewRoot(new UpdateIndexNode(
+                idAllocator.getNextId(),
+                ExchangeNode.gatheringExchange(idAllocator.getNextId(), ExchangeNode.Scope.REMOTE, subPlan.getRoot()),
+                new UpdateIndexMetadata(updateIndex.getIndexName().toString(),
+                        indexProperties,
+                        session.getUser(),
+                        columnTypes)));
     }
 
     private String extractPropertyValue(Expression expression)

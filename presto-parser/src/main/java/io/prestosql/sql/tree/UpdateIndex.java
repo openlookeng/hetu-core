@@ -27,24 +27,25 @@ public class UpdateIndex
         extends Statement
 {
     private final QualifiedName indexName;
-    private final boolean notExists;
+    private final boolean exists;
+    // Properties are removed from grammar but passed as empty for potential future usage
     private final List<Property> properties;
 
-    public UpdateIndex(QualifiedName indexName, boolean notExists, List<Property> properties)
+    public UpdateIndex(QualifiedName indexName, boolean exists, List<Property> properties)
     {
-        this(Optional.empty(), indexName, notExists, properties);
+        this(Optional.empty(), indexName, exists, properties);
     }
 
-    public UpdateIndex(NodeLocation location, QualifiedName indexName, boolean notExists, List<Property> properties)
+    public UpdateIndex(NodeLocation location, QualifiedName indexName, boolean exists, List<Property> properties)
     {
-        this(Optional.of(location), indexName, notExists, properties);
+        this(Optional.of(location), indexName, exists, properties);
     }
 
-    private UpdateIndex(Optional<NodeLocation> location, QualifiedName indexName, boolean notExists, List<Property> properties)
+    private UpdateIndex(Optional<NodeLocation> location, QualifiedName indexName, boolean exists, List<Property> properties)
     {
         super(location);
         this.indexName = requireNonNull(indexName, "indexName is null");
-        this.notExists = notExists;
+        this.exists = exists;
         this.properties = properties;
     }
 
@@ -58,9 +59,9 @@ public class UpdateIndex
         return properties;
     }
 
-    public boolean isNotExists()
+    public boolean isExists()
     {
-        return notExists;
+        return exists;
     }
 
     @Override
@@ -80,7 +81,7 @@ public class UpdateIndex
     @Override
     public int hashCode()
     {
-        return Objects.hash(indexName, notExists, properties);
+        return Objects.hash(indexName, exists, properties);
     }
 
     @Override
@@ -94,7 +95,7 @@ public class UpdateIndex
         }
         UpdateIndex o = (UpdateIndex) obj;
         return Objects.equals(indexName, o.indexName) &&
-                Objects.equals(notExists, o.notExists) &&
+                Objects.equals(exists, o.exists) &&
                 Objects.equals(properties, o.properties);
     }
 
@@ -103,7 +104,7 @@ public class UpdateIndex
     {
         return toStringHelper(this)
                 .add("indexName", indexName)
-                .add("notExists", notExists)
+                .add("notExists", exists)
                 .add("properties", properties)
                 .toString();
     }

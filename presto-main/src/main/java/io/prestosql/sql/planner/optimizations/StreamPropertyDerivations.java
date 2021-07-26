@@ -70,6 +70,7 @@ import io.prestosql.sql.planner.plan.TableUpdateNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
+import io.prestosql.sql.planner.plan.UpdateIndexNode;
 import io.prestosql.sql.planner.plan.UpdateNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 import io.prestosql.sql.tree.SymbolReference;
@@ -286,6 +287,13 @@ public final class StreamPropertyDerivations
                 return new StreamProperties(MULTIPLE, Optional.empty(), false);
             }
             return new StreamProperties(MULTIPLE, streamPartitionSymbols, false);
+        }
+
+        @Override
+        public StreamProperties visitUpdateIndex(UpdateIndexNode node, List<StreamProperties> inputProperties)
+        {
+            StreamProperties properties = Iterables.getOnlyElement(inputProperties);
+            return properties.withUnspecifiedPartitioning();
         }
 
         @Override

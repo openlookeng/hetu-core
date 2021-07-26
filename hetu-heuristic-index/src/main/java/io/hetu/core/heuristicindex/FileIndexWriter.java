@@ -153,7 +153,6 @@ public class FileIndexWriter
      *
      * <pre>
      * /--- {this.root}
-     *   |--- INDEX_RECORDS
      *   |--- table1
      *     |--- column
      *       |--- indexType1

@@ -74,7 +74,7 @@ statement
     | DROP INDEX (IF EXISTS)? indexName=qualifiedName
         (WHERE expression)?                                                     #dropIndex
     | ALTER INDEX (IF EXISTS)? from=qualifiedName RENAME TO to=qualifiedName    #renameIndex
-    | UPDATE INDEX (IF EXISTS)? qualifiedName (SET properties)?                 #updateIndex
+    | UPDATE INDEX (IF EXISTS)? qualifiedName                                   #updateIndex
     | SHOW INDEX (IF EXISTS)? qualifiedName?                                    #showIndex
     | INSERT INTO qualifiedName columnAliases? query                   #insertInto
     | INSERT OVERWRITE (TABLE)? qualifiedName columnAliases? query                   #insertOverwrite

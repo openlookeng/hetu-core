@@ -70,6 +70,7 @@ import io.prestosql.sql.planner.plan.TableUpdateNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
+import io.prestosql.sql.planner.plan.UpdateIndexNode;
 import io.prestosql.sql.planner.plan.UpdateNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 
@@ -145,6 +146,12 @@ public final class ValidateDependenciesChecker
 
         @Override
         public Void visitCreateIndex(CreateIndexNode node, Set<Symbol> boundSymbols)
+        {
+            return null;
+        }
+
+        @Override
+        public Void visitUpdateIndex(UpdateIndexNode node, Set<Symbol> boundSymbols)
         {
             return null;
         }

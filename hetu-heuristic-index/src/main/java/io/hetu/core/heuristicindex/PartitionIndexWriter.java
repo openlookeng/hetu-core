@@ -17,7 +17,7 @@ package io.hetu.core.heuristicindex;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import io.airlift.log.Logger;
-import io.hetu.core.plugin.heuristicindex.index.btree.BTreeIndex;
+import io.hetu.core.heuristicindex.util.IndexConstants;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
@@ -177,8 +177,15 @@ public class PartitionIndexWriter
             properties.put(SYMBOL_TABLE_KEY_NAME, serializedSymbolTable);
             properties.put(MAX_MODIFIED_TIME, String.valueOf(maxLastModifiedTime));
             partitionIndex.setProperties(properties);
-            Path filePath = Paths.get(dbPath + "/" + BTreeIndex.FILE_NAME);
+            Path filePath = Paths.get(dbPath + "/" + IndexConstants.LAST_MODIFIED_FILE_PREFIX + maxLastModifiedTime);
 
+            List<Path> oldFiles = Collections.emptyList();
+            if (fs.exists(Paths.get(dbPath))) {
+                oldFiles = fs.walk(Paths.get(dbPath)).filter(p -> !fs.isDirectory(p)).collect(Collectors.toList());
+            }
+            for (Path oldFile : oldFiles) {
+                fs.deleteIfExists(oldFile);
+            }
             fs.createDirectories(filePath.getParent());
             try (OutputStream os = fs.newOutputStream(filePath)) {
                 partitionIndex.serialize(os);

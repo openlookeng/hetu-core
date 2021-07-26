@@ -571,9 +571,6 @@ class AstBuilder
     public Node visitUpdateIndex(SqlBaseParser.UpdateIndexContext context)
     {
         List<Property> properties = ImmutableList.of();
-        if (context.properties() != null) {
-            properties = visit(context.properties().property(), Property.class);
-        }
         return new UpdateIndex(
                 getLocation(context),
                 getQualifiedName(context.qualifiedName()),

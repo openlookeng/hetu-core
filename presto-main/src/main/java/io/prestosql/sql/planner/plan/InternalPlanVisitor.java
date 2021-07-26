@@ -39,6 +39,11 @@ public abstract class InternalPlanVisitor<R, C>
         return visitPlan(node, context);
     }
 
+    public R visitUpdateIndex(UpdateIndexNode node, C context)
+    {
+        return visitPlan(node, context);
+    }
+
     public R visitDistinctLimit(DistinctLimitNode node, C context)
     {
         return visitPlan(node, context);
