@@ -100,7 +100,7 @@ public class RowBufferHandler
             currentIteration++;
         }
 
-        if (startIteration == endIteration || endIteration == (rowBuffer.size() - 1)) {
+        if (endIteration == (rowBuffer.size() - 1)) {
             isCompleteTraversal = true;
         }
 

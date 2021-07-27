@@ -126,9 +126,11 @@ public class InsertCubeRewrite
                         .stream()
                         .map(Identifier::getValue)
                         .collect(Collectors.toCollection(() -> new TreeSet<>(String.CASE_INSENSITIVE_ORDER)));
-                if (queryWhereColumns.size() != cubeWhereColumns.size() || !cubeWhereColumns.containsAll(queryWhereColumns)) {
-                    throw new IllegalArgumentException(String.format("Where condition must only use the columns from the first insert: %s.",
-                            String.join(", ", cubeWhereColumns)));
+                if (cubeWhereColumns.size() != 0) {
+                    if (queryWhereColumns.size() != cubeWhereColumns.size() || !cubeWhereColumns.containsAll(queryWhereColumns)) {
+                        throw new IllegalArgumentException(String.format("Where condition must only use the columns from the first insert: %s.",
+                                String.join(", ", cubeWhereColumns)));
+                    }
                 }
             }
             return buildCubeInsert(cubeMetadata, node, group);

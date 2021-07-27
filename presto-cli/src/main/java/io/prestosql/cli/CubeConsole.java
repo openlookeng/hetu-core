@@ -495,7 +495,16 @@ public class CubeConsole
                     BetweenPredicate betweenPredicate = (BetweenPredicate) (expression.get());
                     String columnName = betweenPredicate.getValue().toString();
 
-                    String columnDataTypeQuery = String.format(SELECT_DATA_TYPE_STRING, sourceTableName.getPrefix().get().getPrefix().get(), sourceTableName.getSuffix(), columnName);
+                    String columnDataTypeQuery;
+                    if (queryRunner.getSession().getCatalog() != null) {
+                        columnDataTypeQuery = String.format(SELECT_DATA_TYPE_STRING, queryRunner.getSession().getCatalog(), sourceTableName.getSuffix(), columnName);
+                    }
+                    else if (sourceTableName.getPrefix().isPresent() && sourceTableName.getPrefix().get().getPrefix().isPresent()) {
+                        columnDataTypeQuery = String.format(SELECT_DATA_TYPE_STRING, sourceTableName.getPrefix().get().getPrefix().get(), sourceTableName.getSuffix(), columnName);
+                    }
+                    else {
+                        return false;
+                    }
                     processCubeInitialQuery(queryRunner, columnDataTypeQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
                     String resultInitCubeQuery;
                     resultInitCubeQuery = getResultInitCubeQuery();
