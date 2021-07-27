@@ -14,14 +14,9 @@
  */
 package io.prestosql.utils;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
-import io.airlift.json.ObjectMapperProvider;
-import io.airlift.units.Duration;
 import io.prestosql.execution.MockManagedQueryExecution;
 import io.prestosql.spi.resourcegroups.ResourceGroupId;
-import io.prestosql.spi.statestore.StateMap;
-import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.statestore.SharedQueryState;
 import io.prestosql.statestore.SharedResourceGroupState;
 import io.prestosql.statestore.StateCacheStore;
@@ -32,12 +27,7 @@ import org.testng.annotations.Test;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -50,7 +40,6 @@ public class TestDistributedResourceGroupUtils
 {
     // To ensure that test cases are run sequentially
     private final Object lock = new Object();
-    private static final ObjectMapper mapper = new ObjectMapperProvider().get();
 
     @Test
     public void testMapCachedStates()
@@ -91,7 +80,6 @@ public class TestDistributedResourceGroupUtils
             assertEquals(resourceGroupState.getQueuedQueries().peek(), queryState2);
             assertEquals(resourceGroupState.getFinishedQueries().size(), 1);
             assertEquals(resourceGroupState.getFinishedQueries().peek(), queryState3);
-            assertEquals(resourceGroupState.getCpuUsageMillis(), 1000L);
             StateCacheStore.get().resetCachedStates();
         }
     }
@@ -140,86 +128,6 @@ public class TestDistributedResourceGroupUtils
             assertEquals(queryStartTime2, resourceGroupState.getLastExecutionTime());
             StateCacheStore.get().resetCachedStates();
         }
-    }
-
-    @Test
-    public void testCpuUsageUpdate()
-            throws Exception
-    {
-        synchronized (lock) {
-            //manully load datetime
-            DateTime dt = DistributedResourceGroupUtils.getLastUpdateTime();
-
-            ResourceGroupId root = new ResourceGroupId("root");
-
-            StateStore stateStore = setupMockStateStore(new HashMap<>(), new HashMap<>(), new HashMap<>());
-
-            //query1 completed, query2 completed, query3 running
-            MockManagedQueryExecution query1 = new MockManagedQueryExecution(0, "query1", 0,
-                    new Duration(100, MILLISECONDS));
-            query1.setResourceGroupId(root);
-            query1.startWaitingForResources(); // query1 completed
-            query1.complete();
-
-            MockManagedQueryExecution query2 = new MockManagedQueryExecution(0, "query2", 0,
-                    new Duration(200, MILLISECONDS));
-            query2.setResourceGroupId(root);
-            query2.startWaitingForResources(); // query2 completed
-            query2.complete();
-
-            //query1 completed, query2 completed, query3 running
-            MockManagedQueryExecution query3 = new MockManagedQueryExecution(0, "query3", 0,
-                    new Duration(300, MILLISECONDS));
-            query3.setResourceGroupId(root);
-            query3.startWaitingForResources(); // query3 running
-            query3.startWaitingForResources();
-
-            SharedQueryState queryState1 = getSharedQueryState(query1);
-            SharedQueryState queryState2 = getSharedQueryState(query2);
-            SharedQueryState queryState3 = getSharedQueryState(query3);
-
-            ((StateMap) stateStore.getStateCollection(StateStoreConstants.FINISHED_QUERY_STATE_COLLECTION_NAME)).put(query1.toString(), mapper.writeValueAsString(queryState1));
-            ((StateMap) stateStore.getStateCollection(StateStoreConstants.FINISHED_QUERY_STATE_COLLECTION_NAME)).put(query2.toString(), mapper.writeValueAsString(queryState2));
-            ((StateMap) stateStore.getStateCollection(StateStoreConstants.QUERY_STATE_COLLECTION_NAME)).put(query3.toString(), mapper.writeValueAsString(queryState3));
-
-            DistributedResourceGroupUtils.accumulateCpuUsage(stateStore);
-
-            StateMap cpuUsageCollection = (StateMap) stateStore.getStateCollection(StateStoreConstants.CPU_USAGE_STATE_COLLECTION_NAME);
-            assertEquals((long) cpuUsageCollection.get("root"), 300L);
-
-            // Sleep for 1 second so there is new cpu quota
-            TimeUnit.SECONDS.sleep(1);
-            DistributedResourceGroupUtils.updateCpuQuota(stateStore, new HashMap<>());
-            assertEquals((long) cpuUsageCollection.get("root"), 0L);
-
-            StateCacheStore.get().resetCachedStates();
-        }
-    }
-
-    private static StateStore setupMockStateStore(Map<String, String> queryMap, Map<String, String> finishedQueryMap, Map<String, Long> cpuUsageMap)
-    {
-        StateMap mockQueryMap = mock(StateMap.class);
-        StateMap mockFinishedQueryMap = mock(StateMap.class);
-        StateMap mockCpuUsageMap = mock(StateMap.class);
-
-        when(mockQueryMap.put(anyString(), anyString())).thenAnswer(i -> queryMap.put((String) i.getArguments()[0], (String) i.getArguments()[1]));
-        when(mockFinishedQueryMap.put(anyString(), anyString())).thenAnswer(i -> finishedQueryMap.put((String) i.getArguments()[0], (String) i.getArguments()[1]));
-        when(mockCpuUsageMap.put(anyString(), anyString())).thenAnswer(i -> cpuUsageMap.put((String) i.getArguments()[0], (Long) i.getArguments()[1]));
-
-        when(mockQueryMap.get(anyString())).thenAnswer(i -> queryMap.get(i.getArguments()[0]));
-        when(mockQueryMap.getAll()).thenReturn(queryMap);
-
-        when(mockFinishedQueryMap.get(anyString())).thenAnswer(i -> finishedQueryMap.get(i.getArguments()[0]));
-        when(mockFinishedQueryMap.getAll()).thenReturn(finishedQueryMap);
-
-        when(mockCpuUsageMap.get(anyString())).thenAnswer(i -> cpuUsageMap.get(i.getArguments()[0]));
-        when(mockCpuUsageMap.getAll()).thenReturn(cpuUsageMap);
-
-        StateStore stateStore = mock(StateStore.class);
-        when(stateStore.getStateCollection(StateStoreConstants.QUERY_STATE_COLLECTION_NAME)).thenReturn(mockQueryMap);
-        when(stateStore.getStateCollection(StateStoreConstants.FINISHED_QUERY_STATE_COLLECTION_NAME)).thenReturn(mockFinishedQueryMap);
-        when(stateStore.getStateCollection(StateStoreConstants.CPU_USAGE_STATE_COLLECTION_NAME)).thenReturn(mockCpuUsageMap);
-        return stateStore;
     }
 
     private static SharedQueryState getSharedQueryState(MockManagedQueryExecution query)
