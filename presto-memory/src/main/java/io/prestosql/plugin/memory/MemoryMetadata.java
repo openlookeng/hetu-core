@@ -283,8 +283,7 @@ public class MemoryMetadata
                 oldTableHandle.getActiveTableIds(),
                 oldTableHandle.getColumns(),
                 oldTableHandle.getSortedBy(),
-                oldTableHandle.getIndexColumns(),
-                oldTableHandle.getSplitsPerNode());
+                oldTableHandle.getIndexColumns());
 
         metastore.alterTable(MEM_KEY, oldInfo.getSchemaName(), oldInfo.getTableName(),
                 TableEntity.builder()
@@ -398,8 +397,7 @@ public class MemoryMetadata
                 getTableIdSet(nextId),
                 columnHandles,
                 sortedBy,
-                indexColumns,
-                config.getSplitsPerNode());
+                indexColumns);
     }
 
     private void checkSchemaExists(String schemaName, boolean expectExist)

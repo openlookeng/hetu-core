@@ -77,7 +77,6 @@ public class MemoryTableManager
 
     private final Path spillRoot;
     private final long maxBytes;
-    private final int splitsPerNode;
     private final PageSorter pageSorter;
     private final MemoryConfig config;
     private final TypeManager typeManager;
@@ -92,7 +91,6 @@ public class MemoryTableManager
     {
         this.pageSorter = requireNonNull(pageSorter, "pageSorter is null");
         this.config = requireNonNull(config, "config is null");
-        this.splitsPerNode = config.getSplitsPerNode();
         this.maxBytes = config.getMaxDataPerNode().toBytes();
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.spillRoot = config.getSpillRoot();
@@ -144,12 +142,11 @@ public class MemoryTableManager
         }, 0, 3000);
     }
 
-    public synchronized void initialize(long tableId, boolean compressionEnabled, int splitsPerNode, List<MemoryColumnHandle> columns, List<SortingColumn> sortedBy, List<String> indexColumns)
+    public synchronized void initialize(long tableId, boolean compressionEnabled, List<MemoryColumnHandle> columns, List<SortingColumn> sortedBy, List<String> indexColumns)
     {
         if (!tables.containsKey(tableId)) {
             tables.put(tableId, new Table(tableId,
                     compressionEnabled,
-                    splitsPerNode,
                     spillRoot.resolve(String.valueOf(tableId)),
                     columns,
                     sortedBy,
@@ -166,30 +163,31 @@ public class MemoryTableManager
         if (!contains(tableId)) {
             throw new PrestoException(MISSING_DATA, "Failed to find table on a worker.");
         }
-
         page.compact();
-
         Table table = tables.get(tableId); // get current table to make sure it's not LRU
         applyForMemory(page.getSizeInBytes() * CREATION_SCALE_FACTOR, tableId, () -> {}, () -> releaseMemory(table.rollBackUncommitted() * CREATION_SCALE_FACTOR, "Rolling back."));
         table.add(page);
     }
 
+    public int getTableLpCount(long tableId)
+    {
+        return tables.get(tableId).getLogicalPartCount();
+    }
+
     public List<Page> getPages(
             Long tableId,
-            int partNumber,
-            int totalParts,
+            int lpNum,
             List<Integer> columnIndexes,
             long expectedRows,
             OptionalLong limit,
             OptionalDouble sampleRatio)
     {
-        return getPages(tableId, partNumber, totalParts, columnIndexes, expectedRows, limit, sampleRatio, TupleDomain.all());
+        return getPages(tableId, lpNum, columnIndexes, expectedRows, limit, sampleRatio, TupleDomain.all());
     }
 
     public List<Page> getPages(
             Long tableId,
-            int partNumber,
-            int totalParts,
+            int lpNum,
             List<Integer> columnIndexes,
             long expectedRows,
             OptionalLong limit,
@@ -215,14 +213,12 @@ public class MemoryTableManager
 
         ImmutableList.Builder<Page> projectedPages = ImmutableList.builder();
 
-        int splitNumber = partNumber % splitsPerNode;
-
         List<Page> pages;
         if (predicate.isAll()) {
-            pages = table.getPages(splitNumber);
+            pages = table.getPages(lpNum);
         }
         else {
-            pages = table.getPages(splitNumber, predicate);
+            pages = table.getPages(lpNum, predicate);
         }
 
         for (int i = 0; i < pages.size(); i++) {

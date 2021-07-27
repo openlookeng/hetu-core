@@ -40,7 +40,6 @@ public final class MemoryQueryRunner
     public static final long PROCESSING_DELAY = 1000;
 
     private static final Map<String, String> DEFAULT_MEMORY_PROPERTIES = ImmutableMap.of("memory.max-data-per-node", "1GB",
-            "memory.splits-per-node", "2",
             "memory.logical-part-processing-delay", PROCESSING_DELAY + "ms",
             "memory.max-page-size", "50kB");
 

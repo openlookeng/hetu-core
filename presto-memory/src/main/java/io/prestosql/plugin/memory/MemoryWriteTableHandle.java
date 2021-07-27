@@ -38,7 +38,6 @@ public final class MemoryWriteTableHandle
     private final List<String> indexColumns;
     private final String schemaName;
     private final String tableName;
-    private final int splitsPerNode;
 
     @JsonCreator
     public MemoryWriteTableHandle(
@@ -49,14 +48,12 @@ public final class MemoryWriteTableHandle
             @JsonProperty("activeTableIds") Set<Long> activeTableIds,
             @JsonProperty("columns") List<MemoryColumnHandle> columns,
             @JsonProperty("sortedBy") List<SortingColumn> sortedBy,
-            @JsonProperty("indexColumns") List<String> indexColumns,
-            @JsonProperty("splitsPerNode") int splitsPerNode)
+            @JsonProperty("indexColumns") List<String> indexColumns)
     {
         this.table = table;
         this.schemaName = schemaName;
         this.tableName = tableName;
         this.compressionEnabled = compressionEnabled;
-        this.splitsPerNode = splitsPerNode;
         this.activeTableIds = requireNonNull(activeTableIds, "activeTableIds is null");
         this.columns = requireNonNull(columns, "columns is null");
         this.sortedBy = requireNonNull(sortedBy, "sortedBy is null");
@@ -66,7 +63,7 @@ public final class MemoryWriteTableHandle
     @VisibleForTesting
     MemoryWriteTableHandle(long table, Set<Long> activeTableIds)
     {
-        this(table, "", "", SPILL_COMPRESSION_DEFAULT_VALUE, activeTableIds, Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), 1);
+        this(table, "", "", SPILL_COMPRESSION_DEFAULT_VALUE, activeTableIds, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     }
 
     @JsonProperty
@@ -115,12 +112,6 @@ public final class MemoryWriteTableHandle
     public String getTableName()
     {
         return tableName;
-    }
-
-    @JsonProperty
-    public int getSplitsPerNode()
-    {
-        return splitsPerNode;
     }
 
     @Override

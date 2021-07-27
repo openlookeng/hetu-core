@@ -166,7 +166,6 @@ public class TestLogicalPart
                 mock(TypeManager.class),
                 mock(PagesSerde.class),
                 0,
-                0,
                 false);
         AtomicReference<LogicalPart.LogicalPartState> processingState = new AtomicReference<>(LogicalPart.LogicalPartState.COMPLETED);
         ReflectionTestUtils.setField(logicalPart, "processingState", processingState);
@@ -858,7 +857,6 @@ public class TestLogicalPart
                 mock(TypeManager.class),
                 mock(PagesSerde.class),
                 0,
-                0,
                 false);
 
         AtomicReference<LogicalPart.LogicalPartState> processingState = new AtomicReference<>(LogicalPart.LogicalPartState.COMPLETED);
@@ -1001,7 +999,6 @@ public class TestLogicalPart
                 0,
                 mock(TypeManager.class),
                 mock(PagesSerde.class),
-                0,
                 0,
                 false);
 

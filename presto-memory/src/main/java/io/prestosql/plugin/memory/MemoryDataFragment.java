@@ -30,15 +30,18 @@ public class MemoryDataFragment
 
     private final HostAddress hostAddress;
     private final long rows;
+    private final int logicalPartCount;
 
     @JsonCreator
     public MemoryDataFragment(
             @JsonProperty("hostAddress") HostAddress hostAddress,
-            @JsonProperty("rows") long rows)
+            @JsonProperty("rows") long rows,
+            @JsonProperty("logicalPartCount") int logicalPartCount)
     {
         this.hostAddress = requireNonNull(hostAddress, "hostAddress is null");
         checkArgument(rows >= 0, "Rows number can not be negative");
         this.rows = rows;
+        this.logicalPartCount = logicalPartCount;
     }
 
     @JsonProperty
@@ -51,6 +54,12 @@ public class MemoryDataFragment
     public long getRows()
     {
         return rows;
+    }
+
+    @JsonProperty
+    public int getLogicalPartCount()
+    {
+        return logicalPartCount;
     }
 
     public Slice toSlice()
@@ -66,6 +75,6 @@ public class MemoryDataFragment
     public static MemoryDataFragment merge(MemoryDataFragment a, MemoryDataFragment b)
     {
         checkArgument(a.getHostAddress().equals(b.getHostAddress()), "Can not merge fragments from different hosts");
-        return new MemoryDataFragment(a.getHostAddress(), a.getRows() + b.getRows());
+        return new MemoryDataFragment(a.getHostAddress(), a.getRows() + b.getRows(), Math.max(a.getLogicalPartCount(), b.getLogicalPartCount()));
     }
 }
