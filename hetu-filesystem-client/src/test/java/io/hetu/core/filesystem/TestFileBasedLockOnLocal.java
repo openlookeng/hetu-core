@@ -84,9 +84,9 @@ public class TestFileBasedLockOnLocal
             throws InterruptedException, IOException
     {
         Path testDir = Paths.get(testLockRoot + "/testRaceCondition");
-        FileBasedLock lock1 = new FileBasedLock(fs, testDir, 1000L,
+        FileBasedLock lock1 = new FileBasedLock(fs, testDir, 10000L,
                 FileBasedLock.DEFAULT_RETRY_INTERVAL, FileBasedLock.DEFAULT_REFRESH_RATE);
-        FileBasedLock lock2 = new FileBasedLock(fs, testDir, 1000L,
+        FileBasedLock lock2 = new FileBasedLock(fs, testDir, 10000L,
                 FileBasedLock.DEFAULT_RETRY_INTERVAL, FileBasedLock.DEFAULT_REFRESH_RATE);
         lock1.lock();
         assertTrue(lock1.isLocked());
