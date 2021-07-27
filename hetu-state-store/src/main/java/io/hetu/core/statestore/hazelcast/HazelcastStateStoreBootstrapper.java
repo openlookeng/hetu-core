@@ -51,6 +51,8 @@ import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MOD
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_MULTICAST_STRATEGY_CLASS_NAME;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_PORT_CONFIG_NAME;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.HAZELCAST_SSL_ENABLED;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.HEARTBEAT_INTERVAL_SECONDS;
+import static io.hetu.core.statestore.hazelcast.HazelcastConstants.HEARTBEAT_TIMEOUT_SECONDS;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.JAAS_CONFIG_FILE;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.KERBEROS_ENABLED;
 import static io.hetu.core.statestore.hazelcast.HazelcastConstants.KERBEROS_LOGIN_CONTEXT_NAME;
@@ -122,8 +124,7 @@ public class HazelcastStateStoreBootstrapper
         hzConfig = setPortConfigs(config, hzConfig);
 
         // Set timeout rules
-        hzConfig.setProperty(HEARTBEAT_INTERVAL_SECONDS, String.valueOf(HazelcastConstants.HEARTBEAT_INTERVAL_SECONDS));
-        hzConfig.setProperty(HEARTBEAT_TIMEOUT_SECONDS, String.valueOf(HazelcastConstants.HEARTBEAT_TIMEOUT_SECONDS + HazelcastConstants.HEARTBEAT_INTERVAL_SECONDS));
+        hzConfig = setTimeoutConfigs(config, hzConfig);
 
         // Set hazelcast authentication config
         if (Boolean.parseBoolean(config.get(KERBEROS_ENABLED))) {
@@ -231,6 +232,23 @@ public class HazelcastStateStoreBootstrapper
                     "CP member count should not be smaller than " + MINIMUM_CP_MEMBER_COUNT);
         }
         config.getCPSubsystemConfig().setCPMemberCount(cpMemberCount);
+
+        return config;
+    }
+
+    private Config setTimeoutConfigs(Map<String, String> properties, Config config)
+    {
+        final String heartbeatInterval = properties.get(HEARTBEAT_INTERVAL_SECONDS);
+        final String heartbeatTimeout = properties.get(HEARTBEAT_TIMEOUT_SECONDS);
+
+        if (heartbeatInterval != null) {
+            Integer.parseInt(heartbeatInterval);
+            config.setProperty(HEARTBEAT_INTERVAL_SECONDS, heartbeatInterval);
+        }
+        if (heartbeatTimeout != null) {
+            Integer.parseInt(heartbeatTimeout);
+            config.setProperty(HEARTBEAT_TIMEOUT_SECONDS, heartbeatTimeout);
+        }
 
         return config;
     }

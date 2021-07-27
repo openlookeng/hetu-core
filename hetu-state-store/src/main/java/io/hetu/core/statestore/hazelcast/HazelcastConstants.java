@@ -130,13 +130,12 @@ public final class HazelcastConstants
     /**
      * Hazelcast heartbeat interval
      */
-    public static final int HEARTBEAT_INTERVAL_SECONDS = 5;
+    public static final String HEARTBEAT_INTERVAL_SECONDS = "hazelcast.heartbeat.interval.seconds";
 
     /**
      * Hazelcast heartbeat timeout
      */
-    // !Important change the value if the heartbeat timeout value of Hetu nodes changed
-    public static final int HEARTBEAT_TIMEOUT_SECONDS = 10;
+    public static final String HEARTBEAT_TIMEOUT_SECONDS = "hazelcast.heartbeat.timeout.seconds";
 
     private HazelcastConstants()
     {
