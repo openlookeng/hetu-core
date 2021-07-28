@@ -24,7 +24,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -372,7 +372,7 @@ public class FileBasedLock
                 }
                 else {
                     try (InputStream is = fs.newInputStream(lockInfoPath);
-                            InputStreamReader reader = new InputStreamReader(is, Charset.forName("utf8"))) {
+                            InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
                         int idLength = uuid.toString().length();
                         char[] firstIdChars = new char[idLength];
                         return reader.read(firstIdChars, 0, idLength) > 0
@@ -407,10 +407,10 @@ public class FileBasedLock
             // get current filesystem time
             Path tmp = Paths.get(String.format("%s.%s.tmp", this.lockFilePath, this.uuid));
             writeToFile(tmp, "checkTime", true);
-            long cur = Long.valueOf(fs.getAttribute(tmp, "lastModifiedTime").toString());
+            long cur = Long.parseLong(fs.getAttribute(tmp, "lastModifiedTime").toString());
             fs.delete(tmp);
 
-            long lockTime = Long.valueOf(fs.getAttribute(lockPath, "lastModifiedTime").toString());
+            long lockTime = Long.parseLong(fs.getAttribute(lockPath, "lastModifiedTime").toString());
             if (cur - lockTime >= lockFileTimeout) {
                 return true;
             }

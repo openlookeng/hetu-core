@@ -61,7 +61,7 @@ public class TestIndexResources
     @DataProvider(name = "tableData1")
     public Object[][] tableData1()
     {
-        return new Object[][]{{"bitmap", "id", "2"}, {"bloom", "id", "2"}, {"minmax", "id", "2"}, {"btree", "id", "2"}};
+        return new Object[][]{{"bloom", "id", "2"}, {"minmax", "id", "2"}, {"btree", "id", "2"}};
     }
 
     @DataProvider(name = "tableData2")
