@@ -84,6 +84,8 @@ public class MemoryTableManager
 
     @GuardedBy("this")
     private final AtomicLong currentBytes = new AtomicLong();
+
+    // in-memory LRU map of tableId -> table
     private final Map<Long, Table> tables = new LinkedHashMap<>(16, 0.75f, true);
 
     @Inject
@@ -142,6 +144,9 @@ public class MemoryTableManager
         }, 0, 3000);
     }
 
+    /**
+     * Initialize a table and store it in memory
+     */
     public synchronized void initialize(long tableId, boolean compressionEnabled, List<MemoryColumnHandle> columns, List<SortingColumn> sortedBy, List<String> indexColumns)
     {
         if (!tables.containsKey(tableId)) {
@@ -249,6 +254,11 @@ public class MemoryTableManager
         return tables.containsKey(tableId);
     }
 
+    /**
+     * Rollback table creation/insertion
+     *
+     * @param tableId the id of table to be cleaned
+     */
     public synchronized void cleanTable(Long tableId)
     {
         if (tables.containsKey(tableId)) {
@@ -264,6 +274,11 @@ public class MemoryTableManager
         }
     }
 
+    /**
+     * Clean local tables. All non-active tables stored locally in tables map, and the data serialized on disk will be cleaned.
+     *
+     * @param activeTableIds the ids of active tables. all tables not in this set will be cleaned.
+     */
     public synchronized void refreshTables(Set<Long> activeTableIds)
     {
         // We have to remember that there might be some race conditions when there are two tables created at once.
@@ -317,6 +332,13 @@ public class MemoryTableManager
         return new Page(page.getPositionCount(), outputBlocks);
     }
 
+    /**
+     * Spill table to disk.
+     *
+     * Table object (metadata) is serialized into one file. Pages are serialized separately in logical part.
+     *
+     * @param id table id to spill
+     */
     private synchronized void spillTable(long id)
             throws IOException
     {
@@ -343,6 +365,14 @@ public class MemoryTableManager
         LOG.debug("[Spill] Table " + id + " has been serialized to disk. Time elapsed: " + dur + "ms");
     }
 
+    /**
+     * Restore the table from disk to load into tables map.
+     *
+     * Only the skeleton of the table and the logical parts in it will be restored at this time.
+     * (pages won't be loaded until used)
+     *
+     * @param id table to be restored
+     */
     public synchronized void restoreTable(long id)
             throws IOException, ClassNotFoundException
     {

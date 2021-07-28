@@ -104,7 +104,7 @@ public class Table
     private final List<String> indexColumns;
     private final long maxLogicalPartBytes;
     private final int maxPageSizeBytes;
-    private final List<LogicalPart> logicalParts;
+    private final List<LogicalPart> logicalParts; // actual data (pages) stored here
     private final boolean compressionEnabled;
     private TableState tableState;
     private long lastModified = System.currentTimeMillis();
@@ -154,7 +154,9 @@ public class Table
         }, 5, 2, TimeUnit.SECONDS);
     }
 
-    // used for deserialization
+    /**
+     * used for deserialization. these objects are per-runtime so must be restored separately after loading from disk.
+     */
     public void restoreTransientObjects(PageSorter pageSorter, TypeManager typeManager, PagesSerde pagesSerde, Path tableDataRoot)
     {
         this.pageSorter = pageSorter;
@@ -166,6 +168,11 @@ public class Table
         }
     }
 
+    /**
+     * Add page to splits in a robin-robin way.
+     *
+     * @param page page to add
+     */
     public void add(Page page)
     {
         if (logicalParts.isEmpty() || !logicalParts.get(logicalParts.size() - 1).canAdd()) {

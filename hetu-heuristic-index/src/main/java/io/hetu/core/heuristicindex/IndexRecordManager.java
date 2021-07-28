@@ -22,13 +22,16 @@ import io.prestosql.spi.metastore.model.DatabaseEntity;
 import io.prestosql.spi.metastore.model.TableEntity;
 import io.prestosql.spi.metastore.model.TableEntityType;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Index record is stored in hetu metastore as parameters at table level. For each table entity,
+ * See {@link IndexRecord} for more details.
+ */
 public class IndexRecordManager
 {
     private static final Logger LOG = Logger.get(IndexRecordManager.class);
@@ -40,6 +43,13 @@ public class IndexRecordManager
         this.metastore = metastore;
     }
 
+    /**
+     * List all parameters at table level and filter those with hindex prefix.
+     *
+     * Construct {@code IndexRecord} objects from them.
+     *
+     * @return a list of deserialized {@code IndexRecord} objects.
+     */
     public List<IndexRecord> getIndexRecords()
     {
         long startTime = System.currentTimeMillis();
@@ -61,12 +71,17 @@ public class IndexRecordManager
         return records;
     }
 
+    /**
+     * Look up index record according to name.
+     */
     public IndexRecord lookUpIndexRecord(String name)
-            throws IOException
     {
         return getIndexRecords().stream().filter(indexRecord -> indexRecord.name.equals(name)).findFirst().orElse(null);
     }
 
+    /**
+     * Look up index record according to what it is for (triplet of [table, column, type]).
+     */
     public IndexRecord lookUpIndexRecord(String table, String[] columns, String indexType)
     {
         String[] tableQualified = table.split("\\.");
@@ -89,10 +104,10 @@ public class IndexRecordManager
 
     /**
      * Add IndexRecord into record file. If the method is called with a name that already exists,
-     * it will OVERWRITE the existing entry but combine the partition column
+     *
+     * it will OVERWRITE the existing entry but COMBINE the partition columns (if it previously was partitioned)
      */
     public synchronized void addIndexRecord(String name, String user, String table, String[] columns, String indexType, List<String> indexProperties, List<String> partitions)
-            throws IOException
     {
         IndexRecord record = new IndexRecord(name, user, table, columns, indexType, indexProperties, partitions);
         IndexRecord old = lookUpIndexRecord(name);
@@ -135,8 +150,13 @@ public class IndexRecordManager
                 record.serializeValue());
     }
 
+    /**
+     * Delete index record from metastore according to name. Also allows partial deletion.
+     *
+     * @param name name of index to delete
+     * @param partitionsToRemove the partitions to remove. If this list is empty, remove all.
+     */
     public synchronized void deleteIndexRecord(String name, List<String> partitionsToRemove)
-            throws IOException
     {
         getIndexRecords().stream().filter(record -> record.name.equals(name))
                 .forEach(record -> {

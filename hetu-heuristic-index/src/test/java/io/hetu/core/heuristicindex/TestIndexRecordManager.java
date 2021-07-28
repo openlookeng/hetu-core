@@ -66,7 +66,7 @@ public class TestIndexRecordManager
 
     @Test(timeOut = 30000)
     public void testConcurrentMultipleManagers()
-            throws IOException, InterruptedException
+            throws InterruptedException
     {
         Random random = new Random();
         String[] names = new String[] {"a", "b", "c"};
@@ -81,7 +81,7 @@ public class TestIndexRecordManager
                     new IndexRecordManager(testMetastore1)
                             .addIndexRecord(names[finalI], "testUser", "c.s.t", new String[] {"testColumn"}, names[finalI], Collections.emptyList(), Arrays.asList("cp=1"));
                 }
-                catch (IOException | InterruptedException e) {
+                catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
             });
@@ -97,7 +97,7 @@ public class TestIndexRecordManager
                 }
                 indexRecordManager.deleteIndexRecord(names[0], Collections.emptyList());
             }
-            catch (IOException | InterruptedException e) {
+            catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
         });
@@ -116,7 +116,7 @@ public class TestIndexRecordManager
 
     @Test(timeOut = 20000)
     public void testConcurrentSingleManager()
-            throws IOException, InterruptedException
+            throws InterruptedException
     {
         Random random = new Random();
         IndexRecordManager indexRecordManager = new IndexRecordManager(testMetastore2);
@@ -132,7 +132,7 @@ public class TestIndexRecordManager
                     Thread.sleep(random.nextInt(100));
                     indexRecordManager.addIndexRecord(names[finalI], "u", "c.s.t", new String[] {"c"}, names[finalI], Collections.emptyList(), Arrays.asList("cp=1"));
                 }
-                catch (IOException | InterruptedException e) {
+                catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
             });
@@ -147,7 +147,7 @@ public class TestIndexRecordManager
                 }
                 indexRecordManager.deleteIndexRecord(names[0], Collections.emptyList());
             }
-            catch (IOException | InterruptedException e) {
+            catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
         });

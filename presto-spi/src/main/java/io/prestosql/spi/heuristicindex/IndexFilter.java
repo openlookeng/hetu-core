@@ -23,7 +23,7 @@ public interface IndexFilter
      * Apply the filter on a given expression to check if the index matches the expression.
      *
      * @param expression the expression used to filter the result. e.g. col_a = 10 AND col_b in ("a", "b")
-     * @return if the indices in this filter matches the expression.
+     * @return if ANY index in this filter matches the expression.
      */
     public boolean matches(Object expression);
 

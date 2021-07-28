@@ -46,7 +46,7 @@ import static io.prestosql.spi.heuristicindex.SerializationUtils.serializeStripe
 
 /**
  * Indexes which needs to be created at table or partition level
- * needs to use this writer.
+ * needs to use this writer. E.g. BTREE index.
  */
 public class PartitionIndexWriter
         implements IndexWriter
@@ -62,6 +62,16 @@ public class PartitionIndexWriter
     private final Properties properties;
     private final HetuFileSystemClient fs;
     private final Path root;
+
+    /*
+    Each stripe from pages is mapped to a auto-incremental integer, starting from 0.
+    This mapping is stored in symbolToIdMap like 0 -> "<ORCFileName>:<stripeStart>:<stripeEnd>"
+    See more about serialization at {@link io.prestosql.spi.heuristicindex.SerializationUtils}
+
+    The inverted index is stored in data map like {10 -> "1,2", 2 -> "2,3"}, meaning that
+    value 10 occurs in stripe 1 and 2, and value 2 occurs in stripe 2 and 3. The majority of memory
+    is used by this map.
+     */
     private final AtomicInteger counter = new AtomicInteger(0); // symbol table counter
     private final Map<String, String> symbolToIdMap;
     private final Map<Comparable<? extends Comparable<?>>, String> dataMap;
@@ -121,6 +131,12 @@ public class PartitionIndexWriter
                 Comparable<? extends Comparable<?>> comparableKey = (Comparable<? extends Comparable<?>>) key;
                 String existing = dataMap.putIfAbsent(comparableKey, code);
                 if (existing != null) {
+                    // replace old string with new values added. e.g. "1,2,2" -> "1,2,2,3"
+                    // while loop used to allow concurrent modification.
+                    // THIS IS UGLY BUT IS THE WORKING SOLUTION TO SAVE MEMORY.
+                    // Tried to use collections like List[1,2,2,3] or Set[1,2,3] but both
+                    // crash node with too high memory usage.
+                    // TODO: Resolved memory issue in a more decent way
                     String newData = getNewData(key, code);
                     boolean done = dataMap.replace(comparableKey, existing, newData);
                     while (!done) {
@@ -139,6 +155,9 @@ public class PartitionIndexWriter
         return output + "," + splitData;
     }
 
+    /**
+     * Persists the data into an Index object and serialize it to disk.
+     */
     @Override
     public void persist()
             throws IOException

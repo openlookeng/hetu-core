@@ -25,7 +25,7 @@ public class IndexCacheKey
     private final String path;
     private final long lastModifiedTime;
     private final CreateIndexMetadata.Level indexLevel;
-    private boolean noCloseFlag;
+    private boolean noCloseFlag; // Indicate that this index should not be closed at removal
 
     /**
      * @param path path to the file the index files should be read for
@@ -75,7 +75,7 @@ public class IndexCacheKey
         return noCloseFlag;
     }
 
-    // only the path should be used as the key
+    // only the path is used as the key
     // the lastModifiedTime time is only used to check if index is valid
     @Override
     public boolean equals(Object o)

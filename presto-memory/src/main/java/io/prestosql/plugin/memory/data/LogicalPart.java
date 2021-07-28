@@ -131,6 +131,7 @@ public class LogicalPart
     private transient PageSorter pageSorter;
     private transient List<TypeSignature> typeSignatures;
     private transient List<Type> types;
+    // Using majority of memory and disk space. Serialized and deserialized separately. Only loaded when used.
     private transient List<Page> pages;
 
     public LogicalPart(
@@ -701,6 +702,9 @@ public class LogicalPart
         return "logicalPart" + lpNum;
     }
 
+    /**
+     * Deserialize pages from disk
+     */
     private synchronized void readPages()
             throws IOException
     {
@@ -720,6 +724,10 @@ public class LogicalPart
         LOG.debug("[Load] %s completed. Time elapsed: %dms", pagesFile.toString(), dur);
     }
 
+    /**
+     * Serialize pages to disk
+     * @throws IOException
+     */
     private synchronized void writePages()
             throws IOException
     {

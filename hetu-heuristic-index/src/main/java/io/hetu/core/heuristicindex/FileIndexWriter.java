@@ -73,7 +73,7 @@ public class FileIndexWriter
     private Path tmpPath;
 
     /**
-     * Constructor
+     * Constructor. The file index writer is per ORC file, marked by `dataSourceFileName`.
      *
      * @param createIndexMetadata metadata of create index, includes indexName, tableName, indexType, indexColumns and partitions
      * @param fs                  filesystem client to access filesystem where the indexes are persisted/stored
