@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
@@ -59,6 +60,8 @@ public class TaskSnapshotManager
     private final Map<Long, Map<String, Object>> storeCache = Collections.synchronizedMap(new HashMap<>());
     private final Map<Long, Map<String, Object>> loadCache = Collections.synchronizedMap(new HashMap<>());
 
+    private Set<String> createdConsolidatedFiles;
+
     public TaskSnapshotManager(TaskId taskId, SnapshotUtils snapshotUtils)
     {
         this.taskId = taskId;
@@ -68,6 +71,11 @@ public class TaskSnapshotManager
     public QuerySnapshotManager getQuerySnapshotManager()
     {
         return snapshotUtils.getQuerySnapshotManager(taskId.getQueryId());
+    }
+
+    public static SnapshotStateId createConsolidatedId(long snapshotId, TaskId taskId)
+    {
+        return SnapshotStateId.forTaskComponent(snapshotId, taskId, CONSOLIDATED_STATE_COMPONENT);
     }
 
     public void storeConsolidatedState(SnapshotStateId snapshotStateId, Object state)
@@ -95,7 +103,19 @@ public class TaskSnapshotManager
             synchronized (loadCache) {
                 // double-check to make sure only 1 thread attempts load
                 if (!loadCache.containsKey(snapshotId)) {
-                    Object map = snapshotUtils.loadState(SnapshotStateId.forTaskComponent(snapshotId, taskId, CONSOLIDATED_STATE_COMPONENT)).orElse(Collections.emptyMap());
+                    String queryId = taskId.getQueryId().getId();
+                    SnapshotStateId stateId = createConsolidatedId(snapshotId, taskId);
+                    Optional<Object> loadedState = snapshotUtils.loadState(stateId);
+                    if (createdConsolidatedFiles == null) {
+                        createdConsolidatedFiles = snapshotUtils.loadConsolidatedFiles(queryId);
+                    }
+                    // if it is still null after loading, that means it is deleted, and we need to fail
+                    if (createdConsolidatedFiles == null || (createdConsolidatedFiles.contains(stateId.toString()) && !loadedState.isPresent())) {
+                        // we created the consolidated file, but it has been deleted. non-recoverable failure
+                        failedToRestore(stateId, true);
+                        // continue so that the failure can be detected
+                    }
+                    Object map = loadedState.orElse(Collections.emptyMap());
                     loadCache.put(snapshotId, (Map<String, Object>) map);
                 }
             }
@@ -166,6 +186,9 @@ public class TaskSnapshotManager
             throws Exception
     {
         snapshotUtils.storeFile(snapshotStateId, sourceFile);
+        // store dummy value
+        Map<String, Object> map = storeCache.computeIfAbsent(snapshotStateId.getSnapshotId(), (x) -> Collections.synchronizedMap(new HashMap<>()));
+        map.put(snapshotStateId.toString(), snapshotStateId.toString());
     }
 
     public Boolean loadFile(SnapshotStateId snapshotStateId, Path targetFile)
@@ -173,24 +196,14 @@ public class TaskSnapshotManager
     {
         requireNonNull(targetFile);
 
-        // Logic of this function is very similar to that of "loadState"
-        boolean loadResult = snapshotUtils.loadFile(snapshotStateId, targetFile);
-        Map<Long, SnapshotResult> snapshotToSnapshotResultMap = null;
-        while (!loadResult) {
-            if (snapshotToSnapshotResultMap == null) {
-                snapshotToSnapshotResultMap = snapshotUtils.loadSnapshotResult(snapshotStateId.getTaskId().getQueryId().getId());
-            }
-            OptionalLong prevSnapshotId = getPreviousSnapshotIdIfComplete(snapshotToSnapshotResultMap, snapshotStateId.getSnapshotId());
-            if (!prevSnapshotId.isPresent()) {
-                return false;
-            }
-            if (prevSnapshotId.getAsLong() == 0) {
-                return null;
-            }
-            snapshotStateId = snapshotStateId.withSnapshotId(prevSnapshotId.getAsLong());
-            loadResult = snapshotUtils.loadFile(snapshotStateId, targetFile);
+        Optional<Object> loadedValue = loadWithBacktrack(snapshotStateId);
+        if (!loadedValue.isPresent()) {
+            return false;
         }
-        return true;
+        if (loadedValue.get() == NO_STATE) {
+            return null;
+        }
+        return snapshotUtils.loadFile(SnapshotStateId.fromString((String) loadedValue.get()), targetFile);
     }
 
     private OptionalLong getPreviousSnapshotIdIfComplete(Map<Long, SnapshotResult> snapshotToSnapshotResultMap, long snapshotId)
@@ -291,7 +304,7 @@ public class TaskSnapshotManager
                     if (snapshotResult == SnapshotResult.SUCCESSFUL) {
                         // All components for the task have captured their states successfully.
                         // Save the consolidated state.
-                        SnapshotStateId newId = SnapshotStateId.forTaskComponent(snapshotId, taskId, CONSOLIDATED_STATE_COMPONENT);
+                        SnapshotStateId newId = createConsolidatedId(snapshotId, taskId);
                         try {
                             Map<String, Object> map = storeCache.remove(snapshotId);
                             if (map == null) {
@@ -302,12 +315,16 @@ public class TaskSnapshotManager
                         catch (Exception e) {
                             LOG.error(e, "Failed to store state for " + newId);
                             snapshotResult = SnapshotResult.FAILED;
+                            captureResults.put(snapshotId, snapshotResult);
                         }
                     }
                     if (snapshotUtils.isCoordinator()) {
                         // Results on coordinator won't be reported through remote task. Send to the query side.
                         QuerySnapshotManager querySnapshotManager = snapshotUtils.getQuerySnapshotManager(taskId.getQueryId());
                         if (querySnapshotManager != null) {
+                            if (snapshotResult == SnapshotResult.SUCCESSFUL) {
+                                querySnapshotManager.addConsolidatedFileToList(createConsolidatedId(snapshotId, taskId).toString());
+                            }
                             querySnapshotManager.updateQueryCapture(taskId, snapshotId, snapshotResult);
                         }
                     }

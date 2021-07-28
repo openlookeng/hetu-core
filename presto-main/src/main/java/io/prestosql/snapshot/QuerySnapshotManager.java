@@ -29,6 +29,7 @@ import io.prestosql.spi.QueryId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +60,7 @@ public class QuerySnapshotManager
     // LinkedHashMap can be used to keep ordering
     private final Map<Long, SnapshotComponentCounter<TaskId>> captureComponentCounters = Collections.synchronizedMap(new LinkedHashMap<>());
     private final Map<Long, SnapshotResult> captureResults = Collections.synchronizedMap(new LinkedHashMap<>());
+    private final Set<String> consolidatedFilePaths = Collections.synchronizedSet(new HashSet<>());
     private final Map<Long, SnapshotComponentCounter<TaskId>> restoreComponentCounters = Collections.synchronizedMap(new LinkedHashMap<>());
     private final RestoreResult restoreResult = new RestoreResult();
     private final List<Consumer<RestoreResult>> restoreCompleteListeners = Collections.synchronizedList(new ArrayList<>());
@@ -348,20 +350,24 @@ public class QuerySnapshotManager
                 updateCapturedComponents(ImmutableList.of(taskId), false);
             }
             else {
-                updateQueryCapture(taskId, entry.getKey(), entry.getValue());
+                if (updateQueryCapture(taskId, entry.getKey(), entry.getValue())) {
+                    // if the capture works, then that means a consolidated file was created and we need to add it to the list
+                    addConsolidatedFileToList(TaskSnapshotManager.createConsolidatedId(snapshotId, taskId).toString());
+                }
             }
         }
     }
 
     // Update capture results based on TaskSnapshotManager running on coordinator
-    public void updateQueryCapture(TaskId taskId, long snapshotId, SnapshotResult result)
+    public boolean updateQueryCapture(TaskId taskId, long snapshotId, SnapshotResult result)
     {
         if (result == SnapshotResult.FAILED) {
-            updateQueryCapture(snapshotId, taskId, SnapshotComponentCounter.ComponentState.FAILED);
+            return updateQueryCapture(snapshotId, taskId, SnapshotComponentCounter.ComponentState.FAILED);
         }
         else if (result == SnapshotResult.SUCCESSFUL) {
-            updateQueryCapture(snapshotId, taskId, SnapshotComponentCounter.ComponentState.SUCCESSFUL);
+            return updateQueryCapture(snapshotId, taskId, SnapshotComponentCounter.ComponentState.SUCCESSFUL);
         }
+        return false;
     }
 
     // Update restore results based on TaskInfo
@@ -395,6 +401,11 @@ public class QuerySnapshotManager
         }
     }
 
+    public void addConsolidatedFileToList(String path)
+    {
+        consolidatedFilePaths.add(path);
+    }
+
     private void saveQuerySnapshotResult()
     {
         if (!captureResults.isEmpty()) {
@@ -405,6 +416,7 @@ public class QuerySnapshotManager
 
             try {
                 snapshotUtils.storeSnapshotResult(queryId.getId(), doneResult);
+                snapshotUtils.storeConsolidatedFileList(queryId.getId(), consolidatedFilePaths);
             }
             catch (Exception e) {
                 throw new RuntimeException(e);
@@ -412,7 +424,7 @@ public class QuerySnapshotManager
         }
     }
 
-    private void updateQueryCapture(long snapshotId, TaskId taskId, SnapshotComponentCounter.ComponentState componentState)
+    private boolean updateQueryCapture(long snapshotId, TaskId taskId, SnapshotComponentCounter.ComponentState componentState)
     {
         SnapshotComponentCounter<TaskId> counter = captureComponentCounters.computeIfAbsent(snapshotId, k ->
                 // A snapshot is considered complete if tasks either finished their snapshots or have completed
@@ -427,9 +439,11 @@ public class QuerySnapshotManager
                     if (snapshotResult != oldResult && snapshotResult.isDone()) {
                         LOG.debug("Finished capturing snapshot %d for query %s. Result is %s.", snapshotId, queryId.getId(), snapshotResult);
                     }
+                    return true;
                 }
             }
         }
+        return false;
     }
 
     private void updateQueryRestore(long snapshotId, TaskId taskId, SnapshotComponentCounter.ComponentState componentState)

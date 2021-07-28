@@ -30,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * SnapshotStoreFileBased is an implementation of SnapshotStoreClient.
@@ -148,6 +149,33 @@ public class SnapshotFileBasedClient
 
         try (ObjectInputStream ois = new ObjectInputStream(fsClient.newInputStream(file))) {
             return (LinkedHashMap<Long, SnapshotResult>) ois.readObject();
+        }
+    }
+
+    public Set<String> loadConsolidatedFiles(String queryId)
+            throws IOException, ClassNotFoundException
+    {
+        Path file = SnapshotUtils.createStatePath(rootPath, queryId, "ConsolidatedFileList");
+
+        if (!fsClient.exists(file)) {
+            return null;
+        }
+
+        try (ObjectInputStream ois = new ObjectInputStream(fsClient.newInputStream(file))) {
+            return (Set<String>) ois.readObject();
+        }
+    }
+
+    @Override
+    public void storeConsolidatedFileList(String queryId, Set<String> path)
+            throws IOException
+    {
+        Path file = SnapshotUtils.createStatePath(rootPath, queryId, "ConsolidatedFileList");
+
+        fsClient.createDirectories(file.getParent());
+
+        try (ObjectOutputStream oos = new ObjectOutputStream(fsClient.newOutputStream(file))) {
+            oos.writeObject(path);
         }
     }
 }

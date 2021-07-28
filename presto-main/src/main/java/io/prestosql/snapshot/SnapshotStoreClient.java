@@ -17,6 +17,7 @@ package io.prestosql.snapshot;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * SnapshotStoreClient is an client(interface) to connect to snapshot store
@@ -63,5 +64,17 @@ public interface SnapshotStoreClient
      * Load snapshot result of query
      */
     Map<Long, SnapshotResult> loadSnapshotResult(String queryId)
+            throws Exception;
+
+    /**
+     * Adds a consolidated file for verification later
+     */
+    void storeConsolidatedFileList(String queryId, Set<String> path)
+            throws Exception;
+
+    /**
+     * Checks if the consolidated file has been created
+     */
+    Set<String> loadConsolidatedFiles(String queryId)
             throws Exception;
 }
