@@ -37,13 +37,13 @@ public class TestMemoryWorkerCrash
     public void tableAccessAfterWorkerCrash()
             throws Exception
     {
-        getQueryRunner().execute("CREATE TABLE test_nation as SELECT * FROM nation");
-        assertQuery("SELECT * FROM test_nation ORDER BY nationkey", "SELECT * FROM nation ORDER BY nationkey");
+        getQueryRunner().execute("CREATE TABLE test_l as SELECT * FROM lineitem");
+        assertQuery("SELECT * FROM test_l ORDER BY orderkey", "SELECT * FROM lineitem ORDER BY orderkey");
         closeWorker();
-        assertQueryFails("SELECT * FROM test_nation ORDER BY nationkey", "No nodes available to run query");
-        getQueryRunner().execute("INSERT INTO test_nation SELECT * FROM tpch.tiny.nation");
+        assertQueryFails("SELECT * FROM test_l ORDER BY orderkey", "No nodes available to run query");
+        getQueryRunner().execute("INSERT INTO test_l SELECT * FROM tpch.tiny.lineitem");
 
-        assertQueryFails("SELECT * FROM test_nation ORDER BY nationkey", "No nodes available to run query");
+        assertQueryFails("SELECT * FROM test_l ORDER BY orderkey", "No nodes available to run query");
 
         getQueryRunner().execute("CREATE TABLE test_region as SELECT * FROM tpch.tiny.region");
         assertQuery("SELECT * FROM test_region ORDER BY regionkey", "SELECT * FROM region ORDER BY regionkey");
