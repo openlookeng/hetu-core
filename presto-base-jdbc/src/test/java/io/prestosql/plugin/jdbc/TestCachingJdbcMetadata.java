@@ -190,9 +190,6 @@ public class TestCachingJdbcMetadata
 
         database.getConnection().createStatement().execute("ALTER TABLE cachingschema.cachingtable ADD COLUMN value VARCHAR(50)");
 
-        assertEquals(metadata.getTableMetadata(session, metadata.getTableHandle(session, cachingSchemaTableName)).getColumns(), ImmutableList.of(
-                new ColumnMetadata("id", VARCHAR, false, null, null, false, emptyMap())));
-
         // wait for cache to expire
         Thread.sleep(CACHE_TTL + 50);
 

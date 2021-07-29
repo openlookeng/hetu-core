@@ -52,7 +52,7 @@ public class TestConnectionPool
         connectionProperties.setProperty("password", "password");
         connectionProperties.setProperty("useConnectionPool", "true");
         connectionProperties.setProperty("maxIdle", "2");
-        connectionProperties.setProperty("minIdle", "1");
+        connectionProperties.setProperty("minIdle", "0");
         connectionProperties.setProperty("maxTotal", "5");
         connectionProperties.setProperty("lifo", "true");
         connectionProperties.setProperty("fairness", "true");
