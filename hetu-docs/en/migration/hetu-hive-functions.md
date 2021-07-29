@@ -12,13 +12,13 @@ In openLooKeng, we support dynamically loading user-defined Hive scalar function
  byteudf io.hetu.core.hive.dynamicfunctions.examples.udf.ByteUDF
  intudf io.hetu.core.hive.dynamicfunctions.examples.udf.IntUDF
  ```
-2.  Users should upload Hive functions jars and dependencies onto a separate directory under `${node.data-dir}` which is setting in `node.properties`. The directory is user configurable by setting `external-functions.dir` and the default value is `externalFunctions`. An example configuration in `config.properties` is presented as below:
+2.  Users should upload Hive functions jars and **dependencies** onto a separate directory under `${node.data-dir}` which is setting in `node.properties`. The directory is user configurable by setting `external-functions.dir` and the default value is `externalFunctions`. An example configuration in `config.properties` is presented as below:
 ```
 external-functions.dir=externalFunctions
 ``` 
 so by default, user should upload their hive functions to the `externalFunctions` file folder.
 
-3.  Users should upload Hive functions configuration files `udf.properties` into `${node.data-dir}`.
+3.  Users should upload Hive functions configuration files `udf.properties` into `${node.data-dir}/etc`.
 
 ### **Asynchronous execution**
   
