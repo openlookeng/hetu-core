@@ -13,13 +13,13 @@
  byteudf io.hetu.core.hive.dynamicfunctions.examples.udf.ByteUDF
  intudf io.hetu.core.hive.dynamicfunctions.examples.udf.IntUDF
  ```
-2. 用户应将Hive function函数的jar包和依赖项上传到`${node.data-dir}`，这个配置在`node.properties`中。用户可以通过在`config.properties`中设置`external-functions.dir`来自定义上传的路径，默认路径是“externalFunctions”。一个示例配置如下：
+2. 用户应将Hive function函数的jar包和**依赖包**上传到`${node.data-dir}`，这个配置在`node.properties`中。用户可以通过在`config.properties`中设置`external-functions.dir`来自定义上传的路径，默认路径是“externalFunctions”。一个示例配置如下：
 ```
 external-functions.dir=externalFunctions
 ``` 
 因此，默认情况下，用户应该将其Hive function上传到`${node.data-dir}`的`externalFunctions`文件夹。
 
-3. 用户应将Hive function的配置文件`udf.properties`上传到`${node.data-dir}`目录下。
+3. 用户应将Hive function的配置文件`udf.properties`上传到`${node.data-dir}/etc`目录下。
 
 
 
