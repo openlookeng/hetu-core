@@ -22,6 +22,7 @@ import io.prestosql.spi.function.FunctionMetadataManager;
 import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.metastore.HetuMetastore;
+import io.prestosql.spi.plan.FilterStatsCalculatorService;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.type.TypeManager;
 
@@ -78,6 +79,11 @@ public interface ConnectorContext
     }
 
     default BlockEncodingSerde getBlockEncodingSerde()
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default FilterStatsCalculatorService getFilterStatsCalculatorService()
     {
         throw new UnsupportedOperationException();
     }

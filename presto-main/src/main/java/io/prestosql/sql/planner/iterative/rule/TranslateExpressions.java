@@ -25,10 +25,12 @@ import io.prestosql.spi.type.FunctionType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.RowExpressionInterpreter;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.relational.OriginalExpressionUtils;
+import io.prestosql.sql.relational.RowExpressionOptimizer;
 import io.prestosql.sql.relational.SqlToRowExpressionTranslator;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.LambdaArgumentDeclaration;
@@ -147,7 +149,8 @@ public class TranslateExpressions
 
             private RowExpression toRowExpression(Expression expression, Map<NodeRef<Expression>, Type> types, Map<Symbol, Integer> layout, Session session)
             {
-                return SqlToRowExpressionTranslator.translate(expression, FunctionKind.SCALAR, types, layout, metadata.getFunctionAndTypeManager(), session, false);
+                RowExpression rowExpression = SqlToRowExpressionTranslator.translate(expression, FunctionKind.SCALAR, types, layout, metadata.getFunctionAndTypeManager(), session, false);
+                return new RowExpressionOptimizer(metadata).optimize(rowExpression, RowExpressionInterpreter.Level.SERIALIZABLE, session.toConnectorSession());
             }
 
             private RowExpression removeOriginalExpression(RowExpression expression, Rule.Context context, Map<Symbol, Integer> layout)

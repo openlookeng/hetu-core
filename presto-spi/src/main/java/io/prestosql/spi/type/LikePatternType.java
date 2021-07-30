@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.type;
+package io.prestosql.spi.type;
 
 import io.airlift.joni.Regex;
 import io.prestosql.spi.PrestoException;
@@ -19,8 +19,6 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.BlockBuilderStatus;
 import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.type.AbstractType;
-import io.prestosql.spi.type.TypeSignature;
 
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 

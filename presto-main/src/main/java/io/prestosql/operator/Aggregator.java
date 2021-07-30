@@ -24,14 +24,14 @@ import io.prestosql.spi.type.Type;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-class Aggregator
+public class Aggregator
         implements Restorable
 {
     private final Accumulator aggregation;
     private final AggregationNode.Step step;
     private final int intermediateChannel;
 
-    Aggregator(AccumulatorFactory accumulatorFactory, AggregationNode.Step step)
+    public Aggregator(AccumulatorFactory accumulatorFactory, AggregationNode.Step step)
     {
         if (step.isInputRaw()) {
             intermediateChannel = -1;

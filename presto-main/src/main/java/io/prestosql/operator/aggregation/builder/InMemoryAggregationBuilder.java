@@ -81,7 +81,7 @@ public abstract class InMemoryAggregationBuilder
                 groupByTypes,
                 groupByChannels,
                 hashChannel,
-                operatorContext,
+                isDictionaryAggregationEnabled(operatorContext.getSession()),
                 maxPartialMemory,
                 Optional.empty(),
                 joinCompiler,
@@ -96,7 +96,7 @@ public abstract class InMemoryAggregationBuilder
             List<Type> groupByTypes,
             List<Integer> groupByChannels,
             Optional<Integer> hashChannel,
-            OperatorContext operatorContext,
+            boolean processDictionary,
             Optional<DataSize> maxPartialMemory,
             Optional<Integer> overwriteIntermediateChannelOffset,
             JoinCompiler joinCompiler,
@@ -109,7 +109,7 @@ public abstract class InMemoryAggregationBuilder
                     Ints.toArray(groupByChannels),
                     hashChannel,
                     expectedGroups,
-                    isDictionaryAggregationEnabled(operatorContext.getSession()),
+                    processDictionary,
                     joinCompiler,
                     updateMemory);
         }
@@ -119,7 +119,7 @@ public abstract class InMemoryAggregationBuilder
                     Ints.toArray(groupByChannels),
                     hashChannel,
                     expectedGroups,
-                    isDictionaryAggregationEnabled(operatorContext.getSession()),
+                    processDictionary,
                     joinCompiler,
                     updateMemory);
         }

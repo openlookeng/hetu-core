@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import static io.prestosql.SystemSessionProperties.isDictionaryAggregationEnabled;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 
 public class InMemoryHashAggregationBuilder
@@ -58,7 +59,7 @@ public class InMemoryHashAggregationBuilder
                 groupByTypes,
                 groupByChannels,
                 hashChannel,
-                operatorContext,
+                isDictionaryAggregationEnabled(operatorContext.getSession()),
                 maxPartialMemory,
                 Optional.empty(),
                 joinCompiler,
@@ -85,7 +86,7 @@ public class InMemoryHashAggregationBuilder
                 groupByTypes,
                 groupByChannels,
                 hashChannel,
-                operatorContext,
+                isDictionaryAggregationEnabled(operatorContext.getSession()),
                 maxPartialMemory,
                 overwriteIntermediateChannelOffset,
                 joinCompiler,
@@ -100,14 +101,14 @@ public class InMemoryHashAggregationBuilder
             List<Type> groupByTypes,
             List<Integer> groupByChannels,
             Optional<Integer> hashChannel,
-            OperatorContext operatorContext,
+            boolean processDictionary,
             Optional<DataSize> maxPartialMemory,
             Optional<Integer> overwriteIntermediateChannelOffset,
             JoinCompiler joinCompiler,
             UpdateMemory updateMemory,
             AggregationNode.AggregationType aggregationType)
     {
-        super(accumulatorFactories, step, expectedGroups, groupByTypes, groupByChannels, hashChannel, operatorContext,
+        super(accumulatorFactories, step, expectedGroups, groupByTypes, groupByChannels, hashChannel, processDictionary,
                 maxPartialMemory, overwriteIntermediateChannelOffset, joinCompiler, updateMemory, aggregationType);
     }
 

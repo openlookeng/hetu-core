@@ -141,5 +141,9 @@
             <groupId>joda-time</groupId>
             <artifactId>joda-time</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>joni</artifactId>
+        </dependency>
     </dependencies>
 </project>

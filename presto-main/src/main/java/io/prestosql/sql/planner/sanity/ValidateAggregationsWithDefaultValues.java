@@ -18,6 +18,7 @@ import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.optimizations.ActualProperties;
@@ -87,6 +88,19 @@ public class ValidateAggregationsWithDefaultValues
             return aggregatedSeenExchanges(node.getSources());
         }
 
+        private boolean isPartialAggregationPushedDown(AggregationNode node)
+        {
+            if (node.getStep().equals(FINAL)) {
+                if (node.getSource() instanceof ExchangeNode
+                        && node.getSource().getSources().get(0) instanceof ExchangeNode) {
+                    if (node.getSource().getSources().get(0).getSources().get(0) instanceof TableScanNode) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         @Override
         public Optional<SeenExchanges> visitAggregation(AggregationNode node, Void context)
         {
@@ -102,6 +116,11 @@ public class ValidateAggregationsWithDefaultValues
 
             // We only validate FINAL aggregations with empty grouping set
             if (!node.getStep().equals(FINAL) || !node.hasEmptyGroupingSet()) {
+                return Optional.empty();
+            }
+
+            // When partial aggregation is pushed down we do not have an intermediate aggregation step
+            if (isPartialAggregationPushedDown(node)) {
                 return Optional.empty();
             }
 

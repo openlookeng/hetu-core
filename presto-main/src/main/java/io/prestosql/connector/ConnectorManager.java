@@ -26,6 +26,8 @@ import io.prestosql.connector.system.MetadataBasedSystemTablesProvider;
 import io.prestosql.connector.system.StaticSystemTablesProvider;
 import io.prestosql.connector.system.SystemConnector;
 import io.prestosql.connector.system.SystemTablesProvider;
+import io.prestosql.cost.ConnectorFilterStatsCalculatorService;
+import io.prestosql.cost.FilterStatsCalculator;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.index.IndexManager;
@@ -143,6 +145,7 @@ public class ConnectorManager
 
     private final DomainTranslator domainTranslator;
     private final DeterminismEvaluator determinismEvaluator;
+    private final FilterStatsCalculator filterStatsCalculator;
 
     @Inject
     public ConnectorManager(
@@ -169,7 +172,8 @@ public class ConnectorManager
             NodeSchedulerConfig schedulerConfig,
             HeuristicIndexerManager heuristicIndexerManager,
             DomainTranslator domainTranslator,
-            DeterminismEvaluator determinismEvaluator)
+            DeterminismEvaluator determinismEvaluator,
+            FilterStatsCalculator filterStatsCalculator)
     {
         this.hetuMetaStoreManager = hetuMetaStoreManager;
         this.metadataManager = metadataManager;
@@ -195,6 +199,7 @@ public class ConnectorManager
         this.heuristicIndexerManager = heuristicIndexerManager;
         this.domainTranslator = domainTranslator;
         this.determinismEvaluator = determinismEvaluator;
+        this.filterStatsCalculator = filterStatsCalculator;
     }
 
     @PreDestroy
@@ -453,7 +458,8 @@ public class ConnectorManager
                 new ConnectorRowExpressionService(domainTranslator, determinismEvaluator),
                 metadataManager.getFunctionAndTypeManager(),
                 new FunctionResolution(metadataManager.getFunctionAndTypeManager()),
-                metadataManager.getFunctionAndTypeManager().getBlockEncodingSerde());
+                metadataManager.getFunctionAndTypeManager().getBlockEncodingSerde(),
+                new ConnectorFilterStatsCalculatorService(filterStatsCalculator));
 
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(factory.getClass().getClassLoader())) {
             Connector connector = factory.create(catalogName.getCatalogName(), properties, context);

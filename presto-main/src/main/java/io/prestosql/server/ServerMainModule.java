@@ -43,6 +43,9 @@ import io.prestosql.connector.CatalogConnectorStore;
 import io.prestosql.connector.ConnectorManager;
 import io.prestosql.connector.DataCenterConnectorManager;
 import io.prestosql.connector.system.SystemConnectorModule;
+import io.prestosql.cost.FilterStatsCalculator;
+import io.prestosql.cost.ScalarStatsCalculator;
+import io.prestosql.cost.StatsNormalizer;
 import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.event.SplitMonitor;
@@ -454,6 +457,9 @@ public class ServerMainModule
         binder.install(new HandleJsonModule());
 
         // connector
+        binder.bind(ScalarStatsCalculator.class).in(Scopes.SINGLETON);
+        binder.bind(StatsNormalizer.class).in(Scopes.SINGLETON);
+        binder.bind(FilterStatsCalculator.class).in(Scopes.SINGLETON);
         binder.bind(ConnectorManager.class).in(Scopes.SINGLETON);
         // binding the DataCenterConnectorManager class for loading the
         // DC connector sub catalogs
