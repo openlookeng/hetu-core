@@ -1,18 +1,19 @@
 Memory Connector
 ================
 
-The Memory Connector stores data and metadata in RAM on workers to allow for fast queries. Data and metadata are also spilled to local disk and automatically reloaded if nodes are restarted.
+The Memory Connector stores data and metadata in RAM on workers to allow for fast queries. 
+Data and metadata are spilled to local disk and automatically reloaded if nodes are restarted.
 
 Configuration
 -------------
 
 ### Memory Connector Configuration
 
-To configure the Memory connector, create a catalog properties file `etc/catalog/memory.properties` with the following contents:
+To configure the Memory Connector, create or modify the catalog properties file `etc/catalog/memory.properties` for the Memory Connector.
+For example, you can write:
 
 ``` properties
 connector.name=memory
-memory.splits-per-node=10
 memory.max-data-per-node=200GB
 memory.spill-path=/opt/hetu/data/spill          
 ```   
@@ -25,22 +26,24 @@ memory.spill-path=/opt/hetu/data/spill
 - In `etc/config.properties` ensure that `task.writer-count` is set to
  `>=` number of nodes in the cluster running openLooKeng. This will help
   distribute the data uniformly between all the workers.
-- Hetu Metastore must be configured. Check [Hetu Metastore](../admin/meta-store.md) for more information.
+- Hetu Metastore must be configured. The default settings are included in
+  `etc/hetu-metastore.properties`. 
+  Check [Hetu Metastore](../admin/meta-store.md) for more information.
 
 Examples
 --------
 
-Create a table using the memory connector:
+Create a table using the Memory Connector:
 
     CREATE TABLE memory.default.nation AS
     SELECT * from tpch.tiny.nation;
 
-Insert data into a table in the memory connector:
+Insert data into a table in the Memory Connector:
 
     INSERT INTO memory.default.nation
     SELECT * FROM tpch.tiny.nation;
 
-Select from the memory connector:
+Select from the Memory Connector:
 
     SELECT * FROM memory.default.nation;
 
@@ -48,7 +51,7 @@ Drop table:
 
     DROP TABLE memory.default.nation;
 
-Create a table using the memory connector with sorting, indices and spill compression:
+Create a table using the Memory Connector with sorting, indices and spill compression:
 
     CREATE TABLE memory.default.nation
     WITH (
@@ -58,7 +61,7 @@ Create a table using the memory connector with sorting, indices and spill compre
     )
     AS SELECT * from tpch.tiny.nation;
 
-After table creation completes, the memory connector will start building indices and sorting data in the background. Once the processing is complete any queries using the sort or index columns will be faster and more efficient.
+After table creation completes, the Memory Connector will start building indices and sorting data in the background. Once the processing is complete any queries using the sort or index columns will be faster and more efficient.
 
 For now, `sorted_by` only accepts a single column.
 
@@ -68,7 +71,6 @@ Configuration Properties
 
 | Property Name                         | Default Value   | Required| Description               |
 |---------------------------------------|-----------------|---------|---------------------------|
-| `memory.splits-per-node              `  | Available processors on the coordinator          | No     | Number of splits to create per node. Default value is number of available processors on the coordinator. Value is ignored on the workers. In high concurrency, setting this value to a lower number will improve performance.|
 | `memory.spill-path                   `  | None          | Yes     | Directory where memory data will be spilled to. Must have enough free space to store the tables. SSD preferred.|
 | `memory.max-data-per-node            `  | 256MB         | Yes     | Memory limit for total data stored on this node  |
 | `memory.max-logical-part-size        `  | 256MB         | No      | Memory limit for each LogicalPart. Default value is recommended.|
@@ -80,7 +82,7 @@ Path whitelist：`["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/o
 
 Additonal WITH properties
 --------------
-Use these properties when creating a table with the memory connector to make queries faster.
+Use these properties when creating a table with the Memory Connector to make queries faster.
 
 | Property Name            | Argument type             | Requirements                     | Description|
 |--------------------------|---------------------------|----------------------------------|------------|
@@ -105,31 +107,34 @@ Developer Information
 
 This section outlines the overall design of the Memory Connector, as shown in the figure below.
 
-![Memory Connector Overall Design](../images/memory-connector-overall-design.png)
+![Memory Connector Overall Design](../images/memory-connector-design.png)
 
-The data is distributed to different workers as splits. Those Splits are further organized into LogicalParts. The LogicalParts contain indexes and data. Table data will be automatically spilled
-to disk. If there is not enough memory to hold the entire data the tables can be released from memory. Data is sorted and indexed in a background process allowing faster table creation. The table is still queriable during
-processing, queries are just not as efficient. HetuMetastore is used to persist table metadata.
-
-### Splits
-
-During table creation, pages are distributed to each of the workers. Each of the workers will have the same number of splits. Splits are filled with Pages in a round-robin fashion.
-When Tablescan is scheduled, splits will be scheduled. Setting number of splits to a value less than number of cores on the node allows for maximum parallelism. Not all tables will fit into memory, so automatic spill-to-disk management
-takes place. The maximum individual table size is the most that can fit into the configured memory connector limit. The table is automatically spilled to disk after creation as
-part of a background process.
+### Scheduling Process
+The data to be processed are stored in pages, which are distributed to different worker nodes in openLooKeng.
+In the Memory Connector, each worker has a number of LogicalParts.
+During table creation, LogicalParts in the workers are filled with the input pages in a round-robin fashion.
+Table data will be automatically spilled to disk as part of a background process as well. 
+If there is not enough memory to hold the entire data, the tables can be released from memory according to LRU rule.
+HetuMetastore is used to persist table metadata.
+At query time, when Tablescan operation is scheduled, the LogicalParts will be scheduled.
 
 ### LogicalPart
+As shown in the lower part of the design figure, LogicalPart is the data structure that contains both indexes and data.
+The sorting and indexing are handled in a background process allowing faster querying,
+but the table is still queriable during processing.
+LogicalParts have a maximum configurable size (default 256 MB). 
+New LogicalParts are created once the previous one is full.
 
-Each split will be further organized into LogicalParts. LogicalParts have a maximum configurable size (default 256 MB). New LogicalParts are created once the last one is filled. As
-part of background processing after table creation, data is sorted and indexed.
-Based on the pushed down predicate, entire LogicalParts can be filtered out using the Bloom Filter and MinMax indices. Further Page filtering is done using the Sparse index.
 
-### Sparse Index
-
-Pages are first sorted, then optimized and finally a Sparse Index is created. This allows for smaller index sizes since not all unique values need to be stored. The Sparse index
-helps reduce input rows but does not perform perfect filtering. Further filtering is done by openLooKeng’s Filter Operator.
-
-Referring to the Sparse Index example above, this is how the memory connector would filter data for different queries:
+### Indices
+Bloom filter, sparse index and MinMax index are created in the LogicalPart.
+Based on the pushed down predicate, entire LogicalParts can be filtered out using the Bloom Filter and MinMax indices.
+Further Page filtering is done using the Sparse index.
+Pages are first sorted, then optimized and finally a Sparse Index is created. 
+This allows for smaller index sizes since not all unique values need to be stored. The Sparse index
+helps reduce input rows but does not perform perfect filtering. 
+Further filtering is done by openLooKeng’s Filter Operator.
+Referring to the Sparse Index example above, this is how the Memory Connector would filter data for different queries:
 
 ```
 For query: column=a.
@@ -147,7 +152,7 @@ No pages need to be returned because last value of floor entry of c (Page 2) is 
 For queries containing > >= < <= BETWEEN IN similar logic is applied.
 ```
 
-Memory Connector Limitations and known Issues
+Limitations and known Issues
 ---------------------------------------------
 
 - After `DROP TABLE`, memory is not released immediately. It is released on next `CREATE TABLE` operation.
