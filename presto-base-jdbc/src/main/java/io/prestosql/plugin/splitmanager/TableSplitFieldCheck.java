@@ -17,17 +17,13 @@ package io.prestosql.plugin.splitmanager;
 import io.prestosql.plugin.jdbc.ForwardingJdbcClient;
 import io.prestosql.plugin.jdbc.JdbcClient;
 import io.prestosql.plugin.jdbc.JdbcColumnHandle;
-import io.prestosql.plugin.jdbc.JdbcIdentity;
 import io.prestosql.plugin.jdbc.JdbcTableHandle;
 import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.connector.SchemaTableName;
 
 import java.sql.Types;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
-import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.util.Objects.requireNonNull;
 
 public class TableSplitFieldCheck
@@ -52,24 +48,12 @@ public class TableSplitFieldCheck
     }
 
     @Override
-    public Optional<JdbcTableHandle> getTableHandle(JdbcIdentity identity, SchemaTableName schemaTableName)
-    {
-        Optional<JdbcTableHandle> tableHandle = getDelegate().getTableHandle(identity, schemaTableName);
-        if (tableHandle.isPresent()) {
-            TableSplitConfig config = tableSplitManager.getTableSplitConfig(tableHandle.get());
-            if (null != config) {
-                tableHandle.get().setTableSplitField(config.getSplitField());
-            }
-        }
-        return tableHandle;
-    }
-
-    @Override
     public List<JdbcColumnHandle> getColumns(ConnectorSession session, JdbcTableHandle tableHandle)
     {
         List<JdbcColumnHandle> columnHandleList = getDelegate().getColumns(session, tableHandle);
-        String tableSplitField = tableHandle.getTableSplitField();
-        if (!isNullOrEmpty(tableSplitField)) {
+        TableSplitConfig config = tableSplitManager.getTableSplitConfig(tableHandle);
+        if ((config != null) && (!config.isTableSplitFieldValid())) {
+            String tableSplitField = config.getSplitField();
             long matchCoutn = columnHandleList.stream().filter(columnHandle ->
             {
                 int jdbcType = columnHandle.getJdbcTypeHandle().getJdbcType();
@@ -80,7 +64,7 @@ public class TableSplitFieldCheck
             }).count();
 
             if (1 == matchCoutn) {
-                tableHandle.setTableSplitFieldValidated(true);
+                config.setTableSplitFieldValid(true);
             }
         }
         return columnHandleList;

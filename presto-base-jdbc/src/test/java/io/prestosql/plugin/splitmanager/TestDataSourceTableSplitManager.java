@@ -96,8 +96,9 @@ public class TestDataSourceTableSplitManager
                         "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"splitCount\":\"2\"," +
                         "\"fieldMinValue\":\"\",\"fieldMaxValue\":\"\"}]");
         tableHandle = getTableHandle(new SchemaTableName("example", "numbers"));
-        tableHandle.setTableSplitFieldValidated(true);
         splitManager = new DataSourceTableSplitManager(config, jdbcClient, nodeManager);
+        TableSplitConfig tableSplitConfig = splitManager.getTableSplitConfig(tableHandle);
+        tableSplitConfig.setTableSplitFieldValid(true);
         ConnectorSplitSource splitSource = splitManager.getTableSplits(JdbcIdentity.from(SESSION), tableHandle);
         List<ConnectorSplit> splits = getFutureValue(splitSource.getNextBatch(NOT_PARTITIONED, 1000)).getSplits();
         int index = 0;
@@ -128,8 +129,9 @@ public class TestDataSourceTableSplitManager
                         "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"false\",\"splitCount\":\"2\"," +
                         "\"fieldMinValue\":\"\",\"fieldMaxValue\":\"\"}]");
         tableHandle = getTableHandle(new SchemaTableName("example", "numbers"));
-        tableHandle.setTableSplitFieldValidated(true);
         splitManager = new DataSourceTableSplitManager(config, jdbcClient, nodeManager);
+        TableSplitConfig tableSplitConfig = splitManager.getTableSplitConfig(tableHandle);
+        tableSplitConfig.setTableSplitFieldValid(true);
         ConnectorSplitSource splitSource = splitManager.getTableSplits(JdbcIdentity.from(SESSION), tableHandle);
         List<ConnectorSplit> splits = getFutureValue(splitSource.getNextBatch(NOT_PARTITIONED, 1000)).getSplits();
         int index = 0;
@@ -160,8 +162,9 @@ public class TestDataSourceTableSplitManager
                         "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"false\",\"splitCount\":\"2\"," +
                         "\"fieldMinValue\":\"1\",\"fieldMaxValue\":\"12\"}]");
         tableHandle = getTableHandle(new SchemaTableName("example", "numbers"));
-        tableHandle.setTableSplitFieldValidated(true);
         splitManager = new DataSourceTableSplitManager(config, jdbcClient, nodeManager);
+        TableSplitConfig tableSplitConfig = splitManager.getTableSplitConfig(tableHandle);
+        tableSplitConfig.setTableSplitFieldValid(true);
         ConnectorSplitSource splitSource = splitManager.getTableSplits(JdbcIdentity.from(SESSION), tableHandle);
         List<ConnectorSplit> splits = getFutureValue(splitSource.getNextBatch(NOT_PARTITIONED, 1000)).getSplits();
         int index = 0;
@@ -190,8 +193,9 @@ public class TestDataSourceTableSplitManager
                         "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"splitCount\":\"2\"," +
                         "\"fieldMinValue\":\"6\",\"fieldMaxValue\":\"2\"}]");
         tableHandle = getTableHandle(new SchemaTableName("example", "numbers"));
-        tableHandle.setTableSplitFieldValidated(true);
         splitManager = new DataSourceTableSplitManager(config, jdbcClient, nodeManager);
+        TableSplitConfig tableSplitConfig = splitManager.getTableSplitConfig(tableHandle);
+        tableSplitConfig.setTableSplitFieldValid(true);
         ConnectorSplitSource splitSource = splitManager.getTableSplits(JdbcIdentity.from(SESSION), tableHandle);
         List<ConnectorSplit> splits = getFutureValue(splitSource.getNextBatch(NOT_PARTITIONED, 1000)).getSplits();
         int index = 0;
@@ -222,8 +226,9 @@ public class TestDataSourceTableSplitManager
                         "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"splitCount\":\"2\"," +
                         "\"fieldMinValue\":\"1\",\"fieldMaxValue\":\"12\"}]");
         tableHandle = getTableHandle(new SchemaTableName("example", "numbers"));
-        tableHandle.setTableSplitFieldValidated(true);
         splitManager = new DataSourceTableSplitManager(config, jdbcClient, nodeManager);
+        TableSplitConfig tableSplitConfig = splitManager.getTableSplitConfig(tableHandle);
+        tableSplitConfig.setTableSplitFieldValid(true);
         ConnectorSplitSource splitSource = splitManager.getTableSplits(JdbcIdentity.from(SESSION), tableHandle);
         List<ConnectorSplit> splits = getFutureValue(splitSource.getNextBatch(NOT_PARTITIONED, 1000)).getSplits();
         int index = 0;
@@ -328,12 +333,13 @@ public class TestDataSourceTableSplitManager
         BaseJdbcConfig config = new BaseJdbcConfig();
         config.setPushDownEnable(true)
                 .setTableSplitEnable(true)
-                .setTableSplitFields("[{\"catalogName\":\"" + catalogName + "\",\"schemaName\":\"EXAMPLE\",\"tableName\":\"FIVE_NUMBERS\"," +
+                .setTableSplitFields("[{\"catalogName\":\"" + catalogName + "\",\"schemaName\":\"EXAMPLE\",\"tableName\":\"NUMBERS\"," +
                         "\"splitField\":\"value\",\"calcStepEnable\":\"false\",\"dataReadOnly\":\"true\",\"splitCount\":\"3\"," +
                         "\"fieldMinValue\":\"1\",\"fieldMaxValue\":\"5\"}]");
-        tableHandle = getTableHandle(new SchemaTableName("example", "five_numbers"));
-        tableHandle.setTableSplitFieldValidated(true);
+        tableHandle = getTableHandle(new SchemaTableName("example", "numbers"));
         splitManager = new DataSourceTableSplitManager(config, jdbcClient, nodeManager);
+        TableSplitConfig tableSplitConfig = splitManager.getTableSplitConfig(tableHandle);
+        tableSplitConfig.setTableSplitFieldValid(true);
         ConnectorSplitSource splitSource = splitManager.getTableSplits(JdbcIdentity.from(SESSION), tableHandle);
         List<ConnectorSplit> splits = getFutureValue(splitSource.getNextBatch(NOT_PARTITIONED, 1000)).getSplits();
         int index = 0;
@@ -439,7 +445,12 @@ public class TestDataSourceTableSplitManager
 
     private JdbcTableHandle getTableHandle(SchemaTableName table)
     {
-        return jdbcClient.getTableHandle(JdbcIdentity.from(SESSION), table)
+        JdbcTableHandle jdbcTableHandle;
+        jdbcTableHandle = jdbcClient.getTableHandle(JdbcIdentity.from(SESSION), table)
                 .orElseThrow(() -> new IllegalArgumentException("table not found: " + table));
+        if (jdbcTableHandle != null) {
+            jdbcClient.getColumns(SESSION, jdbcTableHandle);
+        }
+        return jdbcTableHandle;
     }
 }
