@@ -241,9 +241,15 @@ public class Int128ArrayBlock
     @Override
     public boolean[] filter(BloomFilter filter, boolean[] validPositions)
     {
-        for (int i = 0; i < values.length / 2; i++) {
-            Slice value = Slices.wrappedLongArray(values[i * 2], values[i * 2 + 1]);
-            validPositions[i] = validPositions[i] && filter.test(value);
+        for (int i = 0; i < positionCount; i++) {
+            int pos = i + positionOffset;
+            if (valueIsNull != null && valueIsNull[pos]) {
+                validPositions[i] = validPositions[i] && filter.test((Slice) null);
+            }
+            else {
+                Slice value = Slices.wrappedLongArray(values[(pos) * 2], values[((pos) * 2) + 1]);
+                validPositions[i] = validPositions[i] && filter.test(value);
+            }
         }
         return validPositions;
     }
