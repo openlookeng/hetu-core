@@ -1675,7 +1675,7 @@ public class SemiTransactionalHiveMetastore
 
             if (pathExists(hdfsContext, hdfsEnvironment, currentPath)) {
                 if (!targetPath.equals(currentPath)) {
-                    renamePartitionDirectory(
+                    renameNewPartitionDirectory(
                             hdfsContext,
                             hdfsEnvironment,
                             currentPath,
@@ -2269,25 +2269,6 @@ public class SemiTransactionalHiveMetastore
         else {
             renameDirectory(context, hdfsEnvironment, source, target,
                     () -> cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, target, true)));
-        }
-    }
-
-    private static void renamePartitionDirectory(HdfsContext context,
-            HdfsEnvironment hdfsEnvironment,
-            Path source,
-            Path target,
-            List<DirectoryCleanUpTask> cleanUpTasksForAbort)
-    {
-        try {
-            if (hdfsEnvironment.getFileSystem(context, source).rename(source, target)) {
-                cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, target, true));
-            }
-            else {
-                renameNewPartitionDirectory(context, hdfsEnvironment, source, target, cleanUpTasksForAbort);
-            }
-        }
-        catch (IOException e) {
-            renameNewPartitionDirectory(context, hdfsEnvironment, source, target, cleanUpTasksForAbort);
         }
     }
 
