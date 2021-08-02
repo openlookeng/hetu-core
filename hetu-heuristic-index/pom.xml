@@ -67,7 +67,7 @@
         <dependency>
             <artifactId>commons-compress</artifactId>
             <groupId>org.apache.commons</groupId>
-            <version>1.19</version>
+            <version>1.21</version>
         </dependency>
         <dependency>
             <groupId>io.hetu.core</groupId>
