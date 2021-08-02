@@ -98,9 +98,9 @@ public class MetastoreHiveStatisticsProvider
 
     private final PartitionsStatisticsProvider statisticsProvider;
     private static Map<String, TableColumnStatistics> statsCache;
-    private static Map<String, SamplePartition> samplePartitionCache;
+    private static Map<Table, SamplePartition> samplePartitionCache;
 
-    public MetastoreHiveStatisticsProvider(SemiTransactionalHiveMetastore metastore, Map<String, TableColumnStatistics> statsCache, Map<String, SamplePartition> samplePartitionCache)
+    public MetastoreHiveStatisticsProvider(SemiTransactionalHiveMetastore metastore, Map<String, TableColumnStatistics> statsCache, Map<Table, SamplePartition> samplePartitionCache)
     {
         requireNonNull(metastore, "metastore is null");
         this.statsCache = requireNonNull(statsCache, "statsCache is null");
@@ -148,10 +148,10 @@ public class MetastoreHiveStatisticsProvider
         }
         int sampleSize = getPartitionStatisticsSampleSize(session);
         List<HivePartition> partitionsSample = null;
-        SamplePartition sample = samplePartitionCache.get(schemaTableName.getTableName());
+        SamplePartition sample = samplePartitionCache.get(table);
         if (includeColumnStatistics || sample == null || sample.partitionCount != partitions.size()) {
             partitionsSample = getPartitionsSample(partitions, sampleSize);
-            samplePartitionCache.put(schemaTableName.getTableName(), new SamplePartition(partitions.size(), partitionsSample));
+            samplePartitionCache.put(table, new SamplePartition(partitions.size(), partitionsSample));
         }
         else if (sample != null) {
             partitionsSample = sample.partitionsSample;

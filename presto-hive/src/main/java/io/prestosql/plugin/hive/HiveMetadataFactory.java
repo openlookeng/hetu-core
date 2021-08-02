@@ -19,6 +19,7 @@ import io.airlift.units.Duration;
 import io.prestosql.plugin.hive.metastore.CachingHiveMetastore;
 import io.prestosql.plugin.hive.metastore.HiveMetastore;
 import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
+import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.plugin.hive.security.AccessControlMetadataFactory;
 import io.prestosql.plugin.hive.statistics.MetastoreHiveStatisticsProvider;
 import io.prestosql.plugin.hive.statistics.TableColumnStatistics;
@@ -39,7 +40,7 @@ public class HiveMetadataFactory
         implements Supplier<TransactionalMetadata>
 {
     protected final Map<String, TableColumnStatistics> statsCache = new ConcurrentHashMap();
-    protected final Map<String, MetastoreHiveStatisticsProvider.SamplePartition> samplePartitionCache = new ConcurrentHashMap();
+    protected final Map<Table, MetastoreHiveStatisticsProvider.SamplePartition> samplePartitionCache = new ConcurrentHashMap();
 
     private final boolean skipDeletionForAlter;
     private final boolean skipTargetCleanupOnRollback;
