@@ -28,7 +28,6 @@ import io.prestosql.spi.resourcegroups.ResourceGroupConfigurationManagerFactory;
 import io.prestosql.spi.resourcegroups.ResourceGroupId;
 import io.prestosql.spi.resourcegroups.SelectionContext;
 import io.prestosql.spi.resourcegroups.SelectionCriteria;
-import io.prestosql.statestore.StateStoreConstants;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.utils.DistributedResourceGroupUtils;
 import io.prestosql.utils.HetuConfig;
@@ -258,26 +257,6 @@ public final class InternalResourceGroupManager<C>
             }
             catch (RuntimeException e) {
                 log.error("Error mapCachedStates: " + e.getMessage());
-            }
-            //make sure statestore is loaded
-            if (stateStoreProvider.getStateStore() != null && groups.size() > 0) {
-                Lock lock = null;
-                boolean locked = false;
-                try {
-                    lock = stateStoreProvider.getStateStore().getLock(StateStoreConstants.UPDATE_CPU_USAGE_LOCK_NAME);
-                    locked = lock.tryLock(StateStoreConstants.DEFAULT_ACQUIRED_LOCK_TIME_MS, TimeUnit.MILLISECONDS);
-                    if (locked) {
-                        DistributedResourceGroupUtils.generateCpuQuotaForAllGroups(stateStoreProvider.getStateStore(), groups);
-                    }
-                }
-                catch (Exception e) {
-                    log.error("Error cpuUsageUpdate: " + e.getMessage());
-                }
-                finally {
-                    if (locked) {
-                        lock.unlock();
-                    }
-                }
             }
         }
 
