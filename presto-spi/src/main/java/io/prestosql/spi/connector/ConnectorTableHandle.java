@@ -143,4 +143,10 @@ public interface ConnectorTableHandle
     {
         return false;
     }
+
+    /* this method validates for required ConnectorTableHandle parameters*/
+    default boolean basicEquals(ConnectorTableHandle that)
+    {
+        return equals(that);
+    }
 }

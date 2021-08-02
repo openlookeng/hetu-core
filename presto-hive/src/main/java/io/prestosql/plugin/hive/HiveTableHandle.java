@@ -338,6 +338,23 @@ public class HiveTableHandle
     }
 
     @Override
+    public boolean basicEquals(ConnectorTableHandle o)
+    {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        HiveTableHandle that = (HiveTableHandle) o;
+        return Objects.equals(schemaName, that.schemaName) &&
+                Objects.equals(tableName, that.tableName) &&
+                Objects.equals(tableParameters, that.tableParameters) &&
+                Objects.equals(partitionColumns, that.partitionColumns) &&
+                Objects.equals(bucketHandle, that.bucketHandle);
+    }
+
+    @Override
     public int hashCode()
     {
         return Objects.hash(schemaName, tableName);
