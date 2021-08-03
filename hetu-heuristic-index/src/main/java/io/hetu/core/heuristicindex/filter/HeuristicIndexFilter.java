@@ -39,6 +39,11 @@ public class HeuristicIndexFilter
 {
     Map<String, List<IndexMetadata>> indices;
 
+    /**
+     * Construct the filter with indexes.
+     *
+     * @param indices A map of column name to list of index. Only one column is supported for now.
+     */
     public HeuristicIndexFilter(Map<String, List<IndexMetadata>> indices)
     {
         this.indices = indices;
@@ -65,7 +70,7 @@ public class HeuristicIndexFilter
                     // todo remote udf, we should get FunctionHandle from FunctionAndTypeManager
                     CallExpression left = new CallExpression(OperatorType.GREATER_THAN_OR_EQUAL.name(), new BuiltInFunctionHandle(sigLeft), specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(1)), Optional.empty());
                     CallExpression right = new CallExpression(OperatorType.LESS_THAN_OR_EQUAL.name(), new BuiltInFunctionHandle(sigRight), specialForm.getType(), ImmutableList.of(specialForm.getArguments().get(0), specialForm.getArguments().get(2)), Optional.empty());
-                    return matches(left) && matches(right);
+                    return matches(left) && matches(right); // break it to (>= left and <= right)
                 case IN:
                     Signature sigEqual = Signature.internalOperator(OperatorType.EQUAL,
                             specialForm.getType().getTypeSignature(),

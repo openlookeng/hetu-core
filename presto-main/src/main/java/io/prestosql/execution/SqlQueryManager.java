@@ -257,6 +257,8 @@ public class SqlQueryManager
             throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Query %s already registered", queryExecution.getQueryId()));
         }
 
+        // CreateIndex operations could not register cleanup operations like connectors
+        // Therefore a listener is added here to clean up index records on failure
         if (isIndexCreationQuery(queryExecution.getQueryInfo())) {
             queryExecution.addStateChangeListener(state -> {
                 try {

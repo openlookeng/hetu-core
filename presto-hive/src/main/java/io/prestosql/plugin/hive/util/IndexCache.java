@@ -94,6 +94,7 @@ public class IndexCache
             if (PropertyService.getBooleanProperty(HetuConstant.FILTER_CACHE_SOFT_REFERENCE)) {
                 cacheBuilder.softValues();
             }
+            // Refresh cache according to index records in the background. Evict index from cache if it's dropped.
             executor.scheduleAtFixedRate(() -> {
                 try {
                     if (cache.size() > 0) {

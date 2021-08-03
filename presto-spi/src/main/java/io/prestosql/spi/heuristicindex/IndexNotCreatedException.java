@@ -14,6 +14,9 @@
  */
 package io.prestosql.spi.heuristicindex;
 
+/**
+ * Special marker exception to indicate that a index is not created for the given data.
+ */
 public class IndexNotCreatedException
         extends Exception
 {

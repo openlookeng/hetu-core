@@ -81,7 +81,7 @@ import static java.util.stream.Collectors.toMap;
 public class MemoryMetadata
         implements ConnectorMetadata
 {
-    public static final String MEM_KEY = "memory";
+    public static final String MEM_KEY = "memory"; // memory metadata all under this catalog
     public static final String DEFAULT_SCHEMA = "default";
     public static final String TABLE_ID_KEY = "id"; // used as param key in TableEntity
     public static final String TABLE_OUTPUT_HANDLE = "output_handle"; // used as param key in TableEntity
@@ -92,10 +92,11 @@ public class MemoryMetadata
     private final NodeManager nodeManager;
     private final TypeManager typeManager;
     private final AtomicLong nextTableId;
-    private final Map<Long, TableInfo> tables = new ConcurrentHashMap<>();
-    private final Map<SchemaTableName, ConnectorViewDefinition> views = new ConcurrentHashMap<>();
     private final HetuMetastore metastore;
     private final MemoryConfig config;
+    // tables and views are cached here
+    private final Map<Long, TableInfo> tables = new ConcurrentHashMap<>();
+    private final Map<SchemaTableName, ConnectorViewDefinition> views = new ConcurrentHashMap<>();
 
     @Inject
     public MemoryMetadata(TypeManager typeManager, NodeManager nodeManager, HetuMetastore metastore, MemoryTableManager tableManager, MemoryConfig memoryConfig)
@@ -247,8 +248,6 @@ public class MemoryMetadata
         metastore.dropTable(MEM_KEY, info.getSchemaName(), info.getTableName());
         updateTableInfo(handle.getId(), null);
     }
-
-    // CONTINUE HERE
 
     @Override
     public void renameTable(ConnectorSession session, ConnectorTableHandle tableHandle, SchemaTableName newTableName)

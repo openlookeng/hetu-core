@@ -34,6 +34,7 @@ import static java.util.Objects.requireNonNull;
 
 public class TableInfo
 {
+    // Codec object to serialize/deserialize this class. Stored in metadata.
     private static final JsonCodec<TableInfo> TABLE_INFO_JSON_CODEC = jsonCodec(TableInfo.class);
 
     private final long id;
