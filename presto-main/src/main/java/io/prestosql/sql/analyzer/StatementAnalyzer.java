@@ -51,6 +51,7 @@ import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.heuristicindex.IndexClient;
+import io.prestosql.spi.heuristicindex.IndexRecord;
 import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.security.AccessDeniedException;
@@ -255,6 +256,7 @@ import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_ATTRIBUTE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_CATALOG;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_COLUMN;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_CUBE;
+import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_INDEX;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_ORDER_BY;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_SCHEMA;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_TABLE;
@@ -1255,6 +1257,10 @@ class StatementAnalyzer
         {
             if (analysis.getOriginalStatement() instanceof CreateIndex) {
                 validateCreateIndex(table, scope);
+            }
+
+            if (analysis.getOriginalStatement() instanceof UpdateIndex) {
+                validateUpdateIndex(table, scope);
             }
 
             if (!table.getName().getPrefix().isPresent()) {
@@ -3079,6 +3085,75 @@ class StatementAnalyzer
                         break;
                     case NOT_FOUND:
                         heuristicIndexerManager.getIndexClient().addIndexRecord(placeHolder);
+                }
+            }
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private void validateUpdateIndex(Table table, Optional<Scope> scope)
+    {
+        UpdateIndex updateIndex = (UpdateIndex) analysis.getOriginalStatement();
+        IndexRecord indexRecord;
+        try {
+            indexRecord = heuristicIndexerManager.getIndexClient().lookUpIndexRecord(updateIndex.getIndexName().toString());
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException("Error reading index records, ", e);
+        }
+
+        QualifiedObjectName tableFullName = QualifiedObjectName.valueOf(indexRecord.qualifiedTable);
+        accessControl.checkCanCreateIndex(session.getRequiredTransactionId(), session.getIdentity(), tableFullName);
+        String tableName = tableFullName.toString();
+
+        Optional<TableHandle> tableHandle = metadata.getTableHandle(session, tableFullName);
+        if (!tableHandle.isPresent()) {
+            throw new SemanticException(MISSING_ATTRIBUTE, table, "Table '%s' is invalid", tableFullName);
+        }
+
+        List<Pair<String, Type>> indexColumns = new LinkedList<>();
+        for (String i : indexRecord.columns) {
+            indexColumns.add(new Pair<>(i, UNKNOWN));
+        }
+
+        try {
+            // Use this place holder to check the existence of index and lock the place
+            Properties properties = new Properties();
+            properties.setProperty(INPROGRESS_PROPERTY_KEY, "TRUE");
+            CreateIndexMetadata placeHolder = new CreateIndexMetadata(
+                    updateIndex.getIndexName().toString(),
+                    tableName,
+                    indexRecord.indexType,
+                    indexColumns,
+                    indexRecord.partitions,
+                    properties,
+                    session.getUser(),
+                    UNDEFINED);
+
+            synchronized (StatementAnalyzer.class) {
+                IndexClient.RecordStatus recordStatus = heuristicIndexerManager.getIndexClient().lookUpIndexRecord(placeHolder);
+                switch (recordStatus) {
+                    case IN_PROGRESS_SAME_NAME:
+                        throw new SemanticException(INDEX_ALREADY_EXISTS, updateIndex,
+                                "Index '%s' is being created by another user. Check running queries for details. If there is no running query for this index, " +
+                                        "the index may be in an unexpected error state and should be dropped using 'DROP INDEX %s'",
+                                updateIndex.getIndexName().toString(), updateIndex.getIndexName().toString());
+                    case IN_PROGRESS_SAME_CONTENT:
+                        throw new SemanticException(INDEX_ALREADY_EXISTS, updateIndex,
+                                "Index with same (table,column,indexType) is being created by another user. Check running queries for details. " +
+                                        "If there is no running query for this index, the index may be in an unexpected error state and should be dropped using 'DROP INDEX'");
+                    case IN_PROGRESS_SAME_INDEX_PART_CONFLICT:
+                        if (indexRecord.partitions.isEmpty()) {
+                            throw new SemanticException(INDEX_ALREADY_EXISTS, updateIndex,
+                                    "Index with same (table,column,indexType) is being created by another user. Check running queries for details. " +
+                                            "If there is no running query for this index, the index may be in an unexpected error state and should be dropped using 'DROP INDEX %s'",
+                                    updateIndex.getIndexName().toString());
+                        }
+                        // allow different queries to run with explicitly same partitions
+                    case NOT_FOUND:
+                        throw new SemanticException(MISSING_INDEX, updateIndex, "Index with name '%s' does not exist", updateIndex.getIndexName().toString());
                 }
             }
         }

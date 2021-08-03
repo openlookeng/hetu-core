@@ -83,6 +83,7 @@ import io.prestosql.sql.planner.plan.TableUpdateNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
+import io.prestosql.sql.planner.plan.UpdateIndexNode;
 import io.prestosql.sql.planner.plan.UpdateNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 import io.prestosql.sql.relational.Expressions;
@@ -271,6 +272,13 @@ public class UnaliasSymbolReferences
         {
             return new CreateIndexNode(node.getId(), context.rewrite(node.getSource()),
                     node.getCreateIndexMetadata());
+        }
+
+        @Override
+        public PlanNode visitUpdateIndex(UpdateIndexNode node, RewriteContext<Void> context)
+        {
+            return new UpdateIndexNode(node.getId(), context.rewrite(node.getSource()),
+                    node.getUpdateIndexMetadata());
         }
 
         @Override

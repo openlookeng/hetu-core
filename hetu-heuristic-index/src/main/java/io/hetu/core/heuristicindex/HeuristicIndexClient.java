@@ -39,9 +39,12 @@ import java.nio.file.FileSystemException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -114,7 +117,7 @@ public class HeuristicIndexClient
             String filename = filenamePath.toString();
             long splitStart = Long.parseLong(filename.substring(0, filename.lastIndexOf('.')));
             String timeDir = Paths.get(table.toString(), column.toString(), indexType.toString(), remainder.toString()).toString();
-            long lastUpdated = getLastModified(timeDir);
+            long lastUpdated = getLastModifiedTime(timeDir);
 
             IndexMetadata index = new IndexMetadata(
                     entry.getValue(),
@@ -132,7 +135,7 @@ public class HeuristicIndexClient
     }
 
     @Override
-    public long getLastModified(String path)
+    public long getLastModifiedTime(String path)
             throws IOException
     {
         // get the absolute path to the file being read
@@ -391,6 +394,38 @@ public class HeuristicIndexClient
         else {
             LOG.debug("File path doesn't exists" + absolutePath);
             return ImmutableList.of();
+        }
+    }
+
+    @Override
+    public Map<String, String> getLastModifiedTimes(String indexName)
+            throws IOException
+    {
+        IndexRecord indexRecord = lookUpIndexRecord(indexName);
+        CreateIndexMetadata.Level createLevel;
+        Optional<String> createLevelString = indexRecord.properties.stream().filter(s -> s.toLowerCase(Locale.ROOT).contains("level=")).findAny();
+        createLevel = CreateIndexMetadata.Level.valueOf(createLevelString.get().replaceAll(".*=", ""));
+
+        Path pathToIndex = Paths.get(root.toString(), indexRecord.qualifiedTable, indexRecord.columns[0], indexRecord.indexType);
+        List<Path> paths = fs.walk(pathToIndex).filter(p -> !fs.isDirectory(p)).collect(Collectors.toList());
+        switch (createLevel) {
+            case STRIPE:
+                return paths.stream().collect(Collectors.toMap(path -> "/" + path.subpath(pathToIndex.getNameCount(), path.getNameCount() - 1), path -> {
+                    String filename = path.getFileName().toString();
+                    return filename.replaceAll("\\D", "");
+                }));
+            case PARTITION:
+                return paths.stream().collect(Collectors.toMap(path -> path.subpath(pathToIndex.getNameCount(), path.getNameCount() - 1).toString(), path -> {
+                    String filename = path.getFileName().toString();
+                    return filename.replaceAll("\\D", "");
+                }));
+            case TABLE:
+                return paths.stream().filter(path -> path.getNameCount() - 1 == pathToIndex.getNameCount()).collect(Collectors.toMap(path -> indexRecord.qualifiedTable, path -> {
+                    String filename = path.getFileName().toString();
+                    return filename.replaceAll("\\D", "");
+                }));
+            default:
+                return Collections.emptyMap();
         }
     }
 }

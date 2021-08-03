@@ -40,7 +40,8 @@ public final class StatementRewrite
             new ExplainRewrite(),
             new CacheTableRewrite(),
             new CreateIndexRewrite(),
-            new InsertCubeRewrite());
+            new InsertCubeRewrite(),
+            new UpdateIndexRewrite());
 
     private StatementRewrite() {}
 

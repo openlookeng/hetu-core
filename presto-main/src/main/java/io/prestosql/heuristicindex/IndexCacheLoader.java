@@ -64,7 +64,7 @@ public class IndexCacheLoader
             long lastModified;
 
             try {
-                lastModified = indexClient.getLastModified(key.getPath());
+                lastModified = indexClient.getLastModifiedTime(key.getPath());
             }
             catch (Exception e) {
                 // no lastModified file found, i.e. index doesn't exist

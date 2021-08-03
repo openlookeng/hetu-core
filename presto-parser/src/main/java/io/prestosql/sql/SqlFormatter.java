@@ -967,6 +967,11 @@ public final class SqlFormatter
         protected Void visitUpdateIndex(UpdateIndex node, Integer context)
         {
             append(context, "UPDATE INDEX ");
+            if (node.isExists()) {
+                builder.append("IF EXISTS ");
+            }
+            builder.append(node.getIndexName());
+            builder.append(formatPropertiesMultiLine(node.getProperties()));
             return null;
         }
 

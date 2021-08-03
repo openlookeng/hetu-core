@@ -82,6 +82,7 @@ import io.prestosql.sql.tree.CurrentUser;
 import io.prestosql.sql.tree.DefaultTraversalVisitor;
 import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.Statement;
+import io.prestosql.sql.tree.UpdateIndex;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.transaction.TransactionId;
 import io.prestosql.utils.OptimizerUtils;
@@ -143,7 +144,7 @@ public class CachedSqlQueryExecution
         }
 
         // if the original statement before rewriting is CreateIndex, set session to let connector know that pageMetadata should be enabled
-        if (analysis.getOriginalStatement() instanceof CreateIndex) {
+        if (analysis.getOriginalStatement() instanceof CreateIndex || analysis.getOriginalStatement() instanceof UpdateIndex) {
             session.setPageMetadataEnabled(true);
         }
 
@@ -165,7 +166,7 @@ public class CachedSqlQueryExecution
                 analysis.getParameters().isEmpty() &&
                 validateAndExtractTableAndColumns(analysis, metadata, session, tableNames, tableStatistics, columnTypes) &&
                 isCacheable(statement) &&
-                (!(analysis.getOriginalStatement() instanceof CreateIndex)); // create index should not be cached
+                (!(analysis.getOriginalStatement() instanceof CreateIndex || analysis.getOriginalStatement() instanceof UpdateIndex)); // create index and update index should not be cached
 
         cacheable = cacheable && !tableNames.isEmpty();
         if (!cacheable) {

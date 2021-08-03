@@ -107,6 +107,7 @@ import io.prestosql.sql.planner.plan.TableUpdateNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
+import io.prestosql.sql.planner.plan.UpdateIndexNode;
 import io.prestosql.sql.planner.plan.UpdateNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 import io.prestosql.sql.planner.planprinter.NodeRepresentation.TypedSymbol;
@@ -768,6 +769,12 @@ public class PlanPrinter
 
         @Override
         public Void visitCreateIndex(CreateIndexNode node, Void context)
+        {
+            return processChildren(node, context);
+        }
+
+        @Override
+        public Void visitUpdateIndex(UpdateIndexNode node, Void context)
         {
             return processChildren(node, context);
         }

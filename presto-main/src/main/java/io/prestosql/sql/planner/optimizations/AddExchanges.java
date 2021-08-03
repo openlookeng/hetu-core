@@ -76,6 +76,7 @@ import io.prestosql.sql.planner.plan.TableUpdateNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
+import io.prestosql.sql.planner.plan.UpdateIndexNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 import io.prestosql.sql.relational.RowExpressionDomainTranslator;
 import io.prestosql.utils.WriteExchangePartitioner;
@@ -523,6 +524,16 @@ public class AddExchanges
         {
             return planTableScan(node, TRUE_CONSTANT)
                     .orElseGet(() -> new PlanWithProperties(node, deriveProperties(node, ImmutableList.of())));
+        }
+
+        @Override
+        public PlanWithProperties visitUpdateIndex(UpdateIndexNode node, PreferredProperties preferredProperties)
+        {
+            PlanWithProperties child = planChild(node, PreferredProperties.undistributed());
+            child = withDerivedProperties(
+                    gatheringExchange(idAllocator.getNextId(), REMOTE, child.getNode()),
+                    child.getProperties());
+            return rebaseAndDeriveProperties(node, child);
         }
 
         @Override
