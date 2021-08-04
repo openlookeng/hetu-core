@@ -16,9 +16,9 @@ package io.prestosql.plugin.memory;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.log.Logging;
-import io.airlift.testing.mysql.TestingMySqlServer;
 import io.airlift.tpch.TpchTable;
 import io.hetu.core.common.filesystem.TempFolder;
+import io.hetu.core.filesystem.HetuFileSystemClientPlugin;
 import io.hetu.core.metastore.HetuMetastorePlugin;
 import io.prestosql.Session;
 import io.prestosql.plugin.tpch.TpchPlugin;
@@ -45,7 +45,8 @@ public final class MemoryQueryRunner
 
     private static final String FOLDER_PROPERTY_KEY = "memory.spill-path";
 
-    private static Map<String, String> createConfig(TempFolder folder, Map<String, String> newConfigs) throws IOException
+    private static Map<String, String> createConfig(TempFolder folder, Map<String, String> newConfigs)
+            throws IOException
     {
         Map<String, String> memoryProperties = new HashMap(DEFAULT_MEMORY_PROPERTIES);
 
@@ -84,22 +85,19 @@ public final class MemoryQueryRunner
         DistributedQueryRunner queryRunner = new DistributedQueryRunner(session, nodes, extraProperties);
 
         try {
+            queryRunner.installPlugin(new HetuFileSystemClientPlugin());
             queryRunner.installPlugin(new HetuMetastorePlugin());
-            TestingMySqlServer mysqlServer = new TestingMySqlServer("test", "mysql", "metastore");
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                mysqlServer.close();
-            }));
+            TempFolder metastoreFolder = new TempFolder().create();
+            Runtime.getRuntime().addShutdownHook(new Thread(metastoreFolder::close));
 
             Map<String, String> metastoreConfig = new HashMap<>();
-            metastoreConfig.put("hetu.metastore.type", "jdbc");
-            metastoreConfig.put("hetu.metastore.db.url", mysqlServer.getJdbcUrl("metastore"));
-            metastoreConfig.put("hetu.metastore.db.user", mysqlServer.getUser());
-            metastoreConfig.put("hetu.metastore.db.password", mysqlServer.getPassword());
+            metastoreConfig.put("hetu.metastore.type", "hetufilesystem");
+            metastoreConfig.put("hetu.metastore.hetufilesystem.profile-name", "default");
+            metastoreConfig.put("hetu.metastore.hetufilesystem.path", metastoreFolder.newFolder("metastore").getAbsolutePath());
 
-            queryRunner.registerCloseable(mysqlServer);
             queryRunner.getServers().forEach(server -> {
                 try {
-                    server.loadMetastore(metastoreConfig);
+                    server.loadMetastore(new HashMap<>(metastoreConfig));
                 }
                 catch (Exception e) {
                     throw new RuntimeException(e);
