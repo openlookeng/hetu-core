@@ -515,4 +515,37 @@ public class TestHindex
         assertTrue(verifyEqualResults(resultLoadingIndex, resultIndexLoaded),
                 "The results should be equal for " + testerQuery + " " + indexType);
     }
+
+    @Test
+    public void testIndicesDroppedWithTable()
+    {
+        String tableName = getNewTableName();
+        createTable1(tableName);
+
+        String testerQuery = "SHOW INDEX";
+        Pair<Integer, MaterializedResult> resultPairIndexCreation = getSplitAndMaterializedResult(testerQuery);
+        MaterializedResult resultIndexCreation = resultPairIndexCreation.getSecond();
+        int initialSize = resultIndexCreation.getRowCount();
+
+        String indexName1 = getNewIndexName();
+        assertQuerySucceeds("CREATE INDEX " + indexName1 + " USING btree ON " + tableName + " (id)");
+        String indexName2 = getNewIndexName();
+        assertQuerySucceeds("CREATE INDEX " + indexName2 + " USING bitmap ON " + tableName + " (id)");
+        String indexName3 = getNewIndexName();
+        assertQuerySucceeds("CREATE INDEX " + indexName3 + " USING bloom ON " + tableName + " (id)");
+        String indexName4 = getNewIndexName();
+        assertQuerySucceeds("CREATE INDEX " + indexName4 + " USING minmax ON " + tableName + " (id)");
+
+        Pair<Integer, MaterializedResult> resultPairIndexCreation1 = getSplitAndMaterializedResult(testerQuery);
+        MaterializedResult resultIndexCreation1 = resultPairIndexCreation1.getSecond();
+        int size = resultIndexCreation1.getRowCount();
+        assertEquals(size - initialSize, 4);
+
+        assertQuerySucceeds("DROP TABLE " + tableName);
+
+        Pair<Integer, MaterializedResult> resultPairIndexCreation2 = getSplitAndMaterializedResult(testerQuery);
+        MaterializedResult resultIndexCreation2 = resultPairIndexCreation2.getSecond();
+        size = resultIndexCreation2.getRowCount();
+        assertEquals(size - initialSize, 0);
+    }
 }

@@ -25,6 +25,8 @@ import io.prestosql.security.AccessControl;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.connector.TableNotFoundException;
+import io.prestosql.spi.heuristicindex.IndexClient;
+import io.prestosql.spi.heuristicindex.IndexRecord;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.service.PropertyService;
 import io.prestosql.sql.analyzer.SemanticException;
@@ -35,8 +37,12 @@ import io.prestosql.transaction.TransactionManager;
 
 import javax.inject.Inject;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.prestosql.cube.CubeManager.STAR_TREE;
@@ -110,6 +116,26 @@ public class DropTableTask
             }
         }
 
+        dropIndices(heuristicIndexerManager, tableName);
+
         return immediateFuture(null);
+    }
+
+    private void dropIndices(HeuristicIndexerManager heuristicIndexerManager, QualifiedName tableName)
+    {
+        IndexClient indexClient = heuristicIndexerManager.getIndexClient();
+        try {
+            List<IndexRecord> indexRecords = indexClient.getAllIndexRecords().stream().filter(r -> r.qualifiedTable.equals(tableName.toString())).collect(Collectors.toList());
+            for (IndexRecord indexRecord : indexRecords) {
+                indexClient.deleteIndex(indexRecord.name, Collections.emptyList());
+            }
+        }
+        catch (UnsupportedOperationException ignored) {
+            // This exception is only thrown when heuristic index is not enabled so the noOpIndexClient is used.
+            // In this case we want drop table to run as normal
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 }
