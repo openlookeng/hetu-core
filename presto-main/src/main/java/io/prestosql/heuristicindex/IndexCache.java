@@ -38,8 +38,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -98,35 +100,14 @@ public class IndexCache
             if (PropertyService.getBooleanProperty(HetuConstant.FILTER_CACHE_SOFT_REFERENCE)) {
                 cacheBuilder.softValues();
             }
-            // Refresh cache according to index records in the background. Evict index from cache if it's dropped.
+
             executor.scheduleAtFixedRate(() -> {
+                // This thread automatically keep the cache updated every 5 secs in the background.
                 try {
-                    if (cache.size() > 0) {
-                        // only refresh cache is it's not empty
-                        List<IndexRecord> newRecords = indexClient.getAllIndexRecords();
-
-                        if (indexRecords != null) {
-                            for (IndexRecord old : indexRecords) {
-                                boolean found = false;
-                                for (IndexRecord now : newRecords) {
-                                    if (now.name.equals(old.name)) {
-                                        found = true;
-                                        if (now.lastModifiedTime != old.lastModifiedTime) {
-                                            // index record has been updated. evict
-                                            evictFromCache(old);
-                                            LOG.debug("Index for {%s} has been evicted from cache because the index has been updated.", old);
-                                        }
-                                    }
-                                }
-                                // old record is gone. evict from cache
-                                if (!found) {
-                                    evictFromCache(old);
-                                    LOG.debug("Index for {%s} has been evicted from cache because the index has been dropped.", old);
-                                }
-                            }
-                        }
-
-                        indexRecords = newRecords;
+                    List<IndexRecord> newRecords = indexClient.getAllIndexRecords();
+                    boolean success = autoUpdateCache(newRecords);
+                    if (success) {
+                        LOG.debug("Cache refreshed");
                     }
                 }
                 catch (Exception e) {
@@ -135,6 +116,65 @@ public class IndexCache
             }, loadDelay, refreshRate, TimeUnit.MILLISECONDS);
             cache = cacheBuilder.build(loader);
         }
+    }
+
+    private boolean autoUpdateCache(List<IndexRecord> newRecords)
+    {
+        // Three cases are checked:
+        // 1. if new index record is created, add it to cache
+        // 2. if the index in cache is updated, update the cache
+        // 3. if the index in cache is outdated, evict it from cache
+
+        if (newRecords == null && indexRecords == null) {
+            return false;
+        }
+
+        HashMap<String, Long> oldIndexMap = new HashMap<>();
+        if (indexRecords != null) {
+            for (IndexRecord oldIndexRecord : indexRecords) {
+                oldIndexMap.put(oldIndexRecord.name, oldIndexRecord.lastModifiedTime);
+            }
+        }
+        boolean dropped = false;
+        boolean created = false;
+        boolean updated = false;
+        HashMap<String, Long> newIndexMap = new HashMap<>();
+        if (newRecords != null) {
+            for (IndexRecord newIndexRecord : newRecords) {
+                newIndexMap.put(newIndexRecord.name, newIndexRecord.lastModifiedTime);
+                if (oldIndexMap.containsKey(newIndexRecord.name)) {
+                    if (oldIndexMap.get(newIndexRecord.name) != newIndexRecord.lastModifiedTime) {
+                        // update operation
+                        updated = true;
+                        //cache.refresh(newIndexRecord);
+                        evictFromCache(newIndexRecord);
+                        CreateIndexMetadata.Level indexLevel = CreateIndexMetadata.Level.valueOf(newIndexRecord.getProperty(CreateIndexMetadata.LEVEL_PROP_KEY).toUpperCase(Locale.ROOT));
+                        preloadIndex(newIndexRecord.qualifiedTable, String.join(",", newIndexRecord.columns), newIndexRecord.indexType, indexLevel);
+                        LOG.debug("Index {%s} has been updated in cache.", newIndexRecord);
+                    }
+                }
+                else {
+                    // create operation
+                    created = true;
+                    CreateIndexMetadata.Level indexLevel = CreateIndexMetadata.Level.valueOf(newIndexRecord.getProperty(CreateIndexMetadata.LEVEL_PROP_KEY).toUpperCase(Locale.ROOT));
+                    preloadIndex(newIndexRecord.qualifiedTable, String.join(",", newIndexRecord.columns), newIndexRecord.indexType, indexLevel);
+                    LOG.debug("Index {%s} has been inserted to cache.", newIndexRecord);
+                }
+            }
+        }
+
+        if (indexRecords != null) {
+            for (IndexRecord oldIndexRecord : indexRecords) {
+                if (!newIndexMap.containsKey(oldIndexRecord.name)) {
+                    // drop operation
+                    dropped = true;
+                    evictFromCache(oldIndexRecord);
+                    LOG.debug("Index {%s} has been evicted from cache because the index has been dropped.", oldIndexRecord);
+                }
+            }
+        }
+        indexRecords = newRecords;
+        return (dropped || created || updated);
     }
 
     public void preloadIndex(String table, String column, String type, CreateIndexMetadata.Level level)
