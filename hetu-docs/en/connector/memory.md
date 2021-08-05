@@ -28,7 +28,10 @@ memory.spill-path=/opt/hetu/data/spill
   distribute the data uniformly between all the workers.
 - Hetu Metastore must be configured. The default settings are included in
   `etc/hetu-metastore.properties`. 
-  Check [Hetu Metastore](../admin/meta-store.md) for more information.
+    - Check [Hetu Metastore](../admin/meta-store.md) for more information. 
+- State Store must be configured to enable automatic memory refresh on workers.
+    - Check [State Store](../admin/state-store.md) for more information
+    - Automatic memory refresh will allow Memory Connector to clean unused tables more often resulting in more efficient use of memory.
 
 Examples
 --------

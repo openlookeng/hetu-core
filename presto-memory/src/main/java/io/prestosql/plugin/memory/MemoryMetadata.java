@@ -63,6 +63,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -88,15 +89,20 @@ public class MemoryMetadata
     public static final String NEXT_ID_KEY = "_NEXT_ID_"; // used as param key in CatalogEntity
     private static final JsonCodec<ConnectorViewDefinition> VIEW_CODEC = jsonCodec(ConnectorViewDefinition.class);
     private static final JsonCodec<MemoryWriteTableHandle> OUTPUT_TABLE_HANDLE_JSON_CODEC = jsonCodec(MemoryWriteTableHandle.class);
+    private static final long metastoreCheckInterval = 10L; // time between scheduled metastore check to remove spilled data
 
     private final NodeManager nodeManager;
     private final TypeManager typeManager;
     private final AtomicLong nextTableId;
     private final HetuMetastore metastore;
     private final MemoryConfig config;
+    private final MemoryTableManager tableManager;
+
     // tables and views are cached here
     private final Map<Long, TableInfo> tables = new ConcurrentHashMap<>();
     private final Map<SchemaTableName, ConnectorViewDefinition> views = new ConcurrentHashMap<>();
+
+    private boolean refreshScheduled; // used to make sure that refresh is only scheduled once
 
     @Inject
     public MemoryMetadata(TypeManager typeManager, NodeManager nodeManager, HetuMetastore metastore, MemoryTableManager tableManager, MemoryConfig memoryConfig)
@@ -105,6 +111,8 @@ public class MemoryMetadata
         this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
         this.config = requireNonNull(memoryConfig, "memoryConfig is null");
         this.metastore = metastore;
+        this.tableManager = tableManager;
+        this.refreshScheduled = false;
         Optional<CatalogEntity> oldCatalog = metastore.getCatalog(MEM_KEY);
         if (!oldCatalog.isPresent()) {
             CatalogEntity newCatalog = CatalogEntity.builder()
@@ -121,6 +129,19 @@ public class MemoryMetadata
                 .setCatalogName(MEM_KEY)
                 .setDatabaseName(DEFAULT_SCHEMA);
         metastore.createDatabaseIfNotExist(databaseBuilder.build());
+    }
+
+    synchronized void scheduleRefreshJob()
+    {
+        if (!this.refreshScheduled && MemoryThreadManager.isSharedThreadPoolInitilized()) {
+            MemoryThreadManager.getSharedThreadPool().scheduleAtFixedRate(() -> {
+                if (tableManager != null) {
+                    nextTableId.set(Long.parseLong(getMemoryCatalogEntity().getParameters().getOrDefault(NEXT_ID_KEY, nextTableId.toString())));
+                    tableManager.refreshTables(getTableIdSet(nextTableId.get()));
+                }
+            }, 1L, metastoreCheckInterval, TimeUnit.SECONDS);
+            this.refreshScheduled = true;
+        }
     }
 
     @Override
