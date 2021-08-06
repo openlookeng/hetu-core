@@ -53,6 +53,11 @@ public class MemoryConnector
         this.tableProperties = ImmutableList.copyOf(requireNonNull(tableProperties, "tableProperties is null").getTableProperties());
     }
 
+    void scheduleRefreshJob()
+    {
+        metadata.scheduleRefreshJob();
+    }
+
     @Override
     public ConnectorTransactionHandle beginTransaction(IsolationLevel isolationLevel, boolean readOnly)
     {

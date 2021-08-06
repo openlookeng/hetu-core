@@ -83,7 +83,10 @@ public class MemoryConnectorFactory
                 MemoryThreadManager.initSharedThreadPool(injector.getInstance(MemoryConfig.class).getThreadPoolSize());
             }
 
-            return injector.getInstance(MemoryConnector.class);
+            MemoryConnector memoryConnector = injector.getInstance(MemoryConnector.class);
+            memoryConnector.scheduleRefreshJob();
+
+            return memoryConnector;
         }
         catch (Exception e) {
             throwIfUnchecked(e);

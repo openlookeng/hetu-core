@@ -21,7 +21,9 @@ memory.spill-path=/opt/hetu/data/spill
 - 关于更多详细信息与其他可选配置项，请参见**配置属性** 章节。
 - 在`etc/config.properties`中，请确保`task.writer-count`的数字不小于配置的openLooKeng集群的节点个数。这会帮助把所有数据更均匀地分配到各个节点上。
 - Hetu Metastore必须被妥善配置来保证内存连接器的正常功能。请参阅[Hetu Metastore](../admin/meta-store.md)。
-
+- 必须配置StateStore使得worker上的表自动刷新生效
+  - 请参阅[State Store](../admin/state-store.md)
+  - 自动刷新特性使得worker节点定期从metastore获取最新的表的列表，并在本地清理已经删除的表
 ## 示例
 
 使用内存连接器创建表：
