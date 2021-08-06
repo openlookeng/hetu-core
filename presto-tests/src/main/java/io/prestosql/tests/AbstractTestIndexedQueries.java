@@ -29,9 +29,9 @@ public abstract class AbstractTestIndexedQueries
     // Generate the indexed data sets
     public static final TpchIndexSpec INDEX_SPEC = new Builder()
             .addIndex("orders", TpchMetadata.TINY_SCALE_FACTOR, ImmutableSet.of("orderkey"))
-            .addIndex("orders", TpchMetadata.TINY_SCALE_FACTOR, ImmutableSet.of("orderkey", "orderstatus"))
+            .addIndex("orders", TpchMetadata.TINY_SCALE_FACTOR, ImmutableSet.of("orderstatus", "orderkey"))
             .addIndex("orders", TpchMetadata.TINY_SCALE_FACTOR, ImmutableSet.of("orderkey", "custkey"))
-            .addIndex("orders", TpchMetadata.TINY_SCALE_FACTOR, ImmutableSet.of("orderstatus", "shippriority"))
+            .addIndex("orders", TpchMetadata.TINY_SCALE_FACTOR, ImmutableSet.of("shippriority", "orderstatus"))
             .build();
 
     protected AbstractTestIndexedQueries(QueryRunnerSupplier supplier)

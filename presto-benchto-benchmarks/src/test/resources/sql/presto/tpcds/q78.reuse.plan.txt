@@ -16,10 +16,10 @@ local exchange (GATHER, SINGLE, [])
                                         local exchange (GATHER, SINGLE, [])
                                             remote exchange (REPLICATE, BROADCAST, [])
                                                 ReuseTableScan date_dim (Consumer)
-                    final hashaggregation over (d_year_57, ws_bill_customer_sk, ws_item_sk)
+                    final hashaggregation over (d_year_45, ws_bill_customer_sk, ws_item_sk)
                         local exchange (GATHER, SINGLE, [])
-                            remote exchange (REPARTITION, HASH, ["d_year_57", "ws_bill_customer_sk", "ws_item_sk"])
-                                partial hashaggregation over (d_year_57, ws_bill_customer_sk, ws_item_sk)
+                            remote exchange (REPARTITION, HASH, ["d_year_45", "ws_bill_customer_sk", "ws_item_sk"])
+                                partial hashaggregation over (d_year_45, ws_bill_customer_sk, ws_item_sk)
                                     join (INNER, REPLICATED):
                                         join (LEFT, REPLICATED):
                                             scan web_sales
@@ -31,10 +31,10 @@ local exchange (GATHER, SINGLE, [])
                                                 ReuseTableScan date_dim (Consumer)
             local exchange (GATHER, SINGLE, [])
                 remote exchange (REPARTITION, HASH, ["cs_bill_customer_sk"])
-                    final hashaggregation over (cs_bill_customer_sk, cs_item_sk, d_year_137)
+                    final hashaggregation over (cs_bill_customer_sk, cs_item_sk, d_year_113)
                         local exchange (GATHER, SINGLE, [])
-                            remote exchange (REPARTITION, HASH, ["cs_bill_customer_sk", "cs_item_sk", "d_year_137"])
-                                partial hashaggregation over (cs_bill_customer_sk, cs_item_sk, d_year_137)
+                            remote exchange (REPARTITION, HASH, ["cs_bill_customer_sk", "cs_item_sk", "d_year_113"])
+                                partial hashaggregation over (cs_bill_customer_sk, cs_item_sk, d_year_113)
                                     join (INNER, REPLICATED):
                                         join (LEFT, REPLICATED):
                                             scan catalog_sales

@@ -30,7 +30,7 @@ final hashaggregation over ()
                                 join (INNER, PARTITIONED):
                                     remote exchange (REPARTITION, HASH, ["wr_order_number"])
                                         scan web_returns
-                                    single hashaggregation over (ws_order_number_107)
+                                    single hashaggregation over (ws_order_number_99)
                                         local exchange (GATHER, SINGLE, [])
-                                            remote exchange (REPARTITION, HASH, ["ws_order_number_107"])
+                                            remote exchange (REPARTITION, HASH, ["ws_order_number_99"])
                                                 scan web_sales

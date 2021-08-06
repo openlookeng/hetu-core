@@ -149,7 +149,8 @@ public class TestFeaturesConfig
                 .setListBuiltInFunctionsOnly(true)
                 .setSortBasedAggregationEnabled(false)
                 .setPrcntDriversForPartialAggr(5)
-                .setSkipAttachingStatsWithPlan(true));
+                .setSkipAttachingStatsWithPlan(true)
+                .setSkipNonApplicableRulesEnabled(false));
     }
 
     @Test
@@ -251,6 +252,7 @@ public class TestFeaturesConfig
                 .put("optimizer.sort-based-aggregation-enabled", "true")
                 .put("sort.prcnt-drivers-for-partial-aggr", "55")
                 .put("optimizer.skip-attaching-stats-with-plan", "false")
+                .put("optimizer.skip-non-applicable-rules-enabled", "true")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -349,7 +351,8 @@ public class TestFeaturesConfig
                 .setListBuiltInFunctionsOnly(false)
                 .setSortBasedAggregationEnabled(true)
                 .setPrcntDriversForPartialAggr(55)
-                .setSkipAttachingStatsWithPlan(false);
+                .setSkipAttachingStatsWithPlan(false)
+                .setSkipNonApplicableRulesEnabled(true);
 
         assertFullMapping(properties, expected);
     }

@@ -171,6 +171,7 @@ public class FeaturesConfig
     private boolean sortBasedAggregationEnabled;
     private int prcntDriversForPartialAggr = 5;
     private boolean skipAttachingStatsWithPlan = true;
+    private boolean skipNonApplicableRulesEnabled;
 
     public enum JoinReorderingStrategy
     {
@@ -1386,6 +1387,18 @@ public class FeaturesConfig
     public FeaturesConfig setSkipAttachingStatsWithPlan(boolean skipAttachingStatsWithPlan)
     {
         this.skipAttachingStatsWithPlan = skipAttachingStatsWithPlan;
+        return this;
+    }
+
+    public boolean isSkipNonApplicableRulesEnabled()
+    {
+        return skipNonApplicableRulesEnabled;
+    }
+
+    @Config("optimizer.skip-non-applicable-rules-enabled")
+    public FeaturesConfig setSkipNonApplicableRulesEnabled(boolean skipNonApplicableRulesEnabled)
+    {
+        this.skipNonApplicableRulesEnabled = skipNonApplicableRulesEnabled;
         return this;
     }
 }

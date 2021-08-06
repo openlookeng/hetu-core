@@ -19,10 +19,10 @@ local exchange (GATHER, SINGLE, [])
                                                     local exchange (GATHER, SINGLE, [])
                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                             scan store
-                                final hashaggregation over (s_store_sk_50)
+                                final hashaggregation over (s_store_sk_44)
                                     local exchange (GATHER, SINGLE, [])
-                                        remote exchange (REPARTITION, HASH, ["s_store_sk_50"])
-                                            partial hashaggregation over (s_store_sk_50)
+                                        remote exchange (REPARTITION, HASH, ["s_store_sk_44"])
+                                            partial hashaggregation over (s_store_sk_44)
                                                 join (INNER, REPLICATED):
                                                     join (INNER, REPLICATED):
                                                         scan store_returns
@@ -67,10 +67,10 @@ local exchange (GATHER, SINGLE, [])
                                                     local exchange (GATHER, SINGLE, [])
                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                             scan web_page
-                                final hashaggregation over (wp_web_page_sk_312)
+                                final hashaggregation over (wp_web_page_sk_272)
                                     local exchange (GATHER, SINGLE, [])
-                                        remote exchange (REPARTITION, HASH, ["wp_web_page_sk_312"])
-                                            partial hashaggregation over (wp_web_page_sk_312)
+                                        remote exchange (REPARTITION, HASH, ["wp_web_page_sk_272"])
+                                            partial hashaggregation over (wp_web_page_sk_272)
                                                 join (INNER, REPLICATED):
                                                     join (INNER, REPLICATED):
                                                         scan web_returns

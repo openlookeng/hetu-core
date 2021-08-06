@@ -16,23 +16,23 @@ remote exchange (GATHER, SINGLE, [])
                                             remote exchange (REPARTITION, HASH, ["cs_sold_date_sk"])
                                                 scan catalog_sales
                     local exchange (GATHER, SINGLE, [])
-                        remote exchange (REPARTITION, HASH, ["d_week_seq_85"])
+                        remote exchange (REPARTITION, HASH, ["d_week_seq_57"])
                             scan date_dim (pushdown = true)
                 local exchange (GATHER, SINGLE, [])
                     remote exchange (REPARTITION, HASH, ["subtract"])
                         join (INNER, PARTITIONED):
-                            final hashaggregation over (d_week_seq_237)
+                            final hashaggregation over (d_week_seq_181)
                                 local exchange (GATHER, SINGLE, [])
-                                    remote exchange (REPARTITION, HASH, ["d_week_seq_237"])
-                                        partial hashaggregation over (d_week_seq_237)
+                                    remote exchange (REPARTITION, HASH, ["d_week_seq_181"])
+                                        partial hashaggregation over (d_week_seq_181)
                                             join (INNER, PARTITIONED):
-                                                remote exchange (REPARTITION, HASH, ["d_date_sk_233"])
+                                                remote exchange (REPARTITION, HASH, ["d_date_sk_177"])
                                                     scan date_dim
                                                 local exchange (GATHER, SINGLE, [])
-                                                    remote exchange (REPARTITION, HASH, ["ws_sold_date_sk_135"])
+                                                    remote exchange (REPARTITION, HASH, ["ws_sold_date_sk_91"])
                                                         scan web_sales
-                                                    remote exchange (REPARTITION, HASH, ["cs_sold_date_sk_182"])
+                                                    remote exchange (REPARTITION, HASH, ["cs_sold_date_sk_132"])
                                                         scan catalog_sales
                             local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPARTITION, HASH, ["d_week_seq_322"])
+                                remote exchange (REPARTITION, HASH, ["d_week_seq_250"])
                                     scan date_dim (pushdown = true)
