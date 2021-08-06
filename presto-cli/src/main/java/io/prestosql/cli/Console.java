@@ -141,18 +141,6 @@ public class Console
                 Optional.ofNullable(clientOptions.krb5CredentialCachePath),
                 !clientOptions.krb5DisableRemoteServiceHostnameCanonicalization)) {
             if (hasQuery) {
-                if (createCubePattern.matcher(query).matches()) {
-                    CubeConsole cubeConsole = new CubeConsole(this);
-                    queryRunner.setCubeConsole(cubeConsole);
-                    return cubeConsole.executeCubeCommand(
-                            queryRunner,
-                            exiting,
-                            query,
-                            clientOptions.outputFormat,
-                            clientOptions.ignoreErrors,
-                            clientOptions.progress);
-                }
-
                 return executeCommand(
                         queryRunner,
                         exiting,
@@ -310,11 +298,25 @@ public class Console
             if (!isEmptyStatement(split.statement())) {
                 try (Terminal terminal = terminal()) {
                     String statement = split.statement();
-                    if (!process(queryRunner, split.statement(), outputFormat, () -> {}, false, showProgress, terminal, System.out, System.err)) {
-                        if (!ignoreErrors) {
-                            return false;
+                    CubeConsole cubeConsole = new CubeConsole(this);
+                    queryRunner.setCubeConsole(cubeConsole);
+                    if (createCubePattern.matcher(statement).matches()) {
+                        PrintStream out = System.out;
+                        PrintStream errorChannel = System.out;
+                        if (!cubeConsole.createCubeCommand(statement, queryRunner, ClientOptions.OutputFormat.NULL, () -> {}, false, showProgress, terminal, out, errorChannel)) {
+                            if (!ignoreErrors) {
+                                return false;
+                            }
+                            success = false;
                         }
-                        success = false;
+                    }
+                    else {
+                        if (!process(queryRunner, statement, outputFormat, () -> {}, false, showProgress, terminal, System.out, System.err)) {
+                            if (!ignoreErrors) {
+                                return false;
+                            }
+                            success = false;
+                        }
                     }
                 }
                 catch (IOException e) {
