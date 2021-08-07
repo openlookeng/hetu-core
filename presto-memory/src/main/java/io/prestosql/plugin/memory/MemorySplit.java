@@ -30,7 +30,7 @@ public class MemorySplit
         implements ConnectorSplit
 {
     private final long table;
-    private final int lpNum; // the order of the logicalPart (equivalent to a split) in each node, starting from 0 (1 split, 0 is the available index)
+    private final int logicalPartNum; // the order of the logicalPart (equivalent to a split) in each node, starting from 0 (1 split, 0 is the available index)
     private final HostAddress address;
     private final long expectedRows;
     private final OptionalLong limit;
@@ -38,15 +38,15 @@ public class MemorySplit
     @JsonCreator
     public MemorySplit(
             @JsonProperty("table") long table,
-            @JsonProperty("lpNum") int lpNum,
+            @JsonProperty("logicalPartNum") int logicalPartNum,
             @JsonProperty("address") HostAddress address,
             @JsonProperty("expectedRows") long expectedRows,
             @JsonProperty("limit") OptionalLong limit)
     {
-        checkState(lpNum >= 0, "lpCount must be >= 0");
+        checkState(logicalPartNum > 0, "logicalPartNum be > 0");
 
         this.table = requireNonNull(table, "table is null");
-        this.lpNum = lpNum;
+        this.logicalPartNum = logicalPartNum;
         this.address = requireNonNull(address, "address is null");
         this.expectedRows = expectedRows;
         this.limit = limit;
@@ -59,9 +59,9 @@ public class MemorySplit
     }
 
     @JsonProperty
-    public int getLogicalPartNumber()
+    public int getLogicalPartNum()
     {
-        return lpNum;
+        return logicalPartNum;
     }
 
     @Override
@@ -111,13 +111,13 @@ public class MemorySplit
         }
         MemorySplit other = (MemorySplit) obj;
         return Objects.equals(this.table, other.table) &&
-                Objects.equals(this.lpNum, other.lpNum);
+                Objects.equals(this.logicalPartNum, other.logicalPartNum);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(table, lpNum);
+        return Objects.hash(table, logicalPartNum);
     }
 
     @Override
@@ -125,7 +125,7 @@ public class MemorySplit
     {
         return "MemorySplit{" +
                 "table=" + table +
-                ", logicalPart number=" + lpNum +
+                ", logicalPart number=" + logicalPartNum +
                 '}';
     }
 }

@@ -158,8 +158,8 @@ public class MemoryPageSinkProvider
         public CompletableFuture<Collection<Slice>> finish()
         {
             tablesManager.finishUpdatingTable(tableId);
-            int lpCount = tablesManager.getTableLpCount(tableId);
-            return completedFuture(ImmutableList.of(new MemoryDataFragment(currentHostAddress, addedRows, lpCount).toSlice()));
+            int logicalPartCount = tablesManager.getTableLpCount(tableId);
+            return completedFuture(ImmutableList.of(new MemoryDataFragment(currentHostAddress, addedRows, logicalPartCount).toSlice()));
         }
 
         @Override

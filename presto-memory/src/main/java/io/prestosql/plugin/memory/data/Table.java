@@ -176,7 +176,7 @@ public class Table
     public void add(Page page)
     {
         if (logicalParts.isEmpty() || !logicalParts.get(logicalParts.size() - 1).canAdd()) {
-            this.logicalParts.add(new LogicalPart(columns, sortedBy, indexColumns, tableDataRoot, pageSorter, maxLogicalPartBytes, maxPageSizeBytes, typeManager, pagesSerde, logicalParts.size(), compressionEnabled));
+            this.logicalParts.add(new LogicalPart(columns, sortedBy, indexColumns, tableDataRoot, pageSorter, maxLogicalPartBytes, maxPageSizeBytes, typeManager, pagesSerde, logicalParts.size() + 1, compressionEnabled));
         }
         logicalParts.get(logicalParts.size() - 1).add(page);
         byteSize += page.getSizeInBytes();
@@ -238,24 +238,32 @@ public class Table
         tableState = state;
     }
 
-    protected List<Page> getPages(int lpNum)
+    protected List<Page> getPages(int logicalPartNum)
     {
         List<Page> list = new ArrayList<>();
         if (!logicalParts.isEmpty()) {
-            list.addAll(logicalParts.get(lpNum).getPages());
+            for (LogicalPart logicalPart : logicalParts) {
+                if (logicalPart.getLogicalPartNum() == logicalPartNum) {
+                    list.addAll(logicalPart.getPages());
+                }
+            }
         }
         return list;
     }
 
-    protected List<Page> getPages(int lpNum, TupleDomain<ColumnHandle> predicate)
+    protected List<Page> getPages(int logicalPartNum, TupleDomain<ColumnHandle> predicate)
     {
         if (predicate.isAll()) {
-            return getPages(lpNum);
+            return getPages(logicalPartNum);
         }
 
         List<Page> list = new ArrayList<>();
         if (!logicalParts.isEmpty()) {
-            list.addAll(logicalParts.get(lpNum).getPages(predicate));
+            for (LogicalPart logicalPart : logicalParts) {
+                if (logicalPart.getLogicalPartNum() == logicalPartNum) {
+                    list.addAll(logicalPart.getPages(predicate));
+                }
+            }
         }
         return list;
     }
@@ -271,6 +279,6 @@ public class Table
 
     protected int getLogicalPartCount()
     {
-        return logicalParts.size() - 1;
+        return logicalParts.size();
     }
 }
