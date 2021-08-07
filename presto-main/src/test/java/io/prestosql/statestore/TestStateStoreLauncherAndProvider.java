@@ -26,6 +26,7 @@ import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.server.InternalCommunicationConfig;
 import io.prestosql.spi.seedstore.Seed;
 import io.prestosql.spi.seedstore.SeedStore;
+import io.prestosql.spi.seedstore.SeedStoreSubType;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.statestore.StateStoreBootstrapper;
 import io.prestosql.spi.statestore.StateStoreFactory;
@@ -109,7 +110,7 @@ public class TestStateStoreLauncherAndProvider
         seeds.add(mockSeed);
 
         SeedStoreManager mockSeedStoreManager = mock(SeedStoreManager.class);
-        when(mockSeedStoreManager.getSeedStore()).thenReturn(mockSeedStore);
+        when(mockSeedStoreManager.getSeedStore(SeedStoreSubType.HAZELCAST)).thenReturn(mockSeedStore);
 
         when(mockSeed.getLocation()).thenReturn(LOCALHOST + ":" + PORT3);
         when(mockSeedStore.get()).thenReturn(seeds);
@@ -136,8 +137,8 @@ public class TestStateStoreLauncherAndProvider
         when(mockSeedStore.get()).thenReturn(seeds);
 
         SeedStoreManager mockSeedStoreManager = mock(SeedStoreManager.class);
-        when(mockSeedStoreManager.getSeedStore()).thenReturn(mockSeedStore);
-        when(mockSeedStoreManager.addSeed(LOCALHOST, true)).thenReturn(seeds);
+        when(mockSeedStoreManager.getSeedStore(SeedStoreSubType.HAZELCAST)).thenReturn(mockSeedStore);
+        when(mockSeedStoreManager.addSeed(SeedStoreSubType.HAZELCAST, LOCALHOST, true)).thenReturn(seeds);
         when(mockSeedStoreManager.getFileSystemClient()).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/")));
 
         InternalCommunicationConfig mockInternalCommunicationConfig = mock(InternalCommunicationConfig.class);
@@ -157,7 +158,7 @@ public class TestStateStoreLauncherAndProvider
         // mock "remove" second instance from cluster (delete from seed store)
         seeds.remove(mockSeed2);
         when(mockSeed1.getLocation()).thenReturn(LOCALHOST + ":" + PORT1);
-        when(mockSeedStoreManager.addSeed(LOCALHOST, true)).thenReturn(seeds);
+        when(mockSeedStoreManager.addSeed(SeedStoreSubType.HAZELCAST, LOCALHOST, true)).thenReturn(seeds);
 
         ((HazelcastStateStore) second).shutdown();
         // Allow the first node to handle failure

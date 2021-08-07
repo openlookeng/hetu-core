@@ -26,13 +26,16 @@ import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.seedstore.Seed;
 import io.prestosql.spi.seedstore.SeedStore;
 import io.prestosql.spi.seedstore.SeedStoreFactory;
+import io.prestosql.spi.seedstore.SeedStoreSubType;
 import io.prestosql.statestore.StateStoreConstants;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.InvalidParameterException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -49,6 +52,7 @@ import static io.prestosql.spi.StandardErrorCode.SEED_STORE_FAILURE;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
+import static java.util.stream.Collectors.toCollection;
 
 /**
  * SeedStoreManager manages the lifecycle of SeedStores
@@ -58,31 +62,43 @@ import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 public class SeedStoreManager
 {
     private static final Logger LOG = Logger.get(SeedStoreManager.class);
-    // properties name
+
+    // configuration files
     private static final File SEED_STORE_CONFIGURATION = new File("etc/seed-store.properties");
     private static final File STATE_STORE_CONFIGURATION = new File("etc/state-store.properties");
+    // properties name
+    private static final String SEED_STORE_ON_YARN_PROPERTY_NAME = "seed-store.on-yarn";
     private static final String SEED_STORE_TYPE_PROPERTY_NAME = "seed-store.type";
+    private static final String SEED_STORE_CLUSTER_PROPERTY_NAME = "seed-store.cluster";
     private static final String SEED_STORE_SEED_HEARTBEAT_PROPERTY_NAME = "seed-store.seed.heartbeat";
     private static final String SEED_STORE_SEED_HEARTBEAT_TIMEOUT_PROPERTY_NAME = "seed-store.seed.heartbeat.timeout";
     private static final String SEED_STORE_FILESYSTEM_PROFILE = "seed-store.filesystem.profile";
     // properties default value
+    private static final boolean SEED_STORE_ON_YARN_ENABLED_DEFAULT_VALUE = false;
     private static final String SEED_STORE_TYPE_DEFAULT_VALUE = "filebased";
-    private static final String SEED_STORE_SEED_HEARTBEAT_DEFAULT_VALUE = "10000"; // 10 seconds
-    private static final String SEED_STORE_SEED_HEARTBEAT_TIMEOUT_DEFAULT_VALUE = "60000"; // 60 seconds
+    private static final String SEED_STORE_CLUSTER_DEFAULT_VALUE = "olk_default";
+    private static final long SEED_STORE_SEED_HEARTBEAT_DEFAULT_VALUE = 10000; // 10 seconds
+    private static final long SEED_STORE_SEED_HEARTBEAT_TIMEOUT_DEFAULT_VALUE = 60000; // 60 seconds
     private static final String SEED_STORE_FILESYSTEM_PROFILE_DEFAULT_VALUE = "hdfs-config-default";
     private static final int SEED_RETRY_TIMES = 5;
     private static final long SEED_RETRY_INTERVAL = 500L;
 
     private final Map<String, SeedStoreFactory> seedStoreFactories = new ConcurrentHashMap<>();
     private final FileSystemClientManager fileSystemClientManager;
-    private ScheduledExecutorService seedRefreshExecutor = newSingleThreadScheduledExecutor(daemonThreadsNamed("SeedRefresher"));
-    private SeedStore seedStore;
-    private String seedStoreType;
-    private String filesystemProfile;
     private HetuFileSystemClient fileSystemClient;
+    private ScheduledExecutorService seedRefreshExecutor = newSingleThreadScheduledExecutor(daemonThreadsNamed("SeedRefresher"));
+
+    private String seedStoreType;
+    private String clusterName;
+    private String filesystemProfile;
+    private boolean isSeedStoreOnYarnEnabled;
     private long seedHeartBeat;
     private long seedHeartBeatTimeout;
-    private boolean isSeedStoreEnabled;
+    private boolean isSeedStoreHazelcastEnabled;
+
+    private SeedStore seedStoreOnYarn;
+    private SeedStore seedStoreHazelcast;
+
     private ConcurrentHashMap<String, Seed> refreshableSeedsMap = new ConcurrentHashMap<>();
 
     @Inject
@@ -111,26 +127,90 @@ public class SeedStoreManager
     public void loadSeedStore()
             throws IOException
     {
-        // load configuration
-        Map<String, String> config = loadConfiguration(STATE_STORE_CONFIGURATION, SEED_STORE_CONFIGURATION);
+        // initialize variables
+        isSeedStoreOnYarnEnabled = SEED_STORE_ON_YARN_ENABLED_DEFAULT_VALUE;
+        seedStoreType = SEED_STORE_TYPE_DEFAULT_VALUE;
+        clusterName = SEED_STORE_CLUSTER_DEFAULT_VALUE;
+        filesystemProfile = SEED_STORE_FILESYSTEM_PROFILE_DEFAULT_VALUE;
+        seedHeartBeat = SEED_STORE_SEED_HEARTBEAT_DEFAULT_VALUE;
+        seedHeartBeatTimeout = SEED_STORE_SEED_HEARTBEAT_TIMEOUT_DEFAULT_VALUE;
 
-        if (isSeedStoreEnabled) {
-            LOG.info("-- Loading seed store --");
-            // create seed store
-            SeedStoreFactory seedStoreFactory = seedStoreFactories.get(seedStoreType);
-            checkState(seedStoreFactory != null, "SeedStoreFactory %s is not registered", seedStoreFactory);
-            try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(seedStoreFactory.getClass().getClassLoader())) {
-                fileSystemClient = fileSystemClientManager.getFileSystemClient(filesystemProfile, Paths.get("/"));
-                seedStore = seedStoreFactory.create(seedStoreType,
-                        fileSystemClient,
-                        ImmutableMap.copyOf(config));
+        Map<String, String> config = new HashMap<>();
+        // load seed store configuration
+        if (SEED_STORE_CONFIGURATION.exists()) {
+            Map<String, String> seedStoreProperties = new HashMap<>(loadPropertiesFrom(SEED_STORE_CONFIGURATION.getPath()));
+            String propertyValue = seedStoreProperties.get(SEED_STORE_ON_YARN_PROPERTY_NAME);
+            if (propertyValue != null) {
+                isSeedStoreOnYarnEnabled = Boolean.parseBoolean(propertyValue);
             }
-            try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(seedStore.getClass().getClassLoader())) {
-                // start seed refresher
-                seedRefreshExecutor.scheduleWithFixedDelay(() -> refreshSeeds(), 0, seedHeartBeat, TimeUnit.MILLISECONDS);
+            seedStoreType = seedStoreProperties.getOrDefault(SEED_STORE_TYPE_PROPERTY_NAME, seedStoreType);
+            clusterName = seedStoreProperties.getOrDefault(SEED_STORE_CLUSTER_PROPERTY_NAME, clusterName);
+            filesystemProfile = seedStoreProperties.getOrDefault(SEED_STORE_FILESYSTEM_PROFILE, filesystemProfile);
+            propertyValue = seedStoreProperties.get(SEED_STORE_SEED_HEARTBEAT_PROPERTY_NAME);
+            if (propertyValue != null) {
+                seedHeartBeat = Long.parseLong(propertyValue);
             }
-            LOG.info("-- Loaded seed store %s --", seedStoreType);
+            propertyValue = seedStoreProperties.get(SEED_STORE_SEED_HEARTBEAT_TIMEOUT_PROPERTY_NAME);
+            if (propertyValue != null) {
+                seedHeartBeatTimeout = Long.parseLong(propertyValue);
+            }
+            if (seedHeartBeat > seedHeartBeatTimeout) {
+                throw new InvalidParameterException(format("The value of %s cannot be greater than the value of %s in the property file",
+                        SEED_STORE_SEED_HEARTBEAT_PROPERTY_NAME, SEED_STORE_SEED_HEARTBEAT_TIMEOUT_PROPERTY_NAME));
+            }
+            config.putAll(seedStoreProperties);
+            if (isSeedStoreOnYarnEnabled) {
+                // create seed store
+                SeedStoreFactory seedStoreFactory = seedStoreFactories.get(seedStoreType);
+                checkState(seedStoreFactory != null, "SeedStoreFactory %s is not registered", seedStoreFactory);
+                if (fileSystemClient == null) {
+                    fileSystemClient = fileSystemClientManager.getFileSystemClient(filesystemProfile, Paths.get("/"));
+                }
+                LOG.info("-- Loading seed store on-yarn --");
+                try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(seedStoreFactory.getClass().getClassLoader())) {
+                    seedStoreOnYarn = seedStoreFactory.create(clusterName,
+                            SeedStoreSubType.ON_YARN,
+                            fileSystemClient,
+                            ImmutableMap.copyOf(config));
+                }
+            }
         }
+        // load state store config if exist
+        if (STATE_STORE_CONFIGURATION.exists()) {
+            Map<String, String> stateStoreProperties = new HashMap<>(loadPropertiesFrom(STATE_STORE_CONFIGURATION.getPath()));
+            // for now, seed store is started only if tcp-ip mode enabled and tcp-ip.seeds is not set
+            String discoveryMode = stateStoreProperties.get(StateStoreConstants.DISCOVERY_MODE_PROPERTY_NAME);
+            isSeedStoreHazelcastEnabled = discoveryMode != null && discoveryMode.equals(StateStoreConstants.DISCOVERY_MODE_TCPIP)
+                    && stateStoreProperties.get(StateStoreConstants.HAZELCAST_DISCOVERY_TCPIP_SEEDS) == null;
+            if (isSeedStoreHazelcastEnabled) {
+                // create seed store
+                SeedStoreFactory seedStoreFactory = seedStoreFactories.get(seedStoreType);
+                checkState(seedStoreFactory != null, "SeedStoreFactory %s is not registered", seedStoreFactory);
+                if (fileSystemClient == null) {
+                    String stateStoreFilesystemProfile = stateStoreProperties.getOrDefault(StateStoreConstants.HAZELCAST_DISCOVERY_TCPIP_PROFILE, filesystemProfile);
+                    fileSystemClient = fileSystemClientManager.getFileSystemClient(stateStoreFilesystemProfile, Paths.get("/"));
+                }
+                LOG.info("-- Loading seed store hazelcast --");
+                try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(seedStoreFactory.getClass().getClassLoader())) {
+                    seedStoreHazelcast = seedStoreFactory.create(clusterName,
+                            SeedStoreSubType.HAZELCAST,
+                            fileSystemClient,
+                            ImmutableMap.copyOf(config));
+                }
+                try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(seedStoreHazelcast.getClass().getClassLoader())) {
+                    // start seed refresher
+                    seedRefreshExecutor.scheduleWithFixedDelay(() -> refreshSeeds(SeedStoreSubType.HAZELCAST), 0, seedHeartBeat, TimeUnit.MILLISECONDS);
+                }
+            }
+        }
+    }
+
+    /**
+     * Check if seed-store on-YARN is enabled
+     */
+    public boolean isSeedStoreOnYarnEnabled()
+    {
+        return isSeedStoreOnYarnEnabled;
     }
 
     /**
@@ -148,9 +228,10 @@ public class SeedStoreManager
      * @return a collection of seeds in the seed store
      * @throws IOException
      */
-    public Collection<Seed> getAllSeeds()
+    public Collection<Seed> getAllSeeds(SeedStoreSubType subType)
             throws IOException
     {
+        SeedStore seedStore = getSeedStore(subType);
         if (seedStore == null) {
             throw new PrestoException(SEED_STORE_FAILURE, "Seed store is null");
         }
@@ -161,6 +242,43 @@ public class SeedStoreManager
     }
 
     /**
+     * Get all seeds from seed store
+     *
+     * @return the latest seed location in the seed store - https or http
+     * @throws IOException
+     */
+    public String getLatestSeedLocation(SeedStoreSubType subType, boolean httpsRequired)
+            throws IOException
+    {
+        SeedStore seedStore = getSeedStore(subType);
+        if (seedStore == null) {
+            throw new PrestoException(SEED_STORE_FAILURE, "Seed store is null");
+        }
+
+        Collection<Seed> seeds = seedStore.get();
+        if (seeds.isEmpty()) {
+            return null;
+        }
+        ArrayList<Seed> list = seeds.stream()
+                .filter(seed -> {
+                    if (httpsRequired) {
+                        return seed.getLocation().contains("https:");
+                    }
+                    else {
+                        return seed.getLocation().contains("http:");
+                    }
+                })
+                .sorted(Comparator.comparing(Seed::getTimestamp))
+                .collect(toCollection(ArrayList::new));
+        if (list.isEmpty()) {
+            return null;
+        }
+        else {
+            return list.get(list.size() - 1).getLocation();
+        }
+    }
+
+    /**
      * Add seed to seed store. If refreshable is enabled, seed will be refreshed periodically
      *
      * @param refreshable
@@ -168,11 +286,12 @@ public class SeedStoreManager
      * @throws IOException
      */
 
-    public Collection<Seed> addSeed(String seedLocation, boolean refreshable)
+    public Collection<Seed> addSeed(SeedStoreSubType subType, String seedLocation, boolean refreshable)
             throws IOException
     {
         Collection<Seed> seeds = new HashSet<>();
 
+        SeedStore seedStore = getSeedStore(subType);
         if (seedStore == null) {
             throw new PrestoException(SEED_STORE_FAILURE, "Seed store is null");
         }
@@ -180,7 +299,7 @@ public class SeedStoreManager
         Seed seed = seedStore.create(ImmutableMap.of(
                 Seed.LOCATION_PROPERTY_NAME, seedLocation,
                 Seed.TIMESTAMP_PROPERTY_NAME, String.valueOf(System.currentTimeMillis())));
-        seeds = addSeed(seed);
+        seeds = addSeed(subType, seed);
 
         if (refreshable) {
             refreshableSeedsMap.put(seedLocation, seed);
@@ -198,11 +317,12 @@ public class SeedStoreManager
      * @throws IOException
      */
 
-    public Collection<Seed> removeSeed(String seedLocation)
+    public Collection<Seed> removeSeed(SeedStoreSubType subType, String seedLocation)
             throws IOException
     {
         Collection<Seed> seeds = new HashSet<>();
 
+        SeedStore seedStore = getSeedStore(subType);
         if (seedStore == null) {
             throw new PrestoException(SEED_STORE_FAILURE, "Seed store is null");
         }
@@ -223,9 +343,10 @@ public class SeedStoreManager
      *
      * @throws IOException
      */
-    public void clearExpiredSeeds()
+    public void clearExpiredSeeds(SeedStoreSubType subType)
             throws IOException
     {
+        SeedStore seedStore = getSeedStore(subType);
         if (seedStore == null) {
             throw new PrestoException(SEED_STORE_FAILURE, "Seed store is null");
         }
@@ -244,13 +365,17 @@ public class SeedStoreManager
         }
     }
 
-    private Collection<Seed> addSeed(Seed seed)
+    private Collection<Seed> addSeed(SeedStoreSubType subType, Seed seed)
             throws IOException
     {
         int retryTimes = 0;
         long retryInterval = 0L;
         Collection<Seed> seeds = null;
 
+        SeedStore seedStore = getSeedStore(subType);
+        if (seedStore == null) {
+            throw new PrestoException(SEED_STORE_FAILURE, "Seed store is null");
+        }
         do {
             try {
                 TimeUnit.MILLISECONDS.sleep(retryInterval);
@@ -280,9 +405,14 @@ public class SeedStoreManager
      *
      * Set the local SeedStore
      * */
-    public void setSeedStore(SeedStore seedStore)
+    public void setSeedStore(SeedStoreSubType subType, SeedStore seedStore)
     {
-        this.seedStore = seedStore;
+        if (subType == SeedStoreSubType.ON_YARN) {
+            seedStoreOnYarn = seedStore;
+        }
+        else {
+            seedStoreHazelcast = seedStore;
+        }
     }
 
     /**
@@ -290,13 +420,18 @@ public class SeedStoreManager
      *
      * @return loaded SeedStore or null if it's not loaded
      */
-    public SeedStore getSeedStore()
+    public SeedStore getSeedStore(SeedStoreSubType subType)
     {
+        SeedStore seedStore = (subType == SeedStoreSubType.ON_YARN) ? seedStoreOnYarn : seedStoreHazelcast;
         return seedStore;
     }
 
-    private void refreshSeeds()
+    private void refreshSeeds(SeedStoreSubType subType)
     {
+        SeedStore seedStore = getSeedStore(subType);
+        if (seedStore == null) {
+            throw new PrestoException(SEED_STORE_FAILURE, "Seed store is null");
+        }
         for (Map.Entry<String, Seed> entry : refreshableSeedsMap.entrySet()) {
             long newTime = System.currentTimeMillis();
             LOG.debug("seed=%s refresh with oldTimestamp=%s and newTimestamp=%s", entry.getKey(), entry.getValue().getTimestamp(), newTime);
@@ -313,46 +448,5 @@ public class SeedStoreManager
                 continue;
             }
         }
-    }
-
-    private Map<String, String> loadConfiguration(File stateStoreConfig, File seedStoreConfig)
-            throws IOException
-    {
-        Map<String, String> properties = new HashMap<>();
-
-        // initialize variables
-        seedStoreType = SEED_STORE_TYPE_DEFAULT_VALUE;
-        filesystemProfile = SEED_STORE_FILESYSTEM_PROFILE_DEFAULT_VALUE;
-        seedHeartBeat = Long.parseLong(SEED_STORE_SEED_HEARTBEAT_DEFAULT_VALUE);
-        seedHeartBeatTimeout = Long.parseLong(SEED_STORE_SEED_HEARTBEAT_TIMEOUT_DEFAULT_VALUE);
-
-        // load state store config if exist
-        if (stateStoreConfig.exists()) {
-            Map<String, String> stateStoreProperties = new HashMap<>(loadPropertiesFrom(stateStoreConfig.getPath()));
-            filesystemProfile = stateStoreProperties.getOrDefault(StateStoreConstants.HAZELCAST_DISCOVERY_TCPIP_PROFILE, filesystemProfile);
-            // for now, seed store is started only if tcp-ip mode enabled and tcp-ip.seeds is not set
-            String discoveryMode = stateStoreProperties.get(StateStoreConstants.DISCOVERY_MODE_PROPERTY_NAME);
-            isSeedStoreEnabled = discoveryMode != null && discoveryMode.equals(StateStoreConstants.DISCOVERY_MODE_TCPIP)
-                    && stateStoreProperties.get(StateStoreConstants.HAZELCAST_DISCOVERY_TCPIP_SEEDS) == null;
-        }
-
-        // load seed store config if exist
-        if (seedStoreConfig.exists()) {
-            Map<String, String> seedStoreProperties = new HashMap<>(loadPropertiesFrom(seedStoreConfig.getPath()));
-            properties.putAll(seedStoreProperties);
-            seedStoreType = properties.getOrDefault(SEED_STORE_TYPE_PROPERTY_NAME, seedStoreType);
-            filesystemProfile = properties.getOrDefault(SEED_STORE_FILESYSTEM_PROFILE, filesystemProfile);
-            if (properties.get(SEED_STORE_SEED_HEARTBEAT_PROPERTY_NAME) != null) {
-                seedHeartBeat = Long.parseLong(properties.get(SEED_STORE_SEED_HEARTBEAT_PROPERTY_NAME));
-            }
-            if (properties.get(SEED_STORE_SEED_HEARTBEAT_TIMEOUT_PROPERTY_NAME) != null) {
-                seedHeartBeatTimeout = Long.parseLong(properties.get(SEED_STORE_SEED_HEARTBEAT_TIMEOUT_PROPERTY_NAME));
-            }
-            if (seedHeartBeat > seedHeartBeatTimeout) {
-                throw new InvalidParameterException(format("The value of %s cannot be greater than the value of %s in the property file",
-                        SEED_STORE_SEED_HEARTBEAT_PROPERTY_NAME, SEED_STORE_SEED_HEARTBEAT_TIMEOUT_PROPERTY_NAME));
-            }
-        }
-        return properties;
     }
 }

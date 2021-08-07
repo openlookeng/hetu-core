@@ -40,6 +40,7 @@ import io.prestosql.spi.metastore.model.TableEntity;
 import io.prestosql.spi.metastore.model.TableEntityType;
 import io.prestosql.spi.seedstore.Seed;
 import io.prestosql.spi.seedstore.SeedStore;
+import io.prestosql.spi.seedstore.SeedStoreSubType;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.statestore.StateStoreBootstrapper;
 import io.prestosql.spi.statestore.StateStoreFactory;
@@ -134,7 +135,7 @@ public class TestHetuMetastoreGlobalCache
         seeds.add(mockSeed);
 
         SeedStoreManager mockSeedStoreManager = mock(SeedStoreManager.class);
-        when(mockSeedStoreManager.getSeedStore()).thenReturn(mockSeedStore);
+        when(mockSeedStoreManager.getSeedStore(SeedStoreSubType.HAZELCAST)).thenReturn(mockSeedStore);
 
         when(mockSeed.getLocation()).thenReturn(LOCALHOST + ":" + PORT3);
         when(mockSeedStore.get()).thenReturn(seeds);

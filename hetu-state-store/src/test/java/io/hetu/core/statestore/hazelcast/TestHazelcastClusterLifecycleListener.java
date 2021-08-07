@@ -14,6 +14,7 @@
  */
 package io.hetu.core.statestore.hazelcast;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.spi.seedstore.Seed;
 import io.prestosql.spi.seedstore.SeedStore;
@@ -106,7 +107,7 @@ public class TestHazelcastClusterLifecycleListener
         private static final long serialVersionUID = 4L;
 
         String location;
-        long timeStamp;
+        long timestamp;
 
         /**
          * Constructor for the mock seed
@@ -116,19 +117,35 @@ public class TestHazelcastClusterLifecycleListener
         MockSeed(String location)
         {
             this.location = location;
-            timeStamp = 0L;
+            timestamp = 0L;
         }
 
         @Override
+        @JsonProperty
         public String getLocation()
         {
             return location;
         }
 
         @Override
+        @JsonProperty
+        public void setLocation(String location)
+        {
+            this.location = location;
+        }
+
+        @Override
+        @JsonProperty
         public long getTimestamp()
         {
             return 0L;
+        }
+
+        @Override
+        @JsonProperty
+        public void setTimestamp(long timestamp)
+        {
+            this.timestamp = timestamp;
         }
 
         @Override
@@ -138,9 +155,9 @@ public class TestHazelcastClusterLifecycleListener
             return "MOCK SEED. SHOULD NOT SERIALIZE.";
         }
 
-        public void setTimeStamp(long timeStamp)
+        public void setTimeStamp(long timestamp)
         {
-            this.timeStamp = timeStamp;
+            this.timestamp = timestamp;
         }
     }
 

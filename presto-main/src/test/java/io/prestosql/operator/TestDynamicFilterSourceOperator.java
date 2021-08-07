@@ -35,6 +35,7 @@ import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.seedstore.Seed;
 import io.prestosql.spi.seedstore.SeedStore;
+import io.prestosql.spi.seedstore.SeedStoreSubType;
 import io.prestosql.spi.statestore.StateSet;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.statestore.StateStoreBootstrapper;
@@ -140,7 +141,7 @@ public class TestDynamicFilterSourceOperator
         seeds.add(mockSeed);
 
         SeedStoreManager mockSeedStoreManager = mock(SeedStoreManager.class);
-        when(mockSeedStoreManager.getSeedStore()).thenReturn(mockSeedStore);
+        when(mockSeedStoreManager.getSeedStore(SeedStoreSubType.HAZELCAST)).thenReturn(mockSeedStore);
 
         when(mockSeed.getLocation()).thenReturn("127.0.0.1:6991");
         when(mockSeedStore.get()).thenReturn(seeds);

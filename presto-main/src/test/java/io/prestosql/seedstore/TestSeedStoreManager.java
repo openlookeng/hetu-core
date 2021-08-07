@@ -14,12 +14,14 @@
  */
 package io.prestosql.seedstore;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.seedstore.Seed;
 import io.prestosql.spi.seedstore.SeedStore;
 import io.prestosql.spi.seedstore.SeedStoreFactory;
+import io.prestosql.spi.seedstore.SeedStoreSubType;
 import io.prestosql.testing.assertions.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.BeforeTest;
@@ -90,6 +92,7 @@ public class TestSeedStoreManager
         SeedStoreFactory mockSeedStoreFactory = mock(SeedStoreFactory.class);
         when(mockSeedStoreFactory.getName()).thenReturn("filebased");
         when(mockSeedStoreFactory.create(any(String.class),
+                SeedStoreSubType.HAZELCAST,
                 any(HetuFileSystemClient.class),
                 any(Map.class))).thenReturn(mockSeedStore);
         seedStoreManager.addSeedStoreFactory(mockSeedStoreFactory);
@@ -100,7 +103,7 @@ public class TestSeedStoreManager
             throws IOException
     {
         seedStoreManager.loadSeedStore();
-        SeedStore returned = seedStoreManager.getSeedStore();
+        SeedStore returned = seedStoreManager.getSeedStore(SeedStoreSubType.HAZELCAST);
     }
 
     @Test
@@ -110,9 +113,9 @@ public class TestSeedStoreManager
         String location1 = "location1";
         String location2 = "location2";
         seedStoreManager.loadSeedStore();
-        seedStoreManager.addSeed(location1, false);
-        seedStoreManager.addSeed(location2, true);
-        Collection<Seed> result = seedStoreManager.getAllSeeds();
+        seedStoreManager.addSeed(SeedStoreSubType.HAZELCAST, location1, false);
+        seedStoreManager.addSeed(SeedStoreSubType.HAZELCAST, location2, true);
+        Collection<Seed> result = seedStoreManager.getAllSeeds(SeedStoreSubType.HAZELCAST);
         Assert.assertEquals(result.size(), 2);
         Assert.assertTrue(result.stream().anyMatch(s -> s.getLocation().equals(location1)));
         Assert.assertTrue(result.stream().anyMatch(s -> s.getLocation().equals(location2)));
@@ -121,7 +124,7 @@ public class TestSeedStoreManager
         long timestamp2Old = result.stream().filter(s -> s.getLocation().equals(location2)).findAny().get().getTimestamp();
         //wait 2 seconds, seed2 will be updated with new timestamp
         Thread.sleep(2000);
-        result = seedStoreManager.getAllSeeds();
+        result = seedStoreManager.getAllSeeds(SeedStoreSubType.HAZELCAST);
         long timestamp1New = result.stream().filter(s -> s.getLocation().equals(location1)).findAny().get().getTimestamp();
         long timestamp2New = result.stream().filter(s -> s.getLocation().equals(location2)).findAny().get().getTimestamp();
         Assert.assertTrue(timestamp1Old == timestamp1New);
@@ -136,12 +139,12 @@ public class TestSeedStoreManager
         String location2 = "location2";
         String location3 = "location3";
         seedStoreManager.loadSeedStore();
-        seedStoreManager.addSeed(location1, false);
-        seedStoreManager.addSeed(location2, true);
-        Assert.assertEquals(seedStoreManager.getAllSeeds().size(), 2);
-        seedStoreManager.removeSeed(location1);
-        seedStoreManager.removeSeed(location3);
-        Collection<Seed> result = seedStoreManager.getAllSeeds();
+        seedStoreManager.addSeed(SeedStoreSubType.HAZELCAST, location1, false);
+        seedStoreManager.addSeed(SeedStoreSubType.HAZELCAST, location2, true);
+        Assert.assertEquals(seedStoreManager.getAllSeeds(SeedStoreSubType.HAZELCAST).size(), 2);
+        seedStoreManager.removeSeed(SeedStoreSubType.HAZELCAST, location1);
+        seedStoreManager.removeSeed(SeedStoreSubType.HAZELCAST, location3);
+        Collection<Seed> result = seedStoreManager.getAllSeeds(SeedStoreSubType.HAZELCAST);
         Assert.assertEquals(result.size(), 1);
         Assert.assertFalse(result.stream().filter(s -> s.getLocation().equals(location1)).findAny().isPresent());
     }
@@ -153,13 +156,13 @@ public class TestSeedStoreManager
         String location1 = "location1";
         String location2 = "location2";
         seedStoreManager.loadSeedStore();
-        seedStoreManager.addSeed(location1, false);
-        seedStoreManager.addSeed(location2, true);
-        Assert.assertEquals(seedStoreManager.getAllSeeds().size(), 2);
+        seedStoreManager.addSeed(SeedStoreSubType.HAZELCAST, location1, false);
+        seedStoreManager.addSeed(SeedStoreSubType.HAZELCAST, location2, true);
+        Assert.assertEquals(seedStoreManager.getAllSeeds(SeedStoreSubType.HAZELCAST).size(), 2);
         //wait 5 seconds, location1 expired since refreshable is not enabled
         Thread.sleep(5000);
-        seedStoreManager.clearExpiredSeeds();
-        Collection<Seed> result = seedStoreManager.getAllSeeds();
+        seedStoreManager.clearExpiredSeeds(SeedStoreSubType.HAZELCAST);
+        Collection<Seed> result = seedStoreManager.getAllSeeds(SeedStoreSubType.HAZELCAST);
         Assert.assertEquals(result.size(), 1);
         Assert.assertFalse(result.stream().filter(s -> s.getLocation().equals(location1)).findAny().isPresent());
     }
@@ -188,7 +191,7 @@ public class TestSeedStoreManager
             }};
         createConfigFile("etc/state-store.properties", stateStoreConfigs);
         seedStoreManager.loadSeedStore();
-        Assert.assertNull(seedStoreManager.getSeedStore());
+        Assert.assertNull(seedStoreManager.getSeedStore(SeedStoreSubType.HAZELCAST));
         // reset config files
         prepareConfigFiles();
     }
@@ -231,15 +234,31 @@ public class TestSeedStoreManager
         }
 
         @Override
+        @JsonProperty
         public String getLocation()
         {
             return location;
         }
 
         @Override
+        @JsonProperty
+        public void setLocation(String location)
+        {
+            this.location = location;
+        }
+
+        @Override
+        @JsonProperty
         public long getTimestamp()
         {
             return timestamp;
+        }
+
+        @Override
+        @JsonProperty
+        public void setTimestamp(long timestamp)
+        {
+            this.timestamp = timestamp;
         }
 
         @Override
@@ -247,11 +266,6 @@ public class TestSeedStoreManager
                 throws IOException
         {
             return "MOCK SEED. SHOULD NOT SERIALIZE.";
-        }
-
-        public void setTimestamp(long timestamp)
-        {
-            this.timestamp = timestamp;
         }
 
         @Override

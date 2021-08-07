@@ -22,6 +22,7 @@ import io.airlift.discovery.client.Announcer;
 import io.airlift.discovery.client.DiscoveryModule;
 import io.airlift.event.client.JsonEventModule;
 import io.airlift.event.client.http.HttpEventModule;
+import io.airlift.http.server.HttpServerInfo;
 import io.airlift.http.server.HttpServerModule;
 import io.airlift.jaxrs.JaxrsModule;
 import io.airlift.jmx.JmxHttpModule;
@@ -43,6 +44,8 @@ import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.execution.warnings.WarningCollectorModule;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
+import io.prestosql.httpserver.HetuHttpServerInfo;
+import io.prestosql.httpserver.HetuHttpServerModule;
 import io.prestosql.jmx.HetuJmxModule;
 import io.prestosql.metadata.StaticCatalogStore;
 import io.prestosql.metadata.StaticFunctionNamespaceStore;
@@ -55,6 +58,7 @@ import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.server.security.PasswordAuthenticatorManager;
 import io.prestosql.server.security.ServerSecurityModule;
 import io.prestosql.snapshot.SnapshotUtils;
+import io.prestosql.spi.seedstore.SeedStoreSubType;
 import io.prestosql.sql.parser.SqlParserOptions;
 import io.prestosql.statestore.StateStoreLauncher;
 import io.prestosql.statestore.StateStoreProvider;
@@ -106,7 +110,7 @@ public class PrestoServer
         modules.add(
                 new NodeModule(),
                 Modules.override(new DiscoveryModule()).with(new HetuDiscoveryModule()),
-                new HttpServerModule(),
+                Modules.override(new HttpServerModule()).with(new HetuHttpServerModule()),
                 new JsonModule(),
                 new SmileModule(),
                 new JaxrsModule(),
@@ -156,6 +160,13 @@ public class PrestoServer
             injector.getInstance(PasswordAuthenticatorManager.class).loadPasswordAuthenticator();
             injector.getInstance(EventListenerManager.class).loadConfiguredEventListener();
 
+            if (injector.getInstance(SeedStoreManager.class).isSeedStoreOnYarnEnabled()) {
+                addSeedOnYarnInformation(
+                        injector.getInstance(ServerConfig.class),
+                        injector.getInstance(SeedStoreManager.class),
+                        (HetuHttpServerInfo) injector.getInstance(HttpServerInfo.class));
+            }
+
             // preload index (on coordinator only)
             if (injector.getInstance(ServerConfig.class).isCoordinator()) {
                 injector.getInstance(HeuristicIndexerManager.class).preloadIndex();
@@ -185,6 +196,34 @@ public class PrestoServer
     protected Iterable<? extends Module> getAdditionalModules()
     {
         return ImmutableList.of();
+    }
+
+    private static void addSeedOnYarnInformation(ServerConfig serverConfig,
+                                                 SeedStoreManager seedStoreManager,
+                                                 HetuHttpServerInfo httpServerInfo)
+    {
+        if (serverConfig == null || seedStoreManager == null || httpServerInfo == null) {
+            return;
+        }
+        if (!serverConfig.isCoordinator()) {
+            return;
+        }
+        String httpUri;
+        if (httpServerInfo.getHttpExternalUri() != null) {
+            httpUri = httpServerInfo.getHttpExternalUri().toString();
+        }
+        else if (httpServerInfo.getHttpsExternalUri() != null) {
+            httpUri = httpServerInfo.getHttpsExternalUri().toString();
+        }
+        else {
+            return;
+        }
+        try {
+            seedStoreManager.addSeed(SeedStoreSubType.ON_YARN, httpUri, false);
+        }
+        catch (IOException e) {
+            return;
+        }
     }
 
     private static void launchEmbeddedStateStore(HetuConfig config, StateStoreLauncher launcher)
