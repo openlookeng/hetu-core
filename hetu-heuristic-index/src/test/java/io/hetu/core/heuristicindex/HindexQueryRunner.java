@@ -14,6 +14,7 @@
  */
 package io.hetu.core.heuristicindex;
 
+import com.google.common.collect.ImmutableMap;
 import io.airlift.testing.mysql.TestingMySqlServer;
 import io.hetu.core.common.filesystem.TempFolder;
 import io.hetu.core.common.util.SslSocketUtil;
@@ -141,7 +142,11 @@ public final class HindexQueryRunner
                     throw new RuntimeException(e);
                 }
             });
-            queryRunner.createCatalog("hive", "Hive");
+            Map<String, String> hiveProperties = ImmutableMap.<String, String>builder()
+                    .put("hive.allow-drop-table", "true")
+                    .build();
+
+            queryRunner.createCatalog("hive", "Hive", hiveProperties);
             return queryRunner;
         }
         catch (Exception e) {
