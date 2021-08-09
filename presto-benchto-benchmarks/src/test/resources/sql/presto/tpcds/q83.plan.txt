@@ -1,10 +1,10 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
         join (INNER, PARTITIONED):
-            final aggregation over (i_item_id)
+            final hashaggregation over (i_item_id)
                 local exchange (GATHER, SINGLE, [])
                     remote exchange (REPARTITION, HASH, ["i_item_id"])
-                        partial aggregation over (i_item_id)
+                        partial hashaggregation over (i_item_id)
                             semijoin (REPLICATED):
                                 join (INNER, REPLICATED):
                                     join (INNER, REPLICATED):
@@ -23,10 +23,10 @@ local exchange (GATHER, SINGLE, [])
                                                 remote exchange (REPLICATE, BROADCAST, [])
                                                     scan date_dim
             join (INNER, PARTITIONED):
-                final aggregation over (i_item_id_82)
+                final hashaggregation over (i_item_id_82)
                     local exchange (GATHER, SINGLE, [])
                         remote exchange (REPARTITION, HASH, ["i_item_id_82"])
-                            partial aggregation over (i_item_id_82)
+                            partial hashaggregation over (i_item_id_82)
                                 semijoin (REPLICATED):
                                     join (INNER, REPLICATED):
                                         join (INNER, REPLICATED):
@@ -44,10 +44,10 @@ local exchange (GATHER, SINGLE, [])
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPLICATE, BROADCAST, [])
                                                         scan date_dim
-                final aggregation over (i_item_id_216)
+                final hashaggregation over (i_item_id_216)
                     local exchange (GATHER, SINGLE, [])
                         remote exchange (REPARTITION, HASH, ["i_item_id_216"])
-                            partial aggregation over (i_item_id_216)
+                            partial hashaggregation over (i_item_id_216)
                                 semijoin (REPLICATED):
                                     join (INNER, REPLICATED):
                                         join (INNER, REPLICATED):

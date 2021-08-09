@@ -8,10 +8,10 @@ remote exchange (GATHER, SINGLE, [])
                             Filter
                                 remote exchange (REPARTITION, HASH, ["ca_county_81", "d_qoy_56", "d_year_52", "sum_94"])
                                     cte ss
-                                        final aggregation over (ca_county_81, d_qoy_56, d_year_52)
+                                        final hashaggregation over (ca_county_81, d_qoy_56, d_year_52)
                                             local exchange (GATHER, SINGLE, [])
                                                 remote exchange (REPARTITION, HASH, ["ca_county_81", "d_qoy_56", "d_year_52"])
-                                                    partial aggregation over (ca_county_81, d_qoy_56, d_year_52)
+                                                    partial hashaggregation over (ca_county_81, d_qoy_56, d_year_52)
                                                         join (INNER, PARTITIONED):
                                                             remote exchange (REPARTITION, HASH, ["ss_addr_sk_29"])
                                                                 join (INNER, REPLICATED):
@@ -30,10 +30,10 @@ remote exchange (GATHER, SINGLE, [])
                                 Filter
                                     remote exchange (REPARTITION, HASH, ["ca_county_173", "d_qoy_148", "d_year_144", "sum_186"])
                                         cte ss
-                                            final aggregation over (ca_county_173, d_qoy_148, d_year_144)
+                                            final hashaggregation over (ca_county_173, d_qoy_148, d_year_144)
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPARTITION, HASH, ["ca_county_173", "d_qoy_148", "d_year_144"])
-                                                        partial aggregation over (ca_county_173, d_qoy_148, d_year_144)
+                                                        partial hashaggregation over (ca_county_173, d_qoy_148, d_year_144)
                                                             join (INNER, PARTITIONED):
                                                                 remote exchange (REPARTITION, HASH, ["ss_addr_sk_121"])
                                                                     join (INNER, REPLICATED):
@@ -53,10 +53,10 @@ remote exchange (GATHER, SINGLE, [])
                                 Filter
                                     remote exchange (REPARTITION, HASH, ["ca_county_345", "d_qoy_320", "d_year_316", "sum_358"])
                                         cte ws
-                                            final aggregation over (ca_county_345, d_qoy_320, d_year_316)
+                                            final hashaggregation over (ca_county_345, d_qoy_320, d_year_316)
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPARTITION, HASH, ["ca_county_345", "d_qoy_320", "d_year_316"])
-                                                        partial aggregation over (ca_county_345, d_qoy_320, d_year_316)
+                                                        partial hashaggregation over (ca_county_345, d_qoy_320, d_year_316)
                                                             join (INNER, PARTITIONED):
                                                                 remote exchange (REPARTITION, HASH, ["ws_bill_addr_sk_283"])
                                                                     join (INNER, REPLICATED):
@@ -74,10 +74,10 @@ remote exchange (GATHER, SINGLE, [])
                                     Filter
                                         remote exchange (REPARTITION, HASH, ["ca_county_448", "d_qoy_423", "d_year_419", "sum_461"])
                                             cte ws
-                                                final aggregation over (ca_county_448, d_qoy_423, d_year_419)
+                                                final hashaggregation over (ca_county_448, d_qoy_423, d_year_419)
                                                     local exchange (GATHER, SINGLE, [])
                                                         remote exchange (REPARTITION, HASH, ["ca_county_448", "d_qoy_423", "d_year_419"])
-                                                            partial aggregation over (ca_county_448, d_qoy_423, d_year_419)
+                                                            partial hashaggregation over (ca_county_448, d_qoy_423, d_year_419)
                                                                 join (INNER, PARTITIONED):
                                                                     remote exchange (REPARTITION, HASH, ["ws_bill_addr_sk_386"])
                                                                         join (INNER, REPLICATED):
@@ -96,10 +96,10 @@ remote exchange (GATHER, SINGLE, [])
                             Filter
                                 remote exchange (REPARTITION, HASH, ["ca_county", "d_qoy", "d_year", "sum"])
                                     cte ss
-                                        final aggregation over (ca_county, d_qoy, d_year)
+                                        final hashaggregation over (ca_county, d_qoy, d_year)
                                             local exchange (GATHER, SINGLE, [])
                                                 remote exchange (REPARTITION, HASH, ["ca_county", "d_qoy", "d_year"])
-                                                    partial aggregation over (ca_county, d_qoy, d_year)
+                                                    partial hashaggregation over (ca_county, d_qoy, d_year)
                                                         join (INNER, PARTITIONED):
                                                             remote exchange (REPARTITION, HASH, ["ss_addr_sk"])
                                                                 join (INNER, REPLICATED):
@@ -118,10 +118,10 @@ remote exchange (GATHER, SINGLE, [])
                                 Filter
                                     remote exchange (REPARTITION, HASH, ["ca_county_242", "d_qoy_217", "d_year_213", "sum_255"])
                                         cte ws
-                                            final aggregation over (ca_county_242, d_qoy_217, d_year_213)
+                                            final hashaggregation over (ca_county_242, d_qoy_217, d_year_213)
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPARTITION, HASH, ["ca_county_242", "d_qoy_217", "d_year_213"])
-                                                        partial aggregation over (ca_county_242, d_qoy_217, d_year_213)
+                                                        partial hashaggregation over (ca_county_242, d_qoy_217, d_year_213)
                                                             join (INNER, PARTITIONED):
                                                                 remote exchange (REPARTITION, HASH, ["ws_bill_addr_sk"])
                                                                     join (INNER, REPLICATED):

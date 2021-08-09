@@ -3,10 +3,10 @@ remote exchange (GATHER, SINGLE, [])
         remote exchange (REPARTITION, ROUND_ROBIN, [])
             join (INNER, PARTITIONED):
                 join (INNER, PARTITIONED):
-                    final aggregation over (d_week_seq)
+                    final hashaggregation over (d_week_seq)
                         local exchange (GATHER, SINGLE, [])
                             remote exchange (REPARTITION, HASH, ["d_week_seq"])
-                                partial aggregation over (d_week_seq)
+                                partial hashaggregation over (d_week_seq)
                                     join (INNER, REPLICATED):
                                         remote exchange (REPARTITION, ROUND_ROBIN, [])
                                             scan web_sales
@@ -20,10 +20,10 @@ remote exchange (GATHER, SINGLE, [])
                 local exchange (GATHER, SINGLE, [])
                     remote exchange (REPARTITION, HASH, ["subtract"])
                         join (INNER, PARTITIONED):
-                            final aggregation over (d_week_seq_232)
+                            final hashaggregation over (d_week_seq_232)
                                 local exchange (GATHER, SINGLE, [])
                                     remote exchange (REPARTITION, HASH, ["d_week_seq_232"])
-                                        partial aggregation over (d_week_seq_232)
+                                        partial hashaggregation over (d_week_seq_232)
                                             join (INNER, REPLICATED):
                                                 remote exchange (REPARTITION, ROUND_ROBIN, [])
                                                     scan web_sales

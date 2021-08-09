@@ -1,7 +1,7 @@
-final aggregation over ()
+final hashaggregation over ()
     local exchange (GATHER, SINGLE, [])
         remote exchange (GATHER, SINGLE, [])
-            partial aggregation over ()
+            partial hashaggregation over ()
                 join (INNER, PARTITIONED):
                     remote exchange (REPARTITION, HASH, ["ss_sold_time_sk"])
                         join (INNER, REPLICATED):

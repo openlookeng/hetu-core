@@ -2,10 +2,10 @@ remote exchange (GATHER, SINGLE, [])
     local exchange (GATHER, UNKNOWN, [])
         remote exchange (REPARTITION, ROUND_ROBIN, [])
             cross join:
-                final aggregation over (partkey)
+                final hashaggregation over (partkey)
                     local exchange (GATHER, SINGLE, [])
                         remote exchange (REPARTITION, HASH, ["partkey"])
-                            partial aggregation over (partkey)
+                            partial hashaggregation over (partkey)
                                 join (INNER, REPLICATED):
                                     scan partsupp
                                     local exchange (GATHER, SINGLE, [])
@@ -17,10 +17,10 @@ remote exchange (GATHER, SINGLE, [])
                                                         scan nation
                 local exchange (GATHER, SINGLE, [])
                     remote exchange (REPLICATE, BROADCAST, [])
-                        final aggregation over ()
+                        final hashaggregation over ()
                             local exchange (GATHER, SINGLE, [])
                                 remote exchange (GATHER, SINGLE, [])
-                                    partial aggregation over ()
+                                    partial hashaggregation over ()
                                         join (INNER, REPLICATED):
                                             scan partsupp
                                             local exchange (GATHER, SINGLE, [])

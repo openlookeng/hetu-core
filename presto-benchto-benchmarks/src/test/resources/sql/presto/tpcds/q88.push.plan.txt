@@ -5,10 +5,10 @@ cross join:
                 cross join:
                     cross join:
                         cross join:
-                            final aggregation over ()
+                            final hashaggregation over ()
                                 local exchange (GATHER, SINGLE, [])
                                     remote exchange (GATHER, SINGLE, [])
-                                        partial aggregation over ()
+                                        partial hashaggregation over ()
                                             join (INNER, PARTITIONED):
                                                 remote exchange (REPARTITION, HASH, ["ss_hdemo_sk_11"])
                                                     join (INNER, REPLICATED):
@@ -23,10 +23,10 @@ cross join:
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPARTITION, HASH, ["hd_demo_sk_30"])
                                                         scan household_demographics (pushdown = true)
-                            final aggregation over ()
+                            final hashaggregation over ()
                                 local exchange (GATHER, SINGLE, [])
                                     remote exchange (GATHER, SINGLE, [])
-                                        partial aggregation over ()
+                                        partial hashaggregation over ()
                                             join (INNER, PARTITIONED):
                                                 remote exchange (REPARTITION, HASH, ["ss_hdemo_sk"])
                                                     join (INNER, REPLICATED):
@@ -41,10 +41,10 @@ cross join:
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPARTITION, HASH, ["hd_demo_sk"])
                                                         scan household_demographics (pushdown = true)
-                        final aggregation over ()
+                        final hashaggregation over ()
                             local exchange (GATHER, SINGLE, [])
                                 remote exchange (GATHER, SINGLE, [])
-                                    partial aggregation over ()
+                                    partial hashaggregation over ()
                                         join (INNER, PARTITIONED):
                                             remote exchange (REPARTITION, HASH, ["ss_hdemo_sk_87"])
                                                 join (INNER, REPLICATED):
@@ -59,10 +59,10 @@ cross join:
                                             local exchange (GATHER, SINGLE, [])
                                                 remote exchange (REPARTITION, HASH, ["hd_demo_sk_106"])
                                                     scan household_demographics (pushdown = true)
-                    final aggregation over ()
+                    final hashaggregation over ()
                         local exchange (GATHER, SINGLE, [])
                             remote exchange (GATHER, SINGLE, [])
-                                partial aggregation over ()
+                                partial hashaggregation over ()
                                     join (INNER, PARTITIONED):
                                         remote exchange (REPARTITION, HASH, ["ss_hdemo_sk_163"])
                                             join (INNER, REPLICATED):
@@ -77,10 +77,10 @@ cross join:
                                         local exchange (GATHER, SINGLE, [])
                                             remote exchange (REPARTITION, HASH, ["hd_demo_sk_182"])
                                                 scan household_demographics (pushdown = true)
-                final aggregation over ()
+                final hashaggregation over ()
                     local exchange (GATHER, SINGLE, [])
                         remote exchange (GATHER, SINGLE, [])
-                            partial aggregation over ()
+                            partial hashaggregation over ()
                                 join (INNER, PARTITIONED):
                                     remote exchange (REPARTITION, HASH, ["ss_hdemo_sk_239"])
                                         join (INNER, REPLICATED):
@@ -95,10 +95,10 @@ cross join:
                                     local exchange (GATHER, SINGLE, [])
                                         remote exchange (REPARTITION, HASH, ["hd_demo_sk_258"])
                                             scan household_demographics (pushdown = true)
-            final aggregation over ()
+            final hashaggregation over ()
                 local exchange (GATHER, SINGLE, [])
                     remote exchange (GATHER, SINGLE, [])
-                        partial aggregation over ()
+                        partial hashaggregation over ()
                             join (INNER, PARTITIONED):
                                 remote exchange (REPARTITION, HASH, ["ss_hdemo_sk_315"])
                                     join (INNER, REPLICATED):
@@ -113,10 +113,10 @@ cross join:
                                 local exchange (GATHER, SINGLE, [])
                                     remote exchange (REPARTITION, HASH, ["hd_demo_sk_334"])
                                         scan household_demographics (pushdown = true)
-        final aggregation over ()
+        final hashaggregation over ()
             local exchange (GATHER, SINGLE, [])
                 remote exchange (GATHER, SINGLE, [])
-                    partial aggregation over ()
+                    partial hashaggregation over ()
                         join (INNER, PARTITIONED):
                             remote exchange (REPARTITION, HASH, ["ss_hdemo_sk_391"])
                                 join (INNER, REPLICATED):
@@ -131,10 +131,10 @@ cross join:
                             local exchange (GATHER, SINGLE, [])
                                 remote exchange (REPARTITION, HASH, ["hd_demo_sk_410"])
                                     scan household_demographics (pushdown = true)
-    final aggregation over ()
+    final hashaggregation over ()
         local exchange (GATHER, SINGLE, [])
             remote exchange (GATHER, SINGLE, [])
-                partial aggregation over ()
+                partial hashaggregation over ()
                     join (INNER, PARTITIONED):
                         remote exchange (REPARTITION, HASH, ["ss_hdemo_sk_467"])
                             join (INNER, REPLICATED):

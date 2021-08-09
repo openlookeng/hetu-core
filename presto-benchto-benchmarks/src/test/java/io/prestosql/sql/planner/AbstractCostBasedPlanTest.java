@@ -245,7 +245,7 @@ public abstract class AbstractCostBasedPlanTest
             if (node.getAggregationType().equals(AggregationNode.AggregationType.SORT_BASED)) {
                 output(
                         indent,
-                        "%s SortAggregate over (%s)",
+                        "%s sortaggregate over (%s)",
                         node.getStep().name().toLowerCase(ENGLISH),
                         node.getGroupingKeys().stream()
                                 .map(Object::toString)
@@ -255,7 +255,7 @@ public abstract class AbstractCostBasedPlanTest
             else {
                 output(
                         indent,
-                        "%s aggregation over (%s)",
+                        "%s hashaggregation over (%s)",
                         node.getStep().name().toLowerCase(ENGLISH),
                         node.getGroupingKeys().stream()
                                 .map(Object::toString)
