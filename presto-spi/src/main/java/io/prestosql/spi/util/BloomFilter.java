@@ -27,6 +27,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Serializable;
 import java.math.RoundingMode;
+import java.util.Arrays;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -395,6 +396,21 @@ public class BloomFilter
             for (long value : data) {
                 bitCount += Long.bitCount(value);
             }
+        }
+
+        @Override
+        public boolean equals(Object other)
+        {
+            return (other != null) &&
+                    (other.getClass() == getClass()) &&
+                    Arrays.equals(this.getData(), ((BitSet) other).getData()) &&
+                    (this.bitCount() == ((BitSet) other).bitCount());
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Arrays.hashCode(this.data) + (int) this.bitCount * 5;
         }
 
         /**

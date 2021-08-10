@@ -15,6 +15,7 @@
 
 package io.hetu.core.plugin.heuristicindex.index.bloom;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.heuristicindex.Index;
@@ -23,12 +24,17 @@ import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.util.BloomFilter;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 
 import static io.hetu.core.heuristicindex.util.IndexServiceUtils.matchCallExpEqual;
 import static io.prestosql.spi.heuristicindex.TypeUtils.getActualValue;
@@ -40,18 +46,33 @@ public class BloomIndex
         implements Index
 {
     public static final String ID = "BLOOM";
-    protected static final int DEFAULT_EXPECTED_NUM_OF_SIZE = 200000;
-    private static final String FPP_KEY = "bloom.fpp";
-    private static final double DEFAULT_FPP = 0.001;
     private Properties properties;
     private BloomFilter filter;
+
+    private int expectedNumOfEntries;
+
+    private static final String FPP_KEY = "bloom.fpp";
+    private static final double DEFAULT_FPP = 0.001;
     private double fpp = DEFAULT_FPP;
-    private int expectedNumOfEntries = DEFAULT_EXPECTED_NUM_OF_SIZE;
+
+    private static final String MMAP_KEY = "bloom.mmapEnabled";
+    private static final Boolean DEFAULT_MMAP = true;
+    private Boolean mmap;
+
+    private File file;
+    private int mmapSizeInByte;
 
     @Override
     public String getId()
     {
         return ID;
+    }
+
+    @VisibleForTesting
+    void setMmapEnabled(Boolean mmap)
+    {
+        // use mmap file to hold the bloom filter if enabled
+        this.mmap = mmap;
     }
 
     @Override
@@ -67,7 +88,7 @@ public class BloomIndex
         List<Object> columnIdxValue = values.get(0).getSecond();
         for (Object value : columnIdxValue) {
             if (value != null) {
-                getFilter().add(value.toString().getBytes());
+                getFilterFromMemory().add(value.toString().getBytes());
             }
         }
         return true;
@@ -86,24 +107,66 @@ public class BloomIndex
         }
         else if (expression instanceof CallExpression) {
             // test ComparisonExpression matching
-            return matchCallExpEqual(expression, object -> filter.test(object.toString().getBytes()));
+            return matchCallExpEqual(expression, object -> getFilter().test(object.toString().getBytes()));
         }
-
         throw new UnsupportedOperationException("Expression not supported by " + ID + " index.");
+    }
+
+    private void writeToMmap(BloomFilter curFilter)
+            throws IOException
+    {
+        try (RandomAccessFile randomFile = new RandomAccessFile(getFile(), "rw")) {
+            try (FileChannel channel = randomFile.getChannel()) {
+                long[] bits = curFilter.getBitSet();
+                int numHashFunctions = curFilter.getNumHashFunctions();
+                int numBits = bits.length;
+                mmapSizeInByte = numBits * 8;
+                MappedByteBuffer map = channel.map(FileChannel.MapMode.READ_WRITE, 0, 2 * 4 + mmapSizeInByte);
+                map.putInt(numHashFunctions);
+                map.putInt(numBits);
+                for (int i = 0; i < numBits; i++) {
+                    map.putLong(bits[i]);
+                }
+            }
+        }
+    }
+
+    private BloomFilter readFromMmap()
+            throws IOException
+    {
+        try (RandomAccessFile randomFile = new RandomAccessFile(getFile(), "r")) {
+            try (FileChannel channel = randomFile.getChannel()) {
+                MappedByteBuffer map = channel.map(FileChannel.MapMode.READ_ONLY, 0, 2 * 4 + mmapSizeInByte);
+                int numHashFunctions = map.getInt();
+                int numBits = map.getInt();
+                long[] bits = new long[numBits];
+                for (int i = 0; i < numBits; i++) {
+                    bits[i] = map.getLong();
+                }
+                return new BloomFilter(bits, numHashFunctions);
+            }
+        }
     }
 
     @Override
     public void serialize(OutputStream out)
             throws IOException
     {
-        getFilter().writeTo(out);
+        getFilterFromMemory().writeTo(out);
     }
 
     @Override
     public Index deserialize(InputStream in)
             throws IOException
     {
-        filter = BloomFilter.readFrom(in);
+        if (isMmapEnabled()) {
+            // write to mmap and do not write memory
+            writeToMmap(BloomFilter.readFrom(in));
+        }
+        else {
+            // deserialize filter to memory
+            filter = BloomFilter.readFrom(in);
+        }
         return this;
     }
 
@@ -121,13 +184,29 @@ public class BloomIndex
 
     private int getExpectedNumOfEntries()
     {
+        if (expectedNumOfEntries < 1) {
+            throw new IllegalArgumentException("Expected number of entries must be greater than 0");
+        }
         return expectedNumOfEntries;
+    }
+
+    private File getFile() throws IOException
+    {
+        if (file == null) {
+            file = File.createTempFile("bloomindex", UUID.randomUUID().toString());
+            file.delete();
+            file.deleteOnExit();
+        }
+        return file;
     }
 
     @Override
     public void setExpectedNumOfEntries(int expectedNumOfEntries)
     {
         this.expectedNumOfEntries = expectedNumOfEntries;
+        if (expectedNumOfEntries < 1) {
+            throw new IllegalArgumentException("Expected number of entries must be greater than 0");
+        }
     }
 
     private double getFpp()
@@ -136,22 +215,56 @@ public class BloomIndex
             String fppValue = getProperties().getProperty(FPP_KEY);
             fpp = fppValue == null ? fpp : Double.parseDouble(fppValue);
         }
-
         return fpp;
     }
 
-    private BloomFilter getFilter()
+    private boolean isMmapEnabled()
+    {
+        if (mmap == null) {
+            if (getProperties() != null) {
+                String mmapValue = getProperties().getProperty(MMAP_KEY);
+                mmap = mmapValue == null ? DEFAULT_MMAP : Boolean.parseBoolean(mmapValue);
+            }
+            else {
+                mmap = DEFAULT_MMAP;
+            }
+        }
+        return mmap;
+    }
+
+    private BloomFilter getFilterFromMemory()
     {
         if (filter == null) {
             filter = new BloomFilter(getExpectedNumOfEntries(), getFpp());
         }
-
         return filter;
+    }
+
+    @VisibleForTesting
+    BloomFilter getFilter()
+    {
+        if (isMmapEnabled()) {
+            try {
+                return readFromMmap();
+            }
+            catch (IOException e) {
+                throw new UnsupportedOperationException("Error reading bloom filter from mmap", e);
+            }
+        }
+        else {
+            return getFilterFromMemory();
+        }
     }
 
     @Override
     public long getMemoryUsage()
     {
-        return getFilter().getRetainedSizeInBytes();
+        return filter == null ? 0 : filter.getRetainedSizeInBytes();
+    }
+
+    @Override
+    public long getDiskUsage()
+    {
+        return mmap ? 2 * 4 + mmapSizeInByte : 0;
     }
 }

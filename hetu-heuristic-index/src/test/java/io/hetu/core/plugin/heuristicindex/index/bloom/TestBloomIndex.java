@@ -23,6 +23,7 @@ import io.prestosql.spi.predicate.ValueSet;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.util.BloomFilter;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -30,12 +31,17 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.Random;
+import java.util.UUID;
 
 import static io.hetu.core.HeuristicIndexTestUtils.simplePredicate;
 import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.spi.type.DoubleType.DOUBLE;
+import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -56,90 +62,150 @@ public class TestBloomIndex
 
     @Test
     public void testMatches()
+            throws IOException
     {
-        BloomIndex bloomIndex = new BloomIndex();
-        List<Object> bloomValues = ImmutableList.of("a", "b", "c", "d");
-        bloomIndex.setExpectedNumOfEntries(bloomValues.size());
-        bloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", bloomValues)));
+        try (TempFolder folder = new TempFolder()) {
+            folder.create();
+            File testFile = folder.newFile();
 
-        RowExpression expression1 = simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, "a");
-        RowExpression expression2 = simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, "e");
+            BloomIndex bloomIndex = new BloomIndex();
+            List<Object> bloomValues = ImmutableList.of("a", "b", "c", "d");
+            bloomIndex.setExpectedNumOfEntries(bloomValues.size());
+            bloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", bloomValues)));
 
-        assertTrue(bloomIndex.matches(expression1));
-        assertFalse(bloomIndex.matches(expression2));
+            try (FileOutputStream fo = new FileOutputStream(testFile)) {
+                bloomIndex.serialize(fo);
+            }
+
+            try (FileInputStream fi = new FileInputStream(testFile)) {
+                bloomIndex.deserialize(fi);
+            }
+
+            RowExpression expression1 = simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, "a");
+            RowExpression expression2 = simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, "e");
+
+            assertTrue(bloomIndex.matches(expression1));
+            assertFalse(bloomIndex.matches(expression2));
+        }
     }
 
     @Test
     public void testDomainMatching()
+            throws IOException
     {
-        BloomIndex stringBloomIndex = new BloomIndex();
-        List<Object> testValues = ImmutableList.of("a", "ab", "测试", "\n", "%#!", ":dfs");
-        stringBloomIndex.setExpectedNumOfEntries(testValues.size());
-        stringBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", testValues)));
+        try (TempFolder folder = new TempFolder()) {
+            folder.create();
+            File testFile = folder.newFile();
 
-        ValueSet valueSet = mock(ValueSet.class);
-        when(valueSet.isSingleValue()).thenReturn(true);
-        when(valueSet.getType()).thenReturn(VARCHAR);
+            BloomIndex stringBloomIndex = new BloomIndex();
+            List<Object> testValues = ImmutableList.of("a", "ab", "测试", "\n", "%#!", ":dfs");
+            stringBloomIndex.setExpectedNumOfEntries(testValues.size());
+            stringBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", testValues)));
 
-        when(valueSet.getSingleValue()).thenReturn("a");
-        assertTrue(stringBloomIndex.matches(Domain.create(valueSet, false)));
+            try (FileOutputStream fo = new FileOutputStream(testFile)) {
+                stringBloomIndex.serialize(fo);
+            }
 
-        when(valueSet.getSingleValue()).thenReturn("%#!");
-        assertTrue(stringBloomIndex.matches(Domain.create(valueSet, false)));
+            try (FileInputStream fi = new FileInputStream(testFile)) {
+                stringBloomIndex.deserialize(fi);
+            }
 
-        when(valueSet.getSingleValue()).thenReturn("bb");
-        assertFalse(stringBloomIndex.matches(Domain.create(valueSet, false)));
+            ValueSet valueSet = mock(ValueSet.class);
+            when(valueSet.isSingleValue()).thenReturn(true);
+            when(valueSet.getType()).thenReturn(VARCHAR);
+
+            when(valueSet.getSingleValue()).thenReturn("a");
+            assertTrue(stringBloomIndex.matches(Domain.create(valueSet, false)));
+
+            when(valueSet.getSingleValue()).thenReturn("%#!");
+            assertTrue(stringBloomIndex.matches(Domain.create(valueSet, false)));
+
+            when(valueSet.getSingleValue()).thenReturn("bb");
+            assertFalse(stringBloomIndex.matches(Domain.create(valueSet, false)));
+        }
     }
 
     @Test
     public void testMatching()
+            throws IOException
     {
-        // Test String bloom indexer
-        BloomIndex stringBloomIndex = new BloomIndex();
-        List<Object> testValues = ImmutableList.of("a", "ab", "测试", "\n", "%#!", ":dfs");
-        stringBloomIndex.setExpectedNumOfEntries(testValues.size());
-        stringBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", testValues)));
+        try (TempFolder folder = new TempFolder()) {
+            folder.create();
+            File testFile = folder.newFile();
 
-        assertTrue(mightContain(stringBloomIndex, VARCHAR, "a"));
-        assertTrue(mightContain(stringBloomIndex, VARCHAR, "ab"));
-        assertTrue(mightContain(stringBloomIndex, VARCHAR, "测试"));
-        assertTrue(mightContain(stringBloomIndex, VARCHAR, "\n"));
-        assertTrue(mightContain(stringBloomIndex, VARCHAR, "%#!"));
-        assertTrue(mightContain(stringBloomIndex, VARCHAR, ":dfs"));
-        assertFalse(mightContain(stringBloomIndex, VARCHAR, "random"));
-        assertFalse(mightContain(stringBloomIndex, VARCHAR, "abc"));
+            // Test String bloom indexer
+            BloomIndex stringBloomIndex = new BloomIndex();
+            List<Object> testValues = ImmutableList.of("a", "ab", "测试", "\n", "%#!", ":dfs");
+            stringBloomIndex.setExpectedNumOfEntries(testValues.size());
+            stringBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", testValues)));
 
-        // Test with the generic type to be Object
-        BloomIndex objectBloomIndex = new BloomIndex();
-        testValues = ImmutableList.of("a", "ab", "测试", "\n", "%#!", ":dfs");
-        objectBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", testValues)));
+            try (FileOutputStream fo = new FileOutputStream(testFile)) {
+                stringBloomIndex.serialize(fo);
+            }
 
-        assertTrue(mightContain(objectBloomIndex, VARCHAR, "a"));
-        assertTrue(mightContain(objectBloomIndex, VARCHAR, "ab"));
-        assertTrue(mightContain(objectBloomIndex, VARCHAR, "测试"));
-        assertTrue(mightContain(objectBloomIndex, VARCHAR, "\n"));
-        assertTrue(mightContain(objectBloomIndex, VARCHAR, "%#!"));
-        assertTrue(mightContain(objectBloomIndex, VARCHAR, ":dfs"));
-        assertFalse(mightContain(objectBloomIndex, VARCHAR, "random"));
-        assertFalse(mightContain(objectBloomIndex, VARCHAR, "abc"));
+            try (FileInputStream fi = new FileInputStream(testFile)) {
+                stringBloomIndex.deserialize(fi);
+            }
 
-        // Test single insertion
-        BloomIndex simpleBloomIndex = new BloomIndex();
-        simpleBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of("a"))));
-        simpleBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of("ab"))));
-        simpleBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of("测试"))));
-        simpleBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of("\n"))));
-        simpleBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of("%#!"))));
-        simpleBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of(":dfs"))));
+            assertTrue(mightContain(stringBloomIndex, VARCHAR, "a"));
+            assertTrue(mightContain(stringBloomIndex, VARCHAR, "ab"));
+            assertTrue(mightContain(stringBloomIndex, VARCHAR, "测试"));
+            assertTrue(mightContain(stringBloomIndex, VARCHAR, "\n"));
+            assertTrue(mightContain(stringBloomIndex, VARCHAR, "%#!"));
+            assertTrue(mightContain(stringBloomIndex, VARCHAR, ":dfs"));
+            assertFalse(mightContain(stringBloomIndex, VARCHAR, "random"));
+            assertFalse(mightContain(stringBloomIndex, VARCHAR, "abc"));
 
-        assertTrue(mightContain(simpleBloomIndex, VARCHAR, "a"));
-        assertTrue(mightContain(simpleBloomIndex, VARCHAR, "ab"));
-        assertTrue(mightContain(simpleBloomIndex, VARCHAR, "测试"));
-        assertTrue(mightContain(simpleBloomIndex, VARCHAR, "\n"));
-        assertTrue(mightContain(simpleBloomIndex, VARCHAR, "%#!"));
-        assertTrue(mightContain(simpleBloomIndex, VARCHAR, ":dfs"));
-        assertFalse(mightContain(simpleBloomIndex, VARCHAR, "random"));
-        assertFalse(mightContain(simpleBloomIndex, VARCHAR, "abc"));
+            // Test with the generic type to be Object
+            BloomIndex objectBloomIndex = new BloomIndex();
+            testValues = ImmutableList.of("a", "ab", "测试", "\n", "%#!", ":dfs");
+            objectBloomIndex.setExpectedNumOfEntries(testValues.size());
+            objectBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", testValues)));
+
+            try (FileOutputStream fo = new FileOutputStream(testFile)) {
+                objectBloomIndex.serialize(fo);
+            }
+
+            try (FileInputStream fi = new FileInputStream(testFile)) {
+                objectBloomIndex.deserialize(fi);
+            }
+
+            assertTrue(mightContain(objectBloomIndex, VARCHAR, "a"));
+            assertTrue(mightContain(objectBloomIndex, VARCHAR, "ab"));
+            assertTrue(mightContain(objectBloomIndex, VARCHAR, "测试"));
+            assertTrue(mightContain(objectBloomIndex, VARCHAR, "\n"));
+            assertTrue(mightContain(objectBloomIndex, VARCHAR, "%#!"));
+            assertTrue(mightContain(objectBloomIndex, VARCHAR, ":dfs"));
+            assertFalse(mightContain(objectBloomIndex, VARCHAR, "random"));
+            assertFalse(mightContain(objectBloomIndex, VARCHAR, "abc"));
+
+            // Test single insertion
+            BloomIndex simpleBloomIndex = new BloomIndex();
+            simpleBloomIndex.setExpectedNumOfEntries(6);
+            simpleBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of("a"))));
+            simpleBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of("ab"))));
+            simpleBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of("测试"))));
+            simpleBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of("\n"))));
+            simpleBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of("%#!"))));
+            simpleBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of(":dfs"))));
+
+            try (FileOutputStream fo = new FileOutputStream(testFile)) {
+                simpleBloomIndex.serialize(fo);
+            }
+
+            try (FileInputStream fi = new FileInputStream(testFile)) {
+                simpleBloomIndex.deserialize(fi);
+            }
+
+            assertTrue(mightContain(simpleBloomIndex, VARCHAR, "a"));
+            assertTrue(mightContain(simpleBloomIndex, VARCHAR, "ab"));
+            assertTrue(mightContain(simpleBloomIndex, VARCHAR, "测试"));
+            assertTrue(mightContain(simpleBloomIndex, VARCHAR, "\n"));
+            assertTrue(mightContain(simpleBloomIndex, VARCHAR, "%#!"));
+            assertTrue(mightContain(simpleBloomIndex, VARCHAR, ":dfs"));
+            assertFalse(mightContain(simpleBloomIndex, VARCHAR, "random"));
+            assertFalse(mightContain(simpleBloomIndex, VARCHAR, "abc"));
+        }
     }
 
     @Test
@@ -152,6 +218,7 @@ public class TestBloomIndex
 
             BloomIndex objectBloomIndex = new BloomIndex();
             List<Object> testValues = ImmutableList.of("%#!", ":dfs", "测试", "\n", "ab", "a");
+            objectBloomIndex.setExpectedNumOfEntries(testValues.size());
             objectBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", testValues)));
 
             try (FileOutputStream fo = new FileOutputStream(testFile)) {
@@ -189,6 +256,7 @@ public class TestBloomIndex
             // Persist it using one object
             BloomIndex objectBloomIndex = new BloomIndex();
             List<Object> testValues = ImmutableList.of("a", "ab", "测试", "\n", "%#!", ":dfs");
+            objectBloomIndex.setExpectedNumOfEntries(testValues.size());
             objectBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", testValues)));
             try (FileOutputStream fo = new FileOutputStream(testFile)) {
                 objectBloomIndex.serialize(fo);
@@ -245,6 +313,7 @@ public class TestBloomIndex
     {
         // adding 3 values to default size should pass
         BloomIndex defaultSizedIndex = new BloomIndex();
+        defaultSizedIndex.setExpectedNumOfEntries(3);
         defaultSizedIndex.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of(1f, 2f, 3f))));
 
         // adding 2 values to an index of size 2 should pass
@@ -262,6 +331,7 @@ public class TestBloomIndex
     public void testMemorySize()
     {
         BloomIndex index = new BloomIndex();
+        index.setExpectedNumOfEntries(3);
         index.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of(1f, 2f, 3f))));
 
         assertTrue(index.getMemoryUsage() > 0);
@@ -271,5 +341,210 @@ public class TestBloomIndex
     {
         CallExpression expression = simplePredicate(OperatorType.EQUAL, "testColumn", type, value);
         return index.matches(expression);
+    }
+
+    @Test
+    public void testMmapUse()
+            throws IOException
+    {
+        // experiment test to understand the performance of using mmap
+        try (TempFolder folder = new TempFolder()) {
+            folder.create();
+            int dataEntryNum = 2000000;
+            int queryNum = 10000;
+
+            // compare the performance on int data with 2000000 values
+            File testFile = folder.newFile("int");
+            BloomIndex objectBloomIndex = new BloomIndex();
+            objectBloomIndex.setExpectedNumOfEntries(dataEntryNum);
+            Random rd = new Random();
+            List<Integer> arr = new ArrayList<>();
+            for (int i = 0; i < dataEntryNum; i++) {
+                arr.add(rd.nextInt());
+            }
+            objectBloomIndex.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of(arr))));
+            try (FileOutputStream fo = new FileOutputStream(testFile)) {
+                objectBloomIndex.serialize(fo);
+            }
+
+            BloomIndex bloomIndexMemory = new BloomIndex();
+            bloomIndexMemory.setMmapEnabled(false);
+            bloomIndexMemory.setExpectedNumOfEntries(dataEntryNum);
+            try (FileInputStream fi = new FileInputStream(testFile)) {
+                bloomIndexMemory.deserialize(fi);
+            }
+
+            BloomIndex bloomIndexMmap = new BloomIndex();
+            bloomIndexMmap.setMmapEnabled(true);
+            bloomIndexMmap.setExpectedNumOfEntries(dataEntryNum);
+            try (FileInputStream fi = new FileInputStream(testFile)) {
+                bloomIndexMmap.deserialize(fi);
+            }
+
+            System.out.println(testFile);
+            Random rdTest = new Random();
+            // get query time using memory
+            long startTime = System.currentTimeMillis();
+            for (int i = 0; i < queryNum; i++) {
+                int testNum = rdTest.nextInt();
+                RowExpression expression = simplePredicate(OperatorType.EQUAL, "testColumn", INTEGER, testNum);
+                bloomIndexMemory.matches(expression);
+            }
+            long stopTime = System.currentTimeMillis();
+            long elapsedTime = stopTime - startTime;
+            System.out.println(elapsedTime);
+
+            // get query time using mmap
+            startTime = System.currentTimeMillis();
+            for (int i = 0; i < queryNum; i++) {
+                int testNum = rdTest.nextInt();
+                RowExpression expression = simplePredicate(OperatorType.EQUAL, "testColumn", INTEGER, testNum);
+                bloomIndexMmap.matches(expression);
+            }
+            stopTime = System.currentTimeMillis();
+            elapsedTime = stopTime - startTime;
+            System.out.println(elapsedTime);
+
+            BloomFilter memoryFilter = bloomIndexMemory.getFilter();
+            BloomFilter mmapFilter = bloomIndexMmap.getFilter();
+            assertEquals(mmapFilter, memoryFilter);
+
+            long usage1 = bloomIndexMemory.getMemoryUsage();
+            long usage2 = bloomIndexMmap.getMemoryUsage();
+            assertTrue(usage1 > usage2, "mmap should use less memory.");
+
+            long fileUsage1 = bloomIndexMemory.getDiskUsage();
+            long fileUsage2 = bloomIndexMmap.getDiskUsage();
+            assertTrue(fileUsage1 < fileUsage2, "mmap should use file space.");
+
+            // compare the performance on double data with 2000000 entries
+
+            File testFileDouble = folder.newFile("double");
+            BloomIndex objectBloomIndexDouble = new BloomIndex();
+            objectBloomIndexDouble.setExpectedNumOfEntries(dataEntryNum);
+            Random rdDouble = new Random();
+            List<Double> arrDouble = new ArrayList<>();
+            for (int i = 0; i < dataEntryNum; i++) {
+                arrDouble.add(rdDouble.nextDouble());
+            }
+            objectBloomIndexDouble.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of(arrDouble))));
+            try (FileOutputStream fo = new FileOutputStream(testFileDouble)) {
+                objectBloomIndexDouble.serialize(fo);
+            }
+
+            BloomIndex bloomIndexMemoryDouble = new BloomIndex();
+            bloomIndexMemoryDouble.setMmapEnabled(false);
+            bloomIndexMemoryDouble.setExpectedNumOfEntries(dataEntryNum);
+            try (FileInputStream fi = new FileInputStream(testFileDouble)) {
+                bloomIndexMemoryDouble.deserialize(fi);
+            }
+
+            BloomIndex bloomIndexMmapDouble = new BloomIndex();
+            bloomIndexMmapDouble.setMmapEnabled(true);
+            bloomIndexMmapDouble.setExpectedNumOfEntries(dataEntryNum);
+            try (FileInputStream fi = new FileInputStream(testFileDouble)) {
+                bloomIndexMmapDouble.deserialize(fi);
+            }
+
+            System.out.println(testFileDouble);
+            Random rdTestDouble = new Random();
+            // get query time using memory
+            startTime = System.currentTimeMillis();
+            for (int i = 0; i < queryNum; i++) {
+                double testDouble = rdTestDouble.nextDouble();
+                RowExpression expression = simplePredicate(OperatorType.EQUAL, "testColumn", DOUBLE, testDouble);
+                bloomIndexMemoryDouble.matches(expression);
+            }
+            stopTime = System.currentTimeMillis();
+            elapsedTime = stopTime - startTime;
+            System.out.println(elapsedTime);
+
+            // get query time using mmap
+            startTime = System.currentTimeMillis();
+            for (int i = 0; i < queryNum; i++) {
+                double testDouble = rdTestDouble.nextDouble();
+                RowExpression expression = simplePredicate(OperatorType.EQUAL, "testColumn", DOUBLE, testDouble);
+                bloomIndexMmapDouble.matches(expression);
+            }
+
+            stopTime = System.currentTimeMillis();
+            elapsedTime = stopTime - startTime;
+            System.out.println(elapsedTime);
+
+            memoryFilter = bloomIndexMemoryDouble.getFilter();
+            mmapFilter = bloomIndexMmapDouble.getFilter();
+            assertEquals(mmapFilter, memoryFilter);
+
+            usage1 = bloomIndexMemoryDouble.getMemoryUsage();
+            usage2 = bloomIndexMmapDouble.getMemoryUsage();
+            assertTrue(usage1 > usage2, "mmap should use less memory.");
+
+            fileUsage1 = bloomIndexMemoryDouble.getDiskUsage();
+            fileUsage2 = bloomIndexMmapDouble.getDiskUsage();
+            assertTrue(fileUsage1 < fileUsage2, "mmap should use file space.");
+
+            // compare the performance on UUID string with 2000000 entries
+
+            File testFileString = folder.newFile("string");
+            BloomIndex objectBloomIndexString = new BloomIndex();
+            objectBloomIndexString.setExpectedNumOfEntries(dataEntryNum);
+            List<String> arrString = new ArrayList<>();
+            for (int i = 0; i < dataEntryNum; i++) {
+                arrString.add(UUID.randomUUID().toString());
+            }
+            objectBloomIndexString.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of(arrString))));
+            try (FileOutputStream fo = new FileOutputStream(testFileString)) {
+                objectBloomIndexString.serialize(fo);
+            }
+
+            BloomIndex bloomIndexMemoryString = new BloomIndex();
+            bloomIndexMemoryString.setMmapEnabled(false);
+            bloomIndexMemoryString.setExpectedNumOfEntries(dataEntryNum);
+            try (FileInputStream fi = new FileInputStream(testFileString)) {
+                bloomIndexMemoryString.deserialize(fi);
+            }
+
+            BloomIndex bloomIndexMmapString = new BloomIndex();
+            bloomIndexMmapString.setMmapEnabled(true);
+            bloomIndexMmapString.setExpectedNumOfEntries(dataEntryNum);
+            try (FileInputStream fi = new FileInputStream(testFileString)) {
+                bloomIndexMmapString.deserialize(fi);
+            }
+
+            System.out.println(testFileString);
+            // get query time using memory
+            startTime = System.currentTimeMillis();
+            for (int i = 0; i < queryNum; i++) {
+                String testString = UUID.randomUUID().toString();
+                RowExpression expression = simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, testString);
+                bloomIndexMemoryString.matches(expression);
+            }
+            stopTime = System.currentTimeMillis();
+            elapsedTime = stopTime - startTime;
+            System.out.println(elapsedTime);
+
+            // get query time using mmap
+            startTime = System.currentTimeMillis();
+            for (int i = 0; i < queryNum; i++) {
+                String testString = UUID.randomUUID().toString();
+                RowExpression expression = simplePredicate(OperatorType.EQUAL, "testColumn", VARCHAR, testString);
+                bloomIndexMmapString.matches(expression);
+            }
+            stopTime = System.currentTimeMillis();
+            elapsedTime = stopTime - startTime;
+            System.out.println(elapsedTime);
+
+            memoryFilter = bloomIndexMemoryString.getFilter();
+            mmapFilter = bloomIndexMmapString.getFilter();
+            assertEquals(mmapFilter, memoryFilter);
+
+            usage1 = bloomIndexMemoryString.getMemoryUsage();
+            usage2 = bloomIndexMmapString.getMemoryUsage();
+            assertTrue(usage1 > usage2, "mmap should use less memory.");
+
+            fileUsage1 = bloomIndexMemoryString.getDiskUsage();
+            fileUsage2 = bloomIndexMmapString.getDiskUsage();
+            assertTrue(fileUsage1 < fileUsage2, "mmap should use file space.");
+        }
     }
 }

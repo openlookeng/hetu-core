@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Properties;
 
 import static io.prestosql.spi.connector.CreateIndexMetadata.AUTOLOAD_PROP_KEY;
 import static java.util.Objects.requireNonNull;
@@ -47,11 +48,12 @@ public class IndexRecord
     public final String[] columns;
     public final String indexType;
     public final long indexSize;
-    public final List<String> properties;
+    public final List<String> propertiesAsList;
+    public final Properties propertiesAsProperties;
     public final List<String> partitions;
     public final long lastModifiedTime;
 
-    public IndexRecord(String name, String user, String qualifiedTable, String[] columns, String indexType, long indexSize, List<String> properties, List<String> partitions)
+    public IndexRecord(String name, String user, String qualifiedTable, String[] columns, String indexType, long indexSize, List<String> propertiesAsList, List<String> partitions)
     {
         this.name = name;
         this.user = user == null ? "" : user;
@@ -66,9 +68,21 @@ public class IndexRecord
         this.columns = Arrays.stream(columns).map(String::toLowerCase).toArray(String[]::new);
         this.indexType = indexType.toUpperCase(Locale.ENGLISH);
         this.indexSize = indexSize;
-        this.properties = properties;
         this.partitions = partitions;
         this.lastModifiedTime = System.currentTimeMillis();
+        this.propertiesAsList = propertiesAsList;
+        this.propertiesAsProperties = stringToProperties(propertiesAsList);
+    }
+
+    private Properties stringToProperties(List<String> properties)
+    {
+        Properties curProperties = new Properties();
+        for (String prop : properties) {
+            String key = prop.substring(0, prop.indexOf("="));
+            String val = prop.substring(prop.indexOf("=") + 1);
+            curProperties.setProperty(key, val);
+        }
+        return curProperties;
     }
 
     /**
@@ -96,8 +110,9 @@ public class IndexRecord
         this.name = requireNonNull(values.get("name"), "attribute 'name' should not be null. Index is in an invalid state, recreate the index to resolve the issue.").getAsString();
         this.user = requireNonNull(values.get("user"), "attribute 'user' should not be null. Index is in an invalid state, recreate the index to resolve the issue.").getAsString();
         this.indexSize = values.has("indexSize") ? values.get("indexSize").getAsLong() : 0;
-        this.properties = new ArrayList<>();
-        requireNonNull(values.get("properties"), "attribute 'properties' should not be null. Index is in an invalid state, recreate the index to resolve the issue.").getAsJsonArray().forEach(e -> this.properties.add(e.getAsString()));
+        this.propertiesAsList = new ArrayList<>();
+        requireNonNull(values.get("properties"), "attribute 'properties' should not be null. Index is in an invalid state, recreate the index to resolve the issue.").getAsJsonArray().forEach(e -> this.propertiesAsList.add(e.getAsString()));
+        this.propertiesAsProperties = stringToProperties(this.propertiesAsList);
         this.partitions = new ArrayList<>();
         requireNonNull(values.get("partitions"), "attribute 'partitions' should not be null. Index is in an invalid state, recreate the index to resolve the issue.").getAsJsonArray().forEach(e -> this.partitions.add(e.getAsString()));
         this.lastModifiedTime = requireNonNull(values.get("lastModifiedTime"), "attribute 'lastModifiedTime' should not be null. Index is in an invalid state, recreate the index to resolve the issue.").getAsLong();
@@ -115,7 +130,7 @@ public class IndexRecord
         content.put("name", name);
         content.put("user", user);
         content.put("indexSize", indexSize);
-        content.put("properties", properties);
+        content.put("properties", propertiesAsList);
         content.put("partitions", partitions);
         content.put("lastModifiedTime", lastModifiedTime);
 
@@ -124,12 +139,17 @@ public class IndexRecord
 
     public boolean isInProgressRecord()
     {
-        return this.properties.stream().anyMatch(property -> property.startsWith(INPROGRESS_PROPERTY_KEY));
+        return this.propertiesAsProperties.containsKey(INPROGRESS_PROPERTY_KEY);
+    }
+
+    public Properties getProperties()
+    {
+        return propertiesAsProperties;
     }
 
     public String getProperty(String key)
     {
-        for (String property : properties) {
+        for (String property : this.propertiesAsList) {
             if (property.toLowerCase(Locale.ROOT).startsWith(key.toLowerCase(Locale.ROOT))) {
                 String[] entry = property.split("=");
                 return entry[1];
@@ -164,7 +184,7 @@ public class IndexRecord
     @Override
     public int hashCode()
     {
-        int result = Objects.hash(name, user, catalog, schema, table, qualifiedTable, indexType, indexSize, properties, partitions, lastModifiedTime);
+        int result = Objects.hash(name, user, catalog, schema, table, qualifiedTable, indexType, indexSize, propertiesAsList, partitions, lastModifiedTime);
         result = 31 * result + Arrays.hashCode(columns);
         return result;
     }
@@ -182,7 +202,7 @@ public class IndexRecord
                 ", columns=" + Arrays.toString(columns) +
                 ", indexType='" + indexType + '\'' +
                 ", indexSize=" + indexSize +
-                ", properties=" + properties +
+                ", properties=" + propertiesAsList +
                 ", partitions=" + partitions +
                 ", lastModifiedTime=" + lastModifiedTime +
                 '}';

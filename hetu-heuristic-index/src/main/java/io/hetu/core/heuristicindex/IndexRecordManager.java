@@ -171,7 +171,7 @@ public class IndexRecordManager
                     else {
                         record.partitions.removeAll(partitionsToRemove);
                         IndexRecord newRecord = new IndexRecord(record.name, record.user, record.qualifiedTable, record.columns,
-                                record.indexType, record.indexSize, record.properties, record.partitions);
+                                record.indexType, record.indexSize, record.propertiesAsList, record.partitions);
                         metastore.alterTableParameter(
                                 record.catalog,
                                 record.schema,
