@@ -2848,7 +2848,18 @@ public abstract class AbstractTestHive
             assertTrue(allColumns.containsKey(schemaTableName));
         }
         finally {
-            dropTable(schemaTableName);
+            try (Transaction transaction1 = newTransaction()) {
+                ConnectorMetadata metadata = transaction1.getMetadata();
+                if (metadata instanceof HiveMetadata) {
+                    ConnectorSession session = newSession();
+                    SemiTransactionalHiveMetastore semiTransactionalHiveMetastore = transaction1.getMetastore(schemaTableName.getSchemaName());
+                    semiTransactionalHiveMetastore.dropTable(session, schemaTableName.getSchemaName(), schemaTableName.getTableName());
+                    transaction1.commit();
+                }
+                else {
+                    dropTable(schemaTableName);
+                }
+            }
         }
     }
 

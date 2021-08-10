@@ -110,9 +110,6 @@ public class TestCarbonAllDataType
 
         hetuServer.startServer("testdb", map);
         hetuServer.execute("drop table if exists testdb.testtable");
-        hetuServer.execute("drop table if exists testdb.testtable2");
-        hetuServer.execute("drop table if exists testdb.testtable3");
-        hetuServer.execute("drop table if exists testdb.testtable4");
         hetuServer.execute("drop schema if exists testdb");
         hetuServer.execute("drop schema if exists default");
         hetuServer.execute("create schema testdb");
@@ -416,72 +413,77 @@ public class TestCarbonAllDataType
     @Test
     public void testCreateTable() throws SQLException
     {
-        hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int) with(format='CARBON') ");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (10, 11)");
-        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
+        hetuServer.execute("drop table if exists testdb.testtablecreate");
+        hetuServer.execute("CREATE TABLE testdb.testtablecreate(a int, b int) with(format='CARBON') ");
+        hetuServer.execute("INSERT INTO testdb.testtablecreate VALUES (10, 11)");
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtablecreate");
 
         List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
             add(new HashMap<String, Object>() {{    put("RESULT", 1); }});
         }};
 
         assertEquals(actualResult.toString(), expectedResult.toString());
-        hetuServer.execute("drop table testdb.testtable2");
+        hetuServer.execute("drop table testdb.testtablecreate");
     }
 
 
     @Test
     public void testCreateTableLocation() throws SQLException
     {
+        hetuServer.execute("drop table if exists testdb.testtablelocation");
         String location = "'" + "file:///" + storePath + "/carbon.store" + "')" ;
-        hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int) with(format='CARBON', location = " + location);
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (10, 11)");
-        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
+        hetuServer.execute("CREATE TABLE testdb.testtablelocation(a int, b int) with(format='CARBON', location = " + location);
+        hetuServer.execute("INSERT INTO testdb.testtablelocation VALUES (10, 11)");
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtablelocation");
 
         List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
             add(new HashMap<String, Object>() {{    put("RESULT", 1); }});
         }};
 
         assertEquals(actualResult.toString(), expectedResult.toString());
-        hetuServer.execute("drop table testdb.testtable2");
+        hetuServer.execute("drop table testdb.testtablelocation");
     }
 
     @Test
     public void testCreateTableAs() throws SQLException
     {
-        hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int) with(format='CARBON') ");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (10, 11)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (20, 11)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (30, 11)");
-        hetuServer.execute("CREATE TABLE testdb.testtable3 as select a, b from  testdb.testtable2 ");
-        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable3");
+        hetuServer.execute("drop table if exists testdb.createsourcetable");
+        hetuServer.execute("CREATE TABLE testdb.createsourcetable(a int, b int) with(format='CARBON') ");
+        hetuServer.execute("INSERT INTO testdb.createsourcetable VALUES (10, 11)");
+        hetuServer.execute("INSERT INTO testdb.createsourcetable VALUES (20, 11)");
+        hetuServer.execute("INSERT INTO testdb.createsourcetable VALUES (30, 11)");
+        hetuServer.execute("CREATE TABLE testdb.createtableas as select a, b from  testdb.createsourcetable ");
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.createtableas");
 
         List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
             add(new HashMap<String, Object>() {{    put("RESULT", 3); }});
         }};
 
         assertEquals(actualResult.toString(), expectedResult.toString());
-        hetuServer.execute("drop table testdb.testtable2");
-        hetuServer.execute("drop table testdb.testtable3");
+        hetuServer.execute("drop table testdb.createsourcetable");
+        hetuServer.execute("drop table testdb.createtableas");
     }
     @Test
     public void testCreateTableAsMultiRow() throws SQLException
     {
-        hetuServer.execute("CREATE TABLE testdb.testtable3 as " +
+        hetuServer.execute("drop table if exists testdb.createtablemultiplerows");
+        hetuServer.execute("CREATE TABLE testdb.createtablemultiplerows as " +
                 "select ID,date,country,name,phonetype,serialname,salary,bonus, monthlyBonus,dob,shortField,isCurrentEmployee " +
                 "from  testdb.testtable");
 
-        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable3");
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.createtablemultiplerows");
 
         List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
             add(new HashMap<String, Object>() {{    put("RESULT", 11); }});
         }};
 
         assertEquals(actualResult.toString(), expectedResult.toString());
-        hetuServer.execute("drop table testdb.testtable3");
+        hetuServer.execute("drop table testdb.createtablemultiplerows");
     }
 
     @Test
     public void testCreateTableWithLocationDisabled() throws SQLException {
+        hetuServer.execute("drop table if exists testdb.testtable3");
         assertEquals(Assert.expectThrows(SQLException.class, () -> hetuServer.execute("CREATE TABLE carbondatacataloglocationdisabled.testdb.testtable3"
                 + "(a int, b int , c int , d int ) with (location='hdfs:///user/')")).getMessage().split(":")[1]," Setting location property is not allowed");
     }
@@ -489,14 +491,14 @@ public class TestCarbonAllDataType
     @Test
     public void testDropTable() throws SQLException
     {
-        hetuServer.execute("drop table if exists testdb.testtable2");
-        hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int) with(format='CARBON') ");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (10, 11)");
+        hetuServer.execute("drop table if exists testdb.testtabledrop");
+        hetuServer.execute("CREATE TABLE testdb.testtabledrop(a int, b int) with(format='CARBON') ");
+        hetuServer.execute("INSERT INTO testdb.testtabledrop VALUES (10, 11)");
 
         try {
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtable2", false), true);
-            hetuServer.execute("drop table testdb.testtable2");
-            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtable2", false), false);
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtabledrop", false), true);
+            hetuServer.execute("drop table testdb.testtabledrop");
+            assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtabledrop", false), false);
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -506,9 +508,10 @@ public class TestCarbonAllDataType
     @Test
     public void testCreateTableValidate() throws SQLException
     {
-        hetuServer.execute("CREATE TABLE testdb.testtable2 (a int, b int , c int , d int )");
+        hetuServer.execute("drop table if exists testdb.testtablevalidate");
+        hetuServer.execute("CREATE TABLE testdb.testtablevalidate (a int, b int , c int , d int )");
 
-        String schemaFilePath = CarbonTablePath.getSchemaFilePath( "file://" + storePath + "/carbon.store"+ "/testdb" + "/testtable2");
+        String schemaFilePath = CarbonTablePath.getSchemaFilePath( "file://" + storePath + "/carbon.store"+ "/testdb" + "/testtablevalidate");
         // If metadata folder exists, it is a transactional table
         CarbonFile schemaFile = FileFactory.getCarbonFile(schemaFilePath);
         boolean isTransactionalTable = schemaFile.exists();
@@ -551,22 +554,22 @@ public class TestCarbonAllDataType
             // wrapperTableInfo is the code level information of a table in carbondata core,
             // different from the Thrift TableInfo.
             TableInfo wrapperTableInfo = schemaConverter
-                    .fromExternalToWrapperTableInfo(tableInfo, "testdb", "testtable2","file://" + storePath + "/carbon.store"+ "/testdb");
+                    .fromExternalToWrapperTableInfo(tableInfo, "testdb", "testtablevalidate","file://" + storePath + "/carbon.store"+ "/testdb");
 
         }
 
-        hetuServer.execute("drop table testdb.testtable2");
+        hetuServer.execute("drop table testdb.testtablevalidate");
     }
 
     @Test
     public void testReadWriteRealDatatype()
             throws SQLException
     {
-        hetuServer.execute("drop table if exists testdb.testtable4");
-        hetuServer.execute("CREATE TABLE testdb.testtable4(a int, b real)");
-        hetuServer.execute("INSERT INTO testdb.testtable4 VALUES (10, 2),(11, 3),(12, 4)");
+        hetuServer.execute("drop table if exists testdb.testtablerealdatatype");
+        hetuServer.execute("CREATE TABLE testdb.testtablerealdatatype(a int, b real)");
+        hetuServer.execute("INSERT INTO testdb.testtablerealdatatype VALUES (10, 2),(11, 3),(12, 4)");
 
-        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select b as RESULT from testdb.testtable4 where a = 11");
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select b as RESULT from testdb.testtablerealdatatype where a = 11");
 
         List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
         {{
@@ -575,7 +578,7 @@ public class TestCarbonAllDataType
         }};
 
         assertEquals(actualResult.toString(), expectedResult.toString());
-        hetuServer.execute("drop table testdb.testtable4");
+        hetuServer.execute("drop table testdb.testtablerealdatatype");
     }
 
 
@@ -583,10 +586,11 @@ public class TestCarbonAllDataType
     public void testReadWriteTinyintDatatype()
             throws SQLException
     {
-        hetuServer.execute("CREATE TABLE testdb.testtable4(a int, b tinyint)");
-        hetuServer.execute("INSERT INTO testdb.testtable4 VALUES (10, tinyint '1'),(11, tinyint '2'),(12, tinyint '3')");
+        hetuServer.execute("drop table if exists testdb.testtabletinydatatype");
+        hetuServer.execute("CREATE TABLE testdb.testtabletinydatatype(a int, b tinyint)");
+        hetuServer.execute("INSERT INTO testdb.testtabletinydatatype VALUES (10, tinyint '1'),(11, tinyint '2'),(12, tinyint '3')");
 
-        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select b as RESULT from testdb.testtable4 where a = 10");
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select b as RESULT from testdb.testtabletinydatatype where a = 10");
 
         List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
         {{
@@ -595,7 +599,7 @@ public class TestCarbonAllDataType
         }};
 
         assertEquals(actualResult.toString(), expectedResult.toString());
-        hetuServer.execute("drop table if exists testdb.testtable4");
+        hetuServer.execute("drop table if exists testdb.testtabletinydatatype");
     }
 
     private String carbondatastorecreator(String data, int i, String[] dataTypes)
@@ -787,20 +791,20 @@ public class TestCarbonAllDataType
     public void testCreateTableValidateExistingPath() throws SQLException
     {
         try {
-            hetuServer.execute("drop table if exists testdb.testtable4");
-            FileFactory.createDirectoryAndSetPermission(storePath  + "/carbon.store/testdb/testtable4" , null);
+            hetuServer.execute("drop table if exists testdb.testtablevalidateexistingpath");
+            FileFactory.createDirectoryAndSetPermission(storePath  + "/carbon.store/testdb/testtablevalidateexistingpath" , null);
             try {
-                hetuServer.execute("CREATE TABLE testdb.testtable4(a int, b int) with(format='CARBON') ");
+                hetuServer.execute("CREATE TABLE testdb.testtablevalidateexistingpath(a int, b int) with(format='CARBON') ");
             }
             catch (Exception e) {
-                Boolean ret = e.getMessage().contains("Target directory for table 'testdb.testtable4' already exists:");
+                Boolean ret = e.getMessage().contains("Target directory for table 'testdb.testtablevalidateexistingpath' already exists:");
                 assertEquals("true", ret.toString());
-                CarbonUtil.deleteFoldersAndFiles(FileFactory.getCarbonFile(storePath  + "/carbon.store/testdb/testtable4"));
+                CarbonUtil.deleteFoldersAndFiles(FileFactory.getCarbonFile(storePath  + "/carbon.store/testdb/testtablevalidateexistingpath"));
                 return;
             }
-            hetuServer.execute("drop table if exists testdb.testtable4");
+            hetuServer.execute("drop table if exists testdb.testtablevalidateexistingpath");
             // in error case it will come here
-            assertEquals("CREATE TABLE testdb.testtable4 should throw error", "CREATE TABLE testdb.testtable4 success");
+            assertEquals("CREATE TABLE testdb.testtablevalidateexistingpath should throw error", "CREATE TABLE testdb.testtablevalidateexistingpath success");
 
         }
         catch (IOException | InterruptedException e) {
@@ -811,6 +815,7 @@ public class TestCarbonAllDataType
     @Test
     public void testSegmentDelete() throws SQLException
     {
+        hetuServer.execute("drop table if exists testdb.segmentdelete");
         hetuServer.execute("CREATE TABLE testdb.segmentdelete(a int, b tinyint)");
         hetuServer.execute("INSERT INTO testdb.segmentdelete VALUES (10, tinyint '1'),(11, tinyint '2'),(12, tinyint '3')");
         hetuServer.execute("INSERT INTO testdb.segmentdelete VALUES (13, tinyint '1'),(14, tinyint '2'),(15, tinyint '3')");
@@ -876,6 +881,7 @@ public class TestCarbonAllDataType
     @Test
     public void testVacuumNonPartitionedTable() throws SQLException
     {
+        hetuServer.execute("drop table if exists testdb.mytesttable");
         hetuServer.execute("CREATE TABLE testdb.mytesttable (a int, b int)");
         hetuServer.execute("INSERT INTO testdb.mytesttable VALUES (1, 2)");
         hetuServer.execute("INSERT INTO testdb.mytesttable VALUES (2, 4)");
@@ -897,6 +903,7 @@ public class TestCarbonAllDataType
     @Test
     public void testDoubleVacuumNonPartitionedTable() throws SQLException
     {
+        hetuServer.execute("drop table if exists testdb.mytesttable2");
         hetuServer.execute("CREATE TABLE testdb.mytesttable2 (a int, b int)");
         hetuServer.execute("INSERT INTO testdb.mytesttable2 VALUES (1, 2)");
         hetuServer.execute("INSERT INTO testdb.mytesttable2 VALUES (2, 4)");
@@ -920,6 +927,7 @@ public class TestCarbonAllDataType
     @Test
     public void testVacuumRollback() throws SQLException
     {
+        hetuServer.execute("drop table if exists testdb.myectable");
         hetuServer.execute("CREATE TABLE testdb.myectable (a int, b int)");
         hetuServer.execute("INSERT INTO testdb.myectable VALUES (1, 2)");
         hetuServer.execute("INSERT INTO testdb.myectable VALUES (2, 4)");
@@ -952,14 +960,15 @@ public class TestCarbonAllDataType
     @Test
     public void testCreateDropTableDifferentLocation() throws SQLException
     {
-        hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int)");
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (10, 11)");
-        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
+        hetuServer.execute("drop table if exists testdb.testtablediffloc");
+        hetuServer.execute("CREATE TABLE testdb.testtablediffloc(a int, b int)");
+        hetuServer.execute("INSERT INTO testdb.testtablediffloc VALUES (10, 11)");
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtablediffloc");
         List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
             add(new HashMap<String, Object>() {{    put("RESULT", 1); }});
         }};
         assertEquals(actualResult.toString(), expectedResult.toString());
-        hetuServer.execute("drop table testdb.testtable2");
+        hetuServer.execute("drop table testdb.testtablediffloc");
 
         // creating table with same name
         try {
@@ -971,31 +980,32 @@ public class TestCarbonAllDataType
         }
 
         String location = "'" + "file:///" + storePath + "/carbon.store/mytestDb" + "')" ;
-        hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int) with(format='CARBON', location = " + location);
-        hetuServer.execute("INSERT INTO testdb.testtable2 VALUES (10, 11)");
-        actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
+        hetuServer.execute("CREATE TABLE testdb.testtablediffloc(a int, b int) with(format='CARBON', location = " + location);
+        hetuServer.execute("INSERT INTO testdb.testtablediffloc VALUES (10, 11)");
+        actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtablediffloc");
 
         expectedResult = new ArrayList<Map<String, Object>>() {{
             add(new HashMap<String, Object>() {{    put("RESULT", 1); }});
         }};
 
         assertEquals(actualResult.toString(), expectedResult.toString());
-        hetuServer.execute("drop table testdb.testtable2");
+        hetuServer.execute("drop table testdb.testtablediffloc");
     }
 
     @Test
     public void testCheckingCarbonCacheUpdate() throws SQLException
     {
-        hetuServer.execute("CREATE TABLE testdb.testtable2(a int, b int)");
-        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
+        hetuServer.execute("drop table if exists testdb.testtablecacheupdate");
+        hetuServer.execute("CREATE TABLE testdb.testtablecacheupdate(a int, b int)");
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtablecacheupdate");
         List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
             add(new HashMap<String, Object>() {{    put("RESULT", 0); }});
         }};
         assertEquals(actualResult.toString(), expectedResult.toString());
 
-        File OriginalFile = new File(storePath + "/carbon.store/testdb/testtable2/Metadata/schema");
+        File OriginalFile = new File(storePath + "/carbon.store/testdb/testtablecacheupdate/Metadata/schema");
         // create the destination file object
-        File dest = new File(storePath + "/carbon.store/testdb/testtable2/schema_backup");
+        File dest = new File(storePath + "/carbon.store/testdb/testtablecacheupdate/schema_backup");
         // check if the file can be renamed
         // to the abstract path name
         if (OriginalFile.renameTo(dest)) {
@@ -1009,7 +1019,7 @@ public class TestCarbonAllDataType
             System.out.println("File cannot be renamed");
         }
         try {
-            hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
+            hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtablecacheupdate");
         }
         catch (SQLException s) {
             Boolean ret = s.getMessage().contains("Failed while reading metadata of the table");
@@ -1021,18 +1031,19 @@ public class TestCarbonAllDataType
         else {
             System.out.println("File cannot be renamed");
         }
-        actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtable2");
+        actualResult = hetuServer.executeQuery("Select count (*) as RESULT from testdb.testtablecacheupdate");
         expectedResult = new ArrayList<Map<String, Object>>() {{
             add(new HashMap<String, Object>() {{    put("RESULT", 0); }});
         }};
         assertEquals(actualResult.toString(), expectedResult.toString());
-        hetuServer.execute("drop table testdb.testtable2");
+        hetuServer.execute("drop table testdb.testtablecacheupdate");
     }
 
     @Test
     public void validateMetadataEntriesAfterInsert() throws SQLException, IOException
     {
         String tableName = "testtablestatus";
+        hetuServer.execute("drop table if exists testdb.testtablestatus");
         hetuServer.execute(String.format("CREATE TABLE testdb.%s (a int, b int)", tableName));
         hetuServer.execute(String.format("INSERT INTO testdb.%s VALUES(1, 2)", tableName));
 
@@ -1053,6 +1064,7 @@ public class TestCarbonAllDataType
     @Test
     public void testShowCreateTable() throws SQLException
     {
+        hetuServer.execute("drop table if exists testdb.showcreatetable");
         hetuServer.execute("CREATE TABLE testdb.showcreatetable (a int, b int)");
         try {
             hetuServer.execute("SHOW CREATE TABLE  testdb.showcreatetable");
@@ -1067,6 +1079,7 @@ public class TestCarbonAllDataType
     @Test
     public void testFilterUnboundedVarcharDatatype() throws SQLException
     {
+        hetuServer.execute("drop table if exists testdb.unboundedvarchar");
         hetuServer.execute("CREATE TABLE testdb.unboundedvarchar(name varchar)");
         hetuServer.execute("INSERT INTO testdb.unboundedvarchar VALUES('akash'),('anubhav'),('bhavya'),('amit  ')");
 
@@ -1109,6 +1122,7 @@ public class TestCarbonAllDataType
     @Test
     public void testFilterBoundedVarcharDatatype() throws SQLException
     {
+        hetuServer.execute("drop table if exists testdb.boundedvarchar");
         hetuServer.execute("CREATE TABLE testdb.boundedvarchar(name varchar(6))");
         hetuServer.execute("INSERT INTO testdb.boundedvarchar VALUES('akash'),('anubav'),('bhavya'), ('amit  ')");
 
@@ -1173,6 +1187,7 @@ public class TestCarbonAllDataType
     @Test
     public void testFilterUnboundedCharDatatype() throws SQLException
     {
+        hetuServer.execute("drop table if exists testdb.unboundedchar");
         hetuServer.execute("CREATE TABLE testdb.unboundedchar(name char)");
         hetuServer.execute("INSERT INTO testdb.unboundedchar VALUES('a'),('b'),('c'),('d')");
 
@@ -1217,6 +1232,7 @@ public class TestCarbonAllDataType
     @Test
     public void testFilterBoundedCharDatatype() throws SQLException
     {
+        hetuServer.execute("drop table if exists testdb.boundedchar");
         hetuServer.execute("CREATE TABLE testdb.boundedchar(name char(7))");
         hetuServer.execute("INSERT INTO testdb.boundedchar VALUES('akash'),('anubav'),('bhavya'),('amit   ')");
 
@@ -1269,6 +1285,7 @@ public class TestCarbonAllDataType
     @Test
     public void testFilterUnboundedVarcharDatatypeForLocalDic() throws SQLException, IOException
     {
+        hetuServer.execute("drop table if exists testdb.unboundedvarcharforlocaldic");
         hetuServer.execute("CREATE TABLE testdb.unboundedvarcharforlocaldic(name varchar)");
         writeSchemaFileForLocalDic("unboundedvarcharforlocaldic");
         hetuServer.execute("INSERT INTO testdb.unboundedvarcharforlocaldic VALUES('akash'),('anubhav'),('bhavya'),('amit  ')");
@@ -1312,6 +1329,7 @@ public class TestCarbonAllDataType
     @Test
     public void testFilterBoundedVarcharDatatypeForLocalDic() throws SQLException, IOException
     {
+        hetuServer.execute("drop table if exists testdb.boundedvarcharforlocaldic");
         hetuServer.execute("CREATE TABLE testdb.boundedvarcharforlocaldic(name varchar(6))");
         writeSchemaFileForLocalDic("boundedvarcharforlocaldic");
         hetuServer.execute("INSERT INTO testdb.boundedvarcharforlocaldic VALUES('akash'),('anubav'),('bhavya'), ('amit  ')");
@@ -1376,6 +1394,7 @@ public class TestCarbonAllDataType
     @Test
     public void testFilterUnboundedCharDatatypeForLocalDic() throws SQLException, IOException
     {
+        hetuServer.execute("drop table if exists testdb.unboundedcharforlocaldic");
         hetuServer.execute("CREATE TABLE testdb.unboundedcharforlocaldic(name char)");
         writeSchemaFileForLocalDic("unboundedcharforlocaldic");
         hetuServer.execute("INSERT INTO testdb.unboundedcharforlocaldic VALUES('a'),('b'),('c'),('d')");
@@ -1422,6 +1441,7 @@ public class TestCarbonAllDataType
 
     @Test
     public void testFilterBoundedCharDatatypeForLocalDic() throws SQLException, IOException {
+        hetuServer.execute("drop table if exists testdb.boundedcharlocaldic");
         hetuServer.execute("CREATE TABLE testdb.boundedcharlocaldic(id int, name char(7))");
         writeSchemaFileForLocalDic("boundedcharlocaldic");
         hetuServer.execute("INSERT INTO testdb.boundedcharlocaldic VALUES(1, 'akash'),(2, 'anubav'),(3, 'bhavya'),(4, 'amit   ')");
@@ -1502,6 +1522,7 @@ public class TestCarbonAllDataType
     public void testCheckCreateTablePartitionByNotSupported() throws SQLException
     {
         try {
+            hetuServer.execute("drop table if exists testdb.partitiontesttable");
             hetuServer.execute("CREATE TABLE testdb.partitiontesttable (a int, b int , c int , d int ) WITH (partitioned_by = ARRAY['c', 'd'])");
         }
         catch (Exception e) {
@@ -1518,6 +1539,8 @@ public class TestCarbonAllDataType
     public void testCheckCreateTableAsPartitionByNotSupported() throws SQLException
     {
         try {
+            hetuServer.execute("drop table if exists testdb.partitiontesttable1");
+            hetuServer.execute("drop table if exists testdb.partitiontesttable2");
             hetuServer.execute("CREATE TABLE testdb.partitiontesttable1 (a int, b int , c int , d int )");
             hetuServer.execute("CREATE TABLE testdb.partitiontesttable2 WITH (partitioned_by = ARRAY['c', 'd']) AS SELECT *  FROM  testdb.partitiontesttable1");
         }
@@ -1537,6 +1560,7 @@ public class TestCarbonAllDataType
     public void test_writer_count() throws SQLException
     {
         hetuServer.execute("drop table if exists testdb.testorders1");
+        hetuServer.execute("drop table if exists testdb.testorders_bak");
         hetuServer.execute("set session task_writer_count=32");
         hetuServer.execute("set session implicit_conversion=true");
         hetuServer.execute("CREATE TABLE testdb.testorders1(orderkey int, orderstatus STRING, totalprice double, orderdate date)");

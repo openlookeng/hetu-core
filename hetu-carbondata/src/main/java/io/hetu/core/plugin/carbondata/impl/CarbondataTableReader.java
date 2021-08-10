@@ -323,7 +323,7 @@ public class CarbondataTableReader
                             inputSplits.get(j).stream().flatMap(f -> Arrays.stream(getLocations(f))).distinct()
                                     .toArray(String[]::new)));
                 }
-                LOGGER.error("Size fo MultiblockList   " + multiBlockSplitList.size());
+                LOGGER.error("Size of MultiblockList   " + multiBlockSplitList.size());
             }
         }
         catch (IOException e) {

@@ -123,37 +123,37 @@ public class TestsWithHiveConnector
     public void deleteTransactionTableDirUsing2tables()
             throws SQLException
     {
-        hetuServer.execute("drop table if exists hive.default.parttable");
+        hetuServer.execute("drop table if exists hive.default.parttable2");
         hetuServer.execute("drop table if exists hive.default.parttable1");
         hetuServer.execute("set session DELETE_TRANSACTIONAL_TABLE_DIRECT = true");
-        hetuServer.execute("create table hive.default.parttable (orderkey int, year int) WITH (transactional = true , format = 'ORC', partitioned_by = ARRAY[ 'year' ] )");
-        hetuServer.execute("insert into hive.default.parttable values (1,2011)");
-        hetuServer.execute("insert into hive.default.parttable values (2,2012)");
-        hetuServer.execute("insert into hive.default.parttable values (3,2013)");
+        hetuServer.execute("create table hive.default.parttable2 (orderkey int, year int) WITH (transactional = true , format = 'ORC', partitioned_by = ARRAY[ 'year' ] )");
+        hetuServer.execute("insert into hive.default.parttable2 values (1,2011)");
+        hetuServer.execute("insert into hive.default.parttable2 values (2,2012)");
+        hetuServer.execute("insert into hive.default.parttable2 values (3,2013)");
 
         hetuServer.execute("create table hive.default.parttable1 (orderkey int, year int) WITH (transactional = true , format = 'ORC', partitioned_by = ARRAY[ 'year' ] )");
         hetuServer.execute("insert into hive.default.parttable1 values (1,2011)");
         hetuServer.execute("insert into hive.default.parttable1 values (2,2012)");
         hetuServer.execute("insert into hive.default.parttable1 values (3,2013)");
 
-        hetuServer.execute("delete from hive.default.parttable where year >= (select max(year) from hive.default.parttable1)  ");
+        hetuServer.execute("delete from hive.default.parttable2 where year >= (select max(year) from hive.default.parttable1)  ");
         try {
             assertEquals(FileFactory.isFileExist(storePath +
-                    "hive.store/default/parttable/year=2013", false), false);
+                    "hive.store/default/parttable2/year=2013", false), false);
         } catch (IOException exception) {
             exception.printStackTrace();
         }
 
-        hetuServer.execute("insert into hive.default.parttable values (4,2014)");
-        hetuServer.execute("delete from hive.default.parttable where year >= (select year from hive.default.parttable1 where orderkey=4 )  ");
+        hetuServer.execute("insert into hive.default.parttable2 values (4,2014)");
+        hetuServer.execute("delete from hive.default.parttable2 where year >= (select year from hive.default.parttable1 where orderkey=4 )  ");
         try {
             assertEquals(FileFactory.isFileExist(storePath +
-                    "hive.store/default/parttable/year=2014", false), false);
+                    "hive.store/default/parttable2/year=2014", false), false);
         } catch (IOException exception) {
             exception.printStackTrace();
         }
 
-        hetuServer.execute("DROP TABLE hive.default.parttable");
+        hetuServer.execute("DROP TABLE hive.default.parttable2");
         hetuServer.execute("DROP TABLE hive.default.parttable1");
     }
 
@@ -161,46 +161,72 @@ public class TestsWithHiveConnector
     public void deleteTransactionTableDirDisable()
             throws SQLException
     {
-        hetuServer.execute("drop table if exists hive.default.parttable");
+        hetuServer.execute("drop table if exists hive.default.parttable3");
         hetuServer.execute("set session DELETE_TRANSACTIONAL_TABLE_DIRECT = false");
-        hetuServer.execute("create table hive.default.parttable (orderkey int, year int) WITH (transactional = true , format = 'ORC', partitioned_by = ARRAY[ 'year' ] )");
-        hetuServer.execute("insert into hive.default.parttable values (1,2011)");
-        hetuServer.execute("insert into hive.default.parttable values (2,2012)");
-        hetuServer.execute("insert into hive.default.parttable values (3,2013)");
+        hetuServer.execute("create table hive.default.parttable3 (orderkey int, year int) WITH (transactional = true , format = 'ORC', partitioned_by = ARRAY[ 'year' ] )");
+        hetuServer.execute("insert into hive.default.parttable3 values (1,2011)");
+        hetuServer.execute("insert into hive.default.parttable3 values (2,2012)");
+        hetuServer.execute("insert into hive.default.parttable3 values (3,2013)");
 
-        hetuServer.execute("create table hive.default.parttable1 (orderkey int, year int) WITH (transactional = true , format = 'ORC', partitioned_by = ARRAY[ 'year' ] )");
-        hetuServer.execute("insert into hive.default.parttable1 values (1,2011)");
-        hetuServer.execute("insert into hive.default.parttable1 values (2,2012)");
-        hetuServer.execute("insert into hive.default.parttable1 values (3,2013)");
+        hetuServer.execute("create table hive.default.parttable4 (orderkey int, year int) WITH (transactional = true , format = 'ORC', partitioned_by = ARRAY[ 'year' ] )");
+        hetuServer.execute("insert into hive.default.parttable4 values (1,2011)");
+        hetuServer.execute("insert into hive.default.parttable4 values (2,2012)");
+        hetuServer.execute("insert into hive.default.parttable4 values (3,2013)");
 
-        hetuServer.execute("delete from hive.default.parttable where year >= (select max(year) from hive.default.parttable1)  ");
+        hetuServer.execute("delete from hive.default.parttable3 where year >= (select max(year) from hive.default.parttable4)  ");
         try {
             assertEquals(FileFactory.isFileExist(storePath +
-                    "/hive.store/default/parttable/year=2013", false), true);
+                    "/hive.store/default/parttable3/year=2013", false), true);
         } catch (IOException exception) {
             exception.printStackTrace();
         }
-        hetuServer.execute("DROP TABLE hive.default.parttable");
+        hetuServer.execute("DROP TABLE hive.default.parttable3");
     }
 
     @Test(dependsOnMethods = {"block_Hive_Table_from_Carbondata"})
     public void block_Carbondata_Table_from_Hive()
             throws SQLException
     {
-        hetuServer.execute("CREATE TABLE carbondata.default.demotable (c1 int)");
+        hetuServer.execute("CREATE TABLE carbondata.default.demotable1 (c1 int)");
 
         hetuServer.execute("use hive.default");
 
-        runQueryAndAssertErrorMessage("SELECT * FROM demotable",
+        runQueryAndAssertErrorMessage("SELECT * FROM demotable1",
                 "Hive connector can't read carbondata tables");
 
-        runQueryAndAssertErrorMessage("INSERT INTO demotable VALUES(1)",
+        runQueryAndAssertErrorMessage("INSERT INTO demotable1 VALUES(1)",
                 "Tables with MapredCarbonInputFormat are not supported by Hive connector");
 
-        runQueryAndAssertErrorMessage("UPDATE demotable SET c1=1",
+        runQueryAndAssertErrorMessage("UPDATE demotable1 SET c1=1",
                 "Tables with MapredCarbonInputFormat are not supported by Hive connector");
 
-        hetuServer.execute("DROP TABLE hive.default.demotable");
+        hetuServer.execute("use carbondata.default");
+        hetuServer.execute("DROP TABLE carbondata.default.demotable1");
+    }
+
+    @Test(dependsOnMethods = {"block_Hive_Table_from_Carbondata"})
+    public void block_Carbondata_Table_change_from_Hive()
+            throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE carbondata.default.changetable (a int, b int, c int)");
+        hetuServer.execute("use hive.default");
+        //rename column
+        runQueryAndAssertErrorMessage("ALTER TABLE default.changetable RENAME COLUMN a TO aa",
+                "Tables with MapredCarbonInputFormat are not supported by Hive connector");
+        //add column
+        runQueryAndAssertErrorMessage("ALTER TABLE default.changetable ADD COLUMN e int COMMENT 'Hello World'",
+                "Tables with MapredCarbonInputFormat are not supported by Hive connector");
+        //drop column
+        runQueryAndAssertErrorMessage("ALTER TABLE hive.default.changetable DROP COLUMN c",
+                "Tables with MapredCarbonInputFormat are not supported by Hive connector");
+        //change table name
+        runQueryAndAssertErrorMessage("ALTER TABLE hive.default.changetable RENAME TO hive.default.changetable_N",
+                "Tables with MapredCarbonInputFormat are not supported by Hive connector");
+        //drop table
+        runQueryAndAssertErrorMessage("DROP TABLE default.changetable",
+                "Tables with MapredCarbonInputFormat are not supported by Hive connector");
+        hetuServer.execute("use carbondata.default");
+        hetuServer.execute("DROP TABLE carbondata.default.changetable");
     }
 
     private Map<String, String> createHiveProperties()
@@ -209,6 +235,11 @@ public class TestsWithHiveConnector
         hiveProperties.put("hive.metastore", "file");
         hiveProperties.put("hive.allow-drop-table", "true");
         hiveProperties.put("hive.non-managed-table-writes-enabled", "true");
+        hiveProperties.put("hive.allow-add-column", "true");
+        hiveProperties.put("hive.allow-drop-column", "true");
+        hiveProperties.put("hive.allow-rename-table", "true");
+        hiveProperties.put("hive.allow-comment-table", "true");
+        hiveProperties.put("hive.allow-rename-column", "true");
         hiveProperties.put("hive.metastore.catalog.dir", "file://" + storePath + "/hive.store");
         return hiveProperties;
     }
