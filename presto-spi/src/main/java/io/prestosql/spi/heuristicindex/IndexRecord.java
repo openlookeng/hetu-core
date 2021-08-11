@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 public class IndexRecord
 {
@@ -44,11 +43,12 @@ public class IndexRecord
     public final String qualifiedTable;
     public final String[] columns;
     public final String indexType;
+    public final long indexSize;
     public final List<String> properties;
     public final List<String> partitions;
     public final long lastModifiedTime;
 
-    public IndexRecord(String name, String user, String qualifiedTable, String[] columns, String indexType, List<String> properties, List<String> partitions)
+    public IndexRecord(String name, String user, String qualifiedTable, String[] columns, String indexType, long indexSize, List<String> properties, List<String> partitions)
     {
         this.name = name;
         this.user = user == null ? "" : user;
@@ -62,32 +62,10 @@ public class IndexRecord
         this.table = qualifiedNames[2];
         this.columns = Arrays.stream(columns).map(String::toLowerCase).toArray(String[]::new);
         this.indexType = indexType.toUpperCase(Locale.ENGLISH);
+        this.indexSize = indexSize;
         this.properties = properties;
         this.partitions = partitions;
         this.lastModifiedTime = System.currentTimeMillis();
-    }
-
-    /**
-     * Construct IndexRecord from line of csv record
-     */
-    public IndexRecord(String csvRecord)
-    {
-        String[] records = csvRecord.split("\\|", Integer.MAX_VALUE);
-        this.name = records[0];
-        this.user = records[1];
-        String[] qualifiedNames = records[2].split("\\.");
-        if (qualifiedNames.length != 3) {
-            throw new IllegalArgumentException(String.format("Invalid table name: %s", records[2]));
-        }
-        this.qualifiedTable = records[2];
-        this.catalog = qualifiedNames[0];
-        this.schema = qualifiedNames[1];
-        this.table = qualifiedNames[2];
-        this.columns = records[3].split(",");
-        this.indexType = records[4];
-        this.properties = Arrays.stream(records[5].split(",")).filter(s -> !s.equals("")).collect(Collectors.toList());
-        this.partitions = Arrays.stream(records[6].split(",")).filter(s -> !s.equals("")).collect(Collectors.toList());
-        this.lastModifiedTime = Long.parseLong(records[7]);
     }
 
     /**
@@ -109,11 +87,11 @@ public class IndexRecord
         this.indexType = keyParts[2];
 
         // parse value (JSON)
-        Gson gson = new Gson();
         JsonParser parser = new JsonParser();
         JsonObject values = parser.parse(metastoreEntry.getValue()).getAsJsonObject();
         this.name = values.get("name").getAsString();
         this.user = values.get("user").getAsString();
+        this.indexSize = values.get("indexSize").getAsLong();
         this.properties = new ArrayList<>();
         values.get("properties").getAsJsonArray().forEach(e -> this.properties.add(e.getAsString()));
         this.partitions = new ArrayList<>();
@@ -132,6 +110,7 @@ public class IndexRecord
         Map<String, Object> content = new HashMap<>();
         content.put("name", name);
         content.put("user", user);
+        content.put("indexSize", indexSize);
         content.put("properties", properties);
         content.put("partitions", partitions);
         content.put("lastModifiedTime", lastModifiedTime);

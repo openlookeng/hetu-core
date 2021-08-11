@@ -167,7 +167,7 @@ public class FileIndexWriter
      * @throws IOException when exceptions occur during persisting
      */
     @Override
-    public void persist()
+    public long persist()
             throws IOException
     {
         for (Long offset : indexPages.keySet()) {
@@ -183,11 +183,14 @@ public class FileIndexWriter
 
         try {
             IndexServiceUtils.writeToHdfs(LOCAL_FS_CLIENT, fs, tmpPath, tarPath);
+            // return the size of this file in bytes
+            return Files.size(tarPath);
         }
         catch (IOException e) {
             LOG.debug("Error copying index files to remote filesystem: ", e);
             // roll back creation
             fs.delete(tarPath);
+            return 0;
         }
         finally {
             LOCAL_FS_CLIENT.deleteRecursively(tmpPath);

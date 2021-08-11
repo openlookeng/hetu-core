@@ -122,7 +122,7 @@ public class CreateIndexOperator
                 Map.Entry<String, IndexWriter> entry = iterator.next();
                 if (persistBy.get(entry.getValue()) == this) {
                     String writerKey = entry.getKey();
-                    entry.getValue().persist();
+                    this.createIndexMetadata.incrementIndexSize(entry.getValue().persist());
                     iterator.remove(); // remove reference to writer once persisted so it can be GCed
                     LOG.debug("Writer for %s has finished persisting. Remaining: %d", writerKey, levelWriter.size());
                 }

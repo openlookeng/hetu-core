@@ -31,6 +31,6 @@ public interface IndexWriter
     void addData(Map<String, List<Object>> values, Properties connectorMetadata)
             throws IOException;
 
-    void persist()
+    long persist()
             throws IOException;
 }

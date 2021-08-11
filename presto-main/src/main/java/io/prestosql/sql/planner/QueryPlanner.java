@@ -735,6 +735,7 @@ class QueryPlanner
                 new CreateIndexMetadata(createIndex.getIndexName().toString(),
                         tableName,
                         createIndex.getIndexType(),
+                        0L,
                         createIndex.getColumnAliases().stream().map(identifier -> new Pair<>(identifier.toString(),
                                 columnTypes.get(identifier.toString().toLowerCase(Locale.ROOT)))).collect(Collectors.toList()),
                         partitions,

@@ -33,7 +33,7 @@ public class NoOpIndexWriter
     }
 
     @Override
-    public void persist()
+    public long persist()
             throws IOException
     {
         throw new UnsupportedOperationException(ERROR_MSG);
