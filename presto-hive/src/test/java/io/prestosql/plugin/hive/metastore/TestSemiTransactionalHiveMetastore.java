@@ -35,7 +35,6 @@ import io.prestosql.testing.TestingConnectorSession;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -106,12 +105,13 @@ public class TestSemiTransactionalHiveMetastore
 
     private void updatePartitionsStatistics()
     {
-        List<Function<PartitionStatistics, PartitionStatistics>> updateList = new ArrayList<>();
+        Map<String, Function<PartitionStatistics, PartitionStatistics>> partNamesUpdateMap = new HashMap<>();
         List<PartitionStatistics> statistics = ImmutableList.of(STATISTICS_1, STATISTICS_1);
-        for (PartitionStatistics partitionStatistics : statistics) {
-            updateList.add(actualStatistics -> partitionStatistics);
+        for (int index = 0; index < partitions.size(); index++) {
+            PartitionStatistics stats = statistics.get(index);
+            partNamesUpdateMap.put(partitions.get(index), actualStatistics -> stats);
         }
-        thriftHiveMetastore.updatePartitionsStatistics(IDENTITY, MockThriftMetastoreClient.TEST_DATABASE, MockThriftMetastoreClient.TEST_TABLE_UP_NAME, partitions, updateList);
+        thriftHiveMetastore.updatePartitionsStatistics(IDENTITY, MockThriftMetastoreClient.TEST_DATABASE, MockThriftMetastoreClient.TEST_TABLE_UP_NAME, partNamesUpdateMap);
     }
 
     private PartitionStatistics skipStats(PartitionStatistics currentStatistics, PartitionStatistics updatedStatistics, boolean isCollectColumnStatisticsOnWrite)

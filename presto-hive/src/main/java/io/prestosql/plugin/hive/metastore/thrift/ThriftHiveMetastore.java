@@ -530,31 +530,36 @@ public class ThriftHiveMetastore
     }
 
     @Override
-    public synchronized void updatePartitionsStatistics(HiveIdentity identity, String databaseName, String tableName, List<String> partitionNames, List<Function<PartitionStatistics, PartitionStatistics>> updateFunctionList)
+    public synchronized void updatePartitionsStatistics(HiveIdentity identity, String databaseName, String tableName, Map<String, Function<PartitionStatistics, PartitionStatistics>> partNamesUpdateFunctionMap)
     {
         ImmutableList.Builder<Partition> modifiedPartitionBuilder = ImmutableList.builder();
         ImmutableMap.Builder<String, PartitionInfo> partitionInfoMapBuilder = ImmutableMap.builder();
         Optional<Table> table = getTable(identity, databaseName, tableName);
-        List<Partition> partitions = getPartitionsByNames(identity, databaseName, tableName, partitionNames);
+
+        List<Partition> partitions = getPartitionsByNames(identity, databaseName, tableName, partNamesUpdateFunctionMap.keySet().stream().collect(Collectors.toList()));
         Map<String, PartitionStatistics> partitionsStatistics = getPartitionStatistics(identity, table.get(), partitions);
 
-        if (partitions.size() != partitionsStatistics.size() || partitions.size() != partitionNames.size()) {
+        if (partitions.size() != partitionsStatistics.size() || partitions.size() != partNamesUpdateFunctionMap.size()) {
             throw new PrestoException(HiveErrorCode.HIVE_METASTORE_ERROR, "Metastore returned multiple partitions");
         }
-        for (int index = 0; index < partitionNames.size(); index++) {
-            String partitionName = partitionNames.get(index);
+        List<String> partColumns = table.get().getPartitionKeys().stream()
+                .map(FieldSchema::getName)
+                .collect(toImmutableList());
+        for (int index = 0; index < partitions.size(); index++) {
+            String partitionName = makePartName(partColumns, partitions.get(index).getValues());
             PartitionStatistics currentStatistics = requireNonNull(partitionsStatistics.get(partitionName),
                     "getPartitionStatistics() returned null");
 
-            PartitionStatistics updatedStatistics = updateFunctionList.get(index).apply(currentStatistics);
+            PartitionStatistics updatedStatistics = partNamesUpdateFunctionMap.get(partitionName).apply(currentStatistics);
 
             Partition originalPartition = partitions.get(index);
             Partition modifiedPartition = originalPartition.deepCopy();
             HiveBasicStatistics basicStatistics = updatedStatistics.getBasicStatistics();
             modifiedPartition.setParameters(ThriftMetastoreUtil.updateStatisticsParameters(modifiedPartition.getParameters(), basicStatistics));
+            originalPartition.setParameters(ThriftMetastoreUtil.updateStatisticsParameters(originalPartition.getParameters(), basicStatistics));
 
             modifiedPartitionBuilder.add(modifiedPartition);
-            partitionInfoMapBuilder.put(partitionName, new PartitionInfo(basicStatistics, currentStatistics, modifiedPartition, updatedStatistics));
+            partitionInfoMapBuilder.put(partitionName, new PartitionInfo(basicStatistics, currentStatistics, originalPartition, updatedStatistics));
         }
         alterPartitionsWithoutStatistics(databaseName, tableName, modifiedPartitionBuilder.build());
 
