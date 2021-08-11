@@ -31,11 +31,11 @@ import static java.util.Objects.requireNonNull;
 public class IndexCacheLoader
         extends CacheLoader<IndexCacheKey, List<IndexMetadata>>
 {
-    private static IndexClient indexClient;
+    private final IndexClient indexClient;
 
     public IndexCacheLoader(IndexClient client)
     {
-        IndexCacheLoader.indexClient = client;
+        this.indexClient = client;
     }
 
     @Override
