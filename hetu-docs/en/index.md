@@ -91,6 +91,7 @@ headless: true
     - [TPCDS]({{< relref "./docs/connector/tpcds.md" >}})
     - [TPCH]({{< relref "./docs/connector/tpch.md" >}})
     - [VDM]({{< relref "./docs/connector/vdm.md" >}})
+    - [Kylin]({{< relref "./docs/connector/kylin.md" >}})
 
 - [Functions and Operators]("#")
     - [Logical Operators]({{< relref "./docs/functions/logical.md" >}})

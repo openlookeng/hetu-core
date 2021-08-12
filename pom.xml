@@ -153,6 +153,7 @@
         <module>hetu-function-namespace-managers</module>
         <module>hetu-greenplum</module>
         <module>hetu-clickhouse</module>
+        <module>hetu-kylin</module>
     </modules>
 
     <dependencyManagement>
@@ -1556,6 +1557,26 @@
                 <version>${dep.jetty.version}</version>
             </dependency>
             <!--jetty manual upgrade of version end-->
+            <dependency>
+                <groupId>org.apache.kylin</groupId>
+                <artifactId>kylin-jdbc</artifactId>
+                <version>3.0.2</version>
+            </dependency>
+            <dependency>
+                <groupId>io.airlift</groupId>
+                <artifactId>joni</artifactId>
+                <version>2.1.5.3</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.lucene</groupId>
+                <artifactId>lucene-analyzers-common</artifactId>
+                <version>8.6.2</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.calcite</groupId>
+                <artifactId>calcite-core</artifactId>
+                <version>1.18.0</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 

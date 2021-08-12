@@ -16,8 +16,10 @@ package io.prestosql.utils;
 
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.planner.SimplePlanVisitor;
 import io.prestosql.sql.planner.iterative.IterativeOptimizer;
@@ -30,11 +32,22 @@ import io.prestosql.sql.planner.iterative.rule.ReorderJoins;
 import io.prestosql.sql.planner.optimizations.ApplyConnectorOptimization;
 import io.prestosql.sql.planner.optimizations.LimitPushDown;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
+import org.apache.commons.lang3.StringUtils;
+import io.airlift.log.Logger;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static io.prestosql.SystemSessionProperties.getJoinReorderingStrategy;
+import static java.util.Objects.requireNonNull;
 
 public class OptimizerUtils
 {
+
+    private static final Map<String,Set<String>> planOptimizerBlacklist = new ConcurrentHashMap<>();
+    private final static ThreadLocal<Map<String,Set<String>>> threadLocal = new ThreadLocal<>();
+    private static final Logger log = Logger.get(OptimizerUtils.class);
+
     private OptimizerUtils()
     {
     }
@@ -135,5 +148,50 @@ public class OptimizerUtils
         {
             return count >= maxLimit;
         }
+    }
+
+    //cutomer config connector optimizer
+    private  static Set<String>  getPlanNodeCatalogs(PlanNode node){
+        Map<String,Set<String>> nodeCatalogMap = threadLocal.get();
+        if( nodeCatalogMap == null || nodeCatalogMap.get( node.getId().toString() ) == null ){
+            if( nodeCatalogMap == null){
+                nodeCatalogMap =  new HashMap<>() ;
+            }
+            Set<String> nodeCatalogs = new HashSet<>();
+            findCatalogName(node,nodeCatalogs);
+            nodeCatalogMap.putIfAbsent(node.getId().toString(), nodeCatalogs);
+            threadLocal.set(nodeCatalogMap);
+        }
+        return nodeCatalogMap.get(node.getId().toString() );
+    }
+
+    //cutomer config connector optimizer
+    public static void addPlanOptimizerBlacklist(String catalogName,  Map<String, String> properties){
+        requireNonNull(catalogName, "catalogName is null");
+        String blackList = properties.get(HetuConstant.CONNECTOR_PLANOPTIMIZER_RULE_BLACKLIST);
+        if(StringUtils.isNoneBlank(blackList)){
+            Set<String> tmpSet = new HashSet(Arrays.asList(blackList.split(",")));
+            planOptimizerBlacklist.putIfAbsent(catalogName,tmpSet);
+        }
+    }
+
+    //cutomer config connector optimizer
+    public static  void  findCatalogName(PlanNode planNode,Set<String> catalogNames){
+        try{
+            if(planNode instanceof TableScanNode){
+                TableScanNode tableScanNode = (TableScanNode)planNode;
+                String catalogName = tableScanNode.getTable().getCatalogName().getCatalogName();
+                catalogNames.add(catalogName);
+            }
+            List<PlanNode> sources = planNode.getSources();
+            if(sources != null && sources.size() > 0 ){
+                for(PlanNode source : sources){
+                    findCatalogName(source, catalogNames);
+                }
+            }
+        }catch (Exception e ){
+            log.warn(e, "findCatalogName failed");
+        }
+
     }
 }
