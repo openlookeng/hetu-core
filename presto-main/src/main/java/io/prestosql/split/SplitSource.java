@@ -63,7 +63,7 @@ public interface SplitSource
         }
     }
 
-    default List<Split> groupSmallSplits(List<Split> pendingSplits, Lifespan lifespan)
+    default List<Split> groupSmallSplits(List<Split> pendingSplits, Lifespan lifespan, int maxGroupSize)
     {
         return pendingSplits;
     }
