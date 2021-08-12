@@ -319,4 +319,9 @@
             <unpack />
         </artifact>
     </artifactSet>
+    <artifactSet to="plugin/kylin">
+        <artifact id="${project.groupId}:hetu-kylin:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
 </runtime>
