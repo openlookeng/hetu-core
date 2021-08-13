@@ -55,8 +55,6 @@ import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.OptionalLong;
 import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -99,7 +97,8 @@ public class MemoryTableManager
         this.pagesSerde = requireNonNull(pagesSerde, "pagesSerde is null");
     }
 
-    public void validateSpillRoot() throws IOException
+    public void validateSpillRoot()
+            throws IOException
     {
         RandomAccessFile testFile;
         String name = UUID.randomUUID().toString();
@@ -116,42 +115,33 @@ public class MemoryTableManager
         }
     }
 
-    public synchronized void finishUpdatingTable(long id)
+    public void finishUpdatingTable(long id)
     {
-        tables.get(id).finishCreation();
-
-        Timer timer = new Timer(true);
-        timer.scheduleAtFixedRate(new TimerTask()
-        {
-            @Override
-            public void run()
-            {
-                if (tables.containsKey(id) && tables.get(id).allProcessed()) {
-                    try {
-                        if (tables.get(id).isSpilled()) {
-                            timer.cancel();
-                            return;
-                        }
-                        spillTable(id);
-                        // processing has finished. Creation overhead can be released
-                        releaseMemory(tables.get(id).getByteSize() * (CREATION_SCALE_FACTOR - 1), "Finish processing table " + id);
-                    }
-                    catch (Exception e) {
-                        LOG.error("Failed to serialize table " + id, e);
-                    }
+        tables.get(id).finishCreation(() -> {
+            // this should only be called once entire table has been processed
+            if (tables.containsKey(id) && tables.get(id).allProcessed()) {
+                try {
+                    // first spill the table to disk
+                    spillTable(id);
+                    // release memory overhead used during processing
+                    releaseMemory(tables.get(id).getByteSize() * (CREATION_SCALE_FACTOR - 1), "Finish processing table " + id);
+                }
+                catch (Exception e) {
+                    LOG.error("Failed to serialize table " + id, e);
                 }
             }
-        }, 0, 3000);
+        });
     }
 
     /**
      * Initialize a table and store it in memory
      */
-    public synchronized void initialize(long tableId, boolean compressionEnabled, List<MemoryColumnHandle> columns, List<SortingColumn> sortedBy, List<String> indexColumns)
+    public synchronized void initialize(long tableId, boolean compressionEnabled, boolean asyncProcessingEnabled, List<MemoryColumnHandle> columns, List<SortingColumn> sortedBy, List<String> indexColumns)
     {
         if (!tables.containsKey(tableId)) {
             tables.put(tableId, new Table(tableId,
                     compressionEnabled,
+                    asyncProcessingEnabled,
                     spillRoot.resolve(String.valueOf(tableId)),
                     columns,
                     sortedBy,
@@ -334,7 +324,7 @@ public class MemoryTableManager
 
     /**
      * Spill table to disk.
-     *
+     * <p>
      * Table object (metadata) is serialized into one file. Pages are serialized separately in logical part.
      *
      * @param id table id to spill
@@ -367,7 +357,7 @@ public class MemoryTableManager
 
     /**
      * Restore the table from disk to load into tables map.
-     *
+     * <p>
      * Only the skeleton of the table and the logical parts in it will be restored at this time.
      * (pages won't be loaded until used)
      *
@@ -445,7 +435,7 @@ public class MemoryTableManager
         }
         currentBytes.set(newSize);
         onSuccess.run();
-        logNumFormat("Fulfilled %s bytes. Current: %s", bytes, currentBytes.get());
+        logNumFormat("Fulfilled %s bytes for Table %s. Current: %s", bytes, reserved, currentBytes.get());
     }
 
     private synchronized void releaseMemory(long bytes, String reason)

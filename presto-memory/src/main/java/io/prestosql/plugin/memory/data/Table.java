@@ -23,6 +23,7 @@ import io.prestosql.plugin.memory.MemoryThreadManager;
 import io.prestosql.plugin.memory.SortingColumn;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageSorter;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -38,11 +39,14 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.TreeMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static java.util.Objects.requireNonNull;
 
 public class Table
@@ -73,32 +77,31 @@ public class Table
     the new class must be added to the whitelist below.
     */
     public static final String[] TYPES_WHITELIST = ImmutableList.of(
-            Number.class.getCanonicalName(),
-            Integer.class.getCanonicalName(),
-            Long.class.getCanonicalName(),
-            Table.class.getName(),
-            AtomicInteger.class.getName(),
-            List.class.getName(),
-            ArrayList.class.getName(),
-            TableState.class.getName(),
-            MemoryColumnHandle.class.getName(),
-            SortingColumn.class.getName(),
-            SortOrder.class.getName(),
-            Enum.class.getName(),
-            HashMap.class.getName(),
-            HashSet.class.getName(),
-            AbstractMap.SimpleEntry.class.getName(),
-            BloomFilter.class.getName(),
-            BloomFilter.BitSet.class.getName(),
-            LogicalPart.class.getName(),
-            LogicalPart.LogicalPartState.class.getName(),
-            TreeMap.class.getName(),
-            LogicalPart.SparseValue.class.getName(),
-            AtomicReference.class.getName(),
-            long[].class.getName())
+                    Number.class.getCanonicalName(),
+                    Integer.class.getCanonicalName(),
+                    Long.class.getCanonicalName(),
+                    Table.class.getName(),
+                    AtomicInteger.class.getName(),
+                    List.class.getName(),
+                    ArrayList.class.getName(),
+                    TableState.class.getName(),
+                    MemoryColumnHandle.class.getName(),
+                    SortingColumn.class.getName(),
+                    SortOrder.class.getName(),
+                    Enum.class.getName(),
+                    HashMap.class.getName(),
+                    HashSet.class.getName(),
+                    AbstractMap.SimpleEntry.class.getName(),
+                    BloomFilter.class.getName(),
+                    BloomFilter.BitSet.class.getName(),
+                    LogicalPart.class.getName(),
+                    LogicalPart.LogicalPartState.class.getName(),
+                    TreeMap.class.getName(),
+                    LogicalPart.SparseValue.class.getName(),
+                    AtomicReference.class.getName(),
+                    long[].class.getName())
             .toArray(new String[0]);
 
-    private final long processingDelay;
     private final List<MemoryColumnHandle> columns;
     private final List<SortingColumn> sortedBy;
     private final List<String> indexColumns;
@@ -107,21 +110,23 @@ public class Table
     private final List<LogicalPart> logicalParts; // actual data (pages) stored here
     private final boolean compressionEnabled;
     private TableState tableState;
-    private long lastModified = System.currentTimeMillis();
     private long byteSize;
+    private final long id;
+    private final boolean asyncEnabled;
 
     private transient Path tableDataRoot;
     private transient PagesSerde pagesSerde;
+
     private transient PageSorter pageSorter;
     private transient TypeManager typeManager;
 
-    public Table(long id, boolean compressionEnabled, Path tableDataRoot, List<MemoryColumnHandle> columns, List<SortingColumn> sortedBy,
+    public Table(long id, boolean compressionEnabled, boolean asyncEnabled, Path tableDataRoot, List<MemoryColumnHandle> columns, List<SortingColumn> sortedBy,
             List<String> indexColumns, PageSorter pageSorter, MemoryConfig config, TypeManager typeManager, PagesSerde pagesSerde)
     {
+        this.id = id;
         this.tableDataRoot = tableDataRoot;
         this.maxLogicalPartBytes = config.getMaxLogicalPartSize().toBytes();
         this.maxPageSizeBytes = Long.valueOf(config.getMaxPageSize().toBytes()).intValue();
-        this.processingDelay = config.getProcessingDelay().toMillis();
         this.compressionEnabled = compressionEnabled;
         this.columns = requireNonNull(columns, "columns is null");
         this.sortedBy = requireNonNull(sortedBy, "sortedBy is null");
@@ -129,29 +134,9 @@ public class Table
         this.pageSorter = requireNonNull(pageSorter, "pageSorter is null");
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.pagesSerde = requireNonNull(pagesSerde, "pagesSerde is null");
+        this.asyncEnabled = asyncEnabled;
 
         this.logicalParts = new ArrayList<>();
-
-        MemoryThreadManager.getSharedThreadPool().scheduleWithFixedDelay(() -> {
-            if ((System.currentTimeMillis() - lastModified) > processingDelay) {
-                for (int i = 0; i < logicalParts.size(); i++) {
-                    LogicalPart logicalPart = logicalParts.get(i);
-                    if (logicalPart.getProcessingState().get() == LogicalPart.LogicalPartState.FINISHED_ADDING) {
-                        int finalI = i;
-                        MemoryThreadManager.getSharedThreadPool().execute(() -> {
-                            LOG.info("Processing Table %d :: logicalPart %d", id, finalI + 1);
-                            try {
-                                logicalPart.process();
-                            }
-                            catch (Exception e) {
-                                LOG.warn("Failed to process Table %d :: logicalPart %d", id, finalI + 1);
-                            }
-                            LOG.info("Processed Table %d :: logicalPart %d", id, finalI + 1);
-                        });
-                    }
-                }
-            }
-        }, 5, 2, TimeUnit.SECONDS);
     }
 
     /**
@@ -180,7 +165,6 @@ public class Table
         }
         logicalParts.get(logicalParts.size() - 1).add(page);
         byteSize += page.getSizeInBytes();
-        lastModified = System.currentTimeMillis();
         tableState = TableState.MODIFIED;
     }
 
@@ -217,13 +201,51 @@ public class Table
         return tableState == TableState.SPILLED;
     }
 
-    public void finishCreation()
+    public void finishCreation(Runnable cleanup)
     {
         tableState = TableState.COMMITTED;
-        for (LogicalPart logicalPart : logicalParts) {
+        List<Future<?>> futuresList = new ArrayList<>(logicalParts.size());
+        for (int i = 0; i < logicalParts.size(); i++) {
             // for all new logical parts, set state to finished adding pages
-            if (logicalPart.getProcessingState().get() == LogicalPart.LogicalPartState.ACCEPTING_PAGES) {
-                logicalPart.finishAdding();
+            if (logicalParts.get(i).getProcessingState().get() == LogicalPart.LogicalPartState.ACCEPTING_PAGES) {
+                logicalParts.get(i).finishAdding();
+            }
+
+            int finalI = i;
+            Runnable runnable = () -> {
+                LOG.info("Processing Table %d :: logicalPart %d", id, finalI + 1);
+                try {
+                    logicalParts.get(finalI).process();
+
+                    // run manager's cleanup, this does two things
+                    // 1. spills the table to disk, the manager handles this because the Table itself doesn't know how/where to spill
+                    // 2. manager handles memory release
+                    // only once all LPs are processed this cleanup will be called by the last LP
+                    if (allProcessed()) {
+                        cleanup.run();
+                    }
+                }
+                catch (Exception e) {
+                    LOG.warn("Failed to process Table %d :: logicalPart %d", id, finalI + 1);
+                }
+                LOG.info("Processed Table %d :: logicalPart %d", id, finalI + 1);
+            };
+
+            if (asyncEnabled) {
+                MemoryThreadManager.getSharedThreadPool().schedule(runnable, 5, TimeUnit.SECONDS);
+            }
+            else {
+                futuresList.add(MemoryThreadManager.getSharedThreadPool().submit(runnable));
+            }
+        }
+
+        // Used to synchronize processing, it will only run for sync processing since for async the list is empty
+        for (Future<?> future : futuresList) {
+            try {
+                future.get();
+            }
+            catch (ExecutionException | InterruptedException e) {
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to process table", e);
             }
         }
     }

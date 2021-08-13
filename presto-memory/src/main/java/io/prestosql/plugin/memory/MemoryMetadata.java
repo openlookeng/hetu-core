@@ -300,6 +300,7 @@ public class MemoryMetadata
                 newTableName.getSchemaName(),
                 newTableName.getTableName(),
                 oldTableHandle.isCompressionEnabled(),
+                oldTableHandle.isAsyncProcessingEnabled(),
                 oldTableHandle.getActiveTableIds(),
                 oldTableHandle.getColumns(),
                 oldTableHandle.getSortedBy(),
@@ -408,12 +409,14 @@ public class MemoryMetadata
                 System.currentTimeMillis()));
 
         boolean spillCompressionEnabled = MemoryTableProperties.getSpillCompressionEnabled(tableMetadata.getProperties());
+        boolean asyncProcessingEnabled = MemoryTableProperties.getAsyncProcessingEnabled(tableMetadata.getProperties());
 
         return new MemoryWriteTableHandle(
                 nextId,
                 tableMetadata.getTable().getSchemaName(),
                 tableMetadata.getTable().getTableName(),
                 spillCompressionEnabled,
+                asyncProcessingEnabled,
                 getTableIdSet(nextId),
                 columnHandles,
                 sortedBy,

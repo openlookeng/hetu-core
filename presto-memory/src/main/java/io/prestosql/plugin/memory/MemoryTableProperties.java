@@ -33,6 +33,8 @@ public class MemoryTableProperties
 {
     public static final String SPILL_COMPRESSION_PROPERTY = "spill_compression";
     public static final boolean SPILL_COMPRESSION_DEFAULT_VALUE = true;
+    public static final String ASYNC_PROCESSING = "async_processing";
+    public static final boolean ASYNC_PROCESSING_DEFAULT_VALUE = true;
     public static final String PARTITIONED_BY_PROPERTY = "partitioned_by";
     public static final String SORTED_BY_PROPERTY = "sorted_by";
     public static final String INDEX_COLUMNS_PROPERTY = "index_columns";
@@ -85,6 +87,11 @@ public class MemoryTableProperties
                         SPILL_COMPRESSION_PROPERTY,
                         "Whether to enable page compression during spilling",
                         SPILL_COMPRESSION_DEFAULT_VALUE,
+                        false),
+                PropertyMetadata.booleanProperty(
+                        ASYNC_PROCESSING,
+                        "Whether to process LogicalParts asynchronously",
+                        ASYNC_PROCESSING_DEFAULT_VALUE,
                         false));
     }
 
@@ -120,6 +127,12 @@ public class MemoryTableProperties
     {
         Boolean spillCompressionEnabled = (Boolean) tableProperties.get(SPILL_COMPRESSION_PROPERTY);
         return spillCompressionEnabled == null ? SPILL_COMPRESSION_DEFAULT_VALUE : spillCompressionEnabled;
+    }
+
+    public static boolean getAsyncProcessingEnabled(Map<String, Object> tableProperties)
+    {
+        Boolean asyncProcessingEnabled = (Boolean) tableProperties.get(ASYNC_PROCESSING);
+        return asyncProcessingEnabled == null ? ASYNC_PROCESSING_DEFAULT_VALUE : asyncProcessingEnabled;
     }
 
     private static SortingColumn sortingColumnFromString(String name)
