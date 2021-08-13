@@ -69,6 +69,8 @@ public class CubeQuery
     private final CubeConsole cubeConsole;
     private String cubeInitQueryResult;
 
+    private static final int EMPTY_ITERATION_LIST_SIZE = 0;
+
     public CubeQuery(StatementClient client, boolean debug, CubeConsole cubeConsole)
     {
         this.client = requireNonNull(client, "client is null");
@@ -175,11 +177,15 @@ public class CubeQuery
             else {
                 renderResults(out, outputFormat, usePager, results.getColumns());
                 ///populate results from here
-                if (client.isFinished() && client.finalStatusInfo().getError() == null) {
-                    QueryData queryData = ((QueryResults) results);
-                    if (queryData.getData().iterator().hasNext()) {
-                        if (queryData.getData().iterator().next().iterator().hasNext()) {
-                            cubeInitQueryResult = queryData.getData().iterator().next().iterator().next().toString();
+                if (cubeConsole.getListRowBufferIterationItems().size() == EMPTY_ITERATION_LIST_SIZE) {
+                    if (client.isFinished() && client.finalStatusInfo().getError() == null) {
+                        QueryData queryData = ((QueryResults) results);
+                        if (queryData.getData() != null) {
+                            if (queryData.getData().iterator().hasNext()) {
+                                if (queryData.getData().iterator().next().iterator().hasNext()) {
+                                    cubeInitQueryResult = queryData.getData().iterator().next().iterator().next().toString();
+                                }
+                            }
                         }
                     }
                 }

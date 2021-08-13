@@ -22,7 +22,6 @@ import io.prestosql.sql.SqlFormatter;
 import io.prestosql.sql.parser.ParsingException;
 import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.parser.SqlParser;
-import io.prestosql.sql.parser.StatementSplitter;
 import io.prestosql.sql.tree.BetweenPredicate;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.CreateCube;
@@ -41,9 +40,7 @@ import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.sql.tree.TimestampLiteral;
 import org.jline.terminal.Terminal;
 
-import java.io.IOException;
 import java.io.PrintStream;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -52,13 +49,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.prestosql.cli.QueryPreprocessor.preprocessQuery;
 import static io.prestosql.client.ClientSession.stripTransactionId;
-import static io.prestosql.sql.parser.StatementSplitter.Statement;
-import static io.prestosql.sql.parser.StatementSplitter.isEmptyStatement;
-import static org.jline.terminal.TerminalBuilder.terminal;
 
 public class CubeConsole
 {
@@ -84,10 +77,12 @@ public class CubeConsole
     private static final String DATATYPE_TINYINT_QUOTE = "tinyint '";
     private static final String DATATYPE_BIGINT_QUOTE = "bigint '";
     private static final String DATATYPE_SMALLINT_QUOTE = "smallint '";
+    private static final String DATATYPE_VARCHAR_QUOTE = "varchar '";
     private static final String DATATYPE_INTEGER = "integer";
     private static final String DATATYPE_TINYINT = "tinyint";
     private static final String DATATYPE_BIGINT = "bigint";
     private static final String DATATYPE_SMALLINT = "smallint";
+    private static final int EMPTY_ROW_BUFFER_ITERATION_ITEMS = 0;
     private static final int INDEX_AT_MIN_POSITION = 0;
     private static final int INDEX_AT_MAX_POSITION = 1;
     private static final long MAX_BUFFERED_ROWS = 10000000000L;
@@ -126,42 +121,6 @@ public class CubeConsole
     public String getCubeColumnDataType()
     {
         return cubeColumnDataType;
-    }
-
-    public boolean executeCubeCommand(
-            QueryRunner queryRunner,
-            AtomicBoolean exiting,
-            String query,
-            ClientOptions.OutputFormat outputFormat,
-            boolean ignoreErrors,
-            boolean showProgress)
-    {
-        boolean success = true;
-        StatementSplitter splitter = new StatementSplitter(query);
-        for (Statement split : splitter.getCompleteStatements()) {
-            if (!isEmptyStatement(split.statement())) {
-                try (Terminal terminal = terminal()) {
-                    String statement = split.statement();
-                    if (createCubeCommand(split.statement(), queryRunner, outputFormat, () -> {}, false, showProgress, terminal, System.out, System.err)) {
-                        if (!ignoreErrors) {
-                            return false;
-                        }
-                        success = false;
-                    }
-                }
-                catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            }
-            if (exiting.get()) {
-                return success;
-            }
-        }
-        if (!isEmptyStatement(splitter.getPartialStatement())) {
-            System.err.println("Non-terminated statement: " + splitter.getPartialStatement());
-            return false;
-        }
-        return success;
     }
 
     /**
@@ -285,7 +244,7 @@ public class CubeConsole
         processCubeInitialQuery(queryRunner, rowCountsDistinctValuesQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
         List<List<?>> rowBufferIterationItems = getListRowBufferIterationItems();
 
-        if (rowBufferIterationItems != null) {
+        if (rowBufferIterationItems != null && rowBufferIterationItems.size() != EMPTY_ROW_BUFFER_ITERATION_ITEMS) {
             //this loop process the multiple insert query statements
             for (List<?> rowBufferItems : rowBufferIterationItems) {
                 Expression finalBetweenPredicate;
@@ -336,6 +295,12 @@ public class CubeConsole
                     case DATATYPE_SMALLINT: {
                         finalBetweenPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_SMALLINT_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()), parser.createExpression(DATATYPE_SMALLINT_QUOTE + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
+                                new ParsingOptions()));
+                        break;
+                    }
+                    case DATATYPE_VARCHAR: {
+                        finalBetweenPredicate = new BetweenPredicate(columnName, parser.createExpression(QUOTE_STRING + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
+                                new ParsingOptions()), parser.createExpression(QUOTE_STRING + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()));
                         break;
                     }
