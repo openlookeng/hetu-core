@@ -231,8 +231,13 @@ public class ByteArrayBlock
     @Override
     public boolean[] filter(BloomFilter filter, boolean[] validPositions)
     {
-        for (int i = 0; i < values.length; i++) {
-            validPositions[i] = validPositions[i] && filter.test(values[i]);
+        for (int i = 0; i < positionCount; i++) {
+            if (valueIsNull != null && valueIsNull[i + arrayOffset]) {
+                validPositions[i] = validPositions[i] && filter.test((byte[]) null);
+            }
+            else {
+                validPositions[i] = validPositions[i] && filter.test(values[i + arrayOffset]);
+            }
         }
         return validPositions;
     }
