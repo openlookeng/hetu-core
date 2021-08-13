@@ -317,7 +317,7 @@ public class OrcPageSourceFactory
                         ACID_COLUMN_CURRENT_TRANSACTION,
                         ACID_COLUMN_OPERATION).build();
                 verifyAcidSchema(reader, path);
-                Map<String, OrcColumn> acidColumnsByName = uniqueIndex(fileColumns, orcColumn -> orcColumn.getColumnName());
+                Map<String, OrcColumn> acidColumnsByName = uniqueIndex(fileColumns, orcColumn -> orcColumn.getColumnName().toLowerCase(ENGLISH));
                 if (AcidUtils.isDeleteDelta(path.getParent())) {
                     //Avoid reading column data from delete_delta files.
                     // Call will come here in case of Minor VACUUM where all delete_delta files are merge together.
@@ -327,15 +327,15 @@ public class OrcPageSourceFactory
                     fileColumns = acidColumnsByName.get(ACID_COLUMN_ROW_STRUCT).getNestedColumns();
                 }
 
-                fileReadColumns.add(acidColumnsByName.get(ACID_COLUMN_ORIGINAL_TRANSACTION));
+                fileReadColumns.add(acidColumnsByName.get(ACID_COLUMN_ORIGINAL_TRANSACTION.toLowerCase(ENGLISH)));
                 fileReadTypes.add(BIGINT);
-                fileReadColumns.add(acidColumnsByName.get(ACID_COLUMN_BUCKET));
+                fileReadColumns.add(acidColumnsByName.get(ACID_COLUMN_BUCKET.toLowerCase(ENGLISH)));
                 fileReadTypes.add(INTEGER);
-                fileReadColumns.add(acidColumnsByName.get(ACID_COLUMN_ROW_ID));
+                fileReadColumns.add(acidColumnsByName.get(ACID_COLUMN_ROW_ID.toLowerCase(ENGLISH)));
                 fileReadTypes.add(BIGINT);
-                fileReadColumns.add(acidColumnsByName.get(ACID_COLUMN_CURRENT_TRANSACTION));
+                fileReadColumns.add(acidColumnsByName.get(ACID_COLUMN_CURRENT_TRANSACTION.toLowerCase(ENGLISH)));
                 fileReadTypes.add(BIGINT);
-                fileReadColumns.add(acidColumnsByName.get(ACID_COLUMN_OPERATION));
+                fileReadColumns.add(acidColumnsByName.get(ACID_COLUMN_OPERATION.toLowerCase(ENGLISH)));
                 fileReadTypes.add(INTEGER);
             }
 
@@ -344,7 +344,7 @@ public class OrcPageSourceFactory
                 verifyFileHasColumnNames(fileColumns, path);
 
                 // Convert column names read from ORC files to lower case to be consistent with those stored in Hive Metastore
-                fileColumnsByName = uniqueIndex(fileColumns, orcColumn -> orcColumn.getColumnName());
+                fileColumnsByName = uniqueIndex(fileColumns, orcColumn -> orcColumn.getColumnName().toLowerCase(ENGLISH));
             }
 
             TupleDomainOrcPredicateBuilder predicateBuilder = TupleDomainOrcPredicate.builder()
