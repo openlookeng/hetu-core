@@ -1,8 +1,8 @@
 cross join:
-    final aggregation over ()
+    final hashaggregation over ()
         local exchange (GATHER, SINGLE, [])
             remote exchange (GATHER, SINGLE, [])
-                partial aggregation over ()
+                partial hashaggregation over ()
                     join (INNER, REPLICATED):
                         join (INNER, REPLICATED):
                             join (INNER, REPLICATED):
@@ -16,10 +16,10 @@ cross join:
                         local exchange (GATHER, SINGLE, [])
                             remote exchange (REPLICATE, BROADCAST, [])
                                 scan household_demographics
-    final aggregation over ()
+    final hashaggregation over ()
         local exchange (GATHER, SINGLE, [])
             remote exchange (GATHER, SINGLE, [])
-                partial aggregation over ()
+                partial hashaggregation over ()
                     join (INNER, REPLICATED):
                         join (INNER, REPLICATED):
                             join (INNER, REPLICATED):

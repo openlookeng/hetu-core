@@ -6,10 +6,10 @@ remote exchange (GATHER, SINGLE, [])
                     join (INNER, REPLICATED):
                         remote exchange (REPARTITION, HASH, ["d_week_seq", "sum", "sum_33", "sum_34", "sum_35", "sum_36", "sum_37", "sum_38"])
                             cte wswscs
-                                final aggregation over (d_week_seq)
+                                final hashaggregation over (d_week_seq)
                                     local exchange (GATHER, SINGLE, [])
                                         remote exchange (REPARTITION, HASH, ["d_week_seq"])
-                                            partial aggregation over (d_week_seq)
+                                            partial hashaggregation over (d_week_seq)
                                                 join (INNER, REPLICATED):
                                                     remote exchange (REPARTITION, HASH, ["sales_price_18", "sold_date_sk_17"])
                                                         cte wscs
@@ -31,10 +31,10 @@ remote exchange (GATHER, SINGLE, [])
                         join (INNER, REPLICATED):
                             remote exchange (REPARTITION, HASH, ["d_week_seq_232", "sum_265", "sum_266", "sum_267", "sum_268", "sum_269", "sum_270", "sum_271"])
                                 cte wswscs
-                                    final aggregation over (d_week_seq_232)
+                                    final hashaggregation over (d_week_seq_232)
                                         local exchange (GATHER, SINGLE, [])
                                             remote exchange (REPARTITION, HASH, ["d_week_seq_232"])
-                                                partial aggregation over (d_week_seq_232)
+                                                partial hashaggregation over (d_week_seq_232)
                                                     join (INNER, REPLICATED):
                                                         remote exchange (REPARTITION, HASH, ["sales_price_221", "sold_date_sk_220"])
                                                             cte wscs

@@ -4,10 +4,10 @@ local exchange (GATHER, SINGLE, [])
             remote exchange (REPARTITION, HASH, ["d_week_seq", "s_store_id"])
                 join (INNER, REPLICATED):
                     join (INNER, REPLICATED):
-                        final aggregation over (d_week_seq, ss_store_sk)
+                        final hashaggregation over (d_week_seq, ss_store_sk)
                             local exchange (GATHER, SINGLE, [])
                                 remote exchange (REPARTITION, HASH, ["d_week_seq", "ss_store_sk"])
-                                    partial aggregation over (d_week_seq, ss_store_sk)
+                                    partial hashaggregation over (d_week_seq, ss_store_sk)
                                         join (INNER, PARTITIONED):
                                             remote exchange (REPARTITION, HASH, ["ss_sold_date_sk"])
                                                 scan store_sales
@@ -24,10 +24,10 @@ local exchange (GATHER, SINGLE, [])
                 remote exchange (REPARTITION, HASH, ["s_store_id_240", "subtract"])
                     join (INNER, REPLICATED):
                         join (INNER, REPLICATED):
-                            final aggregation over (d_week_seq_151, ss_store_sk_130)
+                            final hashaggregation over (d_week_seq_151, ss_store_sk_130)
                                 local exchange (GATHER, SINGLE, [])
                                     remote exchange (REPARTITION, HASH, ["d_week_seq_151", "ss_store_sk_130"])
-                                        partial aggregation over (d_week_seq_151, ss_store_sk_130)
+                                        partial hashaggregation over (d_week_seq_151, ss_store_sk_130)
                                             join (INNER, PARTITIONED):
                                                 remote exchange (REPARTITION, HASH, ["ss_sold_date_sk_123"])
                                                     scan store_sales

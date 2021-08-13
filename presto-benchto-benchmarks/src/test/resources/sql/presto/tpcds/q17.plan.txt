@@ -1,9 +1,9 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
-        final aggregation over (i_item_desc, i_item_id, s_state)
+        final hashaggregation over (i_item_desc, i_item_id, s_state)
             local exchange (GATHER, SINGLE, [])
                 remote exchange (REPARTITION, HASH, ["i_item_desc", "i_item_id", "s_state"])
-                    partial aggregation over (i_item_desc, i_item_id, s_state)
+                    partial hashaggregation over (i_item_desc, i_item_id, s_state)
                         join (INNER, PARTITIONED):
                             remote exchange (REPARTITION, HASH, ["i_item_sk", "ss_customer_sk"])
                                 join (INNER, REPLICATED):

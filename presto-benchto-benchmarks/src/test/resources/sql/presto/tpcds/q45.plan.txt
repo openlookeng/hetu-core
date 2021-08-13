@@ -1,9 +1,9 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
-        final aggregation over (ca_city, ca_zip)
+        final hashaggregation over (ca_city, ca_zip)
             local exchange (GATHER, SINGLE, [])
                 remote exchange (REPARTITION, HASH, ["ca_city", "ca_zip"])
-                    partial aggregation over (ca_city, ca_zip)
+                    partial hashaggregation over (ca_city, ca_zip)
                         semijoin (REPLICATED):
                             join (INNER, REPLICATED):
                                 join (INNER, PARTITIONED):

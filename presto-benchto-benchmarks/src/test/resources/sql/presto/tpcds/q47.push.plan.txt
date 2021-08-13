@@ -4,10 +4,10 @@ local exchange (GATHER, SINGLE, [])
             join (INNER, PARTITIONED):
                 local exchange (GATHER, SINGLE, [])
                     remote exchange (REPARTITION, HASH, ["i_brand", "i_category", "s_company_name", "s_store_name"])
-                        final aggregation over (d_moy, d_year, i_brand, i_category, s_company_name, s_store_name)
+                        final hashaggregation over (d_moy, d_year, i_brand, i_category, s_company_name, s_store_name)
                             local exchange (GATHER, SINGLE, [])
                                 remote exchange (REPARTITION, HASH, ["d_moy", "d_year", "i_brand", "i_category", "s_company_name", "s_store_name"])
-                                    partial aggregation over (d_moy, d_year, i_brand, i_category, s_company_name, s_store_name)
+                                    partial hashaggregation over (d_moy, d_year, i_brand, i_category, s_company_name, s_store_name)
                                         join (INNER, REPLICATED):
                                             join (INNER, REPLICATED):
                                                 join (INNER, REPLICATED):
@@ -23,10 +23,10 @@ local exchange (GATHER, SINGLE, [])
                                                     scan item
                 local exchange (GATHER, SINGLE, [])
                     remote exchange (REPARTITION, HASH, ["i_brand_76", "i_category_80", "s_company_name_161", "s_store_name_149"])
-                        final aggregation over (d_moy_123, d_year_121, i_brand_76, i_category_80, s_company_name_161, s_store_name_149)
+                        final hashaggregation over (d_moy_123, d_year_121, i_brand_76, i_category_80, s_company_name_161, s_store_name_149)
                             local exchange (GATHER, SINGLE, [])
                                 remote exchange (REPARTITION, HASH, ["d_moy_123", "d_year_121", "i_brand_76", "i_category_80", "s_company_name_161", "s_store_name_149"])
-                                    partial aggregation over (d_moy_123, d_year_121, i_brand_76, i_category_80, s_company_name_161, s_store_name_149)
+                                    partial hashaggregation over (d_moy_123, d_year_121, i_brand_76, i_category_80, s_company_name_161, s_store_name_149)
                                         join (INNER, REPLICATED):
                                             join (INNER, REPLICATED):
                                                 join (INNER, REPLICATED):
@@ -42,10 +42,10 @@ local exchange (GATHER, SINGLE, [])
                                                     scan item
             local exchange (GATHER, SINGLE, [])
                 remote exchange (REPARTITION, HASH, ["i_brand_257", "i_category_261", "s_company_name_342", "s_store_name_330"])
-                    final aggregation over (d_moy_304, d_year_302, i_brand_257, i_category_261, s_company_name_342, s_store_name_330)
+                    final hashaggregation over (d_moy_304, d_year_302, i_brand_257, i_category_261, s_company_name_342, s_store_name_330)
                         local exchange (GATHER, SINGLE, [])
                             remote exchange (REPARTITION, HASH, ["d_moy_304", "d_year_302", "i_brand_257", "i_category_261", "s_company_name_342", "s_store_name_330"])
-                                partial aggregation over (d_moy_304, d_year_302, i_brand_257, i_category_261, s_company_name_342, s_store_name_330)
+                                partial hashaggregation over (d_moy_304, d_year_302, i_brand_257, i_category_261, s_company_name_342, s_store_name_330)
                                     join (INNER, REPLICATED):
                                         join (INNER, REPLICATED):
                                             join (INNER, REPLICATED):

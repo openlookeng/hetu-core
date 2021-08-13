@@ -1,9 +1,9 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
-        final aggregation over (r_reason_desc)
+        final hashaggregation over (r_reason_desc)
             local exchange (GATHER, SINGLE, [])
                 remote exchange (REPARTITION, HASH, ["r_reason_desc"])
-                    partial aggregation over (r_reason_desc)
+                    partial hashaggregation over (r_reason_desc)
                         join (INNER, REPLICATED):
                             join (INNER, REPLICATED):
                                 join (INNER, PARTITIONED):

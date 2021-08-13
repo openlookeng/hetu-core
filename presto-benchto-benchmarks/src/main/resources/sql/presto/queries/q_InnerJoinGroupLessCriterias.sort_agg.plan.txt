@@ -1,7 +1,7 @@
 remote exchange (GATHER, SINGLE, [])
-    final aggregation over (ss_customer_sk, ss_item_sk)
+    final hashaggregation over (ss_customer_sk, ss_item_sk)
         local exchange (GATHER, SINGLE, [])
-            partial aggregation over (ss_customer_sk, ss_item_sk)
+            partial hashaggregation over (ss_customer_sk, ss_item_sk)
                 join (LEFT, PARTITIONED):
                     scan store_sales_item_customer_solddate
                     local exchange (GATHER, SINGLE, [])

@@ -565,7 +565,7 @@ public class PlanPrinter
             }
             else {
                 nodeOutput = addNode(node,
-                        format("Aggregate%s%s%s", type, key, formatHash(node.getHashSymbol())));
+                        format("HashAggregate%s%s%s", type, key, formatHash(node.getHashSymbol())));
             }
 
             node.getAggregations().forEach((symbol, aggregation) -> nodeOutput.appendDetailsLine("%s := %s", symbol, formatAggregation(aggregation)));

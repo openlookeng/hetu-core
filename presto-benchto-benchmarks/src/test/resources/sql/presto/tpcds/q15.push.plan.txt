@@ -1,9 +1,9 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
-        final aggregation over (ca_zip)
+        final hashaggregation over (ca_zip)
             local exchange (GATHER, SINGLE, [])
                 remote exchange (REPARTITION, HASH, ["ca_zip"])
-                    partial aggregation over (ca_zip)
+                    partial hashaggregation over (ca_zip)
                         join (INNER, PARTITIONED):
                             remote exchange (REPARTITION, HASH, ["cs_bill_customer_sk"])
                                 join (INNER, REPLICATED):

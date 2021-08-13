@@ -2,10 +2,10 @@ local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
         join (INNER, PARTITIONED):
             join (INNER, PARTITIONED):
-                final aggregation over (i_item_id)
+                final hashaggregation over (i_item_id)
                     local exchange (GATHER, SINGLE, [])
                         remote exchange (REPARTITION, HASH, ["i_item_id"])
-                            partial aggregation over (i_item_id)
+                            partial hashaggregation over (i_item_id)
                                 semijoin (REPLICATED):
                                     join (INNER, REPLICATED):
                                         join (INNER, PARTITIONED):
@@ -26,10 +26,10 @@ local exchange (GATHER, SINGLE, [])
                                                         local exchange (GATHER, SINGLE, [])
                                                             remote exchange (GATHER, SINGLE, [])
                                                                 scan date_dim (pushdown = true)
-                final aggregation over (i_item_id_220)
+                final hashaggregation over (i_item_id_220)
                     local exchange (GATHER, SINGLE, [])
                         remote exchange (REPARTITION, HASH, ["i_item_id_220"])
-                            partial aggregation over (i_item_id_220)
+                            partial hashaggregation over (i_item_id_220)
                                 semijoin (REPLICATED):
                                     join (INNER, PARTITIONED):
                                         remote exchange (REPARTITION, HASH, ["ws_item_sk"])
@@ -51,10 +51,10 @@ local exchange (GATHER, SINGLE, [])
                                                         local exchange (GATHER, SINGLE, [])
                                                             remote exchange (GATHER, SINGLE, [])
                                                                 scan date_dim (pushdown = true)
-            final aggregation over (i_item_id_84)
+            final hashaggregation over (i_item_id_84)
                 local exchange (GATHER, SINGLE, [])
                     remote exchange (REPARTITION, HASH, ["i_item_id_84"])
-                        partial aggregation over (i_item_id_84)
+                        partial hashaggregation over (i_item_id_84)
                             semijoin (REPLICATED):
                                 join (INNER, REPLICATED):
                                     join (INNER, PARTITIONED):

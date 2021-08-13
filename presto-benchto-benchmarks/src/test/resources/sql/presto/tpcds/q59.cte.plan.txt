@@ -6,10 +6,10 @@ local exchange (GATHER, SINGLE, [])
                     join (INNER, REPLICATED):
                         remote exchange (REPARTITION, HASH, ["d_week_seq", "ss_store_sk", "sum", "sum_10", "sum_11", "sum_12", "sum_13", "sum_8", "sum_9"])
                             cte wss
-                                final aggregation over (d_week_seq, ss_store_sk)
+                                final hashaggregation over (d_week_seq, ss_store_sk)
                                     local exchange (GATHER, SINGLE, [])
                                         remote exchange (REPARTITION, HASH, ["d_week_seq", "ss_store_sk"])
-                                            partial aggregation over (d_week_seq, ss_store_sk)
+                                            partial hashaggregation over (d_week_seq, ss_store_sk)
                                                 join (INNER, REPLICATED):
                                                     Filter
                                                         scan store_sales
@@ -31,10 +31,10 @@ local exchange (GATHER, SINGLE, [])
                         join (INNER, REPLICATED):
                             remote exchange (REPARTITION, HASH, ["d_week_seq_147", "ss_store_sk_127", "sum_182", "sum_183", "sum_184", "sum_185", "sum_186", "sum_187", "sum_188"])
                                 cte wss
-                                    final aggregation over (d_week_seq_147, ss_store_sk_127)
+                                    final hashaggregation over (d_week_seq_147, ss_store_sk_127)
                                         local exchange (GATHER, SINGLE, [])
                                             remote exchange (REPARTITION, HASH, ["d_week_seq_147", "ss_store_sk_127"])
-                                                partial aggregation over (d_week_seq_147, ss_store_sk_127)
+                                                partial hashaggregation over (d_week_seq_147, ss_store_sk_127)
                                                     join (INNER, REPLICATED):
                                                         Filter
                                                             scan store_sales

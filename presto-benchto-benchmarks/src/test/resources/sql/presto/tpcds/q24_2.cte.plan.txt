@@ -1,17 +1,17 @@
 remote exchange (GATHER, SINGLE, [])
     Filter
         cross join:
-            final aggregation over (c_first_name, c_last_name, s_store_name)
+            final hashaggregation over (c_first_name, c_last_name, s_store_name)
                 local exchange (GATHER, SINGLE, [])
                     remote exchange (REPARTITION, HASH, ["c_first_name", "c_last_name", "s_store_name"])
-                        partial aggregation over (c_first_name, c_last_name, s_store_name)
+                        partial hashaggregation over (c_first_name, c_last_name, s_store_name)
                             Filter
                                 remote exchange (REPARTITION, HASH, ["c_first_name", "c_last_name", "ca_state", "i_color", "i_current_price", "i_manager_id", "i_size", "i_units", "s_state", "s_store_name", "sum"])
                                     cte ssales
-                                        final aggregation over (c_first_name, c_last_name, ca_state, i_color, i_current_price, i_manager_id, i_size, i_units, s_state, s_store_name)
+                                        final hashaggregation over (c_first_name, c_last_name, ca_state, i_color, i_current_price, i_manager_id, i_size, i_units, s_state, s_store_name)
                                             local exchange (GATHER, SINGLE, [])
                                                 remote exchange (REPARTITION, HASH, ["c_first_name", "c_last_name", "ca_state", "i_color", "i_current_price", "i_manager_id", "i_size", "i_units", "s_state", "s_store_name"])
-                                                    partial aggregation over (c_first_name, c_last_name, ca_state, i_color, i_current_price, i_manager_id, i_size, i_units, s_state, s_store_name)
+                                                    partial hashaggregation over (c_first_name, c_last_name, ca_state, i_color, i_current_price, i_manager_id, i_size, i_units, s_state, s_store_name)
                                                         join (INNER, PARTITIONED):
                                                             remote exchange (REPARTITION, HASH, ["c_birth_country", "s_zip"])
                                                                 join (INNER, PARTITIONED):
@@ -40,16 +40,16 @@ remote exchange (GATHER, SINGLE, [])
                                                                     scan customer_address
             local exchange (GATHER, SINGLE, [])
                 remote exchange (REPLICATE, BROADCAST, [])
-                    final aggregation over ()
+                    final hashaggregation over ()
                         local exchange (GATHER, SINGLE, [])
                             remote exchange (GATHER, SINGLE, [])
-                                partial aggregation over ()
+                                partial hashaggregation over ()
                                     remote exchange (REPARTITION, HASH, ["c_first_name_181", "c_last_name_182", "ca_state_199", "i_color_168", "i_current_price_156", "i_manager_id_171", "i_size_166", "i_units_169", "s_state_146", "s_store_name_127", "sum_225"])
                                         cte ssales
-                                            final aggregation over (c_first_name_181, c_last_name_182, ca_state_199, i_color_168, i_current_price_156, i_manager_id_171, i_size_166, i_units_169, s_state_146, s_store_name_127)
+                                            final hashaggregation over (c_first_name_181, c_last_name_182, ca_state_199, i_color_168, i_current_price_156, i_manager_id_171, i_size_166, i_units_169, s_state_146, s_store_name_127)
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPARTITION, HASH, ["c_first_name_181", "c_last_name_182", "ca_state_199", "i_color_168", "i_current_price_156", "i_manager_id_171", "i_size_166", "i_units_169", "s_state_146", "s_store_name_127"])
-                                                        partial aggregation over (c_first_name_181, c_last_name_182, ca_state_199, i_color_168, i_current_price_156, i_manager_id_171, i_size_166, i_units_169, s_state_146, s_store_name_127)
+                                                        partial hashaggregation over (c_first_name_181, c_last_name_182, ca_state_199, i_color_168, i_current_price_156, i_manager_id_171, i_size_166, i_units_169, s_state_146, s_store_name_127)
                                                             join (INNER, PARTITIONED):
                                                                 remote exchange (REPARTITION, HASH, ["c_birth_country_187", "s_zip_147"])
                                                                     join (INNER, PARTITIONED):

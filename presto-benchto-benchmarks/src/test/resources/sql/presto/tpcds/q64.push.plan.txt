@@ -2,9 +2,9 @@ remote exchange (GATHER, SINGLE, [])
     local exchange (GATHER, UNKNOWN, [])
         remote exchange (REPARTITION, ROUND_ROBIN, [])
             join (INNER, PARTITIONED):
-                final aggregation over (ca_city, ca_city_112, ca_street_name, ca_street_name_109, ca_street_number, ca_street_number_108, ca_zip, ca_zip_115, d_year, d_year_32, d_year_61, i_item_sk, i_product_name, s_store_name, s_zip)
+                final hashaggregation over (ca_city, ca_city_112, ca_street_name, ca_street_name_109, ca_street_number, ca_street_number_108, ca_zip, ca_zip_115, d_year, d_year_32, d_year_61, i_item_sk, i_product_name, s_store_name, s_zip)
                     local exchange (GATHER, SINGLE, [])
-                        partial aggregation over (ca_city, ca_city_112, ca_street_name, ca_street_name_109, ca_street_number, ca_street_number_108, ca_zip, ca_zip_115, d_year, d_year_32, d_year_61, i_item_sk, i_product_name, s_store_name, s_zip)
+                        partial hashaggregation over (ca_city, ca_city_112, ca_street_name, ca_street_name_109, ca_street_number, ca_street_number_108, ca_zip, ca_zip_115, d_year, d_year_32, d_year_61, i_item_sk, i_product_name, s_store_name, s_zip)
                             join (INNER, PARTITIONED):
                                 remote exchange (REPARTITION, HASH, ["cs_item_sk"])
                                     join (INNER, PARTITIONED):
@@ -42,10 +42,10 @@ remote exchange (GATHER, SINGLE, [])
                                                                                                                                                                 local exchange (GATHER, SINGLE, [])
                                                                                                                                                                     remote exchange (REPLICATE, BROADCAST, [])
                                                                                                                                                                         scan store_returns
-                                                                                                                                                        final aggregation over (cs_item_sk)
+                                                                                                                                                        final hashaggregation over (cs_item_sk)
                                                                                                                                                             local exchange (GATHER, SINGLE, [])
                                                                                                                                                                 remote exchange (REPARTITION, HASH, ["cs_item_sk"])
-                                                                                                                                                                    partial aggregation over (cs_item_sk)
+                                                                                                                                                                    partial hashaggregation over (cs_item_sk)
                                                                                                                                                                         join (INNER, PARTITIONED):
                                                                                                                                                                             remote exchange (REPARTITION, HASH, ["cs_item_sk", "cs_order_number"])
                                                                                                                                                                                 scan catalog_sales
@@ -97,9 +97,9 @@ remote exchange (GATHER, SINGLE, [])
                                 local exchange (GATHER, SINGLE, [])
                                     remote exchange (REPARTITION, HASH, ["i_item_sk"])
                                         scan item (pushdown = true)
-                final aggregation over (ca_city_579, ca_city_593, ca_street_name_576, ca_street_name_590, ca_street_number_575, ca_street_number_589, ca_zip_582, ca_zip_596, d_year_391, d_year_420, d_year_449, i_item_sk_609, i_product_name_630, s_store_name_477, s_zip_497)
+                final hashaggregation over (ca_city_579, ca_city_593, ca_street_name_576, ca_street_name_590, ca_street_number_575, ca_street_number_589, ca_zip_582, ca_zip_596, d_year_391, d_year_420, d_year_449, i_item_sk_609, i_product_name_630, s_store_name_477, s_zip_497)
                     local exchange (GATHER, SINGLE, [])
-                        partial aggregation over (ca_city_579, ca_city_593, ca_street_name_576, ca_street_name_590, ca_street_number_575, ca_street_number_589, ca_zip_582, ca_zip_596, d_year_391, d_year_420, d_year_449, i_item_sk_609, i_product_name_630, s_store_name_477, s_zip_497)
+                        partial hashaggregation over (ca_city_579, ca_city_593, ca_street_name_576, ca_street_name_590, ca_street_number_575, ca_street_number_589, ca_zip_582, ca_zip_596, d_year_391, d_year_420, d_year_449, i_item_sk_609, i_product_name_630, s_store_name_477, s_zip_497)
                             join (INNER, PARTITIONED):
                                 remote exchange (REPARTITION, HASH, ["cs_item_sk_312"])
                                     join (INNER, PARTITIONED):
@@ -137,10 +137,10 @@ remote exchange (GATHER, SINGLE, [])
                                                                                                                                                                 local exchange (GATHER, SINGLE, [])
                                                                                                                                                                     remote exchange (REPLICATE, BROADCAST, [])
                                                                                                                                                                         scan store_returns
-                                                                                                                                                        final aggregation over (cs_item_sk_312)
+                                                                                                                                                        final hashaggregation over (cs_item_sk_312)
                                                                                                                                                             local exchange (GATHER, SINGLE, [])
                                                                                                                                                                 remote exchange (REPARTITION, HASH, ["cs_item_sk_312"])
-                                                                                                                                                                    partial aggregation over (cs_item_sk_312)
+                                                                                                                                                                    partial hashaggregation over (cs_item_sk_312)
                                                                                                                                                                         join (INNER, PARTITIONED):
                                                                                                                                                                             remote exchange (REPARTITION, HASH, ["cs_item_sk_312", "cs_order_number_314"])
                                                                                                                                                                                 scan catalog_sales
