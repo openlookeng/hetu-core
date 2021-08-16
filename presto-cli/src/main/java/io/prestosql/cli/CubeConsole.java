@@ -32,6 +32,7 @@ import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.sql.tree.GenericLiteral;
 import io.prestosql.sql.tree.Identifier;
 import io.prestosql.sql.tree.Literal;
+import io.prestosql.sql.tree.LogicalBinaryExpression;
 import io.prestosql.sql.tree.LongLiteral;
 import io.prestosql.sql.tree.Property;
 import io.prestosql.sql.tree.QualifiedName;
@@ -77,11 +78,11 @@ public class CubeConsole
     private static final String DATATYPE_TINYINT_QUOTE = "tinyint '";
     private static final String DATATYPE_BIGINT_QUOTE = "bigint '";
     private static final String DATATYPE_SMALLINT_QUOTE = "smallint '";
-    private static final String DATATYPE_VARCHAR_QUOTE = "varchar '";
     private static final String DATATYPE_INTEGER = "integer";
     private static final String DATATYPE_TINYINT = "tinyint";
     private static final String DATATYPE_BIGINT = "bigint";
     private static final String DATATYPE_SMALLINT = "smallint";
+    private static final String NOT_EQUAL_OPERATOR = "<>";
     private static final int EMPTY_ROW_BUFFER_ITERATION_ITEMS = 0;
     private static final int INDEX_AT_MIN_POSITION = 0;
     private static final int INDEX_AT_MAX_POSITION = 1;
@@ -154,9 +155,8 @@ public class CubeConsole
             CreateCube modifiedCreateCube = new CreateCube(cubeName, sourceTableName, groupingSet, aggregations, notExists, properties, Optional.empty(), createCube.getSourceFilter().orElse(null));
             String queryCreateCube = SqlFormatter.formatSql(modifiedCreateCube, Optional.empty());
 
-            success = console.runQuery(queryRunner, queryCreateCube, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
-            if (!success) {
-                return success;
+            if (!console.runQuery(queryRunner, queryCreateCube, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
+                return false;
             }
             //we check whether the create cube expression can be processed
             if (isSupportedExpression(createCube, queryRunner, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
@@ -228,7 +228,12 @@ public class CubeConsole
         ComparisonExpression.Operator operator = comparisonExpression.getOperator();
         Expression left = comparisonExpression.getLeft();
         Expression right = comparisonExpression.getRight();
+        boolean notEqualOperator = false;
         boolean success = true;
+
+        if (operator.getValue().equalsIgnoreCase(NOT_EQUAL_OPERATOR)) {
+            notEqualOperator = true;
+        }
 
         if (!(left instanceof SymbolReference) && right instanceof SymbolReference) {
             comparisonExpression = new ComparisonExpression(operator.flip(), right, left);
@@ -241,77 +246,82 @@ public class CubeConsole
 
         //Run Query
         String rowCountsDistinctValuesQuery = String.format(SELECT_COLUMN_ROW_COUNT_FROM_STRING, columnName, sourceTableName.toString(), whereClause, columnName, columnName);
-        processCubeInitialQuery(queryRunner, rowCountsDistinctValuesQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+        if (!processCubeInitialQuery(queryRunner, rowCountsDistinctValuesQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
+            return false;
+        }
         List<List<?>> rowBufferIterationItems = getListRowBufferIterationItems();
 
         if (rowBufferIterationItems != null && rowBufferIterationItems.size() != EMPTY_ROW_BUFFER_ITERATION_ITEMS) {
             //this loop process the multiple insert query statements
             for (List<?> rowBufferItems : rowBufferIterationItems) {
-                Expression finalBetweenPredicate;
+                Expression finalPredicate;
                 String queryInsert;
                 switch (cubeColumnDataType) {
                     case DATATYPE_DOUBLE: {
-                        finalBetweenPredicate = new BetweenPredicate(columnName, parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
+                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
                                 new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DOUBLE)), parser.createExpression(rowBufferItems.get(INDEX_AT_MAX_POSITION).toString(),
                                 new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DOUBLE)));
                         break;
                     }
                     case DATATYPE_REAL: {
-                        finalBetweenPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_REAL_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
+                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_REAL_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()), parser.createExpression(DATATYPE_REAL_QUOTE + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()));
                         break;
                     }
                     case DATATYPE_DECIMAL: {
-                        finalBetweenPredicate = new BetweenPredicate(columnName, parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
+                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
                                 new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL)), parser.createExpression(rowBufferItems.get(INDEX_AT_MAX_POSITION).toString(),
                                 new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL)));
                         break;
                     }
                     case DATATYPE_DATE: {
-                        finalBetweenPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_DATE_QUOTE +
+                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_DATE_QUOTE +
                                 rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING, new ParsingOptions()), parser.createExpression(DATATYPE_DATE_QUOTE + rowBufferItems.get(1).toString() + QUOTE_STRING,
                                 new ParsingOptions()));
                         break;
                     }
                     case DATATYPE_TIMESTAMP: {
-                        finalBetweenPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_TIMESTAMP_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
+                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_TIMESTAMP_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()), parser.createExpression(DATATYPE_TIMESTAMP_QUOTE + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()));
                         break;
                     }
                     case DATATYPE_TINYINT: {
-                        finalBetweenPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_TINYINT_QUOTE +
+                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_TINYINT_QUOTE +
                                 rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING, new ParsingOptions()), parser.createExpression(DATATYPE_TINYINT_QUOTE + rowBufferItems.get(1).toString() + QUOTE_STRING,
                                 new ParsingOptions()));
                         break;
                     }
                     case DATATYPE_BIGINT: {
-                        finalBetweenPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_BIGINT_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
+                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_BIGINT_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()), parser.createExpression(DATATYPE_BIGINT_QUOTE + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()));
                         break;
                     }
                     case DATATYPE_SMALLINT: {
-                        finalBetweenPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_SMALLINT_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
+                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_SMALLINT_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()), parser.createExpression(DATATYPE_SMALLINT_QUOTE + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()));
                         break;
                     }
                     case DATATYPE_VARCHAR: {
-                        finalBetweenPredicate = new BetweenPredicate(columnName, parser.createExpression(QUOTE_STRING + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
+                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(QUOTE_STRING + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()), parser.createExpression(QUOTE_STRING + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()));
                         break;
                     }
                     default: {
-                        finalBetweenPredicate = new BetweenPredicate(columnName, parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
+                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
                                 new ParsingOptions()), parser.createExpression(rowBufferItems.get(INDEX_AT_MAX_POSITION).toString(),
                                 new ParsingOptions()));
                         break;
                     }
                 }
-                queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, finalBetweenPredicate);
+                if (notEqualOperator) {
+                    finalPredicate = new LogicalBinaryExpression(LogicalBinaryExpression.Operator.AND, finalPredicate, comparisonExpression);
+                }
+                queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, finalPredicate);
                 success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
             }
         }
@@ -349,77 +359,79 @@ public class CubeConsole
 
         //Run Query
         String rowCountsDistinctValuesQuery = String.format(SELECT_COLUMN_ROW_COUNT_FROM_STRING, columnName, sourceTableName.toString(), whereClause, columnName, columnName);
-        processCubeInitialQuery(queryRunner, rowCountsDistinctValuesQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+        if (!processCubeInitialQuery(queryRunner, rowCountsDistinctValuesQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
+            return false;
+        }
         List<List<?>> rowBufferIterationItems = getListRowBufferIterationItems();
 
         if (rowBufferIterationItems != null) {
             //this loop process the multiple insert query statements
             for (List<?> rowBufferItems : rowBufferIterationItems) {
-                Expression finalBetweenPredicate;
+                Expression finalPredicate;
                 String queryInsert;
                 switch (cubeColumnDataType) {
                     case DATATYPE_DOUBLE: {
-                        finalBetweenPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
+                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
                                 new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DOUBLE)), parser.createExpression(rowBufferItems.get(INDEX_AT_MAX_POSITION).toString(),
                                 new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DOUBLE)));
                         break;
                     }
                     case DATATYPE_REAL: {
-                        finalBetweenPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_REAL_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
+                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_REAL_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()), parser.createExpression(DATATYPE_REAL_QUOTE + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()));
                         break;
                     }
                     case DATATYPE_DECIMAL: {
-                        finalBetweenPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
+                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
                                 new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL)), parser.createExpression(rowBufferItems.get(INDEX_AT_MAX_POSITION).toString(),
                                 new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL)));
                         break;
                     }
                     case DATATYPE_DATE: {
-                        finalBetweenPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_DATE_QUOTE +
+                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_DATE_QUOTE +
                                 rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING, new ParsingOptions()), parser.createExpression(DATATYPE_DATE_QUOTE + rowBufferItems.get(1).toString() + QUOTE_STRING,
                                 new ParsingOptions()));
                         break;
                     }
                     case DATATYPE_TIMESTAMP: {
-                        finalBetweenPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_TIMESTAMP_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
+                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_TIMESTAMP_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()), parser.createExpression(DATATYPE_TIMESTAMP_QUOTE + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()));
                         break;
                     }
                     case DATATYPE_TINYINT: {
-                        finalBetweenPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_TINYINT_QUOTE +
+                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_TINYINT_QUOTE +
                                 rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING, new ParsingOptions()), parser.createExpression(DATATYPE_TINYINT_QUOTE + rowBufferItems.get(1).toString() + QUOTE_STRING,
                                 new ParsingOptions()));
                         break;
                     }
                     case DATATYPE_BIGINT: {
-                        finalBetweenPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_BIGINT_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
+                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_BIGINT_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()), parser.createExpression(DATATYPE_BIGINT_QUOTE + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()));
                         break;
                     }
                     case DATATYPE_SMALLINT: {
-                        finalBetweenPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_SMALLINT_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
+                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_SMALLINT_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()), parser.createExpression(DATATYPE_SMALLINT_QUOTE + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()));
                         break;
                     }
                     case DATATYPE_VARCHAR: {
-                        finalBetweenPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(QUOTE_STRING + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
+                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(QUOTE_STRING + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()), parser.createExpression(QUOTE_STRING + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
                                 new ParsingOptions()));
                         break;
                     }
                     default: {
-                        finalBetweenPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
+                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
                                 new ParsingOptions()), parser.createExpression(rowBufferItems.get(INDEX_AT_MAX_POSITION).toString(),
                                 new ParsingOptions()));
                         break;
                     }
                 }
-                queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, finalBetweenPredicate);
+                queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, finalPredicate);
                 success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
             }
         }
@@ -440,6 +452,7 @@ public class CubeConsole
     private boolean isSupportedExpression(CreateCube createCube, QueryRunner queryRunner, ClientOptions.OutputFormat outputFormat, Runnable schemaChanged, boolean usePager, boolean showProgress, Terminal terminal, PrintStream out, PrintStream errorChannel)
     {
         boolean supportedExpression = false;
+        boolean success = true;
         Optional<Expression> expression = createCube.getWhere();
         if (expression.isPresent()) {
             ImmutableSet.Builder<Identifier> identifierBuilder = new ImmutableSet.Builder<>();
@@ -470,7 +483,9 @@ public class CubeConsole
                     else {
                         return false;
                     }
-                    processCubeInitialQuery(queryRunner, columnDataTypeQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+                    if (!processCubeInitialQuery(queryRunner, columnDataTypeQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
+                        return false;
+                    }
                     String resultInitCubeQuery;
                     resultInitCubeQuery = getResultInitCubeQuery();
                     if (resultInitCubeQuery != null) {
@@ -499,7 +514,9 @@ public class CubeConsole
                                 || betweenPredicate.getMax() instanceof DoubleLiteral) {
                             //initial query to get the total number of distinct column values in the table
                             String countDistinctQuery = String.format(SELECT_COUNT_DISTINCT_FROM_STRING, columnName, sourceTableName.toString(), whereClause);
-                            processCubeInitialQuery(queryRunner, countDistinctQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+                            if (!processCubeInitialQuery(queryRunner, countDistinctQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
+                                return false;
+                            }
                             Long valueCountDistinctQuery = INITIAL_QUERY_RESULT_VALUE;
                             resultInitCubeQuery = getResultInitCubeQuery();
                             if (resultInitCubeQuery != null) {
@@ -539,7 +556,9 @@ public class CubeConsole
                     else {
                         return false;
                     }
-                    processCubeInitialQuery(queryRunner, columnDataTypeQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+                    if (!processCubeInitialQuery(queryRunner, columnDataTypeQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
+                        return false;
+                    }
                     String resultInitCubeQuery;
                     resultInitCubeQuery = getResultInitCubeQuery();
                     if (resultInitCubeQuery != null) {
@@ -565,7 +584,9 @@ public class CubeConsole
                             comparisonExpression.getRight() instanceof TimestampLiteral) {
                         //initial query to get the total number of distinct column values in the table
                         String countDistinctQuery = String.format(SELECT_COUNT_DISTINCT_FROM_STRING, columnName, sourceTableName.toString(), whereClause);
-                        processCubeInitialQuery(queryRunner, countDistinctQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+                        if (!processCubeInitialQuery(queryRunner, countDistinctQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
+                            return false;
+                        }
                         Long valueCountDistinctQuery = INITIAL_QUERY_RESULT_VALUE;
                         resultInitCubeQuery = getResultInitCubeQuery();
                         if (resultInitCubeQuery != null) {
