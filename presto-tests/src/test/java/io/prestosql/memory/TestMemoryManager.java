@@ -342,7 +342,7 @@ public class TestMemoryManager
         return stats.isFullyBlocked() || stats.getRunningDrivers() == 0;
     }
 
-    @Test(timeOut = 60_000, expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".*Query exceeded distributed user memory limit of 1kB.*")
+    @Test(timeOut = 180_000, expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".*Query exceeded distributed user memory limit of 1kB.*")
     public void testQueryUserMemoryLimit()
             throws Exception
     {
@@ -369,7 +369,7 @@ public class TestMemoryManager
         }
     }
 
-    @Test(timeOut = 60_000, expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".*Query exceeded per-node user memory limit of 1kB.*")
+    @Test(timeOut = 180_000, expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".*Query exceeded per-node user memory limit of 1kB.*")
     public void testQueryMemoryPerNodeLimit()
             throws Exception
     {
