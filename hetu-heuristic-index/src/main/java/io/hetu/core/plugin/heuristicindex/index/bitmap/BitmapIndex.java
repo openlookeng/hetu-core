@@ -107,6 +107,7 @@ public class BitmapIndex
     private AtomicBoolean closed = new AtomicBoolean(false);
     private AtomicBoolean updateAllowed = new AtomicBoolean(true);
     private final Map<Object, RoaringBitmap> cache = new HashMap<>();
+    private long memoryUsage;
 
     @Override
     public Set<CreateIndexMetadata.Level> getSupportedIndexLevels()
@@ -190,11 +191,12 @@ public class BitmapIndex
             if (byteArray == null) {
                 return null;
             }
-
             byte[] value = (byte[]) byteArray;
             ByteBuffer bb = ByteBuffer.wrap(value);
             ImmutableRoaringBitmap bm = new ImmutableRoaringBitmap(bb);
-            return new RoaringBitmap(bm);
+            RoaringBitmap result = new RoaringBitmap(bm);
+            memoryUsage += result.getSizeInBytes();
+            return result;
         });
     }
 
@@ -342,7 +344,7 @@ public class BitmapIndex
     @Override
     public long getMemoryUsage()
     {
-        return 0;
+        return memoryUsage;
     }
 
     @Override
