@@ -89,7 +89,7 @@ public class LogicalPart
     private final Set<Integer> indexChannels;
     private final long maxLogicalPartBytes;
     private final int maxPageSizeBytes;
-    private final int lpNum;
+    private final int logicalPartNum;
     private final boolean compressionEnabled;
 
     // indexes
@@ -144,11 +144,11 @@ public class LogicalPart
             int maxPageSizeBytes,
             TypeManager typeManager,
             PagesSerde pagesSerde,
-            int lpNum,
+            int logicalPartNum,
             boolean compressionEnabled)
     {
         this.tableDataRoot = tableDataRoot;
-        this.lpNum = lpNum;
+        this.logicalPartNum = logicalPartNum;
         this.pages = new ArrayList<>();
         this.maxLogicalPartBytes = maxLogicalPartBytes;
         this.maxPageSizeBytes = maxPageSizeBytes;
@@ -193,6 +193,11 @@ public class LogicalPart
     long getByteSize()
     {
         return byteSize;
+    }
+
+    public int getLogicalPartNum()
+    {
+        return logicalPartNum;
     }
 
     void restoreTransientObjects(PageSorter pageSorter, TypeManager typeManager, PagesSerde pagesSerde, Path tableDataRoot)
@@ -699,7 +704,7 @@ public class LogicalPart
 
     private String getPageFileName()
     {
-        return "logicalPart" + lpNum;
+        return "logicalPartNumber" + logicalPartNum;
     }
 
     /**

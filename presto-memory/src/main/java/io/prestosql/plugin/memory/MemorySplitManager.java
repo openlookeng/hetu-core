@@ -50,9 +50,10 @@ public final class MemorySplitManager
 
         for (MemoryDataFragment dataFragment : dataFragments) {
             long rows = dataFragment.getRows();
-            int lpCount = dataFragment.getLogicalPartCount();
+            int logicalPartCount = dataFragment.getLogicalPartCount();
             totalRows += rows;
-            for (int i = 0; i <= lpCount; i++) {
+            // logicalPart ids are 1 based
+            for (int i = 1; i <= logicalPartCount; i++) {
                 splits.add(new MemorySplit(table.getId(), i, dataFragment.getHostAddress(), rows, OptionalLong.empty()));
             }
         }

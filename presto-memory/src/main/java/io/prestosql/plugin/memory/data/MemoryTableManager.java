@@ -181,18 +181,18 @@ public class MemoryTableManager
 
     public List<Page> getPages(
             Long tableId,
-            int lpNum,
+            int logicalPartNum,
             List<Integer> columnIndexes,
             long expectedRows,
             OptionalLong limit,
             OptionalDouble sampleRatio)
     {
-        return getPages(tableId, lpNum, columnIndexes, expectedRows, limit, sampleRatio, TupleDomain.all());
+        return getPages(tableId, logicalPartNum, columnIndexes, expectedRows, limit, sampleRatio, TupleDomain.all());
     }
 
     public List<Page> getPages(
             Long tableId,
-            int lpNum,
+            int logicalPartNum,
             List<Integer> columnIndexes,
             long expectedRows,
             OptionalLong limit,
@@ -220,10 +220,10 @@ public class MemoryTableManager
 
         List<Page> pages;
         if (predicate.isAll()) {
-            pages = table.getPages(lpNum);
+            pages = table.getPages(logicalPartNum);
         }
         else {
-            pages = table.getPages(lpNum, predicate);
+            pages = table.getPages(logicalPartNum, predicate);
         }
 
         for (int i = 0; i < pages.size(); i++) {
