@@ -43,6 +43,7 @@ import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.service.PropertyService;
 import io.prestosql.split.SplitManager;
+import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.PlanFragmentId;
 import io.prestosql.sql.planner.plan.RemoteSourceNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
@@ -53,6 +54,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -63,11 +65,13 @@ import java.util.stream.Collectors;
 
 import static io.prestosql.SessionTestUtils.TEST_SNAPSHOT_SESSION;
 import static io.prestosql.operator.StageExecutionDescriptor.ungroupedExecution;
+import static io.prestosql.spi.plan.AggregationNode.AggregationType.HASH;
 import static io.prestosql.spi.plan.JoinNode.Type.INNER;
 import static io.prestosql.sql.planner.DistributedExecutionPlanner.Mode.RESUME;
 import static io.prestosql.sql.planner.DistributedExecutionPlanner.Mode.SNAPSHOT;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SOURCE_DISTRIBUTION;
+import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.LOCAL;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.GATHER;
 import static io.prestosql.testing.TestingHandles.TEST_TABLE_HANDLE;
 import static org.mockito.Matchers.anyBoolean;
@@ -88,6 +92,7 @@ public class TestDistributedExecutionPlanner
     private final DistributedExecutionPlanner planner;
     private final Map<MarkerSplitSource, String> sources = new HashMap<>();
     private final Multimap<String, String> dependencies = HashMultimap.create();
+    private final Multimap<String, String> unions = HashMultimap.create();
     private int nodeId;
 
     public TestDistributedExecutionPlanner()
@@ -106,6 +111,11 @@ public class TestDistributedExecutionPlanner
                 dependencies.put(id.toString(), sources.get(invocation1.getArgumentAt(0, MarkerSplitSource.class)));
                 return null;
             }).when(source).addDependency(anyObject());
+            doAnswer(invocation1 -> {
+                List<String> list = (List<String>) invocation1.getArgumentAt(0, List.class).stream().map(sources::get).collect(Collectors.toList());
+                unions.putAll(id.toString(), list);
+                return null;
+            }).when(source).addUnionSources(anyObject());
             sources.put(source, id.toString());
             return source;
         }).when(splitManager).getSplits(anyObject(), anyObject(), anyObject(), anyObject(), anyObject(), anyObject(), anyObject(), anyBoolean(), anyObject());
@@ -117,6 +127,7 @@ public class TestDistributedExecutionPlanner
     {
         sources.clear();
         dependencies.clear();
+        unions.clear();
         nodeId = 0;
     }
 
@@ -275,6 +286,33 @@ public class TestDistributedExecutionPlanner
     }
 
     @Test
+    public void testExchangeUnion()
+    {
+        SubPlan stage2 = makePlan(2,
+                source("A"),
+                ImmutableList.of());
+        SubPlan stage3 = makePlan(3,
+                source("B"),
+                ImmutableList.of());
+        SubPlan stage4 = makePlan(4,
+                source("C"),
+                ImmutableList.of());
+        SubPlan stage5 = makePlan(5,
+                source("D"),
+                ImmutableList.of());
+        SubPlan root = makePlan(1,
+                union(remote(2, 3), remote(4, 5)),
+                ImmutableList.of(stage2, stage3, stage4, stage5));
+
+        planner.plan(root, session, SNAPSHOT, null, 0);
+        Collection<String> expected = ImmutableList.of("A", "B", "C", "D");
+        assertEquals(unions.get("A"), expected);
+        assertEquals(unions.get("B"), expected);
+        assertEquals(unions.get("C"), expected);
+        assertEquals(unions.get("D"), expected);
+    }
+
+    @Test
     public void testValuesSnapshot()
     {
         ValuesNode a = values("A");
@@ -388,6 +426,19 @@ public class TestDistributedExecutionPlanner
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty());
+    }
+
+    private ExchangeNode union(PlanNode left, PlanNode right)
+    {
+        return new ExchangeNode(
+                new PlanNodeId(String.valueOf(++nodeId)),
+                GATHER,
+                LOCAL,
+                new PartitioningScheme(Partitioning.create(SINGLE_DISTRIBUTION, ImmutableList.of()), ImmutableList.of(symbol)),
+                ImmutableList.of(left, right),
+                ImmutableList.of(ImmutableList.of(symbol), ImmutableList.of(symbol)),
+                Optional.empty(),
+                HASH);
     }
 
     private TableScanNode source(String name)
