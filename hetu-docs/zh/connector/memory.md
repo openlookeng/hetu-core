@@ -16,14 +16,69 @@ memory.max-data-per-node=200GB
 memory.spill-path=/opt/hetu/data/spill    
 ```
 
+#### 其他必要的配置
+- 本节将介绍使用内存连接器所需的其他配置。
+- 更多信息请参考[Hetu Metastore](../admin/meta-store.md)和[State Store](../admin/state-store.md)的文档。
+  ##### 单个节点设置
+  - 本节将给出单节点集群上内存连接器的示例配置。
+  - 创建文件 `etc/catalog/memory.properties`并填入以下配置:
+  ``` properties
+  connector.name=memory
+  memory.max-data-per-node=200GB
+  memory.spill-path=/opt/hetu/data/spill
+  ```
+  - 创建文件 `etc/hetu-metastore.properties` 并填入以下配置:
+  ```properties
+  hetu.metastore.type=hetufilesystem
+  hetu.metastore.hetufilesystem.profile-name=default
+  hetu.metastore.hetufilesystem.path=/tmp/hetu/metastore
+  hetu.metastore.cache.type=local
+  ```
+  ##### 多节点设置
+  - 本节将为具有多个节点的集群提供内存连接器的示例配置。
+  - 创建文件 `etc/catalog/memory.properties` 并填入以下配置:
+  ``` properties
+  connector.name=memory
+  memory.max-data-per-node=200GB
+  memory.spill-path=/opt/hetu/data/spill
+  ```
+  - 在 `etc/config.properties` 文件中加入以下代码来启用 State Store:
+    - State Store 允许 Memory Connector 自动清理删除的表，否则只有在创建另一个表时才会清理表。
+  ```properties
+  hetu.embedded-state-store.enabled=true
+  ```
+  - 创建文件 `etc/state-store.properties` 并填入以下配置:
+  ```properties
+  state-store.type=hazelcast
+  state-store.name=test
+  state-store.cluster=test-cluster
+  hazelcast.discovery.mode=tcp-ip
+  hazelcast.discovery.port=7980
+  # 每个服务器的ip地址和hazelcast端口应该被声明在这里。
+  # 格式：`hazelcast.discovery.tcp-ip.seeds=host1:port,host2:port` 
+  hazelcast.discovery.tcp-ip.seeds=host1:7980, host2:7980
+  ```
+  - 创建文件 `etc/hetu-metastore.properties` 并填入以下配置:
+  ```properties
+  hetu.metastore.type=hetufilesystem
+  hetu.metastore.hetufilesystem.profile-name=hdfs
+  hetu.metastore.hetufilesystem.path=/tmp/hetu/metastore
+  # 确认使用全局缓存!
+  hetu.metastore.cache.type=global
+  ```
+  - 创建文件 `etc/filesystem/hdfs.properties`  使openLooKeng使用相应的文件系统:
+  ```properties
+  fs.client.type=hdfs
+  # Path to hdfs resource files (e.g. core-site.xml, hdfs-site.xml)
+  hdfs.config.resources=/tmp/hetu/hdfs-site.xml
+  # hdfs authentication, accepted values: KERBEROS/NONE
+  hdfs.authentication.type=NONE
+  ```
+
 **提示：**
 - `spill-path`必须设置为一个有充足存储空间的路径。推荐使用SSD以获得更好性能。 可以依照需求自定义。 
 - 关于更多详细信息与其他可选配置项，请参见**配置属性** 章节。
 - 在`etc/config.properties`中，请确保`task.writer-count`的数字不小于配置的openLooKeng集群的节点个数。这会帮助把所有数据更均匀地分配到各个节点上。
-- Hetu Metastore必须被妥善配置来保证内存连接器的正常功能。请参阅[Hetu Metastore](../admin/meta-store.md)。
-- 必须配置StateStore使得worker上的表自动刷新生效
-  - 请参阅[State Store](../admin/state-store.md)
-  - 自动刷新特性使得worker节点定期从metastore获取最新的表的列表，并在本地清理已经删除的表
 ## 示例
 
 使用内存连接器创建表：
@@ -142,8 +197,7 @@ LogicalPart 中创建了布隆过滤器、稀疏索引和 MinMax 索引。
 
 ## 内存连接器限制和已知问题
 
-- `DROP TABLE`之后，worker上的内存没有立即释放。内存在下一次对内存连接器进行创建操作后释放。
-    - 可以通过创建一个临时的表来在worker上强制清理，如`CREATE TABLE memory.default.tmp AS SELECT * FROM tpch.tiny.nation;`
+- 如果没有 State Store 和带有全局缓存的 Hetu Metastore，在 `DROP TABLE` 之后，内存不会立即释放到 worker 上。它将在下一个“CREATE TABLE”操作时被释放。
 - 当前`sorted_by`只支持按一个列排序。
 - 如果一个CTAS (CREATE TABLE AS)查询失败或被取消，一个无效的表的记录会留在系统中。该表将需要被手动删除。
 
