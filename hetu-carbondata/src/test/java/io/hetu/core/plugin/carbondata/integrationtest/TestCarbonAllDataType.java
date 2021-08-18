@@ -15,9 +15,12 @@
 
 package io.hetu.core.plugin.carbondata.integrationtest;
 
+import com.esotericsoftware.minlog.Log;
 import com.google.gson.Gson;
 import io.hetu.core.plugin.carbondata.server.HetuTestServer;
 import io.prestosql.hive.$internal.au.com.bytecode.opencsv.CSVReader;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.StandardErrorCode;
 import org.apache.carbondata.common.logging.LogServiceFactory;
 import org.apache.carbondata.core.constants.CarbonCommonConstants;
 import org.apache.carbondata.core.datastore.filesystem.CarbonFile;
@@ -53,6 +56,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
+import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -62,8 +66,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
+import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -99,6 +106,9 @@ public class TestCarbonAllDataType
         Map<String, String> map = new HashMap<String, String>();
         map.put("hive.metastore", "file");
         map.put("hive.allow-drop-table", "true");
+        map.put("hive.allow-drop-column", "true");
+        map.put("hive.allow-add-column", "true");
+        map.put("hive.allow-rename-column", "true");
         map.put("hive.metastore.catalog.dir", "file://" + storePath + "/hive.store");
         map.put("carbondata.store-location", "file://" + carbonStoreLocation);
         map.put("carbondata.minor-vacuum-seg-count", "4");
@@ -152,6 +162,804 @@ public class TestCarbonAllDataType
         List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT COUNT(DISTINCT ID) AS RESULT FROM testdb.testtable");
         List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
             add(new HashMap<String, Object>() {{    put("RESULT", 9); }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectSum()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT SUM(ID) AS RESULT FROM TESTDB.TESTTABLE");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 54);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectAvgDistinct()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT AVG(DISTINCT ID) AS RESULT FROM TESTDB.TESTTABLE");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 5.0);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectMinDistinct()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT MIN(DISTINCT ID) AS RESULT FROM TESTDB.TESTTABLE");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 1);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectMaxDistinct()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT MAX(DISTINCT ID) AS RESULT FROM TESTDB.TESTTABLE");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 9);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectCountDistinctDecimal()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT COUNT(DISTINCT BONUS) AS RESULT FROM TESTDB.TESTTABLE");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 10);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectCountDecimal()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT COUNT(BONUS) AS RESULT FROM TESTDB.TESTTABLE");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 10);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectSumDecimal()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT SUM(BONUS) AS RESULT FROM TESTDB.TESTTABLE");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 20774.6475);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectSumDistinctDecimal()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT SUM(DISTINCT BONUS) AS RESULT FROM TESTDB.TESTTABLE");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 20774.6475);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectAvgDistinctDecimal()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT AVG(DISTINCT BONUS) AS RESULT FROM TESTDB.TESTTABLE");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 2077.4648);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectMinDistinctDecimal()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT MIN(DISTINCT BONUS) AS RESULT FROM TESTDB.TESTTABLE");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", BigDecimal.valueOf(500.4140).setScale(4));
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectMaxDistinctDecimal()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT MAX(DISTINCT BONUS) AS RESULT FROM TESTDB.TESTTABLE");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", BigDecimal.valueOf(9999.9990).setScale(4));
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectDecimalOrderBy()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT DISTINCT BONUS AS RESULT FROM TESTDB.TESTTABLE ORDER BY BONUS LIMIT 3");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", BigDecimal.valueOf(500.414).setScale(4));
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", BigDecimal.valueOf(500.59).setScale(4));
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", BigDecimal.valueOf(500.88).setScale(4));
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectStringOrderBy()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT NAME AS RESULT FROM TESTDB.TESTTABLE ORDER BY NAME");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "akash");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "anubhav");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "bhavya");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "geetika");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "jatin");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "jitesh");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "liang");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "prince");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "ravindra");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "sahil");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", null);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectDateOrderBy()
+            throws SQLException, ParseException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT DATE AS RESULT FROM TESTDB.TESTTABLE WHERE id < 10 ORDER BY DATE");
+        DateFormat formatter = new SimpleDateFormat("yyyy-mm-dd");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "2015-07-18");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "2015-07-18");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "2015-07-23");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "2015-07-24");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "2015-07-25");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "2015-07-26");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "2015-07-27");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "2015-07-28");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "2015-07-29");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "2015-07-30");
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testFilterWithLessThanEqualTo()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT ID,DATE,COUNTRY,NAME,PHONETYPE,SERIALNAME,SALARY,BONUS FROM TESTDB.TESTTABLE" +
+                " WHERE BONUS <= 1234.444 AND ID > 2 GROUP BY ID,DATE,COUNTRY,NAME,PHONETYPE,SERIALNAME,SALARY, " +
+                "BONUS ORDER BY ID LIMIT 2");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>()
+            {{
+                put("ID", 3);
+                put("NAME", "liang");
+                put("BONUS", BigDecimal.valueOf(600.7770).setScale(4));
+                put("DATE", "2015-07-25");
+                put("SALARY", 15002.11);
+                put("SERIALNAME", "ASD37014");
+                put("COUNTRY", "china");
+                put("PHONETYPE", "phone1904");
+            }});
+
+            add(new TreeMap<String, Object>()
+            {{
+                put("ID", 6);
+                put("NAME", "akash");
+                put("BONUS", BigDecimal.valueOf(500.5900).setScale(4));
+                put("DATE", "2015-07-28");
+                put("SALARY", 15005.0);
+                put("SERIALNAME", "ASD59961");
+                put("COUNTRY", "china");
+                put("PHONETYPE", "phone294");
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testFilterWithEqualToOnDecimal()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT ID AS RESULT FROM TESTDB.TESTTABLE WHERE BONUS=1234.444");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 1);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testFilterWithLessThanWithAnd()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT ID,DATE,COUNTRY,NAME,PHONETYPE,SERIALNAME,SALARY,BONUS FROM TESTDB.TESTTABLE" +
+                " WHERE BONUS>1234 AND ID<2 GROUP BY ID,DATE,COUNTRY,NAME,PHONETYPE,SERIALNAME,SALARY," + " BONUS ORDER BY ID");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new TreeMap<String, Object>()
+            {{
+                put("ID", 1);
+                put("NAME", "anubhav");
+                put("BONUS", BigDecimal.valueOf(1234.4440).setScale(4));
+                put("DATE", "2015-07-23");
+                put("SALARY", 5000000.0);
+                put("SERIALNAME", "ASD69643");
+                put("COUNTRY", "china");
+                put("PHONETYPE", "phone197");
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectWithIn()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT NAME AS RESULT from testdb.testtable WHERE PHONETYPE IN('phone1848','phone706') ORDER BY NAME");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "geetika");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "jitesh");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "ravindra");
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectWithNotIn()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT NAME AS RESULT from testdb.testtable WHERE PHONETYPE NOT IN('phone1848','phone706') ORDER BY NAME");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "akash");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "anubhav");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "bhavya");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "jatin");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "liang");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "prince");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "sahil");
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testIsNotNullOnDate()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT NAME AS RESULT FROM TESTDB.TESTTABLE WHERE DATE IS NOT NULL AND ID=9");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "ravindra");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "jitesh");
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testIsNotNullTimestamp()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT NAME AS RESULT FROM TESTDB.TESTTABLE WHERE DOB IS NOT NULL AND ID=9");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "ravindra");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", "jitesh");
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectShortWithOrderBy()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT DISTINCT SHORTFIELD AS RESULT from testdb.testtable ORDER BY SHORTFIELD");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 1);
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 4);
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 8);
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 10);
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 11);
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 12);
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 17);
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 18);
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", null);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectShortIsNullWithOrderBy()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT ID AS RESULT from testdb.testtable WHERE SHORTFIELD IS NULL ORDER BY SHORTFIELD");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", null);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectShortWithGreaterThan()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT ID AS RESULT from testdb.testtable WHERE SHORTFIELD>11 ORDER BY ID");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 6);
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 7);
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 9);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectLongDecimal()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT ID  AS RESULT from testdb.testtable WHERE bonus = DECIMAL '1234.5555'");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 2);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectShortDecimal()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT ID AS RESULT from testdb.testtable WHERE monthlyBonus = 15.13");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 2);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectBoolean()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT isCurrentEmployee AS RESULT FROM TESTDB.TESTTABLE WHERE ID=1");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", true);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectBooleanIsNull()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT id AS RESULT FROM TESTDB.TESTTABLE WHERE isCurrentEmployee is null");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 2);
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", null);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectBooleanIsNotNull()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT id AS RESULT FROM TESTDB.TESTTABLE WHERE isCurrentEmployee is NOT null AND ID>8 ORDER BY ID");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 9);
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 9);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testShowSchemas()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SHOW SCHEMAS");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("Schema", "default");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("Schema", "information_schema");
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("Schema", "testdb");
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectWithOr()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT BONUS AS RESULT FROM TESTDB.TESTTABLE WHERE" +
+                " BONUS < 600 OR BONUS > 5000 ORDER BY BONUS");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", BigDecimal.valueOf(500.414).setScale(4));
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", BigDecimal.valueOf(500.59).setScale(4));
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", BigDecimal.valueOf(500.88).setScale(4));
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", BigDecimal.valueOf(500.99).setScale(4));
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", BigDecimal.valueOf(5000.9990).setScale(4));
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", BigDecimal.valueOf(9999.9990).setScale(4));
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectWithOrAndAnd()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT SHORTFIELD AS RESULT FROM TESTDB.TESTTABLE WHERE" +
+                " SHORTFIELD > 4 AND (SHORTFIELD < 10 or SHORTFIELD > 15) ORDER BY SHORTFIELD");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 8);
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 17);
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 18);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectWithOrAndMultipleAnds()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT SHORTFIELD AS RESULT FROM TESTDB.TESTTABLE WHERE" +
+                " (SHORTFIELD > 1 AND SHORTFIELD < 5) OR (SHORTFIELD > 10 AND SHORTFIELD < 15) ORDER BY SHORTFIELD");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 4);
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 11);
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 12);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+    }
+
+    @Test
+    public void testSelectWithOrAndAndOnDiffColumn()
+            throws SQLException
+    {
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT SHORTFIELD AS RESULT FROM TESTDB.TESTTABLE WHERE" +
+                " ID < 7 AND (SHORTFIELD < 5 OR SHORTFIELD > 15) ORDER BY SHORTFIELD");
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 4);
+            }});
+            add(new HashMap<String, Object>()
+            {{
+                put("RESULT", 18);
+            }});
         }};
 
         assertEquals(actualResult.toString(), expectedResult.toString());
@@ -379,6 +1187,107 @@ public class TestCarbonAllDataType
         assertEquals(actualResult.toString(), expectedResult.toString());
     }
 
+    @Test
+    public void testAlterAddColumn() throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE testdb.addcolumn(NAME varchar(7), AGE int)");
+        hetuServer.execute("INSERT INTO testdb.addcolumn VALUES ('Raj', 11)");
+
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT AGE FROM testdb.addcolumn");
+
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{    put("AGE", 11); }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+
+        hetuServer.execute("ALTER TABLE testdb.addcolumn ADD COLUMN COUNTRY varchar(7)");
+
+        TableInfo tableInfo = getTableInfoFromSchemaFile("addcolumn");
+        assertEquals(tableInfo.getFactTable().getListOfColumns().stream().filter(s -> s.getColumnName().equals("country")).collect(Collectors.toList()).get(0).getColumnName(), "country" );
+        if(tableInfo.getFactTable().getListOfColumns().stream().filter(s -> s.getColumnName().equals("country")).collect(Collectors.toList()).get(0).getColumnName().equals("country")) {
+            actualResult = hetuServer.executeQuery("SELECT * FROM testdb.addcolumn");
+
+            expectedResult = new ArrayList<Map<String, Object>>() {{
+                add(new TreeMap<String, Object>() {{
+                    put("age", 11);
+                    put("country", null);
+                    put("name", "Raj");
+                }});
+            }};
+            assertEquals(actualResult.toString(), expectedResult.toString());
+        }
+        hetuServer.execute("drop table if exists testdb.addcolumn");
+    }
+
+    @Test
+    public void testAlterRenameColumn() throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE testdb.renamecolumn(NAME varchar(7), AGE int) with(format='CARBON') ");
+        hetuServer.execute("INSERT INTO testdb.renamecolumn VALUES ('Raj', 11)");
+
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT AGE FROM testdb.renamecolumn");
+
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("AGE", 11);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+
+        hetuServer.execute("ALTER TABLE testdb.renamecolumn RENAME COLUMN AGE TO ID");
+
+        TableInfo tableInfo = getTableInfoFromSchemaFile("renamecolumn");
+        assertEquals(tableInfo.getFactTable().getListOfColumns().stream().filter(s -> s.getColumnName().equals("id")).collect(Collectors.toList()).get(0).getColumnName(), "id" );
+
+        if(tableInfo.getFactTable().getListOfColumns().stream().filter(s -> s.getColumnName().equals("id")).collect(Collectors.toList()).get(0).getColumnName().equals("id")) {
+            actualResult = hetuServer.executeQuery("SELECT * FROM testdb.renamecolumn");
+
+            expectedResult = new ArrayList<Map<String, Object>>() {{
+                add(new TreeMap<String, Object>() {{
+                    put("id", "11");
+                    put("name", "Raj");
+                }});
+            }};
+            assertEquals(actualResult.toString(), expectedResult.toString());
+        }
+        hetuServer.execute("drop table if exists testdb.renamecolumn");
+    }
+
+    @Test
+    public void testAlterDropColumn() throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE testdb.dropcolumn(NAME varchar(7), AGE int) with(format='CARBON') ");
+        hetuServer.execute("INSERT INTO testdb.dropcolumn VALUES ('Raj', 11)");
+
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("SELECT AGE FROM testdb.dropcolumn");
+
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{
+                put("AGE", 11);
+            }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+
+        hetuServer.execute("ALTER TABLE testdb.dropcolumn DROP COLUMN AGE");
+
+        actualResult = hetuServer.executeQuery("SELECT * FROM testdb.dropcolumn");
+
+        expectedResult = new ArrayList<Map<String, Object>>() {{
+            add(new HashMap<String, Object>() {{    put("name", "Raj"); }});
+        }};
+        assertEquals(actualResult.toString(), expectedResult.toString());
+
+        hetuServer.execute("drop table if exists testdb.dropcolumn");
+    }
+
+
     @Test(dependsOnMethods = {"testInsertOverwriteEmptyTable"})
     public void testInsertExistingPartitionsOverwriteEmptyTable() throws SQLException
     {
@@ -426,6 +1335,25 @@ public class TestCarbonAllDataType
         hetuServer.execute("drop table testdb.testtablecreate");
     }
 
+    @Test
+    public void testReadWriteVarbinaryDatatype()
+            throws SQLException
+    {
+        hetuServer.execute("CREATE TABLE testdb.varbinarytype(a int, b varbinary)");
+        hetuServer.execute("INSERT INTO testdb.varbinarytype VALUES (10, varbinary 'b'),(11, varbinary 'c'),(12, varbinary 'd')");
+
+        List<Map<String, Object>> actualResult = hetuServer.executeQuery("Select count(b) as RESULT from testdb.varbinarytype where a = 10");
+
+        List<Map<String, Object>> expectedResult = new ArrayList<Map<String, Object>>()
+        {{
+            add(new HashMap<String, Object>()
+            {{ put("RESULT", 1); }});
+        }};
+
+        assertEquals(actualResult.toString(), expectedResult.toString());
+
+        hetuServer.execute("drop table  testdb.varbinarytype");
+    }
 
     @Test
     public void testCreateTableLocation() throws SQLException
@@ -1646,4 +2574,16 @@ public class TestCarbonAllDataType
         hetuServer.execute("set session task_writer_count=1");
     }
 
+    private TableInfo getTableInfoFromSchemaFile(String tableName)
+    {
+        AbsoluteTableIdentifier identifier = AbsoluteTableIdentifier.from(storePath + "/carbon.store/testdb/" + tableName, "testdb", tableName);
+        TableInfo tableInfo = null;
+        try {
+            tableInfo = SchemaReader.getTableInfo(identifier);
+        }
+        catch (IOException e) {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Unable to read schema file", e);
+        }
+        return tableInfo;
+    }
 }

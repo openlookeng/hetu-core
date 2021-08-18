@@ -56,7 +56,10 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TBase;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -139,10 +142,19 @@ public class CarbondataTableReader
                 carbonTableCacheModel.getCarbonTable().isTransactionalTable()) {
             CarbonTable carbonTable = carbonTableCacheModel.getCarbonTable();
             try {
-                long latestTime = FileFactory.getCarbonFile(CarbonTablePath
-                                .getSchemaFilePath(
-                                        carbonTable.getTablePath()),
-                        config).getLastModifiedTime();
+                String schemaFilePath = CarbonTablePath
+                        .getSchemaFilePath(
+                                carbonTable.getTablePath());
+                FileFactory.FileType fileType = FileFactory.getFileType(schemaFilePath);
+
+                CarbonFile carbonFile = FileFactory.getCarbonFile(schemaFilePath,
+                        config);
+
+                long latestTime = carbonFile.getLastModifiedTime();
+                // Workaround for cache updation error due to round off of latestTime inside LocalCarbonFile
+                if (fileType == FileFactory.FileType.LOCAL) {
+                    latestTime = Files.readAttributes(new File(schemaFilePath).toPath(), BasicFileAttributes.class).lastModifiedTime().toMillis();
+                }
                 carbonTableCacheModel.setCurrentSchemaTime(latestTime);
                 if (!carbonTableCacheModel.isValid()) {
                     // Invalidate datamaps
@@ -150,7 +162,7 @@ public class CarbondataTableReader
                             .clearIndex(carbonTableCacheModel.getCarbonTable().getAbsoluteTableIdentifier());
                 }
             }
-            catch (CarbonFileException e) {
+            catch (CarbonFileException | IOException e) {
                 carbonCache.get().remove(schemaTableName);
             }
         }
@@ -211,6 +223,11 @@ public class CarbondataTableReader
                     tableInfo = (org.apache.carbondata.format.TableInfo) thriftReader.read();
                     thriftReader.close();
                     modifiedTime = schemaFile.getLastModifiedTime();
+                    FileFactory.FileType fileType = FileFactory.getFileType(schemaFilePath);
+                    // Workaround for cache updation error due to round off of latesttime inside LocalCarbonFile
+                    if (fileType == FileFactory.FileType.LOCAL) {
+                        modifiedTime = Files.readAttributes(new File(schemaFilePath).toPath(), BasicFileAttributes.class).lastModifiedTime().toMillis();
+                    }
                 }
                 else {
                     tableInfo = CarbonUtil.inferSchema(tablePath, table.getTableName(), false, config);
