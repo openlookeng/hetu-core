@@ -17,10 +17,10 @@ import io.airlift.units.Duration;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Objects.requireNonNull;
 
@@ -34,7 +34,7 @@ public class PropertyService
     {
     }
 
-    private static Map<String, Object> properties = new HashMap<>();
+    private static Map<String, Object> properties = new ConcurrentHashMap();
 
     /**
      * Return the value of the property from key, converted to String
