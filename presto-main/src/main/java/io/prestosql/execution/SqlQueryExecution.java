@@ -524,10 +524,6 @@ public class SqlQueryExecution
 
     private void resumeQuery(PlanRoot plan)
     {
-        String resumeMessage = "Query encountered failures. Recovering using the distributed-snapshot feature. This is the "
-                + (snapshotManager.getResumeCount() + 1) + "-th attempt.";
-        warningCollector.add(new PrestoWarning(StandardWarningCode.SNAPSHOT_RECOVERY, resumeMessage));
-
         SqlQueryScheduler oldScheduler = queryScheduler.get();
         try {
             // Wait for previous scheduler to finish.
@@ -568,6 +564,8 @@ public class SqlQueryExecution
 
     private SqlQueryScheduler createResumeScheduler(PlanRoot plan, OutputBuffers rootOutputBuffers)
     {
+        String resumeMessage = "Query encountered failures. Recovering using the distributed-snapshot feature.";
+        warningCollector.add(new PrestoWarning(StandardWarningCode.SNAPSHOT_RECOVERY, resumeMessage));
         // Check if there is a snapshot we can restore to, or restart from beginning,
         // and update marker split sources so they know where to resume from.
         // This MUST be done BEFORE creating the new scheduler, because it resets the snapshotManager internal states.
@@ -576,7 +574,6 @@ public class SqlQueryExecution
         announcer.resumeSnapshot(snapshotId.orElse(0));
         // Clear any temporary content that's not part of the snapshot
         resetOutputData(plan, snapshotId);
-
         // Create a new scheduler, to schedule new stages and tasks
         DistributedExecutionPlanner distributedExecutionPlanner = new DistributedExecutionPlanner(splitManager, metadata);
         StageExecutionPlan executionPlan = distributedExecutionPlanner.plan(plan.getRoot(), stateMachine.getSession(),
@@ -714,7 +711,6 @@ public class SqlQueryExecution
     private void checkSnapshotSupport(Session session)
     {
         List<String> reasons = new ArrayList<>();
-        String featureName = "Snapshot Feature - ";
         // Only support create-table-as-select and insert statements
         Statement statement = analysis.getStatement();
         if (statement instanceof CreateTableAsSelect) {
@@ -783,9 +779,8 @@ public class SqlQueryExecution
             // This does not alter ExchangeClient's behavior, because this instance (in coordinator)
             // will never receive any marker.
             session.disableSnapshot();
-            reasons.forEach(reason -> {
-                warningCollector.add(new PrestoWarning(StandardWarningCode.SNAPSHOT_NOT_SUPPORTED, featureName + reason));
-            });
+            String reasonsMessage = "Snapshot feature is disabled: \n" + String.join(". \n", reasons);
+            warningCollector.add(new PrestoWarning(StandardWarningCode.SNAPSHOT_NOT_SUPPORTED, reasonsMessage));
         }
     }
 
