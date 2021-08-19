@@ -52,7 +52,7 @@ public final class MemoryQueryRunner
 
         memoryProperties.put(FOLDER_PROPERTY_KEY, folder.newFolder("memory-connector").getAbsolutePath());
         for (Map.Entry<String, String> entry : newConfigs.entrySet()) {
-            memoryProperties.replace(entry.getKey(), entry.getValue());
+            memoryProperties.put(entry.getKey(), entry.getValue());
         }
 
         return memoryProperties;

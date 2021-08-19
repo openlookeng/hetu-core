@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
+import static io.prestosql.plugin.memory.MemoryTableProperties.ASYNC_PROCESSING_DEFAULT_VALUE;
 import static io.prestosql.plugin.memory.MemoryTableProperties.SPILL_COMPRESSION_DEFAULT_VALUE;
 import static java.util.Objects.requireNonNull;
 
@@ -32,6 +33,7 @@ public final class MemoryWriteTableHandle
 {
     private final long table;
     private final boolean compressionEnabled;
+    private final boolean asyncProcessingEnabled;
     private final Set<Long> activeTableIds;
     private final List<MemoryColumnHandle> columns;
     private final List<SortingColumn> sortedBy;
@@ -45,6 +47,7 @@ public final class MemoryWriteTableHandle
             @JsonProperty("schemaName") String schemaName,
             @JsonProperty("tableName") String tableName,
             @JsonProperty("compressEnabled") boolean compressionEnabled,
+            @JsonProperty("asyncProcessingEnabled") boolean asyncProcessingEnabled,
             @JsonProperty("activeTableIds") Set<Long> activeTableIds,
             @JsonProperty("columns") List<MemoryColumnHandle> columns,
             @JsonProperty("sortedBy") List<SortingColumn> sortedBy,
@@ -58,12 +61,13 @@ public final class MemoryWriteTableHandle
         this.columns = requireNonNull(columns, "columns is null");
         this.sortedBy = requireNonNull(sortedBy, "sortedBy is null");
         this.indexColumns = requireNonNull(indexColumns, "indexColumns is null");
+        this.asyncProcessingEnabled = asyncProcessingEnabled;
     }
 
     @VisibleForTesting
     MemoryWriteTableHandle(long table, Set<Long> activeTableIds)
     {
-        this(table, "", "", SPILL_COMPRESSION_DEFAULT_VALUE, activeTableIds, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+        this(table, "", "", SPILL_COMPRESSION_DEFAULT_VALUE, ASYNC_PROCESSING_DEFAULT_VALUE, activeTableIds, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     }
 
     @JsonProperty
@@ -76,6 +80,12 @@ public final class MemoryWriteTableHandle
     public boolean isCompressionEnabled()
     {
         return compressionEnabled;
+    }
+
+    @JsonProperty
+    public boolean isAsyncProcessingEnabled()
+    {
+        return asyncProcessingEnabled;
     }
 
     @JsonProperty

@@ -33,6 +33,8 @@ import javax.inject.Inject;
 import java.io.FileNotFoundException;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.plugin.memory.MemoryErrorCode.MISSING_DATA;
@@ -45,6 +47,7 @@ public class MemoryPageSinkProvider
 {
     private final MemoryTableManager pagesStore;
     private final HostAddress currentHostAddress;
+    private final ConcurrentHashMap<Long, AtomicInteger> tableSinkCount;
 
     @Inject
     public MemoryPageSinkProvider(MemoryTableManager pagesStore, NodeManager nodeManager)
@@ -57,6 +60,7 @@ public class MemoryPageSinkProvider
     {
         this.pagesStore = requireNonNull(pagesStore, "pagesStore is null");
         this.currentHostAddress = requireNonNull(currentHostAddress, "currentHostAddress is null");
+        this.tableSinkCount = new ConcurrentHashMap<>();
     }
 
     /**
@@ -70,9 +74,13 @@ public class MemoryPageSinkProvider
         long tableId = memoryOutputTableHandle.getTable();
         checkState(memoryOutputTableHandle.getActiveTableIds().contains(tableId));
 
+        AtomicInteger sinkCount = tableSinkCount.computeIfAbsent(tableId, (k) -> new AtomicInteger(0));
+        sinkCount.incrementAndGet();
+
         pagesStore.refreshTables(memoryOutputTableHandle.getActiveTableIds());
         pagesStore.initialize(tableId,
                 memoryOutputTableHandle.isCompressionEnabled(),
+                memoryOutputTableHandle.isAsyncProcessingEnabled(),
                 memoryOutputTableHandle.getColumns(),
                 memoryOutputTableHandle.getSortedBy(),
                 memoryOutputTableHandle.getIndexColumns());
@@ -84,7 +92,7 @@ public class MemoryPageSinkProvider
             throw new PrestoException(GENERIC_USER_ERROR, "Failed writing data to memory.spill-path, ensure directory has correct permissions and free space is available.", e);
         }
 
-        return new MemoryPageSink(pagesStore, currentHostAddress, tableId);
+        return new MemoryPageSink(pagesStore, currentHostAddress, tableId, sinkCount);
     }
 
     /**
@@ -97,6 +105,9 @@ public class MemoryPageSinkProvider
         MemoryWriteTableHandle memoryOutputTableHandle = (MemoryWriteTableHandle) insertTableHandle;
         long tableId = memoryOutputTableHandle.getTable();
         checkState(memoryOutputTableHandle.getActiveTableIds().contains(tableId));
+
+        AtomicInteger sinkCount = tableSinkCount.computeIfAbsent(tableId, (k) -> new AtomicInteger(0));
+        sinkCount.incrementAndGet();
 
         pagesStore.refreshTables(memoryOutputTableHandle.getActiveTableIds());
 
@@ -113,6 +124,7 @@ public class MemoryPageSinkProvider
             //
             pagesStore.initialize(tableId,
                     memoryOutputTableHandle.isCompressionEnabled(),
+                    memoryOutputTableHandle.isAsyncProcessingEnabled(),
                     memoryOutputTableHandle.getColumns(),
                     memoryOutputTableHandle.getSortedBy(),
                     memoryOutputTableHandle.getIndexColumns());
@@ -128,7 +140,7 @@ public class MemoryPageSinkProvider
             throw new PrestoException(GENERIC_USER_ERROR, "Failed writing data to memory.spill-path, ensure directory has correct permissions and free space is available.", e);
         }
 
-        return new MemoryPageSink(pagesStore, currentHostAddress, tableId);
+        return new MemoryPageSink(pagesStore, currentHostAddress, tableId, sinkCount);
     }
 
     private static class MemoryPageSink
@@ -138,12 +150,14 @@ public class MemoryPageSinkProvider
         private final HostAddress currentHostAddress;
         private final long tableId;
         private long addedRows;
+        private AtomicInteger sinkCount;
 
-        public MemoryPageSink(MemoryTableManager tablesManager, HostAddress currentHostAddress, long tableId)
+        public MemoryPageSink(MemoryTableManager tablesManager, HostAddress currentHostAddress, long tableId, AtomicInteger sinkCount)
         {
             this.tablesManager = requireNonNull(tablesManager, "pagesStore is null");
             this.currentHostAddress = requireNonNull(currentHostAddress, "currentHostAddress is null");
             this.tableId = tableId;
+            this.sinkCount = sinkCount;
         }
 
         @Override
@@ -157,14 +171,18 @@ public class MemoryPageSinkProvider
         @Override
         public CompletableFuture<Collection<Slice>> finish()
         {
-            tablesManager.finishUpdatingTable(tableId);
-            int logicalPartCount = tablesManager.getTableLpCount(tableId);
-            return completedFuture(ImmutableList.of(new MemoryDataFragment(currentHostAddress, addedRows, logicalPartCount).toSlice()));
+            if (sinkCount.decrementAndGet() == 0) {
+                tablesManager.finishUpdatingTable(tableId);
+                int logicalPartCount = tablesManager.getTableLpCount(tableId);
+                return completedFuture(ImmutableList.of(new MemoryDataFragment(currentHostAddress, addedRows, logicalPartCount).toSlice()));
+            }
+            return completedFuture(ImmutableList.of(new MemoryDataFragment(currentHostAddress, addedRows, 0).toSlice()));
         }
 
         @Override
         public void abort()
         {
+            sinkCount.decrementAndGet();
             tablesManager.cleanTable(tableId);
         }
     }
