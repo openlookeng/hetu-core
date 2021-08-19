@@ -295,6 +295,10 @@ public class StarTreeAggregationRule
 
         //Filter out cubes that were created before the source table was updated
         long lastModifiedTime = lastModifiedTimeSupplier.getAsLong();
+        //There was a problem retrieving last modified time, we should skip using star tree rather than failing the query
+        if (lastModifiedTime == -1L) {
+            return Result.empty();
+        }
         matchedCubeMetadataList = matchedCubeMetadataList.stream()
                 .filter(cubeMetadata -> cubeMetadata.getSourceTableLastUpdatedTime() >= lastModifiedTime)
                 .collect(Collectors.toList());
@@ -322,10 +326,10 @@ public class StarTreeAggregationRule
             Set<Identifier> sourceFilterPredicateColumns = ExpressionUtils.getIdentifiers(sqlParser.createExpression(matchedCubeMetadata.getCubeFilter().getSourceTablePredicate(), new ParsingOptions()));
             predicate = ExpressionUtils.filterConjuncts(predicate,
                     conjunct -> !sourceFilterPredicateColumns.containsAll(SymbolsExtractor.extractUnique(conjunct)
-                        .stream()
-                        .map(Symbol::getName)
-                        .map(Identifier::new)
-                        .collect(Collectors.toList())));
+                            .stream()
+                            .map(Symbol::getName)
+                            .map(Identifier::new)
+                            .collect(Collectors.toList())));
             rewritten = new FilterNode(filterNode.getId(), ((FilterNode) filterNode).getSource(), castToRowExpression(predicate));
         }
         return rewritten;

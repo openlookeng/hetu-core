@@ -382,4 +382,16 @@ public abstract class ForwardingJdbcClient
     {
         return getDelegate().getSplitFieldMinAndMaxValue(conf, connection, tableHandle);
     }
+
+    @Override
+    public long getTableModificationTime(ConnectorSession session, JdbcTableHandle tableHandle)
+    {
+        return getDelegate().getTableModificationTime(session, tableHandle);
+    }
+
+    @Override
+    public boolean isPreAggregationSupported(ConnectorSession session)
+    {
+        return getDelegate().isPreAggregationSupported(session);
+    }
 }

@@ -61,6 +61,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -286,6 +287,39 @@ public class ClickHouseClient
         catch (SQLException e) {
             throw new PrestoException(JDBC_ERROR, "openLooKeng ClickHouse connector failed to drop column");
         }
+    }
+
+    @Override
+    public long getTableModificationTime(ConnectorSession session, JdbcTableHandle handle)
+    {
+        String sql = format(
+                "SELECT max(modification_time) as modified_time FROM system.parts WHERE database='%s' and table='%s'",
+                handle.getSchemaTableName().getSchemaName(),
+                handle.getSchemaTableName().getTableName());
+
+        try (Connection connection = connectionFactory.openConnection(JdbcIdentity.from(session))) {
+            ResultSet resultSet = getPreparedStatement(connection, sql).executeQuery();
+            if (resultSet.next()) {
+                String updateTime = resultSet.getString("modified_time");
+                SimpleDateFormat parser = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+                return parser.parse(updateTime).getTime();
+            }
+            else {
+                // In the case where for some reason the table doesn't exist anymore in system.parts
+                return -1L;
+            }
+        }
+        catch (Exception e) {
+            // We want to make sure the query doesn't fail because of star-tree not being able to get last modified time
+            logger.error("Exception thrown while trying to get modified time", e);
+            return -1L;
+        }
+    }
+
+    @Override
+    public boolean isPreAggregationSupported(ConnectorSession session)
+    {
+        return true;
     }
 
     @Override
