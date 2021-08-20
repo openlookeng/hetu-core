@@ -52,12 +52,14 @@ public class CreateIndexMetadata
     private final Properties properties;
     private final String user;
     private volatile Level createLevel;
+    private volatile long indexSize;
 
     @JsonCreator
     public CreateIndexMetadata(
             @JsonProperty("indexName") String indexName,
             @JsonProperty("tableName") String tableName,
             @JsonProperty("indexType") String indexType,
+            @JsonProperty("indexSize") long indexSize,
             @JsonProperty("indexColumns") List<Pair<String, Type>> indexColumns,
             @JsonProperty("partitions") List<String> partitions,
             @JsonProperty("properties") Properties properties,
@@ -67,6 +69,7 @@ public class CreateIndexMetadata
         this.indexName = checkNotEmpty(indexName, "indexName");
         this.tableName = requireNonNull(tableName, "tableName is null");
         this.indexType = requireNonNull(indexType, "indexType is null").toUpperCase(Locale.ENGLISH);
+        this.indexSize = indexSize;
         this.indexColumns = indexColumns;
         this.partitions = partitions;
         this.properties = properties;
@@ -121,6 +124,17 @@ public class CreateIndexMetadata
     }
 
     @JsonProperty
+    public long getIndexSize()
+    {
+        return indexSize;
+    }
+
+    public void incrementIndexSize(long sizeToAdd)
+    {
+        this.indexSize += sizeToAdd;
+    }
+
+    @JsonProperty
     public List<Pair<String, Type>> getIndexColumns()
     {
         return indexColumns;
@@ -151,6 +165,7 @@ public class CreateIndexMetadata
         sb.append("indexName='").append(indexName).append('\'');
         sb.append("tableName='").append(tableName).append('\'');
         sb.append("indexType=").append(indexType).append('\'');
+        sb.append("indexSize=").append(indexSize).append('\'');
         if (!indexColumns.isEmpty()) {
             sb.append(", indexColumns=").append(indexColumns);
         }
@@ -168,7 +183,7 @@ public class CreateIndexMetadata
     @Override
     public int hashCode()
     {
-        return Objects.hash(indexName, tableName, indexType, indexColumns, partitions, properties, user);
+        return Objects.hash(indexName, tableName, indexType, indexSize, indexColumns, partitions, properties, user);
     }
 
     @Override
@@ -184,6 +199,7 @@ public class CreateIndexMetadata
         return Objects.equals(this.indexName, other.indexName)
                 && Objects.equals(this.tableName, other.tableName)
                 && Objects.equals(this.indexType, other.indexType)
+                && Objects.equals(this.indexSize, other.indexSize)
                 && Objects.equals(this.indexColumns, other.indexColumns)
                 && Objects.equals(this.partitions, other.partitions)
                 && Objects.equals(this.properties, other.properties)

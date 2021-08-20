@@ -138,7 +138,7 @@ public class UpdateIndexOperator
                             !(pathToModifiedTime.containsKey(entry.getKey()) &&
                                     indexLevelToMaxModifiedTime.containsKey(entry.getKey()) &&
                                     indexLevelToMaxModifiedTime.get(entry.getKey()) <= Long.parseLong(pathToModifiedTime.get(entry.getKey())))) {
-                        entry.getValue().persist();
+                        this.createIndexMetadata.incrementIndexSize(entry.getValue().persist());
                     }
                     String writerKey = entry.getKey();
                     iterator.remove(); // remove reference to writer once persisted so it can be GCed
@@ -167,6 +167,7 @@ public class UpdateIndexOperator
                             createIndexMetadata.getIndexName(),
                             createIndexMetadata.getTableName(),
                             createIndexMetadata.getIndexType(),
+                            createIndexMetadata.getIndexSize(),
                             createIndexMetadata.getIndexColumns(),
                             new ArrayList<>(allPartitions),
                             createIndexMetadata.getProperties(),
@@ -368,6 +369,7 @@ public class UpdateIndexOperator
                     indexRecord.name,
                     indexRecord.qualifiedTable,
                     indexRecord.indexType,
+                    indexRecord.indexSize,
                     Arrays.stream(indexRecord.columns).map(col -> new Pair<>(col,
                             updateIndexMetadata.getColumnTypes().get(col.toLowerCase(Locale.ROOT)))).collect(Collectors.toList()),
                     indexRecord.partitions,

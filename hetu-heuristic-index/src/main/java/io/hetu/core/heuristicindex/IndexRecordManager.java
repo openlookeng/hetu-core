@@ -107,9 +107,9 @@ public class IndexRecordManager
      *
      * it will OVERWRITE the existing entry but COMBINE the partition columns (if it previously was partitioned)
      */
-    public synchronized void addIndexRecord(String name, String user, String table, String[] columns, String indexType, List<String> indexProperties, List<String> partitions)
+    public synchronized void addIndexRecord(String name, String user, String table, String[] columns, String indexType, long indexSize, List<String> indexProperties, List<String> partitions)
     {
-        IndexRecord record = new IndexRecord(name, user, table, columns, indexType, indexProperties, partitions);
+        IndexRecord record = new IndexRecord(name, user, table, columns, indexType, indexSize, indexProperties, partitions);
         IndexRecord old = lookUpIndexRecord(name);
         if (old != null) {
             record.partitions.addAll(0, old.partitions);
@@ -171,7 +171,7 @@ public class IndexRecordManager
                     else {
                         record.partitions.removeAll(partitionsToRemove);
                         IndexRecord newRecord = new IndexRecord(record.name, record.user, record.qualifiedTable, record.columns,
-                                record.indexType, record.properties, record.partitions);
+                                record.indexType, record.indexSize, record.properties, record.partitions);
                         metastore.alterTableParameter(
                                 record.catalog,
                                 record.schema,

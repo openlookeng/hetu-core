@@ -229,6 +229,7 @@ public class HeuristicIndexClient
                 createIndexMetadata.getTableName(),
                 createIndexMetadata.getIndexColumns().stream().map(Pair::getFirst).toArray(String[]::new),
                 createIndexMetadata.getIndexType(),
+                createIndexMetadata.getIndexSize(),
                 properties,
                 createIndexMetadata.getPartitions());
     }
