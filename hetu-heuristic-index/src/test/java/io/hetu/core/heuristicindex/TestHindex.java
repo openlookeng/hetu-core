@@ -129,48 +129,48 @@ public class TestHindex
         }
     }
 
-    @Test(dataProvider = "tableData1")
-    public void testIndexAutoloadCache(String indexType, String queryVariable, String queryValue)
-            throws Exception
-    {
-        System.out.println("Running testIndexAutoloadUpdateCache[indexType: " + indexType +
-                ", queryVariable: " + queryVariable + ", queryValue: " + queryValue + "]");
-
-        String tableName = getNewTableName();
-        createTable1(tableName);
-        String testerQuery = "SELECT * FROM " + tableName + " WHERE " + queryVariable + "=" + queryValue;
-        String indexName = getNewIndexName();
-        long threadRefreshRate = 5000; // this is the rate that background thread gets executed
-        int splitsBeforeIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
-
-        //create index
-        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                indexType + " ON " + tableName + " (" + queryVariable + ")");
-
-        Thread.sleep(threadRefreshRate);
-        int splitsAfterIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
-
-        //update index
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(7, 'new1'), (8, 'new2')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(1, 'test')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(2, '123'), (3, 'temp')");
-        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(3, 'data'), (9, 'ttt'), (5, 'num')");
-        assertQuerySucceeds("UPDATE INDEX " + indexName);
-        Thread.sleep(threadRefreshRate);
-        int splitsAfterIndexUpdate = getSplitAndMaterializedResult(testerQuery).getFirst();
-
-        //drop index
-        assertQuerySucceeds("DROP INDEX " + indexName);
-        Thread.sleep(threadRefreshRate);
-        int splitsDropIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
-
-        assertTrue(splitsBeforeIndex > splitsAfterIndex, "splits should be fewer after index creation");
-        assertTrue(splitsBeforeIndex > splitsAfterIndexUpdate, "splits should be more after adding more data");
-        assertTrue(splitsBeforeIndex < splitsDropIndex, "splits be more even without any index after dropping index due to data addition");
-        assertTrue(splitsAfterIndex < splitsAfterIndexUpdate, "splits should be more after adding data and update index");
-        assertTrue(splitsAfterIndex < splitsDropIndex, "splits should be more anyway after dropping index because data volume increased");
-        assertTrue(splitsAfterIndexUpdate < splitsDropIndex, "the number of splits after dropping index is the largest");
-    }
+//    @Test(dataProvider = "tableData1")
+//    public void testIndexAutoloadCache(String indexType, String queryVariable, String queryValue)
+//            throws Exception
+//    {
+//        System.out.println("Running testIndexAutoloadUpdateCache[indexType: " + indexType +
+//                ", queryVariable: " + queryVariable + ", queryValue: " + queryValue + "]");
+//
+//        String tableName = getNewTableName();
+//        createTable1(tableName);
+//        String testerQuery = "SELECT * FROM " + tableName + " WHERE " + queryVariable + "=" + queryValue;
+//        String indexName = getNewIndexName();
+//        long threadRefreshRate = 5000; // this is the rate that background thread gets executed
+//        int splitsBeforeIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
+//
+//        //create index
+//        assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
+//                indexType + " ON " + tableName + " (" + queryVariable + ")");
+//
+//        Thread.sleep(threadRefreshRate);
+//        int splitsAfterIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
+//
+//        //update index
+//        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(7, 'new1'), (8, 'new2')");
+//        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(1, 'test')");
+//        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(2, '123'), (3, 'temp')");
+//        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(3, 'data'), (9, 'ttt'), (5, 'num')");
+//        assertQuerySucceeds("UPDATE INDEX " + indexName);
+//        Thread.sleep(threadRefreshRate);
+//        int splitsAfterIndexUpdate = getSplitAndMaterializedResult(testerQuery).getFirst();
+//
+//        //drop index
+//        assertQuerySucceeds("DROP INDEX " + indexName);
+//        Thread.sleep(threadRefreshRate);
+//        int splitsDropIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
+//
+//        assertTrue(splitsBeforeIndex > splitsAfterIndex, "splits should be fewer after index creation");
+//        assertTrue(splitsBeforeIndex > splitsAfterIndexUpdate, "splits should be more after adding more data");
+//        assertTrue(splitsBeforeIndex < splitsDropIndex, "splits be more even without any index after dropping index due to data addition");
+//        assertTrue(splitsAfterIndex < splitsAfterIndexUpdate, "splits should be more after adding data and update index");
+//        assertTrue(splitsAfterIndex < splitsDropIndex, "splits should be more anyway after dropping index because data volume increased");
+//        assertTrue(splitsAfterIndexUpdate < splitsDropIndex, "the number of splits after dropping index is the largest");
+//    }
 
     // Tests data consistency and splits for which table data is changed after index creation.
     @Test(dataProvider = "tableData1")
