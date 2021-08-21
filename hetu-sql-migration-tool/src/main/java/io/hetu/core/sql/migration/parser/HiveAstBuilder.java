@@ -1645,6 +1645,18 @@ public class HiveAstBuilder
     @Override
     public Node visitGroupBy(HiveSqlParser.GroupByContext context)
     {
+        HiveSqlParser.GroupByContext groupingSetsContext = new HiveSqlParser.GroupByContext(context.getParent(), context.invokingState);
+        for (HiveSqlParser.GroupingElementContext groupingElementContext : context.groupingElement()) {
+            if (groupingElementContext instanceof HiveSqlParser.SingleGroupingSetContext) {
+                continue;
+            }
+            groupingSetsContext.addAnyChild(groupingElementContext);
+        }
+
+        // if there is "grouping sets", then according to the syntax rule, it only requires "grouping sets" claus, no need individual grouping columns.
+        if (groupingSetsContext.groupingElement().size() > 0) {
+            return new GroupBy(getLocation(context), isDistinct(context.setQuantifier()), visit(groupingSetsContext.groupingElement(), GroupingElement.class));
+        }
         return new GroupBy(getLocation(context), isDistinct(context.setQuantifier()), visit(context.groupingElement(), GroupingElement.class));
     }
 
