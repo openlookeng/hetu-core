@@ -27,10 +27,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
+import static java.util.Objects.requireNonNull;
+
 public class IndexRecord
 {
     // An index record in hetu-metastore's table entity's parameter map:
-    // "HINDEX|<columns>|<indexType>" -> "name|user|properties|partitions|lastModifiedTime"
+    // "HINDEX|<columns>|<indexType>" -> "name|user|properties|indexsize|partitions|lastModifiedTime"
     public static final String INDEX_METASTORE_PREFIX = "HINDEX";
     public static final String METASTORE_DELIMITER = "|";
     public static final String INPROGRESS_PROPERTY_KEY = "CreationInProgress";
@@ -89,14 +91,15 @@ public class IndexRecord
         // parse value (JSON)
         JsonParser parser = new JsonParser();
         JsonObject values = parser.parse(metastoreEntry.getValue()).getAsJsonObject();
-        this.name = values.get("name").getAsString();
-        this.user = values.get("user").getAsString();
-        this.indexSize = values.get("indexSize").getAsLong();
+
+        this.name = requireNonNull(values.get("name"), "attribute 'name' should not be null").getAsString();
+        this.user = requireNonNull(values.get("user"), "attribute 'user' should not be null").getAsString();
+        this.indexSize = values.has("indexSize") ? values.get("indexSize").getAsLong() : 0;
         this.properties = new ArrayList<>();
         values.get("properties").getAsJsonArray().forEach(e -> this.properties.add(e.getAsString()));
         this.partitions = new ArrayList<>();
         values.get("partitions").getAsJsonArray().forEach(e -> this.partitions.add(e.getAsString()));
-        this.lastModifiedTime = values.get("lastModifiedTime").getAsLong();
+        this.lastModifiedTime = requireNonNull(values.get("lastModifiedTime"), "attribute 'lastModifiedTime' should not be null").getAsLong();
     }
 
     public String serializeKey()
@@ -148,13 +151,14 @@ public class IndexRecord
                 Objects.equals(user, that.user) &&
                 Objects.equals(qualifiedTable, that.qualifiedTable) &&
                 Arrays.equals(columns, that.columns) &&
+                indexSize == that.indexSize &&
                 Objects.equals(indexType, that.indexType);
     }
 
     @Override
     public int hashCode()
     {
-        int result = Objects.hash(name, user, qualifiedTable, columns, indexType);
+        int result = Objects.hash(name, user, catalog, schema, table, qualifiedTable, indexType, indexSize, properties, partitions, lastModifiedTime);
         result = 31 * result + Arrays.hashCode(columns);
         return result;
     }
@@ -164,9 +168,16 @@ public class IndexRecord
     {
         return "IndexRecord{" +
                 "name='" + name + '\'' +
-                ", table='" + qualifiedTable + '\'' +
+                ", user='" + user + '\'' +
+                ", catalog='" + catalog + '\'' +
+                ", schema='" + schema + '\'' +
+                ", table='" + table + '\'' +
+                ", qualifiedTable='" + qualifiedTable + '\'' +
                 ", columns=" + Arrays.toString(columns) +
                 ", indexType='" + indexType + '\'' +
+                ", indexSize=" + indexSize +
+                ", properties=" + properties +
+                ", partitions=" + partitions +
                 ", lastModifiedTime=" + lastModifiedTime +
                 '}';
     }
