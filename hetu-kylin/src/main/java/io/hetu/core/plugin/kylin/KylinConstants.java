@@ -16,11 +16,11 @@ package io.hetu.core.plugin.kylin;
 
 public class KylinConstants
 {
-
     /**
      * kyin connector name
      */
     public static final String KYLIN_CONNECTOR_NAME = "kylin";
-
     public static final String KYLIN_IDENTIFIER_QUOTE = "\"";
+
+    private KylinConstants() {}
 }

@@ -21,6 +21,8 @@ import java.util.Set;
 
 public final class KylinKeywords
 {
+    private KylinKeywords() {}
+
     public static Set<String> getKeywords()
     {
         return ImmutableSet.<String>builder()
