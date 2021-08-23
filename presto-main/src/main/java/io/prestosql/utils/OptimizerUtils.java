@@ -48,9 +48,8 @@ import static java.util.Objects.requireNonNull;
 
 public class OptimizerUtils
 {
-
     private static final Map<String, Set<String>> planOptimizerBlacklist = new ConcurrentHashMap<>();
-    private final static ThreadLocal<Map<String, Set<String>>> threadLocal = new ThreadLocal<>();
+    private static final ThreadLocal<Map<String, Set<String>>> threadLocal = new ThreadLocal<>();
     private static final Logger log = Logger.get(OptimizerUtils.class);
 
     private OptimizerUtils()
