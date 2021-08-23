@@ -589,17 +589,17 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void updatePartitionsStatistics(HiveIdentity identity, String databaseName, String tableName, List<String> partitionNames, List<Function<PartitionStatistics, PartitionStatistics>> updateFunctionList)
+    public void updatePartitionsStatistics(HiveIdentity identity, String databaseName, String tableName, Map<String, Function<PartitionStatistics, PartitionStatistics>> partNamesUpdateFunctionMap)
     {
         try {
-            delegate.updatePartitionsStatistics(identity, databaseName, tableName, partitionNames, updateFunctionList);
+            delegate.updatePartitionsStatistics(identity, databaseName, tableName, partNamesUpdateFunctionMap);
         }
         finally {
-            for (int i = 0; i < partitionNames.size(); i++) {
-                partitionStatisticsCache.invalidate(new WithIdentity<>(identity, HivePartitionName.hivePartitionName(databaseName, tableName, partitionNames.get(i))));
+            partNamesUpdateFunctionMap.entrySet().stream().forEach(e -> {
+                partitionStatisticsCache.invalidate(new WithIdentity<>(identity, HivePartitionName.hivePartitionName(databaseName, tableName, e.getKey())));
                 //statistics updated for partition itself in above call.
-                partitionCache.invalidate(new WithIdentity<>(identity, HivePartitionName.hivePartitionName(databaseName, tableName, partitionNames.get(i))));
-            }
+                partitionCache.invalidate(new WithIdentity<>(identity, HivePartitionName.hivePartitionName(databaseName, tableName, e.getKey())));
+            });
             tableCache.invalidate(new WithIdentity<>(identity, HiveTableName.hiveTableName(databaseName, tableName)));
         }
     }

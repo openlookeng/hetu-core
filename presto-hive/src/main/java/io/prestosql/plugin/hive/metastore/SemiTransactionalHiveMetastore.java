@@ -1838,13 +1838,13 @@ public class SemiTransactionalHiveMetastore
         private void updatePartitionsStatistics(HiveIdentity identity, HiveMetastore metastore, SchemaTableName schemaTableName, List<UpdateStatisticsOperation> partitionUpdateStatisticsOperations)
         {
             List<String> partitionNames = new ArrayList<>();
-            List<Function<PartitionStatistics, PartitionStatistics>> updateFunctionList = new ArrayList<>();
+            Map<String, Function<PartitionStatistics, PartitionStatistics>> partNamesUpdateFunctionMap = new HashMap<>();
             for (UpdateStatisticsOperation operation : partitionUpdateStatisticsOperations) {
+                partNamesUpdateFunctionMap.put(operation.partitionName.get(), operation::updateStatistics);
                 partitionNames.add(operation.partitionName.get());
-                updateFunctionList.add(operation::updateStatistics);
             }
-            if (partitionNames.size() == updateFunctionList.size() && partitionUpdateStatisticsOperations.size() > 0) {
-                metastore.updatePartitionsStatistics(identity, schemaTableName.getSchemaName(), schemaTableName.getTableName(), partitionNames, updateFunctionList);
+            if (partitionNames.size() == partNamesUpdateFunctionMap.size() && partitionUpdateStatisticsOperations.size() > 0) {
+                metastore.updatePartitionsStatistics(identity, schemaTableName.getSchemaName(), schemaTableName.getTableName(), partNamesUpdateFunctionMap);
             }
         }
 
