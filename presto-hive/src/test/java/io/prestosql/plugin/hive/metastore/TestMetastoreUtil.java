@@ -29,6 +29,7 @@ import org.testng.annotations.Test;
 import java.util.List;
 import java.util.Properties;
 
+import static io.prestosql.plugin.hive.metastore.MetastoreUtil.META_PARTITION_COLUMNS;
 import static org.apache.hadoop.hive.serde.serdeConstants.COLUMN_NAME_DELIMITER;
 import static org.testng.Assert.assertEquals;
 
@@ -142,6 +143,7 @@ public class TestMetastoreUtil
         Properties expected = MetaStoreUtils.getTableMetadata(TEST_TABLE_WITH_UNSUPPORTED_FIELDS);
         expected.remove(COLUMN_NAME_DELIMITER);
         Properties actual = MetastoreUtil.getHiveSchema(ThriftMetastoreUtil.fromMetastoreApiTable(TEST_TABLE_WITH_UNSUPPORTED_FIELDS, TEST_SCHEMA));
+        actual.remove(META_PARTITION_COLUMNS);
         assertEquals(actual, expected);
     }
 
@@ -151,6 +153,7 @@ public class TestMetastoreUtil
         Properties expected = MetaStoreUtils.getPartitionMetadata(TEST_PARTITION_WITH_UNSUPPORTED_FIELDS, TEST_TABLE_WITH_UNSUPPORTED_FIELDS);
         expected.remove(COLUMN_NAME_DELIMITER);
         Properties actual = MetastoreUtil.getHiveSchema(ThriftMetastoreUtil.fromMetastoreApiPartition(TEST_PARTITION_WITH_UNSUPPORTED_FIELDS), ThriftMetastoreUtil.fromMetastoreApiTable(TEST_TABLE_WITH_UNSUPPORTED_FIELDS, TEST_SCHEMA));
+        actual.remove(META_PARTITION_COLUMNS);
         assertEquals(actual, expected);
     }
 

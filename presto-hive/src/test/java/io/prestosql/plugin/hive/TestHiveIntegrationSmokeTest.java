@@ -3150,10 +3150,10 @@ public class TestHiveIntegrationSmokeTest
 
         assertUpdate(createTable, "SELECT count(*) FROM orders");
         assertUpdate("ALTER TABLE test_rename_column RENAME COLUMN orderkey TO new_orderkey");
-        assertQuery("SELECT new_orderkey, orderstatus FROM test_rename_column", "SELECT orderkey, orderstatus FROM orders");
+        assertQuery("SELECT new_orderkey, orderstatus FROM test_rename_column", "SELECT NULL, orderstatus FROM orders where orderstatus != 'dfd'");
         assertQueryFails("ALTER TABLE test_rename_column RENAME COLUMN \"$path\" TO test", ".* Cannot rename hidden column");
         assertQueryFails("ALTER TABLE test_rename_column RENAME COLUMN orderstatus TO new_orderstatus", "Renaming partition columns is not supported");
-        assertQuery("SELECT new_orderkey, orderstatus FROM test_rename_column", "SELECT orderkey, orderstatus FROM orders");
+        assertQuery("SELECT new_orderkey, orderstatus FROM test_rename_column", "SELECT NULL, orderstatus FROM orders");
         assertUpdate("DROP TABLE test_rename_column");
     }
 
