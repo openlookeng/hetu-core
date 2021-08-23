@@ -1712,6 +1712,7 @@
                             <item>${air.main.basedir}/src/main/resource/license/license-header-alternate-2010.txt</item>
                             <item>${air.main.basedir}/src/main/resource/license/license-header-alternate-2012.txt</item>
                             <item>${air.main.basedir}/src/main/resource/license/license-header-alternate-2020.txt</item>
+                            <item>${air.main.basedir}/src/main/resource/license/license-header-third.txt</item>
                         </validHeaders>
                     </configuration>
                 </plugin>
