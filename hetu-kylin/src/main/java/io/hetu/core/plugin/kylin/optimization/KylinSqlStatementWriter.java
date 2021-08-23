@@ -30,7 +30,6 @@ public class KylinSqlStatementWriter
 
     public KylinSqlStatementWriter(JdbcPushDownParameter pushDownParameter)
     {
-
         super(pushDownParameter);
         this.pushDownParameter = pushDownParameter;
     }

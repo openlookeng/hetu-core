@@ -33,5 +33,6 @@ public final class KylinJdbcTypeHandle
     public static final JdbcTypeHandle JDBC_DATE = new JdbcTypeHandle(Types.DATE, Optional.of("date"), 8, 0, Optional.empty());
     public static final JdbcTypeHandle JDBC_TIME = new JdbcTypeHandle(Types.TIME, Optional.of("time"), 4, 0, Optional.empty());
     public static final JdbcTypeHandle JDBC_TIMESTAMP = new JdbcTypeHandle(Types.TIMESTAMP, Optional.of("timestamp"), 8, 0, Optional.empty());
+
     private KylinJdbcTypeHandle() {}
 }

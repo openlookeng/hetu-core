@@ -20,7 +20,6 @@ import io.prestosql.sql.builder.functioncall.ApplyRemoteFunctionPushDown;
 public class KylinApplyRemoteFunctionPushDown
         extends ApplyRemoteFunctionPushDown
 {
-
     public KylinApplyRemoteFunctionPushDown(BaseJdbcConfig baseJdbcConfig, String connectorName)
     {
         super(baseJdbcConfig, connectorName);

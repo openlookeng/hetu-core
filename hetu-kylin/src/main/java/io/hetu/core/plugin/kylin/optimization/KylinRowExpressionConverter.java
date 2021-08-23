@@ -34,7 +34,6 @@ import static io.prestosql.sql.builder.functioncall.BaseFunctionUtil.isDefaultFu
 public class KylinRowExpressionConverter
         extends BaseJdbcRowExpressionConverter
 {
-
     private final KylinApplyRemoteFunctionPushDown kylinApplyRemoteFunctionPushDown;
 
     public KylinRowExpressionConverter(DeterminismEvaluator determinismEvaluator, RowExpressionService rowExpressionService, FunctionMetadataManager functionManager, StandardFunctionResolution functionResolution, BaseJdbcConfig baseJdbcConfig)
