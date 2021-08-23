@@ -43,9 +43,9 @@ public class RowBufferHandler
         return rowBuffer;
     }
 
-    public RowBufferHandler(CubeConsole cubeConsole, List<List<?>> rowBuffer)
+    public RowBufferHandler(CubeConsole cubeConsole, CubeOutputHandler handler)
     {
-        this.rowBuffer = rowBuffer;
+        this.rowBuffer = handler.getRowBuffer();
         this.cubeConsole = cubeConsole;
     }
 

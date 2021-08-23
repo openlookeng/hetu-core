@@ -30,13 +30,16 @@ public final class CubeOutputHandler
     private static final long MAX_BUFFERED_ROWS = 10000000000L;
 
     private final AtomicBoolean closed = new AtomicBoolean();
-    private final List<List<?>> rowBuffer = new ArrayList<>();
+    private final List<List<?>> rowBuffer;
     private final OutputPrinter printer;
+    private final CubeConsole cubeConsole;
 
     private long bufferStart;
 
-    public CubeOutputHandler(OutputPrinter printer)
+    public CubeOutputHandler(OutputPrinter printer, CubeConsole cubeConsole)
     {
+        this.cubeConsole = requireNonNull(cubeConsole, "cubeConsole is null");
+        this.rowBuffer = new ArrayList<>(cubeConsole.getRowBufferListSize());
         this.printer = requireNonNull(printer, "printer is null");
     }
 
