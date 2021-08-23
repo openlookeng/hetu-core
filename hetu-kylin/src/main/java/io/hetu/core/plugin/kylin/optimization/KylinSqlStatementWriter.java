@@ -35,7 +35,6 @@ public class KylinSqlStatementWriter
         this.pushDownParameter = pushDownParameter;
     }
 
-
     @Override
     public String castAggregationType(String aggregationExpression, RowExpressionConverter converter, Type returnType)
     {
@@ -43,7 +42,8 @@ public class KylinSqlStatementWriter
     }
 
     @Override
-    public String select(List<Selection> selections) {
+    public String select(List<Selection> selections)
+    {
         StringBuilder builder = new StringBuilder("SELECT ");
         if (selections == null || selections.size() == 0) {
             builder.append("null");
@@ -52,7 +52,7 @@ public class KylinSqlStatementWriter
             StringJoiner joiner = new StringJoiner(", ");
             for (Selection selection : selections) {
                 if (selection.isAliased(pushDownParameter.getCaseInsensitiveParameter())) {
-                    joiner.add(  selection.getExpression() + " AS " +   KylinKeywords.getAlias(selection.getAlias() ) );
+                    joiner.add(selection.getExpression() + " AS " + KylinKeywords.getAlias(selection.getAlias()));
                 }
                 else {
                     joiner.add(KylinKeywords.getAlias(selection.getExpression()));
@@ -62,5 +62,4 @@ public class KylinSqlStatementWriter
         }
         return builder.toString();
     }
-
 }

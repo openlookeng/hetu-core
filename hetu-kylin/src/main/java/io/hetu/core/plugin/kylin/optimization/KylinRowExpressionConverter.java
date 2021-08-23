@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 package io.hetu.core.plugin.kylin.optimization;
+
 import io.hetu.core.plugin.kylin.KylinConstants;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.optimization.BaseJdbcRowExpressionConverter;
@@ -30,18 +31,21 @@ import java.util.Optional;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.sql.builder.functioncall.BaseFunctionUtil.isDefaultFunction;
 
-
-public class KylinRowExpressionConverter extends BaseJdbcRowExpressionConverter {
+public class KylinRowExpressionConverter
+        extends BaseJdbcRowExpressionConverter
+{
 
     private final KylinApplyRemoteFunctionPushDown kylinApplyRemoteFunctionPushDown;
 
-    public KylinRowExpressionConverter(DeterminismEvaluator determinismEvaluator, RowExpressionService rowExpressionService, FunctionMetadataManager functionManager, StandardFunctionResolution functionResolution, BaseJdbcConfig baseJdbcConfig) {
+    public KylinRowExpressionConverter(DeterminismEvaluator determinismEvaluator, RowExpressionService rowExpressionService, FunctionMetadataManager functionManager, StandardFunctionResolution functionResolution, BaseJdbcConfig baseJdbcConfig)
+    {
         super(functionManager, functionResolution, rowExpressionService, determinismEvaluator);
         this.kylinApplyRemoteFunctionPushDown = new KylinApplyRemoteFunctionPushDown(baseJdbcConfig, KylinConstants.KYLIN_CONNECTOR_NAME);
     }
 
     @Override
-    public String visitCall(CallExpression call, JdbcConverterContext context) {
+    public String visitCall(CallExpression call, JdbcConverterContext context)
+    {
         // remote udf verify
         FunctionHandle functionHandle = call.getFunctionHandle();
         if (!isDefaultFunction(call)) {
@@ -62,6 +66,4 @@ public class KylinRowExpressionConverter extends BaseJdbcRowExpressionConverter 
 
         return super.visitCall(call, context);
     }
-
-
 }

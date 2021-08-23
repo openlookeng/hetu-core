@@ -22,11 +22,12 @@ import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpressionService;
 
+public class KylinQueryGenerator
+        extends BaseJdbcQueryGenerator
+{
 
-public class KylinQueryGenerator extends BaseJdbcQueryGenerator {
-
-    public KylinQueryGenerator(DeterminismEvaluator determinismEvaluator, RowExpressionService rowExpressionService, FunctionMetadataManager functionManager, StandardFunctionResolution functionResolution, JdbcPushDownParameter pushDownParameter, BaseJdbcConfig baseConfig) {
+    public KylinQueryGenerator(DeterminismEvaluator determinismEvaluator, RowExpressionService rowExpressionService, FunctionMetadataManager functionManager, StandardFunctionResolution functionResolution, JdbcPushDownParameter pushDownParameter, BaseJdbcConfig baseConfig)
+    {
         super(pushDownParameter, new KylinRowExpressionConverter(determinismEvaluator, rowExpressionService, functionManager, functionResolution, baseConfig), new KylinSqlStatementWriter(pushDownParameter));
     }
-
 }

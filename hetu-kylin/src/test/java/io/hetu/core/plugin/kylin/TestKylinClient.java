@@ -17,11 +17,8 @@ package io.hetu.core.plugin.kylin;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.JdbcColumnHandle;
-import io.prestosql.plugin.jdbc.JdbcSplit;
-import io.prestosql.plugin.jdbc.JdbcTableHandle;
 import io.prestosql.plugin.jdbc.JdbcTypeHandle;
 import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.testing.TestingConnectorSession;
 import io.prestosql.type.InternalTypeManager;
@@ -29,11 +26,8 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Types;
-import java.util.List;
 import java.util.Optional;
 
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
@@ -43,19 +37,17 @@ import static org.testng.Assert.assertEquals;
 @Test(singleThreaded = true)
 public class TestKylinClient
 {
-    private TestingDatabase database;
-
     public static final JdbcTypeHandle JDBC_BIGINT = new JdbcTypeHandle(Types.BIGINT, Optional.of("bigint"), 8, 0, Optional.empty());
+    public static final ConnectorSession SESSION = new TestingConnectorSession(ImmutableList.of());
+    private static final TypeManager TYPE_MANAGER = new InternalTypeManager(createTestMetadataManager().getFunctionAndTypeManager());
+    private static final JdbcColumnHandle BIGINT_COLUMN = new JdbcColumnHandle("c_bigint",
+            new JdbcTypeHandle(Types.BIGINT, Optional.of("int8"), 0, 0, Optional.empty()), BIGINT, true);
     KylinClient kylinClient = new KylinClient(new BaseJdbcConfig(), new KylinConfig(), identity -> {
         throw new UnsupportedOperationException();
     }, TYPE_MANAGER);
-    private static final TypeManager TYPE_MANAGER = new InternalTypeManager(createTestMetadataManager().getFunctionAndTypeManager());
-    public static final ConnectorSession SESSION = new TestingConnectorSession(ImmutableList.of());
-    private static final JdbcColumnHandle BIGINT_COLUMN = new JdbcColumnHandle("c_bigint",
-            new JdbcTypeHandle(Types.BIGINT, Optional.of("int8"), 0, 0, Optional.empty()), BIGINT, true);
-
-    private String user = "admin";
-    private String pwd = "admin";
+    private TestingDatabase database;
+    private final String user = "admin";
+    private final String pwd = "admin";
 
     @BeforeMethod
     public void setup()
