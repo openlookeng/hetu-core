@@ -37,5 +37,4 @@ public class KylinConnectorFactory
                 passwordCredentialName,
                 connectionProperties);
     }
-
 }

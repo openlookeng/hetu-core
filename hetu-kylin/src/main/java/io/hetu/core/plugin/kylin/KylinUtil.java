@@ -43,6 +43,10 @@ public class KylinUtil
 {
     private static final int MAX_SCALE = 12;
 
+    private KylinUtil()
+    {
+    }
+
     public static Optional<Integer> prestoTypeToJdbcType(Type type)
     {
         switch (type.getTypeSignature().getBase()) {
@@ -130,9 +134,5 @@ public class KylinUtil
                 || "year".equalsIgnoreCase(str)
                 || "month".equalsIgnoreCase(str)
                 || "day".equalsIgnoreCase(str);
-    }
-
-    private KylinUtil()
-    {
     }
 }

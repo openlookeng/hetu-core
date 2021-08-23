@@ -36,14 +36,6 @@ import static io.prestosql.plugin.jdbc.DriverConnectionFactory.basicConnectionPr
 public class KylinClientModule
         extends AbstractConfigurationAwareModule
 {
-    @Override
-    protected void setup(Binder binder)
-    {
-        binder.bind(JdbcClient.class).to(KylinClient.class).in(Scopes.SINGLETON);
-        ensureCatalogIsEmpty(buildConfigObject(BaseJdbcConfig.class).getConnectionUrl());
-        configBinder(binder).bindConfig(KylinConfig.class);
-    }
-
     private static void ensureCatalogIsEmpty(String connectionUrl)
     {
         try {
@@ -75,5 +67,13 @@ public class KylinClientModule
                 Optional.ofNullable(config.getPasswordCredentialName()),
                 connectionProperties,
                 config);
+    }
+
+    @Override
+    protected void setup(Binder binder)
+    {
+        binder.bind(JdbcClient.class).to(KylinClient.class).in(Scopes.SINGLETON);
+        ensureCatalogIsEmpty(buildConfigObject(BaseJdbcConfig.class).getConnectionUrl());
+        configBinder(binder).bindConfig(KylinConfig.class);
     }
 }

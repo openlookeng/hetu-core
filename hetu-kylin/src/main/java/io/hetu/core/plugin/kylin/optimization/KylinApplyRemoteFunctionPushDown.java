@@ -14,14 +14,15 @@
  */
 package io.hetu.core.plugin.kylin.optimization;
 
-
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.sql.builder.functioncall.ApplyRemoteFunctionPushDown;
 
+public class KylinApplyRemoteFunctionPushDown
+        extends ApplyRemoteFunctionPushDown
+{
 
-public class KylinApplyRemoteFunctionPushDown extends ApplyRemoteFunctionPushDown {
-
-    public KylinApplyRemoteFunctionPushDown(BaseJdbcConfig baseJdbcConfig, String connectorName) {
+    public KylinApplyRemoteFunctionPushDown(BaseJdbcConfig baseJdbcConfig, String connectorName)
+    {
         super(baseJdbcConfig, connectorName);
     }
 }

@@ -32,11 +32,11 @@ public final class KylinKeywords
                 .build();
     }
 
-    public static String getAlias(String name) {
-        if(getKeywords().contains( name.toLowerCase() )){
+    public static String getAlias(String name)
+    {
+        if (getKeywords().contains(name.toLowerCase())) {
             return KylinConstants.KYLIN_IDENTIFIER_QUOTE + name.toUpperCase() + KylinConstants.KYLIN_IDENTIFIER_QUOTE;
         }
         return name;
     }
-
 }

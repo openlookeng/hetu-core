@@ -51,11 +51,9 @@ public class KylinConfig
     private boolean partialPushdownEnableWithCubePriority;
     private String connectorPlanOptimizerRuleBlackList;
 
-    public enum ValidateSqlMethod
+    public boolean isQueryPushDownEnabled()
     {
-        REST,
-        EXPLAIN,
-        AUTO
+        return isQueryPushDownEnabled;
     }
 
     /**
@@ -72,9 +70,9 @@ public class KylinConfig
         return this;
     }
 
-    public boolean isQueryPushDownEnabled()
+    public RoundingMode getRoundingMode()
     {
-        return isQueryPushDownEnabled;
+        return roundingMode;
     }
 
     /**
@@ -90,11 +88,6 @@ public class KylinConfig
     {
         this.roundingMode = roundingMode;
         return this;
-    }
-
-    public RoundingMode getRoundingMode()
-    {
-        return roundingMode;
     }
 
     /**
@@ -279,6 +272,11 @@ public class KylinConfig
         return this;
     }
 
+    public String getConnectorPlanOptimizerRuleBlackList()
+    {
+        return connectorPlanOptimizerRuleBlackList;
+    }
+
     @Mandatory(name = "connector-planoptimizer-rule-blacklist",
             description = "connector planoptimizer rule blacklist",
             defaultValue = "io.prestosql.sql.planner.iterative.rule.SingleDistinctAggregationToGroupBy",
@@ -287,11 +285,14 @@ public class KylinConfig
     @ConfigDescription("connector planoptimizer rule blacklist ")
     public KylinConfig setConnectorPlanOptimizerRuleBlackList(String connectorPlanOptimizerRuleBlackList)
     {
-        this.connectorPlanOptimizerRuleBlackList  = connectorPlanOptimizerRuleBlackList;
+        this.connectorPlanOptimizerRuleBlackList = connectorPlanOptimizerRuleBlackList;
         return this;
     }
 
-    public String getConnectorPlanOptimizerRuleBlackList() {
-        return connectorPlanOptimizerRuleBlackList;
+    public enum ValidateSqlMethod
+    {
+        REST,
+        EXPLAIN,
+        AUTO
     }
 }

@@ -32,5 +32,4 @@ public class KylinJdbcPlugin
         super("kylin", new KylinClientModule());
         log.info("kylin plugin is registered");
     }
-
 }

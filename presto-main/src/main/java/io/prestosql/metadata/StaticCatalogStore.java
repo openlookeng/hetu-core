@@ -103,7 +103,7 @@ public class StaticCatalogStore
         checkState(connectorName != null, "Catalog configuration %s does not contain connector.name", file.getAbsoluteFile());
 
         connectorManager.createConnection(catalogName, connectorName, ImmutableMap.copyOf(properties));
-        OptimizerUtils.addPlanOptimizerBlacklist(catalogName, properties);//cutomer config connector optimizer
+        OptimizerUtils.addPlanOptimizerBlacklist(catalogName, properties);
         log.info("-- Added catalog %s using connector %s --", catalogName, connectorName);
     }
 
