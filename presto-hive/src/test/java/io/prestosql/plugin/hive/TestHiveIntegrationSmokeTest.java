@@ -6608,4 +6608,18 @@ public class TestHiveIntegrationSmokeTest
         assertQuery(String.format("SELECT * FROM %s.%s", schema, table), "VALUES (1, 1, 1)");
         assertUpdate(String.format("DROP TABLE %s.%s", schema, table));
     }
+
+    @Test
+    public void testAcidFormatColumnNameConflict()
+    {
+        assertUpdate(String.format("CREATE TABLE test_acid_columnname_conflict (originalTransaction int, currentTransaction int," +
+                " rowId int, bucket int, row int )"
+                + "with (transactional=true, format='orc')"));
+
+        assertUpdate(String.format("INSERT INTO test_acid_columnname_conflict VALUES (1, 2, 3, 4, 5)"), 1);
+
+        assertQuery("SELECT * FROM test_acid_columnname_conflict", "VALUES (1, 2, 3, 4, 5)");
+
+        assertUpdate(String.format("DROP TABLE test_acid_columnname_conflict"));
+    }
 }
