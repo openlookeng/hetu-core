@@ -80,6 +80,7 @@ public final class HindexQueryRunner
                 configs.put("hetu.heuristicindex.filter.enabled", "true");
                 configs.put("hetu.heuristicindex.filter.cache.max-memory", "5GB");
                 configs.put("hetu.heuristicindex.filter.cache.loading-delay", "0ms");
+                configs.put("hetu.heuristicindex.filter.cache.autoload-default", "false");
                 configs.put("hetu.heuristicindex.indexstore.uri", folder.getRoot().getAbsolutePath());
                 configs.put("hetu.heuristicindex.indexstore.filesystem.profile", "__test__hdfs__");
                 Map<String, String> metastoreConfig = new HashMap<>();

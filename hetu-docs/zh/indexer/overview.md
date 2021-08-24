@@ -97,6 +97,7 @@
 要创建索引, 在命令行中输入：
 
     CREATE INDEX index_name USING bloom ON table1 (column);
+    CREATE INDEX index_name USING bloom ON table1 (column) WITH ("autoload" = false);
     
 ### 4. 运行语句
 
@@ -104,18 +105,18 @@
 
 ## 索引配置属性
 
-| 属性名称                                            | 默认值               | 是否必填| 说明|
-|---------------------------------------------------|---------------------|-------|----------|
-| hetu.heuristicindex.filter.enabled                | false               | 否    | 启用启发式索引|
-| hetu.heuristicindex.filter.cache.max-memory       | 10GB                | 否    | 索引缓存大小|
-| hetu.heuristicindex.filter.cache.soft-reference   | true                | 否    | 允许GC在内存不足时从缓存中清除内容来释放内存|
-| hetu.heuristicindex.filter.cache.ttl              | 24h                 | 否    | 索引缓存的有效时间|
-| hetu.heuristicindex.filter.cache.load-threads     | 10                  | 否    | 从存储文件系统并行加载索引文件使用的线程数|
-| hetu.heuristicindex.filter.cache.loading-delay    | 10s                 | 否    | 在异步加载索引到缓存前等待的时长|
-| hetu.heuristicindex.indexstore.uri                | /opt/hetu/indices/  | 否    | 所有索引文件存储的目录|
-| hetu.heuristicindex.indexstore.filesystem.profile | local-config-default| 否    | 用于存储索引文件的文件系统属性描述文件名称|
-| hetu.heuristicindex.filter.cache.preload-indices  |                     | 否    | 在服务器启动时预加载指定名称的索引(用逗号分隔), 当值为`ALL`时将预载入全部索引|
-
+| 属性名称                                             | 默认值               | 是否必填| 说明|
+|-----------------------------------------------------|---------------------|-------|----------|
+| hetu.heuristicindex.filter.enabled                  | false               | 否    | 启用启发式索引|
+| hetu.heuristicindex.filter.cache.max-memory         | 10GB                | 否    | 索引缓存大小|
+| hetu.heuristicindex.filter.cache.soft-reference     | true                | 否    | 允许GC在内存不足时从缓存中清除内容来释放内存|
+| hetu.heuristicindex.filter.cache.ttl                | 24h                 | 否    | 索引缓存的有效时间|
+| hetu.heuristicindex.filter.cache.load-threads       | 10                  | 否    | 从存储文件系统并行加载索引文件使用的线程数|
+| hetu.heuristicindex.filter.cache.loading-delay      | 10s                 | 否    | 在异步加载索引到缓存前等待的时长|
+| hetu.heuristicindex.indexstore.uri                  | /opt/hetu/indices/  | 否    | 所有索引文件存储的目录|
+| hetu.heuristicindex.indexstore.filesystem.profile   | local-config-default| 否    | 用于存储索引文件的文件系统属性描述文件名称|
+| hetu.heuristicindex.filter.cache.preload-indices    |                     | 否    | 在服务器启动时预加载指定名称的索引(用逗号分隔), 当值为`ALL`时将预载入全部索引|
+| hetu.heuristicindex.filter.cache.autoload-default   | true                | 否    | 自动加载索引的默认值。要更改特定索引的值，请通过在 create index 语句 WITH ("autoload" = true/false) 设置|
 ## 索引语句
 
 参见 [Heuristic Index Statements](./hindex-statements.md).

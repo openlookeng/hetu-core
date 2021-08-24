@@ -33,6 +33,7 @@ import static java.util.Objects.requireNonNull;
 public class CreateIndexMetadata
 {
     public static final String LEVEL_PROP_KEY = "level";
+    public static final String AUTOLOAD_PROP_KEY = "autoload";
     public static final Map<String, List<String>> INDEX_SUPPORTED_TYPES = ImmutableMap.<String, List<String>>builder()
             .put("bloom", ImmutableList.of(
                     "integer", "smallint", "bigint", "tinyint", "varchar", "char", "boolean", "double", "real", "date", "decimal"))

@@ -10,13 +10,17 @@
 CREATE INDEX [ IF NOT EXISTS ] index_name
 USING [ BITMAP | BLOOM | BTREE | MINMAX ]
 ON tbl_name (col_name)
-WITH ( 'level' = ['STRIPE', 'PARTITION'], "bloom.fpp" = '0.001', [, …] )
+WITH ( 'level' = ['STRIPE', 'PARTITION'], "bloom.fpp" = '0.001', "autoload" = true, [, …] )
 WHERE predicate;
 ```
 
 - `WHERE` 用于选择部分分区创建索引
 - `WITH` 用于设置索引属性。参见各个索引的文档来查看支持的配置
 - `"level"='STRIPE'` 如缺省，默认创建级别是STRIPE
+- `"autoload"` 覆盖 config.properties 中的默认值 `hetu.heuristicindex.filter.cache.autoload-default`。
+索引创建或更新后，是否自动加载到缓存中。
+如果为 false，将根据需要加载索引。这意味着，前几个查询可能不会使用索引，因为它正在加载到缓存中。
+将此设置为 true 可能会导致高内存使用率，但会提供最佳结果。
 
 如果表是分区的，可以用一个等于表达式来指定一个创建的分区，或使用IN来指定多个。
 

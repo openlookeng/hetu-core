@@ -41,6 +41,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -145,19 +146,22 @@ public class IndexCache
                     if (oldIndexMap.get(newIndexRecord.name) != newIndexRecord.lastModifiedTime) {
                         // update operation
                         updated = true;
-                        //cache.refresh(newIndexRecord);
-                        evictFromCache(newIndexRecord);
-                        //CreateIndexMetadata.Level indexLevel = CreateIndexMetadata.Level.valueOf(newIndexRecord.getProperty(CreateIndexMetadata.LEVEL_PROP_KEY).toUpperCase(Locale.ROOT));
-                        //preloadIndex(newIndexRecord.qualifiedTable, String.join(",", newIndexRecord.columns), newIndexRecord.indexType, indexLevel);
-                        LOG.debug("Index {%s} has been updated in cache.", newIndexRecord);
+                        if (newIndexRecord.isAutoloadEnabled()) {
+                            evictFromCache(newIndexRecord);
+                            CreateIndexMetadata.Level indexLevel = CreateIndexMetadata.Level.valueOf(newIndexRecord.getProperty(CreateIndexMetadata.LEVEL_PROP_KEY).toUpperCase(Locale.ROOT));
+                            preloadIndex(newIndexRecord.qualifiedTable, String.join(",", newIndexRecord.columns), newIndexRecord.indexType, indexLevel);
+                            LOG.debug("Index {%s} has been updated in cache.", newIndexRecord);
+                        }
                     }
                 }
                 else {
                     // create operation
                     created = true;
-                    //CreateIndexMetadata.Level indexLevel = CreateIndexMetadata.Level.valueOf(newIndexRecord.getProperty(CreateIndexMetadata.LEVEL_PROP_KEY).toUpperCase(Locale.ROOT));
-                    //preloadIndex(newIndexRecord.qualifiedTable, String.join(",", newIndexRecord.columns), newIndexRecord.indexType, indexLevel);
-                    LOG.debug("Index {%s} has been inserted to cache.", newIndexRecord);
+                    if (newIndexRecord.isAutoloadEnabled()) {
+                        CreateIndexMetadata.Level indexLevel = CreateIndexMetadata.Level.valueOf(newIndexRecord.getProperty(CreateIndexMetadata.LEVEL_PROP_KEY).toUpperCase(Locale.ROOT));
+                        preloadIndex(newIndexRecord.qualifiedTable, String.join(",", newIndexRecord.columns), newIndexRecord.indexType, indexLevel);
+                        LOG.debug("Index {%s} has been inserted to cache.", newIndexRecord);
+                    }
                 }
             }
         }

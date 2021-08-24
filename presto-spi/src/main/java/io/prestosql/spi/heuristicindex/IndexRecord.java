@@ -27,6 +27,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
+import static io.prestosql.spi.connector.CreateIndexMetadata.AUTOLOAD_PROP_KEY;
 import static java.util.Objects.requireNonNull;
 
 public class IndexRecord
@@ -135,6 +136,11 @@ public class IndexRecord
             }
         }
         return null;
+    }
+
+    public boolean isAutoloadEnabled()
+    {
+        return Boolean.parseBoolean(getProperty(AUTOLOAD_PROP_KEY));
     }
 
     @Override

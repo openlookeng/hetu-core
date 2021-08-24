@@ -42,6 +42,7 @@ public class HetuConfig
     private Boolean indexCacheSoftReference = Boolean.TRUE;
     private String indexStoreUri = "/opt/hetu/indices/";
     private String indexStoreFileSystemProfile = "local-config-default";
+    private boolean indexAutoload = true;
     private String indexToPreload = "";
     private Boolean enableEmbeddedStateStore = Boolean.FALSE;
     private Boolean enableMultipleCoordinator = Boolean.FALSE;
@@ -114,6 +115,19 @@ public class HetuConfig
     public HetuConfig setIndexCacheTTL(Duration indexCacheTTL)
     {
         this.indexCacheTTL = indexCacheTTL;
+        return this;
+    }
+
+    public Boolean getIndexAutoload()
+    {
+        return indexAutoload;
+    }
+
+    @Config(HetuConstant.FILTER_CACHE_AUTOLOAD_DEFAULT)
+    @ConfigDescription("The default value for autoload property when creating index. If set to true, all indexes will be automatically loaded to cache after creation or update. See CREATE INDEX docs for details.")
+    public HetuConfig setIndexAutoload(Boolean autoloadEnabled)
+    {
+        this.indexAutoload = autoloadEnabled;
         return this;
     }
 
