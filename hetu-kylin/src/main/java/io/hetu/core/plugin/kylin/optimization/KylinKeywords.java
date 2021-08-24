@@ -17,6 +17,7 @@ package io.hetu.core.plugin.kylin.optimization;
 import com.google.common.collect.ImmutableSet;
 import io.hetu.core.plugin.kylin.KylinConstants;
 
+import java.util.Locale;
 import java.util.Set;
 
 public final class KylinKeywords
@@ -36,7 +37,7 @@ public final class KylinKeywords
 
     public static String getAlias(String name)
     {
-        if (getKeywords().contains(name.toLowerCase())) {
+        if (getKeywords().contains(name.toLowerCase(Locale.ENGLISH))) {
             return KylinConstants.KYLIN_IDENTIFIER_QUOTE + name.toUpperCase() + KylinConstants.KYLIN_IDENTIFIER_QUOTE;
         }
         return name;

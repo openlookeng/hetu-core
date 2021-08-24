@@ -63,6 +63,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
@@ -167,7 +168,7 @@ public class KylinClient
                     columnName = sqlBasicCall.operands[1].toString();
                 }
 
-                Type type = types.get(columnName.toLowerCase());
+                Type type = types.get(columnName.toLowerCase(Locale.ENGLISH));
                 if (type instanceof BigintType) {
                     columnHandle = new JdbcColumnHandle(columnName, KylinJdbcTypeHandle.JDBC_BIGINT, BigintType.BIGINT, true);
                 }
