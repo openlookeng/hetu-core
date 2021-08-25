@@ -87,6 +87,8 @@ public class CubeConsole
     private static final int INDEX_AT_MIN_POSITION = 0;
     private static final int INDEX_AT_MAX_POSITION = 1;
     private static final long MAX_BUFFERED_ROWS = 10000000000L;
+    private static int rowBufferListSize;
+    private static final double rowBufferTempMultiplier = 1.3;
     private static String resultInitCubeQUery;
     private List<List<?>> rowBufferIterationItems;
     private String cubeColumnDataType;
@@ -229,7 +231,6 @@ public class CubeConsole
         Expression left = comparisonExpression.getLeft();
         Expression right = comparisonExpression.getRight();
         boolean notEqualOperator = false;
-        boolean success = true;
 
         if (operator.getValue().equalsIgnoreCase(NOT_EQUAL_OPERATOR)) {
             notEqualOperator = true;
@@ -322,15 +323,19 @@ public class CubeConsole
                     finalPredicate = new LogicalBinaryExpression(LogicalBinaryExpression.Operator.AND, finalPredicate, comparisonExpression);
                 }
                 queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, finalPredicate);
-                success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+                if (!console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
+                    return false;
+                }
             }
         }
         else {
             //if the range is within the processing size limit then we run a single insert query only
             String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, whereClause);
-            success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+            if (!console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
+                return false;
+            }
         }
-        return success;
+        return true;
     }
 
     /**
@@ -355,7 +360,6 @@ public class CubeConsole
         QualifiedName cubeName = createCube.getCubeName();
         BetweenPredicate betweenPredicate = (BetweenPredicate) (createCube.getWhere().get());
         String columnName = betweenPredicate.getValue().toString();
-        boolean success = true;
 
         //Run Query
         String rowCountsDistinctValuesQuery = String.format(SELECT_COLUMN_ROW_COUNT_FROM_STRING, columnName, sourceTableName.toString(), whereClause, columnName, columnName);
@@ -432,15 +436,19 @@ public class CubeConsole
                     }
                 }
                 queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, finalPredicate);
-                success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+                if (!console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
+                    return false;
+                }
             }
         }
         else {
             //if the range is within the processing size limit then we run a single insert query only
             String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, whereClause);
-            success = console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+            if (!console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
+                return false;
+            }
         }
-        return success;
+        return true;
     }
 
     /**
@@ -522,8 +530,9 @@ public class CubeConsole
                             if (resultInitCubeQuery != null) {
                                 valueCountDistinctQuery = Long.parseLong(resultInitCubeQuery);
                             }
-                            if (valueCountDistinctQuery < MAX_BUFFERED_ROWS) {
+                            if (valueCountDistinctQuery < MAX_BUFFERED_ROWS && valueCountDistinctQuery * rowBufferTempMultiplier < Integer.MAX_VALUE) {
                                 supportedExpression = true;
+                                rowBufferListSize = (int) ((valueCountDistinctQuery).intValue() * rowBufferTempMultiplier);
                             }
                         }
                     }
@@ -715,5 +724,10 @@ public class CubeConsole
     public String getMaxBatchProcessSize()
     {
         return console.getClientOptions().getMaxBatchProcessSize();
+    }
+
+    public int getRowBufferListSize()
+    {
+        return rowBufferListSize;
     }
 }

@@ -39,7 +39,7 @@ format='orc', partitioned_by=ARRAY['nationkey']);
 ```
 Next, to add data to the cube:
 ```sql 
-INSERT INTO CUBE nation_cube WHERE nationkey > 5;
+INSERT INTO CUBE nation_cube WHERE nationkey >= 5;
 ```
 Creating a star-tree cube with CLI with WHERE clause:
 ```sql 
@@ -48,14 +48,17 @@ ON nation
 WITH (AGGREGATIONS=(count(*), count(distinct regionkey), avg(nationkey), max(regionkey)),
 GROUP=(nationkey),
 format='orc', partitioned_by=ARRAY['nationkey'])
-WHERE nationkey > 4;
+WHERE nationkey >= 5;
 ```
 
 To use the new cube, just query the original table using aggregations that were included in the cube:
 ```sql 
-SELECT count(*) FROM nation WHERE nationkey > 5 GROUP BY nationkey;
-SELECT nationkey, avg(nationkey), max(regionkey) WHERE nationkey > 5 GROUP BY nationkey;
+SELECT count(*) FROM nation WHERE nationkey >= 5 GROUP BY nationkey;
+SELECT nationkey, avg(nationkey), max(regionkey) FROM nation WHERE nationkey >= 5 GROUP BY nationkey;
 ```
+
+Since the data inserted into the cube was for nationkey >= 5, only queries matching this condition will utilize the cube. 
+Queries not matching the condition will still work as usual.
 
 ## Optimizer Changes
 
