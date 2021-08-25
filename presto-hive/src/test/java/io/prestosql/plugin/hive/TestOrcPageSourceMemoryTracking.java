@@ -517,7 +517,7 @@ public class TestOrcPageSourceMemoryTracking
                     null,
                     false,
                     -1L,
-                    ImmutableMap.of())
+                    ImmutableMap.of(), ImmutableList.of())
                     .get();
         }
 

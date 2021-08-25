@@ -126,7 +126,12 @@ public class HivePageSource
             }
 
             if (columnMapping.getKind() == PREFILLED) {
-                prefilledValues[columnIndex] = typedPartitionKey(columnMapping.getPrefilledValue(), type, name);
+                if (columnMapping.getPrefilledValue() == null) {
+                    prefilledValues[columnIndex] = null;
+                }
+                else {
+                    prefilledValues[columnIndex] = typedPartitionKey(columnMapping.getPrefilledValue(), type, name);
+                }
             }
         }
         this.coercers = coercers.build();
