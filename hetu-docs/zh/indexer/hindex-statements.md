@@ -10,7 +10,7 @@
 CREATE INDEX [ IF NOT EXISTS ] index_name
 USING [ BITMAP | BLOOM | BTREE | MINMAX ]
 ON tbl_name (col_name)
-WITH ( 'level' = ['STRIPE', 'PARTITION'], "bloom.fpp" = '0.001', "autoload" = true, [, …] )
+WITH ( 'level' = ['STRIPE', 'PARTITION'], "autoload" = true, "bloom.fpp" = '0.001', "bloom.mmapEnabled" = false, [, …] )
 WHERE predicate;
 ```
 
@@ -34,11 +34,20 @@ CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WHERE p in (p
 
 ## SHOW
 
-显示所有索引或只根据名字显示一个索引：
+显示所有索引或根据名字显示特定索引的信息。
+信息包括索引名、用户、表名、索引列、索引类型、索引状态等。
 
 ```roomsql
 SHOW INDEX;
 SHOW INDEX index_name;
+```
+
+## UPDATE
+
+如果源表已被修改，则更新现有索引。你可以用```SHOW INDEX index_name```检查索引的状态。
+
+```roomsql
+UPDATE INDEX index_name;
 ```
 
 ## DROP
@@ -56,6 +65,7 @@ DROP INDEX index_name where p=part1;
 ```
 
 删除的索引不会立即被从服务器的缓存中清除，直到下一次刷新缓存。刷新时间与设置的缓存加载延迟有关，通常在几秒钟左右。
+如果删除源表，索引将自动删除。
 
 ## 资源使用说明
 
