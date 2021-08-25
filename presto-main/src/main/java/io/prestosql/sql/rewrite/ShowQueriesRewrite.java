@@ -933,7 +933,7 @@ final class ShowQueriesRewrite
                             aliasedName("index_storage_size", "Index Size"),
                             aliasedName("index_status", "Index Status"),
                             aliasedName("partitions", "Partitions"),
-                            aliasedName("index_props", "IndexProps")),
+                            aliasedName("index_props", "Index Properties")),
                     aliased(
                             new Values(expressions),
                             "Index Result",

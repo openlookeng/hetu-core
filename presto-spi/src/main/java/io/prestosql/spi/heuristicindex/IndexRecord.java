@@ -93,14 +93,14 @@ public class IndexRecord
         JsonParser parser = new JsonParser();
         JsonObject values = parser.parse(metastoreEntry.getValue()).getAsJsonObject();
 
-        this.name = requireNonNull(values.get("name"), "attribute 'name' should not be null").getAsString();
-        this.user = requireNonNull(values.get("user"), "attribute 'user' should not be null").getAsString();
+        this.name = requireNonNull(values.get("name"), "attribute 'name' should not be null. Index is in an invalid state, recreate the index to resolve the issue.").getAsString();
+        this.user = requireNonNull(values.get("user"), "attribute 'user' should not be null. Index is in an invalid state, recreate the index to resolve the issue.").getAsString();
         this.indexSize = values.has("indexSize") ? values.get("indexSize").getAsLong() : 0;
         this.properties = new ArrayList<>();
-        values.get("properties").getAsJsonArray().forEach(e -> this.properties.add(e.getAsString()));
+        requireNonNull(values.get("properties"), "attribute 'properties' should not be null. Index is in an invalid state, recreate the index to resolve the issue.").getAsJsonArray().forEach(e -> this.properties.add(e.getAsString()));
         this.partitions = new ArrayList<>();
-        values.get("partitions").getAsJsonArray().forEach(e -> this.partitions.add(e.getAsString()));
-        this.lastModifiedTime = requireNonNull(values.get("lastModifiedTime"), "attribute 'lastModifiedTime' should not be null").getAsLong();
+        requireNonNull(values.get("partitions"), "attribute 'partitions' should not be null. Index is in an invalid state, recreate the index to resolve the issue.").getAsJsonArray().forEach(e -> this.partitions.add(e.getAsString()));
+        this.lastModifiedTime = requireNonNull(values.get("lastModifiedTime"), "attribute 'lastModifiedTime' should not be null. Index is in an invalid state, recreate the index to resolve the issue.").getAsLong();
     }
 
     public String serializeKey()
