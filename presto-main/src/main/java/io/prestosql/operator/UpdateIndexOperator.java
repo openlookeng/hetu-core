@@ -355,9 +355,9 @@ public class UpdateIndexOperator
             this.updateIndexMetadata = updateIndexMetadata;
 
             CreateIndexMetadata.Level createLevel;
-            Optional<String> createLevelString = indexRecord.properties.stream().filter(s -> s.toLowerCase(Locale.ROOT).contains("level=")).findAny();
+            Optional<String> createLevelString = indexRecord.propertiesAsList.stream().filter(s -> s.toLowerCase(Locale.ROOT).contains("level=")).findAny();
             createLevel = CreateIndexMetadata.Level.valueOf(createLevelString.get().replaceAll(".*=", ""));
-            Properties updatedProperties = getPropertiesFromList(indexRecord.properties);
+            Properties updatedProperties = indexRecord.getProperties();
 
             updateIndexMetadata.getProperties().forEach((key, val) -> {
                 if (!key.toString().toLowerCase(Locale.ROOT).equals("level")) {
@@ -411,16 +411,5 @@ public class UpdateIndexOperator
         {
             return new UpdateIndexOperator.UpdateIndexOperatorFactory(operatorId, planNodeId, updateIndexMetadata, heuristicIndexerManager);
         }
-    }
-
-    private static Properties getPropertiesFromList(List<String> listOfProperties)
-    {
-        Properties properties = new Properties();
-        for (String p : listOfProperties) {
-            String key = p.substring(0, p.indexOf("="));
-            String val = p.substring(p.indexOf("=") + 1);
-            properties.setProperty(key, val);
-        }
-        return properties;
     }
 }

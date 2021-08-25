@@ -914,7 +914,7 @@ final class ShowQueriesRewrite
                         new StringLiteral(DataSize.succinctBytes(v.indexSize).toString()),
                         new StringLiteral(indexStatus),
                         new StringLiteral(partitionsStrToDisplay.toString()),
-                        new StringLiteral(String.join(",", v.properties) + inProgressHint),
+                        new StringLiteral(String.join(",", v.propertiesAsList) + inProgressHint),
                         TRUE_LITERAL));
             }
 
