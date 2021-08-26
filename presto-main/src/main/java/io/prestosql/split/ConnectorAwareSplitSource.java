@@ -80,13 +80,13 @@ public class ConnectorAwareSplitSource
         return catalogName + ":" + source;
     }
 
-    public List<Split> groupSmallSplits(List<Split> pendingSplits, Lifespan lifespan)
+    public List<Split> groupSmallSplits(List<Split> pendingSplits, Lifespan lifespan, int maxGroupSize)
     {
         List<ConnectorSplit> connectorSplits = new ArrayList<>();
         for (Split split : pendingSplits) {
             connectorSplits.add(split.getConnectorSplit());
         }
-        List<ConnectorSplit> connectorSplits1 = source.groupSmallSplits(connectorSplits);
+        List<ConnectorSplit> connectorSplits1 = source.groupSmallSplits(connectorSplits, maxGroupSize);
         ImmutableList.Builder<Split> result = ImmutableList.builder();
         for (ConnectorSplit connectorSplit : connectorSplits1) {
             result.add(new Split(catalogName, connectorSplit, lifespan));

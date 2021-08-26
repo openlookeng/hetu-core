@@ -652,13 +652,13 @@ class HiveSplitSource
     }
 
     @Override
-    public List<ConnectorSplit> groupSmallSplits(List<ConnectorSplit> splitList)
+    public List<ConnectorSplit> groupSmallSplits(List<ConnectorSplit> splitList, int maxGroupSize)
     {
         if (splitList.isEmpty()) {
             return splitList;
         }
 
-        int maxSmallSplitsCanBeGrouped = hiveConfig.getMaxSplitsToGroup();
+        int maxSmallSplitsCanBeGrouped = Math.max(hiveConfig.getMaxSplitsToGroup(), maxGroupSize);
         if (maxSmallSplitsCanBeGrouped < 2) {
             return splitList;
         }

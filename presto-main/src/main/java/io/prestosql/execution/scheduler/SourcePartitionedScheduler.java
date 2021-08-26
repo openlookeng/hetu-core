@@ -169,7 +169,13 @@ public class SourcePartitionedScheduler
             @Override
             public ScheduleResult schedule()
             {
-                ScheduleResult scheduleResult = sourcePartitionedScheduler.schedule();
+                return schedule(1);
+            }
+
+            @Override
+            public ScheduleResult schedule(int maxSplitGroup)
+            {
+                ScheduleResult scheduleResult = sourcePartitionedScheduler.schedule(maxSplitGroup);
                 sourcePartitionedScheduler.drainCompletedLifespans();
                 return scheduleResult;
             }
@@ -231,6 +237,12 @@ public class SourcePartitionedScheduler
     @Override
     public synchronized ScheduleResult schedule()
     {
+        return schedule(1);
+    }
+
+    @Override
+    public synchronized ScheduleResult schedule(int maxSplitGroup)
+    {
         dropListenersFromWhenFinishedOrNewLifespansAdded();
 
         int overallSplitAssignmentCount = 0;
@@ -279,7 +291,7 @@ public class SourcePartitionedScheduler
                             SplitFiltering.getFullyQualifiedName(stage), pair.getSecond(), nextSplits, heuristicIndexerManager) : nextSplits.getSplits();
 
                     //In case of ORC small size files/splits are grouped
-                    List<Split> groupedSmallFilesList = splitSource.groupSmallSplits(filteredSplit, lifespan);
+                    List<Split> groupedSmallFilesList = splitSource.groupSmallSplits(filteredSplit, lifespan, maxSplitGroup);
                     filteredSplit = groupedSmallFilesList;
 
                     pendingSplits.addAll(filteredSplit);

@@ -59,7 +59,7 @@ public interface ConnectorSplitSource
         }
     }
 
-    default List<ConnectorSplit> groupSmallSplits(List<ConnectorSplit> pendingSplits)
+    default List<ConnectorSplit> groupSmallSplits(List<ConnectorSplit> pendingSplits, int maxGroupSize)
     {
         return pendingSplits;
     }

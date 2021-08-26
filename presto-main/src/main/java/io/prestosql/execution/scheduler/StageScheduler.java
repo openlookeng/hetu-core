@@ -27,6 +27,11 @@ public interface StageScheduler
      */
     ScheduleResult schedule();
 
+    default ScheduleResult schedule(int maxSplitGroup)
+    {
+        return schedule();
+    }
+
     @Override
     default void close() {}
 }
