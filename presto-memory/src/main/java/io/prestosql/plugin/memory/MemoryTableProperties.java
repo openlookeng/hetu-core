@@ -137,14 +137,14 @@ public class MemoryTableProperties
 
     private static SortingColumn sortingColumnFromString(String name)
     {
-        SortOrder order = SortOrder.ASC_NULLS_FIRST;
+        SortOrder order = SortOrder.ASC_NULLS_LAST;
         String lower = name.toUpperCase(ENGLISH);
         if (lower.endsWith(" ASC")) {
             name = name.substring(0, name.length() - 4).trim();
         }
         else if (lower.endsWith(" DESC")) {
             name = name.substring(0, name.length() - 5).trim();
-            order = SortOrder.DESC_NULLS_FIRST;
+            order = SortOrder.DESC_NULLS_LAST;
 
             // TODO: support DESC
             throw new UnsupportedOperationException("DESC sort is not supported yet.");
