@@ -53,6 +53,19 @@ public class IndexRecord
     public final List<String> partitions;
     public final long lastModifiedTime;
 
+    public long memoryUsage;
+    public long diskUsage;
+
+    public void setMemoryUsage(long memoryUsage)
+    {
+        this.memoryUsage = memoryUsage;
+    }
+
+    public void setDiskUsage(long diskUsage)
+    {
+        this.diskUsage = diskUsage;
+    }
+
     public IndexRecord(String name, String user, String qualifiedTable, String[] columns, String indexType, long indexSize, List<String> propertiesAsList, List<String> partitions)
     {
         this.name = name;

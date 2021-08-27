@@ -38,6 +38,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -75,6 +76,49 @@ public class HeuristicIndexerManager
     public IndexClient getIndexClient()
     {
         return indexClient;
+    }
+
+    private IndexCache getIndexCache()
+    {
+        return SplitFiltering.getCache();
+    }
+
+    public List<IndexRecord> getAllIndexRecordsWithUsage()
+            throws IOException
+    {
+        List<IndexRecord> records = getIndexClient().getAllIndexRecords();
+        updateIndexRecordUsage(records);
+        return records;
+    }
+
+    public List<IndexRecord> getIndexRecordWithUsage(String indexName)
+            throws IOException
+    {
+        List<IndexRecord> records = Collections.singletonList(getIndexClient().lookUpIndexRecord(indexName));
+        if (records.get(0) == null) {
+            return Collections.emptyList();
+        }
+        updateIndexRecordUsage(records);
+        return records;
+    }
+
+    private void updateIndexRecordUsage(List<IndexRecord> targetRecords)
+    {
+        HashMap<IndexRecord, Long> indexRecordMemoryUse = new HashMap<IndexRecord, Long>();
+        HashMap<IndexRecord, Long> indexRecordDiskUse = new HashMap<IndexRecord, Long>();
+        for (IndexRecord record : targetRecords) {
+            indexRecordMemoryUse.put(record, 0L);
+            indexRecordDiskUse.put(record, 0L);
+        }
+
+        // get the memory and disk usage of the records from cache
+        getIndexCache().readUsage(indexRecordMemoryUse, indexRecordDiskUse);
+
+        for (IndexRecord record : targetRecords) {
+            // update the indexRecord memory and disk usage field
+            record.setMemoryUsage(indexRecordMemoryUse.get(record));
+            record.setDiskUsage(indexRecordDiskUse.get(record));
+        }
     }
 
     public IndexWriter getIndexWriter(CreateIndexMetadata createIndexMetadata, Properties connectorMetadata)
@@ -122,14 +166,12 @@ public class HeuristicIndexerManager
     {
         if (PropertyService.getBooleanProperty(HetuConstant.FILTER_ENABLED) && indexClient != null) {
             String preloadNames = PropertyService.getStringProperty(HetuConstant.FILTER_CACHE_PRELOAD_INDICES);
-            if (!preloadNames.isEmpty()) {
-                List<String> preloadNameList = Arrays.asList(preloadNames.split(","));
-                try {
-                    SplitFiltering.preloadCache(indexClient, preloadNameList);
-                }
-                catch (Exception e) {
-                    LOG.info("Error loading index: " + e);
-                }
+            List<String> preloadNameList = Arrays.asList(preloadNames.split(","));
+            try {
+                SplitFiltering.preloadCache(indexClient, preloadNameList);
+            }
+            catch (Exception e) {
+                LOG.info("Error loading index: " + e);
             }
         }
     }

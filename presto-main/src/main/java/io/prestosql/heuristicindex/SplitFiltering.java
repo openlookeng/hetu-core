@@ -96,6 +96,11 @@ public class SplitFiltering
         }
     }
 
+    public static IndexCache getCache()
+    {
+        return indexCache;
+    }
+
     public static void preloadCache(IndexClient indexClient, List<String> preloadIndexNames)
             throws IOException
     {
@@ -124,7 +129,7 @@ public class SplitFiltering
         for (IndexRecord record : indexToPreload) {
             LOG.info("Preloading index for split filtering: " + record);
             CreateIndexMetadata.Level indexLevel = CreateIndexMetadata.Level.valueOf(record.getProperty(CreateIndexMetadata.LEVEL_PROP_KEY).toUpperCase(Locale.ROOT));
-            indexCache.preloadIndex(record.qualifiedTable, String.join(",", record.columns), record.indexType, indexLevel);
+            indexCache.preloadIndex(record);
         }
     }
 
@@ -153,18 +158,19 @@ public class SplitFiltering
         }
         Set<String> referencedColumns = new HashSet<>();
         getAllColumns(expression.get(), referencedColumns, assignments);
-        List<IndexRecord> forwardIndexRecords = new ArrayList<>();
-        List<IndexRecord> invertedIndexRecords = new ArrayList<>();
+        Map<String, IndexRecord> forwardIndexRecords = new HashMap<>();
+        Map<String, IndexRecord> invertedIndexRecords = new HashMap<>();
         for (IndexRecord indexRecord : indexRecords) {
             if (indexRecord.qualifiedTable.equalsIgnoreCase(fullQualifiedTableName)) {
                 List<String> columnsInIndex = Arrays.asList(indexRecord.columns);
                 for (String column : referencedColumns) {
                     if (columnsInIndex.contains(column)) {
+                        String indexRecordKey = indexRecord.qualifiedTable + "/" + column + "/" + indexRecord.indexType;
                         if (INVERTED_INDEX.contains(indexRecord.indexType.toUpperCase())) {
-                            forwardIndexRecords.add(indexRecord);
+                            forwardIndexRecords.put(indexRecordKey, indexRecord);
                         }
                         else {
-                            invertedIndexRecords.add(indexRecord);
+                            invertedIndexRecords.put(indexRecordKey, indexRecord);
                         }
                     }
                 }
@@ -175,15 +181,15 @@ public class SplitFiltering
             return allSplits;
         }
         else if (!forwardIndexRecords.isEmpty() && invertedIndexRecords.isEmpty()) {
-            splitsToReturn = filterUsingInvertedIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, heuristicIndexerManager);
+            splitsToReturn = filterUsingInvertedIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, forwardIndexRecords, heuristicIndexerManager);
         }
         else if (!invertedIndexRecords.isEmpty() && forwardIndexRecords.isEmpty()) {
-            splitsToReturn = filterUsingForwardIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, heuristicIndexerManager);
+            splitsToReturn = filterUsingForwardIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, invertedIndexRecords, heuristicIndexerManager);
         }
         else {
             // filter using both indexes and return the smallest set of splits.
-            List<Split> splitsToReturn1 = filterUsingInvertedIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, heuristicIndexerManager);
-            List<Split> splitsToReturn2 = filterUsingForwardIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, heuristicIndexerManager);
+            List<Split> splitsToReturn1 = filterUsingInvertedIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, forwardIndexRecords, heuristicIndexerManager);
+            List<Split> splitsToReturn2 = filterUsingForwardIndex(expression.get(), allSplits, fullQualifiedTableName, referencedColumns, invertedIndexRecords, heuristicIndexerManager);
             splitsToReturn = splitsToReturn1.size() < splitsToReturn2.size() ? splitsToReturn1 : splitsToReturn2;
         }
 
@@ -195,14 +201,14 @@ public class SplitFiltering
         return splitsToReturn;
     }
 
-    private static List<Split> filterUsingForwardIndex(RowExpression expression, List<Split> inputSplits, String fullQualifiedTableName, Set<String> referencedColumns, HeuristicIndexerManager indexerManager)
+    private static List<Split> filterUsingForwardIndex(RowExpression expression, List<Split> inputSplits, String fullQualifiedTableName, Set<String> referencedColumns, Map<String, IndexRecord> indexRecordKeyToRecordMap, HeuristicIndexerManager indexerManager)
     {
         return inputSplits.parallelStream()
                 .filter(split -> {
                     Map<String, List<IndexMetadata>> allIndices = new HashMap<>();
 
                     for (String col : referencedColumns) {
-                        List<IndexMetadata> splitIndices = indexCache.getIndices(fullQualifiedTableName, col, split);
+                        List<IndexMetadata> splitIndices = indexCache.getIndices(fullQualifiedTableName, col, split, indexRecordKeyToRecordMap);
 
                         if (splitIndices == null || splitIndices.size() == 0) {
                             // no index found, keep split
@@ -240,7 +246,7 @@ public class SplitFiltering
                 .collect(Collectors.toList());
     }
 
-    private static List<Split> filterUsingInvertedIndex(RowExpression expression, List<Split> inputSplits, String fullQualifiedTableName, Set<String> referencedColumns, HeuristicIndexerManager indexerManager)
+    private static List<Split> filterUsingInvertedIndex(RowExpression expression, List<Split> inputSplits, String fullQualifiedTableName, Set<String> referencedColumns, Map<String, IndexRecord> indexRecordKeyToRecordMap, HeuristicIndexerManager indexerManager)
     {
         try {
             Map<String, Long> inputMaxLastUpdated = new HashMap<>();
@@ -274,7 +280,7 @@ public class SplitFiltering
 
                 for (String indexType : INVERTED_INDEX) {
                     indexMetadataList.addAll(indexCache.getIndices(fullQualifiedTableName, column, indexType,
-                            partitionSplitMap.keySet(), Collections.max(inputMaxLastUpdated.values())));
+                            partitionSplitMap.keySet(), Collections.max(inputMaxLastUpdated.values()), indexRecordKeyToRecordMap));
                 }
 
                 // If any of the split contains data which is modified after the index was created, return without filtering

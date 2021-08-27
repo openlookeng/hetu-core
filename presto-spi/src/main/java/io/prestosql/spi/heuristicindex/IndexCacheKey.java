@@ -24,19 +24,34 @@ public class IndexCacheKey
 
     private final String path;
     private final long lastModifiedTime;
+    private final IndexRecord record;
     private final CreateIndexMetadata.Level indexLevel;
     private boolean noCloseFlag; // Indicate that this index should not be closed at removal
 
     /**
      * @param path path to the file the index files should be read for
      * @param lastModifiedTime lastModifiedTime of the file, used to validate the indexes
+     * @param record the index record associated with the cache key
      * @param indexLevel see Index.Level in presto-spi
      */
-    public IndexCacheKey(String path, long lastModifiedTime, CreateIndexMetadata.Level indexLevel)
+    public IndexCacheKey(String path, long lastModifiedTime, IndexRecord record, CreateIndexMetadata.Level indexLevel)
     {
         this.path = path;
         this.lastModifiedTime = lastModifiedTime;
+        this.record = record;
         this.indexLevel = indexLevel;
+    }
+
+    /**
+     * Create a cache with a index level it could be Stripe or partition
+     *
+     * @param path
+     * @param lastModifiedTime
+     * @param record the index record associated with the cache key
+     */
+    public IndexCacheKey(String path, long lastModifiedTime, IndexRecord record)
+    {
+        this(path, lastModifiedTime, record, CreateIndexMetadata.Level.STRIPE);
     }
 
     /**
@@ -47,7 +62,7 @@ public class IndexCacheKey
      */
     public IndexCacheKey(String path, long lastModifiedTime)
     {
-        this(path, lastModifiedTime, CreateIndexMetadata.Level.STRIPE);
+        this(path, lastModifiedTime, null, CreateIndexMetadata.Level.STRIPE);
     }
 
     public String getPath()
@@ -58,6 +73,11 @@ public class IndexCacheKey
     public long getLastModifiedTime()
     {
         return lastModifiedTime;
+    }
+
+    public IndexRecord getRecord()
+    {
+        return record;
     }
 
     public CreateIndexMetadata.Level getIndexLevel()
