@@ -224,7 +224,8 @@ public class DynamicFilterService
     private void removeFinishedQuery()
     {
         List<String> handledQuery = new ArrayList<>();
-        StateMap mergedStateCollection = (StateMap) stateStoreProvider.getStateStore().getOrCreateStateCollection(DynamicFilterUtils.MERGED_DYNAMIC_FILTERS, MAP);
+        StateStore stateStore = stateStoreProvider.getStateStore();
+        StateMap mergedStateCollection = (StateMap) stateStore.getOrCreateStateCollection(DynamicFilterUtils.MERGED_DYNAMIC_FILTERS, MAP);
         // Clear registered dynamic filter tasks
         synchronized (finishedQuery) {
             for (String queryId : finishedQuery) {
@@ -238,6 +239,10 @@ public class DynamicFilterService
                             mergedStateCollection.remove(filterKey);
                         }
                     }
+                }
+                List<String> collectionKeys = stateStore.getStateCollections().keySet().stream().filter(key -> key.contains(queryId)).collect(Collectors.toList());
+                for (String key : collectionKeys) {
+                    clearStatesInStateStore(stateStore, key);
                 }
                 dynamicFilters.remove(queryId);
 
