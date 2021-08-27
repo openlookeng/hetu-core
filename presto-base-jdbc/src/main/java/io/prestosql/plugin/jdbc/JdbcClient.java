@@ -152,6 +152,7 @@ public interface JdbcClient
     /**
      * Hetu's query push down expects the JDBC connectors to provide a {@link QueryGenerator}
      * to write SQL queries for the respective databases.
+     *
      * @return the optional SQL query writer which can write database specific SQL Queries
      */
     default Optional<QueryGenerator<JdbcQueryGeneratorResult, JdbcConverterContext>> getQueryGenerator(DeterminismEvaluator determinismEvaluator, RowExpressionService rowExpressionService, FunctionMetadataManager functionManager, StandardFunctionResolution functionResolution)
@@ -162,7 +163,6 @@ public interface JdbcClient
     /**
      * Hetu can only cache execution plans for supported connectors.
      * By default, most JDBC connectors will be able to support to execution plan caching
-     *
      */
     default boolean isExecutionPlanCacheSupported()
     {
@@ -255,5 +255,15 @@ public interface JdbcClient
     default Long[] getSplitFieldMinAndMaxValue(TableSplitConfig conf, Connection connection, JdbcTableHandle tableHandle)
     {
         return null;
+    }
+
+    default long getTableModificationTime(ConnectorSession session, JdbcTableHandle tableHandle)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "this connector does not support table modification times");
+    }
+
+    default boolean isPreAggregationSupported(ConnectorSession session)
+    {
+        return false;
     }
 }

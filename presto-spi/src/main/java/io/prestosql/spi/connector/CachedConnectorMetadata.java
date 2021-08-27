@@ -739,14 +739,14 @@ public class CachedConnectorMetadata
 
     @Override
     public void grantTablePrivileges(ConnectorSession session, SchemaTableName tableName, Set<Privilege> privileges,
-                                     PrestoPrincipal grantee, boolean grantOption)
+            PrestoPrincipal grantee, boolean grantOption)
     {
         delegate.grantTablePrivileges(session, tableName, privileges, grantee, grantOption);
     }
 
     @Override
     public void revokeTablePrivileges(ConnectorSession session, SchemaTableName tableName, Set<Privilege> privileges,
-                                      PrestoPrincipal grantee, boolean grantOption)
+            PrestoPrincipal grantee, boolean grantOption)
     {
         delegate.revokeTablePrivileges(session, tableName, privileges, grantee, grantOption);
     }
@@ -835,6 +835,18 @@ public class CachedConnectorMetadata
     public boolean isExecutionPlanCacheSupported(ConnectorSession session, ConnectorTableHandle handle)
     {
         return this.delegate.isExecutionPlanCacheSupported(session, handle);
+    }
+
+    @Override
+    public long getTableModificationTime(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        return this.delegate.getTableModificationTime(session, tableHandle);
+    }
+
+    @Override
+    public boolean isPreAggregationSupported(ConnectorSession session)
+    {
+        return this.delegate.isPreAggregationSupported(session);
     }
 
     class MetadataCache

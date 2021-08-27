@@ -306,6 +306,10 @@ final class ShowQueriesRewrite
                 if (status == CubeStatus.INACTIVE) {
                     cubeStatusMap.put(cubeMetadata.getCubeName(), "Inactive");
                 }
+                else if (tableLastModifiedTime == -1L) {
+                    // The table handle isn't present, or we got an error while trying to retrieve last modified time
+                    cubeStatusMap.put(cubeMetadata.getCubeName(), "Invalid");
+                }
                 else {
                     cubeStatusMap.put(cubeMetadata.getCubeName(), tableLastModifiedTime > cubeMetadata.getSourceTableLastUpdatedTime() ? "Expired" : "Active");
                 }

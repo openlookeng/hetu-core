@@ -664,8 +664,10 @@ public class HiveMetadata
             // since HDFS is append-only and any table modification will trigger directory update.
             return fileSystem.getFileStatus(tablePath).getModificationTime();
         }
-        catch (IOException exception) {
-            throw new PrestoException(HIVE_FILESYSTEM_ERROR, "Cannot get the modification time.");
+        // We want to make sure the query doesn't fail because of star-tree not being able to get last modified time
+        catch (Exception e) {
+            log.error("Exception thrown while trying to get modified time", e);
+            return -1L;
         }
     }
 
