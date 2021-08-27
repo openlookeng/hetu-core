@@ -16,14 +16,12 @@ package io.prestosql.spi.connector;
 import io.airlift.slice.Slice;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
-import io.prestosql.spi.snapshot.Restorable;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public interface ConnectorPageSink
-        extends Restorable
 {
     CompletableFuture<?> NOT_BLOCKED = CompletableFuture.completedFuture(null);
 
@@ -82,7 +80,6 @@ public interface ConnectorPageSink
      * If {@link #appendPage} was called, then this method should be called after the returned future is complete.
      * The method should not be called after {@link #finish} or {@link #abort}. Its behavior is undefined.
      */
-    @Override
     default Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         throw new UnsupportedOperationException("This connector is not restorable: " + getClass().getName());
@@ -93,8 +90,7 @@ public interface ConnectorPageSink
      * If {@link #appendPage} was called, then this method should be called after the returned future is complete.
      * The method should not be called after {@link #finish} or {@link #abort}. Its behavior is undefined.
      */
-    @Override
-    default void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    default void restore(Object state, BlockEncodingSerdeProvider serdeProvider, long resumeCount)
     {
         throw new UnsupportedOperationException("This connector is not restorable: " + getClass().getName());
     }

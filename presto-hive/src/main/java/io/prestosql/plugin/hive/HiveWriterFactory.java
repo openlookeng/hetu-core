@@ -41,8 +41,6 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.session.PropertyMetadata;
-import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
-import io.prestosql.spi.snapshot.Restorable;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import org.apache.hadoop.conf.Configuration;
@@ -108,7 +106,6 @@ import static java.util.stream.Collectors.toMap;
 import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.COMPRESSRESULT;
 
 public class HiveWriterFactory
-        implements Restorable
 {
     private static Logger log = Logger.get(HiveWriterFactory.class);
 
@@ -160,7 +157,11 @@ public class HiveWriterFactory
     // Snapshot: instead of writing to a "file", each snapshot is stored in a sub file "file.0", "file.1", etc.
     // These sub files are then merged to the final file when the operator finishes.
     private boolean isSnapshotEnabled;
-    private int snapshotSuffix;
+    // The snapshotSuffixes list records the "resumeCount" for each sub file index.
+    // File suffix includes both the resumeCount and the sub file index.
+    // This ensures that different runs create files with different names, to avoid any potential collision.
+    private final List<Long> snapshotSuffixes = new ArrayList<>();
+    private long resumeCount;
 
     public HiveWriterFactory(
             Set<HiveFileWriterFactory> fileWriterFactories,
@@ -909,7 +910,7 @@ public class HiveWriterFactory
             // Doesn't have a suffix
             return -1;
         }
-        String suffix = fileName.substring(index + 1); // Skip over '.'
+        String suffix = fileName.substring(fileName.indexOf('_', index) + 1); // Skip over '.' and '_'
         return Long.valueOf(suffix);
     }
 
@@ -922,18 +923,12 @@ public class HiveWriterFactory
 
     private String toSnapshotSubFile(String path)
     {
-        return toSnapshotSubFile(path, snapshotSuffix);
+        return toSnapshotSubFile(path, resumeCount, snapshotSuffixes.size());
     }
 
-    private String toSnapshotSubFile(String path, int index)
+    private String toSnapshotSubFile(String path, long resumeCount, int index)
     {
-        return path + '.' + index;
-    }
-
-    private String removeSnapshotSuffix(String path)
-    {
-        // Keep the '.'
-        return path.substring(0, path.lastIndexOf(".") + 1);
+        return path + '.' + resumeCount + '_' + index;
     }
 
     public void mergeSubFiles(List<HiveWriter> writers)
@@ -955,8 +950,13 @@ public class HiveWriterFactory
             Path path = new Path(filePath);
             logContainingFolderInfo(fileSystem, path, "Merging snapshot files to result file: %s", path);
 
-            for (int i = 0; i <= snapshotSuffix; i++) {
-                Path file = new Path(toSnapshotSubFile(filePath, i));
+            // The snapshotSuffixes list records the "resumeCount" for each suffix.
+            // It doesn't has an entry for the current set of files, so an entry is added first.
+            // The resumeCount helps distinguish files created by different runs.
+            snapshotSuffixes.add(resumeCount);
+            for (int i = 0; i < snapshotSuffixes.size(); i++) {
+                long resume = snapshotSuffixes.get(i);
+                Path file = new Path(toSnapshotSubFile(filePath, resume, i));
                 if (fileSystem.exists(file)) {
                     // TODO-cp-I2BZ0A: assuming all files to be of ORC type.
                     // Using same parameters as used by SortingFileWriter
@@ -996,18 +996,18 @@ public class HiveWriterFactory
         }
     }
 
-    @Override
-    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    public Object capture()
     {
         // hiveWriterStats is not captured. They are not updated for sub-files.
         // Increment suffix so that each resume generates a new set of files
-        snapshotSuffix++;
-        return snapshotSuffix;
+        snapshotSuffixes.add(resumeCount);
+        return snapshotSuffixes;
     }
 
-    @Override
-    public void restore(Object obj, BlockEncodingSerdeProvider serdeProvider)
+    public void restore(Object obj, long resumeCount)
     {
-        snapshotSuffix = (Integer) obj;
+        snapshotSuffixes.clear();
+        snapshotSuffixes.addAll((List<Long>) obj);
+        this.resumeCount = resumeCount;
     }
 }
