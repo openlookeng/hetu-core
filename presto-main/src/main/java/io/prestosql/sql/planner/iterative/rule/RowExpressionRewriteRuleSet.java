@@ -429,7 +429,7 @@ public class RowExpressionRewriteRuleSet
         }
     }
 
-    private final class ValuesRowExpressionRewrite
+    public final class ValuesRowExpressionRewrite
             implements Rule<ValuesNode>
     {
         @Override

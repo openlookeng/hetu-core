@@ -29,5 +29,5 @@ local exchange (GATHER, SINGLE, [])
                         remote exchange (REPARTITION, HASH, ["c_current_addr_sk"])
                             scan customer
                         local exchange (GATHER, SINGLE, [])
-                            remote exchange (REPARTITION, HASH, ["ca_address_sk_31"])
+                            remote exchange (REPARTITION, HASH, ["ca_address_sk_21"])
                                 scan customer_address

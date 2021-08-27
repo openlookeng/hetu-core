@@ -143,6 +143,7 @@ import io.prestosql.sql.planner.optimizations.AddExchanges;
 import io.prestosql.sql.planner.optimizations.AddLocalExchanges;
 import io.prestosql.sql.planner.optimizations.AddReuseExchange;
 import io.prestosql.sql.planner.optimizations.AddSortBasedAggregation;
+import io.prestosql.sql.planner.optimizations.AdjustApplicableOptimizationRule;
 import io.prestosql.sql.planner.optimizations.ApplyConnectorOptimization;
 import io.prestosql.sql.planner.optimizations.BeginTableWrite;
 import io.prestosql.sql.planner.optimizations.CheckSubqueryNodesAreRewritten;
@@ -254,6 +255,8 @@ public class PlanOptimizers
         this.exporter = exporter;
         ImmutableList.Builder<PlanOptimizer> builder = ImmutableList.builder();
         CostCalculationHandle costCalculationHandle = new CostCalculationHandle(statsCalculator, costCalculator, costComparator);
+
+        builder.add(new AdjustApplicableOptimizationRule()); //This must be the first rule, as based on this next set of rule to apply will vary.
 
         builder.add(new PruneCTENodes(metadata, typeAnalyzer, false));
         Set<Rule<?>> predicatePushDownRules = ImmutableSet.of(

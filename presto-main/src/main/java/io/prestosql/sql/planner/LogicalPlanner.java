@@ -132,6 +132,7 @@ import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.StandardErrorCode.QUERY_REJECTED;
 import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
+import static io.prestosql.spi.plan.PlanNode.SkipOptRuleLevel.APPLY_ALL_RULES;
 import static io.prestosql.spi.statistics.TableStatisticType.ROW_COUNT;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
@@ -215,15 +216,17 @@ public class LogicalPlanner
     public Plan plan(Analysis analysis, boolean skipStatsWithPlan, Stage stage)
     {
         PlanNode root = planStatement(analysis, analysis.getStatement());
+        PlanNode.SkipOptRuleLevel optimizationLevel = APPLY_ALL_RULES;
 
         planSanityChecker.validateIntermediatePlan(root, session, metadata, typeAnalyzer, planSymbolAllocator.getTypes(), warningCollector);
 
         if (stage.ordinal() >= Stage.OPTIMIZED.ordinal()) {
             for (PlanOptimizer optimizer : planOptimizers) {
-                if (OptimizerUtils.isEnabledLegacy(optimizer, session, root)) {
+                if (OptimizerUtils.isEnabledLegacy(optimizer, session, root) && OptimizerUtils.canApplyOptimizer(optimizer, optimizationLevel)) {
                     root = optimizer.optimize(root, session, planSymbolAllocator.getTypes(), planSymbolAllocator, idAllocator,
                             warningCollector);
                     requireNonNull(root, format("%s returned a null plan", optimizer.getClass().getName()));
+                    optimizationLevel = optimizationLevel == APPLY_ALL_RULES ? root.getSkipOptRuleLevel() : optimizationLevel;
                 }
             }
         }

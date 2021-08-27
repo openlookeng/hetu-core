@@ -167,6 +167,7 @@ public final class SystemSessionProperties
     public static final String SNAPSHOT_MAX_RETRIES = "snapshot_max_retries";
     public static final String SNAPSHOT_RETRY_TIMEOUT = "snapshot_retry_timeout";
     public static final String SKIP_ATTACHING_STATS_WITH_PLAN = "skip_attaching_stats_with_plan";
+    public static final String SKIP_NON_APPLICABLE_RULES_ENABLED = "skip_non_applicable_rules_enabled";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -774,6 +775,11 @@ public final class SystemSessionProperties
                         SKIP_ATTACHING_STATS_WITH_PLAN,
                         "Whether to calculate stats and attach with final plan",
                         featuresConfig.isSkipAttachingStatsWithPlan(),
+                        false),
+                booleanProperty(
+                        SKIP_NON_APPLICABLE_RULES_ENABLED,
+                        "Whether to skip applying some selected rules based on query pattern",
+                        featuresConfig.isSkipNonApplicableRulesEnabled(),
                         false));
     }
 
@@ -1361,5 +1367,10 @@ public final class SystemSessionProperties
     public static boolean isSkipAttachingStatsWithPlan(Session session)
     {
         return session.getSystemProperty(SKIP_ATTACHING_STATS_WITH_PLAN, Boolean.class);
+    }
+
+    public static boolean isSkipNonApplicableRulesEnabled(Session session)
+    {
+        return session.getSystemProperty(SKIP_NON_APPLICABLE_RULES_ENABLED, Boolean.class);
     }
 }

@@ -198,7 +198,9 @@ class QueryPlanner
         builder = sort(builder, orderingScheme);
         builder = offset(builder, query.getOffset());
         builder = limit(builder, query.getLimit(), orderingScheme);
-        builder = project(builder, analysis.getOutputExpressions(query));
+        if (!(builder.getRoot() instanceof ProjectNode)) {
+            builder = project(builder, analysis.getOutputExpressions(query));
+        }
 
         return new RelationPlan(
                 builder.getRoot(),
@@ -250,7 +252,9 @@ class QueryPlanner
         builder = sort(builder, orderingScheme);
         builder = offset(builder, node.getOffset());
         builder = limit(builder, node.getLimit(), orderingScheme);
-        builder = project(builder, outputs);
+        if (!(builder.getRoot() instanceof ProjectNode)) {
+            builder = project(builder, outputs);
+        }
         builder = createIndex(builder, analysis.getOriginalStatement());
         builder = updateIndex(builder, analysis.getOriginalStatement());
 

@@ -1,11 +1,11 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
         local exchange (GATHER, SINGLE, [])
-            remote exchange (REPARTITION, HASH, ["expr_110", "expr_111"])
-                final hashaggregation over (groupid, s_county$gid, s_state$gid_102)
-                    local exchange (REPARTITION, HASH, ["groupid", "s_county$gid", "s_state$gid_102"])
-                        remote exchange (REPARTITION, HASH, ["groupid", "s_county$gid", "s_state$gid_102"])
-                            partial hashaggregation over (groupid, s_county$gid, s_state$gid_102)
+            remote exchange (REPARTITION, HASH, ["expr_104", "expr_105"])
+                final hashaggregation over (groupid, s_county$gid, s_state$gid_96)
+                    local exchange (REPARTITION, HASH, ["groupid", "s_county$gid", "s_state$gid_96"])
+                        remote exchange (REPARTITION, HASH, ["groupid", "s_county$gid", "s_state$gid_96"])
+                            partial hashaggregation over (groupid, s_county$gid, s_state$gid_96)
                                 semijoin (PARTITIONED):
                                     remote exchange (REPARTITION, HASH, ["s_state"])
                                         join (INNER, REPLICATED):
