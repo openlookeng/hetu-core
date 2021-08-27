@@ -283,6 +283,11 @@ public class LogicalPart
             int expressionColumnIndex = ((MemoryColumnHandle) e.getKey()).getColumnIndex();
             List<Range> ranges = ((SortedRangeSet) e.getValue().getValues()).getOrderedRanges();
 
+            // e.g. column=null
+            if (ranges.isEmpty()) {
+                continue;
+            }
+
             if (minMaxIdx.containsKey(expressionColumnIndex)) {
                 minmaxChannelsToRangesMap.put(expressionColumnIndex, ranges);
             }
@@ -341,6 +346,11 @@ public class LogicalPart
                             noMatches++;
                         }
                     }
+                    else {
+                        // the lookup value isn't comparable, we can't do filtering, e.g. if it's null
+                        LOG.warn("Lookup value is not Comparable. MinMax index could not be used.");
+                        return getPages();
+                    }
                 }
                 else {
                     // <, <=, >=, >, BETWEEN
@@ -368,6 +378,11 @@ public class LogicalPart
                                 }
                             }
                         }
+                        else {
+                            // the lookup value isn't comparable, we can't do filtering, e.g. if it's null
+                            LOG.warn("Lookup value is not Comparable. MinMax index could not be used.");
+                            return getPages();
+                        }
                     }
                     else if (!highBoundless && lowBoundless) {
                         // <= or <
@@ -388,6 +403,11 @@ public class LogicalPart
                                 }
                             }
                         }
+                        else {
+                            // the lookup value isn't comparable, we can't do filtering, e.g. if it's null
+                            LOG.warn("Lookup value is not Comparable. MinMax index could not be used.");
+                            return getPages();
+                        }
                     }
                     else if (!highBoundless && !lowBoundless) {
                         // BETWEEN
@@ -400,6 +420,11 @@ public class LogicalPart
                                 // lookup value is outside minmax range, skip logicalpart
                                 noMatches++;
                             }
+                        }
+                        else {
+                            // the lookup value isn't comparable, we can't do filtering, e.g. if it's null
+                            LOG.warn("Lookup value is not Comparable. MinMax index could not be used.");
+                            return getPages();
                         }
                     }
                 }
