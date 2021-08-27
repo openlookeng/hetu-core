@@ -21,6 +21,7 @@ import io.hetu.core.common.filesystem.TempFolder;
 import io.hetu.core.filesystem.HetuFileSystemClientPlugin;
 import io.hetu.core.metastore.HetuMetastorePlugin;
 import io.prestosql.Session;
+import io.prestosql.plugin.tpcds.TpcdsPlugin;
 import io.prestosql.plugin.tpch.TpchPlugin;
 import io.prestosql.tests.DistributedQueryRunner;
 
@@ -122,6 +123,8 @@ public final class MemoryQueryRunner
 
             queryRunner.installPlugin(new TpchPlugin());
             queryRunner.createCatalog("tpch", "tpch", ImmutableMap.of());
+            queryRunner.installPlugin(new TpcdsPlugin());
+            queryRunner.createCatalog("tpcds", "tpcds", ImmutableMap.of());
 
             if (createTpchTables) {
                 copyTpchTables(queryRunner, "tpch", TINY_SCHEMA_NAME, session, TpchTable.getTables());

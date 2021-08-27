@@ -54,6 +54,24 @@ public class TestMemorySelection
     }
 
     @Test
+    public void testNullSelect()
+    {
+        getQueryRunner().execute("CREATE TABLE test_null_noidx AS SELECT * FROM tpcds.tiny.customer");
+        getQueryRunner().execute("CREATE TABLE test_null_sort WITH (sorted_by=ARRAY['c_birth_year']) AS SELECT * FROM tpcds.tiny.customer");
+        getQueryRunner().execute("CREATE TABLE test_null_idx WITH (index_columns=ARRAY['c_birth_year']) AS SELECT * FROM tpcds.tiny.customer");
+
+        Object expectedCount = getSingleResult("SELECT count(*) FROM tpcds.tiny.customer where c_birth_year is null");
+        Object noidxCount = getSingleResult("SELECT count(*) FROM test_null_noidx where c_birth_year is null");
+        Object sortCount = getSingleResult("SELECT count(*) FROM test_null_sort where c_birth_year is null");
+        Object idxCount = getSingleResult("SELECT count(*) FROM test_null_idx where c_birth_year is null");
+
+        assertTrue((long) expectedCount > 0, "expected null count is 0, testcase should be updated");
+        assertEquals(noidxCount, expectedCount);
+        assertEquals(sortCount, expectedCount);
+        assertEquals(idxCount, expectedCount);
+    }
+
+    @Test
     public void testSortedBySelect()
     {
         assertUpdate("CREATE TABLE test_sort_select WITH (sorted_by=ARRAY['nationkey']) AS SELECT * FROM tpch.tiny.nation", "SELECT count(*) FROM nation");
