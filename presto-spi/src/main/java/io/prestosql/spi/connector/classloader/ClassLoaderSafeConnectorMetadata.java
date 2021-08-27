@@ -14,6 +14,7 @@
 package io.prestosql.spi.connector.classloader;
 
 import io.airlift.slice.Slice;
+import io.prestosql.spi.PartialAndFinalAggregationType;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -840,10 +841,10 @@ public class ClassLoaderSafeConnectorMetadata
     }
 
     @Override
-    public boolean canPerformSortBasedAggregation(ConnectorSession session, ConnectorTableHandle tableHandle, List<String> keyNames)
+    public PartialAndFinalAggregationType validateAndGetSortAggregationType(ConnectorSession session, ConnectorTableHandle tableHandle, List<String> keyNames)
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
-            return delegate.canPerformSortBasedAggregation(session, tableHandle, keyNames);
+            return delegate.validateAndGetSortAggregationType(session, tableHandle, keyNames);
         }
     }
 

@@ -14,6 +14,7 @@
 package io.prestosql.spi.connector;
 
 import io.airlift.slice.Slice;
+import io.prestosql.spi.PartialAndFinalAggregationType;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -1023,9 +1024,10 @@ public interface ConnectorMetadata
         throw new UnsupportedOperationException("This connector does not support query resuming");
     }
 
-    default boolean canPerformSortBasedAggregation(ConnectorSession session, ConnectorTableHandle tableHandle, List<String> keyNames)
+    default PartialAndFinalAggregationType validateAndGetSortAggregationType(ConnectorSession session, ConnectorTableHandle tableHandle, List<String> keyNames)
     {
-        return false;
+        PartialAndFinalAggregationType partialAndFinalAggregationType = new PartialAndFinalAggregationType();
+        return partialAndFinalAggregationType;
     }
 
     default void refreshMetadataCache()

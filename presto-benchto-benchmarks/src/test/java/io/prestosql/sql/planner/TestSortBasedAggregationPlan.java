@@ -77,6 +77,7 @@ public class TestSortBasedAggregationPlan
 
             Map<String, String> hiveCatalogConfig = ImmutableMap.<String, String>builder()
                     .put("hive.orc-predicate-pushdown-enabled", "false")
+                    .put("hive.max-partitions-per-writers", "9999")
                     .build();
 
             queryRunner.createCatalog(catalog, hiveConnectorFactory, hiveCatalogConfig);
@@ -118,14 +119,38 @@ public class TestSortBasedAggregationPlan
                     "bucketed_by=array['wr_return_quantity'], bucket_count = 1, " +
                     "partitioned_by = ARRAY['wr_net_loss'], " +
                     "sorted_by = ARRAY['wr_return_quantity','wr_returned_time_sk']) " +
-                    "as select * from tpcds.tiny.web_returns limit 100");
+                    "as select * from tpcds.tiny.web_returns limit 500");
 
             queryRunner.execute("create table web_returns_partition_bucketCount32 with (" +
                     "bucketed_by=array['wr_return_quantity'], bucket_count = 1, " +
                     "partitioned_by = ARRAY['wr_net_loss'], " +
                     "sorted_by = ARRAY['wr_return_quantity','wr_returned_time_sk']) " +
-                    "as select * from tpcds.tiny.web_returns limit 100");
+                    "as select * from tpcds.tiny.web_returns limit 1000");
 
+            queryRunner.execute("create table web_returns_partiotion_netloss_returneddatesk with (" +
+                    "transactional = false, format='orc', " +
+                    "partitioned_by = ARRAY['wr_account_credit', 'wr_net_loss']) " +
+                    "as select * from tpcds.tiny.web_returns limit 500");
+
+            queryRunner.execute("create table web_returns_partiotion_netloss_returneddatesk_bucket8 with (" +
+                    "transactional = false, format='orc', " +
+                    "bucket_count = 8, bucketed_by = ARRAY['wr_return_quantity','wr_returned_time_sk'], " +
+                    "partitioned_by = ARRAY['wr_account_credit', 'wr_net_loss']) " +
+                    "as select * from tpcds.tiny.web_returns limit 500");
+
+            queryRunner.execute("create table web_returns_partiotion_netloss_returneddatesk_bucket8_sort with (" +
+                    "transactional = false, format='orc', " +
+                    "bucket_count = 8, bucketed_by = ARRAY['wr_return_quantity','wr_returned_time_sk'], " +
+                    "partitioned_by = ARRAY['wr_account_credit', 'wr_net_loss'], " +
+                    "sorted_by = ARRAY['wr_return_quantity','wr_returned_time_sk'])" +
+                    "as select * from tpcds.tiny.web_returns limit 500");
+
+            queryRunner.execute("create table web_returns_partiotion_netloss_returneddatesk_bucket1_sort with (" +
+                    "transactional = false, format='orc', " +
+                    "bucket_count = 1, bucketed_by = ARRAY['wr_return_quantity','wr_returned_time_sk'], " +
+                    "sorted_by = ARRAY['wr_return_quantity','wr_returned_time_sk'], " +
+                    "partitioned_by = ARRAY['wr_account_credit', 'wr_net_loss']) " +
+                    "as select * from tpcds.tiny.web_returns limit 500");
             return queryRunner;
         }, false, false, false, true);
     }
@@ -136,7 +161,8 @@ public class TestSortBasedAggregationPlan
         return Stream.of("q_InnerJoin", "q_leftJoin", "q_rightjoin", "q_rightjoin_wrong_order", "q_Inner_LeftJoin", "q_sort_groupby_notsameOrder",
                 "q_sort_groupby_notsameOrder1", "q_groupByHavingMore", "q_InnerJoinWrongOrder", "q_InnerJoinLessCriterias",
                 "q_InnerJoinGroupLessCriterias", "q_bucketAndSortDifferentOrder", "BucketAndGroupSameSortIsMore", "BucketGroupAreDifferent",
-                "groupsAreMoreThanBucket", "ColNameEndWithInt", "q_PartitionBucketCount1", "q_PartitionBucketCount32")
+                "groupsAreMoreThanBucket", "ColNameEndWithInt", "q_sortedPartitionBucketCount1", "q_sortedPartitionBucketCount32",
+                "q_partition2Colu", "q_partition2ColuBucket8", "q_useOnlyPartition2ColuBucket8OnSortTable", "q_useOnlyPartition2ColuBucket1OnSortTable")
                 .flatMap(i -> {
                     String queryId = format("%s", i);
                     System.out.println("query ID: " + queryId);

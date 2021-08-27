@@ -1,0 +1,3 @@
+select count(${database}.${schema}.web_returns_partiotion_netloss_returneddatesk_bucket8.wr_net_loss),${database}.${schema}.web_returns_partiotion_netloss_returneddatesk_bucket8.wr_net_loss
+from ${database}.${schema}.web_returns_partiotion_netloss_returneddatesk_bucket8
+group by ${database}.${schema}.web_returns_partiotion_netloss_returneddatesk_bucket8.wr_account_credit, ${database}.${schema}.web_returns_partiotion_netloss_returneddatesk_bucket8.wr_net_loss

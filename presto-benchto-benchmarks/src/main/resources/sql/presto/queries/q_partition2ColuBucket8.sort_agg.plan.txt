@@ -1,0 +1,6 @@
+remote exchange (GATHER, SINGLE, [])
+    final hashaggregation over (wr_account_credit, wr_net_loss)
+        local exchange (GATHER, SINGLE, [])
+            remote exchange (REPARTITION, HASH, ["wr_account_credit", "wr_net_loss"])
+                partial sortaggregate over (wr_account_credit, wr_net_loss)
+                    scan web_returns_partiotion_netloss_returneddatesk_bucket8
