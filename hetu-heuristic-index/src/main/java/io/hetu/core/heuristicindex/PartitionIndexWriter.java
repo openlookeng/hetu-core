@@ -208,14 +208,13 @@ public class PartitionIndexWriter
             fs.createDirectories(filePath.getParent());
             try (OutputStream os = fs.newOutputStream(filePath)) {
                 partitionIndex.serialize(os);
-
-                return (long) fs.getAttribute(filePath, "size");
             }
             catch (IOException e) {
                 // roll back creation
                 fs.delete(filePath);
                 throw e;
             }
+            return (long) fs.getAttribute(filePath, "size");
         }
         finally {
             if (partitionIndex != null) {
