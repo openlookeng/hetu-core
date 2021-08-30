@@ -28,6 +28,7 @@ import io.prestosql.cost.StatsCalculator;
 import io.prestosql.cost.StatsProvider;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.PartialAndFinalAggregationType;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.AggregationNode;
@@ -119,7 +120,7 @@ public class AddSortBasedAggregation
         @Override
         public PlanNode visitAggregation(AggregationNode node, RewriteContext<TableHandleInfo> context)
         {
-            boolean doSortBasedAggregation = false;
+            PartialAndFinalAggregationType partialAndFinalAggregationType = null;
             List<String> groupingKeyNames = new ArrayList<>();
             List<String> groupingKeyNamesTemp = groupingKeyNames;
             node.getGroupingKeys().forEach(symbol -> groupingKeyNamesTemp.add(symbol.getName()));
@@ -134,12 +135,12 @@ public class AddSortBasedAggregation
             node = (AggregationNode) context.defaultRewrite(node, tableHandleInfo);
 
             if ((null != tableHandleInfo.tableHandles) && (tableHandleInfo.isJoinCriteriaOrdered())) {
-                doSortBasedAggregation = metadata.canPerformSortBasedAggregation(session, tableHandleInfo.tableHandles, groupingKeyNames);
+                partialAndFinalAggregationType = metadata.validateAndGetSortAggregationType(session, tableHandleInfo.tableHandles, groupingKeyNames);
             }
 
-            if (doSortBasedAggregation) {
+            if ((null != partialAndFinalAggregationType) && (partialAndFinalAggregationType.isSortAggregation() || partialAndFinalAggregationType.isPartialAsSortAndFinalAsHashAggregation())) {
                 Optional<Symbol> symbol = Optional.empty();
-                if (node.getStep().equals(AggregationNode.Step.SINGLE)) {
+                if (node.getStep().equals(AggregationNode.Step.SINGLE) && partialAndFinalAggregationType.isSortAggregation()) {
                     if (planSymbolAllocator.getSymbols().containsKey(new Symbol("$finalizevalue"))) {
                         // if $finalizevalue already present in planSymbolAllocator don't add once again
                         symbol = Optional.of(new Symbol("$finalizevalue"));

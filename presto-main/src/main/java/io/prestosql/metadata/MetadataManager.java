@@ -24,6 +24,7 @@ import com.google.inject.Provider;
 import io.airlift.slice.Slice;
 import io.prestosql.Session;
 import io.prestosql.connector.DataCenterConnectorManager;
+import io.prestosql.spi.PartialAndFinalAggregationType;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.CatalogName;
@@ -1555,11 +1556,11 @@ public final class MetadataManager
     }
 
     @Override
-    public boolean canPerformSortBasedAggregation(Session session, TableHandle tableHandle, List<String> keyNames)
+    public PartialAndFinalAggregationType validateAndGetSortAggregationType(Session session, TableHandle tableHandle, List<String> keyNames)
     {
         CatalogName catalogName = tableHandle.getCatalogName();
         ConnectorMetadata metadata = getMetadata(session, catalogName);
-        return metadata.canPerformSortBasedAggregation(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle(), keyNames);
+        return metadata.validateAndGetSortAggregationType(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle(), keyNames);
     }
 
     @Override

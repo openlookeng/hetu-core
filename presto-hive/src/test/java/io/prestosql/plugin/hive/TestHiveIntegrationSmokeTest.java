@@ -6610,6 +6610,52 @@ public class TestHiveIntegrationSmokeTest
     }
 
     @Test
+    public void UnSortAggrePartitionBucketCount1()
+    {
+        initSortBasedAggregation();
+        computeActual("create table lineitem_partition_shipmode_comment_bucket1  with(transactional = false, " +
+                "format = 'ORC', partitioned_by = ARRAY['shipmode', 'comment'], bucketed_by=array['orderkey',  'partkey'], bucket_count=1)" +
+                "  as select * from tpch.tiny.lineitem limit 100");
+
+        String query = "select lineitem_partition_shipmode_comment_bucket1.shipmode, lineitem_partition_shipmode_comment_bucket1.comment " +
+                "from lineitem_partition_shipmode_comment_bucket1 " +
+                "group by shipmode, comment " +
+                "order by shipmode, comment ";
+
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv40, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        assertUpdate("DROP TABLE lineitem_partition_shipmode_comment_bucket1");
+    }
+
+    @Test
+    public void SortAggreGroupOnlyPartitionColumns()
+    {
+        initSortBasedAggregation();
+        computeActual("create table lineitem_sort_partition_shipmode_comment_bucket1  with(transactional = false, " +
+                "format = 'ORC', partitioned_by = ARRAY['shipmode', 'comment'], bucketed_by=array['orderkey',  'partkey'], bucket_count=1, sorted_by = ARRAY['orderkey', 'partkey'])" +
+                "  as select * from tpch.tiny.lineitem limit 100");
+
+        String query = "select lineitem_sort_partition_shipmode_comment_bucket1.shipmode, lineitem_sort_partition_shipmode_comment_bucket1.comment " +
+                "from lineitem_sort_partition_shipmode_comment_bucket1 " +
+                "group by shipmode, comment " +
+                "order by shipmode, comment ";
+
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv40, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        assertUpdate("DROP TABLE lineitem_sort_partition_shipmode_comment_bucket1");
+    }
+
+    @Test
     public void testAcidFormatColumnNameConflict()
     {
         assertUpdate(String.format("CREATE TABLE test_acid_columnname_conflict (originalTransaction int, currentTransaction int," +

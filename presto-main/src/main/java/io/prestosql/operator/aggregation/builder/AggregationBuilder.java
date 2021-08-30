@@ -28,7 +28,7 @@ public interface AggregationBuilder
 
     WorkProcessor<Page> buildResult();
 
-    default WorkProcessor<Page> buildResult(AggregationNode.Step step)
+    default WorkProcessor<Page> buildResult(AggregationNode.Step step, boolean isFinalizedValuePresent)
     {
         return buildResult();
     }

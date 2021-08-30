@@ -48,6 +48,8 @@ public class SortAggregationOperator
     public static class SortAggregationOperatorFactory
             extends GroupAggregationOperatorFactory
     {
+        private boolean isFinalizedValuePresent;
+
         public SortAggregationOperatorFactory(int operatorId, PlanNodeId planNodeId, List<? extends Type> groupByTypes,
                                               List<Integer> groupByChannels, List<Integer> globalAggregationGroupIds,
                                               AggregationNode.Step step, boolean produceDefaultOutput,
@@ -55,11 +57,12 @@ public class SortAggregationOperator
                                               Optional<Integer> groupIdChannel, int expectedGroups,
                                               Optional<DataSize> maxPartialMemory, boolean spillEnabled,
                                               DataSize unspillMemoryLimit, SpillerFactory spillerFactory,
-                                              JoinCompiler joinCompiler, boolean useSystemMemory)
+                                              JoinCompiler joinCompiler, boolean useSystemMemory, boolean isFinalizedValuePresent)
         {
             super(operatorId, planNodeId, groupByTypes, groupByChannels, globalAggregationGroupIds, step, produceDefaultOutput,
                     accumulatorFactories, hashChannel, groupIdChannel, expectedGroups, maxPartialMemory, spillEnabled,
                     unspillMemoryLimit, spillerFactory, joinCompiler, useSystemMemory);
+            this.isFinalizedValuePresent = isFinalizedValuePresent;
         }
 
         SortAggregationOperatorFactory(
@@ -80,7 +83,8 @@ public class SortAggregationOperator
                 DataSize memoryLimitForMergeWithMemory,
                 SpillerFactory spillerFactory,
                 JoinCompiler joinCompiler,
-                boolean useSystemMemory)
+                boolean useSystemMemory,
+                boolean isFinalizedValuePresent)
         {
             super(
                     operatorId,
@@ -101,6 +105,7 @@ public class SortAggregationOperator
                     spillerFactory,
                     joinCompiler,
                     useSystemMemory);
+            this.isFinalizedValuePresent = isFinalizedValuePresent;
         }
 
         @Override
@@ -126,7 +131,8 @@ public class SortAggregationOperator
                     memoryLimitForMergeWithMemory,
                     spillerFactory,
                     joinCompiler,
-                    useSystemMemory);
+                    useSystemMemory,
+                    isFinalizedValuePresent);
             return sortAggregationOperator;
         }
 
@@ -151,7 +157,8 @@ public class SortAggregationOperator
                     memoryLimitForMergeWithMemory,
                     spillerFactory,
                     joinCompiler,
-                    useSystemMemory);
+                    useSystemMemory,
+                    isFinalizedValuePresent);
         }
 
         @Override
@@ -162,6 +169,7 @@ public class SortAggregationOperator
     }
 
     private static final Logger LOG = Logger.get(SortAggregationOperator.class);
+    private boolean isFinalizedValuePresent;
 
     public SortAggregationOperator(OperatorContext operatorContext, List<Type> groupByTypes,
                                    List<Integer> groupByChannels, List<Integer> globalAggregationGroupIds,
@@ -170,11 +178,13 @@ public class SortAggregationOperator
                                    Optional<Integer> groupIdChannel, int expectedGroups,
                                    Optional<DataSize> maxPartialMemory, boolean spillEnabled,
                                    DataSize memoryLimitForMerge, DataSize memoryLimitForMergeWithMemory,
-                                   SpillerFactory spillerFactory, JoinCompiler joinCompiler, boolean useSystemMemory)
+                                   SpillerFactory spillerFactory, JoinCompiler joinCompiler, boolean useSystemMemory,
+                                   boolean isFinalizedValuePresent)
     {
         super(operatorContext, groupByTypes, groupByChannels, globalAggregationGroupIds, step, produceDefaultOutput,
                 accumulatorFactories, hashChannel, groupIdChannel, expectedGroups, maxPartialMemory, spillEnabled,
                 memoryLimitForMerge, memoryLimitForMergeWithMemory, spillerFactory, joinCompiler, useSystemMemory);
+        this.isFinalizedValuePresent = isFinalizedValuePresent;
     }
 
     public AggregationBuilder createAggregationBuilder(Page page, boolean spillEnabled)
@@ -333,7 +343,7 @@ public class SortAggregationOperator
                 return null;
             }
 
-            outputPages = aggregationBuilder.buildResult(step);
+            outputPages = aggregationBuilder.buildResult(step, isFinalizedValuePresent);
         }
 
         if (!outputPages.process()) {
@@ -395,6 +405,7 @@ public class SortAggregationOperator
         myState.inputProcessed = inputProcessed;
         myState.finishing = finishing;
         myState.finished = finished;
+        myState.isFinalizedValuePresent = isFinalizedValuePresent;
         myState.baseState = super.capture(serdeProvider);
         return myState;
     }
@@ -417,6 +428,7 @@ public class SortAggregationOperator
         inputProcessed = myState.inputProcessed;
         finishing = myState.finishing;
         finished = myState.finished;
+        isFinalizedValuePresent = myState.isFinalizedValuePresent;
         super.restore(myState.baseState, serdeProvider);
     }
 
@@ -430,5 +442,6 @@ public class SortAggregationOperator
         private boolean inputProcessed;
         private boolean finishing;
         private boolean finished;
+        private boolean isFinalizedValuePresent;
     }
 }
