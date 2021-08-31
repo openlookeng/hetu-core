@@ -100,12 +100,17 @@ public class MemoryTableManager
     public void validateSpillRoot()
             throws IOException
     {
-        RandomAccessFile testFile;
+        // make sure spillRoot folder exist first.
+        // if not, make specified directory first
+        if (!Files.exists(spillRoot)) {
+            Files.createDirectories(spillRoot);
+        }
+
         String name = UUID.randomUUID().toString();
         Path testPath = spillRoot.resolve(name);
-        try {
+
+        try (RandomAccessFile testFile = new RandomAccessFile(testPath.toFile(), "rw")) {
             // create a new file in the spillRoot that can be written and read from
-            testFile = new RandomAccessFile(testPath.toFile(), "rw");
             // set its length to 1MB
             testFile.setLength(1024 * 1024);
         }
