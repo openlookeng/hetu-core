@@ -567,7 +567,7 @@ public class BaseJdbcClient
             String sql = format(
                     "ALTER TABLE %s RENAME COLUMN %s TO %s",
                     quoted(handle.getCatalogName(), handle.getSchemaName(), handle.getTableName()),
-                    jdbcColumn.getColumnName(),
+                    quoted(jdbcColumn.getColumnName()),
                     newColumnName);
             execute(connection, sql);
         }

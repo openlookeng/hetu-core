@@ -302,9 +302,9 @@ public class StatisticsAwareJdbcClient
     }
 
     @Override
-    public String buildUpdateSql(ConnectorTableHandle handle, int updateColumnNum, List<String> updatedColumns)
+    public String buildUpdateSql(ConnectorSession session, ConnectorTableHandle handle, int updateColumnNum, List<String> updatedColumns)
     {
-        return stats.buildUpdateSql.wrap(() -> getDelegate().buildUpdateSql(handle, updateColumnNum, updatedColumns));
+        return stats.buildUpdateSql.wrap(() -> getDelegate().buildUpdateSql(session, handle, updateColumnNum, updatedColumns));
     }
 
     @Override

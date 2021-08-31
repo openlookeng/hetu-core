@@ -116,7 +116,7 @@ public class JdbcUpdatablePageSource
 
             boolean autoCommitFlag = connection.getAutoCommit();
             connection.setAutoCommit(false);
-            try (PreparedStatement statement = connection.prepareStatement(jdbcClient.buildUpdateSql(handle, updatedColumns.size(), updatedColumns))) {
+            try (PreparedStatement statement = connection.prepareStatement(jdbcClient.buildUpdateSql(this.session, handle, updatedColumns.size(), updatedColumns))) {
                 int batchSize = 0;
                 for (int position = 0; position < rowIds.getPositionCount(); position++) {
                     jdbcClient.setUpdateSql(this.session, this.handle, statement, columnValueAndRowIdBlock, position, updatedColumns);

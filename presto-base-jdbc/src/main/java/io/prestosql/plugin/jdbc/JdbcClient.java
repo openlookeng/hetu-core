@@ -227,7 +227,7 @@ public interface JdbcClient
         throw new PrestoException(NOT_SUPPORTED, "This connector does not support buildDeleteSql");
     }
 
-    default String buildUpdateSql(ConnectorTableHandle handle, int setNum, List<String> updatedColumns)
+    default String buildUpdateSql(ConnectorSession session, ConnectorTableHandle handle, int setNum, List<String> updatedColumns)
     {
         throw new PrestoException(NOT_SUPPORTED, "This connector does not support buildUpdateSql");
     }
