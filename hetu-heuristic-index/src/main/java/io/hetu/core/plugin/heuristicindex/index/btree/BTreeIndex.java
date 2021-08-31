@@ -355,6 +355,12 @@ public class BTreeIndex
     }
 
     @Override
+    public long getDiskUsage()
+    {
+        return dataFile.length();
+    }
+
+    @Override
     public void close()
             throws IOException
     {

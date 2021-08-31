@@ -30,6 +30,7 @@ import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -66,6 +67,17 @@ public class MinMaxIndex
     {
         this.min = (Comparable) min;
         this.max = (Comparable) max;
+    }
+
+    @Override
+    public long getMemoryUsage()
+    {
+        if (min instanceof String) {
+            return ((String) min).getBytes(StandardCharsets.UTF_8).length + ((String) max).getBytes(StandardCharsets.UTF_8).length;
+        }
+        else {
+            return 0; // if the data type is not a string, the memory usage will be too small to converted to a positive number in KB
+        }
     }
 
     @Override
