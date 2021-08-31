@@ -70,6 +70,7 @@ import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_POR
 import static io.prestosql.spi.metastore.HetuErrorCode.HETU_METASTORE_CODE;
 import static io.prestosql.statestore.StateStoreConstants.STATE_STORE_CONFIGURATION_PATH;
 import static java.util.Collections.emptyMap;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -135,7 +136,7 @@ public class TestHetuMetastoreGlobalCache
         seeds.add(mockSeed);
 
         SeedStoreManager mockSeedStoreManager = mock(SeedStoreManager.class);
-        when(mockSeedStoreManager.getSeedStore(SeedStoreSubType.HAZELCAST)).thenReturn(mockSeedStore);
+        when(mockSeedStoreManager.getSeedStore(any(SeedStoreSubType.class))).thenReturn(mockSeedStore);
 
         when(mockSeed.getLocation()).thenReturn(LOCALHOST + ":" + PORT3);
         when(mockSeedStore.get()).thenReturn(seeds);

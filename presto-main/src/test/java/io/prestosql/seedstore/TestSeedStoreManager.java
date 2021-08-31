@@ -92,7 +92,7 @@ public class TestSeedStoreManager
         SeedStoreFactory mockSeedStoreFactory = mock(SeedStoreFactory.class);
         when(mockSeedStoreFactory.getName()).thenReturn("filebased");
         when(mockSeedStoreFactory.create(any(String.class),
-                SeedStoreSubType.HAZELCAST,
+                any(SeedStoreSubType.class),
                 any(HetuFileSystemClient.class),
                 any(Map.class))).thenReturn(mockSeedStore);
         seedStoreManager.addSeedStoreFactory(mockSeedStoreFactory);
