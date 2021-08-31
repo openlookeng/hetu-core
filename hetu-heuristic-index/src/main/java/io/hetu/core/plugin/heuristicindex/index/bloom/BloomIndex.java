@@ -201,6 +201,14 @@ public class BloomIndex
     }
 
     @Override
+    public void close() throws IOException
+    {
+        if (isMmapEnabled()) {
+            getFile().delete();
+        }
+    }
+
+    @Override
     public void setExpectedNumOfEntries(int expectedNumOfEntries)
     {
         this.expectedNumOfEntries = expectedNumOfEntries;
