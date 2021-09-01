@@ -40,5 +40,5 @@ public interface SeedStoreFactory
      * @param config seed store configurations
      * @return created seed store
      */
-    SeedStore create(String name, HetuFileSystemClient fs, Map<String, String> config);
+    SeedStore create(String name, SeedStoreSubType subType, HetuFileSystemClient fs, Map<String, String> config);
 }

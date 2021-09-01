@@ -22,11 +22,16 @@ import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.server.InternalCommunicationConfig;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.filesystem.FileBasedLock;
+import io.prestosql.spi.seedstore.SeedStoreSubType;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.statestore.StateStoreBootstrapper;
 import io.prestosql.utils.HetuConfig;
+
+import javax.net.ServerSocketFactory;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -111,11 +116,11 @@ public class EmbeddedStateStoreLauncher
             if (staticSeeds.size() > 0) {
                 launchStateStore(staticSeeds, properties);
             }
-            else if (seedStoreManager.getSeedStore() != null) {
+            else if (seedStoreManager.getSeedStore(SeedStoreSubType.HAZELCAST) != null) {
                 // Set seed store name
-                seedStoreManager.getSeedStore().setName(properties.get(STATE_STORE_CLUSTER_PROPERTY_NAME));
+                seedStoreManager.getSeedStore(SeedStoreSubType.HAZELCAST).setName(properties.get(STATE_STORE_CLUSTER_PROPERTY_NAME));
                 // Clear expired seeds
-                seedStoreManager.clearExpiredSeeds();
+                seedStoreManager.clearExpiredSeeds(SeedStoreSubType.HAZELCAST);
                 // Use lock to control synchronization of state store launch among all coordinators
                 Lock launcherLock = new FileBasedLock(seedStoreManager.getFileSystemClient(), Paths.get(LAUNCHER_LOCK_FILE_PATH));
                 try {
@@ -142,18 +147,42 @@ public class EmbeddedStateStoreLauncher
     private void launchStateStoreFromSeedStore(Map<String, String> properties) throws IOException
     {
         // Get all seeds
-        Set<String> locations = seedStoreManager.getAllSeeds()
+        Set<String> locations = seedStoreManager.getAllSeeds(SeedStoreSubType.HAZELCAST)
                 .stream()
                 .map(x -> x.getLocation())
                 .collect(Collectors.toSet());
         String launcherPort = getStateStoreLauncherPort(properties);
         requireNonNull(launcherPort, "The launcher port is null");
+        // Detect port conflict and get the next usable one
+        launcherPort = checkAndGetAvailablePort(launcherPort);
+        properties.put(HAZELCAST_DISCOVERY_PORT_PROPERTY_NAME, launcherPort);
         // Launch state store
         String currentLocation = getNodeUri().getHost() + ":" + launcherPort;
         locations.add(currentLocation);
         if (launchStateStore(locations, properties) != null) {
             // Add seed to seed store if and only if state store launched successfully
-            seedStoreManager.addSeed(currentLocation, true);
+            seedStoreManager.addSeed(SeedStoreSubType.HAZELCAST, currentLocation, true);
+        }
+    }
+
+    private String checkAndGetAvailablePort(String port)
+    {
+        int nextPort = Integer.parseInt(port);
+        while (!isPortAvailable(nextPort)) {
+            nextPort++;
+        }
+
+        return String.valueOf(nextPort);
+    }
+
+    private static boolean isPortAvailable(int port)
+    {
+        ServerSocketFactory sslServerSocketFactory = SSLServerSocketFactory.getDefault();
+        try (SSLServerSocket socket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(port)) {
+            return true;
+        }
+        catch (IOException e) {
+            return false;
         }
     }
 
@@ -277,9 +306,9 @@ public class EmbeddedStateStoreLauncher
             registerDiscoveryService(failureMemberHost);
         }
 
-        if (seedStoreManager.getSeedStore() != null) {
+        if (seedStoreManager.getSeedStore(SeedStoreSubType.HAZELCAST) != null) {
             try {
-                seedStoreManager.removeSeed((String) failureMember);
+                seedStoreManager.removeSeed(SeedStoreSubType.HAZELCAST, (String) failureMember);
             }
             catch (Exception e) {
                 LOG.error("Cannot remove failure node %s from seed store: %s", failureMember, e.getMessage());

@@ -78,7 +78,7 @@ public class TestHazelcastStateStoreFactory
         properties.put(DISCOVERY_MODE_CONFIG_NAME, DISCOVERY_MODE_TCPIP);
 
         SeedStore seedStore = mock(SeedStore.class);
-        Seed seed = new FileBasedSeed.FileBasedSeedBuilder(MEMBER_ADDRESS).build();
+        Seed seed = new FileBasedSeed(MEMBER_ADDRESS, 0);
         when(seedStore.get()).thenReturn(ImmutableList.of(seed));
 
         setupHazelcastInstance();

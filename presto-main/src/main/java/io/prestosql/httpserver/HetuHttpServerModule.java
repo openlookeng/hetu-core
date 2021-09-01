@@ -13,28 +13,19 @@
  * limitations under the License.
  */
 
-package io.hetu.core.seedstore.filebased;
+package io.prestosql.httpserver;
 
-/**
- * Class that holds constant values for file-based seed store
- *
- * @since 2020-03-06
- */
-public class FileBasedSeedConstants
+import com.google.inject.Binder;
+import com.google.inject.Module;
+import com.google.inject.Scopes;
+import io.airlift.http.server.HttpServerInfo;
+
+public class HetuHttpServerModule
+        implements Module
 {
-    // Hazelcast seed file name
-    static final String SEED_FILE_NAME = "seeds.txt";
-
-    // ON-YARN seed file name
-    static final String ON_YARN_SEED_FILE_NAME = "seeds.json";
-
-    // dir config properties name
-    static final String SEED_STORE_FILESYSTEM_DIR = "seed-store.filesystem.seed-dir";
-
-    // default seed store directory
-    static final String SEED_STORE_FILESYSTEM_DIR_DEFAULT_VALUE = "/opt/hetu/seedstore";
-
-    private FileBasedSeedConstants()
+    @Override
+    public void configure(Binder binder)
     {
+        binder.bind(HttpServerInfo.class).to(HetuHttpServerInfo.class).in(Scopes.SINGLETON);
     }
 }

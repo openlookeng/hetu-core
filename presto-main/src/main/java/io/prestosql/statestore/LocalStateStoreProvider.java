@@ -21,6 +21,7 @@ import io.prestosql.metastore.MetaStoreConstants;
 import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
+import io.prestosql.spi.seedstore.SeedStoreSubType;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.statestore.StateStoreFactory;
@@ -100,7 +101,7 @@ public class LocalStateStoreProvider
                 stateStoreName = DEFAULT_STATE_STORE_NAME;
             }
             // Create state stores defined in config
-            stateStore = stateStoreFactory.create(stateStoreName, seedStoreManager.getSeedStore(), ImmutableMap.copyOf(properties));
+            stateStore = stateStoreFactory.create(stateStoreName, seedStoreManager.getSeedStore(SeedStoreSubType.HAZELCAST), ImmutableMap.copyOf(properties));
             stateStore.registerClusterFailureHandler(this::handleClusterDisconnection);
             stateStore.init();
         }

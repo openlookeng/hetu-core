@@ -59,6 +59,7 @@ public class TestHetuServiceInventory
         hetuConfig.setMultipleCoordinatorEnabled(true);
 
         HetuServiceInventory inventory = new HetuServiceInventory(hetuConfig,
+                null,
                 createMockStateStoreProvider(),
                 internalCommunicationConfig,
                 new ServiceInventoryConfig(),
@@ -86,6 +87,7 @@ public class TestHetuServiceInventory
         hetuConfig.setMultipleCoordinatorEnabled(true);
 
         HetuServiceInventory inventory = new HetuServiceInventory(hetuConfig,
+                null,
                 createMockStateStoreProvider(),
                 internalCommunicationConfig,
                 new ServiceInventoryConfig(),

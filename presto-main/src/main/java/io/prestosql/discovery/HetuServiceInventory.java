@@ -26,8 +26,10 @@ import io.airlift.http.client.HttpClient;
 import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
 import io.airlift.node.NodeInfo;
+import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.server.InternalCommunicationConfig;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.seedstore.SeedStoreSubType;
 import io.prestosql.spi.statestore.StateMap;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.statestore.StateStoreConstants;
@@ -49,11 +51,13 @@ public class HetuServiceInventory
     private final HetuConfig hetuConfig;
     private final String nodeId;
     private final StateStoreProvider stateStoreProvider;
+    private final SeedStoreManager seedStoreManager;
     private final InternalCommunicationConfig internalCommunicationConfig;
     private AtomicBoolean serverUp = new AtomicBoolean(true);
 
     @Inject
     public HetuServiceInventory(HetuConfig hetuConfig,
+                                SeedStoreManager seedStoreManager,
                                 StateStoreProvider stateStoreProvider,
                                 InternalCommunicationConfig internalCommunicationConfig,
                                 ServiceInventoryConfig config,
@@ -64,6 +68,7 @@ public class HetuServiceInventory
         super(config, nodeInfo, serviceDescriptorsCodec, httpClient);
         this.nodeId = nodeInfo.getNodeId();
         this.hetuConfig = hetuConfig;
+        this.seedStoreManager = seedStoreManager;
         this.stateStoreProvider = stateStoreProvider;
         this.internalCommunicationConfig = internalCommunicationConfig;
     }
@@ -71,28 +76,58 @@ public class HetuServiceInventory
     @Override
     public Iterable<ServiceDescriptor> getServiceDescriptors(String type)
     {
-        if ("discovery".equals(type) && hetuConfig.isMultipleCoordinatorEnabled()) {
-            try {
-                StateStore stateStore = stateStoreProvider.getStateStore();
+        if ("discovery".equals(type)) {
+            if (hetuConfig.isMultipleCoordinatorEnabled()) {
+                try {
+                    StateStore stateStore = stateStoreProvider.getStateStore();
 
-                if (stateStore == null) {
-                    throw new PrestoException(GENERIC_INTERNAL_ERROR, "State store has not been loaded yet");
-                }
+                    if (stateStore == null) {
+                        throw new PrestoException(GENERIC_INTERNAL_ERROR, "State store has not been loaded yet");
+                    }
 
-                Map.Entry<String, String> entry = ((StateMap<String, String>) stateStore.getStateCollection(StateStoreConstants.DISCOVERY_SERVICE_COLLECTION_NAME))
-                        .getAll().entrySet().stream().findFirst().get();
+                    Map.Entry<String, String> entry = ((StateMap<String, String>) stateStore.getStateCollection(StateStoreConstants.DISCOVERY_SERVICE_COLLECTION_NAME))
+                            .getAll().entrySet().stream().findFirst().get();
 
-                ImmutableMap.Builder properties = new ImmutableMap.Builder();
-                if (internalCommunicationConfig != null && internalCommunicationConfig.isHttpsRequired()) {
-                    properties.put("https", "https://" + entry.getKey() + ":" + entry.getValue());
+                    ImmutableMap.Builder properties = new ImmutableMap.Builder();
+                    if (internalCommunicationConfig != null && internalCommunicationConfig.isHttpsRequired()) {
+                        properties.put("https", "https://" + entry.getKey() + ":" + entry.getValue());
+                    }
+                    else {
+                        properties.put("http", "http://" + entry.getKey() + ":" + entry.getValue());
+                    }
+                    return ImmutableList.of(new ServiceDescriptor(UUID.randomUUID(), nodeId, "discovery", null, null, ServiceState.RUNNING, properties.build()));
                 }
-                else {
-                    properties.put("http", "http://" + entry.getKey() + ":" + entry.getValue());
+                catch (Exception e) {
+                    logServerError("Select service from state store failed: " + e);
+                    // do not return the service descriptors loaded from the configuration file, it might register this node to other cluster.
+                    // return an empty list here.
+                    return ImmutableList.of();
                 }
-                return ImmutableList.of(new ServiceDescriptor(UUID.randomUUID(), nodeId, "discovery", null, null, ServiceState.RUNNING, properties.build()));
             }
-            catch (Exception e) {
-                logServerError("Select service from state store failed:" + e);
+            else if (seedStoreManager != null && seedStoreManager.isSeedStoreOnYarnEnabled()) {
+                try {
+                    boolean httpsRequired = (internalCommunicationConfig != null && internalCommunicationConfig.isHttpsRequired());
+                    String location = seedStoreManager.getLatestSeedLocation(SeedStoreSubType.ON_YARN, httpsRequired);
+
+                    if (location == null || location.isEmpty()) {
+                        throw new PrestoException(GENERIC_INTERNAL_ERROR, "Seed store has not been initialized yet");
+                    }
+
+                    ImmutableMap.Builder properties = new ImmutableMap.Builder();
+                    if (httpsRequired) {
+                        properties.put("https", location);
+                    }
+                    else {
+                        properties.put("http", location);
+                    }
+                    return ImmutableList.of(new ServiceDescriptor(UUID.randomUUID(), nodeId, "discovery", null, null, ServiceState.RUNNING, properties.build()));
+                }
+                catch (Exception e) {
+                    logServerError("Select service from seed store failed: " + e);
+                    // do not return the service descriptors loaded from the configuration file, it might register this node to other cluster.
+                    // return an empty list here.
+                    return ImmutableList.of();
+                }
             }
         }
         return super.getServiceDescriptors(type);

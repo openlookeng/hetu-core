@@ -28,6 +28,7 @@ import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.server.testing.TestingPrestoServer;
 import io.prestosql.spi.seedstore.Seed;
 import io.prestosql.spi.seedstore.SeedStore;
+import io.prestosql.spi.seedstore.SeedStoreSubType;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.sql.parser.SqlParserOptions;
 import io.prestosql.statestore.EmbeddedStateStoreLauncher;
@@ -107,7 +108,7 @@ public class DistributedQueryRunnerWithStateStore
             launcher.launchStateStore();
 
             StateStoreProvider provider = server.getInstance(Key.get(StateStoreProvider.class));
-            Seed seed = new FileBasedSeed.FileBasedSeedBuilder("127.0.0.1:" + port).build();
+            Seed seed = new FileBasedSeed("127.0.0.1:" + port, 0);
             SeedStore seedStore = new SeedStore()
             {
                 @Override
@@ -148,7 +149,7 @@ public class DistributedQueryRunnerWithStateStore
                 {
                 }
             };
-            server.getInstance(Key.get(SeedStoreManager.class)).setSeedStore(seedStore);
+            server.getInstance(Key.get(SeedStoreManager.class)).setSeedStore(SeedStoreSubType.HAZELCAST, seedStore);
             if (provider instanceof LocalStateStoreProvider) {
                 Map<String, String> stateStoreProperties = new HashMap<>();
                 stateStoreProperties.putIfAbsent(HazelcastConstants.DISCOVERY_MODE_CONFIG_NAME, HazelcastConstants.DISCOVERY_MODE_TCPIP);
