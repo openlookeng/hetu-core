@@ -92,15 +92,28 @@ import org.apache.carbondata.common.logging.LogServiceFactory;
 import org.apache.carbondata.core.constants.CarbonCommonConstants;
 import org.apache.carbondata.core.datastore.filesystem.CarbonFile;
 import org.apache.carbondata.core.datastore.impl.FileFactory;
+import org.apache.carbondata.core.features.TableOperation;
+import org.apache.carbondata.core.fileoperations.FileWriteOperation;
 import org.apache.carbondata.core.index.Segment;
 import org.apache.carbondata.core.locks.CarbonLockFactory;
 import org.apache.carbondata.core.locks.CarbonLockUtil;
 import org.apache.carbondata.core.locks.ICarbonLock;
 import org.apache.carbondata.core.locks.LockUsage;
 import org.apache.carbondata.core.metadata.AbsoluteTableIdentifier;
+import org.apache.carbondata.core.metadata.CarbonMetadata;
 import org.apache.carbondata.core.metadata.CarbonTableIdentifier;
 import org.apache.carbondata.core.metadata.SegmentFileStore;
+import org.apache.carbondata.core.metadata.converter.SchemaConverter;
+import org.apache.carbondata.core.metadata.converter.ThriftWrapperSchemaConverterImpl;
+import org.apache.carbondata.core.metadata.datatype.DataTypes;
+import org.apache.carbondata.core.metadata.datatype.StructField;
+import org.apache.carbondata.core.metadata.schema.PartitionInfo;
+import org.apache.carbondata.core.metadata.schema.SchemaEvolutionEntry;
 import org.apache.carbondata.core.metadata.schema.table.CarbonTable;
+import org.apache.carbondata.core.metadata.schema.table.TableInfo;
+import org.apache.carbondata.core.metadata.schema.table.TableSchema;
+import org.apache.carbondata.core.metadata.schema.table.TableSchemaBuilder;
+import org.apache.carbondata.core.metadata.schema.table.column.ColumnSchema;
 import org.apache.carbondata.core.mutate.CarbonUpdateUtil;
 import org.apache.carbondata.core.mutate.SegmentUpdateDetails;
 import org.apache.carbondata.core.mutate.data.BlockMappingVO;
@@ -113,6 +126,7 @@ import org.apache.carbondata.core.util.CarbonUtil;
 import org.apache.carbondata.core.util.ObjectSerializationUtil;
 import org.apache.carbondata.core.util.ThreadLocalSessionInfo;
 import org.apache.carbondata.core.util.path.CarbonTablePath;
+import org.apache.carbondata.core.writer.ThriftWriter;
 import org.apache.carbondata.hadoop.api.CarbonOutputCommitter;
 import org.apache.carbondata.hadoop.api.CarbonTableInputFormat;
 import org.apache.carbondata.hadoop.api.CarbonTableOutputFormat;
@@ -147,13 +161,16 @@ import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
@@ -220,6 +237,10 @@ public class CarbondataMetadata
     private List<SegmentUpdateDetails> blockUpdateDetailsList;
     private State currentState = State.OTHER;
     private CarbonLoadModel carbonLoadModel;
+    private AbsoluteTableIdentifier absoluteTableIdentifier;
+    private TableInfo tableInfo;
+    private SchemaTableName schemaTableName;
+
     private String user;
     private Optional<String> tableStorageLocation;
     private String carbondataTableStore;
@@ -244,6 +265,9 @@ public class CarbondataMetadata
         CREATE_TABLE_AS,
         DROP_TABLE,
         OTHER,
+        ADD_COLUMN,
+        DROP_COLUMN,
+        RENAME_COLUMN
     }
 
     public CarbondataMetadata(SemiTransactionalHiveMetastore metastore,
@@ -851,6 +875,14 @@ public class CarbondataMetadata
                 case DROP_TABLE: {
                     break;
                 }
+                case ADD_COLUMN:
+                case DROP_COLUMN:
+                case RENAME_COLUMN: {
+                    hdfsEnvironment.doAs(user, () -> {
+                        revertAlterTableChanges();
+                    });
+                    break;
+                }
                 default: {
                     return;
                 }
@@ -1015,6 +1047,15 @@ public class CarbondataMetadata
                             LOG.error("Error occurred while carbon commitJob.", e);
                             throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Error occurred while carbon commitJob %s", e.getMessage()), e);
                         }
+                    });
+                    super.commit();
+                    break;
+                }
+                case ADD_COLUMN:
+                case RENAME_COLUMN:
+                case DROP_COLUMN: {
+                    hdfsEnvironment.doAs(user, () -> {
+                        writeSchemaFile();
                     });
                     super.commit();
                     break;
@@ -1578,6 +1619,350 @@ public class CarbondataMetadata
         serdeParameters.put(serdeIsVisible, "true");
         serdeParameters.put(serdeSerializationFormat, "1");
         return serdeParameters;
+    }
+
+    @Override
+    public void addColumn(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnMetadata column)
+    {
+        currentState = State.ADD_COLUMN;
+        updateSchemaInfo(session, tableHandle, column, null, null);
+
+        super.addColumn(session, tableHandle, column);
+    }
+
+    @Override
+    public void renameColumn(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle source, String target)
+    {
+        currentState = State.RENAME_COLUMN;
+        updateSchemaInfo(session, tableHandle, null, source, target);
+
+        super.renameColumn(session, tableHandle, source, target);
+    }
+
+    @Override
+    public void dropColumn(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle column)
+    {
+        currentState = State.DROP_COLUMN;
+        updateSchemaInfo(session, tableHandle, null, column, null);
+
+        super.dropColumn(session, tableHandle, column);
+    }
+
+    private void updateSchemaInfo(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnMetadata column, ColumnHandle source, String target)
+    {
+        HiveTableHandle handle = (HiveTableHandle) tableHandle;
+        table = metastore.getTable(new HiveIdentity(session), handle.getSchemaName(), handle.getTableName());
+        String tablePath = table.get().getStorage().getLocation();
+        hdfsEnvironment.doAs(user, () -> {
+            initialConfiguration = ConfigurationUtils.toJobConf(this.hdfsEnvironment
+                    .getConfiguration(
+                            new HdfsEnvironment.HdfsContext(session, handle.getSchemaName(),
+                                    handle.getTableName()), new Path(tablePath)));
+            Properties schema = MetastoreUtil.getHiveSchema(table.get());
+            schema.setProperty("tablePath", tablePath);
+            carbonTable = getCarbonTable(handle.getSchemaName(),
+                    handle.getTableName(),
+                    schema,
+                    initialConfiguration);
+        });
+        acquireLocksForAlter();
+        schemaTableName = handle.getSchemaTableName();
+        absoluteTableIdentifier = AbsoluteTableIdentifier.from(tablePath, handle.getTableName(), handle.getSchemaName());
+        tableInfo = carbonTable.getTableInfo();
+        SchemaEvolutionEntry schemaEvolutionEntry;
+        switch (currentState) {
+            case ADD_COLUMN: {
+                schemaEvolutionEntry = updateSchemaInfoAddColumn(column);
+                break;
+            }
+            case RENAME_COLUMN: {
+                schemaEvolutionEntry = updateSchemaInfoRenameColumn(source, target);
+                break;
+            }
+            case DROP_TABLE: {
+                schemaEvolutionEntry = updateSchemaInfoDropColumn(source);
+                break;
+            }
+            default: {
+                return;
+            }
+        }
+        if (schemaEvolutionEntry != null) {
+            tableInfo.getFactTable().getSchemaEvolution().getSchemaEvolutionEntryList()
+                    .add(schemaEvolutionEntry);
+        }
+    }
+
+    private SchemaEvolutionEntry updateSchemaInfoAddColumn(ColumnMetadata column)
+    {
+        HiveColumnHandle columnHandle = new HiveColumnHandle(column.getName(), HiveType.toHiveType(typeTranslator, column.getType()),
+                column.getType().getTypeSignature(), tableInfo.getFactTable().getListOfColumns().size(), HiveColumnHandle.ColumnType.REGULAR, Optional.empty());
+        TableSchema tableSchema = tableInfo.getFactTable();
+        List<ColumnSchema> tableColumns = tableSchema.getListOfColumns();
+        int currentSchemaOrdinal = tableColumns.stream().max(Comparator.comparing(ColumnSchema::getSchemaOrdinal))
+                .orElseThrow(NoSuchElementException::new).getSchemaOrdinal() + 1;
+        List<ColumnSchema> longStringColumns = new ArrayList<>();
+        List<ColumnSchema> allColumns = tableColumns.stream().filter(cols -> cols.isDimensionColumn()
+                && !cols.getDataType().isComplexType() && cols.getSchemaOrdinal() != -1 && (cols.getDataType() != DataTypes.VARCHAR)).collect(toList());
+
+        TableSchemaBuilder schemaBuilder = new TableSchemaBuilder();
+        List<ColumnSchema> columnSchemas = new ArrayList<ColumnSchema>();
+        ColumnSchema newColumn = schemaBuilder.addColumn(new StructField(columnHandle.getName(),
+                        CarbondataHetuFilterUtil.spi2CarbondataTypeMapper(columnHandle)), null,
+                false, false);
+        newColumn.setSchemaOrdinal(currentSchemaOrdinal);
+        columnSchemas.add(newColumn);
+
+        if (newColumn.getDataType() == DataTypes.VARCHAR) {
+            longStringColumns.add(newColumn);
+        }
+        else if (newColumn.isDimensionColumn()) {
+            // add the column which is not long string
+            allColumns.add(newColumn);
+        }
+        // put the old long string columns
+        allColumns.addAll(tableColumns.stream().filter(cols -> cols.isDimensionColumn() && (cols.getDataType() == DataTypes.VARCHAR)).collect(toList()));
+        // and the new long string column after old long string columns
+        allColumns.addAll(longStringColumns);
+        // put complex type columns at the end of dimension columns
+        allColumns.addAll(tableColumns.stream().filter(cols -> cols.isDimensionColumn() &&
+                (cols.isComplexColumn() || cols.getSchemaOrdinal() == -1)).collect(toList()));
+        // original measure columns
+        allColumns.addAll(tableColumns.stream().filter(cols -> !cols.isDimensionColumn()).collect(toList()));
+        // add new measure column
+        if (!newColumn.isDimensionColumn()) {
+            allColumns.add(newColumn);
+        }
+        allColumns.stream().filter(cols -> !cols.isInvisible()).collect(Collectors.groupingBy(ColumnSchema::getColumnName))
+                .forEach((columnName, schemaList) -> {
+                    if (schemaList.size() > 2) {
+                        throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Duplicate columns found"));
+                    }
+                });
+        if (newColumn.isComplexColumn()) {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Complex column cannot be added"));
+        }
+
+        List<ColumnSchema> finalAllColumns = allColumns;
+        allColumns.stream().forEach(columnSchema -> {
+            List<ColumnSchema> colWithSameId = finalAllColumns.stream().filter(x ->
+                    x.getColumnUniqueId().equals(columnSchema.getColumnUniqueId())).collect(toList());
+            if (colWithSameId.size() > 1) {
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Two columns can not have same columnId"));
+            }
+        });
+        if (tableInfo.getFactTable().getPartitionInfo() != null) {
+            List<ColumnSchema> par = tableInfo.getFactTable().getPartitionInfo().getColumnSchemaList();
+            allColumns = allColumns.stream().filter(cols -> !par.contains(cols)).collect(toList());
+            allColumns.addAll(par);
+        }
+        tableSchema.setListOfColumns(allColumns);
+        tableInfo.setLastUpdatedTime(timeStamp);
+        tableInfo.setFactTable(tableSchema);
+        SchemaEvolutionEntry schemaEvolutionEntry = new SchemaEvolutionEntry();
+        schemaEvolutionEntry.setTimeStamp(timeStamp);
+        schemaEvolutionEntry.setAdded(columnSchemas);
+
+        return schemaEvolutionEntry;
+    }
+
+    private SchemaEvolutionEntry updateSchemaInfoRenameColumn(ColumnHandle source, String target)
+    {
+        HiveColumnHandle oldColumnHandle = (HiveColumnHandle) source;
+        String oldColumnName = oldColumnHandle.getColumnName();
+        String newColumnName = target;
+        if (!carbonTable.canAllow(carbonTable, TableOperation.ALTER_COLUMN_RENAME, oldColumnHandle.getName())) {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Alter table rename column is  not supported for index indexschema"));
+        }
+
+        TableSchema tableSchema = tableInfo.getFactTable();
+        List<ColumnSchema> tableColumns = tableSchema.getListOfColumns();
+
+        if (!tableColumns.stream().map(cols -> cols.getColumnName()).collect(toList()).contains(oldColumnHandle.getName())) {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Column " + oldColumnHandle.getName() + "does not exist in " +
+                    carbonTable.getDatabaseName() + "." + carbonTable.getTableName()));
+        }
+
+        List<ColumnSchema> carbonColumns = carbonTable.getCreateOrderColumn().stream().filter(cols -> !cols.isInvisible())
+                .map(cols -> cols.getColumnSchema()).collect(toList());
+
+        ColumnSchema oldCarbonColumn = carbonColumns.stream().filter(cols -> cols.getColumnName().equalsIgnoreCase(oldColumnName)).findFirst().get();
+        validateColumnsForRenaming(oldCarbonColumn);
+
+        TableSchemaBuilder schemaBuilder = new TableSchemaBuilder();
+        ColumnSchema deletedColumn = schemaBuilder.addColumn(new StructField(oldColumnHandle.getName(),
+                CarbondataHetuFilterUtil.spi2CarbondataTypeMapper(oldColumnHandle)), null, false, false);
+
+        SchemaEvolutionEntry schemaEvolutionEntry = new SchemaEvolutionEntry();
+        tableColumns.forEach(cols -> {
+            if (cols.getColumnName().equalsIgnoreCase(oldColumnName)) {
+                cols.setColumnName(newColumnName);
+                schemaEvolutionEntry.setTimeStamp(timeStamp);
+                schemaEvolutionEntry.setAdded(Arrays.asList(cols));
+                schemaEvolutionEntry.setRemoved(Arrays.asList(deletedColumn));
+            }
+        });
+
+        Map<String, String> tableProperties = tableInfo.getFactTable().getTableProperties();
+        tableProperties.forEach((tablePropertyKey, tablePropertyValue) -> {
+            if (tablePropertyKey.equalsIgnoreCase(oldColumnName)) {
+                tableProperties.put(tablePropertyKey, newColumnName);
+            }
+        });
+
+        tableInfo.setLastUpdatedTime(System.currentTimeMillis());
+        tableInfo.setFactTable(tableSchema);
+        return schemaEvolutionEntry;
+    }
+
+    private SchemaEvolutionEntry updateSchemaInfoDropColumn(ColumnHandle column)
+    {
+        HiveColumnHandle columnHandle = (HiveColumnHandle) column;
+        TableSchema tableSchema = tableInfo.getFactTable();
+        List<ColumnSchema> tableColumns = tableSchema.getListOfColumns();
+        int currentSchemaOrdinal = tableColumns.stream().max(Comparator.comparing(ColumnSchema::getSchemaOrdinal))
+                .orElseThrow(NoSuchElementException::new).getSchemaOrdinal() + 1;
+
+        TableSchemaBuilder schemaBuilder = new TableSchemaBuilder();
+        List<ColumnSchema> columnSchemas = new ArrayList<ColumnSchema>();
+        ColumnSchema newColumn = schemaBuilder.addColumn(new StructField(columnHandle.getColumnName(),
+                        CarbondataHetuFilterUtil.spi2CarbondataTypeMapper(columnHandle)), null,
+                false, false);
+        newColumn.setSchemaOrdinal(currentSchemaOrdinal);
+        columnSchemas.add(newColumn);
+
+        PartitionInfo partitionInfo = tableInfo.getFactTable().getPartitionInfo();
+        if (partitionInfo != null) {
+            List<String> partitionColumnSchemaList = tableInfo.getFactTable().getPartitionInfo()
+                    .getColumnSchemaList().stream().map(cols -> cols.getColumnName()).collect(toList());
+            if (partitionColumnSchemaList.stream().anyMatch(partitionColumn -> partitionColumn.equals(newColumn.getColumnName()))) {
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Partition columns cannot be dropped");
+            }
+            // when table has two columns, dropping unpartitioned column will be wrong
+            if (tableColumns.stream().filter(cols -> !cols.getColumnName().equals(newColumn.getColumnName()))
+                    .map(cols -> cols.getColumnName()).equals(partitionColumnSchemaList)) {
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Cannot have table with all columns as partition columns");
+            }
+        }
+
+        if (!tableColumns.stream().filter(cols -> cols.getColumnName().equals(newColumn.getColumnName())).collect(toList()).isEmpty()) {
+            if (newColumn.isComplexColumn()) {
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Complex column cannot be dropped");
+            }
+        }
+        else {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Cannot have table with all columns as partition columns");
+        }
+        tableInfo.setLastUpdatedTime(System.currentTimeMillis());
+        tableInfo.setFactTable(tableSchema);
+
+        SchemaEvolutionEntry schemaEvolutionEntry = new SchemaEvolutionEntry();
+        schemaEvolutionEntry.setTimeStamp(timeStamp);
+        schemaEvolutionEntry.setRemoved(columnSchemas);
+
+        return schemaEvolutionEntry;
+    }
+
+    private void revertAlterTableChanges()
+    {
+        String tableName = absoluteTableIdentifier.getTableName();
+        String databaseName = absoluteTableIdentifier.getDatabaseName();
+        TableInfo tableInfo = carbonTable.getTableInfo();
+        List<SchemaEvolutionEntry> evolutionEntryList = tableInfo.getFactTable().getSchemaEvolution().getSchemaEvolutionEntryList();
+        Long updatedTime = evolutionEntryList.get(evolutionEntryList.size() - 1).getTimeStamp();
+        LOG.info("Reverting changes for " + databaseName + "." + tableName);
+        List<ColumnSchema> addedSchemas = evolutionEntryList.get(evolutionEntryList.size() - 1).getAdded();
+        List<ColumnSchema> removedSchemas = evolutionEntryList.get(evolutionEntryList.size() - 1).getRemoved();
+        if (updatedTime == timeStamp) {
+            switch (currentState) {
+                case ADD_COLUMN: {
+                    carbonTable.getTableInfo().getFactTable().getListOfColumns().removeAll(addedSchemas);
+                    break;
+                }
+                case DROP_COLUMN: {
+                    tableInfo.getFactTable().getListOfColumns().forEach(cols -> removedSchemas.forEach(removedCols -> {
+                        if (cols.isInvisible() && removedCols.getColumnUniqueId().equals(cols.getColumnUniqueId())) {
+                            cols.setInvisible(false);
+                        }
+                    }));
+                    break;
+                }
+                default:
+                    break;
+            }
+            evolutionEntryList.remove(evolutionEntryList.size() - 1);
+            writeSchemaFile();
+        }
+    }
+
+    private void writeSchemaFile()
+    {
+        try {
+            String schemaFilePath = CarbonTablePath.getSchemaFilePath(table.get().getStorage().getLocation());
+            SchemaConverter schemaConverter = new ThriftWrapperSchemaConverterImpl();
+            ThriftWriter thriftWriter = new ThriftWriter(schemaFilePath, false);
+            thriftWriter.open(FileWriteOperation.OVERWRITE);
+            thriftWriter.write(schemaConverter.fromWrapperToExternalTableInfo(tableInfo, absoluteTableIdentifier.getTableName(),
+                    absoluteTableIdentifier.getDatabaseName()));
+            thriftWriter.close();
+            FileFactory.getCarbonFile(schemaFilePath).setLastModifiedTime(timeStamp);
+            carbondataTableReader.deleteTableFromCarbonCache(new SchemaTableName(absoluteTableIdentifier.getDatabaseName(), absoluteTableIdentifier.getTableName()));
+            CarbonMetadata.getInstance().removeTable(absoluteTableIdentifier.getTablePath(), absoluteTableIdentifier.getDatabaseName());
+            CarbonMetadata.getInstance().loadTableMetadata(tableInfo);
+            LOG.info("Schema file written");
+        }
+        catch (IOException e) {
+            //TODO handle cases while exception thrown
+            releaseLocks();
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Error while writing to schema file", e));
+        }
+    }
+
+    private void acquireLocksForAlter()
+    {
+        metadataLock = CarbonLockFactory.getCarbonLockObj(carbonTable
+                .getAbsoluteTableIdentifier(), LockUsage.METADATA_LOCK);
+        compactionLock = CarbonLockFactory.getCarbonLockObj(carbonTable
+                .getAbsoluteTableIdentifier(), LockUsage.COMPACTION_LOCK);
+        try {
+            boolean lockStatus = metadataLock.lockWithRetries();
+            if (lockStatus) {
+                LOG.info("Successfully able to get the table metadata file lock");
+            }
+            else {
+                throw new Exception("Table is already locked");
+            }
+
+            if (compactionLock.lockWithRetries()) {
+                LOG.info("Successfully able to get compaction lock");
+            }
+            else {
+                throw new RuntimeException("Unable to get compaction locks");
+            }
+        }
+        catch (Exception e) {
+            LOG.error("Exception in alter operation", e);
+            releaseLocks();
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Error while taking locks", e);
+        }
+    }
+
+    private void validateColumnsForRenaming(ColumnSchema oldColumn)
+    {
+        if (carbonTable != null) {
+            // if the column rename is for complex column, block the operation
+            if (oldColumn.isComplexColumn()) {
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Rename column is not supported for complex datatype"));
+            }
+            // if column rename operation is on partition column, then fail the rename operation
+            if (null != carbonTable.getPartitionInfo()) {
+                List<ColumnSchema> partitionColumns = carbonTable.getPartitionInfo().getColumnSchemaList();
+                if (!partitionColumns.stream().filter(cols -> cols.getColumnName()
+                        .equalsIgnoreCase(oldColumn.getColumnName())).collect(toList()).isEmpty()) {
+                    throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Cannot rename a partition column"));
+                }
+            }
+        }
     }
 
     private void writeSegmentFileAndSetLoadModel()
