@@ -354,6 +354,25 @@ public abstract class AbstractTestStarTreeQueries
     }
 
     @Test
+    public void testCubePredicateTimestampType()
+    {
+        computeActual("CREATE TABLE timestamp_test_table (cint_1 int, cint_2 int, cint_3 int, cint_4 int, time_stamp TIMESTAMP)");
+        computeActual("INSERT INTO timestamp_test_table (cint_1, cint_2, cint_3, cint_4, time_stamp) VALUES (4, 8 ,9 ,10 , timestamp '2021-03-15 15:20:00')");
+        computeActual("CREATE CUBE timestamp_test_table_cube_1 ON timestamp_test_table " +
+                "WITH (AGGREGATIONS=(count(*))," + " group=(time_stamp), format= 'orc', partitioned_by = ARRAY['cint_1'])");
+        computeActual("INSERT INTO CUBE timestamp_test_table_cube_1 where time_stamp = timestamp '2021-03-15 15:20:00'");
+        MaterializedResult result = computeActual("SHOW CUBES FOR timestamp_test_table");
+        MaterializedRow matchingRow = result.getMaterializedRows().stream().filter(row -> row.getField(1).toString().contains("timestamp_test_table_cube_1")).findFirst().orElse(null);
+        assertNotNull(matchingRow);
+        matchingRow = result.getMaterializedRows().stream().filter(row -> row.getField(5).toString().contains("TIMESTAMP '2021-03-15 15:20:00.000'")).findFirst().orElse(null);
+        assertNotNull(matchingRow);
+        assertEquals(matchingRow.getField(2), "Active");
+
+        assertUpdate("DROP CUBE timestamp_test_table_cube_1");
+        assertUpdate("DROP TABLE timestamp_test_table");
+    }
+
+    @Test
     public void testEmptyGroup()
     {
         assertQuerySucceeds("CREATE TABLE nation_table_empty_group_test_1 AS SELECT * FROM nation");

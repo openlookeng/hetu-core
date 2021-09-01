@@ -32,6 +32,7 @@ import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Decimals;
 import io.prestosql.spi.type.SqlDate;
+import io.prestosql.spi.type.SqlTimestamp;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
@@ -62,6 +63,7 @@ import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.SmallintType.SMALLINT;
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.UnknownType.UNKNOWN;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
@@ -238,6 +240,10 @@ public final class LiteralEncoder
 
         if (type.equals(DATE)) {
             return new GenericLiteral("DATE", new SqlDate(toIntExact((Long) object)).toString());
+        }
+
+        if (type.equals(TIMESTAMP)) {
+            return new GenericLiteral("TIMESTAMP", new SqlTimestamp((Long) object).toString());
         }
 
         if (object instanceof Block) {
