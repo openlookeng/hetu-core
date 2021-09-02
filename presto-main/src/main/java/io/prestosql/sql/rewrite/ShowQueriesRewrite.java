@@ -855,7 +855,8 @@ final class ShowQueriesRewrite
         {
             List<IndexRecord> indexRecords;
             try {
-                indexRecords = readIndexRecords(node.getIndexName());
+                String indexName = node.getIndexName();
+                indexRecords = indexName == null ? heuristicIndexerManager.getAllIndexRecordsWithUsage() : heuristicIndexerManager.getIndexRecordWithUsage(indexName);
             }
             catch (IOException e) {
                 throw new UncheckedIOException("Error reading index records, ", e);
@@ -919,12 +920,15 @@ final class ShowQueriesRewrite
                         new StringLiteral(indexStatus),
                         new StringLiteral(partitionsStrToDisplay.toString()),
                         new StringLiteral(String.join(",", v.propertiesAsList) + inProgressHint),
-                        TRUE_LITERAL));
+                        new StringLiteral(DataSize.succinctBytes(v.memoryUsage).toString()),
+                        new StringLiteral(DataSize.succinctBytes(v.diskUsage).toString()), TRUE_LITERAL));
             }
 
             //bogus row to support empty index
             rows.add(row(new StringLiteral(""), new StringLiteral(""), new StringLiteral(""),
-                    new StringLiteral(""), new StringLiteral(""), new StringLiteral(""), new StringLiteral(""), new StringLiteral(""), new StringLiteral(""), FALSE_LITERAL));
+                    new StringLiteral(""), new StringLiteral(""), new StringLiteral(""),
+                    new StringLiteral(""), new StringLiteral(""), new StringLiteral(""),
+                    new StringLiteral(""), new StringLiteral(""), FALSE_LITERAL));
 
             ImmutableList<Expression> expressions = rows.build();
             return simpleQuery(
@@ -937,11 +941,13 @@ final class ShowQueriesRewrite
                             aliasedName("index_storage_size", "Index Size"),
                             aliasedName("index_status", "Index Status"),
                             aliasedName("partitions", "Partitions"),
-                            aliasedName("index_props", "Index Properties")),
+                            aliasedName("index_props", "Index Properties"),
+                            aliasedName("index_memoryUse", "Memory Usage (Coordinator Only)"),
+                            aliasedName("index_diskUse", "Disk Usage (Coordinator Only)")),
                     aliased(
                             new Values(expressions),
                             "Index Result",
-                            ImmutableList.of("index_name", "user", "table_name", "index_columns", "index_type", "index_storage_size", "index_status", "partitions", "index_props", "include")),
+                            ImmutableList.of("index_name", "user", "table_name", "index_columns", "index_type", "index_storage_size", "index_status", "partitions", "index_props", "index_memoryUse", "index_diskUse", "include")),
                     identifier("include"),
                     ordering(ascending("index_name")));
         }
@@ -1017,22 +1023,6 @@ final class ShowQueriesRewrite
         protected Node visitNode(Node node, Void context)
         {
             return node;
-        }
-
-        private List<IndexRecord> readIndexRecords(String indexName)
-                throws IOException
-        {
-            if (indexName == null || indexName.equals(Optional.empty().toString())) {
-                return heuristicIndexerManager.getIndexClient().getAllIndexRecords();
-            }
-            else {
-                List<IndexRecord> records = Collections.singletonList(
-                        heuristicIndexerManager.getIndexClient().lookUpIndexRecord(indexName));
-                if (records.get(0) == null) {
-                    return Collections.emptyList();
-                }
-                return records;
-            }
         }
     }
 }

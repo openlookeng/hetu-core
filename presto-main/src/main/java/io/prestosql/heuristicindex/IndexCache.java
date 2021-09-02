@@ -42,6 +42,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -118,6 +119,25 @@ public class IndexCache
         }
     }
 
+    // only called on "SHOW INDEX" statement
+    public void readUsage(HashMap<IndexRecord, Long> indexRecordMemoryUse, HashMap<IndexRecord, Long> indexRecordDiskUse)
+    {
+        try {
+            for (Map.Entry<IndexCacheKey, List<IndexMetadata>> entry : cache.asMap().entrySet()) {
+                IndexRecord curRecord = entry.getKey().getRecord();
+                if (indexRecordMemoryUse.containsKey(curRecord)) {
+                    for (IndexMetadata indexMetadata : entry.getValue()) {
+                        indexRecordMemoryUse.put(curRecord, indexRecordMemoryUse.get(curRecord) + indexMetadata.getIndex().getMemoryUsage());
+                        indexRecordDiskUse.put(curRecord, indexRecordDiskUse.get(curRecord) + indexMetadata.getIndex().getDiskUsage());
+                    }
+                }
+            }
+        }
+        catch (Exception e) {
+            LOG.debug(e, "Error updating memory or disk usage");
+        }
+    }
+
     private boolean autoUpdateCache(List<IndexRecord> newRecords)
     {
         // Three cases are checked:
@@ -148,8 +168,7 @@ public class IndexCache
                         updated = true;
                         if (newIndexRecord.isAutoloadEnabled()) {
                             evictFromCache(newIndexRecord);
-                            CreateIndexMetadata.Level indexLevel = CreateIndexMetadata.Level.valueOf(newIndexRecord.getProperty(CreateIndexMetadata.LEVEL_PROP_KEY).toUpperCase(Locale.ROOT));
-                            preloadIndex(newIndexRecord.qualifiedTable, String.join(",", newIndexRecord.columns), newIndexRecord.indexType, indexLevel);
+                            preloadIndex(newIndexRecord);
                             LOG.debug("Index {%s} has been updated in cache.", newIndexRecord);
                         }
                     }
@@ -158,8 +177,7 @@ public class IndexCache
                     // create operation
                     created = true;
                     if (newIndexRecord.isAutoloadEnabled()) {
-                        CreateIndexMetadata.Level indexLevel = CreateIndexMetadata.Level.valueOf(newIndexRecord.getProperty(CreateIndexMetadata.LEVEL_PROP_KEY).toUpperCase(Locale.ROOT));
-                        preloadIndex(newIndexRecord.qualifiedTable, String.join(",", newIndexRecord.columns), newIndexRecord.indexType, indexLevel);
+                        preloadIndex(newIndexRecord);
                         LOG.debug("Index {%s} has been inserted to cache.", newIndexRecord);
                     }
                 }
@@ -180,10 +198,15 @@ public class IndexCache
         return (dropped || created || updated);
     }
 
-    public void preloadIndex(String table, String column, String type, CreateIndexMetadata.Level level)
+    public void preloadIndex(IndexRecord record)
     {
+        String table = record.qualifiedTable;
+        String column = String.join(",", record.columns);
+        String type = record.indexType;
+        CreateIndexMetadata.Level level = CreateIndexMetadata.Level.valueOf(record.getProperty(CreateIndexMetadata.LEVEL_PROP_KEY).toUpperCase(Locale.ROOT));
+
         String filterKeyPath = table + "/" + column + "/" + type;
-        IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, LAST_MODIFIED_TIME_PLACE_HOLDER, level);
+        IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, LAST_MODIFIED_TIME_PLACE_HOLDER, record, level);
         filterKey.setNoCloseFlag(true);
         executor.schedule(() -> {
             List<IndexMetadata> allLoaded;
@@ -197,7 +220,7 @@ public class IndexCache
                         // break index key from table/column/type to several table/column/type/split-path
                         for (IndexMetadata index : allLoaded) {
                             String indexUri = index.getUri();
-                            IndexCacheKey newKey = new IndexCacheKey(filterKeyPath + indexUri, index.getLastModifiedTime());
+                            IndexCacheKey newKey = new IndexCacheKey(filterKeyPath + indexUri, index.getLastModifiedTime(), record);
                             cache.asMap().putIfAbsent(newKey, new ArrayList<>());
                             cache.asMap().get(newKey).add(index);
                         }
@@ -216,7 +239,7 @@ public class IndexCache
                                 }
                             }
                             if (partition != null) {
-                                IndexCacheKey newKey = new IndexCacheKey(filterKeyPath + "/" + partition, index.getLastModifiedTime());
+                                IndexCacheKey newKey = new IndexCacheKey(filterKeyPath + "/" + partition, index.getLastModifiedTime(), record);
                                 cache.asMap().putIfAbsent(newKey, new ArrayList<>());
                                 cache.asMap().get(newKey).add(index);
                             }
@@ -235,6 +258,11 @@ public class IndexCache
 
     public List<IndexMetadata> getIndices(String table, String column, Split split)
     {
+        return getIndices(table, column, split, Collections.emptyMap());
+    }
+
+    public List<IndexMetadata> getIndices(String table, String column, Split split, Map<String, IndexRecord> indexRecordKeyToRecordMap)
+    {
         if (cache == null) {
             return Collections.emptyList();
         }
@@ -245,7 +273,9 @@ public class IndexCache
 
         for (String indexType : INDEX_TYPES) {
             String filterKeyPath = table + "/" + column + "/" + indexType + splitUri.getRawPath();
-            IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime);
+            String indexRecordKey = table + "/" + column + "/" + indexType;
+            IndexRecord record = indexRecordKeyToRecordMap.get(indexRecordKey);
+            IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, record);
             //it is possible to return multiple SplitIndexMetadata due to the range mismatch, especially in the case
             //where the split has a wider range than the original splits used for index creation
             // check if cache contains the key
@@ -287,7 +317,7 @@ public class IndexCache
         return indices;
     }
 
-    public List<IndexMetadata> getIndices(String table, String column, String indexType, Set<String> partitions, long lastModifiedTime)
+    public List<IndexMetadata> getIndices(String table, String column, String indexType, Set<String> partitions, long lastModifiedTime, Map<String, IndexRecord> indexRecordKeyToRecordMap)
     {
         if (cache == null) {
             return Collections.emptyList();
@@ -297,7 +327,8 @@ public class IndexCache
         if (!partitions.isEmpty()) {
             for (String partition : partitions) {
                 String filterKeyPath = table + "/" + column + "/" + indexType + "/" + partition;
-                IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, CreateIndexMetadata.Level.PARTITION);
+                IndexRecord record = indexRecordKeyToRecordMap.get(filterKeyPath);
+                IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, record, CreateIndexMetadata.Level.PARTITION);
                 List<IndexMetadata> result = loadIndex(filterKey);
                 if (result != null) {
                     indices.addAll(result);
@@ -311,7 +342,8 @@ public class IndexCache
         }
 
         String filterKeyPath = table + "/" + column + "/" + indexType;
-        IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, CreateIndexMetadata.Level.TABLE);
+        IndexRecord record = indexRecordKeyToRecordMap.get(filterKeyPath);
+        IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, lastModifiedTime, record, CreateIndexMetadata.Level.TABLE);
         List<IndexMetadata> result = loadIndex(filterKey);
         if (result != null) {
             indices.addAll(result);
