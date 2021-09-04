@@ -19,6 +19,7 @@ import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.expressions.LogicalRowExpressions;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.function.FunctionMetadata;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.plan.Symbol;
@@ -59,6 +60,7 @@ import io.prestosql.sql.tree.NotExpression;
 import io.prestosql.sql.tree.SymbolReference;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 
 import java.util.List;
 import java.util.Map;
@@ -108,6 +110,7 @@ public class FilterStatsCalculator
     private final LiteralEncoder literalEncoder;
     private final FunctionResolution functionResolution;
 
+    @Inject
     public FilterStatsCalculator(Metadata metadata, ScalarStatsCalculator scalarStatsCalculator, StatsNormalizer normalizer)
     {
         this.metadata = requireNonNull(metadata, "metadata is null");
@@ -131,12 +134,22 @@ public class FilterStatsCalculator
     public PlanNodeStatsEstimate filterStats(
             PlanNodeStatsEstimate statsEstimate,
             RowExpression predicate,
-            Session session,
+            ConnectorSession session,
             TypeProvider types,
             Map<Integer, Symbol> layout)
     {
         RowExpression simplifiedExpression = simplifyExpression(session, predicate);
         return new FilterRowExpressionStatsCalculatingVisitor(statsEstimate, session, types, layout).process(simplifiedExpression);
+    }
+
+    public PlanNodeStatsEstimate filterStats(
+            PlanNodeStatsEstimate statsEstimate,
+            RowExpression predicate,
+            Session session,
+            TypeProvider types,
+            Map<Integer, Symbol> layout)
+    {
+        return filterStats(statsEstimate, predicate, session.toConnectorSession(), types, layout);
     }
 
     private Expression simplifyExpression(Session session, Expression predicate, TypeProvider types)
@@ -154,9 +167,9 @@ public class FilterStatsCalculator
         return literalEncoder.toExpression(value, BOOLEAN);
     }
 
-    private RowExpression simplifyExpression(Session session, RowExpression predicate)
+    private RowExpression simplifyExpression(ConnectorSession session, RowExpression predicate)
     {
-        RowExpressionInterpreter interpreter = new RowExpressionInterpreter(predicate, metadata, session.toConnectorSession(), OPTIMIZED);
+        RowExpressionInterpreter interpreter = new RowExpressionInterpreter(predicate, metadata, session, OPTIMIZED);
         Object value = interpreter.optimize();
 
         if (value == null) {
@@ -480,7 +493,7 @@ public class FilterStatsCalculator
         private OptionalDouble doubleValueFromLiteral(Type type, Literal literal)
         {
             Object literalValue = LiteralInterpreter.evaluate(metadata, session.toConnectorSession(), literal);
-            return toStatsRepresentation(metadata, session, type, literalValue);
+            return toStatsRepresentation(metadata, session.toConnectorSession(), type, literalValue);
         }
     }
 
@@ -488,11 +501,11 @@ public class FilterStatsCalculator
             implements RowExpressionVisitor<PlanNodeStatsEstimate, Void>
     {
         private final PlanNodeStatsEstimate input;
-        private final Session session;
+        private final ConnectorSession session;
         private final TypeProvider types;
         private final Map<Integer, Symbol> layout;
 
-        FilterRowExpressionStatsCalculatingVisitor(PlanNodeStatsEstimate input, Session session, TypeProvider types, Map<Integer, Symbol> layout)
+        FilterRowExpressionStatsCalculatingVisitor(PlanNodeStatsEstimate input, ConnectorSession session, TypeProvider types, Map<Integer, Symbol> layout)
         {
             this.input = requireNonNull(input, "input is null");
             this.session = requireNonNull(session, "session is null");

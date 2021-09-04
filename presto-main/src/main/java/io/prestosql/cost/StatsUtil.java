@@ -13,8 +13,8 @@
  */
 package io.prestosql.cost;
 
-import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.BooleanType;
@@ -37,13 +37,13 @@ final class StatsUtil
 {
     private StatsUtil() {}
 
-    static OptionalDouble toStatsRepresentation(Metadata metadata, Session session, Type type, Object value)
+    static OptionalDouble toStatsRepresentation(Metadata metadata, ConnectorSession session, Type type, Object value)
     {
         if (convertibleToDoubleWithCast(type)) {
             InterpretedFunctionInvoker functionInvoker = new InterpretedFunctionInvoker(metadata.getFunctionAndTypeManager());
             FunctionHandle cast = metadata.getFunctionAndTypeManager().lookupCast(CAST, type.getTypeSignature(), DoubleType.DOUBLE.getTypeSignature());
 
-            return OptionalDouble.of((double) functionInvoker.invoke(cast, session.toConnectorSession(), singletonList(value)));
+            return OptionalDouble.of((double) functionInvoker.invoke(cast, session, singletonList(value)));
         }
 
         if (DateType.DATE.equals(type)) {

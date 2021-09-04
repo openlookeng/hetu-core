@@ -47,10 +47,10 @@ import static io.prestosql.spi.function.OperatorType.NOT_EQUAL;
 import static io.prestosql.spi.function.OperatorType.SUBSCRIPT;
 import static io.prestosql.spi.function.OperatorType.SUBTRACT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
+import static io.prestosql.spi.type.LikePatternType.LIKE_PATTERN;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.tree.ArrayConstructor.ARRAY_CONSTRUCTOR;
-import static io.prestosql.type.LikePatternType.LIKE_PATTERN;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 

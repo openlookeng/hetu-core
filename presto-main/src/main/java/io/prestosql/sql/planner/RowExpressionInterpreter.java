@@ -78,6 +78,7 @@ import static io.prestosql.operator.scalar.JsonStringToRowCast.JSON_STRING_TO_RO
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.function.OperatorType.EQUAL;
 import static io.prestosql.spi.relation.SpecialForm.Form.AND;
+import static io.prestosql.spi.relation.SpecialForm.Form.BETWEEN;
 import static io.prestosql.spi.relation.SpecialForm.Form.BIND;
 import static io.prestosql.spi.relation.SpecialForm.Form.COALESCE;
 import static io.prestosql.spi.relation.SpecialForm.Form.DEREFERENCE;
@@ -686,6 +687,14 @@ public class RowExpressionInterpreter
                     return new SpecialForm(SWITCH, node.getType(), argumentsBuilder.build());
                 }
                 case BETWEEN: {
+                    List<Object> argumentValues = new ArrayList<>();
+                    for (RowExpression expression : node.getArguments()) {
+                        Object value = expression.accept(this, context);
+                        argumentValues.add(value);
+                    }
+                    if (hasUnresolvedValue(argumentValues)) {
+                        return new SpecialForm(BETWEEN, node.getType(), toRowExpressions(argumentValues, node.getArguments()));
+                    }
                     return node;
                 }
                 default:

@@ -104,7 +104,7 @@ public class ValuesStatsRule
         }
 
         double[] valuesAsDoubles = nonNullValues.stream()
-                .map(value -> toStatsRepresentation(metadata, session, type, value))
+                .map(value -> toStatsRepresentation(metadata, session.toConnectorSession(), type, value))
                 .filter(OptionalDouble::isPresent)
                 .mapToDouble(OptionalDouble::getAsDouble)
                 .toArray();

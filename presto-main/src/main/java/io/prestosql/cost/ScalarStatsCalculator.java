@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.function.FunctionMetadata;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.plan.Symbol;
@@ -92,6 +93,11 @@ public class ScalarStatsCalculator
 
     public SymbolStatsEstimate calculate(RowExpression scalarExpression, PlanNodeStatsEstimate inputStatistics, Session session, Map<Integer, Symbol> layout)
     {
+        return scalarExpression.accept(new RowExpressionStatsVisitor(inputStatistics, session.toConnectorSession(), layout), null);
+    }
+
+    public SymbolStatsEstimate calculate(RowExpression scalarExpression, PlanNodeStatsEstimate inputStatistics, ConnectorSession session, Map<Integer, Symbol> layout)
+    {
         return scalarExpression.accept(new RowExpressionStatsVisitor(inputStatistics, session, layout), null);
     }
 
@@ -99,11 +105,11 @@ public class ScalarStatsCalculator
             implements RowExpressionVisitor<SymbolStatsEstimate, Void>
     {
         private final PlanNodeStatsEstimate input;
-        private final Session session;
+        private final ConnectorSession session;
         private final Map<Integer, Symbol> layout;
         private final FunctionResolution functionResolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
 
-        public RowExpressionStatsVisitor(PlanNodeStatsEstimate input, Session session, Map<Integer, Symbol> layout)
+        public RowExpressionStatsVisitor(PlanNodeStatsEstimate input, ConnectorSession session, Map<Integer, Symbol> layout)
         {
             this.input = requireNonNull(input, "input is null");
             this.session = requireNonNull(session, "session is null");
@@ -122,7 +128,7 @@ public class ScalarStatsCalculator
                 return computeArithmeticBinaryStatistics(call, context);
             }
 
-            RowExpression value = new RowExpressionOptimizer(metadata).optimize(call, OPTIMIZED, session.toConnectorSession());
+            RowExpression value = new RowExpressionOptimizer(metadata).optimize(call, OPTIMIZED, session);
 
             if (value instanceof ConstantExpression && ((ConstantExpression) value).getValue() == null) {
                 return nullStatsEstimate();
@@ -357,7 +363,7 @@ public class ScalarStatsCalculator
         {
             Object value = evaluate(metadata, session.toConnectorSession(), node);
             Type type = ExpressionAnalyzer.createConstantAnalyzer(metadata, session, ImmutableList.of(), WarningCollector.NOOP).analyze(node, Scope.create());
-            OptionalDouble doubleValue = toStatsRepresentation(metadata, session, type, value);
+            OptionalDouble doubleValue = toStatsRepresentation(metadata, session.toConnectorSession(), type, value);
             SymbolStatsEstimate.Builder estimate = SymbolStatsEstimate.builder()
                     .setNullsFraction(0)
                     .setDistinctValuesCount(1);

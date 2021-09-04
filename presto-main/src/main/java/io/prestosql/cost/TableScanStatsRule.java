@@ -140,7 +140,7 @@ public class TableScanStatsRule
         return Optional.of(tableEstimates);
     }
 
-    private static SymbolStatsEstimate toSymbolStatistics(TableStatistics tableStatistics, ColumnStatistics columnStatistics, Type type)
+    public static SymbolStatsEstimate toSymbolStatistics(TableStatistics tableStatistics, ColumnStatistics columnStatistics, Type type)
     {
         requireNonNull(tableStatistics, "tableStatistics is null");
         requireNonNull(columnStatistics, "columnStatistics is null");

@@ -23,6 +23,7 @@ import io.prestosql.spi.function.FunctionMetadataManager;
 import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.metastore.HetuMetastore;
+import io.prestosql.spi.plan.FilterStatsCalculatorService;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.type.TypeManager;
 
@@ -43,6 +44,7 @@ public class ConnectorContextInstance
     private final FunctionMetadataManager functionMetadataManager;
     private final StandardFunctionResolution functionResolution;
     private final BlockEncodingSerde blockEncodingSerde;
+    private final FilterStatsCalculatorService filterStatsCalculatorService;
 
     public ConnectorContextInstance(
             NodeManager nodeManager,
@@ -55,7 +57,8 @@ public class ConnectorContextInstance
             RowExpressionService rowExpressionService,
             FunctionMetadataManager functionMetadataManager,
             StandardFunctionResolution functionResolution,
-            BlockEncodingSerde blockEncodingSerde)
+            BlockEncodingSerde blockEncodingSerde,
+            FilterStatsCalculatorService filterStatsCalculatorService)
     {
         this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
         this.versionEmbedder = requireNonNull(versionEmbedder, "versionEmbedder is null");
@@ -68,6 +71,7 @@ public class ConnectorContextInstance
         this.functionMetadataManager = requireNonNull(functionMetadataManager, "functionMetadataManager is null");
         this.functionResolution = requireNonNull(functionResolution, "functionResolution is null");
         this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");
+        this.filterStatsCalculatorService = requireNonNull(filterStatsCalculatorService, "filterStatsCalculatorService is null");
     }
 
     @Override
@@ -134,5 +138,11 @@ public class ConnectorContextInstance
     public BlockEncodingSerde getBlockEncodingSerde()
     {
         return blockEncodingSerde;
+    }
+
+    @Override
+    public FilterStatsCalculatorService getFilterStatsCalculatorService()
+    {
+        return filterStatsCalculatorService;
     }
 }

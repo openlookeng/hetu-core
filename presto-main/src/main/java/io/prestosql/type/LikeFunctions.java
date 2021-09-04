@@ -26,6 +26,7 @@ import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.function.ScalarFunction;
 import io.prestosql.spi.function.ScalarOperator;
 import io.prestosql.spi.function.SqlType;
+import io.prestosql.spi.type.LikePatternType;
 import io.prestosql.spi.type.StandardTypes;
 
 import java.util.Optional;

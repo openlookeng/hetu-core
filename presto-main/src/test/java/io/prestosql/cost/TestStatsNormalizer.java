@@ -156,6 +156,6 @@ public class TestStatsNormalizer
 
     private double asStatsValue(Object value, Type type)
     {
-        return toStatsRepresentation(metadata, TEST_SESSION, type, value).orElse(NaN);
+        return toStatsRepresentation(metadata, TEST_SESSION.toConnectorSession(), type, value).orElse(NaN);
     }
 }

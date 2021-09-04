@@ -41,7 +41,10 @@ import io.prestosql.cost.CostCalculator;
 import io.prestosql.cost.CostCalculatorUsingExchanges;
 import io.prestosql.cost.CostCalculatorWithEstimatedExchanges;
 import io.prestosql.cost.CostComparator;
+import io.prestosql.cost.FilterStatsCalculator;
+import io.prestosql.cost.ScalarStatsCalculator;
 import io.prestosql.cost.StatsCalculator;
+import io.prestosql.cost.StatsNormalizer;
 import io.prestosql.cost.TaskCountEstimator;
 import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
@@ -244,6 +247,9 @@ public class LocalQueryRunner
     private final PageSorter pageSorter;
     private final PageIndexerFactory pageIndexerFactory;
     private final MetadataManager metadata;
+    private final ScalarStatsCalculator scalarStatsCalculator;
+    private final StatsNormalizer statsNormalizer;
+    private final FilterStatsCalculator filterStatsCalculator;
     private final StatsCalculator statsCalculator;
     private final CostCalculator costCalculator;
     private final CostCalculator estimatedExchangesCostCalculator;
@@ -347,7 +353,10 @@ public class LocalQueryRunner
         this.planFragmenter = new PlanFragmenter(this.metadata, this.nodePartitioningManager, new QueryManagerConfig());
         this.joinCompiler = new JoinCompiler(metadata);
         this.pageIndexerFactory = new GroupByHashPageIndexerFactory(joinCompiler);
-        this.statsCalculator = createNewStatsCalculator(metadata);
+        this.statsNormalizer = new StatsNormalizer();
+        this.scalarStatsCalculator = new ScalarStatsCalculator(metadata);
+        this.filterStatsCalculator = new FilterStatsCalculator(metadata, scalarStatsCalculator, statsNormalizer);
+        this.statsCalculator = createNewStatsCalculator(metadata, scalarStatsCalculator, statsNormalizer, filterStatsCalculator);
         this.taskCountEstimator = new TaskCountEstimator(() -> nodeCountForStats);
         this.costCalculator = new CostCalculatorUsingExchanges(taskCountEstimator);
         this.estimatedExchangesCostCalculator = new CostCalculatorWithEstimatedExchanges(costCalculator, taskCountEstimator);
@@ -389,7 +398,8 @@ public class LocalQueryRunner
                 new NodeSchedulerConfig(),
                 heuristicIndexerManager,
                 new RowExpressionDomainTranslator(metadata),
-                new RowExpressionDeterminismEvaluator(metadata));
+                new RowExpressionDeterminismEvaluator(metadata),
+                new FilterStatsCalculator(metadata, scalarStatsCalculator, statsNormalizer));
 
         GlobalSystemConnectorFactory globalSystemConnectorFactory = new GlobalSystemConnectorFactory(ImmutableSet.of(
                 new NodeSystemTable(nodeManager),

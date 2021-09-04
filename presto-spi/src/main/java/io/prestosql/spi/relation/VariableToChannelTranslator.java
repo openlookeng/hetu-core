@@ -11,24 +11,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.sql.relational;
+package io.prestosql.spi.relation;
 
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.relation.CallExpression;
-import io.prestosql.spi.relation.ConstantExpression;
-import io.prestosql.spi.relation.InputReferenceExpression;
-import io.prestosql.spi.relation.LambdaDefinitionExpression;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.relation.RowExpressionVisitor;
-import io.prestosql.spi.relation.SpecialForm;
-import io.prestosql.spi.relation.VariableReferenceExpression;
 
 import java.util.Map;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Maps.filterKeys;
-import static io.prestosql.sql.relational.Expressions.call;
-import static io.prestosql.sql.relational.Expressions.field;
 
 public final class VariableToChannelTranslator
 {
@@ -56,7 +46,7 @@ public final class VariableToChannelTranslator
         {
             ImmutableList.Builder<RowExpression> arguments = ImmutableList.builder();
             call.getArguments().forEach(argument -> arguments.add(argument.accept(this, layout)));
-            return call(call.getDisplayName(), call.getFunctionHandle(), call.getType(), arguments.build(), call.getFilter());
+            return new CallExpression(call.getDisplayName(), call.getFunctionHandle(), call.getType(), arguments.build(), call.getFilter());
         }
 
         @Override
@@ -79,7 +69,7 @@ public final class VariableToChannelTranslator
             // TODO https://github.com/prestodb/presto/issues/12892
             Map<VariableReferenceExpression, Integer> candidate = filterKeys(layout, variable -> variable.getName().equals(reference.getName()));
             if (!candidate.isEmpty()) {
-                return field(getOnlyElement(candidate.values()), reference.getType());
+                return new InputReferenceExpression(getOnlyElement(candidate.values()), reference.getType());
             }
             // this is possible only for lambda
             return reference;
