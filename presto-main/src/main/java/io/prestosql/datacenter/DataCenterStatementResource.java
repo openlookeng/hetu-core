@@ -29,6 +29,7 @@ import io.prestosql.server.protocol.PagePublisherQueryManager;
 import io.prestosql.server.protocol.PagePublisherQueryRunner;
 import io.prestosql.server.protocol.PageSubscriber;
 import io.prestosql.spi.block.BlockEncodingSerde;
+import io.prestosql.spi.security.GroupProvider;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.utils.HetuConfig;
 
@@ -63,6 +64,7 @@ public class DataCenterStatementResource
 {
     private final PagePublisherQueryManager queryManager;
     private final int splitCount;
+    private final GroupProvider groupProvider;
 
     @Inject
     public DataCenterStatementResource(
@@ -72,7 +74,8 @@ public class DataCenterStatementResource
             BlockEncodingSerde blockEncodingSerde,
             ExchangeClientSupplier exchangeClientSupplier,
             DispatchExecutor dispatchExecutor,
-            StateStoreProvider stateStoreProvider)
+            StateStoreProvider stateStoreProvider,
+            GroupProvider groupProvider)
     {
         this.queryManager = new PagePublisherQueryManager(dispatchManager,
                 queryManager,
@@ -84,6 +87,7 @@ public class DataCenterStatementResource
         int noOfSplits = hetuConfig.getDataCenterSplits();
         // If the config value is out of range, use 5 as the default count
         this.splitCount = noOfSplits > 0 && noOfSplits <= 100 ? noOfSplits : 5;
+        this.groupProvider = groupProvider;
     }
 
     @PreDestroy
@@ -113,7 +117,7 @@ public class DataCenterStatementResource
             throw badRequest(BAD_REQUEST, "SQL statement is empty");
         }
 
-        SessionContext context = new HttpRequestSessionContext(servletRequest);
+        SessionContext context = new HttpRequestSessionContext(servletRequest, groupProvider);
         DataCenterResponse response;
         try {
             PagePublisherQueryRunner queryRunner = this.queryManager.submit(globalQueryId, request.getQuery(), request.getClientId(), request.getMaxAnticipatedDelay(), context);

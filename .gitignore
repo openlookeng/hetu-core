@@ -1,6 +1,7 @@
 *.iml
 *.ipr
 *.iws
+*.icloud
 target/
 /var
 /*/var/

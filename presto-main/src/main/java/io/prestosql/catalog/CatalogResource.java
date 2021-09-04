@@ -20,6 +20,7 @@ import com.google.common.io.Files;
 import com.google.inject.Inject;
 import io.airlift.json.JsonCodec;
 import io.prestosql.server.HttpRequestSessionContext;
+import io.prestosql.spi.security.GroupProvider;
 import org.assertj.core.util.VisibleForTesting;
 import org.glassfish.jersey.media.multipart.BodyPartEntity;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
@@ -64,9 +65,10 @@ public class CatalogResource
     private final int catalogMaxFileSizeInBytes;
     private final int catalogMaxFileNumber;
     private final List<String> validFileSuffixes;
+    private final GroupProvider groupProvider;
 
     @Inject
-    public CatalogResource(DynamicCatalogService service, DynamicCatalogConfig config)
+    public CatalogResource(DynamicCatalogService service, DynamicCatalogConfig config, GroupProvider groupProvider)
     {
         requireNonNull(config, "config is null");
         this.service = requireNonNull(service, "service is null");
@@ -74,6 +76,7 @@ public class CatalogResource
         catalogMaxFileNumber = config.getCatalogMaxFileNumber();
         String suffixes = config.getCatalogValidFileSuffixes();
         validFileSuffixes = (suffixes == null ? ImmutableList.of() : Arrays.asList(suffixes.split(",")));
+        this.groupProvider = groupProvider;
     }
 
     @VisibleForTesting
@@ -194,7 +197,7 @@ public class CatalogResource
         try (CatalogFileInputStream configFiles = toCatalogFiles(catalogConfigFileBodyParts, globalConfigFilesBodyParts)) {
             return service.createCatalog(catalogInfo,
                     configFiles,
-                    new HttpRequestSessionContext(servletRequest));
+                    new HttpRequestSessionContext(servletRequest, groupProvider));
         }
         catch (WebApplicationException ex) {
             throw ex;
@@ -221,7 +224,7 @@ public class CatalogResource
         try (CatalogFileInputStream configFiles = toCatalogFiles(catalogConfigFileBodyParts, globalConfigFilesBodyParts)) {
             return service.updateCatalog(catalogInfo,
                     configFiles,
-                    new HttpRequestSessionContext(servletRequest));
+                    new HttpRequestSessionContext(servletRequest, groupProvider));
         }
         catch (WebApplicationException ex) {
             throw ex;
@@ -244,7 +247,7 @@ public class CatalogResource
         checkCatalogName(catalogName);
         Response response;
         try {
-            response = service.dropCatalog(catalogName, new HttpRequestSessionContext(servletRequest));
+            response = service.dropCatalog(catalogName, new HttpRequestSessionContext(servletRequest, groupProvider));
         }
         catch (WebApplicationException ex) {
             throw ex;
@@ -262,7 +265,7 @@ public class CatalogResource
     {
         Response response;
         try {
-            response = service.showCatalogs(new HttpRequestSessionContext(servletRequest));
+            response = service.showCatalogs(new HttpRequestSessionContext(servletRequest, groupProvider));
         }
         catch (WebApplicationException ex) {
             throw ex;

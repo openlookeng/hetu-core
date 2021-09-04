@@ -108,6 +108,7 @@ import io.prestosql.operator.PagesIndex;
 import io.prestosql.operator.StageExecutionDescriptor;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.operator.index.IndexJoinLookupStats;
+import io.prestosql.security.GroupProviderManager;
 import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.server.InternalCommunicationConfig;
 import io.prestosql.server.PluginManager;
@@ -424,6 +425,7 @@ public class LocalQueryRunner
                 accessControl,
                 new PasswordAuthenticatorManager(),
                 new EventListenerManager(),
+                new GroupProviderManager(),
                 cubeManager,
                 new LocalStateStoreProvider(seedStoreManager), // Hetu: LocalStateProvider
                 new EmbeddedStateStoreLauncher(seedStoreManager,

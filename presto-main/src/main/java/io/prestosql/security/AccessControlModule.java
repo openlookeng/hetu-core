@@ -16,6 +16,7 @@ package io.prestosql.security;
 import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
+import io.prestosql.spi.security.GroupProvider;
 
 import static org.weakref.jmx.guice.ExportBinder.newExporter;
 
@@ -26,6 +27,8 @@ public class AccessControlModule
     public void configure(Binder binder)
     {
         binder.bind(AccessControlManager.class).in(Scopes.SINGLETON);
+        binder.bind(GroupProviderManager.class).in(Scopes.SINGLETON);
+        binder.bind(GroupProvider.class).to(GroupProviderManager.class).in(Scopes.SINGLETON);
         binder.bind(AccessControl.class).to(AccessControlManager.class).in(Scopes.SINGLETON);
         newExporter(binder).export(AccessControlManager.class).withGeneratedName();
     }

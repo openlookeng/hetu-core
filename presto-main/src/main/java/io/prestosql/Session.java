@@ -165,6 +165,11 @@ public final class Session
         return identity.getUser();
     }
 
+    public Set<String> getGroups()
+    {
+        return identity.getGroups();
+    }
+
     public Identity getIdentity()
     {
         return identity;
@@ -379,7 +384,7 @@ public final class Session
                 queryId,
                 Optional.of(transactionId),
                 clientTransactionSupport,
-                new Identity(identity.getUser(), identity.getPrincipal(), roles.build(), identity.getExtraCredentials()),
+                new Identity(identity.getUser(), identity.getGroups(), identity.getPrincipal(), roles.build(), identity.getExtraCredentials()),
                 source,
                 catalog,
                 schema,
@@ -493,6 +498,7 @@ public final class Session
                 transactionId,
                 clientTransactionSupport,
                 identity.getUser(),
+                identity.getGroups(),
                 identity.getPrincipal().map(Principal::toString),
                 source,
                 catalog,
@@ -523,6 +529,7 @@ public final class Session
                 .add("queryId", queryId)
                 .add("transactionId", transactionId)
                 .add("user", getUser())
+                .add("groups", getGroups())
                 .add("principal", getIdentity().getPrincipal().orElse(null))
                 .add("source", source.orElse(null))
                 .add("catalog", catalog.orElse(null))

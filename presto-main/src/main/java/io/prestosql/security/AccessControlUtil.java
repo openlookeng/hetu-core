@@ -17,6 +17,7 @@ package io.prestosql.security;
 import io.prestosql.server.HttpRequestSessionContext;
 import io.prestosql.server.ServerConfig;
 import io.prestosql.server.SessionContext;
+import io.prestosql.spi.security.GroupProvider;
 import io.prestosql.spi.security.Identity;
 
 import javax.servlet.http.HttpServletRequest;
@@ -31,9 +32,9 @@ public class AccessControlUtil
 
     public static Optional<String> getUserForFilter(AccessControl accessControl,
                 ServerConfig serverConfig,
-                HttpServletRequest servletRequest)
+                HttpServletRequest servletRequest, GroupProvider groupProvider)
     {
-        String sessionUser = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(servletRequest));
+        String sessionUser = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(servletRequest, groupProvider));
         Optional<String> user = Optional.of(sessionUser);
         // if the user is admin, don't filter results by user.
         if (serverConfig.isAdmin(sessionUser)) {

@@ -28,6 +28,7 @@ import io.prestosql.security.AccessControl;
 import io.prestosql.security.AccessControlUtil;
 import io.prestosql.server.HttpRequestSessionContext;
 import io.prestosql.server.ServerConfig;
+import io.prestosql.spi.security.GroupProvider;
 import org.joda.time.DateTime;
 
 import javax.servlet.http.HttpServletRequest;
@@ -48,6 +49,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static java.util.Objects.requireNonNull;
+
 @Path("/api/query")
 public class QueryResource
 {
@@ -56,19 +59,21 @@ public class QueryResource
     private final QueryStore queryStore;
     private final AccessControl accessControl;
     private final ServerConfig serverConfig;
+    private final GroupProvider groupProvider;
 
     @Inject
     public QueryResource(JobHistoryStore jobHistoryStore,
                 QueryStore queryStore,
                 ActiveJobsStore activeJobsStore,
                 AccessControl accessControl,
-                ServerConfig serverConfig)
+                ServerConfig serverConfig, GroupProvider groupProvider)
     {
         this.jobHistoryStore = jobHistoryStore;
         this.queryStore = queryStore;
         this.activeJobsStore = activeJobsStore;
         this.accessControl = accessControl;
         this.serverConfig = serverConfig;
+        this.groupProvider = requireNonNull(groupProvider, "groupProvider is null");
     }
 
     public static final Function<Job, DateTime> JOB_ORDERING = (input) ->
@@ -87,7 +92,7 @@ public class QueryResource
             @Context HttpServletRequest servletRequest)
     {
         // if the user is admin, don't filter results by user.
-        Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest);
+        Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest, groupProvider);
 
         Set<Job> recentlyRun;
         if (tables.size() < 1) {
@@ -115,7 +120,7 @@ public class QueryResource
     public Response getSaved(@Context HttpServletRequest servletRequest)
     {
         // if the user is admin, don't filter results by user.
-        Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest);
+        Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest, groupProvider);
 
         return Response.ok(queryStore.getSavedQueries(filterUser)).build();
     }
@@ -129,7 +134,7 @@ public class QueryResource
             @FormParam("query") String query,
             @Context HttpServletRequest servletRequest) throws IOException
     {
-        String user = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(servletRequest));
+        String user = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(servletRequest, groupProvider));
         CreateSavedQueryBuilder createFeaturedQueryRequest = CreateSavedQueryBuilder.notFeatured()
                 .description(description)
                 .name(name)

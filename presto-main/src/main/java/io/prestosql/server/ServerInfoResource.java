@@ -19,6 +19,7 @@ import io.prestosql.client.ServerInfo;
 import io.prestosql.metadata.NodeState;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.security.AccessDeniedException;
+import io.prestosql.spi.security.GroupProvider;
 
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -54,19 +55,22 @@ public class ServerInfoResource
     private final long startTime = System.nanoTime();
     private final AtomicBoolean startupComplete = new AtomicBoolean();
     private final AccessControl accessControl;
+    private final GroupProvider groupProvider;
 
     @Inject
     public ServerInfoResource(NodeVersion nodeVersion,
             NodeInfo nodeInfo,
             ServerConfig serverConfig,
             NodeStateChangeHandler nodeStateChangeHandler,
-            AccessControl accessControl)
+            AccessControl accessControl,
+            GroupProvider groupProvider)
     {
         this.version = requireNonNull(nodeVersion, "nodeVersion is null");
         this.environment = requireNonNull(nodeInfo, "nodeInfo is null").getEnvironment();
         this.coordinator = requireNonNull(serverConfig, "serverConfig is null").isCoordinator();
         this.nodeStateChangeHandler = requireNonNull(nodeStateChangeHandler, "nodeStateChangeHandler");
         this.accessControl = requireNonNull(accessControl, "accessControl is null");
+        this.groupProvider = requireNonNull(groupProvider, "groupProvider is null");
     }
 
     @GET
@@ -113,7 +117,7 @@ public class ServerInfoResource
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
         try {
-            HttpRequestSessionContext httpRequestSessionContext = new HttpRequestSessionContext(servletRequest);
+            HttpRequestSessionContext httpRequestSessionContext = new HttpRequestSessionContext(servletRequest, groupProvider);
             accessControl.checkCanAccessNodeInfo(httpRequestSessionContext.getIdentity());
         }
         catch (AccessDeniedException e) {

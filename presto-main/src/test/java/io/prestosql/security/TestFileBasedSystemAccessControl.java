@@ -47,7 +47,7 @@ import static org.testng.Assert.assertThrows;
 
 public class TestFileBasedSystemAccessControl
 {
-    private static final Identity alice = new Identity("alice", Optional.empty());
+    private static final Identity alice = Identity.forUser("alice").withGroups(ImmutableSet.of("staff")).build();
     private static final Identity kerberosValidAlice = new Identity("alice", Optional.of(new KerberosPrincipal("alice/example.com@EXAMPLE.COM")));
     private static final Identity kerberosValidNonAsciiUser = new Identity("\u0194\u0194\u0194", Optional.of(new KerberosPrincipal("\u0194\u0194\u0194/example.com@EXAMPLE.COM")));
     private static final Identity kerberosInvalidAlice = new Identity("alice", Optional.of(new KerberosPrincipal("mallory/example.com@EXAMPLE.COM")));
@@ -56,13 +56,16 @@ public class TestFileBasedSystemAccessControl
     private static final Identity validSpecialRegexWildDot = new Identity(".*", Optional.of(new KerberosPrincipal("special/.*@EXAMPLE.COM")));
     private static final Identity validSpecialRegexEndQuote = new Identity("\\E", Optional.of(new KerberosPrincipal("special/\\E@EXAMPLE.COM")));
     private static final Identity invalidSpecialRegex = new Identity("alice", Optional.of(new KerberosPrincipal("special/.*@EXAMPLE.COM")));
-    private static final Identity bob = new Identity("bob", Optional.empty());
-    private static final Identity admin = new Identity("admin", Optional.empty());
-    private static final Identity nonAsciiUser = new Identity("\u0194\u0194\u0194", Optional.empty());
-    private static final Set<String> allCatalogs = ImmutableSet.of("secret", "open-to-all", "all-allowed", "alice-catalog", "allowed-absent", "\u0200\u0200\u0200");
+    private static final Identity bob = Identity.forUser("bob").withGroups(ImmutableSet.of("staff")).build();
+    private static final Identity admin = Identity.forUser("admin").withGroups(ImmutableSet.of("admin")).build();
+    private static final Identity nonAsciiUser = Identity.forUser("\u0194\u0194\u0194").withGroups(ImmutableSet.of("\u0194\u0194\u0194")).build();
+    private static final Set<String> allCatalogs = ImmutableSet.of("secret", "open-to-all", "all-allowed", "alice-catalog", "\u0200\u0200\u0200", "staff-catalog");
     private static final QualifiedObjectName aliceTable = new QualifiedObjectName("alice-catalog", "schema", "table");
     private static final QualifiedObjectName aliceView = new QualifiedObjectName("alice-catalog", "schema", "view");
     private static final CatalogSchemaName aliceSchema = new CatalogSchemaName("alice-catalog", "schema");
+    private static final QualifiedObjectName staffTable = new QualifiedObjectName("staff-catalog", "schema2", "table");
+    private static final QualifiedObjectName staffView = new QualifiedObjectName("staff-catalog", "schema2", "view");
+    private static final CatalogSchemaName staffSchema = new CatalogSchemaName("staff-catalog", "schema2");
 
     @Test
     public void testCanImpersonateUserOperations()
@@ -158,13 +161,12 @@ public class TestFileBasedSystemAccessControl
     {
         TransactionManager transactionManager = createTestTransactionManager();
         AccessControlManager accessControlManager = newAccessControlManager(transactionManager, "catalog.json");
-
         transaction(transactionManager, accessControlManager)
                 .execute(transactionId -> {
                     assertEquals(accessControlManager.filterCatalogs(admin, allCatalogs), allCatalogs);
-                    Set<String> aliceCatalogs = ImmutableSet.of("open-to-all", "alice-catalog", "all-allowed");
+                    Set<String> aliceCatalogs = ImmutableSet.of("open-to-all", "alice-catalog", "all-allowed", "staff-catalog");
                     assertEquals(accessControlManager.filterCatalogs(alice, allCatalogs), aliceCatalogs);
-                    Set<String> bobCatalogs = ImmutableSet.of("open-to-all", "all-allowed");
+                    Set<String> bobCatalogs = ImmutableSet.of("open-to-all", "all-allowed", "staff-catalog");
                     assertEquals(accessControlManager.filterCatalogs(bob, allCatalogs), bobCatalogs);
                     Set<String> nonAsciiUserCatalogs = ImmutableSet.of("open-to-all", "all-allowed", "\u0200\u0200\u0200");
                     assertEquals(accessControlManager.filterCatalogs(nonAsciiUser, allCatalogs), nonAsciiUserCatalogs);
@@ -203,7 +205,6 @@ public class TestFileBasedSystemAccessControl
                     Set<String> aliceSchemas = ImmutableSet.of("schema");
                     assertEquals(accessControlManager.filterSchemas(transactionId, alice, "alice-catalog", aliceSchemas), aliceSchemas);
                     assertEquals(accessControlManager.filterSchemas(transactionId, bob, "alice-catalog", aliceSchemas), ImmutableSet.of());
-
                     accessControlManager.checkCanCreateSchema(transactionId, alice, aliceSchema);
                     accessControlManager.checkCanDropSchema(transactionId, alice, aliceSchema);
                     accessControlManager.checkCanRenameSchema(transactionId, alice, aliceSchema, "new-schema");

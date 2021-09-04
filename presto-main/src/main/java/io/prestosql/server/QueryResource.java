@@ -32,6 +32,7 @@ import io.prestosql.server.security.SecurityRequireNonNull;
 import io.prestosql.spi.ErrorType;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.security.GroupProvider;
 
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -77,6 +78,7 @@ public class QueryResource
     private final AccessControl accessControl;
 
     private final ServerConfig serverConfig;
+    private final GroupProvider groupProvider;
 
     public enum SortOrder
     {
@@ -89,13 +91,15 @@ public class QueryResource
                          QueryManager queryManager,
                          HttpServerInfo httpServerInfo,
                          AccessControl accessControl,
-                         ServerConfig serverConfig)
+                         ServerConfig serverConfig,
+                         GroupProvider groupProvider)
     {
         this.dispatchManager = requireNonNull(dispatchManager, "dispatchManager is null");
         this.queryManager = requireNonNull(queryManager, "queryManager is null");
         this.httpServerInfo = requireNonNull(httpServerInfo, "httpServerInfo is null");
         this.accessControl = requireNonNull(accessControl, "httpServerInfo is null");
         this.serverConfig = requireNonNull(serverConfig, "httpServerInfo is null");
+        this.groupProvider = requireNonNull(groupProvider, "groupProvider is null");
     }
 
     @GET
@@ -110,7 +114,7 @@ public class QueryResource
             @Context HttpServletRequest servletRequest)
     {
         // if the user is admin, don't filter results by user.
-        Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest);
+        Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest, groupProvider);
 
         if (pageNum != null && pageNum <= 0) {
             return Response.status(Status.BAD_REQUEST).build();

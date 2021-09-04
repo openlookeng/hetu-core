@@ -76,7 +76,7 @@ public class TestQuerySessionSupplier
     @Test
     public void testCreateSession()
     {
-        HttpRequestSessionContext context = new HttpRequestSessionContext(TEST_REQUEST);
+        HttpRequestSessionContext context = new HttpRequestSessionContext(TEST_REQUEST, user -> ImmutableSet.of());
         QuerySessionSupplier sessionSupplier = new QuerySessionSupplier(
                 createTestTransactionManager(),
                 new AllowAllAccessControl(),
@@ -114,7 +114,7 @@ public class TestQuerySessionSupplier
                         .put(PRESTO_USER, "testUser")
                         .build(),
                 "remoteAddress");
-        HttpRequestSessionContext context1 = new HttpRequestSessionContext(request1);
+        HttpRequestSessionContext context1 = new HttpRequestSessionContext(request1, user -> ImmutableSet.of());
         assertEquals(context1.getClientTags(), ImmutableSet.of());
 
         HttpServletRequest request2 = new MockHttpServletRequest(
@@ -123,7 +123,7 @@ public class TestQuerySessionSupplier
                         .put(PRESTO_CLIENT_TAGS, "")
                         .build(),
                 "remoteAddress");
-        HttpRequestSessionContext context2 = new HttpRequestSessionContext(request2);
+        HttpRequestSessionContext context2 = new HttpRequestSessionContext(request2, user -> ImmutableSet.of());
         assertEquals(context2.getClientTags(), ImmutableSet.of());
     }
 
@@ -136,7 +136,7 @@ public class TestQuerySessionSupplier
                         .put(PRESTO_CLIENT_CAPABILITIES, "foo, bar")
                         .build(),
                 "remoteAddress");
-        HttpRequestSessionContext context1 = new HttpRequestSessionContext(request1);
+        HttpRequestSessionContext context1 = new HttpRequestSessionContext(request1, user -> ImmutableSet.of());
         assertEquals(context1.getClientCapabilities(), ImmutableSet.of("foo", "bar"));
 
         HttpServletRequest request2 = new MockHttpServletRequest(
@@ -144,7 +144,7 @@ public class TestQuerySessionSupplier
                         .put(PRESTO_USER, "testUser")
                         .build(),
                 "remoteAddress");
-        HttpRequestSessionContext context2 = new HttpRequestSessionContext(request2);
+        HttpRequestSessionContext context2 = new HttpRequestSessionContext(request2, user -> ImmutableSet.of());
         assertEquals(context2.getClientCapabilities(), ImmutableSet.of());
     }
 
@@ -157,7 +157,7 @@ public class TestQuerySessionSupplier
                         .put(PRESTO_TIME_ZONE, "unknown_timezone")
                         .build(),
                 "testRemote");
-        HttpRequestSessionContext context = new HttpRequestSessionContext(request);
+        HttpRequestSessionContext context = new HttpRequestSessionContext(request, user -> ImmutableSet.of());
         QuerySessionSupplier sessionSupplier = new QuerySessionSupplier(
                 createTestTransactionManager(),
                 new AllowAllAccessControl(),

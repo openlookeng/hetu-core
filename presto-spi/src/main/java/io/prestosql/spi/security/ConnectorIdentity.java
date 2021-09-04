@@ -17,26 +17,30 @@ import java.security.Principal;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
 import static java.util.Collections.unmodifiableMap;
 import static java.util.Objects.requireNonNull;
 
 public class ConnectorIdentity
 {
     private final String user;
+    private final Set<String> groups;
     private final Optional<Principal> principal;
     private final Optional<SelectedRole> role;
     private final Map<String, String> extraCredentials;
 
     public ConnectorIdentity(String user, Optional<Principal> principal, Optional<SelectedRole> role)
     {
-        this(user, principal, role, emptyMap());
+        this(user, emptySet(), principal, role, emptyMap());
     }
 
-    public ConnectorIdentity(String user, Optional<Principal> principal, Optional<SelectedRole> role, Map<String, String> extraCredentials)
+    public ConnectorIdentity(String user, Set<String> groups, Optional<Principal> principal, Optional<SelectedRole> role, Map<String, String> extraCredentials)
     {
         this.user = requireNonNull(user, "user is null");
+        this.groups = requireNonNull(groups, "groups is null");
         this.principal = requireNonNull(principal, "principal is null");
         this.role = requireNonNull(role, "role is null");
         this.extraCredentials = unmodifiableMap(new HashMap<>(requireNonNull(extraCredentials, "extraCredentials is null")));
@@ -45,6 +49,11 @@ public class ConnectorIdentity
     public String getUser()
     {
         return user;
+    }
+
+    public Set<String> getGroups()
+    {
+        return groups;
     }
 
     public Optional<Principal> getPrincipal()
@@ -81,10 +90,92 @@ public class ConnectorIdentity
     {
         StringBuilder sb = new StringBuilder("ConnectorIdentity{");
         sb.append("user='").append(user).append('\'');
+        sb.append(", groups=").append(groups);
         principal.ifPresent(principal -> sb.append(", principal=").append(principal));
         role.ifPresent(role -> sb.append(", role=").append(role));
         sb.append(", extraCredentials=").append(extraCredentials.keySet());
         sb.append('}');
         return sb.toString();
+    }
+
+    public static ConnectorIdentity ofUser(String user)
+    {
+        return new Builder(user).build();
+    }
+
+    public static Builder forUser(String user)
+    {
+        return new Builder(user);
+    }
+
+    public static class Builder
+    {
+        private final String user;
+        private Set<String> groups = emptySet();
+        private Optional<Principal> principal = Optional.empty();
+        private Optional<SelectedRole> connectorRole = Optional.empty();
+        private Map<String, String> extraCredentials = new HashMap<>();
+
+        private Builder(String user)
+        {
+            this.user = requireNonNull(user, "user is null");
+        }
+
+        public Builder withGroups(Set<String> groups)
+        {
+            this.groups = requireNonNull(groups, "groups is null");
+            return this;
+        }
+
+        public Builder withPrincipal(Principal principal)
+        {
+            return withPrincipal(Optional.of(requireNonNull(principal, "principal is null")));
+        }
+
+        public Builder withPrincipal(Optional<Principal> principal)
+        {
+            this.principal = requireNonNull(principal, "principal is null");
+            return this;
+        }
+
+        /**
+         * @deprecated Use withConnectorRole
+         */
+        @Deprecated
+        public Builder withRole(SelectedRole role)
+        {
+            return withConnectorRole(role);
+        }
+
+        /**
+         * @deprecated Use withConnectorRole
+         */
+        @Deprecated
+        public Builder withRole(Optional<SelectedRole> role)
+        {
+            return withConnectorRole(role);
+        }
+
+        public Builder withConnectorRole(SelectedRole connectorRole)
+        {
+            return withConnectorRole(Optional.of(requireNonNull(connectorRole, "connectorRole is null")));
+        }
+
+        public Builder withConnectorRole(Optional<SelectedRole> connectorRole)
+        {
+            this.connectorRole = requireNonNull(connectorRole, "connectorRole is null");
+            return this;
+        }
+
+        public Builder withExtraCredentials(Map<String, String> extraCredentials)
+        {
+            this.extraCredentials = new HashMap<>(requireNonNull(extraCredentials, "extraCredentials is null"));
+            return this;
+        }
+
+        public ConnectorIdentity build()
+        {
+            return new ConnectorIdentity(user, groups, principal, connectorRole, extraCredentials);
+        }
     }
 }
