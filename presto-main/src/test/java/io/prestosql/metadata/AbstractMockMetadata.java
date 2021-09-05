@@ -17,6 +17,7 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 import io.prestosql.Session;
+import io.prestosql.spi.PartialAndFinalAggregationType;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.CatalogSchemaName;
@@ -698,7 +699,7 @@ public abstract class AbstractMockMetadata
     }
 
     @Override
-    public boolean canPerformSortBasedAggregation(Session session, TableHandle tableHandle, List<String> keyNames)
+    public PartialAndFinalAggregationType validateAndGetSortAggregationType(Session session, TableHandle tableHandle, List<String> keyNames)
     {
         throw new UnsupportedOperationException();
     }

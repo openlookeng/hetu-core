@@ -1,5 +1,5 @@
-final aggregation over ()
+final hashaggregation over ()
     local exchange (GATHER, SINGLE, [])
         remote exchange (GATHER, SINGLE, [])
-            partial aggregation over ()
+            partial hashaggregation over ()
                 scan lineitem

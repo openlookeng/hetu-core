@@ -199,7 +199,7 @@ public class HetuHdfsFileSystemClient
             case SupportedFileAttributes.LAST_MODIFIED_TIME:
                 return fileStatus.getModificationTime();
             case SupportedFileAttributes.SIZE:
-                return fileStatus.getBlockSize();
+                return fileStatus.getLen();
             default:
                 return null;
         }

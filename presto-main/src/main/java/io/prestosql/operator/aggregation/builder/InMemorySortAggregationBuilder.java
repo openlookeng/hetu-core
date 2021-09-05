@@ -48,30 +48,30 @@ public class InMemorySortAggregationBuilder
                 maxPartialMemory, joinCompiler, updateMemory, AggregationNode.AggregationType.SORT_BASED);
     }
 
-    public WorkProcessor<Page> buildResult(AggregationNode.Step step)
+    public WorkProcessor<Page> buildResult(AggregationNode.Step step, boolean isFinalizedValuePresent)
     {
         for (Aggregator aggregator : aggregators) {
             aggregator.prepareFinal();
         }
-        return buildResult(consecutiveGroupIds(), step);
+        return buildResult(consecutiveGroupIds(), step, isFinalizedValuePresent);
     }
 
-    public List<Type> buildTypes(AggregationNode.Step step)
+    public List<Type> buildTypes(AggregationNode.Step step, boolean isFinalizedValuePresent)
     {
         ArrayList<Type> types = new ArrayList<>(groupBy.getTypes());
         for (Aggregator aggregator : aggregators) {
             types.add(aggregator.getType());
         }
         // BOOLEAN block is added to identify row is finalized
-        if (AggregationNode.Step.PARTIAL.equals(step)) {
+        if (isFinalizedValuePresent && AggregationNode.Step.PARTIAL.equals(step)) {
             types.add(BooleanType.BOOLEAN);
         }
         return types;
     }
 
-    private WorkProcessor<Page> buildResult(IntIterator groupIds, AggregationNode.Step step)
+    private WorkProcessor<Page> buildResult(IntIterator groupIds, AggregationNode.Step step, boolean isFinalizedValuePresent)
     {
-        final PageBuilder pageBuilder = new PageBuilder(buildTypes(step));
+        final PageBuilder pageBuilder = new PageBuilder(buildTypes(step, isFinalizedValuePresent));
         return WorkProcessor.create(() -> {
             if (!groupIds.hasNext()) {
                 return WorkProcessor.ProcessState.finished();
@@ -93,7 +93,7 @@ public class InMemorySortAggregationBuilder
                     aggregator.evaluate(groupId, output);
                 }
 
-                if (step == AggregationNode.Step.PARTIAL) {
+                if (isFinalizedValuePresent && step == AggregationNode.Step.PARTIAL) {
                     BlockBuilder output1 = pageBuilder.getBlockBuilder(types.size() + aggregators.size());
                     if (groupId == 0 || !groupIds.hasNext()) {
                         BOOLEAN.writeBoolean(output1, false);

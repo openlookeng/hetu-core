@@ -43,11 +43,25 @@ public interface Seed
     String getLocation();
 
     /**
+     * St location of seed
+     *
+     * @return void
+     */
+    void setLocation(String location);
+
+    /**
      * Get timestamp of seed
      *
      * @return timestamp of seed
      */
     long getTimestamp();
+
+    /**
+     * Set timestamp of seed
+     *
+     * @return void
+     */
+    void setTimestamp(long timestamp);
 
     /**
      * Serialize seed object to string and return

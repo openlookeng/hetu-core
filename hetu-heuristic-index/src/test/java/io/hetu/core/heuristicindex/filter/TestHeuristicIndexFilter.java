@@ -17,6 +17,7 @@ package io.hetu.core.heuristicindex.filter;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.hetu.core.common.filesystem.TempFolder;
 import io.hetu.core.plugin.heuristicindex.index.bloom.BloomIndex;
 import io.hetu.core.plugin.heuristicindex.index.minmax.MinMaxIndex;
 import io.prestosql.expressions.LogicalRowExpressions;
@@ -30,6 +31,9 @@ import io.prestosql.spi.relation.VariableReferenceExpression;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Collections;
 
@@ -51,19 +55,40 @@ public class TestHeuristicIndexFilter
     public void setup()
             throws IOException
     {
-        bloomIndex1 = new BloomIndex();
-        bloomIndex1.setExpectedNumOfEntries(2);
-        bloomIndex1.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of("a", "b"))));
+        try (TempFolder folder = new TempFolder()) {
+            folder.create();
+            File testFile = folder.newFile();
 
-        bloomIndex2 = new BloomIndex();
-        bloomIndex2.setExpectedNumOfEntries(2);
-        bloomIndex2.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of("c", "d"))));
+            bloomIndex1 = new BloomIndex();
+            bloomIndex1.setExpectedNumOfEntries(2);
+            bloomIndex1.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of("a", "b"))));
 
-        minMaxIndex1 = new MinMaxIndex();
-        minMaxIndex1.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of(1L, 5L, 10L))));
+            try (FileOutputStream fo = new FileOutputStream(testFile)) {
+                bloomIndex1.serialize(fo);
+            }
 
-        minMaxIndex2 = new MinMaxIndex();
-        minMaxIndex2.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of(50L, 80L, 100L))));
+            try (FileInputStream fi = new FileInputStream(testFile)) {
+                bloomIndex1.deserialize(fi);
+            }
+
+            bloomIndex2 = new BloomIndex();
+            bloomIndex2.setExpectedNumOfEntries(2);
+            bloomIndex2.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of("c", "d"))));
+
+            try (FileOutputStream fo = new FileOutputStream(testFile)) {
+                bloomIndex2.serialize(fo);
+            }
+
+            try (FileInputStream fi = new FileInputStream(testFile)) {
+                bloomIndex2.deserialize(fi);
+            }
+
+            minMaxIndex1 = new MinMaxIndex();
+            minMaxIndex1.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of(1L, 5L, 10L))));
+
+            minMaxIndex2 = new MinMaxIndex();
+            minMaxIndex2.addValues(Collections.singletonList(new Pair<>("testColumn", ImmutableList.of(50L, 80L, 100L))));
+        }
     }
 
     @Test

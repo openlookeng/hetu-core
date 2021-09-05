@@ -3,10 +3,10 @@ remote exchange (GATHER, SINGLE, [])
         remote exchange (REPARTITION, ROUND_ROBIN, [])
             cross join:
                 join (RIGHT, PARTITIONED):
-                    final aggregation over (partkey_15)
+                    final hashaggregation over (partkey_15)
                         local exchange (GATHER, SINGLE, [])
                             remote exchange (REPARTITION, HASH, ["partkey_15"])
-                                partial aggregation over (partkey_15)
+                                partial hashaggregation over (partkey_15)
                                     join (INNER, REPLICATED):
                                         scan partsupp
                                         local exchange (GATHER, SINGLE, [])
@@ -43,5 +43,5 @@ remote exchange (GATHER, SINGLE, [])
                                                                 scan region
                 local exchange (GATHER, SINGLE, [])
                     remote exchange (REPLICATE, BROADCAST, [])
-                        single aggregation over ()
+                        single hashaggregation over ()
                             values (1 rows)

@@ -1,9 +1,9 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
-        final aggregation over (c_first_name, c_last_name)
+        final hashaggregation over (c_first_name, c_last_name)
             local exchange (GATHER, SINGLE, [])
                 remote exchange (REPARTITION, HASH, ["c_first_name", "c_last_name"])
-                    partial aggregation over (c_first_name, c_last_name)
+                    partial hashaggregation over (c_first_name, c_last_name)
                         semijoin (PARTITIONED):
                             remote exchange (REPARTITION, HASH, ["cs_bill_customer_sk"])
                                 semijoin (PARTITIONED):
@@ -20,9 +20,9 @@ local exchange (GATHER, SINGLE, [])
                                                     scan customer
                                     local exchange (GATHER, SINGLE, [])
                                         remote exchange (REPARTITION, HASH, ["i_item_sk"])
-                                            final aggregation over (d_date_6, i_item_sk, substr)
+                                            final hashaggregation over (d_date_6, i_item_sk, substr)
                                                 local exchange (GATHER, SINGLE, [])
-                                                    partial aggregation over (d_date_6, i_item_sk, substr)
+                                                    partial hashaggregation over (d_date_6, i_item_sk, substr)
                                                         join (INNER, PARTITIONED):
                                                             remote exchange (REPARTITION, HASH, ["ss_item_sk"])
                                                                 join (INNER, REPLICATED):
@@ -34,12 +34,12 @@ local exchange (GATHER, SINGLE, [])
                                                                 remote exchange (REPARTITION, HASH, ["i_item_sk"])
                                                                     scan item
                             local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPARTITION, HASH, ["c_customer_sk_86"])
+                                remote exchange (REPARTITION, HASH, ["c_customer_sk_76"])
                                     cross join:
-                                        final aggregation over (c_customer_sk_86)
+                                        final hashaggregation over (c_customer_sk_76)
                                             local exchange (GATHER, SINGLE, [])
-                                                remote exchange (REPARTITION, HASH, ["c_customer_sk_86"])
-                                                    partial aggregation over (c_customer_sk_86)
+                                                remote exchange (REPARTITION, HASH, ["c_customer_sk_76"])
+                                                    partial hashaggregation over (c_customer_sk_76)
                                                         join (INNER, REPLICATED):
                                                             scan store_sales
                                                             local exchange (GATHER, SINGLE, [])
@@ -47,14 +47,14 @@ local exchange (GATHER, SINGLE, [])
                                                                     scan customer
                                         local exchange (GATHER, SINGLE, [])
                                             remote exchange (REPLICATE, BROADCAST, [])
-                                                final aggregation over ()
+                                                final hashaggregation over ()
                                                     local exchange (GATHER, SINGLE, [])
                                                         remote exchange (GATHER, SINGLE, [])
-                                                            partial aggregation over ()
-                                                                final aggregation over (c_customer_sk_136)
+                                                            partial hashaggregation over ()
+                                                                final hashaggregation over (c_customer_sk_126)
                                                                     local exchange (GATHER, SINGLE, [])
-                                                                        remote exchange (REPARTITION, HASH, ["c_customer_sk_136"])
-                                                                            partial aggregation over (c_customer_sk_136)
+                                                                        remote exchange (REPARTITION, HASH, ["c_customer_sk_126"])
+                                                                            partial hashaggregation over (c_customer_sk_126)
                                                                                 join (INNER, REPLICATED):
                                                                                     join (INNER, REPLICATED):
                                                                                         scan store_sales
@@ -64,16 +64,16 @@ local exchange (GATHER, SINGLE, [])
                                                                                     local exchange (GATHER, SINGLE, [])
                                                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                                                             scan customer
-        final aggregation over (c_first_name_240, c_last_name_241)
+        final hashaggregation over (c_first_name_213, c_last_name_214)
             local exchange (GATHER, SINGLE, [])
-                remote exchange (REPARTITION, HASH, ["c_first_name_240", "c_last_name_241"])
-                    partial aggregation over (c_first_name_240, c_last_name_241)
+                remote exchange (REPARTITION, HASH, ["c_first_name_213", "c_last_name_214"])
+                    partial hashaggregation over (c_first_name_213, c_last_name_214)
                         semijoin (PARTITIONED):
                             remote exchange (REPARTITION, HASH, ["ws_bill_customer_sk"])
                                 semijoin (PARTITIONED):
                                     remote exchange (REPARTITION, HASH, ["ws_item_sk"])
                                         join (INNER, PARTITIONED):
-                                            remote exchange (REPARTITION, HASH, ["c_customer_sk_232"])
+                                            remote exchange (REPARTITION, HASH, ["c_customer_sk_205"])
                                                 scan customer
                                             local exchange (GATHER, SINGLE, [])
                                                 remote exchange (REPARTITION, HASH, ["ws_bill_customer_sk"])
@@ -83,27 +83,27 @@ local exchange (GATHER, SINGLE, [])
                                                             remote exchange (REPLICATE, BROADCAST, [])
                                                                 scan date_dim (pushdown = true)
                                     local exchange (GATHER, SINGLE, [])
-                                        remote exchange (REPARTITION, HASH, ["i_item_sk_334"])
-                                            final aggregation over (d_date_307, i_item_sk_334, substr_357)
+                                        remote exchange (REPARTITION, HASH, ["i_item_sk_307"])
+                                            final hashaggregation over (d_date_280, i_item_sk_307, substr_330)
                                                 local exchange (GATHER, SINGLE, [])
-                                                    partial aggregation over (d_date_307, i_item_sk_334, substr_357)
+                                                    partial hashaggregation over (d_date_280, i_item_sk_307, substr_330)
                                                         join (INNER, PARTITIONED):
-                                                            remote exchange (REPARTITION, HASH, ["ss_item_sk_283"])
+                                                            remote exchange (REPARTITION, HASH, ["ss_item_sk_256"])
                                                                 join (INNER, REPLICATED):
                                                                     scan store_sales
                                                                     local exchange (GATHER, SINGLE, [])
                                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                                             scan date_dim (pushdown = true)
                                                             local exchange (GATHER, SINGLE, [])
-                                                                remote exchange (REPARTITION, HASH, ["i_item_sk_334"])
+                                                                remote exchange (REPARTITION, HASH, ["i_item_sk_307"])
                                                                     scan item
                             local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPARTITION, HASH, ["c_customer_sk_416"])
+                                remote exchange (REPARTITION, HASH, ["c_customer_sk_379"])
                                     cross join:
-                                        final aggregation over (c_customer_sk_416)
+                                        final hashaggregation over (c_customer_sk_379)
                                             local exchange (GATHER, SINGLE, [])
-                                                remote exchange (REPARTITION, HASH, ["c_customer_sk_416"])
-                                                    partial aggregation over (c_customer_sk_416)
+                                                remote exchange (REPARTITION, HASH, ["c_customer_sk_379"])
+                                                    partial hashaggregation over (c_customer_sk_379)
                                                         join (INNER, REPLICATED):
                                                             scan store_sales
                                                             local exchange (GATHER, SINGLE, [])
@@ -111,14 +111,14 @@ local exchange (GATHER, SINGLE, [])
                                                                     scan customer
                                         local exchange (GATHER, SINGLE, [])
                                             remote exchange (REPLICATE, BROADCAST, [])
-                                                final aggregation over ()
+                                                final hashaggregation over ()
                                                     local exchange (GATHER, SINGLE, [])
                                                         remote exchange (GATHER, SINGLE, [])
-                                                            partial aggregation over ()
-                                                                final aggregation over (c_customer_sk_468)
+                                                            partial hashaggregation over ()
+                                                                final hashaggregation over (c_customer_sk_431)
                                                                     local exchange (GATHER, SINGLE, [])
-                                                                        remote exchange (REPARTITION, HASH, ["c_customer_sk_468"])
-                                                                            partial aggregation over (c_customer_sk_468)
+                                                                        remote exchange (REPARTITION, HASH, ["c_customer_sk_431"])
+                                                                            partial hashaggregation over (c_customer_sk_431)
                                                                                 join (INNER, REPLICATED):
                                                                                     join (INNER, REPLICATED):
                                                                                         scan store_sales

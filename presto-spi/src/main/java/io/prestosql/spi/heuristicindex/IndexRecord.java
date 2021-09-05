@@ -26,12 +26,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
+import java.util.Properties;
+
+import static io.prestosql.spi.connector.CreateIndexMetadata.AUTOLOAD_PROP_KEY;
+import static java.util.Objects.requireNonNull;
 
 public class IndexRecord
 {
     // An index record in hetu-metastore's table entity's parameter map:
-    // "HINDEX|<columns>|<indexType>" -> "name|user|properties|partitions|lastModifiedTime"
+    // "HINDEX|<columns>|<indexType>" -> "name|user|properties|indexsize|partitions|lastModifiedTime"
     public static final String INDEX_METASTORE_PREFIX = "HINDEX";
     public static final String METASTORE_DELIMITER = "|";
     public static final String INPROGRESS_PROPERTY_KEY = "CreationInProgress";
@@ -44,11 +47,13 @@ public class IndexRecord
     public final String qualifiedTable;
     public final String[] columns;
     public final String indexType;
-    public final List<String> properties;
+    public final long indexSize;
+    public final List<String> propertiesAsList;
+    public final Properties propertiesAsProperties;
     public final List<String> partitions;
     public final long lastModifiedTime;
 
-    public IndexRecord(String name, String user, String qualifiedTable, String[] columns, String indexType, List<String> properties, List<String> partitions)
+    public IndexRecord(String name, String user, String qualifiedTable, String[] columns, String indexType, long indexSize, List<String> propertiesAsList, List<String> partitions)
     {
         this.name = name;
         this.user = user == null ? "" : user;
@@ -62,32 +67,22 @@ public class IndexRecord
         this.table = qualifiedNames[2];
         this.columns = Arrays.stream(columns).map(String::toLowerCase).toArray(String[]::new);
         this.indexType = indexType.toUpperCase(Locale.ENGLISH);
-        this.properties = properties;
+        this.indexSize = indexSize;
         this.partitions = partitions;
         this.lastModifiedTime = System.currentTimeMillis();
+        this.propertiesAsList = propertiesAsList;
+        this.propertiesAsProperties = stringToProperties(propertiesAsList);
     }
 
-    /**
-     * Construct IndexRecord from line of csv record
-     */
-    public IndexRecord(String csvRecord)
+    private Properties stringToProperties(List<String> properties)
     {
-        String[] records = csvRecord.split("\\|", Integer.MAX_VALUE);
-        this.name = records[0];
-        this.user = records[1];
-        String[] qualifiedNames = records[2].split("\\.");
-        if (qualifiedNames.length != 3) {
-            throw new IllegalArgumentException(String.format("Invalid table name: %s", records[2]));
+        Properties curProperties = new Properties();
+        for (String prop : properties) {
+            String key = prop.substring(0, prop.indexOf("="));
+            String val = prop.substring(prop.indexOf("=") + 1);
+            curProperties.setProperty(key, val);
         }
-        this.qualifiedTable = records[2];
-        this.catalog = qualifiedNames[0];
-        this.schema = qualifiedNames[1];
-        this.table = qualifiedNames[2];
-        this.columns = records[3].split(",");
-        this.indexType = records[4];
-        this.properties = Arrays.stream(records[5].split(",")).filter(s -> !s.equals("")).collect(Collectors.toList());
-        this.partitions = Arrays.stream(records[6].split(",")).filter(s -> !s.equals("")).collect(Collectors.toList());
-        this.lastModifiedTime = Long.parseLong(records[7]);
+        return curProperties;
     }
 
     /**
@@ -109,16 +104,18 @@ public class IndexRecord
         this.indexType = keyParts[2];
 
         // parse value (JSON)
-        Gson gson = new Gson();
         JsonParser parser = new JsonParser();
         JsonObject values = parser.parse(metastoreEntry.getValue()).getAsJsonObject();
-        this.name = values.get("name").getAsString();
-        this.user = values.get("user").getAsString();
-        this.properties = new ArrayList<>();
-        values.get("properties").getAsJsonArray().forEach(e -> this.properties.add(e.getAsString()));
+
+        this.name = requireNonNull(values.get("name"), "attribute 'name' should not be null. Index is in an invalid state, recreate the index to resolve the issue.").getAsString();
+        this.user = requireNonNull(values.get("user"), "attribute 'user' should not be null. Index is in an invalid state, recreate the index to resolve the issue.").getAsString();
+        this.indexSize = values.has("indexSize") ? values.get("indexSize").getAsLong() : 0;
+        this.propertiesAsList = new ArrayList<>();
+        requireNonNull(values.get("properties"), "attribute 'properties' should not be null. Index is in an invalid state, recreate the index to resolve the issue.").getAsJsonArray().forEach(e -> this.propertiesAsList.add(e.getAsString()));
+        this.propertiesAsProperties = stringToProperties(this.propertiesAsList);
         this.partitions = new ArrayList<>();
-        values.get("partitions").getAsJsonArray().forEach(e -> this.partitions.add(e.getAsString()));
-        this.lastModifiedTime = values.get("lastModifiedTime").getAsLong();
+        requireNonNull(values.get("partitions"), "attribute 'partitions' should not be null. Index is in an invalid state, recreate the index to resolve the issue.").getAsJsonArray().forEach(e -> this.partitions.add(e.getAsString()));
+        this.lastModifiedTime = requireNonNull(values.get("lastModifiedTime"), "attribute 'lastModifiedTime' should not be null. Index is in an invalid state, recreate the index to resolve the issue.").getAsLong();
     }
 
     public String serializeKey()
@@ -132,7 +129,8 @@ public class IndexRecord
         Map<String, Object> content = new HashMap<>();
         content.put("name", name);
         content.put("user", user);
-        content.put("properties", properties);
+        content.put("indexSize", indexSize);
+        content.put("properties", propertiesAsList);
         content.put("partitions", partitions);
         content.put("lastModifiedTime", lastModifiedTime);
 
@@ -141,18 +139,28 @@ public class IndexRecord
 
     public boolean isInProgressRecord()
     {
-        return this.properties.stream().anyMatch(property -> property.startsWith(INPROGRESS_PROPERTY_KEY));
+        return this.propertiesAsProperties.containsKey(INPROGRESS_PROPERTY_KEY);
+    }
+
+    public Properties getProperties()
+    {
+        return propertiesAsProperties;
     }
 
     public String getProperty(String key)
     {
-        for (String property : properties) {
+        for (String property : this.propertiesAsList) {
             if (property.toLowerCase(Locale.ROOT).startsWith(key.toLowerCase(Locale.ROOT))) {
                 String[] entry = property.split("=");
                 return entry[1];
             }
         }
         return null;
+    }
+
+    public boolean isAutoloadEnabled()
+    {
+        return Boolean.parseBoolean(getProperty(AUTOLOAD_PROP_KEY));
     }
 
     @Override
@@ -169,13 +177,14 @@ public class IndexRecord
                 Objects.equals(user, that.user) &&
                 Objects.equals(qualifiedTable, that.qualifiedTable) &&
                 Arrays.equals(columns, that.columns) &&
+                indexSize == that.indexSize &&
                 Objects.equals(indexType, that.indexType);
     }
 
     @Override
     public int hashCode()
     {
-        int result = Objects.hash(name, user, qualifiedTable, columns, indexType);
+        int result = Objects.hash(name, user, catalog, schema, table, qualifiedTable, indexType, indexSize, propertiesAsList, partitions, lastModifiedTime);
         result = 31 * result + Arrays.hashCode(columns);
         return result;
     }
@@ -185,9 +194,16 @@ public class IndexRecord
     {
         return "IndexRecord{" +
                 "name='" + name + '\'' +
-                ", table='" + qualifiedTable + '\'' +
+                ", user='" + user + '\'' +
+                ", catalog='" + catalog + '\'' +
+                ", schema='" + schema + '\'' +
+                ", table='" + table + '\'' +
+                ", qualifiedTable='" + qualifiedTable + '\'' +
                 ", columns=" + Arrays.toString(columns) +
                 ", indexType='" + indexType + '\'' +
+                ", indexSize=" + indexSize +
+                ", properties=" + propertiesAsList +
+                ", partitions=" + partitions +
                 ", lastModifiedTime=" + lastModifiedTime +
                 '}';
     }

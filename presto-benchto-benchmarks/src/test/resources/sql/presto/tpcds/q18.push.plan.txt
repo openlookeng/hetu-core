@@ -1,9 +1,9 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
-        final aggregation over (ca_country$gid, ca_county$gid, ca_state$gid, groupid, i_item_id$gid)
+        final hashaggregation over (ca_country$gid, ca_county$gid, ca_state$gid, groupid, i_item_id$gid)
             local exchange (REPARTITION, HASH, ["ca_country$gid", "ca_county$gid", "ca_state$gid", "groupid", "i_item_id$gid"])
                 remote exchange (REPARTITION, HASH, ["ca_country$gid", "ca_county$gid", "ca_state$gid", "groupid", "i_item_id$gid"])
-                    partial aggregation over (ca_country$gid, ca_county$gid, ca_state$gid, groupid, i_item_id$gid)
+                    partial hashaggregation over (ca_country$gid, ca_county$gid, ca_state$gid, groupid, i_item_id$gid)
                         join (INNER, PARTITIONED):
                             remote exchange (REPARTITION, HASH, ["cs_item_sk"])
                                 join (INNER, PARTITIONED):

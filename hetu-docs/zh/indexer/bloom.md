@@ -43,6 +43,15 @@ BloomIndex仅支持相等表达式，例如`name='monkey'`。
 > 更小的FPP会提高索引的过滤能力，但是会增加索引的体积。在大多数情况下默认值就足以够用。
 > 如果创建的索引太大，可以考虑增加这个值（例如，至0.05)。
 
+### `bloom.mmapEnabled`
+
+> -   **类型:** `Boolean`
+> -   **默认值:** `true`
+> 
+> 控制在读取布隆索引时是否应使用内存映射文件 (mmap)。
+> 启用此值将在读取期间将 Bloom 索引缓存到本地磁盘而不是内存中。
+> 这将减少内存消耗，但会导致性能略有下降。
+
 ## 用例
 
 **创建索引:**
@@ -51,6 +60,7 @@ create index idx using bloom on hive.hindex.users (id);
 create index idx using bloom on hive.hindex.users (id) where regionkey=1;
 create index idx using bloom on hive.hindex.users (id) where regionkey in (3, 1);
 create index idx using bloom on hive.hindex.users (id) WITH ("bloom.fpp" = '0.001');
+create index idx using bloom on hive.hindex.users (id) WITH ("bloom.mmapEnabled" = false);
 ```
 
 * 假设表已按照`regionkey`列分区

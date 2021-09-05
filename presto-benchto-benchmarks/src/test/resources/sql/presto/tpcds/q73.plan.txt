@@ -3,10 +3,10 @@ remote exchange (GATHER, SINGLE, [])
         remote exchange (REPARTITION, ROUND_ROBIN, [])
             join (INNER, PARTITIONED):
                 remote exchange (REPARTITION, HASH, ["ss_customer_sk"])
-                    final aggregation over (ss_customer_sk, ss_ticket_number)
+                    final hashaggregation over (ss_customer_sk, ss_ticket_number)
                         local exchange (GATHER, SINGLE, [])
                             remote exchange (REPARTITION, HASH, ["ss_customer_sk", "ss_ticket_number"])
-                                partial aggregation over (ss_customer_sk, ss_ticket_number)
+                                partial hashaggregation over (ss_customer_sk, ss_ticket_number)
                                     join (INNER, REPLICATED):
                                         join (INNER, REPLICATED):
                                             join (INNER, REPLICATED):

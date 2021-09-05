@@ -1,7 +1,7 @@
-final aggregation over ()
+final hashaggregation over ()
     local exchange (GATHER, SINGLE, [])
         remote exchange (GATHER, SINGLE, [])
-            partial aggregation over ()
+            partial hashaggregation over ()
                 local exchange (GATHER, SINGLE, [])
                     Filter
                         semijoin (PARTITIONED):
@@ -29,7 +29,7 @@ final aggregation over ()
                                         remote exchange (REPARTITION, HASH, ["ws_order_number_17"])
                                             cte ws_wh
                                                 Filter
-                                                    single aggregation over (ws_order_number_17)
+                                                    single hashaggregation over (ws_order_number_17)
                                                         local exchange (GATHER, SINGLE, [])
                                                             remote exchange (REPARTITION, HASH, ["ws_order_number_17"])
                                                                 scan web_sales
@@ -40,10 +40,10 @@ final aggregation over ()
                                             Filter
                                                 scan web_returns
                                         local exchange (GATHER, SINGLE, [])
-                                            remote exchange (REPARTITION, HASH, ["ws_order_number_107"])
+                                            remote exchange (REPARTITION, HASH, ["ws_order_number_99"])
                                                 cte ws_wh
                                                     Filter
-                                                        single aggregation over (ws_order_number_107)
+                                                        single hashaggregation over (ws_order_number_99)
                                                             local exchange (GATHER, SINGLE, [])
-                                                                remote exchange (REPARTITION, HASH, ["ws_order_number_107"])
+                                                                remote exchange (REPARTITION, HASH, ["ws_order_number_99"])
                                                                     scan web_sales

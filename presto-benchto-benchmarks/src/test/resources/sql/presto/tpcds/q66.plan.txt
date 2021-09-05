@@ -1,12 +1,12 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
-        final aggregation over (concat_306, d_year_307, w_city_302, w_country_305, w_county_303, w_state_304, w_warehouse_name_300, w_warehouse_sq_ft_301)
-            local exchange (REPARTITION, HASH, ["concat_306", "d_year_307", "w_city_302", "w_country_305", "w_county_303", "w_state_304", "w_warehouse_name_300", "w_warehouse_sq_ft_301"])
-                partial aggregation over (concat_603, d_year, w_city, w_country, w_county, w_state, w_warehouse_name, w_warehouse_sq_ft)
-                    final aggregation over (d_year, w_city, w_country, w_county, w_state, w_warehouse_name, w_warehouse_sq_ft)
+        final hashaggregation over (concat_242, d_year_243, w_city_238, w_country_241, w_county_239, w_state_240, w_warehouse_name_236, w_warehouse_sq_ft_237)
+            local exchange (REPARTITION, HASH, ["concat_242", "d_year_243", "w_city_238", "w_country_241", "w_county_239", "w_state_240", "w_warehouse_name_236", "w_warehouse_sq_ft_237"])
+                partial hashaggregation over (concat_463, d_year, w_city, w_country, w_county, w_state, w_warehouse_name, w_warehouse_sq_ft)
+                    final hashaggregation over (d_year, w_city, w_country, w_county, w_state, w_warehouse_name, w_warehouse_sq_ft)
                         local exchange (GATHER, SINGLE, [])
                             remote exchange (REPARTITION, HASH, ["d_year", "w_city", "w_country", "w_county", "w_state", "w_warehouse_name", "w_warehouse_sq_ft"])
-                                partial aggregation over (d_year, w_city, w_country, w_county, w_state, w_warehouse_name, w_warehouse_sq_ft)
+                                partial hashaggregation over (d_year, w_city, w_country, w_county, w_state, w_warehouse_name, w_warehouse_sq_ft)
                                     join (INNER, REPLICATED):
                                         join (INNER, REPLICATED):
                                             join (INNER, REPLICATED):
@@ -24,11 +24,11 @@ local exchange (GATHER, SINGLE, [])
                                         local exchange (GATHER, SINGLE, [])
                                             remote exchange (REPLICATE, BROADCAST, [])
                                                 scan warehouse
-                partial aggregation over (concat_646, d_year_136, w_city_124, w_country_128, w_county_125, w_state_126, w_warehouse_name_118, w_warehouse_sq_ft_119)
-                    final aggregation over (d_year_136, w_city_124, w_country_128, w_county_125, w_state_126, w_warehouse_name_118, w_warehouse_sq_ft_119)
+                partial hashaggregation over (concat_506, d_year_104, w_city_92, w_country_96, w_county_93, w_state_94, w_warehouse_name_86, w_warehouse_sq_ft_87)
+                    final hashaggregation over (d_year_104, w_city_92, w_country_96, w_county_93, w_state_94, w_warehouse_name_86, w_warehouse_sq_ft_87)
                         local exchange (GATHER, SINGLE, [])
-                            remote exchange (REPARTITION, HASH, ["d_year_136", "w_city_124", "w_country_128", "w_county_125", "w_state_126", "w_warehouse_name_118", "w_warehouse_sq_ft_119"])
-                                partial aggregation over (d_year_136, w_city_124, w_country_128, w_county_125, w_state_126, w_warehouse_name_118, w_warehouse_sq_ft_119)
+                            remote exchange (REPARTITION, HASH, ["d_year_104", "w_city_92", "w_country_96", "w_county_93", "w_state_94", "w_warehouse_name_86", "w_warehouse_sq_ft_87"])
+                                partial hashaggregation over (d_year_104, w_city_92, w_country_96, w_county_93, w_state_94, w_warehouse_name_86, w_warehouse_sq_ft_87)
                                     join (INNER, REPLICATED):
                                         join (INNER, REPLICATED):
                                             join (INNER, REPLICATED):

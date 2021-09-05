@@ -29,7 +29,9 @@ import io.prestosql.sql.planner.iterative.rule.HintedReorderJoins;
 import io.prestosql.sql.planner.iterative.rule.PushLimitThroughOuterJoin;
 import io.prestosql.sql.planner.iterative.rule.PushLimitThroughSemiJoin;
 import io.prestosql.sql.planner.iterative.rule.PushLimitThroughUnion;
+import io.prestosql.sql.planner.iterative.rule.PushPredicateIntoTableScan;
 import io.prestosql.sql.planner.iterative.rule.ReorderJoins;
+import io.prestosql.sql.planner.iterative.rule.RowExpressionRewriteRuleSet;
 import io.prestosql.sql.planner.optimizations.ApplyConnectorOptimization;
 import io.prestosql.sql.planner.optimizations.LimitPushDown;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
@@ -44,6 +46,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static io.prestosql.SystemSessionProperties.getJoinReorderingStrategy;
+import static io.prestosql.spi.plan.PlanNode.SkipOptRuleLevel.APPLY_ALL_LEGACY_AND_ROWEXPR;
+import static io.prestosql.spi.plan.PlanNode.SkipOptRuleLevel.APPLY_ALL_LEGACY_AND_ROWEXPR_PUSH_PREDICATE;
+import static io.prestosql.spi.plan.PlanNode.SkipOptRuleLevel.APPLY_ALL_RULES;
 import static java.util.Objects.requireNonNull;
 
 public class OptimizerUtils
@@ -126,6 +131,21 @@ public class OptimizerUtils
         return counter.isMaxCountReached();
     }
 
+    public static boolean canApplyOptimizer(PlanOptimizer optimizer, PlanNode.SkipOptRuleLevel optimizationLevel)
+    {
+        if (optimizationLevel == APPLY_ALL_RULES) {
+            return true;
+        }
+
+        // If it is IterativeOptimizer, then only rule as per level selected can be applied.
+        return !(optimizer instanceof IterativeOptimizer)
+                || (((optimizationLevel != APPLY_ALL_LEGACY_AND_ROWEXPR
+                || ((IterativeOptimizer) optimizer).getRules().stream().findFirst().get() instanceof RowExpressionRewriteRuleSet.ValuesRowExpressionRewrite))
+                && (optimizationLevel != APPLY_ALL_LEGACY_AND_ROWEXPR_PUSH_PREDICATE
+                || ((IterativeOptimizer) optimizer).getRules().stream().findFirst().get() instanceof RowExpressionRewriteRuleSet.ValuesRowExpressionRewrite
+                || ((IterativeOptimizer) optimizer).getRules().stream().findFirst().get() instanceof PushPredicateIntoTableScan));
+    }
+
     //cutomer config connector optimizer
     private static Set<String> getPlanNodeCatalogs(PlanNode node)
     {
@@ -177,8 +197,8 @@ public class OptimizerUtils
     private static class JoinNodeCounter
             extends SimplePlanVisitor<Void>
     {
-        private int count;
         private final int maxLimit;
+        private int count;
 
         JoinNodeCounter(int maxLimit)
         {

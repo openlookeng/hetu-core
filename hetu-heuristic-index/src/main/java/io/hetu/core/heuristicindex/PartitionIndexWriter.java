@@ -159,7 +159,7 @@ public class PartitionIndexWriter
      * Persists the data into an Index object and serialize it to disk.
      */
     @Override
-    public void persist()
+    public long persist()
             throws IOException
     {
         persistLock.lock();
@@ -214,6 +214,7 @@ public class PartitionIndexWriter
                 fs.delete(filePath);
                 throw e;
             }
+            return (long) fs.getAttribute(filePath, "size");
         }
         finally {
             if (partitionIndex != null) {

@@ -3,10 +3,10 @@ remote exchange (GATHER, SINGLE, [])
         remote exchange (REPARTITION, ROUND_ROBIN, [])
             join (INNER, PARTITIONED):
                 remote exchange (REPARTITION, HASH, ["i_item_sk", "w_warehouse_sk"])
-                    final aggregation over (d_moy, i_item_sk, w_warehouse_name, w_warehouse_sk)
+                    final hashaggregation over (d_moy, i_item_sk, w_warehouse_name, w_warehouse_sk)
                         local exchange (GATHER, SINGLE, [])
                             remote exchange (REPARTITION, HASH, ["d_moy", "i_item_sk", "w_warehouse_name", "w_warehouse_sk"])
-                                partial aggregation over (d_moy, i_item_sk, w_warehouse_name, w_warehouse_sk)
+                                partial hashaggregation over (d_moy, i_item_sk, w_warehouse_name, w_warehouse_sk)
                                     join (INNER, REPLICATED):
                                         join (INNER, REPLICATED):
                                             join (INNER, REPLICATED):
@@ -21,11 +21,11 @@ remote exchange (GATHER, SINGLE, [])
                                             remote exchange (REPLICATE, BROADCAST, [])
                                                 scan warehouse
                 local exchange (GATHER, SINGLE, [])
-                    remote exchange (REPARTITION, HASH, ["i_item_sk_70", "w_warehouse_sk_93"])
-                        final aggregation over (d_moy_116, i_item_sk_70, w_warehouse_name_95, w_warehouse_sk_93)
+                    remote exchange (REPARTITION, HASH, ["i_item_sk_44", "w_warehouse_sk_67"])
+                        final hashaggregation over (d_moy_90, i_item_sk_44, w_warehouse_name_69, w_warehouse_sk_67)
                             local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPARTITION, HASH, ["d_moy_116", "i_item_sk_70", "w_warehouse_name_95", "w_warehouse_sk_93"])
-                                    partial aggregation over (d_moy_116, i_item_sk_70, w_warehouse_name_95, w_warehouse_sk_93)
+                                remote exchange (REPARTITION, HASH, ["d_moy_90", "i_item_sk_44", "w_warehouse_name_69", "w_warehouse_sk_67"])
+                                    partial hashaggregation over (d_moy_90, i_item_sk_44, w_warehouse_name_69, w_warehouse_sk_67)
                                         join (INNER, REPLICATED):
                                             join (INNER, REPLICATED):
                                                 join (INNER, REPLICATED):

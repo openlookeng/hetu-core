@@ -49,7 +49,6 @@ import java.util.stream.Collectors;
 import static io.prestosql.plugin.hive.HiveBucketing.BucketingVersion.BUCKETING_V1;
 import static io.prestosql.plugin.hive.HiveBucketing.BucketingVersion.BUCKETING_V2;
 import static io.prestosql.plugin.hive.HiveColumnHandle.BUCKET_COLUMN_NAME;
-import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_INVALID_METADATA;
 import static io.prestosql.plugin.hive.HiveUtil.getRegularColumnHandles;
 import static java.lang.String.format;
 import static java.util.Map.Entry;
@@ -152,9 +151,7 @@ public final class HiveBucketing
         for (String bucketColumnName : hiveBucketProperty.get().getBucketedBy()) {
             HiveColumnHandle bucketColumnHandle = map.get(bucketColumnName);
             if (bucketColumnHandle == null) {
-                throw new PrestoException(
-                        HIVE_INVALID_METADATA,
-                        format("Table '%s.%s' is bucketed on non-existent column '%s'", table.getDatabaseName(), table.getTableName(), bucketColumnName));
+                return Optional.empty();
             }
             bucketColumns.add(bucketColumnHandle);
         }
@@ -166,7 +163,7 @@ public final class HiveBucketing
 
     public static Optional<HiveBucketFilter> getHiveBucketFilter(Table table, TupleDomain<ColumnHandle> effectivePredicate)
     {
-        if (!table.getStorage().getBucketProperty().isPresent()) {
+        if (!getHiveBucketHandle(table).isPresent()) {
             return Optional.empty();
         }
 

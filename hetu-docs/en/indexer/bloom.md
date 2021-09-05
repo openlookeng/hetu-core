@@ -48,6 +48,16 @@ data is being filtered on the column and `phone` column has a high cardinality.
 > in most usecases. If the index is too large, this value can be increased
 > e.g. 0.05.
 
+### `bloom.mmapEnabled`
+
+> -   **Type:** `Boolean`
+> -   **Default value:** `true`
+>
+> Control if Memory-Mapped File (mmap) should be used while reading the Bloom Index.
+> Enabling this value will cache the Bloom Index to local disk instead of in-memory during reading. 
+> This will reduce memory consumption but will result in slightly lower performance.
+
+
 ## Examples
 
 **Creating index:**
@@ -56,6 +66,7 @@ create index idx using bloom on hive.hindex.users (id);
 create index idx using bloom on hive.hindex.users (id) where regionkey=1;
 create index idx using bloom on hive.hindex.users (id) where regionkey in (3, 1);
 create index idx using bloom on hive.hindex.users (id) WITH ("bloom.fpp" = '0.001');
+create index idx using bloom on hive.hindex.users (id) WITH ("bloom.mmapEnabled" = false);
 ```
 
 * assuming users table is partitioned on `regionkey`

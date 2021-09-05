@@ -2,15 +2,15 @@ local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
         join (INNER, PARTITIONED):
             join (INNER, PARTITIONED):
-                remote exchange (REPARTITION, HASH, ["add", "cc_name_147", "i_brand_65", "i_category_69"])
-                    remote exchange (REPARTITION, HASH, ["avg_191", "cc_name_147", "d_moy_121", "d_year_119", "i_brand_65", "i_category_69", "rank_197", "sum_185"])
+                remote exchange (REPARTITION, HASH, ["add", "cc_name_131", "i_brand_49", "i_category_53"])
+                    remote exchange (REPARTITION, HASH, ["avg_175", "cc_name_131", "d_moy_105", "d_year_103", "i_brand_49", "i_category_53", "rank_181", "sum_169"])
                         cte v1
                             local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPARTITION, HASH, ["cc_name_147", "i_brand_65", "i_category_69"])
-                                    final aggregation over (cc_name_147, d_moy_121, d_year_119, i_brand_65, i_category_69)
+                                remote exchange (REPARTITION, HASH, ["cc_name_131", "i_brand_49", "i_category_53"])
+                                    final hashaggregation over (cc_name_131, d_moy_105, d_year_103, i_brand_49, i_category_53)
                                         local exchange (GATHER, SINGLE, [])
-                                            remote exchange (REPARTITION, HASH, ["cc_name_147", "d_moy_121", "d_year_119", "i_brand_65", "i_category_69"])
-                                                partial aggregation over (cc_name_147, d_moy_121, d_year_119, i_brand_65, i_category_69)
+                                            remote exchange (REPARTITION, HASH, ["cc_name_131", "d_moy_105", "d_year_103", "i_brand_49", "i_category_53"])
+                                                partial hashaggregation over (cc_name_131, d_moy_105, d_year_103, i_brand_49, i_category_53)
                                                     join (INNER, REPLICATED):
                                                         join (INNER, REPLICATED):
                                                             join (INNER, REPLICATED):
@@ -33,10 +33,10 @@ local exchange (GATHER, SINGLE, [])
                                 cte v1
                                     local exchange (GATHER, SINGLE, [])
                                         remote exchange (REPARTITION, HASH, ["cc_name", "i_brand", "i_category"])
-                                            final aggregation over (cc_name, d_moy, d_year, i_brand, i_category)
+                                            final hashaggregation over (cc_name, d_moy, d_year, i_brand, i_category)
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPARTITION, HASH, ["cc_name", "d_moy", "d_year", "i_brand", "i_category"])
-                                                        partial aggregation over (cc_name, d_moy, d_year, i_brand, i_category)
+                                                        partial hashaggregation over (cc_name, d_moy, d_year, i_brand, i_category)
                                                             join (INNER, REPLICATED):
                                                                 join (INNER, REPLICATED):
                                                                     join (INNER, REPLICATED):
@@ -53,15 +53,15 @@ local exchange (GATHER, SINGLE, [])
                                                                     remote exchange (REPLICATE, BROADCAST, [])
                                                                         scan call_center
             local exchange (GATHER, SINGLE, [])
-                remote exchange (REPARTITION, HASH, ["cc_name_328", "i_brand_246", "i_category_250", "subtract"])
-                    remote exchange (REPARTITION, HASH, ["avg_372", "cc_name_328", "d_moy_302", "d_year_300", "i_brand_246", "i_category_250", "rank_378", "sum_366"])
+                remote exchange (REPARTITION, HASH, ["cc_name_296", "i_brand_214", "i_category_218", "subtract"])
+                    remote exchange (REPARTITION, HASH, ["avg_340", "cc_name_296", "d_moy_270", "d_year_268", "i_brand_214", "i_category_218", "rank_346", "sum_334"])
                         cte v1
                             local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPARTITION, HASH, ["cc_name_328", "i_brand_246", "i_category_250"])
-                                    final aggregation over (cc_name_328, d_moy_302, d_year_300, i_brand_246, i_category_250)
+                                remote exchange (REPARTITION, HASH, ["cc_name_296", "i_brand_214", "i_category_218"])
+                                    final hashaggregation over (cc_name_296, d_moy_270, d_year_268, i_brand_214, i_category_218)
                                         local exchange (GATHER, SINGLE, [])
-                                            remote exchange (REPARTITION, HASH, ["cc_name_328", "d_moy_302", "d_year_300", "i_brand_246", "i_category_250"])
-                                                partial aggregation over (cc_name_328, d_moy_302, d_year_300, i_brand_246, i_category_250)
+                                            remote exchange (REPARTITION, HASH, ["cc_name_296", "d_moy_270", "d_year_268", "i_brand_214", "i_category_218"])
+                                                partial hashaggregation over (cc_name_296, d_moy_270, d_year_268, i_brand_214, i_category_218)
                                                     join (INNER, REPLICATED):
                                                         join (INNER, REPLICATED):
                                                             join (INNER, REPLICATED):

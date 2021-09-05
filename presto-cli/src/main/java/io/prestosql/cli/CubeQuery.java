@@ -69,6 +69,8 @@ public class CubeQuery
     private final CubeConsole cubeConsole;
     private String cubeInitQueryResult;
 
+    private static final int EMPTY_ITERATION_LIST_SIZE = 0;
+
     public CubeQuery(StatementClient client, boolean debug, CubeConsole cubeConsole)
     {
         this.client = requireNonNull(client, "client is null");
@@ -175,11 +177,15 @@ public class CubeQuery
             else {
                 renderResults(out, outputFormat, usePager, results.getColumns());
                 ///populate results from here
-                if (client.isFinished() && client.finalStatusInfo().getError() == null) {
-                    QueryData queryData = ((QueryResults) results);
-                    if (queryData.getData().iterator().hasNext()) {
-                        if (queryData.getData().iterator().next().iterator().hasNext()) {
-                            cubeInitQueryResult = queryData.getData().iterator().next().iterator().next().toString();
+                if (cubeConsole.getListRowBufferIterationItems().size() == EMPTY_ITERATION_LIST_SIZE) {
+                    if (client.isFinished() && client.finalStatusInfo().getError() == null) {
+                        QueryData queryData = ((QueryResults) results);
+                        if (queryData.getData() != null) {
+                            if (queryData.getData().iterator().hasNext()) {
+                                if (queryData.getData().iterator().next().iterator().hasNext()) {
+                                    cubeInitQueryResult = queryData.getData().iterator().next().iterator().next().toString();
+                                }
+                            }
                         }
                     }
                 }
@@ -246,7 +252,7 @@ public class CubeQuery
 
     private void discardResults()
     {
-        try (CubeOutputHandler handler = new CubeOutputHandler(new NullPrinter())) {
+        try (CubeOutputHandler handler = new CubeOutputHandler(new NullPrinter(), cubeConsole)) {
             handler.processRows(client);
             handler.getRowBuffer();
         }
@@ -298,7 +304,7 @@ public class CubeQuery
             }
             handler.processRows(client);
             List<List<?>> rowBuffer = handler.getRowBuffer();
-            RowBufferHandler rowBufferHandler = new RowBufferHandler(cubeConsole, rowBuffer);
+            RowBufferHandler rowBufferHandler = new RowBufferHandler(cubeConsole, handler);
             rowBufferHandler.processIterationIndex();
             cubeConsole.setListRowBufferIterationItems(rowBufferHandler.getRowBufferIterationItems());
         }
@@ -317,15 +323,15 @@ public class CubeQuery
             handler.processRows(client);
             //new method
             List<List<?>> rowBuffer = handler.getRowBuffer();
-            RowBufferHandler rowBufferHandler = new RowBufferHandler(cubeConsole, rowBuffer);
+            RowBufferHandler rowBufferHandler = new RowBufferHandler(cubeConsole, handler);
             rowBufferHandler.processIterationIndex();
             cubeConsole.setListRowBufferIterationItems(rowBufferHandler.getRowBufferIterationItems());
         }
     }
 
-    private static CubeOutputHandler createCubeOutputHandler(ClientOptions.OutputFormat format, Writer writer, List<Column> columns)
+    private CubeOutputHandler createCubeOutputHandler(ClientOptions.OutputFormat format, Writer writer, List<Column> columns)
     {
-        return new CubeOutputHandler(createOutputPrinter(format, writer, columns));
+        return new CubeOutputHandler(createOutputPrinter(format, writer, columns), cubeConsole);
     }
 
     private static OutputPrinter createOutputPrinter(ClientOptions.OutputFormat format, Writer writer, List<Column> columns)

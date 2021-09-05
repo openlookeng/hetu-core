@@ -2,21 +2,21 @@ local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
         join (INNER, PARTITIONED):
             join (INNER, PARTITIONED):
-                final aggregation over (i_item_id_87)
+                final hashaggregation over (i_item_id_79)
                     local exchange (GATHER, SINGLE, [])
-                        remote exchange (REPARTITION, HASH, ["i_item_id_87"])
-                            partial aggregation over (i_item_id_87)
+                        remote exchange (REPARTITION, HASH, ["i_item_id_79"])
+                            partial hashaggregation over (i_item_id_79)
                                 semijoin (REPLICATED):
                                     join (INNER, PARTITIONED):
                                         remote exchange (REPARTITION, HASH, ["cr_item_sk"])
                                             join (INNER, PARTITIONED):
-                                                remote exchange (REPARTITION, HASH, ["d_date_sk_109"])
+                                                remote exchange (REPARTITION, HASH, ["d_date_sk_101"])
                                                     scan date_dim
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPARTITION, HASH, ["cr_returned_date_sk"])
                                                         scan catalog_returns
                                         local exchange (GATHER, SINGLE, [])
-                                            remote exchange (REPARTITION, HASH, ["i_item_sk_86"])
+                                            remote exchange (REPARTITION, HASH, ["i_item_sk_78"])
                                                 scan item
                                     local exchange (GATHER, SINGLE, [])
                                         remote exchange (REPLICATE, BROADCAST, [])
@@ -25,13 +25,13 @@ local exchange (GATHER, SINGLE, [])
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPLICATE, BROADCAST, [])
                                                         scan date_dim (pushdown = true)
-                final aggregation over (i_item_id_226)
+                final hashaggregation over (i_item_id_210)
                     local exchange (GATHER, SINGLE, [])
-                        remote exchange (REPARTITION, HASH, ["i_item_id_226"])
-                            partial aggregation over (i_item_id_226)
+                        remote exchange (REPARTITION, HASH, ["i_item_id_210"])
+                            partial hashaggregation over (i_item_id_210)
                                 semijoin (REPLICATED):
                                     join (INNER, PARTITIONED):
-                                        remote exchange (REPARTITION, HASH, ["i_item_sk_225"])
+                                        remote exchange (REPARTITION, HASH, ["i_item_sk_209"])
                                             scan item
                                         local exchange (GATHER, SINGLE, [])
                                             remote exchange (REPARTITION, HASH, ["wr_item_sk"])
@@ -47,10 +47,10 @@ local exchange (GATHER, SINGLE, [])
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPLICATE, BROADCAST, [])
                                                         scan date_dim (pushdown = true)
-            final aggregation over (i_item_id)
+            final hashaggregation over (i_item_id)
                 local exchange (GATHER, SINGLE, [])
                     remote exchange (REPARTITION, HASH, ["i_item_id"])
-                        partial aggregation over (i_item_id)
+                        partial hashaggregation over (i_item_id)
                             semijoin (REPLICATED):
                                 join (INNER, PARTITIONED):
                                     remote exchange (REPARTITION, HASH, ["sr_item_sk"])

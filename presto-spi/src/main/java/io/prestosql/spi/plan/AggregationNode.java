@@ -101,6 +101,9 @@ public class AggregationNode
                     outputs.addAll(symbolList);
                 }
             }
+            else if (step.equals(Step.FINAL) && !finalizeSymbol.isPresent()) {
+                aggregationType = AggregationType.HASH;
+            }
         }
 
         this.outputs = outputs.build();

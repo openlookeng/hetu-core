@@ -11,13 +11,17 @@ To create an index you can run sql statements of the form:
 CREATE INDEX [ IF NOT EXISTS ] index_name
 USING [ BITMAP | BLOOM | BTREE | MINMAX ]
 ON tbl_name (col_name)
-WITH ( 'level' = ['STRIPE', 'PARTITION'], "bloom.fpp" = '0.001', [, …] )
+WITH ( 'level' = ['STRIPE', 'PARTITION'], "autoload" = true, "bloom.fpp" = '0.001', "bloom.mmapEnabled" = false, [, …] )
 WHERE predicate;
 ```
 
 - `WHERE` predicate can be used to create index on select partition(s)
 - `WITH` can be used to specify index properties or index level. See individual index documentation to support properties.
 - `"level"='STRIPE'` if not specified
+- `"autoload"` overrides the default value `hetu.heuristicindex.filter.cache.autoload-default` in config.properties. 
+After the index is created or updated, whether to automatically load it into cache.
+If false, index will be loaded as needed. This means, the first few queries may not benefit from index as it is being loaded into cache. 
+Setting this to true may result in high memory usage but will give the best results.
 
 If the table is partitioned, you can specify a single partition to create an index on, or an in-predicate to specify multiple partitions:
 
@@ -31,11 +35,20 @@ CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WHERE p in (p
 
 ## SHOW
 
-To show all indexes or a specific index_name:
+To show the information of all the indices or a specific index by index_name.
+The information includes index name, user, table name, index columns, index type, index status, etc.
 
 ```roomsql
 SHOW INDEX;
 SHOW INDEX index_name;
+```
+
+## UPDATE
+
+Update an existing index if the source table has been modified. You can check the status of the index with ```SHOW INDEX index_name```.
+
+```roomsql
+UPDATE INDEX index_name;
 ```
 
 ## DROP
@@ -54,7 +67,7 @@ DROP INDEX index_name where p=part1;
 ```
 
 Note: dropped index will be removed from cache after a few seconds, so you may still see the next few queries still using the index.
-
+The index will be automatically dropped if the source table is dropped.
 
 ## Notes on resource usage
 

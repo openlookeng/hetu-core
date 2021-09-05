@@ -170,6 +170,12 @@ public class FixedSourcePartitionedScheduler
     @Override
     public ScheduleResult schedule()
     {
+        return schedule(1);
+    }
+
+    @Override
+    public ScheduleResult schedule(int maxSplitGroup)
+    {
         // schedule a task on every node in the distribution
         List<RemoteTask> newTasks = ImmutableList.of();
         if (!scheduledTasks) {
@@ -210,7 +216,7 @@ public class FixedSourcePartitionedScheduler
                 sourceScheduler.noMoreLifespans();
             }
 
-            ScheduleResult schedule = sourceScheduler.schedule();
+            ScheduleResult schedule = sourceScheduler.schedule(maxSplitGroup);
             splitsScheduled += schedule.getSplitsScheduled();
             if (schedule.getBlockedReason().isPresent()) {
                 blocked.add(schedule.getBlocked());
@@ -317,6 +323,12 @@ public class FixedSourcePartitionedScheduler
         public ScheduleResult schedule()
         {
             return sourceScheduler.schedule();
+        }
+
+        @Override
+        public ScheduleResult schedule(int maxSplitGroupSize)
+        {
+            return sourceScheduler.schedule(maxSplitGroupSize);
         }
 
         @Override

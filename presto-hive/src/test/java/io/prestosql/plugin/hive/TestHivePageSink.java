@@ -407,7 +407,7 @@ public class TestHivePageSink
         Object state = hivePageSink.capture(null);
         hivePageSink.appendPage(page2);
         hivePageSink.capture(null);
-        hivePageSink.restore(state, null);
+        hivePageSink.restore(state, null, 2);
         hivePageSink.appendPage(page2);
         hivePageSink.finish();
     }
@@ -424,7 +424,7 @@ public class TestHivePageSink
         Object state = hivePageSink.capture(null);
         hivePageSink.appendPage(page2);
         hivePageSink.capture(null);
-        hivePageSink.restore(state, null);
+        hivePageSink.restore(state, null, 2);
         hivePageSink.appendPage(page2);
         hivePageSink.abort();
     }

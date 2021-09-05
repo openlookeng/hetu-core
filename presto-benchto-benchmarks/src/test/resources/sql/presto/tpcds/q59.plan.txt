@@ -4,10 +4,10 @@ local exchange (GATHER, SINGLE, [])
             remote exchange (REPARTITION, HASH, ["d_week_seq", "s_store_id"])
                 join (INNER, REPLICATED):
                     join (INNER, REPLICATED):
-                        final aggregation over (d_week_seq, ss_store_sk)
+                        final hashaggregation over (d_week_seq, ss_store_sk)
                             local exchange (GATHER, SINGLE, [])
                                 remote exchange (REPARTITION, HASH, ["d_week_seq", "ss_store_sk"])
-                                    partial aggregation over (d_week_seq, ss_store_sk)
+                                    partial hashaggregation over (d_week_seq, ss_store_sk)
                                         join (INNER, REPLICATED):
                                             scan store_sales
                                             local exchange (GATHER, SINGLE, [])
@@ -20,13 +20,13 @@ local exchange (GATHER, SINGLE, [])
                         remote exchange (REPLICATE, BROADCAST, [])
                             scan store
             local exchange (GATHER, SINGLE, [])
-                remote exchange (REPARTITION, HASH, ["s_store_id_235", "subtract"])
+                remote exchange (REPARTITION, HASH, ["s_store_id_179", "subtract"])
                     join (INNER, REPLICATED):
                         join (INNER, REPLICATED):
-                            final aggregation over (d_week_seq_147, ss_store_sk_127)
+                            final hashaggregation over (d_week_seq_109, ss_store_sk_89)
                                 local exchange (GATHER, SINGLE, [])
-                                    remote exchange (REPARTITION, HASH, ["d_week_seq_147", "ss_store_sk_127"])
-                                        partial aggregation over (d_week_seq_147, ss_store_sk_127)
+                                    remote exchange (REPARTITION, HASH, ["d_week_seq_109", "ss_store_sk_89"])
+                                        partial hashaggregation over (d_week_seq_109, ss_store_sk_89)
                                             join (INNER, REPLICATED):
                                                 scan store_sales
                                                 local exchange (GATHER, SINGLE, [])

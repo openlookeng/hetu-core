@@ -138,7 +138,7 @@ public class UpdateIndexOperator
                             !(pathToModifiedTime.containsKey(entry.getKey()) &&
                                     indexLevelToMaxModifiedTime.containsKey(entry.getKey()) &&
                                     indexLevelToMaxModifiedTime.get(entry.getKey()) <= Long.parseLong(pathToModifiedTime.get(entry.getKey())))) {
-                        entry.getValue().persist();
+                        this.createIndexMetadata.incrementIndexSize(entry.getValue().persist());
                     }
                     String writerKey = entry.getKey();
                     iterator.remove(); // remove reference to writer once persisted so it can be GCed
@@ -167,6 +167,7 @@ public class UpdateIndexOperator
                             createIndexMetadata.getIndexName(),
                             createIndexMetadata.getTableName(),
                             createIndexMetadata.getIndexType(),
+                            createIndexMetadata.getIndexSize(),
                             createIndexMetadata.getIndexColumns(),
                             new ArrayList<>(allPartitions),
                             createIndexMetadata.getProperties(),
@@ -354,9 +355,9 @@ public class UpdateIndexOperator
             this.updateIndexMetadata = updateIndexMetadata;
 
             CreateIndexMetadata.Level createLevel;
-            Optional<String> createLevelString = indexRecord.properties.stream().filter(s -> s.toLowerCase(Locale.ROOT).contains("level=")).findAny();
+            Optional<String> createLevelString = indexRecord.propertiesAsList.stream().filter(s -> s.toLowerCase(Locale.ROOT).contains("level=")).findAny();
             createLevel = CreateIndexMetadata.Level.valueOf(createLevelString.get().replaceAll(".*=", ""));
-            Properties updatedProperties = getPropertiesFromList(indexRecord.properties);
+            Properties updatedProperties = indexRecord.getProperties();
 
             updateIndexMetadata.getProperties().forEach((key, val) -> {
                 if (!key.toString().toLowerCase(Locale.ROOT).equals("level")) {
@@ -368,6 +369,7 @@ public class UpdateIndexOperator
                     indexRecord.name,
                     indexRecord.qualifiedTable,
                     indexRecord.indexType,
+                    indexRecord.indexSize,
                     Arrays.stream(indexRecord.columns).map(col -> new Pair<>(col,
                             updateIndexMetadata.getColumnTypes().get(col.toLowerCase(Locale.ROOT)))).collect(Collectors.toList()),
                     indexRecord.partitions,
@@ -409,16 +411,5 @@ public class UpdateIndexOperator
         {
             return new UpdateIndexOperator.UpdateIndexOperatorFactory(operatorId, planNodeId, updateIndexMetadata, heuristicIndexerManager);
         }
-    }
-
-    private static Properties getPropertiesFromList(List<String> listOfProperties)
-    {
-        Properties properties = new Properties();
-        for (String p : listOfProperties) {
-            String key = p.substring(0, p.indexOf("="));
-            String val = p.substring(p.indexOf("=") + 1);
-            properties.setProperty(key, val);
-        }
-        return properties;
     }
 }

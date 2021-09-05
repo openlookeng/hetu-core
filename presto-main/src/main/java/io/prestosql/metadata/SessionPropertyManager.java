@@ -365,6 +365,7 @@ public final class SessionPropertyManager
             PropertyService.setProperty(HetuConstant.FILTER_CACHE_SOFT_REFERENCE, hetuConfig.isIndexCacheSoftReferenceEnabled());
             PropertyService.setProperty(HetuConstant.INDEXSTORE_URI, hetuConfig.getIndexStoreUri());
             PropertyService.setProperty(HetuConstant.INDEXSTORE_FILESYSTEM_PROFILE, hetuConfig.getIndexStoreFileSystemProfile());
+            PropertyService.setProperty(HetuConstant.FILTER_CACHE_AUTOLOAD_DEFAULT, hetuConfig.getIndexAutoload());
             PropertyService.setProperty(HetuConstant.FILTER_CACHE_PRELOAD_INDICES, hetuConfig.getIndexToPreload());
         }
     }

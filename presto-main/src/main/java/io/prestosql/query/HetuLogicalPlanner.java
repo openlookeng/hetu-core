@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static io.prestosql.SystemSessionProperties.isSkipAttachingStatsWithPlan;
+import static io.prestosql.spi.plan.PlanNode.SkipOptRuleLevel.APPLY_ALL_RULES;
 import static io.prestosql.sql.planner.sanity.PlanSanityChecker.DISTRIBUTED_PLAN_SANITY_CHECKER;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -86,6 +87,7 @@ public class HetuLogicalPlanner
     public Plan plan(Analysis analysis, boolean skipStatsWithPlan, Stage stage)
     {
         PlanNode root = planStatement(analysis, analysis.getStatement());
+        PlanNode.SkipOptRuleLevel optimizationLevel = APPLY_ALL_RULES;
 
         planSanityChecker.validateIntermediatePlan(root, session, metadata, typeAnalyzer, planSymbolAllocator.getTypes(),
                 warningCollector);
@@ -98,9 +100,13 @@ public class HetuLogicalPlanner
                     if (optimizer instanceof BeginTableWrite) {
                         continue;
                     }
-                    root = optimizer.optimize(root, session, planSymbolAllocator.getTypes(), planSymbolAllocator, idAllocator,
-                            warningCollector);
-                    requireNonNull(root, format("%s returned a null plan", optimizer.getClass().getName()));
+
+                    if (OptimizerUtils.canApplyOptimizer(optimizer, optimizationLevel)) {
+                        root = optimizer.optimize(root, session, planSymbolAllocator.getTypes(), planSymbolAllocator, idAllocator,
+                                warningCollector);
+                        requireNonNull(root, format("%s returned a null plan", optimizer.getClass().getName()));
+                        optimizationLevel = optimizationLevel == APPLY_ALL_RULES ? root.getSkipOptRuleLevel() : optimizationLevel;
+                    }
                 }
             }
         }

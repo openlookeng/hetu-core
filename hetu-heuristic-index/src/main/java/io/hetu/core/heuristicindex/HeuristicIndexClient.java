@@ -81,9 +81,12 @@ public class HeuristicIndexClient
         List<IndexMetadata> indexes = new LinkedList<>();
 
         Path indexKeyPath = Paths.get(path);
+
+        IndexRecord curIndex = null;
         try {
-            if (indexRecordManager.lookUpIndexRecord(indexKeyPath.subpath(0, 1).toString(),
-                    new String[] {indexKeyPath.subpath(1, 2).toString()}, indexKeyPath.subpath(2, 3).toString()) == null) {
+            curIndex = indexRecordManager.lookUpIndexRecord(indexKeyPath.subpath(0, 1).toString(),
+                    new String[] {indexKeyPath.subpath(1, 2).toString()}, indexKeyPath.subpath(2, 3).toString());
+            if (curIndex == null) {
                 // Use index record file to pre-screen. If record does not contain the index, skip loading
                 return null;
             }
@@ -92,7 +95,8 @@ public class HeuristicIndexClient
             // On exception, log and continue reading from disk
             LOG.debug("Error reading index records: " + path);
         }
-        for (Map.Entry<String, Index> entry : readIndexMap(path).entrySet()) {
+
+        for (Map.Entry<String, Index> entry : readIndexMap(path, curIndex).entrySet()) {
             String absolutePath = entry.getKey();
             Path remainder = Paths.get(absolutePath.replaceFirst(root.toString(), ""));
             Path table = remainder.subpath(0, 1);
@@ -229,6 +233,7 @@ public class HeuristicIndexClient
                 createIndexMetadata.getTableName(),
                 createIndexMetadata.getIndexColumns().stream().map(Pair::getFirst).toArray(String[]::new),
                 createIndexMetadata.getIndexType(),
+                createIndexMetadata.getIndexSize(),
                 properties,
                 createIndexMetadata.getPartitions());
     }
@@ -320,7 +325,7 @@ public class HeuristicIndexClient
      * @return an immutable mapping from all index files read to the corresponding index that was loaded
      * @throws IOException
      */
-    private Map<String, Index> readIndexMap(String path)
+    private Map<String, Index> readIndexMap(String path, IndexRecord indexRecord)
             throws IOException
     {
         ImmutableMap.Builder<String, Index> result = ImmutableMap.builder();
@@ -350,6 +355,10 @@ public class HeuristicIndexClient
                         String indexType = filename.substring(filename.lastIndexOf('.') + 1);
                         Index index = HeuristicIndexFactory.createIndex(indexType);
 
+                        // set property for index
+                        index.setProperties(indexRecord.getProperties());
+
+                        // deserialize from file
                         index.deserialize(new CloseShieldInputStream(i));
                         LOG.debug("Loaded %s index from %s.", index.getId(), tarFile.toAbsolutePath());
                         result.put(tarFile.getParent().resolve(filename).toString(), index);
@@ -359,7 +368,6 @@ public class HeuristicIndexClient
         }
 
         Map<String, Index> resultMap = result.build();
-
         return resultMap;
     }
 
@@ -403,7 +411,7 @@ public class HeuristicIndexClient
     {
         IndexRecord indexRecord = lookUpIndexRecord(indexName);
         CreateIndexMetadata.Level createLevel;
-        Optional<String> createLevelString = indexRecord.properties.stream().filter(s -> s.toLowerCase(Locale.ROOT).contains("level=")).findAny();
+        Optional<String> createLevelString = indexRecord.propertiesAsList.stream().filter(s -> s.toLowerCase(Locale.ROOT).contains("level=")).findAny();
         createLevel = CreateIndexMetadata.Level.valueOf(createLevelString.get().replaceAll(".*=", ""));
 
         Path pathToIndex = Paths.get(root.toString(), indexRecord.qualifiedTable, indexRecord.columns[0], indexRecord.indexType);

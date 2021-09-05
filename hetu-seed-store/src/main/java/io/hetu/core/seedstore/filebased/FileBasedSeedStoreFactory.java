@@ -18,6 +18,7 @@ package io.hetu.core.seedstore.filebased;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.seedstore.SeedStore;
 import io.prestosql.spi.seedstore.SeedStoreFactory;
+import io.prestosql.spi.seedstore.SeedStoreSubType;
 
 import java.util.Map;
 
@@ -32,9 +33,14 @@ public class FileBasedSeedStoreFactory
     private static final String FACTORY_TYPE = "filebased";
 
     @Override
-    public SeedStore create(String name, HetuFileSystemClient fs, Map<String, String> config)
+    public SeedStore create(String name, SeedStoreSubType subType, HetuFileSystemClient fs, Map<String, String> config)
     {
-        return new FileBasedSeedStore(name, fs, config);
+        if (subType == SeedStoreSubType.ON_YARN) {
+            return new FileBasedSeedStoreOnYarn(name, fs, config);
+        }
+        else {
+            return new FileBasedSeedStore(name, fs, config);
+        }
     }
 
     @Override

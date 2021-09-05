@@ -1,7 +1,7 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
         join (INNER, PARTITIONED):
-            remote exchange (REPARTITION, HASH, ["ss_item_sk_61"])
+            remote exchange (REPARTITION, HASH, ["ss_item_sk_47"])
                 join (INNER, PARTITIONED):
                     remote exchange (REPARTITION, HASH, ["ss_item_sk"])
                         join (INNER, PARTITIONED):
@@ -9,42 +9,42 @@ local exchange (GATHER, SINGLE, [])
                                 local exchange (GATHER, SINGLE, [])
                                     remote exchange (GATHER, SINGLE, [])
                                         cross join:
-                                            final aggregation over (ss_item_sk)
+                                            final hashaggregation over (ss_item_sk)
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPARTITION, HASH, ["ss_item_sk"])
-                                                        partial aggregation over (ss_item_sk)
+                                                        partial hashaggregation over (ss_item_sk)
                                                             scan store_sales
                                             local exchange (GATHER, SINGLE, [])
                                                 remote exchange (REPLICATE, BROADCAST, [])
                                                     local exchange (GATHER, SINGLE, [])
                                                         remote exchange (GATHER, SINGLE, [])
-                                                            final aggregation over (ss_store_sk_13)
+                                                            final hashaggregation over (ss_store_sk_13)
                                                                 local exchange (GATHER, SINGLE, [])
                                                                     remote exchange (REPARTITION, HASH, ["ss_store_sk_13"])
-                                                                        partial aggregation over (ss_store_sk_13)
+                                                                        partial hashaggregation over (ss_store_sk_13)
                                                                             scan store_sales
                             local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPARTITION, HASH, ["rank_131"])
+                                remote exchange (REPARTITION, HASH, ["rank_111"])
                                     local exchange (GATHER, SINGLE, [])
                                         remote exchange (GATHER, SINGLE, [])
                                             cross join:
-                                                final aggregation over (ss_item_sk_61)
+                                                final hashaggregation over (ss_item_sk_47)
                                                     local exchange (GATHER, SINGLE, [])
-                                                        remote exchange (REPARTITION, HASH, ["ss_item_sk_61"])
-                                                            partial aggregation over (ss_item_sk_61)
+                                                        remote exchange (REPARTITION, HASH, ["ss_item_sk_47"])
+                                                            partial hashaggregation over (ss_item_sk_47)
                                                                 scan store_sales
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPLICATE, BROADCAST, [])
                                                         local exchange (GATHER, SINGLE, [])
                                                             remote exchange (GATHER, SINGLE, [])
-                                                                final aggregation over (ss_store_sk_98)
+                                                                final hashaggregation over (ss_store_sk_84)
                                                                     local exchange (GATHER, SINGLE, [])
-                                                                        remote exchange (REPARTITION, HASH, ["ss_store_sk_98"])
-                                                                            partial aggregation over (ss_store_sk_98)
+                                                                        remote exchange (REPARTITION, HASH, ["ss_store_sk_84"])
+                                                                            partial hashaggregation over (ss_store_sk_84)
                                                                                 scan store_sales
                     local exchange (GATHER, SINGLE, [])
                         remote exchange (REPARTITION, HASH, ["i_item_sk"])
                             scan item
             local exchange (GATHER, SINGLE, [])
-                remote exchange (REPARTITION, HASH, ["i_item_sk_148"])
+                remote exchange (REPARTITION, HASH, ["i_item_sk_120"])
                     scan item

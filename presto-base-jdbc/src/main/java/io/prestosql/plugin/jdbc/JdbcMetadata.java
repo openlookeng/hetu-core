@@ -132,7 +132,6 @@ public class JdbcMetadata
     /**
      * Hetu can only cache execution plans for supported connectors.
      * This method checks if the property for supporting execution plan caching is enabled for a given connector.
-
      *
      * @param session Presto session
      * @param handle Connector specific table handle
@@ -369,5 +368,17 @@ public class JdbcMetadata
     public ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle, List<ColumnHandle> updatedColumns)
     {
         return jdbcClient.getUpdateRowIdColumnHandle(session, tableHandle, updatedColumns);
+    }
+
+    @Override
+    public long getTableModificationTime(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        return jdbcClient.getTableModificationTime(session, (JdbcTableHandle) tableHandle);
+    }
+
+    @Override
+    public boolean isPreAggregationSupported(ConnectorSession session)
+    {
+        return jdbcClient.isPreAggregationSupported(session);
     }
 }

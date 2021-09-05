@@ -1,8 +1,8 @@
 remote exchange (GATHER, SINGLE, [])
-    final SortAggregate over (ss_customer_sk, ss_item_sk)
+    final sortaggregate over (ss_customer_sk, ss_item_sk)
         local exchange (GATHER, SINGLE, [])
             remote exchange (REPARTITION, HASH, ["ss_customer_sk", "ss_item_sk"])
-                partial SortAggregate over (ss_customer_sk, ss_item_sk)
+                partial sortaggregate over (ss_customer_sk, ss_item_sk)
                     join (RIGHT, PARTITIONED):
                         scan store_sales_customer_item
                         local exchange (GATHER, SINGLE, [])

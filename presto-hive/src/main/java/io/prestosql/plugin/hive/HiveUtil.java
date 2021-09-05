@@ -123,6 +123,7 @@ import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Lists.transform;
 import static io.prestosql.plugin.hive.HiveBucketing.bucketedOnTimestamp;
+import static io.prestosql.plugin.hive.HiveBucketing.getHiveBucketHandle;
 import static io.prestosql.plugin.hive.HiveColumnHandle.bucketColumnHandle;
 import static io.prestosql.plugin.hive.util.CustomSplitConversionUtils.recreateSplitWithCustomInfo;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
@@ -878,7 +879,7 @@ public final class HiveUtil
 
         // add hidden columns
         columns.add(HiveColumnHandle.pathColumnHandle());
-        if (table.getStorage().getBucketProperty().isPresent()) {
+        if (getHiveBucketHandle(table).isPresent()) {
             if (!bucketedOnTimestamp(table.getStorage().getBucketProperty().get(), table)) {
                 columns.add(bucketColumnHandle());
             }

@@ -46,6 +46,7 @@ import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.operator.TaskLocation;
+import io.prestosql.server.ResourceGroupInfo;
 import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CatalogName;
@@ -127,6 +128,8 @@ public class SqlQueryScheduler
     private static final Logger log = Logger.get(SqlQueryScheduler.class);
     private static final int[] THROTTLE_SLEEP_TIMER = {5, 10, 15}; //seconds
     private static final long MIN_RESUME_INTERVAL = 5000; // milliseconds
+    private static final int[] SPLIT_GROUP_GRADATION = {1, 2, 4, 8, 16, 32, 64, 128};
+    private static final int[] SPLIT_GROUP_BUCKETS = {5, 10, 20, 40, 80, 100, 120};
 
     private final QueryStateMachine queryStateMachine;
     private final ExecutionPolicy executionPolicy;
@@ -721,6 +724,19 @@ public class SqlQueryScheduler
         return false;
     }
 
+    private int getOptimalSmallSplitGroupSize()
+    {
+        ResourceGroupInfo resourceGroupInfo = queryStateMachine.getResourceGroupManager().getResourceGroupInfo(queryStateMachine.getResourceGroup());
+        long queries = resourceGroupInfo.getNumRunningQueries();
+        int result = 0;
+        for (int i = 0; i < SPLIT_GROUP_BUCKETS.length; i++, result++) {
+            if (queries <= SPLIT_GROUP_BUCKETS[i]) {
+                break;
+            }
+        }
+        return SPLIT_GROUP_GRADATION[result];
+    }
+
     private void schedule()
     {
         try (SetThreadName ignored = new SetThreadName("Query-%s", queryStateMachine.getQueryId())) {
@@ -755,8 +771,10 @@ public class SqlQueryScheduler
                     }
 
                     // perform some scheduling work
+                    /* Todo(nitin) get groupSize specification from the ResourceGroupManager */
+                    int maxSplitGroupSize = getOptimalSmallSplitGroupSize();
                     ScheduleResult result = stageSchedulers.get(stage.getStageId())
-                            .schedule();
+                            .schedule(maxSplitGroupSize);
 
                     // modify parent and children based on the results of the scheduling
                     if (result.isFinished()) {

@@ -79,7 +79,7 @@ public class TestIndexRecordManager
                 try {
                     Thread.sleep(random.nextInt(100));
                     new IndexRecordManager(testMetastore1)
-                            .addIndexRecord(names[finalI], "testUser", "c.s.t", new String[] {"testColumn"}, names[finalI], Collections.emptyList(), Arrays.asList("cp=1"));
+                            .addIndexRecord(names[finalI], "testUser", "c.s.t", new String[] {"testColumn"}, names[finalI], 0L, Collections.emptyList(), Arrays.asList("cp=1"));
                 }
                 catch (InterruptedException e) {
                     throw new RuntimeException(e);
@@ -130,7 +130,7 @@ public class TestIndexRecordManager
             threads[i] = new Thread(() -> {
                 try {
                     Thread.sleep(random.nextInt(100));
-                    indexRecordManager.addIndexRecord(names[finalI], "u", "c.s.t", new String[] {"c"}, names[finalI], Collections.emptyList(), Arrays.asList("cp=1"));
+                    indexRecordManager.addIndexRecord(names[finalI], "u", "c.s.t", new String[] {"c"}, names[finalI], 0L, Collections.emptyList(), Arrays.asList("cp=1"));
                 }
                 catch (InterruptedException e) {
                     throw new RuntimeException(e);
@@ -174,8 +174,8 @@ public class TestIndexRecordManager
                     FILE_SYSTEM_CLIENT);
 
             IndexRecordManager indexRecordManager = new IndexRecordManager(testMetaStore);
-            indexRecordManager.addIndexRecord("1", "testUser", "testCatalog.testSchema.testTable", new String[] {"testColumn"}, "minmax", Collections.emptyList(), Arrays.asList("cp=1"));
-            indexRecordManager.addIndexRecord("2", "testUser", "testCatalog.testSchema.testTable", new String[] {"testColumn"}, "bloom", Collections.emptyList(), Arrays.asList("cp=1"));
+            indexRecordManager.addIndexRecord("1", "testUser", "testCatalog.testSchema.testTable", new String[] {"testColumn"}, "minmax", 0L, Collections.emptyList(), Arrays.asList("cp=1"));
+            indexRecordManager.addIndexRecord("2", "testUser", "testCatalog.testSchema.testTable", new String[] {"testColumn"}, "bloom", 0L, Collections.emptyList(), Arrays.asList("cp=1"));
             assertNotNull(indexRecordManager.lookUpIndexRecord("1"));
             assertEquals(indexRecordManager.getIndexRecords().size(), 2);
 
@@ -228,8 +228,8 @@ public class TestIndexRecordManager
                     FILE_SYSTEM_CLIENT);
 
             IndexRecordManager indexRecordManager = new IndexRecordManager(testMetaStore);
-            IndexRecord expected = new IndexRecord(name, user, table, columns, indexType, indexProperties, partitions);
-            indexRecordManager.addIndexRecord(name, user, table, columns, indexType, indexProperties, partitions);
+            IndexRecord expected = new IndexRecord(name, user, table, columns, indexType, 0L, indexProperties, partitions);
+            indexRecordManager.addIndexRecord(name, user, table, columns, indexType, 0L, indexProperties, partitions);
 
             IndexRecord actual1 = indexRecordManager.lookUpIndexRecord(name);
             assertNotNull(actual1);

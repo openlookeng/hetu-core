@@ -10,13 +10,17 @@
 CREATE INDEX [ IF NOT EXISTS ] index_name
 USING [ BITMAP | BLOOM | BTREE | MINMAX ]
 ON tbl_name (col_name)
-WITH ( 'level' = ['STRIPE', 'PARTITION'], "bloom.fpp" = '0.001', [, …] )
+WITH ( 'level' = ['STRIPE', 'PARTITION'], "autoload" = true, "bloom.fpp" = '0.001', "bloom.mmapEnabled" = false, [, …] )
 WHERE predicate;
 ```
 
 - `WHERE` 用于选择部分分区创建索引
 - `WITH` 用于设置索引属性。参见各个索引的文档来查看支持的配置
 - `"level"='STRIPE'` 如缺省，默认创建级别是STRIPE
+- `"autoload"` 覆盖 config.properties 中的默认值 `hetu.heuristicindex.filter.cache.autoload-default`。
+索引创建或更新后，是否自动加载到缓存中。
+如果为 false，将根据需要加载索引。这意味着，前几个查询可能不会使用索引，因为它正在加载到缓存中。
+将此设置为 true 可能会导致高内存使用率，但会提供最佳结果。
 
 如果表是分区的，可以用一个等于表达式来指定一个创建的分区，或使用IN来指定多个。
 
@@ -30,11 +34,20 @@ CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WHERE p in (p
 
 ## SHOW
 
-显示所有索引或只根据名字显示一个索引：
+显示所有索引或根据名字显示特定索引的信息。
+信息包括索引名、用户、表名、索引列、索引类型、索引状态等。
 
 ```roomsql
 SHOW INDEX;
 SHOW INDEX index_name;
+```
+
+## UPDATE
+
+如果源表已被修改，则更新现有索引。你可以用```SHOW INDEX index_name```检查索引的状态。
+
+```roomsql
+UPDATE INDEX index_name;
 ```
 
 ## DROP
@@ -52,6 +65,7 @@ DROP INDEX index_name where p=part1;
 ```
 
 删除的索引不会立即被从服务器的缓存中清除，直到下一次刷新缓存。刷新时间与设置的缓存加载延迟有关，通常在几秒钟左右。
+如果删除源表，索引将自动删除。
 
 ## 资源使用说明
 

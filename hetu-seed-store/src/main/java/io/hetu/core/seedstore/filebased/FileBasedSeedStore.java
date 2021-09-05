@@ -157,7 +157,7 @@ public class FileBasedSeedStore
             throw new NullPointerException("Cannot create filebased seed since location is null or empty");
         }
 
-        return new FileBasedSeed.FileBasedSeedBuilder(location).setTimestamp(Long.parseLong(timestamp)).build();
+        return new FileBasedSeed(location, Long.parseLong(timestamp));
     }
 
     @Override

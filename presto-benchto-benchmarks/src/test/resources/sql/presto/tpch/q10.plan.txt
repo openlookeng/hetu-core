@@ -1,9 +1,9 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
-        final aggregation over (acctbal, address, comment_4, custkey_3, name, name_7, phone)
+        final hashaggregation over (acctbal, address, comment_4, custkey_3, name, name_7, phone)
             local exchange (GATHER, SINGLE, [])
                 remote exchange (REPARTITION, HASH, ["acctbal", "address", "comment_4", "custkey_3", "name", "name_7", "phone"])
-                    partial aggregation over (acctbal, address, comment_4, custkey_3, name, name_7, phone)
+                    partial hashaggregation over (acctbal, address, comment_4, custkey_3, name, name_7, phone)
                         join (INNER, PARTITIONED):
                             remote exchange (REPARTITION, HASH, ["orderkey"])
                                 scan lineitem

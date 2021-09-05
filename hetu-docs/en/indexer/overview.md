@@ -109,6 +109,7 @@ when scanning table1.
 To create index run the following statement:
 
     CREATE INDEX index_name USING bloom ON table1 (column);
+    CREATE INDEX index_name USING bloom ON table1 (column) WITH ("autoload" = false);
     
 **Note:**   Index for decimal type columns is not supported currently. For more details follow the [issue](https://gitee.com/openlookeng/hetu-core/issues/I2AMH0?from=project-issue)
 ### 4. Run query
@@ -120,17 +121,17 @@ Subsequent queries will utilize the index to reduce the amount of data read
 
 ## Configuration Properties
 
-| Property Name                                     | Default Value       | Required| Description|
-|---------------------------------------------------|---------------------|---------|--------------|
-| hetu.heuristicindex.filter.enabled                | false               | No      | Enables heuristic index|
-| hetu.heuristicindex.filter.cache.max-memory       | 10GB                | No      | Caching size of index files|
-| hetu.heuristicindex.filter.cache.soft-reference   | true                | No      | Enabling this property allows the GC to remove entries from the cache if memory is running low|
-| hetu.heuristicindex.filter.cache.ttl              | 24h                 | No      | The time period after which index cache expires|
-| hetu.heuristicindex.filter.cache.load-threads     | 10                  | No      | The number of threads used to load indices in parallel|
-| hetu.heuristicindex.filter.cache.loading-delay    | 10s                 | No      | The delay to wait before async loading task starts to load index cache from indexstore|
-| hetu.heuristicindex.indexstore.uri                | /opt/hetu/indices/  | No      | Directory under which all index files are stored|
-| hetu.heuristicindex.indexstore.filesystem.profile | local-config-default| No      | This property defines the filesystem profile used to read and write index|
-| hetu.heuristicindex.filter.cache.preload-indices  |                     | No      | Preload the specified indices (comma-separated) when the server starts. Put `ALL` to load all indices|
+| Property Name                                      | Default Value       | Required| Description|
+|----------------------------------------------------|---------------------|---------|--------------|
+| hetu.heuristicindex.filter.enabled                 | false               | No      | Enables heuristic index|
+| hetu.heuristicindex.filter.cache.max-memory        | 10GB                | No      | Caching size of index files|
+| hetu.heuristicindex.filter.cache.soft-reference    | true                | No      | Enabling this property allows the GC to remove entries from the cache if memory is running low|
+| hetu.heuristicindex.filter.cache.ttl               | 24h                 | No      | The time period after which index cache expires|
+| hetu.heuristicindex.filter.cache.load-threads      | 10                  | No      | The number of threads used to load indices in parallel|
+| hetu.heuristicindex.filter.cache.loading-delay     | 10s                 | No      | The delay to wait before async loading task starts to load index cache from indexstore|
+| hetu.heuristicindex.indexstore.uri                 | /opt/hetu/indices/  | No      | Directory under which all index files are stored|
+| hetu.heuristicindex.indexstore.filesystem.profile  | local-config-default| No      | This property defines the filesystem profile used to read and write index|
+| hetu.heuristicindex.filter.cache.autoload-default  | true                | No      | The default value for autoloading indices. To change the value for a specifc index, set by WITH ("autoload" = true/false) in the create index statement|
 
 ## Index Statements
 

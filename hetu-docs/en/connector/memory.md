@@ -16,7 +16,66 @@ For example, you can write:
 connector.name=memory
 memory.max-data-per-node=200GB
 memory.spill-path=/opt/hetu/data/spill          
-```   
+```
+#### Other Required Configurations
+- This section will cover other configurations required to use Memory Connector.
+- Refer to the documentation of [Hetu Metastore](../admin/meta-store.md) and [State Store](../admin/state-store.md) for more information.
+
+  ##### Single Node Setup
+  - This section will give an example configuration for Memory Connector on a single node cluster.
+  - Create a file `etc/catalog/memory.properties` with the following information:
+  ``` properties
+  connector.name=memory
+  memory.max-data-per-node=200GB
+  memory.spill-path=/opt/hetu/data/spill
+  ```
+  - Create the file `etc/hetu-metastore.properties` with these configurations:
+  ```properties
+  hetu.metastore.type=hetufilesystem
+  hetu.metastore.hetufilesystem.profile-name=default
+  hetu.metastore.hetufilesystem.path=/tmp/hetu/metastore
+  hetu.metastore.cache.type=local
+  ```
+  ##### Multi-Node Setup
+  - This section will give an example configuration for Memory Connector an a cluster with more than one node.
+  - Create a file `etc/catalog/memory.properties` with the following information:
+  ``` properties
+  connector.name=memory
+  memory.max-data-per-node=200GB
+  memory.spill-path=/opt/hetu/data/spill
+  ```
+  - Add this line in `etc/config.properties` to enable State Store:
+      - State Store allows Memory Connector to automatically clean up dropped tables, otherwise tables will only be cleaned up when another table is created.
+  ```properties
+  hetu.embedded-state-store.enabled=true
+  ```
+  - Create a file called `etc/state-store.properties` with the following contents:
+  ```properties
+  state-store.type=hazelcast
+  state-store.name=test
+  state-store.cluster=test-cluster
+  hazelcast.discovery.mode=tcp-ip
+  hazelcast.discovery.port=7980
+  # The ip address and hazelcast discovery ports of each server should be included here
+  # formatted like `hazelcast.discovery.tcp-ip.seeds=host1:port,host2:port` 
+  hazelcast.discovery.tcp-ip.seeds=host1:7980, host2:7980
+  ```
+  - Create the file `etc/hetu-metastore.properties` with these configurations:
+  ```properties
+  hetu.metastore.type=hetufilesystem
+  hetu.metastore.hetufilesystem.profile-name=hdfs
+  hetu.metastore.hetufilesystem.path=/tmp/hetu/metastore
+  # make sure to use global cache!
+  hetu.metastore.cache.type=global
+  ```
+  - Create the file `etc/filesystem/hdfs.properties`  to direct openLooKeng to your hdfs file system:
+  ```properties
+  fs.client.type=hdfs
+  # Path to hdfs resource files (e.g. core-site.xml, hdfs-site.xml)
+  hdfs.config.resources=/tmp/hetu/hdfs-site.xml
+  # hdfs authentication, accepted values: KERBEROS/NONE
+  hdfs.authentication.type=NONE
+  ```
 
 **Note:**
 - `spill-path` should be set to a directory with enough free space to hold
@@ -26,12 +85,6 @@ memory.spill-path=/opt/hetu/data/spill
 - In `etc/config.properties` ensure that `task.writer-count` is set to
  `>=` number of nodes in the cluster running openLooKeng. This will help
   distribute the data uniformly between all the workers.
-- Hetu Metastore must be configured. The default settings are included in
-  `etc/hetu-metastore.properties`. 
-    - Check [Hetu Metastore](../admin/meta-store.md) for more information. 
-- State Store must be configured to enable automatic memory refresh on workers.
-    - Check [State Store](../admin/state-store.md) for more information
-    - Automatic memory refresh will allow Memory Connector to clean unused tables more often resulting in more efficient use of memory.
 
 Examples
 --------
@@ -158,7 +211,6 @@ For queries containing > >= < <= BETWEEN IN similar logic is applied.
 Limitations and known Issues
 ---------------------------------------------
 
-- After `DROP TABLE`, memory is not released immediately. It is released on next `CREATE TABLE` operation.
-    - A simple workaround is to create a small temporary table to trigger a cleanup `CREATE TABLE memory.default.tmp AS SELECT * FROM tpch.tiny.nation;`
+- Without State Store and Hetu Metastore with global cache, after `DROP TABLE`, memory is not released immediately on the workers. It is released on the next `CREATE TABLE` operation.
 - Currently only a single column in ascending order is supported by `sorted_by`
 - If a CTAS (CREATE TABLE AS) query fails or is cancelled, an invalid table will remain. This table must be dropped manually.

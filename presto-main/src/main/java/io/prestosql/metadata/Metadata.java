@@ -15,6 +15,7 @@ package io.prestosql.metadata;
 
 import io.airlift.slice.Slice;
 import io.prestosql.Session;
+import io.prestosql.spi.PartialAndFinalAggregationType;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.CatalogSchemaName;
@@ -569,7 +570,7 @@ public interface Metadata
      */
     boolean isPreAggregationSupported(Session session, CatalogName catalogName);
 
-    boolean canPerformSortBasedAggregation(Session session, TableHandle tableHandle, List<String> keyNames);
+    PartialAndFinalAggregationType validateAndGetSortAggregationType(Session session, TableHandle tableHandle, List<String> keyNames);
 
     void refreshMetadataCache(Session session, Optional<String> catalogName);
 }

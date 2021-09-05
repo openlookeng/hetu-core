@@ -502,7 +502,7 @@ public class TestTableWriterOperator
         }
 
         @Override
-        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider, long resumeCount)
         {
             TableWriteInfoTestPageSinkState myState = (TableWriteInfoTestPageSinkState) state;
             this.pages.clear();

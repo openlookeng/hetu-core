@@ -16,6 +16,7 @@ package io.prestosql.plugin.memory;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.json.JsonCodec;
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.prestosql.plugin.memory.data.MemoryTableManager;
 import io.prestosql.spi.HostAddress;
@@ -82,6 +83,7 @@ import static java.util.stream.Collectors.toMap;
 public class MemoryMetadata
         implements ConnectorMetadata
 {
+    private static final Logger log = Logger.get(MemoryMetadata.class);
     public static final String MEM_KEY = "memory"; // memory metadata all under this catalog
     public static final String DEFAULT_SCHEMA = "default";
     public static final String TABLE_ID_KEY = "id"; // used as param key in TableEntity
@@ -300,6 +302,7 @@ public class MemoryMetadata
                 newTableName.getSchemaName(),
                 newTableName.getTableName(),
                 oldTableHandle.isCompressionEnabled(),
+                oldTableHandle.isAsyncProcessingEnabled(),
                 oldTableHandle.getActiveTableIds(),
                 oldTableHandle.getColumns(),
                 oldTableHandle.getSortedBy(),
@@ -408,12 +411,14 @@ public class MemoryMetadata
                 System.currentTimeMillis()));
 
         boolean spillCompressionEnabled = MemoryTableProperties.getSpillCompressionEnabled(tableMetadata.getProperties());
+        boolean asyncProcessingEnabled = MemoryTableProperties.getAsyncProcessingEnabled(tableMetadata.getProperties());
 
         return new MemoryWriteTableHandle(
                 nextId,
                 tableMetadata.getTable().getSchemaName(),
                 tableMetadata.getTable().getTableName(),
                 spillCompressionEnabled,
+                asyncProcessingEnabled,
                 getTableIdSet(nextId),
                 columnHandles,
                 sortedBy,
@@ -625,7 +630,14 @@ public class MemoryMetadata
     @Override
     public long getTableModificationTime(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        return getTableInfo(((MemoryTableHandle) tableHandle).getId()).getModificationTime();
+        try {
+            return getTableInfo(((MemoryTableHandle) tableHandle).getId()).getModificationTime();
+        }
+        // We want to make sure the query doesn't fail because of star-tree not being able to get last modified time
+        catch (Exception e) {
+            log.error("Exception thrown while trying to get modified time", e);
+            return -1L;
+        }
     }
 
     /**

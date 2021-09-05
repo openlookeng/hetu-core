@@ -40,6 +40,7 @@ import io.prestosql.spi.metastore.model.TableEntity;
 import io.prestosql.spi.metastore.model.TableEntityType;
 import io.prestosql.spi.seedstore.Seed;
 import io.prestosql.spi.seedstore.SeedStore;
+import io.prestosql.spi.seedstore.SeedStoreSubType;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.statestore.StateStoreBootstrapper;
 import io.prestosql.spi.statestore.StateStoreFactory;
@@ -69,6 +70,7 @@ import static io.hetu.core.statestore.hazelcast.HazelcastConstants.DISCOVERY_POR
 import static io.prestosql.spi.metastore.HetuErrorCode.HETU_METASTORE_CODE;
 import static io.prestosql.statestore.StateStoreConstants.STATE_STORE_CONFIGURATION_PATH;
 import static java.util.Collections.emptyMap;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -134,7 +136,7 @@ public class TestHetuMetastoreGlobalCache
         seeds.add(mockSeed);
 
         SeedStoreManager mockSeedStoreManager = mock(SeedStoreManager.class);
-        when(mockSeedStoreManager.getSeedStore()).thenReturn(mockSeedStore);
+        when(mockSeedStoreManager.getSeedStore(any(SeedStoreSubType.class))).thenReturn(mockSeedStore);
 
         when(mockSeed.getLocation()).thenReturn(LOCALHOST + ":" + PORT3);
         when(mockSeedStore.get()).thenReturn(seeds);

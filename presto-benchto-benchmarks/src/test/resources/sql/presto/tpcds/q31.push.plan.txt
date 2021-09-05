@@ -4,74 +4,74 @@ remote exchange (GATHER, SINGLE, [])
             join (INNER, PARTITIONED):
                 join (INNER, PARTITIONED):
                     join (INNER, PARTITIONED):
-                        final aggregation over (ca_county_85, d_qoy_59, d_year_55)
+                        final hashaggregation over (ca_county_77, d_qoy_51, d_year_47)
                             local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPARTITION, HASH, ["ca_county_85", "d_qoy_59", "d_year_55"])
-                                    partial aggregation over (ca_county_85, d_qoy_59, d_year_55)
+                                remote exchange (REPARTITION, HASH, ["ca_county_77", "d_qoy_51", "d_year_47"])
+                                    partial hashaggregation over (ca_county_77, d_qoy_51, d_year_47)
                                         join (INNER, PARTITIONED):
-                                            remote exchange (REPARTITION, HASH, ["ss_addr_sk_31"])
+                                            remote exchange (REPARTITION, HASH, ["ss_addr_sk_23"])
                                                 join (INNER, REPLICATED):
                                                     scan store_sales
                                                     local exchange (GATHER, SINGLE, [])
                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                             scan date_dim (pushdown = true)
                                             local exchange (GATHER, SINGLE, [])
-                                                remote exchange (REPARTITION, HASH, ["ca_address_sk_78"])
+                                                remote exchange (REPARTITION, HASH, ["ca_address_sk_70"])
                                                     scan customer_address
                         local exchange (GATHER, SINGLE, [])
-                            remote exchange (REPARTITION, HASH, ["ca_county_180", NullableValue{type=integer, value=2000}, NullableValue{type=integer, value=2}])
-                                final aggregation over (ca_county_180, d_qoy_154, d_year_150)
+                            remote exchange (REPARTITION, HASH, ["ca_county_164", NullableValue{type=integer, value=2000}, NullableValue{type=integer, value=2}])
+                                final hashaggregation over (ca_county_164, d_qoy_138, d_year_134)
                                     local exchange (GATHER, SINGLE, [])
-                                        remote exchange (REPARTITION, HASH, ["ca_county_180", "d_qoy_154", "d_year_150"])
-                                            partial aggregation over (ca_county_180, d_qoy_154, d_year_150)
+                                        remote exchange (REPARTITION, HASH, ["ca_county_164", "d_qoy_138", "d_year_134"])
+                                            partial hashaggregation over (ca_county_164, d_qoy_138, d_year_134)
                                                 join (INNER, PARTITIONED):
-                                                    remote exchange (REPARTITION, HASH, ["ss_addr_sk_126"])
+                                                    remote exchange (REPARTITION, HASH, ["ss_addr_sk_110"])
                                                         join (INNER, REPLICATED):
                                                             scan store_sales
                                                             local exchange (GATHER, SINGLE, [])
                                                                 remote exchange (REPLICATE, BROADCAST, [])
                                                                     scan date_dim (pushdown = true)
                                                     local exchange (GATHER, SINGLE, [])
-                                                        remote exchange (REPARTITION, HASH, ["ca_address_sk_173"])
+                                                        remote exchange (REPARTITION, HASH, ["ca_address_sk_157"])
                                                             scan customer_address
                     join (INNER, PARTITIONED):
-                        final aggregation over (ca_county_358, d_qoy_332, d_year_328)
+                        final hashaggregation over (ca_county_326, d_qoy_300, d_year_296)
                             local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPARTITION, HASH, ["ca_county_358", "d_qoy_332", "d_year_328"])
-                                    partial aggregation over (ca_county_358, d_qoy_332, d_year_328)
+                                remote exchange (REPARTITION, HASH, ["ca_county_326", "d_qoy_300", "d_year_296"])
+                                    partial hashaggregation over (ca_county_326, d_qoy_300, d_year_296)
                                         join (INNER, PARTITIONED):
-                                            remote exchange (REPARTITION, HASH, ["ws_bill_addr_sk_294"])
+                                            remote exchange (REPARTITION, HASH, ["ws_bill_addr_sk_262"])
                                                 join (INNER, REPLICATED):
                                                     scan web_sales
                                                     local exchange (GATHER, SINGLE, [])
                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                             scan date_dim (pushdown = true)
                                             local exchange (GATHER, SINGLE, [])
-                                                remote exchange (REPARTITION, HASH, ["ca_address_sk_351"])
+                                                remote exchange (REPARTITION, HASH, ["ca_address_sk_319"])
                                                     scan customer_address
                         local exchange (GATHER, SINGLE, [])
-                            remote exchange (REPARTITION, HASH, ["ca_county_464", NullableValue{type=integer, value=2000}, NullableValue{type=integer, value=2}])
-                                final aggregation over (ca_county_464, d_qoy_438, d_year_434)
+                            remote exchange (REPARTITION, HASH, ["ca_county_424", NullableValue{type=integer, value=2000}, NullableValue{type=integer, value=2}])
+                                final hashaggregation over (ca_county_424, d_qoy_398, d_year_394)
                                     local exchange (GATHER, SINGLE, [])
-                                        remote exchange (REPARTITION, HASH, ["ca_county_464", "d_qoy_438", "d_year_434"])
-                                            partial aggregation over (ca_county_464, d_qoy_438, d_year_434)
+                                        remote exchange (REPARTITION, HASH, ["ca_county_424", "d_qoy_398", "d_year_394"])
+                                            partial hashaggregation over (ca_county_424, d_qoy_398, d_year_394)
                                                 join (INNER, PARTITIONED):
-                                                    remote exchange (REPARTITION, HASH, ["ws_bill_addr_sk_400"])
+                                                    remote exchange (REPARTITION, HASH, ["ws_bill_addr_sk_360"])
                                                         join (INNER, REPLICATED):
                                                             scan web_sales
                                                             local exchange (GATHER, SINGLE, [])
                                                                 remote exchange (REPLICATE, BROADCAST, [])
                                                                     scan date_dim (pushdown = true)
                                                     local exchange (GATHER, SINGLE, [])
-                                                        remote exchange (REPARTITION, HASH, ["ca_address_sk_457"])
+                                                        remote exchange (REPARTITION, HASH, ["ca_address_sk_417"])
                                                             scan customer_address
                 local exchange (GATHER, SINGLE, [])
                     remote exchange (REPARTITION, HASH, ["ca_county", NullableValue{type=integer, value=2000}, NullableValue{type=integer, value=2}])
                         join (INNER, PARTITIONED):
-                            final aggregation over (ca_county, d_qoy, d_year)
+                            final hashaggregation over (ca_county, d_qoy, d_year)
                                 local exchange (GATHER, SINGLE, [])
                                     remote exchange (REPARTITION, HASH, ["ca_county", "d_qoy", "d_year"])
-                                        partial aggregation over (ca_county, d_qoy, d_year)
+                                        partial hashaggregation over (ca_county, d_qoy, d_year)
                                             join (INNER, PARTITIONED):
                                                 remote exchange (REPARTITION, HASH, ["ss_addr_sk"])
                                                     join (INNER, REPLICATED):
@@ -82,10 +82,10 @@ remote exchange (GATHER, SINGLE, [])
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPARTITION, HASH, ["ca_address_sk"])
                                                         scan customer_address
-                            final aggregation over (ca_county_252, d_qoy_226, d_year_222)
+                            final hashaggregation over (ca_county_228, d_qoy_202, d_year_198)
                                 local exchange (GATHER, SINGLE, [])
-                                    remote exchange (REPARTITION, HASH, ["ca_county_252", "d_qoy_226", "d_year_222"])
-                                        partial aggregation over (ca_county_252, d_qoy_226, d_year_222)
+                                    remote exchange (REPARTITION, HASH, ["ca_county_228", "d_qoy_202", "d_year_198"])
+                                        partial hashaggregation over (ca_county_228, d_qoy_202, d_year_198)
                                             join (INNER, PARTITIONED):
                                                 remote exchange (REPARTITION, HASH, ["ws_bill_addr_sk"])
                                                     join (INNER, REPLICATED):
@@ -94,5 +94,5 @@ remote exchange (GATHER, SINGLE, [])
                                                             remote exchange (REPLICATE, BROADCAST, [])
                                                                 scan date_dim (pushdown = true)
                                                 local exchange (GATHER, SINGLE, [])
-                                                    remote exchange (REPARTITION, HASH, ["ca_address_sk_245"])
+                                                    remote exchange (REPARTITION, HASH, ["ca_address_sk_221"])
                                                         scan customer_address

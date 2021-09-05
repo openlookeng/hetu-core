@@ -1,11 +1,11 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
         join (INNER, PARTITIONED):
-            single aggregation over (d_year_183, i_brand_id_184, i_category_id_186, i_class_id_185, i_manufact_id_187)
-                final aggregation over (d_year_183, expr_188, expr_189, i_brand_id_184, i_category_id_186, i_class_id_185, i_manufact_id_187)
-                    local exchange (REPARTITION, HASH, ["d_year_183", "i_brand_id_184", "i_category_id_186", "i_class_id_185", "i_manufact_id_187"])
+            single hashaggregation over (d_year_162, i_brand_id_163, i_category_id_165, i_class_id_164, i_manufact_id_166)
+                final hashaggregation over (d_year_162, expr_167, expr_168, i_brand_id_163, i_category_id_165, i_class_id_164, i_manufact_id_166)
+                    local exchange (REPARTITION, HASH, ["d_year_162", "i_brand_id_163", "i_category_id_165", "i_class_id_164", "i_manufact_id_166"])
                         remote exchange (REPARTITION, HASH, ["i_brand_id", "i_category_id", "i_class_id", "i_manufact_id"])
-                            partial aggregation over (d_year, expr, expr_16, i_brand_id, i_category_id, i_class_id, i_manufact_id)
+                            partial hashaggregation over (d_year, expr, expr_16, i_brand_id, i_category_id, i_class_id, i_manufact_id)
                                 join (RIGHT, PARTITIONED):
                                     remote exchange (REPARTITION, HASH, ["cr_item_sk", "cr_order_number"])
                                         scan catalog_returns
@@ -20,8 +20,8 @@ local exchange (GATHER, SINGLE, [])
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPLICATE, BROADCAST, [])
                                                         scan date_dim (pushdown = true)
-                        remote exchange (REPARTITION, HASH, ["i_brand_id_32", "i_category_id_36", "i_class_id_34", "i_manufact_id_38"])
-                            partial aggregation over (d_year_56, expr_91, expr_92, i_brand_id_32, i_category_id_36, i_class_id_34, i_manufact_id_38)
+                        remote exchange (REPARTITION, HASH, ["i_brand_id_25", "i_category_id_29", "i_class_id_27", "i_manufact_id_31"])
+                            partial hashaggregation over (d_year_49, expr_84, expr_85, i_brand_id_25, i_category_id_29, i_class_id_27, i_manufact_id_31)
                                 join (RIGHT, PARTITIONED):
                                     remote exchange (REPARTITION, HASH, ["sr_item_sk", "sr_ticket_number"])
                                         scan store_returns
@@ -36,8 +36,8 @@ local exchange (GATHER, SINGLE, [])
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPLICATE, BROADCAST, [])
                                                         scan date_dim (pushdown = true)
-                        remote exchange (REPARTITION, HASH, ["i_brand_id_115", "i_category_id_119", "i_class_id_117", "i_manufact_id_121"])
-                            partial aggregation over (d_year_139, expr_174, expr_175, i_brand_id_115, i_category_id_119, i_class_id_117, i_manufact_id_121)
+                        remote exchange (REPARTITION, HASH, ["i_brand_id_101", "i_category_id_105", "i_class_id_103", "i_manufact_id_107"])
+                            partial hashaggregation over (d_year_125, expr_160, expr_161, i_brand_id_101, i_category_id_105, i_class_id_103, i_manufact_id_107)
                                 join (RIGHT, PARTITIONED):
                                     remote exchange (REPARTITION, HASH, ["wr_item_sk", "wr_order_number"])
                                         scan web_returns
@@ -52,16 +52,16 @@ local exchange (GATHER, SINGLE, [])
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPLICATE, BROADCAST, [])
                                                         scan date_dim (pushdown = true)
-            single aggregation over (d_year_642, i_brand_id_643, i_category_id_645, i_class_id_644, i_manufact_id_646)
-                final aggregation over (d_year_642, expr_647, expr_648, i_brand_id_643, i_category_id_645, i_class_id_644, i_manufact_id_646)
+            single hashaggregation over (d_year_579, i_brand_id_580, i_category_id_582, i_class_id_581, i_manufact_id_583)
+                final hashaggregation over (d_year_579, expr_584, expr_585, i_brand_id_580, i_category_id_582, i_class_id_581, i_manufact_id_583)
                     local exchange (GATHER, SINGLE, [])
-                        remote exchange (REPARTITION, HASH, ["i_brand_id_287", "i_category_id_291", "i_class_id_289", "i_manufact_id_293"])
-                            partial aggregation over (d_year_311, expr_373, expr_374, i_brand_id_287, i_category_id_291, i_class_id_289, i_manufact_id_293)
+                        remote exchange (REPARTITION, HASH, ["i_brand_id_245", "i_category_id_249", "i_class_id_247", "i_manufact_id_251"])
+                            partial hashaggregation over (d_year_269, expr_331, expr_332, i_brand_id_245, i_category_id_249, i_class_id_247, i_manufact_id_251)
                                 join (RIGHT, PARTITIONED):
-                                    remote exchange (REPARTITION, HASH, ["cr_item_sk_338", "cr_order_number_352"])
+                                    remote exchange (REPARTITION, HASH, ["cr_item_sk_296", "cr_order_number_310"])
                                         scan catalog_returns
                                     local exchange (GATHER, SINGLE, [])
-                                        remote exchange (REPARTITION, HASH, ["cs_item_sk_260", "cs_order_number_262"])
+                                        remote exchange (REPARTITION, HASH, ["cs_item_sk_218", "cs_order_number_220"])
                                             join (INNER, REPLICATED):
                                                 join (INNER, REPLICATED):
                                                     scan catalog_sales
@@ -71,13 +71,13 @@ local exchange (GATHER, SINGLE, [])
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPLICATE, BROADCAST, [])
                                                         scan date_dim (pushdown = true)
-                        remote exchange (REPARTITION, HASH, ["i_brand_id_413", "i_category_id_417", "i_class_id_415", "i_manufact_id_419"])
-                            partial aggregation over (d_year_437, expr_492, expr_493, i_brand_id_413, i_category_id_417, i_class_id_415, i_manufact_id_419)
+                        remote exchange (REPARTITION, HASH, ["i_brand_id_364", "i_category_id_368", "i_class_id_366", "i_manufact_id_370"])
+                            partial hashaggregation over (d_year_388, expr_443, expr_444, i_brand_id_364, i_category_id_368, i_class_id_366, i_manufact_id_370)
                                 join (RIGHT, PARTITIONED):
-                                    remote exchange (REPARTITION, HASH, ["sr_item_sk_464", "sr_ticket_number_471"])
+                                    remote exchange (REPARTITION, HASH, ["sr_item_sk_415", "sr_ticket_number_422"])
                                         scan store_returns
                                     local exchange (GATHER, SINGLE, [])
-                                        remote exchange (REPARTITION, HASH, ["ss_item_sk_384", "ss_ticket_number_391"])
+                                        remote exchange (REPARTITION, HASH, ["ss_item_sk_335", "ss_ticket_number_342"])
                                             join (INNER, REPLICATED):
                                                 join (INNER, REPLICATED):
                                                     scan store_sales
@@ -87,13 +87,13 @@ local exchange (GATHER, SINGLE, [])
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPLICATE, BROADCAST, [])
                                                         scan date_dim (pushdown = true)
-                        remote exchange (REPARTITION, HASH, ["i_brand_id_550", "i_category_id_554", "i_class_id_552", "i_manufact_id_556"])
-                            partial aggregation over (d_year_574, expr_633, expr_634, i_brand_id_550, i_category_id_554, i_class_id_552, i_manufact_id_556)
+                        remote exchange (REPARTITION, HASH, ["i_brand_id_494", "i_category_id_498", "i_class_id_496", "i_manufact_id_500"])
+                            partial hashaggregation over (d_year_518, expr_577, expr_578, i_brand_id_494, i_category_id_498, i_class_id_496, i_manufact_id_500)
                                 join (RIGHT, PARTITIONED):
-                                    remote exchange (REPARTITION, HASH, ["wr_item_sk_601", "wr_order_number_612"])
+                                    remote exchange (REPARTITION, HASH, ["wr_item_sk_545", "wr_order_number_556"])
                                         scan web_returns
                                     local exchange (GATHER, SINGLE, [])
-                                        remote exchange (REPARTITION, HASH, ["ws_item_sk_511", "ws_order_number_525"])
+                                        remote exchange (REPARTITION, HASH, ["ws_item_sk_455", "ws_order_number_469"])
                                             join (INNER, REPLICATED):
                                                 join (INNER, REPLICATED):
                                                     scan web_sales

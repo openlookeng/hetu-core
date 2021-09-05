@@ -1,7 +1,7 @@
-final aggregation over ()
+final hashaggregation over ()
     local exchange (GATHER, SINGLE, [])
         remote exchange (GATHER, SINGLE, [])
-            partial aggregation over ()
+            partial hashaggregation over ()
                 Filter
                     semijoin (PARTITIONED):
                         remote exchange (REPARTITION, HASH, ["cs_bill_customer_sk"])
@@ -20,10 +20,10 @@ final aggregation over ()
                                             remote exchange (REPARTITION, HASH, ["count_31", "d_date_3", "ss_item_sk", "substr"])
                                                 cte frequent_ss_items
                                                     Filter
-                                                        final aggregation over (d_date_3, ss_item_sk, substr)
+                                                        final hashaggregation over (d_date_3, ss_item_sk, substr)
                                                             local exchange (GATHER, SINGLE, [])
                                                                 remote exchange (REPARTITION, HASH, ["d_date_3", "ss_item_sk", "substr"])
-                                                                    partial aggregation over (d_date_3, ss_item_sk, substr)
+                                                                    partial hashaggregation over (d_date_3, ss_item_sk, substr)
                                                                         join (INNER, REPLICATED):
                                                                             join (INNER, REPLICATED):
                                                                                 Filter
@@ -36,16 +36,16 @@ final aggregation over ()
                                                                                 remote exchange (REPLICATE, BROADCAST, [])
                                                                                     scan item
                         local exchange (GATHER, SINGLE, [])
-                            remote exchange (REPARTITION, HASH, ["ss_customer_sk_60"])
-                                remote exchange (REPARTITION, HASH, ["ss_customer_sk_60", "sum"])
+                            remote exchange (REPARTITION, HASH, ["ss_customer_sk_50"])
+                                remote exchange (REPARTITION, HASH, ["ss_customer_sk_50", "sum"])
                                     cte best_ss_customer
                                         Filter
                                             cross join:
-                                                final aggregation over (ss_customer_sk_60)
+                                                final hashaggregation over (ss_customer_sk_50)
                                                     local exchange (GATHER, SINGLE, [])
-                                                        partial aggregation over (ss_customer_sk_60)
+                                                        partial hashaggregation over (ss_customer_sk_50)
                                                             join (INNER, PARTITIONED):
-                                                                remote exchange (REPARTITION, HASH, ["ss_customer_sk_60"])
+                                                                remote exchange (REPARTITION, HASH, ["ss_customer_sk_50"])
                                                                     scan store_sales
                                                                 local exchange (GATHER, SINGLE, [])
                                                                     remote exchange (REPARTITION, HASH, ["c_customer_sk"])
@@ -55,26 +55,26 @@ final aggregation over ()
                                                         local exchange (GATHER, SINGLE, [])
                                                             remote exchange (GATHER, SINGLE, [])
                                                                 cte max_store_sales
-                                                                    final aggregation over ()
+                                                                    final hashaggregation over ()
                                                                         local exchange (GATHER, SINGLE, [])
                                                                             remote exchange (GATHER, SINGLE, [])
-                                                                                partial aggregation over ()
-                                                                                    final aggregation over (ss_customer_sk_90)
+                                                                                partial hashaggregation over ()
+                                                                                    final hashaggregation over (ss_customer_sk_80)
                                                                                         local exchange (GATHER, SINGLE, [])
-                                                                                            partial aggregation over (ss_customer_sk_90)
+                                                                                            partial hashaggregation over (ss_customer_sk_80)
                                                                                                 join (INNER, REPLICATED):
                                                                                                     join (INNER, PARTITIONED):
-                                                                                                        remote exchange (REPARTITION, HASH, ["ss_customer_sk_90"])
+                                                                                                        remote exchange (REPARTITION, HASH, ["ss_customer_sk_80"])
                                                                                                             Filter
                                                                                                                 scan store_sales
                                                                                                         local exchange (GATHER, SINGLE, [])
-                                                                                                            remote exchange (REPARTITION, HASH, ["c_customer_sk_110"])
+                                                                                                            remote exchange (REPARTITION, HASH, ["c_customer_sk_100"])
                                                                                                                 scan customer
                                                                                                     local exchange (GATHER, SINGLE, [])
                                                                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                                                                             Filter
                                                                                                                 scan date_dim
-            partial aggregation over ()
+            partial hashaggregation over ()
                 Filter
                     semijoin (PARTITIONED):
                         remote exchange (REPARTITION, HASH, ["ws_bill_customer_sk"])
@@ -89,14 +89,14 @@ final aggregation over ()
                                                     Filter
                                                         scan date_dim
                                     local exchange (GATHER, SINGLE, [])
-                                        remote exchange (REPARTITION, HASH, ["ss_item_sk_226"])
-                                            remote exchange (REPARTITION, HASH, ["count_304", "d_date_249", "ss_item_sk_226", "substr_297"])
+                                        remote exchange (REPARTITION, HASH, ["ss_item_sk_201"])
+                                            remote exchange (REPARTITION, HASH, ["count_279", "d_date_224", "ss_item_sk_201", "substr_272"])
                                                 cte frequent_ss_items
                                                     Filter
-                                                        final aggregation over (d_date_249, ss_item_sk_226, substr_297)
+                                                        final hashaggregation over (d_date_224, ss_item_sk_201, substr_272)
                                                             local exchange (GATHER, SINGLE, [])
-                                                                remote exchange (REPARTITION, HASH, ["d_date_249", "ss_item_sk_226", "substr_297"])
-                                                                    partial aggregation over (d_date_249, ss_item_sk_226, substr_297)
+                                                                remote exchange (REPARTITION, HASH, ["d_date_224", "ss_item_sk_201", "substr_272"])
+                                                                    partial hashaggregation over (d_date_224, ss_item_sk_201, substr_272)
                                                                         join (INNER, REPLICATED):
                                                                             join (INNER, REPLICATED):
                                                                                 Filter
@@ -109,39 +109,39 @@ final aggregation over ()
                                                                                 remote exchange (REPLICATE, BROADCAST, [])
                                                                                     scan item
                         local exchange (GATHER, SINGLE, [])
-                            remote exchange (REPARTITION, HASH, ["ss_customer_sk_335"])
-                                remote exchange (REPARTITION, HASH, ["ss_customer_sk_335", "sum_377"])
+                            remote exchange (REPARTITION, HASH, ["ss_customer_sk_300"])
+                                remote exchange (REPARTITION, HASH, ["ss_customer_sk_300", "sum_342"])
                                     cte best_ss_customer
                                         Filter
                                             cross join:
-                                                final aggregation over (ss_customer_sk_335)
+                                                final hashaggregation over (ss_customer_sk_300)
                                                     local exchange (GATHER, SINGLE, [])
-                                                        partial aggregation over (ss_customer_sk_335)
+                                                        partial hashaggregation over (ss_customer_sk_300)
                                                             join (INNER, PARTITIONED):
-                                                                remote exchange (REPARTITION, HASH, ["ss_customer_sk_335"])
+                                                                remote exchange (REPARTITION, HASH, ["ss_customer_sk_300"])
                                                                     scan store_sales
                                                                 local exchange (GATHER, SINGLE, [])
-                                                                    remote exchange (REPARTITION, HASH, ["c_customer_sk_355"])
+                                                                    remote exchange (REPARTITION, HASH, ["c_customer_sk_320"])
                                                                         scan customer
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPLICATE, BROADCAST, [])
                                                         local exchange (GATHER, SINGLE, [])
                                                             remote exchange (GATHER, SINGLE, [])
                                                                 cte max_store_sales
-                                                                    final aggregation over ()
+                                                                    final hashaggregation over ()
                                                                         local exchange (GATHER, SINGLE, [])
                                                                             remote exchange (GATHER, SINGLE, [])
-                                                                                partial aggregation over ()
-                                                                                    final aggregation over (ss_customer_sk_385)
+                                                                                partial hashaggregation over ()
+                                                                                    final hashaggregation over (ss_customer_sk_350)
                                                                                         local exchange (GATHER, SINGLE, [])
-                                                                                            partial aggregation over (ss_customer_sk_385)
+                                                                                            partial hashaggregation over (ss_customer_sk_350)
                                                                                                 join (INNER, REPLICATED):
                                                                                                     join (INNER, PARTITIONED):
-                                                                                                        remote exchange (REPARTITION, HASH, ["ss_customer_sk_385"])
+                                                                                                        remote exchange (REPARTITION, HASH, ["ss_customer_sk_350"])
                                                                                                             Filter
                                                                                                                 scan store_sales
                                                                                                         local exchange (GATHER, SINGLE, [])
-                                                                                                            remote exchange (REPARTITION, HASH, ["c_customer_sk_405"])
+                                                                                                            remote exchange (REPARTITION, HASH, ["c_customer_sk_370"])
                                                                                                                 scan customer
                                                                                                     local exchange (GATHER, SINGLE, [])
                                                                                                         remote exchange (REPLICATE, BROADCAST, [])

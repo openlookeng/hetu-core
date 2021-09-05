@@ -22,6 +22,7 @@ import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.MetadataUtil;
 import io.prestosql.metadata.TableMetadata;
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -46,6 +47,7 @@ import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.service.PropertyService;
 import io.prestosql.spi.sql.expression.Types.FrameBoundType;
 import io.prestosql.spi.sql.expression.Types.WindowFrameType;
 import io.prestosql.spi.type.Type;
@@ -121,6 +123,7 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Streams.stream;
 import static io.prestosql.SystemSessionProperties.isSkipRedundantSort;
+import static io.prestosql.spi.connector.CreateIndexMetadata.AUTOLOAD_PROP_KEY;
 import static io.prestosql.spi.connector.CreateIndexMetadata.INDEX_SUPPORTED_TYPES;
 import static io.prestosql.spi.connector.CreateIndexMetadata.LEVEL_PROP_KEY;
 import static io.prestosql.spi.plan.AggregationNode.groupingSets;
@@ -195,7 +198,9 @@ class QueryPlanner
         builder = sort(builder, orderingScheme);
         builder = offset(builder, query.getOffset());
         builder = limit(builder, query.getLimit(), orderingScheme);
-        builder = project(builder, analysis.getOutputExpressions(query));
+        if (!(builder.getRoot() instanceof ProjectNode)) {
+            builder = project(builder, analysis.getOutputExpressions(query));
+        }
 
         return new RelationPlan(
                 builder.getRoot(),
@@ -247,7 +252,9 @@ class QueryPlanner
         builder = sort(builder, orderingScheme);
         builder = offset(builder, node.getOffset());
         builder = limit(builder, node.getLimit(), orderingScheme);
-        builder = project(builder, outputs);
+        if (!(builder.getRoot() instanceof ProjectNode)) {
+            builder = project(builder, outputs);
+        }
         builder = createIndex(builder, analysis.getOriginalStatement());
         builder = updateIndex(builder, analysis.getOriginalStatement());
 
@@ -719,6 +726,7 @@ class QueryPlanner
         CreateIndexMetadata.Level indexCreationLevel = CreateIndexMetadata.Level.UNDEFINED;
         indexProperties.setProperty(LEVEL_PROP_KEY, indexCreationLevel.toString());
 
+        boolean autoLoadFound = false;
         for (Property property : createIndex.getProperties()) {
             String key = extractPropertyValue(property.getName());
             String val = extractPropertyValue(property.getValue()).toUpperCase(Locale.ENGLISH);
@@ -726,7 +734,22 @@ class QueryPlanner
                 indexCreationLevel = CreateIndexMetadata.Level.valueOf(val);
                 continue;
             }
+            if (key.equals(AUTOLOAD_PROP_KEY)) {
+                autoLoadFound = true;
+                String valInLowerCase = val.toLowerCase(Locale.ROOT);
+                if (valInLowerCase.equals("true") || valInLowerCase.equals("false")) {
+                    indexProperties.setProperty(key, valInLowerCase);
+                }
+                else {
+                    throw new IllegalArgumentException("Unrecognized value for key '" + AUTOLOAD_PROP_KEY + "', only 'true' or 'false' are allowed");
+                }
+                continue;
+            }
             indexProperties.setProperty(key, val);
+        }
+        if (!autoLoadFound) {
+            boolean defaultAutoloadProp = PropertyService.getBooleanProperty(HetuConstant.FILTER_CACHE_AUTOLOAD_DEFAULT);
+            indexProperties.setProperty(AUTOLOAD_PROP_KEY, String.valueOf(defaultAutoloadProp));
         }
 
         return subPlan.withNewRoot(new CreateIndexNode(
@@ -735,6 +758,7 @@ class QueryPlanner
                 new CreateIndexMetadata(createIndex.getIndexName().toString(),
                         tableName,
                         createIndex.getIndexType(),
+                        0L,
                         createIndex.getColumnAliases().stream().map(identifier -> new Pair<>(identifier.toString(),
                                 columnTypes.get(identifier.toString().toLowerCase(Locale.ROOT)))).collect(Collectors.toList()),
                         partitions,

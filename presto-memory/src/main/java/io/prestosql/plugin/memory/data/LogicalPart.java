@@ -89,7 +89,7 @@ public class LogicalPart
     private final Set<Integer> indexChannels;
     private final long maxLogicalPartBytes;
     private final int maxPageSizeBytes;
-    private final int lpNum;
+    private final int logicalPartNum;
     private final boolean compressionEnabled;
 
     // indexes
@@ -144,11 +144,11 @@ public class LogicalPart
             int maxPageSizeBytes,
             TypeManager typeManager,
             PagesSerde pagesSerde,
-            int lpNum,
+            int logicalPartNum,
             boolean compressionEnabled)
     {
         this.tableDataRoot = tableDataRoot;
-        this.lpNum = lpNum;
+        this.logicalPartNum = logicalPartNum;
         this.pages = new ArrayList<>();
         this.maxLogicalPartBytes = maxLogicalPartBytes;
         this.maxPageSizeBytes = maxPageSizeBytes;
@@ -193,6 +193,11 @@ public class LogicalPart
     long getByteSize()
     {
         return byteSize;
+    }
+
+    public int getLogicalPartNum()
+    {
+        return logicalPartNum;
     }
 
     void restoreTransientObjects(PageSorter pageSorter, TypeManager typeManager, PagesSerde pagesSerde, Path tableDataRoot)
@@ -278,6 +283,11 @@ public class LogicalPart
             int expressionColumnIndex = ((MemoryColumnHandle) e.getKey()).getColumnIndex();
             List<Range> ranges = ((SortedRangeSet) e.getValue().getValues()).getOrderedRanges();
 
+            // e.g. column=null
+            if (ranges.isEmpty()) {
+                continue;
+            }
+
             if (minMaxIdx.containsKey(expressionColumnIndex)) {
                 minmaxChannelsToRangesMap.put(expressionColumnIndex, ranges);
             }
@@ -336,6 +346,11 @@ public class LogicalPart
                             noMatches++;
                         }
                     }
+                    else {
+                        // the lookup value isn't comparable, we can't do filtering, e.g. if it's null
+                        LOG.warn("Lookup value is not Comparable. MinMax index could not be used.");
+                        return getPages();
+                    }
                 }
                 else {
                     // <, <=, >=, >, BETWEEN
@@ -363,6 +378,11 @@ public class LogicalPart
                                 }
                             }
                         }
+                        else {
+                            // the lookup value isn't comparable, we can't do filtering, e.g. if it's null
+                            LOG.warn("Lookup value is not Comparable. MinMax index could not be used.");
+                            return getPages();
+                        }
                     }
                     else if (!highBoundless && lowBoundless) {
                         // <= or <
@@ -383,6 +403,11 @@ public class LogicalPart
                                 }
                             }
                         }
+                        else {
+                            // the lookup value isn't comparable, we can't do filtering, e.g. if it's null
+                            LOG.warn("Lookup value is not Comparable. MinMax index could not be used.");
+                            return getPages();
+                        }
                     }
                     else if (!highBoundless && !lowBoundless) {
                         // BETWEEN
@@ -395,6 +420,11 @@ public class LogicalPart
                                 // lookup value is outside minmax range, skip logicalpart
                                 noMatches++;
                             }
+                        }
+                        else {
+                            // the lookup value isn't comparable, we can't do filtering, e.g. if it's null
+                            LOG.warn("Lookup value is not Comparable. MinMax index could not be used.");
+                            return getPages();
                         }
                     }
                 }
@@ -699,7 +729,7 @@ public class LogicalPart
 
     private String getPageFileName()
     {
-        return "logicalPart" + lpNum;
+        return "logicalPartNumber" + logicalPartNum;
     }
 
     /**

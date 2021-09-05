@@ -134,7 +134,7 @@ public class DistributedExecutionPlanner
         ImmutableList.Builder<SplitSource> allSplitSources = ImmutableList.builder();
         try {
             if (mode != Mode.SNAPSHOT) {
-                return doPlan(mode, root, session, resumeSnapshotId, nextSnapshotId, allSplitSources, null, null);
+                return doPlan(mode, root, session, resumeSnapshotId, nextSnapshotId, allSplitSources, null, null, null);
             }
 
             // Capture dependencies among table scan sources. Only need to do this for the initial planning.
@@ -142,7 +142,9 @@ public class DistributedExecutionPlanner
             Map<PlanFragmentId, Object> leftmostSources = new HashMap<>();
             // Source dependency. Key is SplitSource or ValuesNode or RemoteSourceNode; value is SplitSource or ValuesNode or RemoteSourceNode
             Multimap<Object, Object> sourceDependencies = HashMultimap.create();
-            StageExecutionPlan ret = doPlan(mode, root, session, resumeSnapshotId, nextSnapshotId, allSplitSources, leftmostSources, sourceDependencies);
+            // List of sources from the same union. Values are SplitSource or ValuesNode or RemoteSourceNode.
+            List<List<Object>> unionSources = new ArrayList<>();
+            StageExecutionPlan ret = doPlan(mode, root, session, resumeSnapshotId, nextSnapshotId, allSplitSources, leftmostSources, sourceDependencies, unionSources);
 
             for (Map.Entry<Object, Object> entry : sourceDependencies.entries()) {
                 List<MarkerSplitSource> right = collectSources(leftmostSources, entry.getValue());
@@ -150,6 +152,21 @@ public class DistributedExecutionPlanner
                     for (SplitSource dependency : right) {
                         source.addDependency((MarkerSplitSource) dependency);
                     }
+                }
+            }
+
+            List<MarkerSplitSource> sources = new ArrayList<>();
+            for (List<Object> union : unionSources) {
+                sources.clear();
+                for (Object unionSource : union) {
+                    sources.addAll(collectSources(leftmostSources, unionSource));
+                }
+                // These sources are part of a "union". They eventually reach the same "union" point (e.g. an ExchangeOperator).
+                // For snapshot to work, all sources must produce the same number of markers, otherwise the union point
+                // will not receive markers from all input channels, causing corresponding snapshots to be incomplete.
+                // Adding all these sources as "union dependencies" for each other, to make sure they produce the same set of markers.
+                for (MarkerSplitSource source : sources) {
+                    source.addUnionSources(sources);
                 }
             }
 
@@ -209,7 +226,8 @@ public class DistributedExecutionPlanner
             long nextSnapshotId,
             ImmutableList.Builder<SplitSource> allSplitSources,
             Map<PlanFragmentId, Object> leftmostSources,
-            Multimap<Object, Object> sourceDependencies)
+            Multimap<Object, Object> sourceDependencies,
+            List<List<Object>> unionSources)
     {
         PlanFragment currentFragment = root.getFragment();
 
@@ -221,7 +239,7 @@ public class DistributedExecutionPlanner
                 break;
             case SNAPSHOT:
                 // Add additional logic to record which sources depend on (are blocked by) which other sources through join operators
-                SnapshotAwareVisitor visitor = new SnapshotAwareVisitor(session, currentFragment.getStageExecutionDescriptor(), nextSnapshotId, allSplitSources, sourceDependencies);
+                SnapshotAwareVisitor visitor = new SnapshotAwareVisitor(session, currentFragment.getStageExecutionDescriptor(), nextSnapshotId, allSplitSources, sourceDependencies, unionSources);
                 splitSources = currentFragment.getRoot().accept(visitor, null);
                 leftmostSources.put(currentFragment.getId(), visitor.leftmostSource);
                 break;
@@ -236,7 +254,7 @@ public class DistributedExecutionPlanner
         // create child stages
         ImmutableList.Builder<StageExecutionPlan> dependencies = ImmutableList.builder();
         for (SubPlan childPlan : root.getChildren()) {
-            dependencies.add(doPlan(mode, childPlan, session, resumeSnapshotId, nextSnapshotId, allSplitSources, leftmostSources, sourceDependencies));
+            dependencies.add(doPlan(mode, childPlan, session, resumeSnapshotId, nextSnapshotId, allSplitSources, leftmostSources, sourceDependencies, unionSources));
         }
 
         // extract TableInfo
@@ -656,6 +674,7 @@ public class DistributedExecutionPlanner
             extends Visitor
     {
         private final Multimap<Object, Object> sourceDependencies;
+        private final List<List<Object>> unionSources;
         private final long nextSnapshotId;
         // Which are the corresponding "left" sources from join nodes while visiting the "right" nodes.
         // Value can be SplitSource, ValuesNode, or RemoteSourceNode
@@ -668,12 +687,47 @@ public class DistributedExecutionPlanner
                 StageExecutionDescriptor stageExecutionDescriptor,
                 long nextSnapshotId,
                 ImmutableList.Builder<SplitSource> allSplitSources,
-                Multimap<Object, Object> sourceDependencies)
+                Multimap<Object, Object> sourceDependencies,
+                List<List<Object>> unionSources)
         {
             super(session, stageExecutionDescriptor, allSplitSources);
             this.sourceDependencies = sourceDependencies;
+            this.unionSources = unionSources;
             this.nextSnapshotId = nextSnapshotId;
             sourceStack = new Stack<>();
+        }
+
+        @Override
+        public Map<PlanNodeId, SplitSource> visitExchange(ExchangeNode node, Void context)
+        {
+            if (node.getScope() == ExchangeNode.Scope.REMOTE ||
+                    node.getType() == ExchangeNode.Type.REPLICATE ||
+                    node.getSources().size() <= 1) {
+                return super.visitExchange(node, context);
+            }
+
+            // This is a unions with local sources, as an ExchangeNode with GATHER or REPARTITION types.
+            // (Unions with remote sources are handled by RemoteSourceNode.)
+            // Collect all (left-most) "leaf" sources, so that their corresponding MarkerSplitSources
+            // can be associated later.
+            List<Object> sources = new ArrayList<>();
+            unionSources.add(sources);
+
+            ImmutableMap.Builder<PlanNodeId, SplitSource> result = ImmutableMap.builder();
+            for (PlanNode child : node.getSources()) {
+                // Backup the current left-most source
+                Object prevLeftmost = leftmostSource;
+                leftmostSource = null;
+                result.putAll(child.accept(this, context));
+                // Collect left-most source of this union member
+                sources.add(leftmostSource);
+                // Restore original left-most source if necessary
+                if (prevLeftmost != null) {
+                    leftmostSource = prevLeftmost;
+                }
+            }
+
+            return result.build();
         }
 
         @Override

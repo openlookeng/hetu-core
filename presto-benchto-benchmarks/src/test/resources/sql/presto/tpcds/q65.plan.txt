@@ -2,10 +2,10 @@ local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
         join (INNER, REPLICATED):
             join (INNER, REPLICATED):
-                final aggregation over (ss_item_sk_26, ss_store_sk_31)
+                final hashaggregation over (ss_item_sk_16, ss_store_sk_21)
                     local exchange (GATHER, SINGLE, [])
-                        remote exchange (REPARTITION, HASH, ["ss_item_sk_26", "ss_store_sk_31"])
-                            partial aggregation over (ss_item_sk_26, ss_store_sk_31)
+                        remote exchange (REPARTITION, HASH, ["ss_item_sk_16", "ss_store_sk_21"])
+                            partial hashaggregation over (ss_item_sk_16, ss_store_sk_21)
                                 join (INNER, REPLICATED):
                                     scan store_sales
                                     local exchange (GATHER, SINGLE, [])
@@ -16,14 +16,14 @@ local exchange (GATHER, SINGLE, [])
                         join (INNER, PARTITIONED):
                             remote exchange (REPARTITION, HASH, ["s_store_sk"])
                                 scan store
-                            final aggregation over (ss_store_sk)
+                            final hashaggregation over (ss_store_sk)
                                 local exchange (GATHER, SINGLE, [])
                                     remote exchange (REPARTITION, HASH, ["ss_store_sk"])
-                                        partial aggregation over (ss_store_sk)
-                                            final aggregation over (ss_item_sk, ss_store_sk)
+                                        partial hashaggregation over (ss_store_sk)
+                                            final hashaggregation over (ss_item_sk, ss_store_sk)
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPARTITION, HASH, ["ss_item_sk", "ss_store_sk"])
-                                                        partial aggregation over (ss_item_sk, ss_store_sk)
+                                                        partial hashaggregation over (ss_item_sk, ss_store_sk)
                                                             join (INNER, REPLICATED):
                                                                 scan store_sales
                                                                 local exchange (GATHER, SINGLE, [])

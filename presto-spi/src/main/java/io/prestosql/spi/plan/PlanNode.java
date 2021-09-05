@@ -22,17 +22,27 @@ import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static io.prestosql.spi.plan.PlanNode.SkipOptRuleLevel.APPLY_ALL_RULES;
 import static java.util.Objects.requireNonNull;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.MINIMAL_CLASS, property = "@type")
 public abstract class PlanNode
 {
+    public enum SkipOptRuleLevel
+    {
+        APPLY_ALL_RULES,                // default behaviour
+        APPLY_ALL_LEGACY_AND_ROWEXPR,    // applies all legacy rule and only RowExpressionRewriteRuleSet iterative rule
+        APPLY_ALL_LEGACY_AND_ROWEXPR_PUSH_PREDICATE     // APPLY_ALL_LEGACY_AND_ROWEXPR + PushPredicateIntoTableScan
+    }
+
     private final PlanNodeId id;
+    private SkipOptRuleLevel skipOptRuleLevel;
 
     protected PlanNode(PlanNodeId id)
     {
         requireNonNull(id, "id is null");
         this.id = id;
+        skipOptRuleLevel = APPLY_ALL_RULES;
     }
 
     @JsonProperty("id")
@@ -62,5 +72,15 @@ public abstract class PlanNode
     public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
     {
         return visitor.visitPlan(this, context);
+    }
+
+    public void setSkipOptRuleLevel(SkipOptRuleLevel skipOptRuleLevel)
+    {
+        this.skipOptRuleLevel = skipOptRuleLevel;
+    }
+
+    public SkipOptRuleLevel getSkipOptRuleLevel()
+    {
+        return this.skipOptRuleLevel;
     }
 }

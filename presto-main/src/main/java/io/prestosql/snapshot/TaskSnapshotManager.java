@@ -45,6 +45,7 @@ public class TaskSnapshotManager
     private static final String CONSOLIDATED_STATE_COMPONENT = "ConsolidatedState";
 
     private final TaskId taskId;
+    private final long resumeCount;
     private final SnapshotUtils snapshotUtils;
 
     private int totalComponents = -1;
@@ -62,10 +63,16 @@ public class TaskSnapshotManager
 
     private Set<String> createdConsolidatedFiles;
 
-    public TaskSnapshotManager(TaskId taskId, SnapshotUtils snapshotUtils)
+    public TaskSnapshotManager(TaskId taskId, long resumeCount, SnapshotUtils snapshotUtils)
     {
         this.taskId = taskId;
+        this.resumeCount = resumeCount;
         this.snapshotUtils = snapshotUtils;
+    }
+
+    public long getResumeCount()
+    {
+        return resumeCount;
     }
 
     public QuerySnapshotManager getQuerySnapshotManager()

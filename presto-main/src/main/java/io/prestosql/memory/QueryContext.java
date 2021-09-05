@@ -259,11 +259,13 @@ public class QueryContext
     public TaskContext addTaskContext(TaskStateMachine taskStateMachine, Session session, boolean perOperatorCpuTimerEnabled, boolean cpuTimerEnabled, OptionalInt totalPartitions, Optional<PlanNodeId> parent, PagesSerdeFactory serdeFactory)
     {
         // Use a random instance id for tests
-        return addTaskContext(UUID.randomUUID().toString(), taskStateMachine, session, perOperatorCpuTimerEnabled, cpuTimerEnabled, totalPartitions, parent, serdeFactory);
+        return addTaskContext("0-" + UUID.randomUUID().toString(), taskStateMachine, session, perOperatorCpuTimerEnabled, cpuTimerEnabled, totalPartitions, parent, serdeFactory);
     }
 
     public TaskContext addTaskContext(String taskInstanceId, TaskStateMachine taskStateMachine, Session session, boolean perOperatorCpuTimerEnabled, boolean cpuTimerEnabled, OptionalInt totalPartitions, Optional<PlanNodeId> parent, PagesSerdeFactory serdeFactory)
     {
+        // Task instance id has format "<resume count>-<random UUID>"
+        long resumeCount = Long.valueOf(taskInstanceId.substring(0, taskInstanceId.indexOf('-')));
         TaskContext taskContext = TaskContext.createTaskContext(
                 this,
                 taskStateMachine,
@@ -277,7 +279,7 @@ public class QueryContext
                 totalPartitions,
                 parent.orElse(null),
                 serdeFactory,
-                new TaskSnapshotManager(taskStateMachine.getTaskId(), snapshotUtils));
+                new TaskSnapshotManager(taskStateMachine.getTaskId(), resumeCount, snapshotUtils));
         taskContexts.put(taskInstanceId, taskContext);
         return taskContext;
     }

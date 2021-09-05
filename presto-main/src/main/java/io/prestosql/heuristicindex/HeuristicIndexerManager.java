@@ -124,13 +124,11 @@ public class HeuristicIndexerManager
             String preloadNames = PropertyService.getStringProperty(HetuConstant.FILTER_CACHE_PRELOAD_INDICES);
             if (!preloadNames.isEmpty()) {
                 List<String> preloadNameList = Arrays.asList(preloadNames.split(","));
-                if (!preloadNameList.isEmpty()) {
-                    try {
-                        SplitFiltering.preloadCache(indexClient, preloadNameList);
-                    }
-                    catch (Exception e) {
-                        LOG.info("Error preloading index: " + e);
-                    }
+                try {
+                    SplitFiltering.preloadCache(indexClient, preloadNameList);
+                }
+                catch (Exception e) {
+                    LOG.info("Error loading index: " + e);
                 }
             }
         }

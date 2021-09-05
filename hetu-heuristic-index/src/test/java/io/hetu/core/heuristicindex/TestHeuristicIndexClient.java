@@ -60,6 +60,7 @@ public class TestHeuristicIndexClient
             client.addIndexRecord(new CreateIndexMetadata("idx1",
                     tableName,
                     "BLOOM",
+                    0L,
                     Collections.singletonList(new Pair<>("test_column", VARCHAR)),
                     Collections.emptyList(),
                     new Properties(),

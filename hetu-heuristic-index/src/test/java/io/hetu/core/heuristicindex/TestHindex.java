@@ -14,11 +14,13 @@
  */
 package io.hetu.core.heuristicindex;
 
+import io.airlift.units.DataSize;
 import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.MaterializedRow;
 import org.testng.annotations.Test;
 
+import java.util.List;
 import java.util.Locale;
 
 import static org.testng.Assert.assertEquals;
@@ -136,16 +138,19 @@ public class TestHindex
 
         String tableName = getNewTableName();
         createTable1(tableName);
-        String testerQuery = "SELECT * FROM " + tableName + " WHERE " + queryVariable + "=" + queryValue;
         String indexName = getNewIndexName();
         long threadRefreshRate = 5000; // this is the rate that background thread gets executed
+
+        // original split num
+        String testerQuery = "SELECT * FROM " + tableName + " WHERE " + queryVariable + "=" + queryValue;
         int splitsBeforeIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
 
         //create index
         assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
-                indexType + " ON " + tableName + " (" + queryVariable + ")");
+                indexType + " ON " + tableName + " (" + queryVariable + ")" + " WITH (autoload = true)");
 
         Thread.sleep(threadRefreshRate);
+        // split num after using index
         int splitsAfterIndex = getSplitAndMaterializedResult(testerQuery).getFirst();
 
         //update index
@@ -155,6 +160,7 @@ public class TestHindex
         assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(3, 'data'), (9, 'ttt'), (5, 'num')");
         assertQuerySucceeds("UPDATE INDEX " + indexName);
         Thread.sleep(threadRefreshRate);
+        //split num after updating data and autoloading index
         int splitsAfterIndexUpdate = getSplitAndMaterializedResult(testerQuery).getFirst();
 
         //drop index
@@ -591,5 +597,48 @@ public class TestHindex
         MaterializedResult resultIndexCreation2 = resultPairIndexCreation2.getSecond();
         size = resultIndexCreation2.getRowCount();
         assertEquals(size - initialSize, 0);
+    }
+
+    @Test
+    public void testShowIndexSize()
+    {
+        System.out.println("Running testShowIndexSize");
+
+        String tableName = getNewTableName();
+        String indexType = "bloom";
+        String indexName = getNewIndexName();
+        createTable1(tableName);
+
+        // Create index
+        assertQuerySucceeds("CREATE INDEX IF NOT EXISTS " + indexName + " USING " +
+                indexType + " ON " + tableName + " (id)");
+
+        // Get `SHOW INDEX` query output of this index
+        String testerQuery = "SHOW INDEX " + indexName;
+        MaterializedResult result = getSplitAndMaterializedResult(testerQuery).getSecond();
+        List<Object> resultFields = result.getMaterializedRows().get(0).getFields();
+
+        // the index of size in the `SHOW INDEX` output
+        // `sizeLocation` may need to be changed if new fields are added to the output
+        int sizeLocation = 5;
+        String indexSizeStr = (String) resultFields.get(sizeLocation);
+        DataSize indexSize = DataSize.valueOf(indexSizeStr);
+        assertTrue(indexSize.toBytes() != 0);
+
+        //update index
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(7, 'new1'), (8, 'new2')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(1, 'test')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(2, '123'), (3, 'temp')");
+        assertQuerySucceeds("INSERT INTO " + tableName + " VALUES(3, 'data'), (9, 'ttt'), (5, 'num')");
+        assertQuerySucceeds("UPDATE INDEX " + indexName);
+
+        // Get `SHOW INDEX` query output of this index after UPDATE INDEX
+        MaterializedResult newResult = getSplitAndMaterializedResult(testerQuery).getSecond();
+        List<Object> newResultFields = newResult.getMaterializedRows().get(0).getFields();
+
+        String newIndexSizeStr = (String) newResultFields.get(sizeLocation);
+        DataSize newIndexSize = DataSize.valueOf(newIndexSizeStr);
+        assertTrue(newIndexSize.toBytes() != 0);
+        assertTrue(newIndexSize.toBytes() > indexSize.toBytes());
     }
 }

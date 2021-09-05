@@ -22,8 +22,11 @@ package io.hetu.core.seedstore.filebased;
  */
 public class FileBasedSeedConstants
 {
-    // seed file name
+    // Hazelcast seed file name
     static final String SEED_FILE_NAME = "seeds.txt";
+
+    // ON-YARN seed file name
+    static final String ON_YARN_SEED_FILE_NAME = "seeds.json";
 
     // dir config properties name
     static final String SEED_STORE_FILESYSTEM_DIR = "seed-store.filesystem.seed-dir";
