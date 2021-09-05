@@ -17,11 +17,13 @@ package io.hetu.core.plugin.kylin;
 
 import io.airlift.configuration.Config;
 import io.airlift.configuration.ConfigDescription;
+import io.airlift.configuration.ConfigSecuritySensitive;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
 import io.prestosql.spi.function.Description;
 import io.prestosql.spi.function.Mandatory;
 
+import javax.annotation.Nullable;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
@@ -32,6 +34,9 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 
 public class KylinConfig
 {
+    private String connectionUrl;
+    private String connectionUser;
+    private String connectionPassword;
     private boolean isQueryPushDownEnabled;
     private RoundingMode roundingMode;
     private boolean enablePredicatePushdownWithOrOperator;
@@ -108,6 +113,54 @@ public class KylinConfig
     public KylinConfig setEnablePredicatePushdownWithOrOperator(boolean enablePredicatePushdownWithOrOperator)
     {
         this.enablePredicatePushdownWithOrOperator = enablePredicatePushdownWithOrOperator;
+        return this;
+    }
+
+    @NotNull
+    public String getConnectionUrl()
+    {
+        return connectionUrl;
+    }
+
+    @Config("connection-url")
+    public KylinConfig setConnectionUrl(String connectionUrl)
+    {
+        this.connectionUrl = connectionUrl;
+        return this;
+    }
+
+    @Nullable
+    public String getConnectionUser()
+    {
+        return connectionUser;
+    }
+
+    @Mandatory(name = "connection-user",
+            description = "User to connect to remote database",
+            defaultValue = "root",
+            required = true)
+    @Config("connection-user")
+    public KylinConfig setConnectionUser(String connectionUser)
+    {
+        this.connectionUser = connectionUser;
+        return this;
+    }
+
+    @Nullable
+    public String getConnectionPassword()
+    {
+        return connectionPassword;
+    }
+
+    @Mandatory(name = "connection-password",
+            description = "Password of user to connect to remote database",
+            defaultValue = "secret",
+            required = true)
+    @Config("connection-password")
+    @ConfigSecuritySensitive
+    public KylinConfig setConnectionPassword(String connectionPassword)
+    {
+        this.connectionPassword = connectionPassword;
         return this;
     }
 
