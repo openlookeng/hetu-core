@@ -19,7 +19,6 @@ import io.airlift.configuration.Config;
 import io.airlift.configuration.ConfigDescription;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
-import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.spi.function.Description;
 import io.prestosql.spi.function.Mandatory;
 
@@ -32,7 +31,6 @@ import java.util.Optional;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 public class KylinConfig
-        extends BaseJdbcConfig
 {
     private boolean isQueryPushDownEnabled;
     private RoundingMode roundingMode;
