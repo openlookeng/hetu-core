@@ -1079,23 +1079,50 @@ public class TestHiveSqlMigrate
     }
 
     @Test
+    public void testGroupBy()
+    {
+        String sql = "SELECT count(*), a,b FROM T1 group by a,b";
+        String expectSql = "SELECT\n" +
+                "  \"count\"(*)\n" +
+                ", a\n" +
+                ", b\n" +
+                "FROM\n" +
+                "  T1\n" +
+                "GROUP BY a, b\n";
+        assertSuccess(sql, expectSql);
+
+        String sql2 = "SELECT count(*), a,b FROM T1 group by a,b grouping sets(a,b)";
+        String expectSql2 = "SELECT\n" +
+                "  \"count\"(*)\n" +
+                ", a\n" +
+                ", b\n" +
+                "FROM\n" +
+                "  T1\n" +
+                "GROUP BY GROUPING SETS ((a), (b))\n";
+        assertSuccess(sql2, expectSql2);
+
+        String sql3 = "SELECT count(*), a,b,c FROM T1 group by a,b,c grouping sets((a,b),(a,c))";
+        String expectSql3 = "SELECT\n" +
+                "  \"count\"(*)\n" +
+                ", a\n" +
+                ", b\n" +
+                ", c\n" +
+                "FROM\n" +
+                "  T1\n" +
+                "GROUP BY GROUPING SETS ((a, b), (a, c))\n";
+        assertSuccess(sql3, expectSql3);
+    }
+
+    @Test
     public void testQuery()
     {
         // test "sort by"
         String sql = "SELECT C1 FROM T1 GROUP BY NAME SORT BY CNT";
         assertUnsupported(sql, Optional.of("SORT BY"));
 
-        // test "GROUPING SETS"
-        sql = "SELECT C1 FROM T1 GROUP BY URL GROUPING SETS ((ID, NAME), (ID, SEX))";
-        String expectedSql = "SELECT C1\n" +
-                "FROM\n" +
-                "  T1\n" +
-                "GROUP BY URL, GROUPING SETS ((ID, NAME), (ID, SEX))\n";
-        assertSuccess(sql, expectedSql);
-
         // test function "current_date()" and "current_timestamp()"
         sql = "select current_date()";
-        expectedSql = "SELECT current_date\n" +
+        String expectedSql = "SELECT current_date\n" +
                 "\n";
         assertSuccess(sql, expectedSql);
 
