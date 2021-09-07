@@ -54,4 +54,7 @@ public class HetuConstant
     public static final String INDEX_TABLE_DELETED = "Table Deleted";
     public static final String INDEX_OUT_OF_SYNC = "Out-of-sync";
     public static final String INDEX_OK = "OK";
+
+    // error message
+    public static final String HINDEX_CONFIG_ERROR_MSG = "Heuristic Index is not enabled in config.properties or is configured incorrectly.";
 }

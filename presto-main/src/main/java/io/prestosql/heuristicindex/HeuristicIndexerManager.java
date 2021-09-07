@@ -80,7 +80,7 @@ public class HeuristicIndexerManager
 
     private IndexCache getIndexCache()
     {
-        return SplitFiltering.getCache();
+        return SplitFiltering.getCache(indexClient);
     }
 
     public List<IndexRecord> getAllIndexRecordsWithUsage()
