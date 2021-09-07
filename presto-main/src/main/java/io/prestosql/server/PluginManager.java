@@ -86,10 +86,6 @@ public class PluginManager
             .add("io.airlift.slice.")
             .add("io.airlift.units.")
             .add("org.openjdk.jol.")
-            .add("io.hete.core.metadata.")
-            .add("io.hete.core.operator.scalar.")
-            .add("io.hete.core.type.")
-            .add("io.hete.core.util.")
             .add("io.prestosql.sql.tree.")
             .build();
 
