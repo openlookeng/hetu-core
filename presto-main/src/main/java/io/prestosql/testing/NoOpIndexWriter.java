@@ -14,6 +14,7 @@
  */
 package io.prestosql.testing;
 
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.heuristicindex.IndexWriter;
 
 import java.io.IOException;
@@ -24,18 +25,16 @@ import java.util.Properties;
 public class NoOpIndexWriter
         implements IndexWriter
 {
-    private static final String ERROR_MSG = "Heuristic Index is not enabled or is configured incorrectly.";
-
     @Override
     public void addData(Map<String, List<Object>> values, Properties connectorMetadata)
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        throw new UnsupportedOperationException(HetuConstant.HINDEX_CONFIG_ERROR_MSG);
     }
 
     @Override
     public long persist()
             throws IOException
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        throw new UnsupportedOperationException(HetuConstant.HINDEX_CONFIG_ERROR_MSG);
     }
 }

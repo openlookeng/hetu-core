@@ -20,6 +20,7 @@ import com.google.common.collect.Sets;
 import io.airlift.log.Logger;
 import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.metadata.Split;
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.function.BuiltInFunctionHandle;
@@ -43,6 +44,7 @@ import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.spi.service.PropertyService;
 import io.prestosql.split.SplitSource;
 import io.prestosql.sql.planner.PlanFragment;
 import io.prestosql.utils.RangeUtil;
@@ -90,24 +92,26 @@ public class SplitFiltering
 
     private static synchronized void initCache(IndexClient indexClient)
     {
-        if (indexCache == null) {
-            CacheLoader<IndexCacheKey, List<IndexMetadata>> cacheLoader = new IndexCacheLoader(indexClient);
-            indexCache = new IndexCache(cacheLoader, indexClient);
-        }
+        CacheLoader<IndexCacheKey, List<IndexMetadata>> cacheLoader = new IndexCacheLoader(indexClient);
+        indexCache = new IndexCache(cacheLoader, indexClient);
     }
 
-    public static IndexCache getCache()
+    public static IndexCache getCache(IndexClient indexClient)
     {
-        return indexCache;
+        if (PropertyService.getBooleanProperty(HetuConstant.FILTER_ENABLED)) {
+            if (indexCache == null) {
+                initCache(indexClient);
+            }
+            return indexCache;
+        }
+        else {
+            throw new IllegalStateException(HetuConstant.HINDEX_CONFIG_ERROR_MSG);
+        }
     }
 
     public static void preloadCache(IndexClient indexClient, List<String> preloadIndexNames)
             throws IOException
     {
-        if (indexCache == null) {
-            initCache(indexClient);
-        }
-
         List<IndexRecord> indexToPreload = new ArrayList<>(preloadIndexNames.size());
 
         if (preloadIndexNames.contains(PRELOAD_ALL_KEY)) {
@@ -138,10 +142,6 @@ public class SplitFiltering
     {
         if (!expression.isPresent() || !tableName.isPresent()) {
             return nextSplits.getSplits();
-        }
-
-        if (indexCache == null) {
-            initCache(heuristicIndexerManager.getIndexClient());
         }
 
         List<Split> allSplits = nextSplits.getSplits();
@@ -208,7 +208,7 @@ public class SplitFiltering
                     Map<String, List<IndexMetadata>> allIndices = new HashMap<>();
 
                     for (String col : referencedColumns) {
-                        List<IndexMetadata> splitIndices = indexCache.getIndices(fullQualifiedTableName, col, split, indexRecordKeyToRecordMap);
+                        List<IndexMetadata> splitIndices = getCache(indexerManager.getIndexClient()).getIndices(fullQualifiedTableName, col, split, indexRecordKeyToRecordMap);
 
                         if (splitIndices == null || splitIndices.size() == 0) {
                             // no index found, keep split
@@ -279,7 +279,7 @@ public class SplitFiltering
                 List<IndexMetadata> indexMetadataList = new ArrayList<>();
 
                 for (String indexType : INVERTED_INDEX) {
-                    indexMetadataList.addAll(indexCache.getIndices(fullQualifiedTableName, column, indexType,
+                    indexMetadataList.addAll(getCache(indexerManager.getIndexClient()).getIndices(fullQualifiedTableName, column, indexType,
                             partitionSplitMap.keySet(), Collections.max(inputMaxLastUpdated.values()), indexRecordKeyToRecordMap));
                 }
 

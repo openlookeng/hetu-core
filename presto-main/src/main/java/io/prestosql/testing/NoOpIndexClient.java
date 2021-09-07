@@ -13,6 +13,7 @@
  */
 package io.prestosql.testing;
 
+import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.heuristicindex.IndexClient;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
@@ -26,62 +27,60 @@ import java.util.Map;
 public class NoOpIndexClient
         implements IndexClient
 {
-    private static final String ERROR_MSG = "Heuristic Index is not enabled or is configured incorrectly.";
-
     @Override
     public List<IndexMetadata> readSplitIndex(String path)
             throws IOException
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        throw new UnsupportedOperationException(HetuConstant.HINDEX_CONFIG_ERROR_MSG);
     }
 
     @Override
     public long getLastModifiedTime(String path)
             throws IOException
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        throw new UnsupportedOperationException(HetuConstant.HINDEX_CONFIG_ERROR_MSG);
     }
 
     @Override
     public List<IndexMetadata> readPartitionIndex(String path)
             throws IOException
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        throw new UnsupportedOperationException(HetuConstant.HINDEX_CONFIG_ERROR_MSG);
     }
 
     @Override
     public Map<String, String> getLastModifiedTimes(String indexName)
             throws IOException
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        throw new UnsupportedOperationException(HetuConstant.HINDEX_CONFIG_ERROR_MSG);
     }
 
     @Override
     public void addIndexRecord(CreateIndexMetadata createIndexMetadata)
             throws IOException
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        throw new UnsupportedOperationException(HetuConstant.HINDEX_CONFIG_ERROR_MSG);
     }
 
     @Override
     public void deleteIndexRecord(String indexName, List<String> partitionsToDelete)
             throws IOException
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        throw new UnsupportedOperationException(HetuConstant.HINDEX_CONFIG_ERROR_MSG);
     }
 
     @Override
     public RecordStatus lookUpIndexRecord(CreateIndexMetadata createIndexMetadata)
             throws IOException
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        throw new UnsupportedOperationException(HetuConstant.HINDEX_CONFIG_ERROR_MSG);
     }
 
     @Override
     public void deleteIndex(String indexName, List<String> partitionsToDelete)
             throws IOException
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        throw new UnsupportedOperationException(HetuConstant.HINDEX_CONFIG_ERROR_MSG);
     }
 
     @Override
@@ -95,6 +94,6 @@ public class NoOpIndexClient
     public IndexRecord lookUpIndexRecord(String name)
             throws IOException
     {
-        throw new UnsupportedOperationException(ERROR_MSG);
+        throw new UnsupportedOperationException(HetuConstant.HINDEX_CONFIG_ERROR_MSG);
     }
 }
