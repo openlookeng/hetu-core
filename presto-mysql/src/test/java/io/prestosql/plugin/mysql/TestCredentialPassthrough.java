@@ -37,7 +37,7 @@ public class TestCredentialPassthrough
     public TestCredentialPassthrough()
             throws Exception
     {
-        mysqlServer = new TestingMySqlServer("testuser", "testpass", TEST_SCHEMA);
+        mysqlServer = MySqlQueryRunner.createTestingMySqlServer("testuser", "testpass", TEST_SCHEMA);
         mySqlQueryRunner = createQueryRunner(mysqlServer);
     }
 

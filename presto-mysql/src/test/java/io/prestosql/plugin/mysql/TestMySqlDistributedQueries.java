@@ -35,7 +35,7 @@ public class TestMySqlDistributedQueries
     public TestMySqlDistributedQueries()
             throws Exception
     {
-        this(new TestingMySqlServer("testuser", "testpass", "tpch"));
+        this(MySqlQueryRunner.createTestingMySqlServer("testuser", "testpass", "tpch"));
     }
 
     public TestMySqlDistributedQueries(TestingMySqlServer mysqlServer)
