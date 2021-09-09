@@ -30,11 +30,11 @@ import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 
 import javax.inject.Inject;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.MoreCollectors.toOptional;
 import static io.hetu.core.metastore.jdbc.JdbcMetadataUtil.onDemand;
 import static io.hetu.core.metastore.jdbc.JdbcMetadataUtil.runTransaction;
@@ -353,7 +353,7 @@ public class JdbcHetuMetastore
             List<Map.Entry<Long, TableEntity>> entries = transactionDao.getAllTables(catalogName, databaseName);
             getTableColumns(entries, tables, transactionDao);
         });
-        return tables.build().stream().collect(toImmutableList());
+        return new ArrayList<>(tables.build());
     }
 
     @Override
