@@ -3111,7 +3111,8 @@ class StatementAnalyzer
 
         Optional<TableHandle> tableHandle = metadata.getTableHandle(session, tableFullName);
         if (!tableHandle.isPresent()) {
-            throw new SemanticException(MISSING_ATTRIBUTE, table, "Table '%s' is invalid", tableFullName);
+            throw new SemanticException(MISSING_ATTRIBUTE, table, "Unable to update index. " +
+                    "Index table '%s' may have been dropped from outside OLK. Index should also be dropped.", tableFullName);
         }
 
         List<Pair<String, Type>> indexColumns = new LinkedList<>();
