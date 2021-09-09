@@ -62,7 +62,7 @@ public class TestSeedStoreManager
         // prepare seed store configs
         Map<String, String> seedStoreConfigs = new HashMap<String, String>(){{
                 put("seed-store.type", "filebased");
-                put("seed-store.filesystem.profile", "etc/filesystem/hdfs-config-default.properties");
+                put("seed-store.filesystem.profile", "hdfs-config-default");
                 put("seed-store.seed.heartbeat", "1000");
                 put("seed-store.seed.heartbeat.timeout", "3000");
             }};
