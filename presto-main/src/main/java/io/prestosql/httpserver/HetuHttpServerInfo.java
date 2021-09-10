@@ -78,7 +78,7 @@ public class HetuHttpServerInfo
             }
             this.httpsUri = buildUri("https", nodeInfo.getInternalAddress(), port(this.httpsChannel));
             this.httpsExternalUri = buildUri("https", nodeInfo.getExternalAddress(), this.httpsUri.getPort());
-            LOG.info(String.format("HetuHttpServerInfo https channel bind to port %s", port(this.httpChannel)));
+            LOG.info(String.format("HetuHttpServerInfo https channel bind to port %s", port(this.httpsChannel)));
         }
         else {
             httpsChannel = null;
