@@ -184,13 +184,13 @@ public class FileIndexWriter
         try {
             IndexServiceUtils.writeToHdfs(LOCAL_FS_CLIENT, fs, tmpPath, tarPath);
             // return the size of this file in bytes
-            return Files.size(tarPath);
+            return (Long) fs.getAttribute(tarPath, "size");
         }
         catch (IOException e) {
             LOG.debug("Error copying index files to remote filesystem: ", e);
             // roll back creation
             fs.delete(tarPath);
-            return 0;
+            throw e;
         }
         finally {
             LOCAL_FS_CLIENT.deleteRecursively(tmpPath);
