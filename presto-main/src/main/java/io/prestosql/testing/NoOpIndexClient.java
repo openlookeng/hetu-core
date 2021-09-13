@@ -77,6 +77,13 @@ public class NoOpIndexClient
     }
 
     @Override
+    public long getIndexSize(String name)
+            throws IOException
+    {
+        throw new UnsupportedOperationException(HetuConstant.HINDEX_CONFIG_ERROR_MSG);
+    }
+
+    @Override
     public void deleteIndex(String indexName, List<String> partitionsToDelete)
             throws IOException
     {

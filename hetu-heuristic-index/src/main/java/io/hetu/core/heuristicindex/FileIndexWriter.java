@@ -38,6 +38,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
@@ -175,7 +176,7 @@ public class FileIndexWriter
         }
         // Package index files for one File and write to remote filesystem
         String table = createIndexMetadata.getTableName();
-        String column = createIndexMetadata.getIndexColumns().iterator().next().getFirst(); // Support indexing on only one column for now
+        String column = createIndexMetadata.getIndexColumns().iterator().next().getFirst().toLowerCase(Locale.ENGLISH); // Support indexing on only one column for now
         String type = createIndexMetadata.getIndexType();
         String lastModifiedFileName = IndexConstants.LAST_MODIFIED_FILE_PREFIX + dataSourceFileLastModifiedTime + ".tar";
 
@@ -184,7 +185,7 @@ public class FileIndexWriter
         try {
             IndexServiceUtils.writeToHdfs(LOCAL_FS_CLIENT, fs, tmpPath, tarPath);
             // return the size of this file in bytes
-            return Files.size(tarPath);
+            return (Long) fs.getAttribute(tarPath, "size");
         }
         catch (IOException e) {
             LOG.debug("Error copying index files to remote filesystem: ", e);

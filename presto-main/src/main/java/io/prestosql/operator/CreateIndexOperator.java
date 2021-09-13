@@ -122,7 +122,7 @@ public class CreateIndexOperator
                 Map.Entry<String, IndexWriter> entry = iterator.next();
                 if (persistBy.get(entry.getValue()) == this) {
                     String writerKey = entry.getKey();
-                    this.createIndexMetadata.incrementIndexSize(entry.getValue().persist());
+                    entry.getValue().persist();
                     iterator.remove(); // remove reference to writer once persisted so it can be GCed
                     LOG.debug("Writer for %s has finished persisting. Remaining: %d", writerKey, levelWriter.size());
                 }
@@ -144,6 +144,7 @@ public class CreateIndexOperator
                 // update metadata
                 IndexClient indexClient = heuristicIndexerManager.getIndexClient();
                 try {
+                    createIndexMetadata.setIndexSize(heuristicIndexerManager.getIndexClient().getIndexSize(createIndexMetadata.getIndexName()));
                     IndexClient.RecordStatus recordStatus = indexClient.lookUpIndexRecord(createIndexMetadata);
                     LOG.debug("Current record status: %s", recordStatus);
 
