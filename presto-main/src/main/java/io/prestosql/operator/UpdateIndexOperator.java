@@ -138,7 +138,7 @@ public class UpdateIndexOperator
                             !(pathToModifiedTime.containsKey(entry.getKey()) &&
                                     indexLevelToMaxModifiedTime.containsKey(entry.getKey()) &&
                                     indexLevelToMaxModifiedTime.get(entry.getKey()) <= Long.parseLong(pathToModifiedTime.get(entry.getKey())))) {
-                        this.createIndexMetadata.incrementIndexSize(entry.getValue().persist());
+                        entry.getValue().persist();
                     }
                     String writerKey = entry.getKey();
                     iterator.remove(); // remove reference to writer once persisted so it can be GCed
@@ -158,6 +158,7 @@ public class UpdateIndexOperator
                 // update metadata
                 IndexClient indexClient = heuristicIndexerManager.getIndexClient();
                 try {
+                    createIndexMetadata.setIndexSize(heuristicIndexerManager.getIndexClient().getIndexSize(createIndexMetadata.getIndexName()));
                     IndexClient.RecordStatus recordStatus = indexClient.lookUpIndexRecord(createIndexMetadata);
                     LOG.debug("Current record status: %s", recordStatus);
                     Set<String> allPartitions = new HashSet<>();

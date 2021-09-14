@@ -130,9 +130,9 @@ public class CreateIndexMetadata
         return indexSize;
     }
 
-    public void incrementIndexSize(long sizeToAdd)
+    public void setIndexSize(long size)
     {
-        this.indexSize += sizeToAdd;
+        this.indexSize = size;
     }
 
     @JsonProperty

@@ -139,4 +139,12 @@ public interface IndexClient
         IN_PROGRESS_SAME_INDEX_PART_CAN_MERGE,
         IN_PROGRESS_SAME_INDEX_PART_CONFLICT
     }
+
+    /**
+     * Get the index size with the index name provided
+     *
+     * @param name index name
+     * @throws IOException any IOException thrown by filesystem client during file read
+     */
+    long getIndexSize(String name) throws IOException;
 }

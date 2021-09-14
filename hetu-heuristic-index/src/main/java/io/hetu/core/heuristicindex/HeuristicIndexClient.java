@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -435,5 +436,32 @@ public class HeuristicIndexClient
             default:
                 return Collections.emptyMap();
         }
+    }
+
+    @Override
+    public long getIndexSize(String name)
+            throws IOException
+    {
+        IndexRecord referenceRecord = indexRecordManager.lookUpIndexRecord(name);
+        Path pathToIndex = Paths.get(root.toString(), referenceRecord.qualifiedTable, referenceRecord.columns[0], referenceRecord.indexType);
+        return getDirectorySize(pathToIndex);
+    }
+
+    private long getDirectorySize(Path rootPath)
+            throws IOException
+    {
+        // use fs to get size
+        AtomicLong indexSize = new AtomicLong(0L);
+        fs.walk(rootPath).forEach(file -> {
+            try {
+                if (!fs.isDirectory(file)) {
+                    indexSize.addAndGet((Long) fs.getAttribute(file, "size"));
+                }
+            }
+            catch (IOException e) {
+                LOG.debug("Failed to calculate index size", e);
+            }
+        });
+        return indexSize.longValue();
     }
 }
