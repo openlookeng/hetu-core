@@ -36,14 +36,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -160,16 +158,13 @@ public class UpdateIndexOperator
                 try {
                     IndexClient.RecordStatus recordStatus = indexClient.lookUpIndexRecord(createIndexMetadata);
                     LOG.debug("Current record status: %s", recordStatus);
-                    Set<String> allPartitions = new HashSet<>();
-                    allPartitions.addAll(indexLevelToMaxModifiedTime.keySet());
-                    allPartitions.addAll(createIndexMetadata.getPartitions());
                     CreateIndexMetadata updatedCreateIndexMetadata = new CreateIndexMetadata(
                             createIndexMetadata.getIndexName(),
                             createIndexMetadata.getTableName(),
                             createIndexMetadata.getIndexType(),
                             createIndexMetadata.getIndexSize(),
                             createIndexMetadata.getIndexColumns(),
-                            new ArrayList<>(allPartitions),
+                            createIndexMetadata.getPartitions(),
                             createIndexMetadata.getProperties(),
                             createIndexMetadata.getUser(),
                             createIndexMetadata.getCreateLevel());
