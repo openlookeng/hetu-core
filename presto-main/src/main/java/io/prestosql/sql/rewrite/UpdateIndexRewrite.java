@@ -19,8 +19,12 @@ import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.TableMetadata;
 import io.prestosql.security.AccessControl;
+import io.prestosql.spi.connector.ColumnMetadata;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.heuristicindex.IndexRecord;
+import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.sql.analyzer.QueryExplainer;
 import io.prestosql.sql.analyzer.SemanticException;
 import io.prestosql.sql.parser.SqlParser;
@@ -36,6 +40,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static io.prestosql.sql.ParsingUtil.createParsingOptions;
+import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_ATTRIBUTE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_INDEX;
 import static java.util.Objects.requireNonNull;
 
@@ -55,7 +60,7 @@ public class UpdateIndexRewrite
             WarningCollector warningCollector,
             HeuristicIndexerManager heuristicIndexerManager)
     {
-        return (Statement) new UpdateIndexRewrite.Visitor(parser, session, heuristicIndexerManager).process(node, null);
+        return (Statement) new UpdateIndexRewrite.Visitor(parser, session, heuristicIndexerManager, metadata, node).process(node, null);
     }
 
     private static class Visitor
@@ -64,12 +69,16 @@ public class UpdateIndexRewrite
         private final Session session;
         private final SqlParser sqlParser;
         private final HeuristicIndexerManager heuristicIndexerManager;
+        private final Metadata metadata;
+        private final Node node;
 
-        public Visitor(SqlParser sqlParser, Session session, HeuristicIndexerManager heuristicIndexerManager)
+        public Visitor(SqlParser sqlParser, Session session, HeuristicIndexerManager heuristicIndexerManager, Metadata metadata, Node node)
         {
             this.sqlParser = requireNonNull(sqlParser, "sqlParser is null");
             this.session = requireNonNull(session, "session is null");
             this.heuristicIndexerManager = heuristicIndexerManager;
+            this.metadata = metadata;
+            this.node = node;
         }
 
         @Override
@@ -85,7 +94,42 @@ public class UpdateIndexRewrite
             if (indexRecord == null) {
                 throw new SemanticException(MISSING_INDEX, updateIndex, "Index '%s' does not exist", updateIndex.getIndexName().toString());
             }
-            return sqlParser.createStatement("select " + String.join(", ", indexRecord.columns) + " from " + indexRecord.qualifiedTable, createParsingOptions(session));
+
+            StringBuilder builder = new StringBuilder();
+            builder.append("select " + String.join(", ", indexRecord.columns) + " from " + indexRecord.qualifiedTable);
+
+            List<String> partitions = indexRecord.partitions;
+            if (partitions != null && !partitions.isEmpty()) {
+                QualifiedObjectName tableFullName = QualifiedObjectName.valueOf(indexRecord.qualifiedTable);
+                Optional<TableHandle> tableHandle = metadata.getTableHandle(session, tableFullName);
+                if (!tableHandle.isPresent()) {
+                    throw new SemanticException(MISSING_ATTRIBUTE, updateIndex, "Table '%s' is invalid", tableFullName);
+                }
+
+                String partitionColumnName = partitions.get(0).split("=")[0];
+                TableMetadata tableMetadata = metadata.getTableMetadata(session, tableHandle.get());
+                ColumnMetadata partitionColumn = tableMetadata.getColumn(partitionColumnName);
+                String valuePrefix = partitionColumn.getType().getTypeSignature().getBase();
+
+                builder.append(" where ");
+                builder.append(partitionColumnName);
+                builder.append(" IN (");
+                for (int i = 0; i < partitions.size(); i++) {
+                    String partition = partitions.get(i);
+                    String partitionValue = partition.split("=")[1];
+                    builder.append(valuePrefix);
+                    builder.append(" '");
+                    builder.append(partitionValue);
+                    builder.append("'");
+                    if (i < partitions.size() - 1) {
+                        builder.append(",");
+                    }
+                }
+
+                builder.append(")");
+            }
+
+            return sqlParser.createStatement(builder.toString(), createParsingOptions(session));
         }
 
         @Override
