@@ -41,7 +41,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -203,7 +202,7 @@ public class IndexCache
         String table = record.qualifiedTable;
         String column = String.join(",", record.columns);
         String type = record.indexType;
-        CreateIndexMetadata.Level level = CreateIndexMetadata.Level.valueOf(record.getProperty(CreateIndexMetadata.LEVEL_PROP_KEY).toUpperCase(Locale.ROOT));
+        CreateIndexMetadata.Level level = record.getLevel();
 
         String filterKeyPath = table + "/" + column + "/" + type;
         IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, LAST_MODIFIED_TIME_PLACE_HOLDER, record, level);
