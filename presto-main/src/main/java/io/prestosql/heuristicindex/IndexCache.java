@@ -247,7 +247,10 @@ public class IndexCache
                         cache.invalidate(filterKey);
                         break;
                     case TABLE:
-                        // no need to break index, and lastModifiedTime is not used for TABLE level. no need to do anything
+                        // no need to break index, and lastModifiedTime is not used for TABLE level, but we need to
+                        // toggle back the noCloseFlag, as it was previously set to true.
+                        filterKey.setNoCloseFlag(false);
+                        break;
                 }
             }
             catch (ExecutionException e) {
