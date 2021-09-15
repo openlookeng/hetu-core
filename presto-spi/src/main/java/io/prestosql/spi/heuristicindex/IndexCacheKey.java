@@ -87,7 +87,7 @@ public class IndexCacheKey
 
     public void setNoCloseFlag(boolean flag)
     {
-        this.noCloseFlag = true;
+        this.noCloseFlag = flag;
     }
 
     public boolean skipCloseIndex()
