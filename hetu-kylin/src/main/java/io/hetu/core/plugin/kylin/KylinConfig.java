@@ -23,7 +23,6 @@ import io.airlift.units.MinDuration;
 import io.prestosql.spi.function.Description;
 import io.prestosql.spi.function.Mandatory;
 
-import javax.annotation.Nullable;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
@@ -129,7 +128,6 @@ public class KylinConfig
         return this;
     }
 
-    @Nullable
     public String getConnectionUser()
     {
         return connectionUser;
@@ -146,7 +144,6 @@ public class KylinConfig
         return this;
     }
 
-    @Nullable
     public String getConnectionPassword()
     {
         return connectionPassword;
