@@ -81,8 +81,8 @@ public class HazelcastStateStoreBootstrapper
     private static final String HEARTBEAT_INTERVAL_SECONDS = "hazelcast.heartbeat.interval.seconds";
     private static final String HEARTBEAT_TIMEOUT_SECONDS = "hazelcast.max.no.heartbeat.seconds";
     private static final int MAXIDLESECONDS = 30;
-    private static final int EVICTIONSIZE = 200;
-    private static final int TIMETOLIVESECONDS = 300;
+    private static final int EVICTIONSIZE = 10000;
+    private static final int TIMETOLIVESECONDS = 3000;
 
     @Override
     public HazelcastStateStore bootstrap(Collection<String> locations, Map<String, String> config)

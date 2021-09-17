@@ -43,7 +43,6 @@ public class HazelcastStateMap<K, V>
         implements StateMap<K, V>
 {
     private final String name;
-
     private IMap<K, V> hzMap;
     private SetMultimap<MapListener, UUID> registeredListeners = HashMultimap.create();
 

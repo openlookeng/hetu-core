@@ -108,9 +108,7 @@ public class HetuMetastoreCache
     public Optional<CatalogEntity> getCatalog(String catalogName)
     {
         try {
-            return catalogCache.getIfAbsent(catalogName, () -> {
-                return delegate.getCatalog(catalogName);
-            });
+            return catalogCache.getIfAbsent(catalogName, () -> delegate.getCatalog(catalogName));
         }
         catch (Exception executionException) {
             log.debug(executionException.getCause(),
@@ -123,9 +121,7 @@ public class HetuMetastoreCache
     public List<CatalogEntity> getCatalogs()
     {
         try {
-            return catalogsCache.getIfAbsent("", () -> {
-                return delegate.getCatalogs();
-            });
+            return catalogsCache.getIfAbsent("", () -> delegate.getCatalogs());
         }
         catch (Exception executionException) {
             log.debug(executionException.getCause(),
@@ -191,9 +187,7 @@ public class HetuMetastoreCache
     {
         try {
             String key = catalogName + "." + databaseName;
-            return databaseCache.getIfAbsent(key, () -> {
-                return delegate.getDatabase(catalogName, databaseName);
-            });
+            return databaseCache.getIfAbsent(key, () -> delegate.getDatabase(catalogName, databaseName));
         }
         catch (Exception executionException) {
             log.debug(executionException.getCause(),
@@ -206,9 +200,7 @@ public class HetuMetastoreCache
     public List<DatabaseEntity> getAllDatabases(String catalogName)
     {
         try {
-            return databasesCache.getIfAbsent(catalogName, () -> {
-                return delegate.getAllDatabases(catalogName);
-            });
+            return databasesCache.getIfAbsent(catalogName, () -> delegate.getAllDatabases(catalogName));
         }
         catch (Exception executionException) {
             log.debug(executionException.getCause(),
