@@ -58,42 +58,97 @@ memory and cpu usage and result in improved query performance, especially at hig
 ## Getting started
 
 This section gives a short tutorial which introduces the basic usage of Heuristic Index through a sample query.
-For a complete list of configuration properties see [Properties](../admin/properties.md).
 
-### 1. Configure indexer settings
+### 1. Configurations
 
-Heuristic indexer uses Hetu Metastore to manage its metadata. Hetu Metastore is a shared metadata management
+Heuristic Index requires several components to be configured before it can work.
+Ensure all nodes in the cluster are configured the same way, i.e. using the same
+Hetu Filesystem, Metastore, etc. 
+
+#### a. Hetu Metastore
+
+Heuristic Index uses Hetu Metastore to manage its metadata. Hetu Metastore is a shared metadata management
 utility used by multiple openLooKeng features. For more information about how to configure it,
 please check [Hetu Metastore](../admin/meta-store.md).
-Note: Indexer won't work if Hetu Metastore is not properly configured!
+
+**Note**: Global cache must be enabled! Heuristic Index won't work if Hetu Metastore is not properly configured.
+
+Here is a reference `etc/hetu-metastore.properties`:
+
+  ```properties
+  hetu.metastore.type=hetufilesystem
+  hetu.metastore.hetufilesystem.profile-name=hdfs
+  # this path is inside hdfs
+  hetu.metastore.hetufilesystem.path=/tmp/hetu/metastore
+  # make sure to use global cache!
+  hetu.metastore.cache.type=global
+  ```
+
+  *Path whitelist：`["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`*
+
+#### b. Hetu Statestore
+
+As mentioned in the Hetu Metastore setup, the global cache must be enabled, this requires the Hetu Statestore
+to be configured. For more information about how to configure it, please check [Hetu Statestore](../admin/state-store.md).
+
+In `etc/config.propertes`:
+
+  ```properties
+  hetu.embedded-state-store.enabled=true
+  ```
+
+Here is a reference `etc/state-store.properties`:
+
+  ```properties
+  state-store.type=hazelcast
+  state-store.name=test
+  state-store.cluster=test-cluster
+  hazelcast.discovery.mode=tcp-ip
+  hazelcast.discovery.port=7980
+  # The ip address and hazelcast discovery ports of each server must be included here
+  hazelcast.discovery.tcp-ip.seeds=host1:7980,host2:7980
+  ```
+
+#### c. Hetu Filesystem
+
+Hetu Filesystem is used for storing the index, and in the above example, it was also used
+for the the Hetu Metastore. `HDFS` filesystem type must be used in order for
+the index to be accessible by all nodes in the cluster. 
+For more information about how to configure it, please check [Hetu Filesystem](../develop/filesystem.md).
+
+Here is a reference `etc/filesystem/hdfs.properties`:
+
+  ```properties
+  fs.client.type=hdfs
+  # Path to hdfs resource files (e.g. core-site.xml, hdfs-site.xml) on your local machine
+  hdfs.config.resources=/tmp/hetu/hdfs-site.xml,/tmp/hetu/core-site.xml
+  hdfs.authentication.type=NONE
+  fs.hdfs.impl.disable.cache=true
+  ```
+
+  *Path whitelist：`["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`*
+
+#### d. Heuristic Index
+
+Finally, once all the prerequisites are configured, the Heuristic Index can be enabled.
 
 In `etc/config.properties`, add these lines:
 
-    hetu.heuristicindex.filter.enabled=true
-    hetu.heuristicindex.filter.cache.max-memory=10GB
-    hetu.heuristicindex.indexstore.uri=/opt/hetu/indices
-    hetu.heuristicindex.indexstore.filesystem.profile=index-store-profile
+  ```properties
+  hetu.heuristicindex.filter.enabled=true
+  hetu.heuristicindex.indexstore.filesystem.profile=hdfs
+  # this path is inside hdfs
+  hetu.heuristicindex.indexstore.uri=/tmp/hetu/indexstore
+  ```
 
-Path whitelist：`["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`
+  *Path whitelist：`["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`*
 
-**Note**：
-- `LOCAL` filesystem type is NOT supported. Local filesystem should NOT be used in Hetu metastore as well.
-- `HDFS` filesystem type should be used in production in order for the index to be accessible by all nodes in the cluster.
-- All nodes should be configured to use the same filesystem profile.
-- Heuristic Index can be disabled while the engine is running by setting: `set session heuristicindex_filter_enabled=false;`
+For a complete list of Heuristic Index configurations see [Configuration Properties](#configuration-properties) below
+and [Properties](../admin/properties.md).
 
-Filesystem profile file should be placed at `etc/filesystem/index-store-profile.properties`, 
-where `index-store-profile` is the name referenced above in `config.properties`:
+Heuristic Index can be disabled while the engine is running by setting: `set session heuristicindex_filter_enabled=false;`.
 
-    fs.client.type=hdfs
-    hdfs.config.resources=/path/to/core-site.xml,/path/to/hdfs-site.xml
-    hdfs.authentication.type=NONE
-    fs.hdfs.impl.disable.cache=true
-    
-If the kerberos authentication is enabled, additional configs `hdfs.krb5.conf.path`, 
-`hdfs.krb5.keytab.path`, and `hdfs.krb5.principal` must be provided. 
-
-With Heuristic Indexer configured, start the engine.
+With Heuristic Index configured, start the engine.
 
 ### 2. Identify a column to create index on
 
