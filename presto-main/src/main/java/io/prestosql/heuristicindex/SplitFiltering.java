@@ -22,7 +22,6 @@ import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.ColumnHandle;
-import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.OperatorType;
@@ -62,7 +61,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
@@ -132,7 +130,6 @@ public class SplitFiltering
 
         for (IndexRecord record : indexToPreload) {
             LOG.info("Preloading index for split filtering: " + record);
-            CreateIndexMetadata.Level indexLevel = CreateIndexMetadata.Level.valueOf(record.getProperty(CreateIndexMetadata.LEVEL_PROP_KEY).toUpperCase(Locale.ROOT));
             indexCache.preloadIndex(record);
         }
     }

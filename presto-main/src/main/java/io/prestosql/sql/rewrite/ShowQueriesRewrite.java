@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
 import io.airlift.units.DataSize;
+import io.airlift.units.Duration;
 import io.hetu.core.spi.cube.CubeFilter;
 import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.CubeStatus;
@@ -114,6 +115,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
@@ -878,17 +880,6 @@ final class ShowQueriesRewrite
                 String partitions = (v.partitions == null || v.partitions.isEmpty()) ? "all" : String.join(",", v.partitions);
                 StringBuilder partitionsStrToDisplay = new StringBuilder();
 
-                String inProgressHint = "";
-                if (v.isInProgressRecord()) {
-                    long timeElapsed = System.currentTimeMillis() - v.lastModifiedTime;
-                    long millis = timeElapsed % 1000;
-                    long second = (timeElapsed / 1000) % 60;
-                    long minute = (timeElapsed / (1000 * 60)) % 60;
-                    long hour = (timeElapsed / (1000 * 60 * 60)) % 24;
-
-                    inProgressHint = String.format(" (has been in progress for %02dh %02dm %02d.%ds)", hour, minute, second, millis);
-                }
-
                 for (int i = 0; i < partitions.length(); i += COL_MAX_LENGTH) {
                     partitionsStrToDisplay.append(partitions, i, Math.min(i + COL_MAX_LENGTH, partitions.length()));
                     if (i + COL_MAX_LENGTH < partitions.length()) {
@@ -900,14 +891,22 @@ final class ShowQueriesRewrite
                 QualifiedObjectName indexFullName = QualifiedObjectName.valueOf(v.qualifiedTable);
 
                 String indexStatus;
-                Optional<TableHandle> tableHandle = metadata.getTableHandle(session, indexFullName);
-                if (!tableHandle.isPresent()) {
-                    indexStatus = INDEX_TABLE_DELETED;
+                // if user runs SHOW INDEX while index creation is in-progress, show the duration in the status column
+                if (v.isInProgressRecord()) {
+                    long timeElapsed = System.currentTimeMillis() - v.lastModifiedTime;
+                    Duration duration = Duration.succinctDuration(Double.valueOf(timeElapsed), TimeUnit.MILLISECONDS);
+                    indexStatus = String.format("Creation in-progress for %s", duration.toString());
                 }
                 else {
-                    LongSupplier lastModifiedTimeSupplier = metadata.getTableLastModifiedTimeSupplier(session, tableHandle.get());
-                    long lastModifiedTime = lastModifiedTimeSupplier.getAsLong();
-                    indexStatus = lastModifiedTime > v.lastModifiedTime ? INDEX_OUT_OF_SYNC : INDEX_OK;
+                    Optional<TableHandle> tableHandle = metadata.getTableHandle(session, indexFullName);
+                    if (!tableHandle.isPresent()) {
+                        indexStatus = INDEX_TABLE_DELETED;
+                    }
+                    else {
+                        LongSupplier lastModifiedTimeSupplier = metadata.getTableLastModifiedTimeSupplier(session, tableHandle.get());
+                        long lastModifiedTime = lastModifiedTimeSupplier.getAsLong();
+                        indexStatus = lastModifiedTime > v.lastModifiedTime ? INDEX_OUT_OF_SYNC : INDEX_OK;
+                    }
                 }
 
                 rows.add(row(
@@ -919,7 +918,7 @@ final class ShowQueriesRewrite
                         new StringLiteral(DataSize.succinctBytes(v.indexSize).toString()),
                         new StringLiteral(indexStatus),
                         new StringLiteral(partitionsStrToDisplay.toString()),
-                        new StringLiteral(String.join(",", v.propertiesAsList) + inProgressHint),
+                        new StringLiteral(String.join(",", v.propertiesAsList)),
                         new StringLiteral(DataSize.succinctBytes(v.memoryUsage).toString()),
                         new StringLiteral(DataSize.succinctBytes(v.diskUsage).toString()), TRUE_LITERAL));
             }

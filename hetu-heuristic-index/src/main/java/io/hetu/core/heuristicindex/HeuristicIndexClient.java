@@ -42,9 +42,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
@@ -411,9 +409,7 @@ public class HeuristicIndexClient
             throws IOException
     {
         IndexRecord indexRecord = lookUpIndexRecord(indexName);
-        CreateIndexMetadata.Level createLevel;
-        Optional<String> createLevelString = indexRecord.propertiesAsList.stream().filter(s -> s.toLowerCase(Locale.ROOT).contains("level=")).findAny();
-        createLevel = CreateIndexMetadata.Level.valueOf(createLevelString.get().replaceAll(".*=", ""));
+        CreateIndexMetadata.Level createLevel = indexRecord.getLevel();
 
         Path pathToIndex = Paths.get(root.toString(), indexRecord.qualifiedTable, indexRecord.columns[0], indexRecord.indexType);
         List<Path> paths = fs.walk(pathToIndex).filter(p -> !fs.isDirectory(p)).collect(Collectors.toList());

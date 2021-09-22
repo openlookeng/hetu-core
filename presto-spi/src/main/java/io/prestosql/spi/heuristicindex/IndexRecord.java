@@ -17,6 +17,7 @@ package io.prestosql.spi.heuristicindex;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.metastore.model.TableEntity;
 
 import java.util.ArrayList;
@@ -169,6 +170,17 @@ public class IndexRecord
             }
         }
         return null;
+    }
+
+    public CreateIndexMetadata.Level getLevel()
+    {
+        String levelStr = this.getProperty(CreateIndexMetadata.LEVEL_PROP_KEY);
+
+        if (levelStr == null || levelStr.isEmpty()) {
+            throw new RuntimeException("IndexRecord's level property not found. The Index is in an invalid state and should be dropped.");
+        }
+
+        return CreateIndexMetadata.Level.valueOf(levelStr.toUpperCase(Locale.ROOT));
     }
 
     public boolean isAutoloadEnabled()
