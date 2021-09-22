@@ -48,22 +48,33 @@
 
 ## 示例教程
 
-这一教程将通过一个示例查询语句来展示索引的用法。完整的配置请参见[Properties](../admin/properties.md)。
+这一教程将通过一个示例查询语句来展示索引的用法。
 
 ### 1. 配置索引
 
-索引功能现使用Hetu Metastore管理元数据。Hetu Metastore是一个被整个OLK集群多个功能共用的元数据管理器，
-请参阅 [Hetu Metastore](../admin/meta-store.md) 获取关于如何配置的更多信息。
-注意：必须先配置好Hetu Metastore，启发式索引才能正常运行！
+启发式索引需要配置几个组件才能工作。
+确保集群中的所有节点都以相同的方式配置,使用相同的hetu文件系统和Metastore等.
 
-在 `etc/config.properties` 中加入这些行：
+#### a. Hetu Metastore
 
-    hetu.heuristicindex.filter.enabled=true
-    hetu.heuristicindex.filter.cache.max-memory=10GB
-    hetu.heuristicindex.indexstore.uri=/opt/hetu/indices
-    hetu.heuristicindex.indexstore.filesystem.profile=index-store-profile
+Heuristic Index 使用 Hetu Metastore 来管理其元数据。 
+Hetu Metastore 是一个共享元数据管理实用程序，多个 openLooKeng 功能使用它。 
+有关如何配置它的更多信息， 请参考 [Hetu Metastore](../admin/meta-store.md).
 
-路径配置白名单：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", 工作目录]
+**注意**: 必须启用全局缓存！ 如果Hetu Metastore 配置不正确，启发式索引将不起作用。
+
+以下是参考`etc/hetu-metastore.properties`:
+
+```properties
+  hetu.metastore.type=hetufilesystem
+  hetu.metastore.hetufilesystem.profile-name=hdfs
+  # 此路径在 hdfs 内 
+  hetu.metastore.hetufilesystem.path=/tmp/hetu/metastore
+  # 使用全局缓存！ 
+  hetu.metastore.cache.type=global
+```
+
+*路径白名单：`["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`*
 
 避免选择根目录；路径不能包含../；如果配置了node.data_dir,那么当前工作目录为node.data_dir的父目录；如果没有配置，那么当前工作目录为openlookeng server的目录
 
@@ -73,14 +84,68 @@
 - 所有节点必须有相同的文件系统配置。
 - 在服务器运行中可以通过`set session heuristicindex_filter_enabled=false;`关闭启发式索引。
 
-然后在`etc/filesystem/index-store-profile.properties`中创建一个HDFS描述文件, 其中`index-store-profile`是上面使用的名字：
+#### b. Hetu Statestore
 
-    fs.client.type=hdfs
-    hdfs.config.resources=/path/to/core-site.xml,/path/to/hdfs-site.xml
-    hdfs.authentication.type=NONE
-    fs.hdfs.impl.disable.cache=true
-    
-如果HDFS集群开启了KERBEROS验证，还需要配置`hdfs.krb5.conf.path, hdfs.krb5.keytab.path, hdfs.krb5.principal`. 
+如Hetu Metastore 设置中提到的，必须启用全局缓存，这需要配置Hetu Statestore。 
+更多配置方法请查看[Hetu Statestore](../admin/state-store.md).
+
+在`etc/config.propertes`中配置:
+
+```properties
+  hetu.embedded-state-store.enabled=true
+```
+
+以下是参考`etc/state-store.properties`：
+
+```properties
+  state-store.type=hazelcast
+  state-store.name=test
+  state-store.cluster=test-cluster
+  hazelcast.discovery.mode=tcp-ip
+  hazelcast.discovery.port=7980
+  # 这里必须包含每台服务器的ip地址和hazelcast发现端口 
+  hazelcast.discovery.tcp-ip.seeds=host1:7980,host2:7980
+```
+
+#### c. Hetu Filesystem
+
+Hetu Filesystem 用于存储索引，在上面的例子Hetu Metastore中也使用了Hetu Filesystem。 
+必须使用 `HDFS` 文件系统类型以便集群中所有节点都可以访问索引。
+更多配置方法请查看 [Hetu Filesystem](../develop/filesystem.md).
+
+以下是参考`etc/filesystem/hdfs.properties`：
+
+```properties
+  fs.client.type=hdfs
+  # 本地计算机上的 hdfs 资源文件（例如 core-site.xml、hdfs-site.xml）的路径 
+  hdfs.config.resources=/tmp/hetu/hdfs-site.xml,/tmp/hetu/core-site.xml
+  hdfs.authentication.type=NONE
+  fs.hdfs.impl.disable.cache=true
+```
+
+*路径白名单：`["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`*
+
+#### d. Heuristic Index
+
+最后，一旦配置了所有先决条件，就可以启用Heuristic Index。
+
+在 `etc/config.properties` 中，添加以下几行：
+
+  ```properties
+  hetu.heuristicindex.filter.enabled=true
+  hetu.heuristicindex.indexstore.filesystem.profile=hdfs
+  # 此路径在 hdfs 内 
+  hetu.heuristicindex.indexstore.uri=/tmp/hetu/indexstore
+  ```
+
+*路径白名单：`["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`*
+
+有关Heuristic Index的完整配置列表，请参阅 [Configuration Properties](#configuration-properties) below
+and [Properties](../admin/properties.md).
+
+可以通过设置`set session heuristicindex_filter_enabled=false;`在引擎运行时禁用启发式索引。
+
+配置启发式索引后，启动引擎。
 
 ### 2. 确定索引建立的列
 
