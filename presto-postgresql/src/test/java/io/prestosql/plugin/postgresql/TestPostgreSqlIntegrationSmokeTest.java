@@ -317,9 +317,10 @@ public class TestPostgreSqlIntegrationSmokeTest
                 extendServer.execute(sql);
             }
             else {
-                Connection connection = DriverManager.getConnection(postgreSqlServer.getJdbcUrl());
-                Statement statement = connection.createStatement();
-                statement.execute(sql);
+                try (Connection connection = DriverManager.getConnection(postgreSqlServer.getJdbcUrl());
+                        Statement statement = connection.createStatement()) {
+                    statement.execute(sql);
+                }
             }
         }
         catch (Exception e) {

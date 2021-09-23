@@ -17,6 +17,7 @@ package io.hetu.core.heuristicindex;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import io.airlift.log.Logger;
+import io.hetu.core.common.util.SecurePathWhiteList;
 import io.hetu.core.heuristicindex.util.IndexConstants;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.CreateIndexMetadata;
@@ -42,6 +43,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.spi.heuristicindex.SerializationUtils.serializeMap;
 import static io.prestosql.spi.heuristicindex.SerializationUtils.serializeStripeSymbol;
 
@@ -187,6 +189,12 @@ public class PartitionIndexWriter
                 partitionIndex = HeuristicIndexFactory.createIndex(createIndexMetadata.getIndexType());
             }
 
+            // check required for security scan since we are constructing a path using input
+            checkArgument(!dbPath.toString().contains("../"),
+                    dbPath + " must be absolute and under one of the following whitelisted directories:  " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+            checkArgument(SecurePathWhiteList.isSecurePath(dbPath),
+                    dbPath + " must be under one of the following whitelisted directories: " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+
             List<Pair<Comparable<? extends Comparable<?>>, String>> values = new ArrayList<>(dataMap.size());
             for (Map.Entry<Comparable<? extends Comparable<?>>, String> entry : dataMap.entrySet()) {
                 values.add(new Pair<>(entry.getKey(), entry.getValue()));
@@ -198,6 +206,12 @@ public class PartitionIndexWriter
             properties.put(MAX_MODIFIED_TIME, String.valueOf(maxLastModifiedTime));
             partitionIndex.setProperties(properties);
             Path filePath = Paths.get(dbPath + "/" + IndexConstants.LAST_MODIFIED_FILE_PREFIX + maxLastModifiedTime);
+
+            // check required for security scan since we are constructing a path using input
+            checkArgument(!filePath.toString().contains("../"),
+                    filePath + " must be absolute and under one of the following whitelisted directories:  " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+            checkArgument(SecurePathWhiteList.isSecurePath(dbPath),
+                    filePath + " must be under one of the following whitelisted directories: " + SecurePathWhiteList.getSecurePathWhiteList().toString());
 
             List<Path> oldFiles = Collections.emptyList();
             if (fs.exists(Paths.get(dbPath))) {

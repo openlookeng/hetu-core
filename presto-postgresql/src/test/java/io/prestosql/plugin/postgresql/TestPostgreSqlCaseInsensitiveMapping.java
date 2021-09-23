@@ -191,15 +191,15 @@ public class TestPostgreSqlCaseInsensitiveMapping
 
     private void execute(String sql)
     {
-        Connection connection;
         try {
             if (extendServer != null) {
                 extendServer.execute(sql);
             }
             else {
-                connection = DriverManager.getConnection(postgreSqlServer.getJdbcUrl());
-                Statement statement = connection.createStatement();
-                statement.execute(sql);
+                try (Connection connection = DriverManager.getConnection(postgreSqlServer.getJdbcUrl());
+                        Statement statement = connection.createStatement()) {
+                    statement.execute(sql);
+                }
             }
         }
         catch (Exception e) {

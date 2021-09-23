@@ -16,6 +16,7 @@ package io.prestosql.heuristicindex;
 
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
+import io.hetu.core.common.util.SecurePathWhiteList;
 import io.prestosql.execution.QueryInfo;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.metastore.HetuMetaStoreManager;
@@ -42,6 +43,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 public class HeuristicIndexerManager
 {
@@ -145,6 +148,15 @@ public class HeuristicIndexerManager
             String indexStoreRoot = PropertyService.getStringProperty(HetuConstant.INDEXSTORE_URI);
 
             root = Paths.get(indexStoreRoot);
+
+            // although the root is already checked in HetuConfig#getIndexStoreUri
+            // when we set and get it from PropertyService, the code scan tool loses track and complains
+            // add the check here again
+            checkArgument(!root.toString().contains("../"),
+                    HetuConstant.INDEXSTORE_URI + " must be absolute and under one of the following whitelisted directories:  " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+            checkArgument(SecurePathWhiteList.isSecurePath(root),
+                    HetuConstant.INDEXSTORE_URI + " must be under one of the following whitelisted directories: " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+
             fs = fileSystemClientManager.getFileSystemClient(fsProfile, root);
             if (fileSystemClientManager.isFileSystemLocal(fsProfile)) {
                 throw new IllegalArgumentException("Indexer does not support local filesystem: " + fsProfile);

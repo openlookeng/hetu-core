@@ -95,12 +95,14 @@ public class TestOpenGaussServer
     {
         try {
             Class.forName("org.postgresql.Driver");
-            Connection conn = DriverManager.getConnection(jdbcUrl, user, passWd);
-            LOG.info("Connection succeed!");
-            if (conn != null) {
-                conn.setReadOnly(false);
-                Statement stmt = conn.createStatement();
-                stmt.execute(sql);
+            try (Connection conn = DriverManager.getConnection(jdbcUrl, user, passWd)) {
+                LOG.info("Connection succeed!");
+                if (conn != null) {
+                    conn.setReadOnly(false);
+                    try (Statement stmt = conn.createStatement()) {
+                        stmt.execute(sql);
+                    }
+                }
             }
         }
         catch (ClassNotFoundException e) {

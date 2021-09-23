@@ -18,6 +18,7 @@ package io.prestosql.plugin.memory.data;
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.hetu.core.common.util.SecureObjectInputStream;
+import io.hetu.core.common.util.SecurePathWhiteList;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.prestosql.plugin.memory.MemoryColumnHandle;
 import io.prestosql.plugin.memory.MemoryConfig;
@@ -60,6 +61,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.plugin.memory.MemoryErrorCode.MEMORY_LIMIT_EXCEEDED;
 import static io.prestosql.plugin.memory.MemoryErrorCode.MISSING_DATA;
 import static java.lang.String.format;
@@ -108,6 +110,11 @@ public class MemoryTableManager
 
         String name = UUID.randomUUID().toString();
         Path testPath = spillRoot.resolve(name);
+        // added for security scan since we are constructing a path using input
+        checkArgument(!testPath.toString().contains("../"),
+                testPath + " must be absolute and under one of the following whitelisted directories:  " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        checkArgument(SecurePathWhiteList.isSecurePath(testPath),
+                testPath + " must be under one of the following whitelisted directories: " + SecurePathWhiteList.getSecurePathWhiteList().toString());
 
         try (RandomAccessFile testFile = new RandomAccessFile(testPath.toFile(), "rw")) {
             // create a new file in the spillRoot that can be written and read from
