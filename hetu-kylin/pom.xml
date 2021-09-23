@@ -187,18 +187,6 @@
             <version>2.1.5.3</version>
         </dependency>
         <dependency>
-            <groupId>org.apache.lucene</groupId>
-            <artifactId>lucene-analyzers-common</artifactId>
-            <scope>test</scope>
-            <version>8.6.2</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.lucene</groupId>
-                    <artifactId>lucene-core</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-main</artifactId>
             <exclusions>
@@ -226,17 +214,18 @@
                     <groupId>com.google.code.findbugs</groupId>
                     <artifactId>jsr305</artifactId>
                 </exclusion>
-
+                <exclusion>
+                    <artifactId>lucene-analyzers-common</artifactId>
+                    <groupId>org.apache.lucene</groupId>
+                </exclusion>
             </exclusions>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>org.apache.calcite</groupId>
             <artifactId>calcite-core</artifactId>
             <version>1.12.0</version>
             <exclusions>
-
                 <exclusion>
                     <artifactId>protobuf-java</artifactId>
                     <groupId>com.google.protobuf</groupId>
