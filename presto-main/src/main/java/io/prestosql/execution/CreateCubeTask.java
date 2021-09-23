@@ -141,16 +141,16 @@ public class CreateCubeTask
         }
 
         TableMetadata tableMetadata = metadata.getTableMetadata(session, tableHandle.get());
-        List<String> groupingSet = statement.getGroupingSet().stream().map(Identifier::getValue).collect(Collectors.toList());
+        List<String> groupingSet = statement.getGroupingSet().stream().map(s -> s.getValue().toLowerCase(ENGLISH)).collect(Collectors.toList());
         Map<String, ColumnMetadata> sourceTableColumns = tableMetadata.getColumns().stream().collect(Collectors.toMap(ColumnMetadata::getName, col -> col));
         List<ColumnMetadata> cubeColumns = new ArrayList<>();
         Map<String, AggregationSignature> aggregations = new HashMap<>();
         Analysis analysis = analyzeStatement(statement, session, metadata, accessControl, parameters, stateMachine.getWarningCollector());
-        Map<String, Field> fields = analysis.getOutputDescriptor().getAllFields().stream().collect(Collectors.toMap(col -> col.getName().get(), col -> col));
+        Map<String, Field> fields = analysis.getOutputDescriptor().getAllFields().stream().collect(Collectors.toMap(col -> col.getName().map(String::toLowerCase).get(), col -> col));
 
         for (FunctionCall aggFunction : statement.getAggregations()) {
             String aggFunctionName = aggFunction.getName().toString().toLowerCase(ENGLISH);
-            String argument = aggFunction.getArguments().isEmpty() || aggFunction.getArguments().get(0) instanceof LongLiteral ? null : ((Identifier) aggFunction.getArguments().get(0)).getValue();
+            String argument = aggFunction.getArguments().isEmpty() || aggFunction.getArguments().get(0) instanceof LongLiteral ? null : ((Identifier) aggFunction.getArguments().get(0)).getValue().toLowerCase(ENGLISH);
             boolean distinct = aggFunction.isDistinct();
             String cubeColumnName = aggFunctionName + "_" + (argument == null ? "all" : argument) + (aggFunction.isDistinct() ? "_distinct" : "");
             CubeAggregateFunction cubeAggregateFunction = CubeAggregateFunction.valueOf(aggFunctionName.toUpperCase(ENGLISH));
