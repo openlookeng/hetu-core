@@ -43,6 +43,19 @@
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-record-decoder</artifactId>
+            <exclusions>
+                <exclusion>
+                    <artifactId>commons-compress</artifactId>
+                    <groupId>org.apache.commons</groupId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <artifactId>commons-compress</artifactId>
+            <groupId>org.apache.commons</groupId>
+            <version>1.21</version>
+            <scope>runtime</scope>
         </dependency>
 
         <dependency>
