@@ -117,13 +117,13 @@ public class TestHetuMetastoreGlobalCache
             launcherConfigFile.delete();
             launcherConfigFile.createNewFile();
         }
-        FileWriter configWriter = new FileWriter(STATE_STORE_CONFIGURATION_PATH);
-        configWriter.write("state-store.type=hazelcast\n" +
-                "state-store.name=test\n" +
-                "state-store.cluster=test-cluster\n" +
-                "hazelcast.discovery.mode=tcp-ip\n" +
-                "hazelcast.discovery.port=" + PORT1 + "\n");
-        configWriter.close();
+        try (FileWriter configWriter = new FileWriter(STATE_STORE_CONFIGURATION_PATH)) {
+            configWriter.write("state-store.type=hazelcast\n" +
+                    "state-store.name=test\n" +
+                    "state-store.cluster=test-cluster\n" +
+                    "hazelcast.discovery.mode=tcp-ip\n" +
+                    "hazelcast.discovery.port=" + PORT1 + "\n");
+        }
     }
 
     @BeforeTest

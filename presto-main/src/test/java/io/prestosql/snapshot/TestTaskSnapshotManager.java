@@ -484,30 +484,31 @@ public class TestTaskSnapshotManager
         File firstFile = new File("/tmp/test_snapshot_manager/" + queryId + "/firstFile");
         dirs.mkdirs();
         firstFile.createNewFile();
-        FileWriter fw1 = new FileWriter(firstFile);
-        String firstStr = "first string";
-        fw1.write(firstStr);
-        SnapshotStateId stateId = SnapshotStateId.forOperator(firstSnapshotId, taskId1, 3, 4, 5);
-        snapshotManager.storeFile(stateId, firstFile.toPath());
-        snapshotManager.succeededToCapture(stateId);
+        try (FileWriter fw1 = new FileWriter(firstFile)) {
+            String firstStr = "first string";
+            fw1.write(firstStr);
+            SnapshotStateId stateId = SnapshotStateId.forOperator(firstSnapshotId, taskId1, 3, 4, 5);
+            snapshotManager.storeFile(stateId, firstFile.toPath());
+            snapshotManager.succeededToCapture(stateId);
+        }
 
         // second store, then deleted
         File secondFile = new File("/tmp/test_snapshot_manager/" + queryId + "/secondFile");
         secondFile.createNewFile();
-        FileWriter fw2 = new FileWriter(secondFile);
-        String secondStr = "second string";
-        fw2.write(secondStr);
-        SnapshotStateId secondId = SnapshotStateId.forOperator(2L, taskId1, 3, 4, 5);
-        snapshotManager.storeFile(secondId, secondFile.toPath());
-        snapshotManager.succeededToCapture(secondId);
+        try (FileWriter fw2 = new FileWriter(secondFile)) {
+            String secondStr = "second string";
+            fw2.write(secondStr);
+            SnapshotStateId secondId = SnapshotStateId.forOperator(2L, taskId1, 3, 4, 5);
+            snapshotManager.storeFile(secondId, secondFile.toPath());
+            snapshotManager.succeededToCapture(secondId);
+            querySnapshotManager.updateQueryCapture(taskId1, Collections.singletonMap(firstSnapshotId, SnapshotResult.SUCCESSFUL));
 
-        querySnapshotManager.updateQueryCapture(taskId1, Collections.singletonMap(firstSnapshotId, SnapshotResult.SUCCESSFUL));
+            File secondFileOperator = new File("/tmp/test_snapshot_manager/" + queryId + "/2/1/0/3/4/5/secondFile");
+            assertTrue(secondFileOperator.exists());
+            secondFileOperator.delete();
+            assertFalse(secondFileOperator.exists());
 
-        File secondFileOperator = new File("/tmp/test_snapshot_manager/" + queryId + "/2/1/0/3/4/5/secondFile");
-        assertTrue(secondFileOperator.exists());
-        secondFileOperator.delete();
-        assertFalse(secondFileOperator.exists());
-
-        assertFalse(snapshotManager.loadFile(secondId, secondFile.toPath()));
+            assertFalse(snapshotManager.loadFile(secondId, secondFile.toPath()));
+        }
     }
 }

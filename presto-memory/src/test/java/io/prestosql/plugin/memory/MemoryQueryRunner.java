@@ -84,6 +84,7 @@ public final class MemoryQueryRunner
                 .build();
 
         DistributedQueryRunner queryRunner = new DistributedQueryRunner(session, nodes, extraProperties);
+        Runtime.getRuntime().addShutdownHook(new Thread(queryRunner::close));
 
         try {
             queryRunner.installPlugin(new HetuFileSystemClientPlugin());

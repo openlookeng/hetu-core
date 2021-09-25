@@ -164,34 +164,34 @@ public class TestSourcePartitionedScheduler
         NodeTaskMap nodeTaskMap = new NodeTaskMap(finalizerService);
         SqlStageExecution stage = createSqlStageExecution(plan, nodeTaskMap);
 
-        StageScheduler scheduler = getSourcePartitionedScheduler(plan, stage, nodeManager, nodeTaskMap, 1);
+        try (StageScheduler scheduler = getSourcePartitionedScheduler(plan, stage, nodeManager, nodeTaskMap, 1)) {
+            for (int i = 0; i < 60; i++) {
+                ScheduleResult scheduleResult = scheduler.schedule();
 
-        for (int i = 0; i < 60; i++) {
-            ScheduleResult scheduleResult = scheduler.schedule();
+                // only finishes when last split is fetched
+                if (i == 59) {
+                    assertEffectivelyFinished(scheduleResult, scheduler);
+                }
+                else {
+                    assertFalse(scheduleResult.isFinished());
+                }
 
-            // only finishes when last split is fetched
-            if (i == 59) {
-                assertEffectivelyFinished(scheduleResult, scheduler);
+                // never blocks
+                assertTrue(scheduleResult.getBlocked().isDone());
+
+                // first three splits create new tasks
+                assertEquals(scheduleResult.getNewTasks().size(), i < 3 ? 1 : 0);
+                assertEquals(stage.getAllTasks().size(), i < 3 ? i + 1 : 3);
+
+                assertPartitionedSplitCount(stage, min(i + 1, 60));
             }
-            else {
-                assertFalse(scheduleResult.isFinished());
+
+            for (RemoteTask remoteTask : stage.getAllTasks()) {
+                assertEquals(remoteTask.getPartitionedSplitCount(), 20);
             }
 
-            // never blocks
-            assertTrue(scheduleResult.getBlocked().isDone());
-
-            // first three splits create new tasks
-            assertEquals(scheduleResult.getNewTasks().size(), i < 3 ? 1 : 0);
-            assertEquals(stage.getAllTasks().size(), i < 3 ? i + 1 : 3);
-
-            assertPartitionedSplitCount(stage, min(i + 1, 60));
+            stage.abort();
         }
-
-        for (RemoteTask remoteTask : stage.getAllTasks()) {
-            assertEquals(remoteTask.getPartitionedSplitCount(), 20);
-        }
-
-        stage.abort();
     }
 
     @Test

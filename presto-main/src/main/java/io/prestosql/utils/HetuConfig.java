@@ -19,12 +19,15 @@ import io.airlift.configuration.ConfigDescription;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
+import io.hetu.core.common.util.SecurePathWhiteList;
 import io.prestosql.spi.HetuConstant;
 
 import javax.validation.constraints.NotNull;
 
+import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.units.DataSize.Unit.GIGABYTE;
 
 /**
@@ -80,6 +83,18 @@ public class HetuConfig
     @NotNull
     public String getIndexStoreUri()
     {
+        // if indexStoreUri is null, let the config manager throw the error, it's more user friendly
+        if (indexStoreUri != null) {
+            try {
+                checkArgument(!indexStoreUri.toString().contains("../"),
+                        HetuConstant.INDEXSTORE_URI + " must be absolute and under one of the following whitelisted directories:  " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+                checkArgument(SecurePathWhiteList.isSecurePath(indexStoreUri),
+                        HetuConstant.INDEXSTORE_URI + " must be under one of the following whitelisted directories: " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+            }
+            catch (IOException e) {
+                throw new IllegalArgumentException("Failed to get secure path list.", e);
+            }
+        }
         return indexStoreUri;
     }
 

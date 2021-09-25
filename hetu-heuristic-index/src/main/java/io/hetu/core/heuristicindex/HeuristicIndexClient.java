@@ -17,6 +17,7 @@ package io.hetu.core.heuristicindex;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
+import io.hetu.core.common.util.SecurePathWhiteList;
 import io.hetu.core.heuristicindex.util.IndexConstants;
 import io.hetu.core.plugin.heuristicindex.index.btree.BTreeIndex;
 import io.prestosql.spi.connector.CreateIndexMetadata;
@@ -48,6 +49,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -143,6 +145,12 @@ public class HeuristicIndexClient
     {
         // get the absolute path to the file being read
         Path absolutePath = Paths.get(root.toString(), path);
+
+        // check required for security scan since we are constructing a path using input
+        checkArgument(!absolutePath.toString().contains("../"),
+                absolutePath + " must be absolute and under one of the following whitelisted directories:  " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        checkArgument(SecurePathWhiteList.isSecurePath(absolutePath),
+                absolutePath + " must be under one of the following whitelisted directories: " + SecurePathWhiteList.getSecurePathWhiteList().toString());
 
         try (Stream<Path> children = fs.list(absolutePath)) {
             for (Path child : (Iterable<Path>) children::iterator) {
@@ -332,6 +340,12 @@ public class HeuristicIndexClient
         // get the absolute path to the file being read
         Path absolutePath = Paths.get(root.toString(), path);
 
+        // check required for security scan since we are constructing a path using input
+        checkArgument(!absolutePath.toString().contains("../"),
+                absolutePath + " must be absolute and under one of the following whitelisted directories:  " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        checkArgument(SecurePathWhiteList.isSecurePath(absolutePath),
+                absolutePath + " must be under one of the following whitelisted directories: " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+
         if (!fs.exists(absolutePath)) {
             return ImmutableMap.of();
         }
@@ -412,6 +426,13 @@ public class HeuristicIndexClient
         CreateIndexMetadata.Level createLevel = indexRecord.getLevel();
 
         Path pathToIndex = Paths.get(root.toString(), indexRecord.qualifiedTable, indexRecord.columns[0], indexRecord.indexType);
+
+        // check required for security scan since we are constructing a path using input
+        checkArgument(!pathToIndex.toString().contains("../"),
+                pathToIndex + " must be absolute and under one of the following whitelisted directories:  " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        checkArgument(SecurePathWhiteList.isSecurePath(pathToIndex),
+                pathToIndex + " must be under one of the following whitelisted directories: " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+
         List<Path> paths = fs.walk(pathToIndex).filter(p -> !fs.isDirectory(p)).collect(Collectors.toList());
         switch (createLevel) {
             case STRIPE:
