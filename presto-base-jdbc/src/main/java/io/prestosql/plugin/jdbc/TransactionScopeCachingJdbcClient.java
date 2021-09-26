@@ -143,9 +143,9 @@ public class TransactionScopeCachingJdbcClient
     }
 
     @Override
-    public String buildUpdateSql(ConnectorTableHandle handle, int updateColumnNum, List<String> updatedColumns)
+    public String buildUpdateSql(ConnectorSession session, ConnectorTableHandle handle, int updateColumnNum, List<String> updatedColumns)
     {
-        return super.buildUpdateSql(handle, updateColumnNum, updatedColumns);
+        return super.buildUpdateSql(session, handle, updateColumnNum, updatedColumns);
     }
 
     @Override

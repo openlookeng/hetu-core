@@ -63,12 +63,6 @@
             <artifactId>javax.inject</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>com.google.code.findbugs</groupId>
-            <artifactId>jsr305</artifactId>
-            <optional>true</optional>
-        </dependency>
-
         <!-- Presto SPI -->
         <dependency>
             <groupId>io.hetu.core</groupId>

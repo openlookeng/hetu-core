@@ -348,9 +348,9 @@ public abstract class ForwardingJdbcClient
     }
 
     @Override
-    public String buildUpdateSql(ConnectorTableHandle handle, int updateColumnNum, List<String> updatedColumns)
+    public String buildUpdateSql(ConnectorSession session, ConnectorTableHandle handle, int updateColumnNum, List<String> updatedColumns)
     {
-        return getDelegate().buildUpdateSql(handle, updateColumnNum, updatedColumns);
+        return getDelegate().buildUpdateSql(session, handle, updateColumnNum, updatedColumns);
     }
 
     @Override

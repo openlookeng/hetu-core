@@ -18,7 +18,6 @@ import com.google.common.base.CharMatcher;
 import com.google.common.base.VerifyException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.hetu.core.plugin.oracle.config.RoundingMode;
@@ -66,7 +65,6 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.VarcharType;
 
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 import java.math.BigDecimal;
@@ -84,15 +82,16 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
 import static io.prestosql.plugin.jdbc.StandardColumnMappings.bigintColumnMapping;
@@ -314,22 +313,6 @@ public class OracleClient
         return Instant.ofEpochMilli(value).atZone(UTC).toLocalDateTime();
     }
 
-    @Override
-    protected Collection<String> listSchemas(Connection connection)
-    {
-        try (ResultSet resultSet = connection.getMetaData().getSchemas()) {
-            ImmutableSet.Builder<String> schemaNames = ImmutableSet.builder();
-            while (resultSet.next()) {
-                String schemaName = resultSet.getString(1).toLowerCase(Locale.ENGLISH);
-                schemaNames.add(schemaName);
-            }
-            return schemaNames.build();
-        }
-        catch (SQLException e) {
-            throw new RuntimeException("Hetu Oracle connector failed to list schemas");
-        }
-    }
-
     private String[] getTableTypes()
     {
         if (synonymsEnabled) {
@@ -345,43 +328,6 @@ public class OracleClient
         return connection.getMetaData()
                 .getTables(connection.getCatalog(), schemaName.orElse(null), tableName.orElse(null),
                         getTableTypes());
-    }
-
-    @Nullable
-    @Override
-    public Optional<JdbcTableHandle> getTableHandle(JdbcIdentity identity, SchemaTableName schemaTableName)
-    {
-        try (Connection connection = connectionFactory.openConnection(identity)) {
-            DatabaseMetaData metadata = connection.getMetaData();
-            String jdbcSchemaName = schemaTableName.getSchemaName();
-            String jdbcTableName = schemaTableName.getTableName();
-            if (metadata.storesUpperCaseIdentifiers()) {
-                jdbcSchemaName = jdbcSchemaName.toUpperCase(Locale.ENGLISH);
-                jdbcTableName = jdbcTableName.toUpperCase(Locale.ENGLISH);
-            }
-            try (ResultSet resultSet = getTables(connection, Optional.of(jdbcSchemaName), Optional.of(jdbcTableName))) {
-                List<JdbcTableHandle> tableHandles = new ArrayList<>(1);
-                while (resultSet.next()) {
-                    if (jdbcTableName.equals(resultSet.getString(Constants.TABLE_NAME).toUpperCase(Locale.ENGLISH))) {
-                        tableHandles.add(new JdbcTableHandle(schemaTableName, resultSet.getString("TABLE_CAT"),
-                                resultSet.getString("TABLE_SCHEM"), resultSet.getString(Constants.TABLE_NAME)));
-                    }
-                }
-                if (tableHandles.isEmpty()) {
-                    return Optional.empty();
-                }
-                if (tableHandles.size() > 1) {
-                    throw new PrestoException(NOT_SUPPORTED, "Multiple tables matched: " + schemaTableName);
-                }
-                return Optional.of(getOnlyElement(tableHandles));
-            }
-            catch (SQLException e) {
-                return Optional.empty();
-            }
-        }
-        catch (SQLException e) {
-            throw new RuntimeException("Hetu oracle connector failed to get table handle");
-        }
     }
 
     @SuppressFBWarnings("SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING")
@@ -874,22 +820,62 @@ public class OracleClient
     {
     }
 
+    private Map<String, String> getColumnNameMap(ConnectorSession session, JdbcTableHandle tableHandle)
+    {
+        HashMap<String, String> columnNameMap = new HashMap<>(); //<columnName in lower case, columnName in datasource>
+        List<JdbcColumnHandle> columnList = getColumns(session, tableHandle);
+
+        for (JdbcColumnHandle columnHandle : columnList) {
+            String columnName = columnHandle.getColumnName();
+            columnNameMap.put(columnName.toLowerCase(ENGLISH), columnName);
+        }
+
+        return columnNameMap;
+    }
+
+    private String buildRemoteSchemaTableName(JdbcTableHandle tableHandle)
+    {
+        StringBuilder remoteSchemaTable = new StringBuilder();
+
+        if (!isNullOrEmpty(tableHandle.getSchemaName())) {
+            remoteSchemaTable.append(quoted(tableHandle.getSchemaName())).append(".");
+        }
+
+        remoteSchemaTable.append(quoted(tableHandle.getTableName()));
+
+        return remoteSchemaTable.toString();
+    }
+
     @Override
     public String buildDeleteSql(ConnectorTableHandle handle)
     {
         JdbcTableHandle tableHandle = (JdbcTableHandle) handle;
         return format(
-                "DELETE FROM %s WHERE ROWID=%s", tableHandle.getSchemaPrefixedTableName(), "?");
+                "DELETE FROM %s WHERE ROWID=%s", buildRemoteSchemaTableName(tableHandle), "?");
+    }
+
+    private List<String> getColumnNameFromDataSource(ConnectorSession session, JdbcTableHandle tableHandle, List<String> columns)
+    {
+        Map<String, String> columnNameMap = getColumnNameMap(session, tableHandle);
+        List<String> updatedColumns = new ArrayList<>();
+
+        for (String columnName : columns) {
+            String originName = columnNameMap.get(columnName.toLowerCase(Locale.ENGLISH));
+            updatedColumns.add((originName != null) ? originName : columnName);
+        }
+
+        return updatedColumns;
     }
 
     @Override
-    public String buildUpdateSql(ConnectorTableHandle handle, int setNum, List<String> updatedColumns)
+    public String buildUpdateSql(ConnectorSession session, ConnectorTableHandle handle, int setNum, List<String> updatedColumns)
     {
         JdbcTableHandle tableHandle = (JdbcTableHandle) handle;
         StringBuilder sqlBuilder = new StringBuilder();
-        sqlBuilder.append(format("UPDATE %s SET ", tableHandle.getSchemaPrefixedTableName()));
+        sqlBuilder.append(format("UPDATE %s SET ", buildRemoteSchemaTableName(tableHandle)));
+        List<String> columnList = getColumnNameFromDataSource(session, tableHandle, updatedColumns);
         for (int i = 0; i < setNum; i++) {
-            sqlBuilder.append(updatedColumns.get(i));
+            sqlBuilder.append(quoted(columnList.get(i)));
             sqlBuilder.append(" = ? ");
             if (i != setNum - 1) {
                 sqlBuilder.append(", ");
@@ -933,5 +919,39 @@ public class OracleClient
     {
         JdbcTypeHandle jdbcTypeHandle = new JdbcTypeHandle(Types.ROWID, Optional.of("rowid"), 18, 0, Optional.empty());
         return new JdbcColumnHandle("ROWID", jdbcTypeHandle, VARCHAR, true);
+    }
+
+    @Override
+    public void renameColumn(JdbcIdentity identity, JdbcTableHandle handle, JdbcColumnHandle jdbcColumn, String newColumnName)
+    {
+        try (Connection connection = connectionFactory.openConnection(identity)) {
+            if (connection.getMetaData().storesUpperCaseIdentifiers()) {
+                newColumnName = newColumnName.toUpperCase(ENGLISH);
+            }
+            String sql = format(
+                    "ALTER TABLE %s RENAME COLUMN %s TO %s",
+                    quoted(handle.getCatalogName(), handle.getSchemaName(), handle.getTableName()),
+                    quoted(jdbcColumn.getColumnName()),
+                    quoted(newColumnName));
+            execute(connection, sql);
+        }
+        catch (SQLException e) {
+            throw new PrestoException(JDBC_ERROR, e);
+        }
+    }
+
+    @Override
+    public void dropColumn(JdbcIdentity identity, JdbcTableHandle handle, JdbcColumnHandle column)
+    {
+        try (Connection connection = connectionFactory.openConnection(identity)) {
+            String sql = format(
+                    "ALTER TABLE %s DROP COLUMN %s",
+                    quoted(handle.getCatalogName(), handle.getSchemaName(), handle.getTableName()),
+                    quoted(column.getColumnName()));
+            execute(connection, sql);
+        }
+        catch (SQLException e) {
+            throw new PrestoException(JDBC_ERROR, e);
+        }
     }
 }
