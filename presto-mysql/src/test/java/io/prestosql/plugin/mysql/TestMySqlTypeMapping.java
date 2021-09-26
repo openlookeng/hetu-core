@@ -70,7 +70,7 @@ public class TestMySqlTypeMapping
     public TestMySqlTypeMapping()
             throws Exception
     {
-        this(new TestingMySqlServer("testuser", "testpass", "tpch"));
+        this(MySqlQueryRunner.createTestingMySqlServer("testuser", "testpass", "tpch"));
     }
 
     private TestMySqlTypeMapping(TestingMySqlServer mysqlServer)

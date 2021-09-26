@@ -38,6 +38,39 @@ public final class MySqlQueryRunner
 
     private static final String TPCH_SCHEMA = "tpch";
 
+    public static final TestingMySqlServer createTestingMySqlServer(String userName, String password, String schemaName)
+            throws Exception
+    {
+        return createTestingMySqlServer(userName, password, schemaName, null);
+    }
+
+    public static final TestingMySqlServer createTestingMySqlServer(String userName, String password, String schemaName, String dataBase)
+            throws Exception
+    {
+        TestingMySqlServer tempServer = null;
+        final int createRetry = 3;
+
+        for (int i = 0; i < createRetry; i++) {
+            try {
+                if (dataBase == null) {
+                    tempServer = new TestingMySqlServer(userName, password, schemaName);
+                }
+                else {
+                    tempServer = new TestingMySqlServer(userName, password, schemaName, dataBase);
+                }
+            }
+            catch (Exception e) {
+                if (i == (createRetry - 1)) {
+                    throw e;
+                }
+                continue;
+            }
+            break;
+        }
+
+        return tempServer;
+    }
+
     public static QueryRunner createMySqlQueryRunner(TestingMySqlServer server, TpchTable<?>... tables)
             throws Exception
     {

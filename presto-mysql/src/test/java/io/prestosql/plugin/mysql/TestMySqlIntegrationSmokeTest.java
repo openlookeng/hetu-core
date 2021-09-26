@@ -46,7 +46,8 @@ public class TestMySqlIntegrationSmokeTest
     public TestMySqlIntegrationSmokeTest()
             throws Exception
     {
-        this(new TestingMySqlServer("testuser", "testpass", "tpch", "test_database"));
+        this(MySqlQueryRunner.createTestingMySqlServer("testuser", "testpass",
+                "tpch", "test_database"));
     }
 
     public TestMySqlIntegrationSmokeTest(TestingMySqlServer mysqlServer)
