@@ -32,7 +32,6 @@ import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.sql.tree.GenericLiteral;
 import io.prestosql.sql.tree.Identifier;
 import io.prestosql.sql.tree.Literal;
-import io.prestosql.sql.tree.LogicalBinaryExpression;
 import io.prestosql.sql.tree.LongLiteral;
 import io.prestosql.sql.tree.Property;
 import io.prestosql.sql.tree.QualifiedName;
@@ -42,6 +41,9 @@ import io.prestosql.sql.tree.TimestampLiteral;
 import org.jline.terminal.Terminal;
 
 import java.io.PrintStream;
+import java.math.BigInteger;
+import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -89,7 +91,7 @@ public class CubeConsole
     private static final long MAX_BUFFERED_ROWS = 10000000000L;
     private static int rowBufferListSize;
     private static final double rowBufferTempMultiplier = 1.3;
-    private static String resultInitCubeQUery;
+    private static String resultInitCubeQuery;
     private List<List<?>> rowBufferIterationItems;
     private String cubeColumnDataType;
 
@@ -101,9 +103,9 @@ public class CubeConsole
         this.console = console;
     }
 
-    private static void setResultInitCubeQuery(String resultCubeQUery)
+    private static void setResultInitCubeQuery(String resultCubeQuery)
     {
-        resultInitCubeQUery = resultCubeQUery;
+        resultInitCubeQuery = resultCubeQuery;
     }
 
     public void setListRowBufferIterationItems(List<List<?>> rowBufferIterationItems)
@@ -118,7 +120,7 @@ public class CubeConsole
 
     private static String getResultInitCubeQuery()
     {
-        return resultInitCubeQUery;
+        return resultInitCubeQuery;
     }
 
     public String getCubeColumnDataType()
@@ -254,75 +256,79 @@ public class CubeConsole
 
         if (rowBufferIterationItems != null && rowBufferIterationItems.size() != EMPTY_ROW_BUFFER_ITERATION_ITEMS) {
             //this loop process the multiple insert query statements
-            for (List<?> rowBufferItems : rowBufferIterationItems) {
+            int end = rowBufferIterationItems.size() - 1;
+
+            for (int i = 0; i <= end; i++) {
+                List<?> rowBufferItems = rowBufferIterationItems.get(i);
                 Expression finalPredicate;
+                Expression userBoundaryPredicate = null;
                 String queryInsert;
+                String minItem = rowBufferItems.get(INDEX_AT_MIN_POSITION).toString();
+                String maxItem = rowBufferItems.get(INDEX_AT_MAX_POSITION).toString();
+
                 switch (cubeColumnDataType) {
                     case DATATYPE_DOUBLE: {
-                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
-                                new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DOUBLE)), parser.createExpression(rowBufferItems.get(INDEX_AT_MAX_POSITION).toString(),
-                                new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DOUBLE)));
+                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_DOUBLE + " " + QUOTE_STRING + minItem + QUOTE_STRING, new ParsingOptions()), parser.createExpression(DATATYPE_DOUBLE + " " + QUOTE_STRING + maxItem + QUOTE_STRING, new ParsingOptions()));
+                        userBoundaryPredicate = new ComparisonExpression(operator, left, right);
                         break;
                     }
                     case DATATYPE_REAL: {
-                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_REAL_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()), parser.createExpression(DATATYPE_REAL_QUOTE + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()));
+                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_REAL_QUOTE + minItem + QUOTE_STRING, new ParsingOptions()), parser.createExpression(DATATYPE_REAL_QUOTE + maxItem + QUOTE_STRING, new ParsingOptions()));
+                        userBoundaryPredicate = new ComparisonExpression(operator, left, right);
                         break;
                     }
                     case DATATYPE_DECIMAL: {
-                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
-                                new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL)), parser.createExpression(rowBufferItems.get(INDEX_AT_MAX_POSITION).toString(),
-                                new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL)));
+                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_DECIMAL + " " + QUOTE_STRING + minItem + QUOTE_STRING, new ParsingOptions()), parser.createExpression(DATATYPE_DECIMAL + " " + QUOTE_STRING + maxItem + QUOTE_STRING, new ParsingOptions()));
+                        userBoundaryPredicate = new ComparisonExpression(operator, left, right);
                         break;
                     }
                     case DATATYPE_DATE: {
-                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_DATE_QUOTE +
-                                rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING, new ParsingOptions()), parser.createExpression(DATATYPE_DATE_QUOTE + rowBufferItems.get(1).toString() + QUOTE_STRING,
-                                new ParsingOptions()));
+                        finalPredicate = new BetweenPredicate(left, parser.createExpression(DATATYPE_DATE_QUOTE + minItem + QUOTE_STRING, new ParsingOptions()), parser.createExpression(DATATYPE_DATE_QUOTE + maxItem + QUOTE_STRING, new ParsingOptions()));
+                        userBoundaryPredicate = new ComparisonExpression(operator, left, right);
                         break;
                     }
                     case DATATYPE_TIMESTAMP: {
-                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_TIMESTAMP_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()), parser.createExpression(DATATYPE_TIMESTAMP_QUOTE + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()));
+                        finalPredicate = new BetweenPredicate(left, parser.createExpression(DATATYPE_TIMESTAMP_QUOTE + minItem + QUOTE_STRING, new ParsingOptions()), parser.createExpression(DATATYPE_TIMESTAMP_QUOTE + maxItem + QUOTE_STRING, new ParsingOptions()));
+                        userBoundaryPredicate = new ComparisonExpression(operator, left, right);
                         break;
                     }
                     case DATATYPE_TINYINT: {
-                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_TINYINT_QUOTE +
-                                rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING, new ParsingOptions()), parser.createExpression(DATATYPE_TINYINT_QUOTE + rowBufferItems.get(1).toString() + QUOTE_STRING,
-                                new ParsingOptions()));
+                        finalPredicate = new BetweenPredicate(left, parser.createExpression(DATATYPE_TINYINT_QUOTE + minItem + QUOTE_STRING, new ParsingOptions()), parser.createExpression(DATATYPE_TINYINT_QUOTE + maxItem + QUOTE_STRING, new ParsingOptions()));
+                        userBoundaryPredicate = new ComparisonExpression(operator, left, right);
                         break;
                     }
                     case DATATYPE_BIGINT: {
-                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_BIGINT_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()), parser.createExpression(DATATYPE_BIGINT_QUOTE + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()));
+                        finalPredicate = new BetweenPredicate(left, parser.createExpression(DATATYPE_BIGINT_QUOTE + minItem + QUOTE_STRING, new ParsingOptions()), parser.createExpression(DATATYPE_BIGINT_QUOTE + maxItem + QUOTE_STRING, new ParsingOptions()));
+                        userBoundaryPredicate = new ComparisonExpression(operator, left, right);
                         break;
                     }
                     case DATATYPE_SMALLINT: {
-                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(DATATYPE_SMALLINT_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()), parser.createExpression(DATATYPE_SMALLINT_QUOTE + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()));
+                        finalPredicate = new BetweenPredicate(left, parser.createExpression(DATATYPE_SMALLINT_QUOTE + minItem + QUOTE_STRING, new ParsingOptions()), parser.createExpression(DATATYPE_SMALLINT_QUOTE + maxItem + QUOTE_STRING, new ParsingOptions()));
+                        userBoundaryPredicate = new ComparisonExpression(operator, left, right);
                         break;
                     }
                     case DATATYPE_VARCHAR: {
-                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(QUOTE_STRING + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()), parser.createExpression(QUOTE_STRING + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()));
+                        finalPredicate = new BetweenPredicate(left, parser.createExpression(QUOTE_STRING + minItem + QUOTE_STRING, new ParsingOptions()), parser.createExpression(QUOTE_STRING + maxItem + QUOTE_STRING, new ParsingOptions()));
+                        userBoundaryPredicate = new ComparisonExpression(operator, left, right);
                         break;
                     }
                     default: {
-                        finalPredicate = new BetweenPredicate(columnName, parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
-                                new ParsingOptions()), parser.createExpression(rowBufferItems.get(INDEX_AT_MAX_POSITION).toString(),
-                                new ParsingOptions()));
+                        finalPredicate = new BetweenPredicate(left, parser.createExpression(minItem, new ParsingOptions()), parser.createExpression(maxItem, new ParsingOptions()));
+                        userBoundaryPredicate = new ComparisonExpression(operator, left, right);
                         break;
                     }
                 }
                 if (notEqualOperator) {
-                    finalPredicate = new LogicalBinaryExpression(LogicalBinaryExpression.Operator.AND, finalPredicate, comparisonExpression);
+                    finalPredicate = new ComparisonExpression(ComparisonExpression.Operator.NOT_EQUAL, left, right);
+                    queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, finalPredicate);
                 }
-                queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, finalPredicate);
+                else if (i == end && userBoundaryPredicate != null) {
+                    queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, userBoundaryPredicate);
+                }
+                else {
+                    queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, finalPredicate);
+                }
+
                 if (!console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
                     return false;
                 }
@@ -359,7 +365,11 @@ public class CubeConsole
         QualifiedName sourceTableName = createCube.getSourceTableName();
         QualifiedName cubeName = createCube.getCubeName();
         BetweenPredicate betweenPredicate = (BetweenPredicate) (createCube.getWhere().get());
+        Expression betweenPredicateValue = betweenPredicate.getValue();
         String columnName = betweenPredicate.getValue().toString();
+        BetweenPredicate betweenExpression = ((BetweenPredicate) createCube.getWhere().get());
+        Expression left = betweenExpression.getMin();
+        Expression right = betweenExpression.getMax();
 
         //Run Query
         String rowCountsDistinctValuesQuery = String.format(SELECT_COLUMN_ROW_COUNT_FROM_STRING, columnName, sourceTableName.toString(), whereClause, columnName, columnName);
@@ -370,68 +380,235 @@ public class CubeConsole
 
         if (rowBufferIterationItems != null) {
             //this loop process the multiple insert query statements
-            for (List<?> rowBufferItems : rowBufferIterationItems) {
+            int end = rowBufferIterationItems.size() - 1;
+            for (int i = 0; i <= end; i++) {
+                List<?> rowBufferItems = rowBufferIterationItems.get(i);
                 Expression finalPredicate;
                 String queryInsert;
+                String minItem = rowBufferItems.get(INDEX_AT_MIN_POSITION).toString();
+                String maxItem = rowBufferItems.get(INDEX_AT_MAX_POSITION).toString();
+                Expression finalPredicateMinExp = null;
+                Expression finalPredicateMaxExp = null;
+
                 switch (cubeColumnDataType) {
                     case DATATYPE_DOUBLE: {
-                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
-                                new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DOUBLE)), parser.createExpression(rowBufferItems.get(INDEX_AT_MAX_POSITION).toString(),
-                                new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DOUBLE)));
+                        double parsedMinVal = Double.valueOf(minItem);
+                        double parsedMaxVal = Double.valueOf(maxItem);
+                        double userMinVal = Double.valueOf(left.toString().replace(DATATYPE_DOUBLE, "").replaceAll(QUOTE_STRING, ""));
+                        double userMaxVal = Double.valueOf(right.toString().replace(DATATYPE_DOUBLE, "").replaceAll(QUOTE_STRING, ""));
+
+                        if (parsedMinVal > userMinVal) {
+                            finalPredicateMinExp = left;
+                        }
+                        else {
+                            finalPredicateMinExp = parser.createExpression(DATATYPE_DOUBLE + QUOTE_STRING + parsedMinVal + QUOTE_STRING, new ParsingOptions());
+                        }
+                        if (parsedMaxVal < userMaxVal) {
+                            finalPredicateMaxExp = right;
+                        }
+                        else {
+                            finalPredicateMaxExp = parser.createExpression(DATATYPE_DOUBLE + QUOTE_STRING + parsedMaxVal + QUOTE_STRING, new ParsingOptions());
+                        }
+
+                        finalPredicate = new BetweenPredicate(betweenPredicateValue, finalPredicateMinExp, finalPredicateMaxExp);
                         break;
                     }
                     case DATATYPE_REAL: {
-                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_REAL_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()), parser.createExpression(DATATYPE_REAL_QUOTE + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()));
+                        double parsedMinVal = Double.valueOf(minItem);
+                        double parsedMaxVal = Double.valueOf(maxItem);
+                        double userMinVal = Double.valueOf(left.toString().replace(DATATYPE_REAL_QUOTE, "").replaceAll(QUOTE_STRING, ""));
+                        double userMaxVal = Double.valueOf(right.toString().replace(DATATYPE_REAL_QUOTE, "").replaceAll(QUOTE_STRING, ""));
+
+                        if (parsedMinVal > userMinVal) {
+                            finalPredicateMinExp = left;
+                        }
+                        else {
+                            finalPredicateMinExp = parser.createExpression(DATATYPE_REAL + QUOTE_STRING + parsedMinVal + QUOTE_STRING, new ParsingOptions());
+                        }
+                        if (parsedMaxVal < userMaxVal) {
+                            finalPredicateMaxExp = right;
+                        }
+                        else {
+                            finalPredicateMaxExp = parser.createExpression(DATATYPE_REAL + QUOTE_STRING + parsedMaxVal + QUOTE_STRING, new ParsingOptions());
+                        }
+
+                        finalPredicate = new BetweenPredicate(betweenPredicateValue, finalPredicateMinExp, finalPredicateMaxExp);
                         break;
                     }
                     case DATATYPE_DECIMAL: {
-                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
-                                new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL)), parser.createExpression(rowBufferItems.get(INDEX_AT_MAX_POSITION).toString(),
-                                new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL)));
+                        double parsedMinVal = Double.valueOf(minItem);
+                        double parsedMaxVal = Double.valueOf(maxItem);
+                        double userMinVal = Double.valueOf(left.toString().replace(DATATYPE_DECIMAL, "").replaceAll(QUOTE_STRING, ""));
+                        double userMaxVal = Double.valueOf(right.toString().replace(DATATYPE_DECIMAL, "").replaceAll(QUOTE_STRING, ""));
+
+                        if (parsedMinVal > userMinVal) {
+                            finalPredicateMinExp = left;
+                        }
+                        else {
+                            finalPredicateMinExp = parser.createExpression(DATATYPE_DECIMAL + QUOTE_STRING + parsedMinVal + QUOTE_STRING, new ParsingOptions());
+                        }
+                        if (parsedMaxVal < userMaxVal) {
+                            finalPredicateMaxExp = right;
+                        }
+                        else {
+                            finalPredicateMaxExp = parser.createExpression(DATATYPE_DECIMAL + QUOTE_STRING + parsedMaxVal + QUOTE_STRING, new ParsingOptions());
+                        }
+
+                        finalPredicate = new BetweenPredicate(betweenPredicateValue, finalPredicateMinExp, finalPredicateMaxExp);
                         break;
                     }
                     case DATATYPE_DATE: {
-                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_DATE_QUOTE +
-                                rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING, new ParsingOptions()), parser.createExpression(DATATYPE_DATE_QUOTE + rowBufferItems.get(1).toString() + QUOTE_STRING,
-                                new ParsingOptions()));
+                        LocalDate parsedMinVal = LocalDate.parse(minItem);
+                        LocalDate parsedMaxVal = LocalDate.parse(maxItem);
+                        LocalDate userMinVal = LocalDate.parse(left.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_DATE_QUOTE, ""));
+                        LocalDate userMaxVal = LocalDate.parse(right.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_DATE_QUOTE, ""));
+
+                        if (parsedMinVal.compareTo(userMinVal) > 0) {
+                            finalPredicateMinExp = left;
+                        }
+                        else {
+                            finalPredicateMinExp = parser.createExpression(DATATYPE_DATE_QUOTE + parsedMinVal + QUOTE_STRING, new ParsingOptions());
+                        }
+                        if (parsedMaxVal.compareTo(userMaxVal) < 0) {
+                            finalPredicateMaxExp = right;
+                        }
+                        else {
+                            finalPredicateMaxExp = parser.createExpression(DATATYPE_DATE_QUOTE + parsedMaxVal + QUOTE_STRING, new ParsingOptions());
+                        }
+
+                        finalPredicate = new BetweenPredicate(betweenPredicateValue, finalPredicateMinExp, finalPredicateMaxExp);
                         break;
                     }
                     case DATATYPE_TIMESTAMP: {
-                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_TIMESTAMP_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()), parser.createExpression(DATATYPE_TIMESTAMP_QUOTE + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()));
+                        Timestamp parsedMinVal = Timestamp.valueOf(minItem);
+                        Timestamp parsedMaxVal = Timestamp.valueOf(maxItem);
+                        Timestamp userMinVal = Timestamp.valueOf(left.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_TIMESTAMP_QUOTE, ""));
+                        Timestamp userMaxVal = Timestamp.valueOf(right.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_TIMESTAMP_QUOTE, ""));
+
+                        if (parsedMinVal.compareTo(userMinVal) > 0) {
+                            finalPredicateMinExp = left;
+                        }
+                        else {
+                            finalPredicateMinExp = parser.createExpression(DATATYPE_TIMESTAMP_QUOTE + parsedMinVal + QUOTE_STRING, new ParsingOptions());
+                        }
+                        if (parsedMaxVal.compareTo(userMaxVal) < 0) {
+                            finalPredicateMaxExp = right;
+                        }
+                        else {
+                            finalPredicateMaxExp = parser.createExpression(DATATYPE_TIMESTAMP_QUOTE + parsedMaxVal + QUOTE_STRING, new ParsingOptions());
+                        }
+
+                        finalPredicate = new BetweenPredicate(betweenPredicateValue, finalPredicateMinExp, finalPredicateMaxExp);
                         break;
                     }
                     case DATATYPE_TINYINT: {
-                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_TINYINT_QUOTE +
-                                rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING, new ParsingOptions()), parser.createExpression(DATATYPE_TINYINT_QUOTE + rowBufferItems.get(1).toString() + QUOTE_STRING,
-                                new ParsingOptions()));
+                        int parsedMinVal = Integer.parseInt(minItem);
+                        int parsedMaxVal = Integer.parseInt(maxItem);
+                        int userMinVal = Integer.parseInt(left.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_TINYINT_QUOTE, ""));
+                        int userMaxVal = Integer.parseInt(right.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_TINYINT_QUOTE, ""));
+
+                        if (parsedMinVal > userMinVal) {
+                            finalPredicateMinExp = left;
+                        }
+                        else {
+                            finalPredicateMinExp = parser.createExpression(DATATYPE_TINYINT_QUOTE + parsedMinVal + QUOTE_STRING, new ParsingOptions());
+                        }
+                        if (parsedMaxVal < userMaxVal) {
+                            finalPredicateMaxExp = right;
+                        }
+                        else {
+                            finalPredicateMaxExp = parser.createExpression(DATATYPE_TINYINT_QUOTE + parsedMaxVal + QUOTE_STRING, new ParsingOptions());
+                        }
+
+                        finalPredicate = new BetweenPredicate(betweenPredicateValue, finalPredicateMinExp, finalPredicateMaxExp);
                         break;
                     }
                     case DATATYPE_BIGINT: {
-                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_BIGINT_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()), parser.createExpression(DATATYPE_BIGINT_QUOTE + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()));
+                        BigInteger parsedMinVal = new BigInteger(minItem);
+                        BigInteger parsedMaxVal = new BigInteger(maxItem);
+                        BigInteger userMinVal = new BigInteger(left.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_BIGINT_QUOTE, ""));
+                        BigInteger userMaxVal = new BigInteger(right.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_BIGINT_QUOTE, ""));
+
+                        if (parsedMinVal.compareTo(userMinVal) > 0) {
+                            finalPredicateMinExp = left;
+                        }
+                        else {
+                            finalPredicateMinExp = parser.createExpression(DATATYPE_BIGINT_QUOTE + parsedMinVal + QUOTE_STRING, new ParsingOptions());
+                        }
+                        if (parsedMaxVal.compareTo(userMaxVal) < 0) {
+                            finalPredicateMaxExp = right;
+                        }
+                        else {
+                            finalPredicateMaxExp = parser.createExpression(DATATYPE_BIGINT_QUOTE + parsedMaxVal + QUOTE_STRING, new ParsingOptions());
+                        }
+
+                        finalPredicate = new BetweenPredicate(betweenPredicateValue, finalPredicateMinExp, finalPredicateMaxExp);
                         break;
                     }
                     case DATATYPE_SMALLINT: {
-                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(DATATYPE_SMALLINT_QUOTE + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()), parser.createExpression(DATATYPE_SMALLINT_QUOTE + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()));
+                        int parsedMinVal = Integer.parseInt(minItem);
+                        int parsedMaxVal = Integer.parseInt(maxItem);
+                        int userMinVal = Integer.parseInt(left.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_SMALLINT_QUOTE, ""));
+                        int userMaxVal = Integer.parseInt(right.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_SMALLINT_QUOTE, ""));
+
+                        if (parsedMinVal > userMinVal) {
+                            finalPredicateMinExp = left;
+                        }
+                        else {
+                            finalPredicateMinExp = parser.createExpression(DATATYPE_SMALLINT_QUOTE + parsedMinVal + QUOTE_STRING, new ParsingOptions());
+                        }
+                        if (parsedMaxVal < userMaxVal) {
+                            finalPredicateMaxExp = right;
+                        }
+                        else {
+                            finalPredicateMaxExp = parser.createExpression(DATATYPE_SMALLINT_QUOTE + parsedMaxVal + QUOTE_STRING, new ParsingOptions());
+                        }
+
+                        finalPredicate = new BetweenPredicate(betweenPredicateValue, finalPredicateMinExp, finalPredicateMaxExp);
                         break;
                     }
                     case DATATYPE_VARCHAR: {
-                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(QUOTE_STRING + rowBufferItems.get(INDEX_AT_MIN_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()), parser.createExpression(QUOTE_STRING + rowBufferItems.get(INDEX_AT_MAX_POSITION).toString() + QUOTE_STRING,
-                                new ParsingOptions()));
+                        String parsedMinVal = minItem;
+                        String parsedMaxVal = maxItem;
+                        String userMinVal = left.toString().substring(0, right.toString().length() - 1).replaceFirst(QUOTE_STRING, "");
+                        String userMaxVal = right.toString().substring(0, right.toString().length() - 1).replaceFirst(QUOTE_STRING, "");
+
+                        if (parsedMinVal.compareTo(userMinVal) > 0) {
+                            finalPredicateMinExp = left;
+                        }
+                        else {
+                            finalPredicateMinExp = parser.createExpression(QUOTE_STRING + parsedMinVal + QUOTE_STRING, new ParsingOptions());
+                        }
+                        if (parsedMaxVal.compareTo(userMaxVal) < 0) {
+                            finalPredicateMaxExp = right;
+                        }
+                        else {
+                            finalPredicateMaxExp = parser.createExpression(QUOTE_STRING + parsedMaxVal + QUOTE_STRING, new ParsingOptions());
+                        }
+
+                        finalPredicate = new BetweenPredicate(betweenPredicateValue, finalPredicateMinExp, finalPredicateMaxExp);
                         break;
                     }
                     default: {
-                        finalPredicate = new BetweenPredicate(betweenPredicate.getValue(), parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(),
-                                new ParsingOptions()), parser.createExpression(rowBufferItems.get(INDEX_AT_MAX_POSITION).toString(),
-                                new ParsingOptions()));
+                        int parsedMinVal = Integer.parseInt(minItem);
+                        int parsedMaxVal = Integer.parseInt(maxItem);
+                        int userMinVal = Integer.parseInt(left.toString());
+                        int userMaxVal = Integer.parseInt(right.toString());
+
+                        if (parsedMinVal > userMinVal) {
+                            finalPredicateMinExp = left;
+                        }
+                        else {
+                            finalPredicateMinExp = parser.createExpression(rowBufferItems.get(INDEX_AT_MIN_POSITION).toString(), new ParsingOptions());
+                        }
+                        if (parsedMaxVal < userMaxVal) {
+                            finalPredicateMaxExp = right;
+                        }
+                        else {
+                            finalPredicateMaxExp = parser.createExpression(rowBufferItems.get(INDEX_AT_MAX_POSITION).toString(), new ParsingOptions());
+                        }
+
+                        finalPredicate = new BetweenPredicate(betweenPredicateValue, finalPredicateMinExp, finalPredicateMaxExp);
                         break;
                     }
                 }
