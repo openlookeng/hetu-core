@@ -172,12 +172,18 @@ public abstract class BasePostgreSqlClient
                 new String[] {"TABLE", "VIEW", "MATERIALIZED VIEW", "FOREIGN TABLE"});
     }
 
+    protected ResultSet optimizedGetColumns(Connection connection, JdbcTableHandle tableHandle)
+            throws SQLException
+    {
+        return getColumns(tableHandle, connection.getMetaData());
+    }
+
     @Override
     public List<JdbcColumnHandle> getColumns(ConnectorSession session, JdbcTableHandle tableHandle)
     {
         try (Connection connection = connectionFactory.openConnection(JdbcIdentity.from(session))) {
             Map<String, Integer> arrayColumnDimensions = getArrayColumnDimensions(connection, tableHandle);
-            try (ResultSet resultSet = getColumns(tableHandle, connection.getMetaData())) {
+            try (ResultSet resultSet = optimizedGetColumns(connection, tableHandle)) {
                 List<JdbcColumnHandle> columns = new ArrayList<>();
                 while (resultSet.next()) {
                     String columnName = resultSet.getString("COLUMN_NAME");
