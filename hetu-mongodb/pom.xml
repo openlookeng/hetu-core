@@ -166,7 +166,18 @@
                     <groupId>net.java.dev.jna</groupId>
                     <artifactId>jna</artifactId>
                 </exclusion>
+                <exclusion>
+                    <artifactId>commons-compress</artifactId>
+                    <groupId>org.apache.commons</groupId>
+                </exclusion>
             </exclusions>
+        </dependency>
+
+        <dependency>
+            <artifactId>commons-compress</artifactId>
+            <groupId>org.apache.commons</groupId>
+            <version>1.21</version>
+            <scope>runtime</scope>
         </dependency>
 
         <dependency>
