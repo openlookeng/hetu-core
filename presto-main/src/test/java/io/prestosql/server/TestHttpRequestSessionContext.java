@@ -15,6 +15,7 @@ package io.prestosql.server;
 
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.security.SelectedRole;
 import org.testng.annotations.Test;
@@ -69,7 +70,7 @@ public class TestHttpRequestSessionContext
                         .build(),
                 "testRemote");
 
-        HttpRequestSessionContext context = new HttpRequestSessionContext(request);
+        HttpRequestSessionContext context = new HttpRequestSessionContext(request, user -> ImmutableSet.of(user));
         assertEquals(context.getSource(), "testSource");
         assertEquals(context.getCatalog(), "testCatalog");
         assertEquals(context.getSchema(), "testSchema");
@@ -89,6 +90,7 @@ public class TestHttpRequestSessionContext
                 "bar_connector", new SelectedRole(SelectedRole.Type.NONE, Optional.empty()),
                 "foobar_connector", new SelectedRole(SelectedRole.Type.ROLE, Optional.of("role"))));
         assertEquals(context.getIdentity().getExtraCredentials(), ImmutableMap.of("test.token.foo", "bar", "test.token.abc", "xyz"));
+        assertEquals(context.getIdentity().getGroups(), ImmutableSet.of("testUser"));
     }
 
     @Test
@@ -97,22 +99,22 @@ public class TestHttpRequestSessionContext
         MockHttpServletRequest servletRequest = new MockHttpServletRequest(
                 ImmutableListMultimap.of(PRESTO_USER, "testUser"),
                 "testRemote");
-        HttpRequestSessionContext context = new HttpRequestSessionContext(servletRequest);
-        assertEquals(context.getIdentity(), new Identity("testUser", Optional.empty()));
+        HttpRequestSessionContext context = new HttpRequestSessionContext(servletRequest, user -> ImmutableSet.of(user));
+        assertEquals(context.getIdentity(), Identity.forUser("testUser").withGroups(ImmutableSet.of("testUser")).build());
 
         servletRequest = new MockHttpServletRequest(ImmutableListMultimap.of(), "testRemote");
         servletRequest.setAttribute(PRESTO_USER, "mappedUser");
-        context = new HttpRequestSessionContext(servletRequest);
-        assertEquals(context.getIdentity(), new Identity("mappedUser", Optional.empty()));
+        context = new HttpRequestSessionContext(servletRequest, user -> ImmutableSet.of(user));
+        assertEquals(context.getIdentity(), Identity.forUser("mappedUser").withGroups(ImmutableSet.of("mappedUser")).build());
 
         servletRequest = new MockHttpServletRequest(
                 ImmutableListMultimap.of(PRESTO_USER, "testUser"),
                 "testRemote");
         servletRequest.setAttribute(PRESTO_USER, "mappedUser");
-        context = new HttpRequestSessionContext(servletRequest);
-        assertEquals(context.getIdentity(), new Identity("testUser", Optional.empty()));
+        context = new HttpRequestSessionContext(servletRequest, user -> ImmutableSet.of(user));
+        assertEquals(context.getIdentity(), Identity.forUser("testUser").withGroups(ImmutableSet.of("testUser")).build());
 
-        assertThatThrownBy(() -> new HttpRequestSessionContext(new MockHttpServletRequest(ImmutableListMultimap.of(), "testRemote")))
+        assertThatThrownBy(() -> new HttpRequestSessionContext(new MockHttpServletRequest(ImmutableListMultimap.of(), "testRemote"), user -> ImmutableSet.of()))
                 .isInstanceOf(WebApplicationException.class)
                 .matches(e -> ((WebApplicationException) e).getResponse().getStatus() == 400);
     }
@@ -133,6 +135,6 @@ public class TestHttpRequestSessionContext
                         .put(PRESTO_PREPARED_STATEMENT, "query1=abcdefg")
                         .build(),
                 "testRemote");
-        new HttpRequestSessionContext(request);
+        new HttpRequestSessionContext(request, user -> ImmutableSet.of());
     }
 }

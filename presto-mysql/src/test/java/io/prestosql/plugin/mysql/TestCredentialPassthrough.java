@@ -27,6 +27,7 @@ import java.util.Optional;
 import static io.airlift.testing.Closeables.closeAllSuppress;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static java.lang.String.format;
+import static java.util.Collections.emptySet;
 
 public class TestCredentialPassthrough
 {
@@ -75,7 +76,7 @@ public class TestCredentialPassthrough
         return testSessionBuilder()
                 .setCatalog("mysql")
                 .setSchema(TEST_SCHEMA)
-                .setIdentity(new Identity(mySqlServer.getUser(), Optional.empty(), ImmutableMap.of(), extraCredentials))
+                .setIdentity(new Identity(mySqlServer.getUser(), emptySet(), Optional.empty(), ImmutableMap.of(), extraCredentials))
                 .build();
     }
 

@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableSet;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session.ResourceEstimateBuilder;
+import io.prestosql.spi.security.GroupProvider;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.security.SelectedRole;
 import io.prestosql.spi.session.ResourceEstimates;
@@ -101,7 +102,7 @@ public final class HttpRequestSessionContext
     private final boolean clientTransactionSupport;
     private final String clientInfo;
 
-    public HttpRequestSessionContext(HttpServletRequest servletRequest)
+    public HttpRequestSessionContext(HttpServletRequest servletRequest, GroupProvider groupProvider)
             throws WebApplicationException
     {
         catalog = trimEmptyToNull(servletRequest.getHeader(PRESTO_CATALOG));
@@ -113,6 +114,7 @@ public final class HttpRequestSessionContext
         if (authenticatedUser != null) {
             authenticatedIdentity = Optional.of(new Identity(
                     authenticatedUser,
+                    groupProvider.getGroups(authenticatedUser),
                     Optional.ofNullable(servletRequest.getUserPrincipal()),
                     parseRoleHeaders(servletRequest),
                     parseExtraCredentials(servletRequest)));
@@ -128,6 +130,7 @@ public final class HttpRequestSessionContext
         assertRequest(user != null, "User must be set");
         identity = new Identity(
                 user,
+                groupProvider.getGroups(user),
                 Optional.ofNullable(servletRequest.getUserPrincipal()),
                 parseRoleHeaders(servletRequest),
                 parseExtraCredentials(servletRequest));

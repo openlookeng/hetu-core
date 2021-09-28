@@ -19,6 +19,7 @@ import io.prestosql.queryeditorui.store.files.ExpiringFileStore;
 import io.prestosql.security.AccessControl;
 import io.prestosql.security.AccessControlUtil;
 import io.prestosql.server.ServerConfig;
+import io.prestosql.spi.security.GroupProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,13 +51,15 @@ public class ResultsPreviewResource
     private final ExpiringFileStore fileStore;
     private final AccessControl accessControl;
     private final ServerConfig serverConfig;
+    private final GroupProvider groupProvider;
 
     @Inject
-    public ResultsPreviewResource(ExpiringFileStore fileStore, AccessControl accessControl, ServerConfig serverConfig)
+    public ResultsPreviewResource(ExpiringFileStore fileStore, AccessControl accessControl, ServerConfig serverConfig, GroupProvider groupProvider)
     {
         this.fileStore = fileStore;
         this.accessControl = accessControl;
         this.serverConfig = serverConfig;
+        this.groupProvider = groupProvider;
     }
 
     @GET
@@ -69,7 +72,7 @@ public class ResultsPreviewResource
             @Context HttpServletRequest servletRequest)
     {
         // if the user is admin, don't filter results by user.
-        Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest);
+        Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest, groupProvider);
 
         return getFilePreview(fileURI, pageNum, pageSize, filterUser);
     }

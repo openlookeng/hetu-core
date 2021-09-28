@@ -29,6 +29,7 @@ import io.prestosql.metadata.MetadataManager;
 import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.queryeditorui.store.connectors.ConnectorCache;
 import io.prestosql.security.AccessControlManager;
+import io.prestosql.security.GroupProviderManager;
 import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.server.security.PasswordAuthenticatorManager;
 import io.prestosql.spi.Plugin;
@@ -43,6 +44,7 @@ import io.prestosql.spi.function.SqlFunction;
 import io.prestosql.spi.heuristicindex.IndexFactory;
 import io.prestosql.spi.metastore.HetuMetaStoreFactory;
 import io.prestosql.spi.resourcegroups.ResourceGroupConfigurationManagerFactory;
+import io.prestosql.spi.security.GroupProviderFactory;
 import io.prestosql.spi.security.PasswordAuthenticatorFactory;
 import io.prestosql.spi.security.SystemAccessControlFactory;
 import io.prestosql.spi.seedstore.SeedStoreFactory;
@@ -100,6 +102,7 @@ public class PluginManager
     private final AccessControlManager accessControlManager;
     private final PasswordAuthenticatorManager passwordAuthenticatorManager;
     private final EventListenerManager eventListenerManager;
+    private final GroupProviderManager groupProviderManager;
     private final CubeManager cubeManager;
     private final StateStoreProvider localStateStoreProvider;
     private final StateStoreLauncher stateStoreLauncher;
@@ -125,6 +128,7 @@ public class PluginManager
             AccessControlManager accessControlManager,
             PasswordAuthenticatorManager passwordAuthenticatorManager,
             EventListenerManager eventListenerManager,
+            GroupProviderManager groupProviderManager,
             CubeManager cubeManager,
             StateStoreProvider localStateStoreProvider, // StateStoreProvider
             StateStoreLauncher stateStoreLauncher,
@@ -154,6 +158,7 @@ public class PluginManager
         this.accessControlManager = requireNonNull(accessControlManager, "accessControlManager is null");
         this.passwordAuthenticatorManager = requireNonNull(passwordAuthenticatorManager, "passwordAuthenticatorManager is null");
         this.eventListenerManager = requireNonNull(eventListenerManager, "eventListenerManager is null");
+        this.groupProviderManager = requireNonNull(groupProviderManager, "groupProviderManager is null");
         this.cubeManager = requireNonNull(cubeManager, "cubeManager is null");
         // LocalStateProvider
         this.localStateStoreProvider = requireNonNull(localStateStoreProvider, "stateStoreManager is null");
@@ -296,6 +301,11 @@ public class PluginManager
         for (EventListenerFactory eventListenerFactory : plugin.getEventListenerFactories()) {
             log.info("Registering event listener %s", eventListenerFactory.getName());
             eventListenerManager.addEventListenerFactory(eventListenerFactory);
+        }
+
+        for (GroupProviderFactory groupProviderFactory : plugin.getGroupProviderFactories()) {
+            log.info("Registering group provider %s", groupProviderFactory.getName());
+            groupProviderManager.addGroupProviderFactory(groupProviderFactory);
         }
 
         // Install StateStorePlugin

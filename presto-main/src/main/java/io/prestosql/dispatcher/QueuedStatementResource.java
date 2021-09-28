@@ -31,6 +31,7 @@ import io.prestosql.server.NodeStateChangeHandler;
 import io.prestosql.server.SessionContext;
 import io.prestosql.spi.ErrorCode;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.security.GroupProvider;
 import io.prestosql.sql.analyzer.SemanticErrorCode;
 
 import javax.annotation.PreDestroy;
@@ -103,17 +104,20 @@ public class QueuedStatementResource
 
     private final ConcurrentMap<QueryId, Query> queries = new ConcurrentHashMap<>();
     private final ScheduledExecutorService queryPurger = newSingleThreadScheduledExecutor(threadsNamed("dispatch-query-purger"));
+    private final GroupProvider groupProvider;
 
     @Inject
     public QueuedStatementResource(
             DispatchManager dispatchManager,
             NodeStateChangeHandler nodeStateChangeHandler,
-            DispatchExecutor executor)
+            DispatchExecutor executor,
+            GroupProvider groupProvider)
     {
         this.dispatchManager = requireNonNull(dispatchManager, "dispatchManager is null");
         this.nodeStateChangeHandler = requireNonNull(nodeStateChangeHandler, "nodeStateChangeHandler is null");
         this.responseExecutor = requireNonNull(executor, "responseExecutor is null").getExecutor();
         this.timeoutExecutor = requireNonNull(executor, "timeoutExecutor is null").getScheduledExecutor();
+        this.groupProvider = requireNonNull(groupProvider, "groupProvider is null");
 
         queryPurger.scheduleWithFixedDelay(
                 () -> {
@@ -164,7 +168,7 @@ public class QueuedStatementResource
             throw badRequest(SERVICE_UNAVAILABLE, "This coordinator is not active so can not accept queries");
         }
 
-        SessionContext sessionContext = new HttpRequestSessionContext(servletRequest);
+        SessionContext sessionContext = new HttpRequestSessionContext(servletRequest, groupProvider);
         Query query = new Query(statement, sessionContext, dispatchManager);
         queries.put(query.getQueryId(), query);
 
