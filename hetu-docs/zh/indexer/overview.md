@@ -161,9 +161,8 @@ and [Properties](../admin/properties.md).
 
 要创建索引, 在命令行中输入：
 
-    CREATE INDEX index_name USING bloom ON table1 (column);
-    CREATE INDEX index_name USING bloom ON table1 (column) WITH ("autoload" = false);
-    
+    CREATE INDEX index_name USING bloom ON table1 (id);
+
 ### 4. 运行语句
 
 完成上面的操作后，再次在Hetu服务器运行这个语句，服务器将在后台自动加载索引。接下来的语句将会从中获得性能提升。
