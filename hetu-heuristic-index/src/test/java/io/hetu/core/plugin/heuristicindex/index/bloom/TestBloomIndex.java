@@ -55,9 +55,11 @@ import static org.testng.Assert.assertTrue;
 public class TestBloomIndex
 {
     @Test
-    public void testGetId()
+    public void testGetId() throws IOException
     {
-        assertEquals("BLOOM", new BloomIndex().getId());
+        try (BloomIndex index = new BloomIndex()) {
+            assertEquals("BLOOM", index.getId());
+        }
     }
 
     @Test
