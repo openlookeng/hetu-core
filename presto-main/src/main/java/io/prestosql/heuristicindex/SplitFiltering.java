@@ -310,14 +310,22 @@ public class SplitFiltering
             for (Map.Entry<String, List<Split>> entry : partitionSplitMap.entrySet()) {
                 String partitionKey = entry.getKey();
 
-                if (!indexMaxLastUpdated.containsKey(partitionKey) // the partition is not indexed by its own partition's index
-                        && indexMaxLastUpdated.size() != 1 // or a table-level index)
-                        && !indexMaxLastUpdated.containsKey(TABLE_LEVEL_KEY)) {
+                // the partition is indexed by its own partition's index
+                boolean partitionHasOwnIndex = indexMaxLastUpdated.containsKey(partitionKey);
+                // the partition is covered by a table-level index
+                boolean partitionHasTableLevelIndex = indexMaxLastUpdated.size() == 1 && indexMaxLastUpdated.containsKey(TABLE_LEVEL_KEY);
+
+                if (!partitionHasOwnIndex && !partitionHasTableLevelIndex) {
                     filteredSplits.addAll(entry.getValue());
                 }
                 else {
-                    long indexLastModifiedTimeOfThisPartition = indexMaxLastUpdated.size() == 1 && indexMaxLastUpdated.containsKey(TABLE_LEVEL_KEY) ?
-                            indexMaxLastUpdated.get(TABLE_LEVEL_KEY) : indexMaxLastUpdated.get(partitionKey);
+                    long indexLastModifiedTimeOfThisPartition;
+                    if (partitionHasOwnIndex) {
+                        indexLastModifiedTimeOfThisPartition = indexMaxLastUpdated.get(partitionKey);
+                    }
+                    else {
+                        indexLastModifiedTimeOfThisPartition = indexMaxLastUpdated.get(TABLE_LEVEL_KEY);
+                    }
 
                     for (Split split : entry.getValue()) {
                         String filePathStr = new URI(split.getConnectorSplit().getFilePath()).getPath();
