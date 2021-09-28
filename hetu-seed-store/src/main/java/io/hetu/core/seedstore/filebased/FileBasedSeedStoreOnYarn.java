@@ -74,15 +74,15 @@ public class FileBasedSeedStoreOnYarn
         try {
             seedFileFolder = Paths.get(config.getOrDefault(FileBasedSeedConstants.SEED_STORE_FILESYSTEM_DIR, FileBasedSeedConstants.SEED_STORE_FILESYSTEM_DIR_DEFAULT_VALUE).trim());
 
-            checkArgument(!seedFilePath.toString().contains("../"),
+            checkArgument(!seedFileFolder.toString().contains("../"),
                     "SeedStore directory path must be absolute and at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
-            checkArgument(SecurePathWhiteList.isSecurePath(seedFilePath.toString()),
+            checkArgument(SecurePathWhiteList.isSecurePath(seedFileFolder.toString()),
                     "SeedStore directory path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
 
             seedFilePath = seedFileFolder.resolve(name).resolve(FileBasedSeedConstants.ON_YARN_SEED_FILE_NAME);
-            checkArgument(!seedFileFolder.toString().contains("../"),
+            checkArgument(!seedFilePath.toString().contains("../"),
                     "Seed file path must be absolute and at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
-            checkArgument(SecurePathWhiteList.isSecurePath(seedFileFolder.toString()),
+            checkArgument(SecurePathWhiteList.isSecurePath(seedFilePath.toString()),
                     "Seed file path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
         }
         catch (IOException e) {
@@ -155,7 +155,12 @@ public class FileBasedSeedStoreOnYarn
             throws IOException
     {
         LOG.debug("FileBasedOnYarnSeedStore::remove() invoked.");
-        Lock lock = new FileBasedLock(fs, seedFileFolder.resolve(name));
+        Path lockPath = seedFileFolder.resolve(name);
+        checkArgument(!lockPath.toString().contains("../"),
+                "Lock path must be absolute and at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        checkArgument(SecurePathWhiteList.isSecurePath(lockPath.toString()),
+                "Lock path must be at user workspace " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        Lock lock = new FileBasedLock(fs, lockPath);
         try {
             lock.lock();
             Set<Seed> outputs = new HashSet<>();

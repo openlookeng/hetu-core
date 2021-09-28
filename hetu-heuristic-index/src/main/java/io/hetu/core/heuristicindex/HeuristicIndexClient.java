@@ -461,6 +461,13 @@ public class HeuristicIndexClient
     {
         IndexRecord referenceRecord = indexRecordManager.lookUpIndexRecord(name);
         Path pathToIndex = Paths.get(root.toString(), referenceRecord.qualifiedTable, referenceRecord.columns[0], referenceRecord.indexType);
+
+        // check required for security scan since we are constructing a path using input
+        checkArgument(!pathToIndex.toString().contains("../"),
+                pathToIndex + " must be absolute and under one of the following whitelisted directories:  " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+        checkArgument(SecurePathWhiteList.isSecurePath(pathToIndex),
+                pathToIndex + " must be under one of the following whitelisted directories: " + SecurePathWhiteList.getSecurePathWhiteList().toString());
+
         return getDirectorySize(pathToIndex);
     }
 

@@ -298,7 +298,8 @@ public class ClickHouseClient
                 handle.getSchemaTableName().getTableName());
 
         try (Connection connection = connectionFactory.openConnection(JdbcIdentity.from(session));
-                ResultSet resultSet = getPreparedStatement(connection, sql).executeQuery()) {
+                PreparedStatement preparedStatement = getPreparedStatement(connection, sql)) {
+            ResultSet resultSet = preparedStatement.executeQuery();
             if (resultSet.next()) {
                 String updateTime = resultSet.getString("modified_time");
                 SimpleDateFormat parser = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
