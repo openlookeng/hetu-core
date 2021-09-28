@@ -161,11 +161,15 @@ and [Properties](../admin/properties.md).
 
 要创建索引, 在命令行中输入：
 
-    CREATE INDEX index_name USING bloom ON table1 (id);
+      CREATE INDEX index_name USING bloom ON table1 (id);
 
 ### 4. 运行语句
 
-完成上面的操作后，再次在Hetu服务器运行这个语句，服务器将在后台自动加载索引。接下来的语句将会从中获得性能提升。
+创建索引后，它将自动加载到Coordinator缓存中。
+未来的查询将利用索引来减少读取的数据量并且查询性能将得到提高。
+
+      # 再次运行相同的查询现在应该会导致更少的拆分和改进的性能
+      SELECT * FROM hive.schema.table1 WHERE id="abcd1234";
 
 ## 索引配置属性
 
@@ -180,7 +184,42 @@ and [Properties](../admin/properties.md).
 | hetu.heuristicindex.indexstore.uri                  | /opt/hetu/indices/  | 否    | 所有索引文件存储的目录|
 | hetu.heuristicindex.indexstore.filesystem.profile   | local-config-default| 否    | 用于存储索引文件的文件系统属性描述文件名称|
 | hetu.heuristicindex.filter.cache.preload-indices    |                     | 否    | 在服务器启动时预加载指定名称的索引(用逗号分隔), 当值为`ALL`时将预载入全部索引|
-| hetu.heuristicindex.filter.cache.autoload-default   | true                | 否    | 自动加载索引的默认值。要更改特定索引的值，请通过在 create index 语句 WITH ("autoload" = true/false) 设置|
+| hetu.heuristicindex.filter.cache.autoload-default   | true                | 否    | Coordinator上自动加载索引的默认值。要更改特定索引的值，请通过在 create index 语句 WITH ("autoload" = true/false) 设置|
+
+**关于`hetu.heuristicindex.filter.cache.autoload-default`的更多细节：**
+
+自动加载仅影响Coordinator上使用的索引，例如 MinMax、Bloom 和 BTree 索引。
+Worker上使用的索引，例如 Bitmap索引，将在查询被执行时按需加载。
+
+建议保持启用自动加载。
+
+启用自动加载设置后，索引将在创建后（延迟约 5 秒）加载到Coordinator缓存中 。
+当索引加载到Coordinator缓存中时，它将在用户运行查询时被使用。
+
+例如：
+
+      CREATE INDEX idx USING bloom ON table1 (id);
+      # 创建后，索引将自动加载到coordinator缓存中 
+
+      # 运行此查询将利用索引
+      SELECT * FROM hive.schema.table1 WHERE id="abcd1234";
+
+禁用自动加载设置时，索引创建后不会自动加载到Coordinator缓存中。
+相反，它将在用户运行查询时按需加载。
+以后的查询将使用该索引。
+
+例如：
+
+      CREATE INDEX idx USING bloom ON table1 (id) WITH ("autoload" = false);
+      # 创建后，索引不会自动加载到coordinator缓存中
+    
+      # 运行一次查询将触发索引加载 
+      SELECT * FROM hive.schema.table1 WHERE id="abcd1234";
+      # 索引将开始在后台加载 
+    
+      # 现在运行相同的查询将使用索引
+      SELECT * FROM hive.schema.table1 WHERE id="abcd1234";
+
 ## 索引语句
 
 参见 [Heuristic Index Statements](./hindex-statements.md).
