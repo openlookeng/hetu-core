@@ -53,9 +53,9 @@ BTreeIndex用于调度时的分片(Split)过滤，被coordinator节点使用。
 **创建索引:**
 
 ```sql
-create index idx using btree on hive.hindex.orders (orderid) with (level=table)';
-create index idx using btree on hive.hindex.orders (orderid) with (level=partition) where orderDate='01-10-2020';
-create index idx using btree on hive.hindex.orders (orderid) with (level=partition) where orderDate in ('01-10-2020', '01-10-2020');
+create index idx using btree on hive.hindex.orders (orderid)';
+create index idx using btree on hive.hindex.orders (orderid) where orderDate='01-10-2020';
+create index idx using btree on hive.hindex.orders (orderid) where orderDate in ('01-10-2020', '01-10-2020');
 ```
 
 * 假设表已按照`orderDate`列分区

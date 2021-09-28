@@ -163,16 +163,16 @@ when scanning table1.
 
 To create index run the following statement:
 
-    CREATE INDEX index_name USING bloom ON table1 (column);
-    CREATE INDEX index_name USING bloom ON table1 (column) WITH ("autoload" = false);
-    
-**Note:**   Index for decimal type columns is not supported currently. For more details follow the [issue](https://gitee.com/openlookeng/hetu-core/issues/I2AMH0?from=project-issue)
+    CREATE INDEX index_name USING bloom ON table1 (id);
+
 ### 4. Run query
 
-After index is created, run the query; index will start loading in the background. 
-Subsequent queries will utilize the index to reduce the amount of data read
- and query performance will be improved.
+After index is created, it will autoload into coordinator cache.
+Future queries will utilize the index to reduce the amount of data read
+and query performance will be improved.
 
+    # running the same query again should now result in fewer splits and improved performance
+    SELECT * FROM hive.schema.table1 WHERE id="abcd1234";
 
 ## Configuration Properties
 
@@ -186,7 +186,45 @@ Subsequent queries will utilize the index to reduce the amount of data read
 | hetu.heuristicindex.filter.cache.loading-delay     | 10s                 | No      | The delay to wait before async loading task starts to load index cache from indexstore|
 | hetu.heuristicindex.indexstore.uri                 | /opt/hetu/indices/  | No      | Directory under which all index files are stored|
 | hetu.heuristicindex.indexstore.filesystem.profile  | local-config-default| No      | This property defines the filesystem profile used to read and write index|
-| hetu.heuristicindex.filter.cache.autoload-default  | true                | No      | The default value for autoloading indices. To change the value for a specifc index, set by WITH ("autoload" = true/false) in the create index statement|
+| hetu.heuristicindex.filter.cache.autoload-default  | true                | No      | The default value for autoloading indices on the coordinator. To change the value for a specific index, set by WITH ("autoload" = true/false) in the create index statement|
+
+**More details on `hetu.heuristicindex.filter.cache.autoload-default`:**
+
+Autoloading only effects indexes used on the coordinator, e.g. MinMax, Bloom and BTree Index.
+Indexes used on the workers, e.g. Bitmap Index, will be loaded on-demand as queries
+are executed. 
+
+It is recommended to keep autoload enabled.
+
+When the autoload setting is enabled, the index will be loaded into the coordinator
+cache after creation (with a delay of ~5 seconds).
+As the index is loaded into the coordinator cache, it will be utilized when user 
+runs queries that can benefit from the index.
+
+For example:
+
+    CREATE INDEX idx USING bloom ON table1 (id);
+    # after creation, index will autoload into coordinator cache
+
+    # running this query will utilize the index
+    SELECT * FROM hive.schema.table1 WHERE id="abcd1234";
+
+When the autoload setting is disabled, the index will not be loaded into the coordinator
+cache automatically after creation.
+Instead, it will be loaded on-demand as the user runs queries that can benefit from the index.
+Future queries will then utilize the index.
+
+For example:
+
+    CREATE INDEX idx USING bloom ON table1 (id) WITH ("autoload" = false);
+    # after creation, index will NOT autoload into coordinator cache
+    
+    # running the query once will trigger the index loading
+    SELECT * FROM hive.schema.table1 WHERE id="abcd1234";
+    # index will now begin to load in the background
+    
+    # running the same query will now utilize the index
+    SELECT * FROM hive.schema.table1 WHERE id="abcd1234";
 
 ## Index Statements
 
