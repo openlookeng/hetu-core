@@ -55,6 +55,8 @@ If you used a different name for your catalog properties file, use that catalog 
 
 > - The `use-connection-pool` configuration is not supported.
 
+> - Setting `opengauss.metadata.speedup=true` in catalog properties file can speed up DatabaseMetaData access, its default value is false.
+
 *If the subsequent version of openGuass supports the above restriction, we will make corresponding adaptation.*
 
 openGauss Connector Limitations

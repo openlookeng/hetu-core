@@ -14,16 +14,17 @@
 
 package io.hetu.core.plugin.opengauss;
 
+import io.airlift.log.Logger;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.ColumnMapping;
 import io.prestosql.plugin.jdbc.ConnectionFactory;
 import io.prestosql.plugin.jdbc.JdbcIdentity;
 import io.prestosql.plugin.jdbc.JdbcSplit;
+import io.prestosql.plugin.jdbc.JdbcTableHandle;
 import io.prestosql.plugin.jdbc.JdbcTypeHandle;
 import io.prestosql.plugin.jdbc.SliceWriteFunction;
 import io.prestosql.plugin.jdbc.WriteMapping;
 import io.prestosql.plugin.postgresql.BasePostgreSqlClient;
-import io.prestosql.plugin.postgresql.PostgreSqlConfig;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.type.ArrayType;
@@ -32,13 +33,16 @@ import io.prestosql.spi.type.TinyintType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.VarcharType;
+import org.joda.time.DateTime;
 import org.postgresql.util.PGobject;
 
 import javax.inject.Inject;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.util.Locale;
 import java.util.Optional;
 
 import static io.airlift.slice.Slices.utf8Slice;
@@ -56,11 +60,16 @@ import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 public class OpenGaussClient
         extends BasePostgreSqlClient
 {
+    private static final Logger log = Logger.get(OpenGaussClient.class);
+
+    private boolean metaDataSpeedup;
+
     @Inject
-    public OpenGaussClient(BaseJdbcConfig config, PostgreSqlConfig postgresqlConfig,
-                           ConnectionFactory connectionFactory, TypeManager typeManager)
+    public OpenGaussClient(BaseJdbcConfig config, OpenGaussClientConfig openGaussConfig,
+            ConnectionFactory connectionFactory, TypeManager typeManager)
     {
-        super(config, postgresqlConfig, connectionFactory, typeManager);
+        super(config, openGaussConfig, connectionFactory, typeManager);
+        this.metaDataSpeedup = openGaussConfig.getMetaDataSpeedup();
     }
 
     @Override
@@ -175,5 +184,58 @@ public class OpenGaussClient
             pgObject.setValue(value.toStringUtf8());
             statement.setObject(index, pgObject);
         };
+    }
+
+    @Override
+    protected ResultSet optimizedGetColumns(Connection connection, JdbcTableHandle tableHandle)
+            throws SQLException
+    {
+        ResultSet resultSet;
+        String nestLoopConfig = "off";
+        String hashjoinConfig = "on";
+        String indexNestLoopConfig = "off";
+        String resumeConfig;
+        DateTime start;
+
+        start = DateTime.now();
+        if (!metaDataSpeedup) {
+            resultSet = getColumns(tableHandle, connection.getMetaData());
+            log.debug("Get table(%s) columns spend %s ms", tableHandle.getSchemaTableName(), DateTime.now().getMillis() - start.getMillis());
+            return resultSet;
+        }
+
+        resultSet = connection.prepareStatement("show enable_nestloop;").executeQuery();
+        if (resultSet.next()) {
+            nestLoopConfig = resultSet.getString(1).toLowerCase(Locale.ENGLISH);
+        }
+        resultSet.close();
+
+        resultSet = connection.prepareStatement("show enable_index_nestloop;").executeQuery();
+        if (resultSet.next()) {
+            indexNestLoopConfig = resultSet.getString(1).toLowerCase(Locale.ENGLISH);
+        }
+        resultSet.close();
+
+        if (nestLoopConfig.equals("on") && indexNestLoopConfig.equals("on")) {
+            resultSet = getColumns(tableHandle, connection.getMetaData());
+            log.debug("Get table(%s) columns spend %s ms", tableHandle.getSchemaTableName(), DateTime.now().getMillis() - start.getMillis());
+            return resultSet;
+        }
+
+        resultSet = connection.prepareStatement("show enable_hashjoin;").executeQuery();
+        if (resultSet.next()) {
+            hashjoinConfig = resultSet.getString(1).toLowerCase(Locale.ENGLISH);
+        }
+        resultSet.close();
+
+        connection.prepareStatement("set enable_nestloop=on;set enable_index_nestloop=on;").execute();
+        resultSet = getColumns(tableHandle, connection.getMetaData());
+        resumeConfig = "set enable_hashjoin=" + (hashjoinConfig.equals("on") ? "on" : "off") + ";"
+                + "set enable_nestloop=" + (nestLoopConfig.equals("on") ? "on" : "off") + ";"
+                + "set enable_index_nestloop=" + (indexNestLoopConfig.equals("on") ? "on" : "off") + ";";
+        connection.prepareStatement(resumeConfig).execute();
+        log.debug("Get table(%s) columns spend %s ms", tableHandle.getSchemaTableName(), DateTime.now().getMillis() - start.getMillis());
+
+        return resultSet;
     }
 }

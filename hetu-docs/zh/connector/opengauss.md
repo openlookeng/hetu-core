@@ -51,6 +51,8 @@ openGauss连接器为每个openGauss模式提供一个模式。可通过执行`S
 
 > - 不支持配置`use-connection-pool`。
 
+> - 在目录属性文件设置`opengauss.metadata.speedup=true`可以用于加速DatabaseMetaData查询（缺省值为false）。
+
 *openGauss后续版本如果支持上述限制，我们会进行相应的适配。*
 
 ## openGauss连接器限制
