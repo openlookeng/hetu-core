@@ -19,6 +19,7 @@ Distributed snapshot is most useful for long running queries. It is disabled by 
 
 To be able to resume execution from a previously saved snapshot, there must be a sufficient number of workers available so that all previous tasks can be restored. To enable distributed snapshot for a query, the following is required:
 - at least 2 workers
+- at least 50% more available cluster-wide memory resources with tolerance for worker node failure. If constrained by memory, not all queries may be able to recover (see [I44RMW](https://e.gitee.com/open_lookeng/issues/list?issue=I44RMW))
 - at least 80% (rounded down) of previously available workers still active for the resume to be successful. If not enough workers are available, the query will not be able to
   resume from any previous snapshot, so the query reruns from the beginning.
 
@@ -46,7 +47,7 @@ Snapshot data is stored in a file system as specified using the `hetu.experiment
 
 Snapshot files are stored under `/tmp/hetu/snapshot/` folder of the file system. All workers must be authorized to read and write to this folder.
 
-Snapshots reflect states in query execution, potentially becoming very large in size and varying significantly from query to query. For example, queries that need to buffer large amounts of data (typically involving ordering, window, join, aggregation, etc. operations), may result in snapshots that include data from an entire table. Ensure that the shared file system has sufficient space available to save these snapshots before proceeding.
+Snapshots reflect states in query execution, potentially becoming very large in size and varying significantly from query to query. For example, queries that need to buffer large amounts of data (typically involving ordering, window, join, aggregation, etc. operations), may result in snapshots that include data from an entire table. Ensure that the cluster has enough memory to process the snapshots and the shared file system has sufficient disk space available to store these snapshots before proceeding.
 
 Each query execution may produce multiple snapshots. Contents of these snapshots may overlap. Currently they are stored as separate files. In the future, "incremental snapshots" feature may be introduced to save storage space.
 
