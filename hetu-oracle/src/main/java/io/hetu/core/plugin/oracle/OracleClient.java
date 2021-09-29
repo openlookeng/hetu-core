@@ -230,7 +230,9 @@ public class OracleClient
             @StatsCollecting ConnectionFactory connectionFactory)
     {
         // the empty "" is to not use a quote to create queries
-        super(config, "\"", connectionFactory);
+        //support both auto case trans between hetu to data source
+        //and mixed cases table attributes DDL in data source side
+        super(config.internalsetCaseInsensitiveNameMatching(true), "\"", connectionFactory);
         this.pushDownModule = config.getPushDownModule();
         this.numberDefaultScale = oracleConfig.getNumberDefaultScale();
         this.roundingMode = requireNonNull(oracleConfig.getRoundingMode(), "oracle rounding mode cannot be null");
