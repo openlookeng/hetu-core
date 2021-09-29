@@ -53,7 +53,7 @@ When selecting between BTreeIndex and BloomIndex, the following should be consid
 **Creating index:**
 
 ```sql
-create index idx using btree on hive.hindex.orders (orderid)';
+create index idx using btree on hive.hindex.orders (orderid);
 create index idx using btree on hive.hindex.orders (orderid) where orderDate='01-10-2020';
 create index idx using btree on hive.hindex.orders (orderid) where orderDate in ('01-10-2020', '01-10-2020');
 ```
