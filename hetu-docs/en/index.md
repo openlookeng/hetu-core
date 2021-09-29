@@ -62,7 +62,11 @@ headless: true
     - [BTree Index]({{< relref "./docs/indexer/btree.md" >}})
     - [HIndex Statements]({{< relref "./docs/indexer/hindex-statements.md" >}})
     - [New Index]({{< relref "./docs/indexer/new-index.md" >}})
-
+    - 
+- [Star Tree Cubes](#)
+    - [Overview] ({{< relref "./docs/preagg/overview.md" >}}>)
+    - [Statements] ({{< "./docs/preagg/statements.md" >}})
+  
 - [Connectors]({{< relref "./docs/connector/_index.md" >}})
     - [Carbondata]({{< relref "./docs/connector/carbondata.md" >}})
     - [ClickHouse]({{< relref "./docs/connector/clickhouse.md" >}})
@@ -132,7 +136,6 @@ headless: true
     - [CALL]({{< relref "./docs/sql/call.md" >}})
     - [COMMENT]({{< relref "./docs/sql/comment.md" >}})
     - [COMMIT]({{< relref "./docs/sql/commit.md" >}})
-    - [CREATE CUBE]({{< relref "./docs/sql/create-cube.md" >}})
     - [CREATE ROLE]({{< relref "./docs/sql/create-role.md" >}})
     - [CREATE SCHEMA]({{< relref "./docs/sql/create-schema.md" >}})
     - [CREATE TABLE]({{< relref "./docs/sql/create-table.md" >}})
@@ -144,7 +147,6 @@ headless: true
     - [DESCRIBE INPUT]({{< relref "./docs/sql/describe-input.md" >}})
     - [DESCRIBE OUTPUT]({{< relref "./docs/sql/describe-output.md" >}})
     - [DROP CACHE]({{< relref "./docs/sql/drop-cache.md" >}})
-    - [DROP CUBE]({{< relref "./docs/sql/drop-cube.md" >}})
     - [DROP ROLE]({{< relref "./docs/sql/drop-role.md" >}})
     - [DROP SCHEMA]({{< relref "./docs/sql/drop-schema.md" >}})
     - [DROP TABLE]({{< relref "./docs/sql/drop-table.md" >}})
@@ -206,7 +208,6 @@ headless: true
     - [Filesystem Access Utilities]({{< relref "./docs/develop/filesystem.md" >}})
     - [Hive ORC Cache]({{< relref "./docs/develop/hive-orc-cache.md" >}})
     - [External Function Registration and Push Down]({{< relref "./docs/develop/externalfunction-registration-pushdown.md" >}})
-    - [Star Tree Cube]({{< relref "./docs/develop/star-tree-cube.md" >}})
 
 - [openLooKeng REST API]({{< relref "./docs/rest/_index.md" >}})
     - [Node Resource]({{< relref "./docs/rest/node.md" >}})
