@@ -43,6 +43,7 @@ public class BaseJdbcConfig
     private String userCredentialName;
     private String passwordCredentialName;
     private boolean caseInsensitiveNameMatching;
+    private boolean caseInsensitiveNameMatchingConfigured;
     private Duration caseInsensitiveNameMatchingCacheTtl = new Duration(1, MINUTES);
     private boolean useConnectionPool;
     private int maxTotal = 50;
@@ -387,7 +388,27 @@ public class BaseJdbcConfig
     public BaseJdbcConfig setCaseInsensitiveNameMatching(boolean caseInsensitiveNameMatching)
     {
         this.caseInsensitiveNameMatching = caseInsensitiveNameMatching;
+        setCaseInsensitiveNameMatchingConfigured(true);
         return this;
+    }
+
+    public BaseJdbcConfig internalsetCaseInsensitiveNameMatching(boolean caseInsensitiveNameMatching)
+    {
+        if (!isCaseInsensitiveNameMatchingConfigured()) {
+            this.caseInsensitiveNameMatching = caseInsensitiveNameMatching;
+        }
+        return this;
+    }
+
+    public BaseJdbcConfig setCaseInsensitiveNameMatchingConfigured(boolean isConfigured)
+    {
+        this.caseInsensitiveNameMatchingConfigured = isConfigured;
+        return this;
+    }
+
+    public boolean isCaseInsensitiveNameMatchingConfigured()
+    {
+        return this.caseInsensitiveNameMatchingConfigured;
     }
 
     @NotNull
