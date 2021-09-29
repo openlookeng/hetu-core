@@ -153,7 +153,8 @@ MongoDB在`mongodb.schema-collection`指定的配置特殊集合上维护表格�
 **注意**
 
     插件无法检测到集合被删除。
-    需要在Mongo shell中通过db.getCollection("_schema").remove({ table: delete_table_name })删除集合。
+    需要在Mongo shell中通过以下命令删除集合。
+    db.getCollection("_schema").remove({ table: delete_table_name })
     或者通过使用openLooKeng运行DROP TABLE table_name来删除集合。
 
 schema中的集合由表的MongoDB文档组成。
