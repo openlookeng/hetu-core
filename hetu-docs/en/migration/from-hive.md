@@ -81,7 +81,7 @@ In particular, use `VARCHAR` instead of `STRING`.
 
 ## Use CAST when dividing integers
 
-openLooKeng follows the standard behavior of performing integer division when dividing two integers. For example, dividing `7` by `2` will result in `3`, not `3.5`. To perform floating point division on two integers, cast
+openLooKeng follows the standard behaviour of performing integer division when dividing two integers. For example, dividing `7` by `2` will result in `3`, not `3.5`. To perform floating point division on two integers, cast
 one of them to a double:
 
 ```sql
