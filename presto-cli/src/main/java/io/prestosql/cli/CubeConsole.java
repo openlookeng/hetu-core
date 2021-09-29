@@ -52,7 +52,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.cli.QueryPreprocessor.preprocessQuery;
 import static io.prestosql.client.ClientSession.stripTransactionId;
 
@@ -94,6 +97,7 @@ public class CubeConsole
     private static String resultInitCubeQuery;
     private List<List<?>> rowBufferIterationItems;
     private String cubeColumnDataType;
+    private static final String INPUT_REGEX = "[\\[\\]\"\'`\\\\<>%=!~*.]";
 
     List<String> supportedDataTypes = new ArrayList<>(Arrays.asList(DATATYPE_INTEGER, DATATYPE_TINYINT,
             DATATYPE_BIGINT, DATATYPE_SMALLINT, DATATYPE_DATE, DATATYPE_TIMESTAMP, DATATYPE_DOUBLE, DATATYPE_REAL, DATATYPE_VARCHAR));
@@ -641,7 +645,8 @@ public class CubeConsole
         Optional<Expression> expression = createCube.getWhere();
         if (expression.isPresent()) {
             ImmutableSet.Builder<Identifier> identifierBuilder = new ImmutableSet.Builder<>();
-            new DefaultExpressionTraversalVisitor<Void, ImmutableSet.Builder<Identifier>>() {
+            new DefaultExpressionTraversalVisitor<Void, ImmutableSet.Builder<Identifier>>()
+            {
                 @Override
                 protected Void visitIdentifier(Identifier node, ImmutableSet.Builder<Identifier> builder)
                 {
@@ -731,13 +736,25 @@ public class CubeConsole
                         supportedExpression = true;
                     }
 
+                    String catalogName;
+                    String tableName = sourceTableName.getSuffix();
                     String columnName = comparisonExpression.getLeft().toString();
                     String columnDataTypeQuery;
+
+                    checkArgument(tableName.matches("[\\p{Alnum}_]+"), "Invalid table name");
+                    if (hasInvalidSymbol(columnName)) {
+                        return false;
+                    }
+
                     if (queryRunner.getSession().getCatalog() != null) {
-                        columnDataTypeQuery = String.format(SELECT_DATA_TYPE_STRING, queryRunner.getSession().getCatalog(), sourceTableName.getSuffix(), columnName);
+                        catalogName = queryRunner.getSession().getCatalog();
+                        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+                        columnDataTypeQuery = String.format(SELECT_DATA_TYPE_STRING, catalogName, tableName, columnName);
                     }
                     else if (sourceTableName.getPrefix().isPresent() && sourceTableName.getPrefix().get().getPrefix().isPresent()) {
-                        columnDataTypeQuery = String.format(SELECT_DATA_TYPE_STRING, sourceTableName.getPrefix().get().getPrefix().get(), sourceTableName.getSuffix(), columnName);
+                        catalogName = sourceTableName.getPrefix().get().getPrefix().get().toString();
+                        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+                        columnDataTypeQuery = String.format(SELECT_DATA_TYPE_STRING, catalogName, tableName, columnName);
                     }
 
                     else {
@@ -907,5 +924,16 @@ public class CubeConsole
     public int getRowBufferListSize()
     {
         return rowBufferListSize;
+    }
+
+    private boolean hasInvalidSymbol(String sql)
+    {
+        if (sql == null) {
+            return false;
+        }
+
+        Pattern pattern = Pattern.compile(INPUT_REGEX);
+        Matcher matcher = pattern.matcher(sql);
+        return matcher.find();
     }
 }
