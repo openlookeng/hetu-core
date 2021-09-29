@@ -7,7 +7,7 @@ The VDM connector supports to:
 
 - Create, update and delete views that combines multiple catalogs
 - Visit real data through the views
-- Manage user previlege through the views
+- Manage user privilege through the views
 - Log the use of VDM views by each user
 
 ## Usage

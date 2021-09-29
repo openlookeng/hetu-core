@@ -1,5 +1,5 @@
 # State Store
-This section describes the openlookeng state store. State store is used to store states that are shared between state store members and state store clients.
+This section describes the openLooKeng state store. State store is used to store states that are shared between state store members and state store clients.
 
 State store cluster is composed of state store members, and state store clients can do all state store operations without being a member of cluster.
 
