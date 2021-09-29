@@ -4,6 +4,9 @@
 除了手动部署openLooKeng服务器外，还可以按照以下指导更快、更容易地完成部署。这个脚本对大多数Linux操作系统都很友好。但是，对于Ubuntu，需要手动安装以下依赖项。
 
 > sshpass1.06及以上版本
+~~~shell
+yum install sshpass
+~~~
 
 ## 在单个节点上部署openLooKeng
 
