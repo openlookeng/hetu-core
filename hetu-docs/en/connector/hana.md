@@ -5,18 +5,18 @@ Hana Connector
 Overview
 --------
 
-The Hana connector allows querying and creating tables on an external Hana database. This can be used to join data between different systems like Hana and Hive, or between two different Hana instances.
+The Hana connector allows querying and creating tables on an external Hana database. This can be used to join data between different systems such as Hana and Hive, or between two different Hana instances.
 
 Configurations
 --------------
 
 ### Basic configuration
 
-First of all, we should finish the following steps before you start to use hana connector.
+First of all, follow the steps before you start to use Hana connector:
 
 -   JDBC Connection details to connect to the SAP HANA
 
-It should be written in form of a regular openLooKeng connector config (eg. hana.properties for a openLooKeng catalog named hana). The file should contain the following contents, replacing the connection properties as appropriate for your setup.
+It should be written in form of a regular openLooKeng connector configuration (for example, **hana.properties** for a openLooKeng catalog named Hana). The file should contain the following contents, replacing the connection properties as appropriate for your setup.
 
 Base property setting: 
 
@@ -29,13 +29,13 @@ Base property setting:
 
 -   Adding SAP HANA Driver
 
-SAP HANA JDBC Driver is not available in common repositories, so you will need to download it from SAP HANA and install manually in your repository. The SAP HANA JDBC Driver (ngdbc.jar) may be installed as
-part of your SAP HANA client installation or you can download it from the SAP HANA office website. Once you have got the SAP HANA JDBC Driver, you can deploy the jdbc jar file to openLooKeng plugin folder on coordinator and worker nodes. For example, if the jdbc driver file is ngdbc.jar and openLooKeng plugin folder is /usr/lib/openlookeng/lib/plugin, use the following command to copy the library to the plugin folder. cp ngdbc.jar
-/usr/lib/openlookeng/lib/plugin/hana Restart the coordinator and worker processes and hana connector will work.
+If SAP HANA JDBC Driver is not available in common repositories, then you need to download it from SAP HANA office website and install in your repository manually. The SAP HANA JDBC Driver (**ngdbc.jar**) may be installed as part of your SAP HANA client installation or you can download it from the SAP HANA office website. Once you got the SAP HANA JDBC Driver, you can deploy the jdbc jar file to openLooKeng plugin folder on coordinator and worker nodes. 
+
+For example, if the jdbc driver file is **ngdbc.jar** and openLooKeng plugin folder is **/usr/lib/openlookeng/lib/plugin**, use the following command to copy the library to the plugin folder. cp ngdbc.jar /usr/lib/openlookeng/lib/plugin/hana. Restart the coordinator and worker processes and hana connector works.
 
 -   Enable the query push down feature or not.
 
-If you want to enable the connector push down feature for hana connector, you do not need to do any things for hana connector\'s push down feature is turn on by default. But you can also set as below:
+If you want to enable the connector push down feature for Hana connector, you do not need to do any thing for Hana connector\'s push down feature, which is turn on by default. But you can also set as follows:
 
 | jdbc.pushdown-enabled=true                   |
 | --------------------------------------------------- |
@@ -43,7 +43,7 @@ If you want to enable the connector push down feature for hana connector, you do
 
 -   Mode for the push-down feature.
 
-If you want to enable the connector all push down feature for hana connector, you do not need to do any things for hana connector's push down feature, which is FULL_PUSHDOWN on by default. But you can also set as below:
+If you want to enable the connector all push down feature for hana connector, you do not need to do any things for hana connector's push down feature, which is FULL_PUSHDOWN on by default. But you can also set as follows:
 
 | jdbc.pushdown-module=FULL_PUSHDOWN                    |
 | --------------------------------------------------- |
@@ -51,12 +51,14 @@ If you want to enable the connector all push down feature for hana connector, yo
 
 ### Multiple Hana Databases or Servers
 
-Please configure another instance of the Hana plugin as a separate catalog if you want to connect to ultiple Hana Databases. To add another SAP HANA catalog, please add another properties file to ../conf/catalog with a different name (making sure it ends in .properties). For example, add a file named hana2.properties to ../conf/catalog to add another connector named hana2.
+Configure another instance of the Hana plugin as a separate catalog if you want to connect to ultiple Hana Databases. To add another SAP HANA catalog, add another properties file to **../conf/catalog** with a different name (ensure it ends in **.properties**). 
+
+For example, add a file named **hana2.properties** to **../conf/catalog** to add another connector named **hana2**.
 
 Querying Hana through openLooKeng
 --------------------------
 
-For there is a SAP HANA connector named hana, each SAP HANA Database\'s user can get its available schemas throught the hana connector by running SHOW SCHEMAS:
+There is a SAP HANA connector named hana, each SAP HANA Database\'s user can get its available schemas throught the hana connector by running SHOW SCHEMAS:
 
     SHOW SCHEMAS FROM hana;
 
@@ -69,7 +71,7 @@ To see a list of the columns in a table named hello in data\'s schema, use eithe
     DESCRIBE hana.data.hello;
     SHOW COLUMNS FROM hana.data.hello;
 
-And you can access the hello table in data\'s schema:
+You can access the hello table in data\'s schema:
 
     SELECT * FROM hana.data.hello;
 

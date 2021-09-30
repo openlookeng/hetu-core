@@ -10,8 +10,7 @@ The Elasticsearch Connector allows access to Elasticsearch data from openLooKeng
 **Note**
 *It is highly recommended to use Elasticsearch 6.0.0 or later.*
 
-
-Configuration
+**Configuration**
 
 To configure the Elasticsearch connector, create a catalog properties file `etc/catalog/elasticsearch.properties` with the following contents, replacing the properties as appropriate:
 
@@ -192,4 +191,4 @@ The array fields of this structure can be defined by using the following command
     
 ## Limitations
 1. openLooKeng does not support to query table in Elasticsearch which has duplicated columns, such as column "name" and "NAME";
-2. opneLooKeng does not support to query the table in Elasticsearch that the name has special characters, such as '-', '.', etc.
+2. opneLooKeng does not support to query the table in Elasticsearch that the name has special characters, such as '-', '.', and so on.
