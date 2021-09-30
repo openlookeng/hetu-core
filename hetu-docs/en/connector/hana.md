@@ -56,7 +56,7 @@ Please configure another instance of the Hana plugin as a separate catalog if yo
 Querying Hana through openLooKeng
 --------------------------
 
-For there is a SAP HANA connector named hana, each SAP HANA Database\'s user can get its available schemas throught the hana connector by running SHOW SCHEMAS:
+For there is a SAP HANA connector named hana, each SAP HANA Database\'s user can get its available schemas through the hana connector by running SHOW SCHEMAS:
 
     SHOW SCHEMAS FROM hana;
 
@@ -80,7 +80,7 @@ Mapping Data Types Between openLooKeng and Hana
 
 ### Hana-to-openLooKeng Type Mapping
 
-openLooKeng support selecting the following SAP HANA Detabase types. The table shows the mapping from SAP HANA data type.
+openLooKeng support selecting the following SAP HANA Database types. The table shows the mapping from SAP HANA data type.
 
 Data type projection table:
 
@@ -300,7 +300,7 @@ database,passwd -n ip:34215 -c "SELECT CURRENT_TIME FROM DUMMY"
 Hana Connector\'s Limitations
 -----------------------------
 
-For the differences between hana datatype and openLooKeng datatype, there are some limitations when preject the hana data type to the openLooKeng datatype.
+For the differences between hana datatype and openLooKeng datatype, there are some limitations when project the hana data type to the openLooKeng datatype.
 
 ### Hana\'s Smalldecimal Data type
 
