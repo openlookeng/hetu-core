@@ -136,7 +136,7 @@ Configuration Properties
 
 Path whitelist：`["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`
 
-Additonal WITH properties
+Additional WITH properties
 --------------
 Use these properties when creating a table with the Memory Connector to make queries faster.
 
