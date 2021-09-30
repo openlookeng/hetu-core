@@ -664,11 +664,23 @@ public class CubeConsole
                     String columnName = betweenPredicate.getValue().toString();
 
                     String columnDataTypeQuery;
+                    String catalogName;
+                    String tableName = sourceTableName.getSuffix();
+
+                    checkArgument(tableName.matches("[\\p{Alnum}_]+"), "Invalid table name");
+                    if (hasInvalidSymbol(columnName)) {
+                        return false;
+                    }
+
                     if (queryRunner.getSession().getCatalog() != null) {
-                        columnDataTypeQuery = String.format(SELECT_DATA_TYPE_STRING, queryRunner.getSession().getCatalog(), sourceTableName.getSuffix(), columnName);
+                        catalogName = queryRunner.getSession().getCatalog();
+                        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+                        columnDataTypeQuery = String.format(SELECT_DATA_TYPE_STRING, catalogName, tableName, columnName);
                     }
                     else if (sourceTableName.getPrefix().isPresent() && sourceTableName.getPrefix().get().getPrefix().isPresent()) {
-                        columnDataTypeQuery = String.format(SELECT_DATA_TYPE_STRING, sourceTableName.getPrefix().get().getPrefix().get(), sourceTableName.getSuffix(), columnName);
+                        catalogName = sourceTableName.getPrefix().get().getPrefix().get().toString();
+                        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+                        columnDataTypeQuery = String.format(SELECT_DATA_TYPE_STRING, catalogName, tableName, columnName);
                     }
                     else {
                         return false;
