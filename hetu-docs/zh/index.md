@@ -200,7 +200,7 @@ headless: true
     - [文件系统访问实用程序]({{< relref "./docs/develop/filesystem.md" >}})
     - [Hive ORC Cache]({{< relref "./docs/develop/hive-orc-cache.md" >}})
     - [外部函数注册和下推]({{< relref "./docs/develop/externalfunction-registration-pushdown.md" >}})
-    - [Star-tree多维数据集]({{< relref "./docs/develop/star-tree-cube.md" >}})
+
 - [openLooKeng REST接口说明]({{< relref "./docs/rest/_index.md" >}})
     - [节点资源]({{< relref "./docs/rest/node.md" >}})
     - [查询资源]({{< relref "./docs/rest/query.md" >}})
