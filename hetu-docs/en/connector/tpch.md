@@ -5,7 +5,7 @@ TPCH Connector
 The TPCH connector provides a set of schemas to support the TPC Benchmark™ H (TPC-H). TPC-H is a database benchmark used to measure the performance of highly-complex decision support databases.
 
 This connector can also be used to test the capabilities and query syntax of openLooKeng without configuring access to an external data source.
-When you query a TPCH schema, the connector generates the data on the fly using a deterministic lgorithm.
+When you query a TPCH schema, the connector generates the data on the fly using a deterministic algorithm.
 
 Configuration
 -------------
