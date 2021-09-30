@@ -121,6 +121,7 @@ public final class HindexQueryRunner
                 try {
                     server.loadMetastore(metastoreProperties);
                     server.getHeuristicIndexerManager().buildIndexClient();
+                    server.getHeuristicIndexerManager().initCache();
                 }
                 catch (Exception e) {
                     throw new RuntimeException(e);

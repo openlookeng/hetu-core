@@ -71,6 +71,13 @@ public class HeuristicIndexerManager
         return new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager());
     }
 
+    public void initCache()
+    {
+        if (PropertyService.getBooleanProperty(HetuConstant.FILTER_ENABLED)) {
+            SplitFiltering.getCache(getIndexClient());
+        }
+    }
+
     public void loadIndexFactories(IndexFactory indexFactory)
     {
         HeuristicIndexerManager.factory = indexFactory;
