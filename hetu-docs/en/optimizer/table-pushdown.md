@@ -16,7 +16,7 @@ The user may also add a special comment in the following format to leverage the 
 /* #distinct@ table1 = col1, col2, ... #*/
 ```
 
-This hint is optional as openLookeng can identify all distinct columns if the relevant statistics are available for the table.
+This hint is optional as openLooKeng can identify all distinct columns if the relevant statistics are available for the table.
 
 The following query (modified from Query 17 of TPC-H benchmark) is one such eligible query and pushes the outer table into the subquery and improves overall query latency.
 
