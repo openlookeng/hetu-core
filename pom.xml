@@ -1849,4 +1849,8 @@
             </build>
         </profile>
     </profiles>
+
+  <scm>
+    <tag>branch-1.4</tag>
+  </scm>
 </project>
