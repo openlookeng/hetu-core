@@ -74,7 +74,7 @@ public class TestQueuesDb
     private DistributedQueryRunner queryRunner;
     private H2ResourceGroupsDao dao;
 
-    @BeforeMethod
+    @BeforeMethod(alwaysRun = true)
     public void setup()
             throws Exception
     {
