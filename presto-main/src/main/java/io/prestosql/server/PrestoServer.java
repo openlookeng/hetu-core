@@ -171,7 +171,9 @@ public class PrestoServer
 
             // preload index (on coordinator only)
             if (injector.getInstance(ServerConfig.class).isCoordinator()) {
-                injector.getInstance(HeuristicIndexerManager.class).preloadIndex();
+                HeuristicIndexerManager heuristicIndexerManager = injector.getInstance(HeuristicIndexerManager.class);
+                heuristicIndexerManager.preloadIndex();
+                heuristicIndexerManager.initCache();
             }
             // register dynamic filter listener
             registerStateStoreListeners(
