@@ -231,7 +231,7 @@ public class IndexCache
                             Path indexUri = Paths.get(index.getUri());
                             String partition = null;
                             // get partition name from path if present
-                            for (int i = indexUri.getNameCount() - 1; i >= 0; i--) {
+                            for (int i = 0; i < indexUri.getNameCount(); i++) {
                                 if (indexUri.getName(i).toString().contains("=")) {
                                     partition = indexUri.getName(i).toString();
                                     break;
