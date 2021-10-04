@@ -2,16 +2,14 @@
 JMX Connector
 =============
 
-The JMX connector provides the ability to query JMX information from all nodes in a openLooKeng cluster. This is very useful for monitoring or debugging. Java Management Extensions (JMX) provides information about the Java Virtual Machine and all of the software running inside it. openLooKeng itself is heavily instrumented via JMX.
+The JMX connector provides the ability to query JMX information from all nodes in a openLooKeng cluster. This is very useful for monitoring or debugging. Java Management Extensions (JMX) provides information about the Java Virtual Machine and all of the software running inside it. openLooKeng itself is heavily instrumented through JMX.
 
- 
-
-This connector can also be configured so that chosen JMX information will be periodically dumped and stored in memory for later access.
+ This connector can also be configured so that chosen JMX information will be periodically dumped and stored in memory for later access.
 
 Configuration
 -------------
 
-To configure the JMX connector, create a catalog properties file `etc/catalog/jmx.properties` with the following contents:
+To configure the JMX connector, create a catalog properties file **etc/catalog/jmx.properties** with the following contents:
 
 ``` properties
 connector.name=jmx
@@ -26,7 +24,7 @@ jmx.dump-period=10s
 jmx.max-entries=86400
 ```
 
-`dump-tables` is a comma separated list of Managed Beans (MBean). It specifies which MBeans will be sampled and stored in memory every `dump-period`. History will have limited size of `max-entries` of entries. Both `dump-period` and `max-entries` have default values of `10s` and `86400` accordingly.
+**dump-tables** is a comma separated list of Managed Beans (MBean). It specifies which MBeans will be sampled and stored in memory every **dump-period**. History has limited size of **max-entries** of entries. Both **dump-period** and **max-entries** have default values of **10s** and **86400** accordingly.
 
  
 
@@ -46,13 +44,11 @@ The JMX connector provides two schemas.
 
  
 
-The first one is `current` that contains every MBean from every node in the openLooKeng cluster. You can see all of the available MBeans by running `SHOW TABLES`:
+The first one is **current** that contains every MBean from every node in the openLooKeng cluster. You can see all of the available MBeans by running **SHOW TABLES**:
 
     SHOW TABLES FROM jmx.current;
 
-MBean names map to non-standard table names and must be quoted with
-double quotes when referencing them in a query. For example, the
-following query shows the JVM version of every node:
+MBean names map to non-standard table names and must be quoted with double quotes when referencing them in a query. For example, the following query shows the JVM version of every node:
 
     SELECT node, vmname, vmversion
     FROM jmx.current."java.lang:type=runtime";
@@ -76,7 +72,7 @@ openfiledescriptorcount | maxfiledescriptorcount
 (1 row)
 ```
 
-The wildcard character `*` may be used with table names in the `current` schema. This allows matching several MBean objects within a single query. The following query returns information from the different openLooKeng memory pools on each node:
+The wildcard character ***** may be used with table names in the **current** schema. This allows matching several MBean objects within a single query. The following query returns information from the different openLooKeng memory pools on each node:
 
     SELECT freebytes, node, object_name
     FROM jmx.current."presto.memory:*type=memorypool*";
@@ -90,7 +86,7 @@ freebytes  |  node   |                       object_name
 (3 rows)
 ```
 
-The `history` schema contains the list of tables configured in the connector properties file. The tables have the same columns as those in the current schema, but with an additional timestamp column that stores
+The **history** schema contains the list of tables configured in the connector properties file. The tables have the same columns as those in the current schema, but with an additional timestamp column that stores
 the time at which the snapshot was taken:
 
     SELECT "timestamp", "uptime" FROM jmx.history."java.lang:type=runtime";

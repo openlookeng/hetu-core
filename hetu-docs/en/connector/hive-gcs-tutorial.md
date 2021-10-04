@@ -13,9 +13,9 @@ If your data is publicly available, you do not need to do anything here. However
 You can do this on the [service accounts page in GCP](https://console.cloud.google.com/projectselector2/iam-admin/serviceaccounts).
 Once you create a service account, create a key for it and download the key in JSON format.
 
-### Hive Connector configuration
+### Hive Connector Configuration
 
-Another requirement is that you have enabled and configured a Hive connector in openLooKeng. The connector uses Hive metastore for data discovery and is not limited to data residing on HDFS.
+This requirement is that you have enabled and configured a Hive connector in openLooKeng. The connector uses Hive metastore for data discovery and is not limited to data residing on HDFS.
 
 **Configuring Hive Connector**
 
@@ -31,7 +31,7 @@ Another requirement is that you have enabled and configured a Hive connector in 
 
 -   GCS access:
 
-    > Here are example values for all GCS configuration properties which can be set in Hive catalog properties file:
+    > Here are examples of values for all GCS configuration properties which can be set in Hive catalog properties file:
     >
     > ``` properties
     > # JSON key file used to access Google Cloud Storage
@@ -102,11 +102,11 @@ Writing GCS Data with openLooKeng
 
 ### Prerequisites
 
-Before you attempt to write data to GCS, make sure you have configured everything necessary to read data from GCS.
+Before you attempt to write data to GCS, ensure you have configured everything necessary to read data from GCS.
 
 ### Create Export Schema
 
-If Hive metastore contains schema(s) mapped to GCS locations, you can use them to export data to GCS. If you don\'t want to use existing schemas (or there are no appropriate schemas in the Hive metastore), you
+If Hive metastore contains schema(s) mapped to GCS locations, you can use them to export data to GCS. If you do not want to use existing schemas (or there are no appropriate schemas in the Hive metastore), you
 need to create a new one:
 
 ```sql

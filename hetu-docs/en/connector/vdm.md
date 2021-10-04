@@ -15,7 +15,7 @@ The VDM connector supports to:
 VDM uses openLooKeng metastore to store its database information. It can be stored either on HDFS or relational database, depending on the implementation of openLooKeng metastore. 
 
 Therefore metastore must be configured first. 
-* Here is an example of using RDBMS as metastore, create `etc/hetu-metastore.properties`:
+* Here is an example of using RDBMS as metastore, create **etc/hetu-metastore.properties**:
 ```
 # the type of metastore storage
 hetu.metastore.type=jdbc
@@ -26,12 +26,14 @@ hetu.metastore.db.user=root
 # the password of database 
 hetu.metastore.db.password=123456
 ```
-* Here is an example of using HDFS as metastore，create `etc/hetu-metastore.properties`：
+* Here is an example of using HDFS as metastore，create **etc/hetu-metastore.properties**：
 
     Path white list：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]
     
-    Notice：avoid to choose root directory; ../ can't include in path; if you config node.date_dir, then the current workspace is the parent of node.data_dir;
-    otherwise, the current workspace is the openlookeng server's directory.
+    **Notice**
+    
+    *Avoid to choose root directory; ../ cannot include in path; if you configure node.date_dir, then the current workspace is the parent of node.data_dir;*
+    *Otherwise, the current workspace is the openlookeng server's directory.*
 
 ```
 # the type of metastore storage
@@ -40,22 +42,26 @@ hetu.metastore.type=hetufilesystem
 hetu.metastore.hetufilesystem.profile-name=hdfs-config-metastore
 # the path of metastore storage in the hetu file system
 hetu.metastore.hetufilesystem.path=/etc/openlookeng/metastore
-```    
+```
 Check [filesystem](../develop/filesystem.md) for more information.
 
 For user interface, the connector can be accessed from JDBC or command line interface. Currently VDM only supports schemas and views. Tables are NOT supported.
 
-Schema operations are the same as usual openLooKeng catalogs, including `create schema`, `drop schema`, `rename schema` and `show schemas`. 
+Schema operations are the same as usual openLooKeng catalogs, including **create schema**, **drop schema**, **rename schema** and **show schemas**. 
 
-Views can be created under a specific schema: `create view as ...`, `drop view`.
+Views can be created under a specific schema: create view as ..., drop view.
 
-## Example usage:
+## Example Usage
 
-Configure a data source `vdm1` by creating `vdm1.properties` in `etc/catalogs` with following contents:
+Configure a data source **vdm1** by creating **vdm1.properties** in **etc/catalogs** with following contents:
 
     connector.name=vdm
 
-This example creates a schema `schema1` in `vdm1` catalog, and creates two views from two other different data sources. Note that metastore must be configured in advance (See [usage](./vdm.md#usage) section).
+This example creates a schema **schema1** in **vdm1** catalog, and creates two views from two other different data sources. 
+
+**Note** 
+
+*The metastore must be configured in advance (See [usage](./vdm.md#usage) section).*
 
     create schema vdm1.schema1;
     use vdm1.schema1;
@@ -69,17 +75,18 @@ VDM datasource can also be managed through dynamic catalog API. See [Dynamic Cat
 
 | Support operation               | External interface (SQL command) |
 | :------------------------------ | :------------------------------- |
-| Add VDM                         | `create catalog`(resulful)       |
-| Remove VDM                      | `drop catalog`(resulful)         |
-| Query all VDM                   | `show catalogs`                  |
-| Create schema                   | `create schema`                  |
-| Delete schema                   | `drop schema`                    |
-| Rename schema                   | `rename schema`                  |
-| Query all schemas under VDM     | `show schemas`                   |
-| Query all views in the schema   | `show tables`                    |
-| Create/Update View              | `create [or replace] view`       |
-| Delete view                     | `drop view`                      |
-| Query data by view              | `select`             |
-| Query view creation information | `show create view`               |
-| Query view column information   | `describe`                      |
+| Add VDM                         | create catalog(resulful)       |
+| Remove VDM                      | drop catalog(resulful)         |
+| Query all VDM                   | show catalogs                  |
+| Create schema                   | create schema                  |
+| Delete schema                   | drop schema                    |
+| Rename schema                   | rename schema                  |
+| Query all schemas under VDM     | show schemas                   |
+| Query all views in the schema   | show tables                    |
+| Create/Update View              | create [or replace] view       |
+| Delete view                     | drop view                      |
+| Query data by view              | select             |
+| Query view creation information | show create view               |
+| Query view column information   | describe                      |
+
 See [SQL Statement Syntax](../sql/_index.md) topic for more information.

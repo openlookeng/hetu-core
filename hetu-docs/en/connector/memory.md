@@ -7,9 +7,7 @@ Data and metadata are spilled to local disk and automatically reloaded if nodes 
 Configuration
 -------------
 
-### Memory Connector Configuration
-
-To configure the Memory Connector, create or modify the catalog properties file `etc/catalog/memory.properties` for the Memory Connector.
+To configure the Memory Connector, create or modify the catalog properties file **etc/catalog/memory.properties** for the Memory Connector.
 For example, you can write:
 
 ``` properties
@@ -23,13 +21,13 @@ memory.spill-path=/opt/hetu/data/spill
 
   ##### Single Node Setup
   - This section will give an example configuration for Memory Connector on a single node cluster.
-  - Create a file `etc/catalog/memory.properties` with the following information:
+  - Create a file **etc/catalog/memory.properties** with the following information:
   ``` properties
   connector.name=memory
   memory.max-data-per-node=200GB
   memory.spill-path=/opt/hetu/data/spill
   ```
-  - Create the file `etc/hetu-metastore.properties` with these configurations:
+  - Create the file **etc/hetu-metastore.properties** with these configurations:
   ```properties
   hetu.metastore.type=hetufilesystem
   hetu.metastore.hetufilesystem.profile-name=default
@@ -37,19 +35,19 @@ memory.spill-path=/opt/hetu/data/spill
   hetu.metastore.cache.type=local
   ```
   ##### Multi-Node Setup
-  - This section will give an example configuration for Memory Connector an a cluster with more than one node.
-  - Create a file `etc/catalog/memory.properties` with the following information:
+  - This section gives an example of configuration for Memory Connector and a cluster with more than one node.
+  - Create a file **etc/catalog/memory.properties** with the following information:
   ``` properties
   connector.name=memory
   memory.max-data-per-node=200GB
   memory.spill-path=/opt/hetu/data/spill
   ```
-  - Add this line in `etc/config.properties` to enable State Store:
+  - Add this line in **etc/config.properties** to enable State Store:
       - State Store allows Memory Connector to automatically clean up dropped tables, otherwise tables will only be cleaned up when another table is created.
   ```properties
   hetu.embedded-state-store.enabled=true
   ```
-  - Create a file called `etc/state-store.properties` with the following contents:
+  - Create a file called **etc/state-store.properties** with the following contents:
   ```properties
   state-store.type=hazelcast
   state-store.name=test
@@ -60,7 +58,7 @@ memory.spill-path=/opt/hetu/data/spill
   # formatted like `hazelcast.discovery.tcp-ip.seeds=host1:port,host2:port` 
   hazelcast.discovery.tcp-ip.seeds=host1:7980, host2:7980
   ```
-  - Create the file `etc/hetu-metastore.properties` with these configurations:
+  - Create the file **etc/hetu-metastore.properties** with the following configurations:
   ```properties
   hetu.metastore.type=hetufilesystem
   hetu.metastore.hetufilesystem.profile-name=hdfs
@@ -68,7 +66,7 @@ memory.spill-path=/opt/hetu/data/spill
   # make sure to use global cache!
   hetu.metastore.cache.type=global
   ```
-  - Create the file `etc/filesystem/hdfs.properties`  to direct openLooKeng to your hdfs file system:
+  - Create the file **etc/filesystem/hdfs.properties**  to direct openLooKeng to your hdfs file system:
   ```properties
   fs.client.type=hdfs
   # Path to hdfs resource files (e.g. core-site.xml, hdfs-site.xml)
@@ -78,12 +76,12 @@ memory.spill-path=/opt/hetu/data/spill
   ```
 
 **Note:**
-- `spill-path` should be set to a directory with enough free space to hold
+- **spill-path** should be set to a directory with enough free space to hold
  the table data.
 - See **Configuration Properties** section for additional properties and
  details.
-- In `etc/config.properties` ensure that `task.writer-count` is set to
- `>=` number of nodes in the cluster running openLooKeng. This will help
+- In **etc/config.properties** ensure that **task.writer-count** is set to
+ **>=** number of nodes in the cluster running openLooKeng. This will help
   distribute the data uniformly between all the workers.
 
 Examples
@@ -119,7 +117,7 @@ Create a table using the Memory Connector with sorting, indices and spill compre
 
 After table creation completes, the Memory Connector will start building indices and sorting data in the background. Once the processing is complete any queries using the sort or index columns will be faster and more efficient.
 
-For now, `sorted_by` only accepts a single column.
+For now, **sorted_by** accepts a single column.
 
 
 Configuration Properties
@@ -127,14 +125,14 @@ Configuration Properties
 
 | Property Name                         | Default Value   | Required| Description               |
 |---------------------------------------|-----------------|---------|---------------------------|
-| `memory.spill-path                   `  | None          | Yes     | Directory where memory data will be spilled to. Must have enough free space to store the tables. SSD preferred.|
-| `memory.max-data-per-node            `  | 256MB         | Yes     | Memory limit for total data stored on this node  |
-| `memory.max-logical-part-size        `  | 256MB         | No      | Memory limit for each LogicalPart. Default value is recommended.|
-| `memory.max-page-size                `  | 512KB         | No      | Memory limit for each page. Default value is recommended.|
-| `memory.logical-part-processing-delay`  | 5s            | No      | The delay between when the table is created/updated and LogicalPart processing starts. Default value is recommended.|
-| `memory.thread-pool-size             `  | Half of threads available to the JVM | No      | Maximum threads to allocate for background processing (e.g. sorting, index creation, cleanup, etc)|
+| memory.spill-path  | None          | Yes     | Directory where memory data will be spilled to. Must have enough free space to store the tables. SSD preferred.|
+| memory.max-data-per-node  | 256MB         | Yes     | Memory limit for total data stored on this node  |
+| memory.max-logical-part-size  | 256MB         | No      | Memory limit for each LogicalPart. Default value is recommended.|
+| memory.max-page-size  | 512KB         | No      | Memory limit for each page. Default value is recommended.|
+| memory.logical-part-processing-delay  | 5s            | No      | The delay between when the table is created/updated and LogicalPart processing starts. Default value is recommended.|
+| memory.thread-pool-size  | Half of threads available to the JVM | No      | Maximum threads to allocate for background processing (For example, sorting, index creation, cleanup, and so on) |
 
-Path whitelist：`["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`
+Path whitelist：**["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]**
 
 Additional WITH properties
 --------------
@@ -142,9 +140,9 @@ Use these properties when creating a table with the Memory Connector to make que
 
 | Property Name            | Argument type             | Requirements                     | Description|
 |--------------------------|---------------------------|----------------------------------|------------|
-| sorted_by                | `array['col']`            | Maximum of one column. Column type must be comparable.  | Sort and create indexes on the given column|
-| index_columns            | `array['col1', 'col2']`   | None                             | Create indexes on the given column|
-| spill_compression        | `boolean`           | None                             | Compress data when spilling to disk|
+| sorted_by                | array['col']            | Maximum of one column. Column type must be comparable.  | Sort and create indexes on the given column|
+| index_columns            | array['col1', 'col2']   | None                             | Create indexes on the given column|
+| spill_compression        | boolean           | None                             | Compress data when spilling to disk|
 
 
 Index Types
@@ -154,9 +152,9 @@ use that operator, but the query will not benefit from the index.
 
 | Index ID                          |Built for Columns In | Supported query operators             |
 |-----------------------------------|----------------------------------------|---------------------------------------|
-| Bloom   | `sorted_by,index_columns`                                 | `=` `IN`                             |                   
-| MinMax  | `sorted_by,index_columns`                            | `=` `>` `>=` `<` `<=` `IN` `BETWEEN` |
-| Sparse  | `sorted_by`                            | `=` `>` `>=` `<` `<=` `IN` `BETWEEN` |
+| Bloom   | sorted_by,index_columns                                 | = IN                             |
+| MinMax  | sorted_by,index_columns                            | = > >= < <= IN BETWEEN |
+| Sparse  | sorted_by                            | = > >= < <= IN BETWEEN |
 
 Developer Information
 ----------------------------
@@ -211,6 +209,7 @@ For queries containing > >= < <= BETWEEN IN similar logic is applied.
 Limitations and known Issues
 ---------------------------------------------
 
-- Without State Store and Hetu Metastore with global cache, after `DROP TABLE`, memory is not released immediately on the workers. It is released on the next `CREATE TABLE` operation.
-- Currently only a single column in ascending order is supported by `sorted_by`
-- If a CTAS (CREATE TABLE AS) query fails or is cancelled, an invalid table will remain. This table must be dropped manually.
+- Without State Store and Hetu Metastore with global cache, after DROP TABLE, memory is not released immediately on the workers. It is released on the next CREATE TABLE operation.
+- Currently only a single column in ascending order is supported by sorted_by.
+- If a CTAS (CREATE TABLE AS) query fails or is canceled, an invalid table will remain. This table must be dropped manually.
+
