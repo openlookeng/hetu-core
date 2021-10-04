@@ -64,7 +64,7 @@ With this mechanism, the peak memory used by the join operator can be decreased 
 ### Aggregations
 
 Aggregation functions perform an operation on a group of values and return one value. If the number of groups you\'re aggregating over is large, a significant amount of memory may be needed. When spill-to-disk
-is enabled, if there is not enough memory, intermediate cumulated aggregation results are written to disk. They are loaded back and merged with a lower memory footprint.
+is enabled, if there is not enough memory, intermediate accumulated aggregation results are written to disk. They are loaded back and merged with a lower memory footprint.
 
 ### Order By
 
