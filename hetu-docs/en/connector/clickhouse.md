@@ -2,13 +2,13 @@
 
 ## Overview
 
-The ClickHouse connector allows querying on an external ClickHouse database. This can be used to join data between different systems like ClickHouse and Hive, or between two different ClickHouse instances.
+The ClickHouse connector allows querying on an external ClickHouse database. This can be used to join data between different systems such as ClickHouse and Hive, or between two different ClickHouse instances.
 
 ## Configuration
 
 ### Basic configuration
 
-To configure the ClickHouse connector, create a catalog properties file in`etc/catalog` named, for example, `clickhouse.properties`, to mount the ClickHouse connector as the `clickhouse` catalog. Create the file with the following
+To configure the ClickHouse connector, create a catalog properties file inetc/catalog named, for example, **clickhouse.properties**, to mount the ClickHouse connector as the `clickhouse` catalog. Create the file with the following
 contents, replacing the connection properties as appropriate for your setup.
 
 Base property setting: 
@@ -44,29 +44,29 @@ case-insensitive-name-matching=true
 
 ### Multiple ClickHouse Servers
 
-You can have as many catalogs as you need, so if you have additional ClickHouse servers, simply add another properties file to `etc/catalog` with a different name (making sure it ends in `.properties`). For example, if
-you name the property file `clickhouse2.properties`, openLooKeng will create a catalog named `clickhouse2` using the configured connector.
+You can have as many catalogs as you need, so if you have additional ClickHouse servers, simply add another properties file to **etc/catalog** with a different name (Ensure it ends in **.properties**). For example, if
+you name the property file **clickhouse2.properties**, openLooKeng will create a catalog named **clickhouse2** using the configured connector.
 
 ## Querying ClickHouse through openLooKeng
 
-The ClickHouse connector provides a schema for every ClickHouse *database*. You can see the available ClickHouse databases by running `SHOW SCHEMAS`:
+The ClickHouse connector provides a schema for every ClickHouse database. You can see the available ClickHouse databases by running SHOW SCHEMAS:
 
     SHOW SCHEMAS FROM clickhouse;
 
-If you have a ClickHouse database named `data`, you can view the tables in this database by running `SHOW TABLES`:
+If you have a ClickHouse database named data, you can view the tables in this database by running SHOW TABLES:
 
     SHOW TABLES FROM clickhouse.data;
 
-You can see a list of the columns in the `hello` table in the `data` database using either of the following:
+You can see a list of the columns in the hello table in the data database using either of the following:
 
     DESCRIBE clickhouse.data.hello;
     SHOW COLUMNS FROM clickhouse.data.hello;
 
-Finally, you can also access the `hello` table in the `data` database:
+Finally, you can also access the hello table in the data database:
 
     SELECT * FROM clickhouse.data.hello;
 
-If you used a different name for your catalog properties file, use that catalog name instead of `clickhouse` in the above examples.
+If you used a different name for your catalog properties file, use that catalog name instead of clickhouse in the above examples.
 
 ## Mapping Data Types Between openLooKeng and ClickHouse
 
@@ -124,7 +124,9 @@ openLooKeng support creating tables with the following type into a ClickHouse Da
 
 ### Functions that support pushdown
 
-Note: The \"\$n\" is placeholder to present an argument in a function.
+**Note**
+
+*The \"\$n\" is placeholder to present an argument in a function.*
 
 #### Aggregate Functions
 
@@ -208,7 +210,9 @@ DAY_OF_MONTH($1)
 DAY_OF_YEAR($1)
 ```
 
-Note: The functions supported by openLooKeng can also be used in the ClickHouse connector, but functions not in the above list will not be pushed down.
+**Note**: 
+
+*The functions supported by openLooKeng can also be used in the ClickHouse connector, but functions not in the above list will not be pushed down.*
 
 ## ClickHouse Connector Limitations
 
