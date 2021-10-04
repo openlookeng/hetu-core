@@ -7,7 +7,7 @@ The System connector provides information and metrics about the currently runnin
 Configuration
 -------------
 
-The System connector doesn\'t need to be configured: it is automatically available via a catalog named `system`.
+The System connector doesn't need to be configured: it is automatically available via a catalog named `system`.
 
 Using the System Connector
 --------------------------
