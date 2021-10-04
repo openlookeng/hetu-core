@@ -561,8 +561,8 @@ lk:default> SELECT created_at, raw_date FROM (
  2014-07-29 14:07:21.000 | Tue Jul 29 21:07:21 +0000 2014
  2014-07-29 14:07:22.000 | Tue Jul 29 21:07:22 +0000 2014
  2014-07-29 14:07:23.000 | Tue Jul 29 21:07:23 +0000 2014
- 2014-07-29 14:07:24.000 | Tue Jul 29 21:07:24 +0000 2014
+ 2014-07-29 14:07:24.000 | Tue Jul 29 21:07:24 +0000 201
 (5 rows)
 ```
 
-The Kafka connector contains converters for ISO 8601, RFC 2822 text formats and for number-based timestamps using seconds or miilliseconds since the epoch. There is also a generic, text-based formatter which uses Joda-Time format strings to parse text columns.
+The Kafka connector contains converters for ISO 8601, RFC 2822 text formats and for number-based timestamps using seconds or milliseconds since the epoch. There is also a generic, text-based formatter which uses Joda-Time format strings to parse text columns.
