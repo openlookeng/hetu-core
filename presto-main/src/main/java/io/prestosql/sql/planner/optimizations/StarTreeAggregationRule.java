@@ -32,7 +32,6 @@ import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TableMetadata;
-import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.PrestoWarning;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.metadata.TableHandle;
@@ -236,7 +235,7 @@ public class StarTreeAggregationRule
                     context.getIdAllocator(),
                     context.getWarningCollector());
         }
-        catch (UnsupportedOperationException | IllegalArgumentException | IllegalStateException | PrestoException ex) {
+        catch (RuntimeException ex) {
             LOGGER.warn("Encountered exception '" + ex.getMessage() + "' while applying the StartTreeAggregationRule", ex);
             return Result.empty();
         }
@@ -361,23 +360,25 @@ public class StarTreeAggregationRule
         SqlParser sqlParser = new SqlParser();
         Expression queryPredicate = castToExpression(filterNode.getPredicate());
         Expression sourceTablePredicate = cubeFilter.getSourceTablePredicate() == null ? null : sqlParser.createExpression(cubeFilter.getSourceTablePredicate(), new ParsingOptions());
-        Pair<Expression, Expression> splitPredicate = splitQueryPredicate(queryPredicate, sourceTablePredicate);
-        if (!arePredicatesEqual(splitPredicate.getLeft(), sourceTablePredicate, metadata, session, types)) {
+        Pair<Expression, Expression> splitQueryPredicate = splitQueryPredicate(queryPredicate, sourceTablePredicate);
+        if (!arePredicatesEqual(splitQueryPredicate.getLeft(), sourceTablePredicate, metadata, session, types)) {
             LOGGER.debug("Cube source table predicate %s not matching query predicate %s", sourceTablePredicate, queryPredicate);
             return false;
         }
-        if (cubeFilter.getCubePredicate() == null) {
-            //Cube has no additional predicates to compare with
-            return true;
-        }
-        if (splitPredicate.getRight() == null || !doesCubeContainQueryPredicateColumns(splitPredicate.getRight(), cubeMetadata)) {
-            // Cube has more predicate to match but query does not
+        //Check if columns in query predicate are all part of the Cube.
+        if ((cubeFilter.getCubePredicate() != null && splitQueryPredicate.getRight() == null)
+                || (splitQueryPredicate.getRight() != null && !doesCubeContainQueryPredicateColumns(splitQueryPredicate.getRight(), cubeMetadata))) {
+            // Query predicate does not exactly match Cube predicate
             // OR
             // Cube does not contain all columns in the remaining predicate
             return false;
         }
+        if (cubeFilter.getCubePredicate() == null) {
+            //Cube has no additional predicates to compare with. i.e. Cube can be used to optimize the query
+            return true;
+        }
         Expression cubePredicate = ExpressionUtils.rewriteIdentifiersToSymbolReferences(sqlParser.createExpression(cubeFilter.getCubePredicate(), new ParsingOptions()));
-        ExpressionDomainTranslator.ExtractionResult decomposedQueryPredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, splitPredicate.getRight(), types);
+        ExpressionDomainTranslator.ExtractionResult decomposedQueryPredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, splitQueryPredicate.getRight(), types);
         if (!BooleanLiteral.TRUE_LITERAL.equals(decomposedQueryPredicate.getRemainingExpression())) {
             LOGGER.error("StarTree cube cannot support predicate %s", castToExpression(filterNode.getPredicate()));
             return false;
@@ -394,14 +395,14 @@ public class StarTreeAggregationRule
 
     private boolean doesCubeContainQueryPredicateColumns(Expression queryPredicate, CubeMetadata cubeMetadata)
     {
-        Set<Identifier> cubePredicateColumns = new HashSet<>();
-        cubeMetadata.getDimensions().stream().map(Identifier::new).forEach(cubePredicateColumns::add);
+        Set<Identifier> cubeColumns = new HashSet<>();
+        cubeMetadata.getDimensions().stream().map(Identifier::new).forEach(cubeColumns::add);
         Set<Identifier> queryPredicateColumns = SymbolsExtractor.extractUnique(queryPredicate)
                 .stream()
                 .map(Symbol::getName)
                 .map(Identifier::new)
                 .collect(Collectors.toSet());
-        return cubePredicateColumns.containsAll(queryPredicateColumns);
+        return cubeColumns.containsAll(queryPredicateColumns);
     }
 
     /**

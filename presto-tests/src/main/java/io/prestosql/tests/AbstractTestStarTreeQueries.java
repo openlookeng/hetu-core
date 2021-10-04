@@ -707,6 +707,22 @@ public abstract class AbstractTestStarTreeQueries
         assertUpdate("DROP TABLE orders_table_multiple_cube_insert");
     }
 
+    @Test
+    public void testWithMultipleCubesAlmostSimilar()
+    {
+        computeActual("CREATE TABLE orders_table_multiple_cubes_similar AS SELECT * FROM orders");
+        //cube creation order is important because the recently created cube is used for query execution in case of multi-match
+        computeActual("CREATE CUBE orders_cube_similar_1 ON orders_table_multiple_cubes_similar WITH (AGGREGATIONS = (avg(totalprice)), GROUP = (orderdate, orderstatus), FILTER = (orderpriority = '1-URGENT' AND shippriority = 1))");
+        assertQuerySucceeds("INSERT INTO CUBE orders_cube_similar_1 WHERE orderstatus = 'F'");
+        computeActual("CREATE CUBE orders_cube_similar_2 ON orders_table_multiple_cubes_similar WITH (AGGREGATIONS = (avg(totalprice)), GROUP = (orderdate, orderstatus), FILTER = (orderpriority = '1-URGENT'))");
+        assertQuerySucceeds("INSERT INTO CUBE orders_cube_similar_2");
+        assertQuery(sessionStarTree,
+                "SELECT orderdate, orderstatus, avg(totalprice) FROM orders_table_multiple_cubes_similar WHERE orderpriority = '1-URGENT' AND shippriority = 1 AND orderstatus = 'F' GROUP BY orderdate, orderstatus",
+                "SELECT orderdate, orderstatus, avg(totalprice) FROM orders WHERE orderpriority = '1-URGENT' AND shippriority = 1 AND orderstatus = 'F' GROUP BY orderdate, orderstatus",
+                assertTableScan("orders_cube_similar_1"));
+        assertUpdate("DROP TABLE orders_table_multiple_cubes_similar");
+    }
+
     private Consumer<Plan> assertInTableScans(String tableName)
     {
         return plan ->
