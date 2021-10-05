@@ -2,8 +2,6 @@
 
 ## Overview
 
-### Introduction
-
 This user manual contains information about the openLooKeng ODBC driver for Windows, including driver installation, ODBC data source configuration, and basic driver information.
 
 Open Database Connectivity (ODBC) is an interoperable interface protocol proposed by Microsoft for applications to access different DBMSs. It defines a universal database access mechanism and provides a set of ODBC APIs for accessing databases to simplify the interoperability between clients and different DBMSs.
@@ -12,7 +10,7 @@ The ODBC driver enables applications to connect to databases. This product is th
 
 ### Prerequisites
 
-**The following knowledge is required for using this product:**
+The following knowledge is required for using this product:
 
 * ANSI structured query language (SQL)
 
@@ -20,7 +18,7 @@ The ODBC driver enables applications to connect to databases. This product is th
 
 ### Supported Version
 
-**This product supports the following version:**
+This product supports the following version:
 
 - Windows 10 64-bit
 
@@ -136,11 +134,11 @@ KerberosConfigPath=F:/openLooKeng/krb5.conf
 KerberosKeytabPath=F:/openLooKeng/user.keytab
 ```
 
-After the preceding configuration is complete, click **Test DSN**. If the configuration is correct, a dialog box is displayed, indicating that the connection is successfully established. You are advised to check whether the corresponding catalog and schema are correctly displayed in the **Catalog** and **Schema** drop-down list boxes. After the data source DSN is configured, the ODBC application can be connected to the openLooKeng through the configured DSN.
+After the preceding configuration is completed, click **Test DSN**. If the configuration is correct, a dialog box is displayed, indicating that the connection is successfully established. You are advised to check whether the corresponding catalog and schema are correctly displayed in the **Catalog** and **Schema** drop-down list boxes. After the data source DSN is configured, the ODBC application can be connected to the openLooKeng through the configured DSN.
 
 ## Data Types Supported by the Driver
 
-The following table lists the data types supported by the driver, ODBC data types, and openLooKeng data types.
+The following table lists the data types supported by the driver, ODBC data types, and openLooKeng data types:
 
 | openLooKeng Data Type| ODBC Data Type|
 |:----------:|:----------:|
@@ -173,4 +171,5 @@ The openLooKeng ODBC driver supports **both ANSI and Unicode** applications. The
 
 When calling the ODBC API to retrieve data, if bound to the SQL_C_WCHAR C data type buffer, the driver will return the Unicode encoded result for both ANSI and Unicode applications. When bound to the SQL_C_CHAR C data type buffer, by deafult, the driver will return to the ANSI application the result  encoded in system default character set, and for Unicode application the driver will return the result encoded in utf8. If the encoding character set used by the application does not match the default, the result may be garbled. To this end, the user should configure the connection character set to specify the encoding of the result. For example, if the application has garbled Chinese characters, you can try to configure the connection character set to GBK or GB2312.
 
-While configuring data source all connection character sets supported by the openLooKeng ODBC driver can be set in the **Character Set** drop-down box on the page 3 of the User interface. User can select the connection character from the drop-down box after the **Test DSN** is success.
+While configuring data source all connection character sets supported by the openLooKeng ODBC driver can be set in the **Character Set** drop-down box on the page 3 of the user interface. User can select the connection character from the drop-down box after the **Test DSN** is success.
+

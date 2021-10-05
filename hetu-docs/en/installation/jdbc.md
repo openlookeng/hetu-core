@@ -15,7 +15,7 @@ Starting from version `1.0.1`, the driver is also available from Maven Central. 
 
 ## Driver Name
 
-The driver class name is `io.hetu.core.jdbc.OpenLooKengDriver`. Most users will not need this information as drivers are loaded automatically.
+The driver class name is `io.hetu.core.jdbc.OpenLooKengDriver`. Most users do not need this information as drivers are loaded automatically.
 
 ## Connection
 

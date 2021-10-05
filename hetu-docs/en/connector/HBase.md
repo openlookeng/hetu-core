@@ -8,7 +8,9 @@ The HBase Connector allows querying and creating tables on an external Apache HB
 
 The HBase Connector maintains a Metastore to persist HBase metadata, currently support Metastore: `openLooKeng Metastore`.
 
-**Note:** *Apache HBase 2.2.3 version or ealier versions are supported in HBase connector*
+**Note**
+
+*Apache HBase 2.2.3 version or ealier versions are supported in HBase connector*
 
 
 
@@ -43,7 +45,7 @@ hetu.metastore.type=hetufilesystem
 hetu.metastore.hetufilesystem.profile-name=hdfs-config-metastore
 #the path of metastore storage in the hetu file system
 hetu.metastore.hetufilesystem.path=/etc/openlookeng/metastore
-```    
+```
 If HDFS is used, configure hetu filesystem. The configuration file name must be the same as that of profile-name, and the suffix is properties.
 
 vi etc/filesystem/hdfs-config-metastore.properties
@@ -51,19 +53,21 @@ vi etc/filesystem/hdfs-config-metastore.properties
 fs.client.type=hdfs
 hdfs.config.resources=/opt/openlookeng/xxx/core-site.xml,/opt/openlookeng/xxx/hdfs-site.xml
 hdfs.authentication.type=NONE
-```  
+```
 For details about HDFS Kerberos configurations, see [filesystem](../develop/filesystem.md).
 
-**Note:** *Either the hbase.properties and hetu-metastore.properties configuration files are mandatory. If HDFS is configured, hdfs-config-metastore.properties is required.*
+**Note** 
+
+*Either the hbase.properties and hetu-metastore.properties configuration files are mandatory. If HDFS is configured, hdfs-config-metastore.properties is required.*
 
 ```
 Possible problem: After the configuration is complete, an error message indicating that the xxx path (configuration file A) is not in the white path list is displayed when the service is started.
 Solution: Select a directory in the white path list recorded in the log, copy the file in the directory where the error occurs, and modify the corresponding path in configuration file A.
 ```
 
-**Kerberos Configuration:**
+**Kerberos Configuration**
 
-If HBase/Zookeeper is a security cluster，so we should add the configuration about kerberos.
+If HBase/Zookeeper is a security cluster, so you should add the configuration about kerberos.
 
 ```properties
 hbase.jaas.conf.path=/opt/openlookeng/xxx/jaas.conf
@@ -199,7 +203,7 @@ HBase Connector supports two forms of table creation:
 2. Create a new table that does not exist in the HBase data source, there is no need to specify hbase_table_name. We must specify 'external = false'.
 
 
-Below is an example of how to create a table `schemaName.tableName` and link it to an existing table named `hbaseNamespace:hbaseTable` :
+Follow the example of how to create a table `schemaName.tableName` and link it to an existing table named `hbaseNamespace:hbaseTable` :
 
 Column mapping format: 'column_name:family:qualifier'
 

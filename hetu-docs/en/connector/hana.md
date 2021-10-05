@@ -5,18 +5,18 @@ Hana Connector
 Overview
 --------
 
-The Hana connector allows querying and creating tables on an external Hana database. This can be used to join data between different systems like Hana and Hive, or between two different Hana instances.
+The Hana connector allows querying and creating tables on an external Hana database. This can be used to join data between different systems such as Hana and Hive, or between two different Hana instances.
 
 Configurations
 --------------
 
 ### Basic configuration
 
-First of all, we should finish the following steps before you start to use hana connector.
+First of all, follow the steps before you start to use hana connector.
 
 -   JDBC Connection details to connect to the SAP HANA
 
-It should be written in form of a regular openLooKeng connector config (eg. hana.properties for a openLooKeng catalog named hana). The file should contain the following contents, replacing the connection properties as appropriate for your setup.
+It should be written in form of a regular openLooKeng connector configuration (for example, hana.properties for a openLooKeng catalog named hana). The file should contain the following contents, replacing the connection properties as appropriate for your setup.
 
 Base property setting: 
 
@@ -29,13 +29,20 @@ Base property setting:
 
 -   Adding SAP HANA Driver
 
-SAP HANA JDBC Driver is not available in common repositories, so you will need to download it from SAP HANA and install manually in your repository. The SAP HANA JDBC Driver (ngdbc.jar) may be installed as
-part of your SAP HANA client installation or you can download it from the SAP HANA office website. Once you have got the SAP HANA JDBC Driver, you can deploy the jdbc jar file to openLooKeng plugin folder on coordinator and worker nodes. For example, if the jdbc driver file is ngdbc.jar and openLooKeng plugin folder is /usr/lib/openlookeng/lib/plugin, use the following command to copy the library to the plugin folder. cp ngdbc.jar
-/usr/lib/openlookeng/lib/plugin/hana Restart the coordinator and worker processes and hana connector will work.
+SAP HANA JDBC Driver is not available in common repositories, so you need to download it from SAP HANA and install manually in your repository. The SAP HANA JDBC Driver (ngdbc.jar) may be installed as
+part of your SAP HANA client installation or you can download it from the SAP HANA office website. Once you have got the SAP HANA JDBC Driver, you can deploy the jdbc jar file to openLooKeng plugin folder on coordinator and worker nodes. 
+
+For example, if the jdbc driver file is ngdbc.jar and openLooKeng plugin folder is /usr/lib/openlookeng/lib/plugin, use the following command to copy the library to the plugin folder. 
+
+cp ngdbc.jar 
+
+/usr/lib/openlookeng/lib/plugin/hana 
+
+Restart the coordinator and worker processes and hana connector will work.
 
 -   Enable the query push down feature or not.
 
-If you want to enable the connector push down feature for hana connector, you do not need to do any things for hana connector\'s push down feature is turn on by default. But you can also set as below:
+If you want to enable the connector push down feature for hana connector, you do not need to do any things for hana connector\'s push down feature is turn on by default. But you can also set as follows:
 
 | jdbc.pushdown-enabled=true                   |
 | --------------------------------------------------- |
@@ -43,7 +50,7 @@ If you want to enable the connector push down feature for hana connector, you do
 
 -   Mode for the push-down feature.
 
-If you want to enable the connector all push down feature for hana connector, you do not need to do any things for hana connector's push down feature, which is FULL_PUSHDOWN on by default. But you can also set as below:
+If you want to enable the connector all push down feature for hana connector, you do not need to do any things for hana connector's push down feature which is FULL_PUSHDOWN on by default but you can also set as follows:
 
 | jdbc.pushdown-module=FULL_PUSHDOWN                    |
 | --------------------------------------------------- |
@@ -51,7 +58,7 @@ If you want to enable the connector all push down feature for hana connector, yo
 
 ### Multiple Hana Databases or Servers
 
-Please configure another instance of the Hana plugin as a separate catalog if you want to connect to ultiple Hana Databases. To add another SAP HANA catalog, please add another properties file to ../conf/catalog with a different name (making sure it ends in .properties). For example, add a file named hana2.properties to ../conf/catalog to add another connector named hana2.
+Configure another instance of the Hana plugin as a separate catalog if you want to connect to ultiple Hana Databases. To add another SAP HANA catalog, add another properties file to ../conf/catalog with a different name (ensure it ends in .properties). For example, add a file named hana2.properties to ../conf/catalog to add another connector named hana2.
 
 Querying Hana through openLooKeng
 --------------------------
@@ -143,7 +150,11 @@ openLooKeng support creating tables with the following type into a SAP HANA Data
 
 ### openLooKeng-to-Hana function Mapping
 
-The openLooKeng functions which can be mapped to SAP HANA function is listed in the following table. Note: The \"\$n\" is placeholder to present an argument in a function.
+The openLooKeng functions which can be mapped to SAP HANA function is listed in the following table:
+
+**Note**
+
+*The \"\$n\" is placeholder to present an argument in a function.*
 
 > | openLooKeng function                |               HANA function | notes                                                        |
 > | ----------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
@@ -220,7 +231,7 @@ For example, if you have a table named SCORES:
 | ww   | Math    | 80    |
 | ww   | English | 90    |
 
-In hana you can use `map` function to transform the row data into column data:
+In hana, you can use `map` function to transform the row data into column data:
 
 ```sql
 SELECT
@@ -234,7 +245,7 @@ GROUP BY NAME
 
 In openLookeng, you can use `case` as an alternative implementation:
 
-The other differences between hana and openLooKeng sql grammar, please refer to the official document list below:
+The other differences between hana and openLooKeng sql grammar, refer to the official document list aas follows:
 
 | name        | web address                                                                                                    |
 | :-----------| :------------------------------------------------------------------------------------------------------------- |
@@ -304,9 +315,8 @@ For the differences between hana datatype and openLooKeng datatype, there are so
 
 ### Hana\'s Smalldecimal Data type
 
-The smalldecimal in hana has a variable precision and zero scale length, but openLooKeng do not support. For the reason about, the openLooKeng translate smalldecimal in hana into double in openLooKeng, and this will cause some
-precision lose in a special value range.
+The smalldecimal in hana has a variable precision and zero scale length, but openLooKeng do not support. For the reason about, the openLooKeng translate smalldecimal in hana into double in openLooKeng, and this causes some precision lose in a special value range.
 
 ### Hana\'s tiny int data type
 
-Tiny int in hana is a 8 bits integer without sign bit and will cause some precision lose in a special value range in openLooKeng.
+Tiny int in hana is a 8 bits integer without sign bit and causes some precision lose in a special value range in openLooKeng.
