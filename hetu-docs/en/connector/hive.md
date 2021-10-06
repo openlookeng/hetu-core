@@ -9,10 +9,15 @@ The Hive connector allows querying data stored in a Hive data warehouse.
 Hive is a combination of three components:
 
 -   Data files in varying formats that are typically stored in the Hadoop Distributed File System (HDFS) or in Amazon S3.
--   Metadata about how the data files are mapped to schemas and tables. This metadata is stored in a database such as MySQL and is accessed via the Hive metastore service.
+-   Metadata about how the data files are mapped to schemas and tables. This metadata is stored in a database such as MySQL and is accessed thrtough he Hive metastore service.
 -   A query language called HiveQL. This query language is executed on a distributed computing framework such as MapReduce or Tez.
 
-openLooKeng only uses the first two components: the data and the metadata. It does not use HiveQL or any part of Hive\'s execution environment.
+openLooKeng uses the first two components as follows: 
+
+- data 
+- metadata
+
+It does not use HiveQL or any part of Hive\'s execution environment.
 
 ## Supported File Types
 
@@ -51,7 +56,7 @@ hive.metastore.uri=thrift://example.net:9083
 
 ### Multiple Hive Clusters
 
-You can have as many catalogs as you need, so if you have additional Hive clusters, simply add another properties file to `etc/catalog` with a different name (making sure it ends in `.properties`). For example, if you name the property file `sales.properties`, openLooKeng will create acatalog named `sales` using the configured connector.
+You can have as many catalogs as you need, so if you have additional Hive clusters, add another properties file to `etc/catalog` with a different name (ensure it ends in `.properties`). For example, if you name the property file `sales.properties`, openLooKeng creates acatalog named `sales` using the configured connector.
 
 ### HDFS Configuration
 
@@ -61,15 +66,15 @@ For basic setups, openLooKeng configures the HDFS client automatically and does 
 hive.config.resources=/etc/hadoop/conf/core-site.xml,/etc/hadoop/conf/hdfs-site.xml
 ```
 
-Only specify additional configuration files if necessary for your setup. We also recommend reducing the configuration files to have the minimum set of required properties, as additional properties may cause problems.
+Only specify additional configuration files if necessary for your setup. It is recommended to reduce the configuration files to have the minimum set of required properties, as additional properties may cause problems.
 
-The configuration files must exist on all openLooKeng nodes. If you are referencing existing Hadoop config files, make sure to copy them to any openLooKeng nodes that are not running Hadoop.
+The configuration files must exist on all openLooKeng nodes. If you are referencing existing Hadoop configuration files, ensure to copy them to any openLooKeng nodes that are not running Hadoop.
 
 ### HDFS Username and Permissions
 
-Before running any `CREATE TABLE` or `CREATE TABLE AS` statements for Hive tables in openLooKeng, you need to check that the user openLooKeng is using to access HDFS has access to the Hive warehouse directory. The Hive warehouse directory is specified by the configuration variable `hive.metastore.warehouse.dir` in `hive-site.xml`, and the default value is `/user/hive/warehouse`.
+Before running any `CREATE TABLE` or `CREATE TABLE AS` statements for Hive tables in openLooKeng, you need to check that the openLooKeng user has HDFS access to the Hive warehouse directory. The Hive warehouse directory is specified by the configuration variable `hive.metastore.warehouse.dir` in `hive-site.xml`, and the default value is `/user/hive/warehouse`.
 
-When not using Kerberos with HDFS, openLooKeng will access HDFS using the OS user of the openLooKeng process. For example, if openLooKeng is running as `nobody`, it will access HDFS as `nobody`. You can override this username by setting the `HADOOP_USER_NAME` system property in the openLooKeng [JVM Config](../installation/deployment.md#jvm-config), replacing `hdfs_user` with the appropriate username:
+When Kerberos with HDFS is not used, then openLooKeng will access HDFS using the OS user of the openLooKeng process. For example, if openLooKeng is running as `nobody`, it will access HDFS as `nobody`. You can override this username by setting the `HADOOP_USER_NAME` system property in the openLooKeng [JVM Config](../installation/deployment.md#jvm-config), replacing `hdfs_user` with the appropriate username:
 
 ``` properties
 -DHADOOP_USER_NAME=hdfs_user
@@ -135,8 +140,6 @@ Please see the [Hive Security Configuration](./hive-security.md) section for a m
 
 
 
-
-
 ## Hive Thrift Metastore Configuration Properties
 
 
@@ -171,7 +174,7 @@ Please see the [Hive Security Configuration](./hive-security.md) section for a m
 ## Amazon S3 Configuration
 
 
-The Hive Connector can read and write tables that are stored in S3. This is accomplished by having a table or database location that uses an S3 prefix rather than an HDFS prefix.
+The Hive connector can read and write tables that are stored in S3. This is accomplished by having a table or database location that uses an S3 prefix rather than an HDFS prefix.
 
 openLooKeng uses its own S3 filesystem for the URI prefixes `s3://`, `s3n://`and `s3a://`.
 
@@ -203,17 +206,16 @@ openLooKeng uses its own S3 filesystem for the URI prefixes `s3://`, `s3n://`and
 
 ### S3 Credentials
 
-If you are running openLooKeng on Amazon EC2 using EMR or another facility, it is highly recommended that you set `hive.s3.use-instance-credentials` to `true` and use IAM Roles for EC2 to govern access to S3. If this is the case, your EC2 instances will need to be assigned an IAM Role which grants appropriate access to the data stored in the S3 bucket(s) you wish to use. It\'s also possible to configure an IAM role with `hive.s3.iam-role` that will be assumed for accessing any S3 bucket.
-This is much cleaner than setting AWS access and secret keys in the `hive.s3.aws-access-key` and `hive.s3.aws-secret-key` settings, and also allows EC2 to automatically rotate credentials on a regular basis without any additional work on your part.
+If you are running openLooKeng on Amazon EC2 using EMR or another facility, it is highly recommended that you set `hive.s3.use-instance-credentials` to `true` and use IAM Roles for EC2 to govern access to S3. If this is the case, your EC2 instances will need to be assigned an IAM Role which grants appropriate access to the data stored in the S3 bucket(s) you wish to use. It is also possible to configure an IAM role with `hive.s3.iam-role` that is assumed for accessing any S3 bucket.
+This is much simpler than setting AWS access and secret keys in the `hive.s3.aws-access-key` and `hive.s3.aws-secret-key` settings, and also allows EC2 to automatically rotate credentials on a regular basis without any additional work on your part.
 
 ### Custom S3 Credentials Provider
 
-You can configure a custom S3 credentials provider by setting the Hadoop configuration property `presto.s3.credentials-provider` to be the fully qualified class name of a custom AWS credentials provider
-implementation. This class must implement the [AWSCredentialsProvider](http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/AWSCredentialsProvider.html) interface and provide a two-argument constructor that takes a `java.net.URI` and a Hadoop `org.apache.hadoop.conf.Configuration` as arguments. A custom credentials provider can be used to provide temporary credentials from STS (using `STSSessionCredentialsProvider`), IAM role-based credentials (using `STSAssumeRoleSessionCredentialsProvider`), or credentials for a specific use case (e.g., bucket/user specific credentials). This Hadoop configuration property must be set in the Hadoop configuration files referenced by the `hive.config.resources` Hive connector property.
+You can configure a custom S3 credentials provider by setting the Hadoop configuration property `presto.s3.credentials-provider` to be the fully qualified class name of a custom AWS credentials provider implementation. This class must implement the [AWSCredentialsProvider](http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/AWSCredentialsProvider.html) interface and provide a two-argument constructor that takes a `java.net.URI` and a Hadoop `org.apache.hadoop.conf.Configuration` as arguments. A custom credentials provider can be used to provide temporary credentials from STS (using `STSSessionCredentialsProvider`), IAM role-based credentials (using `STSAssumeRoleSessionCredentialsProvider`), or credentials for a specific use case (for example, bucket/user specific credentials). This Hadoop configuration property must be set in the Hadoop configuration files referenced by the `hive.config.resources` Hive connector property.
 
 ### Tuning Properties
 
-he following tuning properties affect the behavior of the client used by the openLooKeng S3 filesystem when communicating with S3. Most of these parameters affect settings on the `ClientConfiguration` object associated with the `AmazonS3Client`.
+The following tuning properties affect the behavior of the client used by the openLooKeng S3 filesystem when communicating with S3. Most of these parameters affect settings on the `ClientConfiguration` object associated with the `AmazonS3Client`.
 
 | Property Name                     | Description                                                  | Default      |
 | :-------------------------------- | :----------------------------------------------------------- | :----------- |
@@ -246,7 +248,7 @@ S3 Select Pushdown enables pushing down projection (SELECT) and predicate (WHERE
 
 #### Is S3 Select a good fit for my workload?
 
-Performance of S3 Select Pushdown depends on the amount of data filtered by the query. Filtering a large number of rows should result in better performance. If the query doesn\'t filter any data then pushdown may not add any additional value and user will be charged for S3 Select requests. Thus, we recommend that you benchmark your workloads with and without S3 Select to see if using it may be suitable for your workload. By default, S3 Select Pushdown is disabled and you should enable it in production after proper benchmarking and cost analysis. For more information on S3 Select request cost, please see [Amazon S3 Cloud Storage Pricing](https://aws.amazon.com/s3/pricing/).
+Performance of S3 Select Pushdown depends on the amount of data filtered by the query. Filtering a large number of rows should result in better performance. If the query does not filter any data then pushdown may not add any additional value and user will be charged for S3 Select requests. Thus, it is recommended that you benchmark your workloads with and without S3 Select to see if using it may be suitable for your workload. By default, S3 Select Pushdown is disabled and you should enable it in production after proper benchmarking and cost analysis. For more information on S3 Select request cost, see [Amazon S3 Cloud Storage Pricing](https://aws.amazon.com/s3/pricing/).
 
 Use the following guidelines to determine if S3 Select is a good fit for your workload:
 
@@ -280,9 +282,7 @@ If your workload experiences the error *Timeout waiting for connection from pool
 The Hive connector can access data stored in GCS, using the `gs://` URI prefix. Please refer to the `hive-gcs-tutorial` for step-by-step instructions.
 
 
-### GCS Configuration properties
-
- 
+### GCS Configuration Properties
 
 | Property Name                 | Description                                                  |
 | :---------------------------- | :----------------------------------------------------------- |
@@ -316,14 +316,11 @@ files that are matching the predicates provided via `cache table` sql statement.
 | `hive.orc.row-data.block.cache.ttl`        | TTL for ORC row group cache                          | `4 hours` |
 | `hive.orc.row-data.block.cache.max.weight` | Maximum weight of ORC row group cache                | `20 GB`  |
 
-TTL is time taken since cache entry was last accessed by read or write. Timed expiration is performed with periodic maintenance during writes 
-and occasionally during reads, as discussed below.
+TTL is time taken since cache entry was last accessed by read or write. Timed expiration is performed with periodic maintenance during writes and occasionally during reads, as follows:
 
 ## Table Statistics
 
 When writing data, the Hive connector always collects basic statistics (`numFiles`, `numRows`, `rawDataSize`, `totalSize`) and by default will also collect column level statistics:
-
- 
 
 | Column Type | Collectible Statistics                                     |
 | :---------- | :--------------------------------------------------------- |
@@ -355,13 +352,9 @@ When analyzing a partitioned table, the partitions to analyze can be specified v
 
 This query will collect statistics for two partitions with keys `p1_value1, p1_value2` and `p2_value1, p2_value2`.
 
-
-
 ## Hive ACID support
 
 openLooKeng supports ACID transactions (INSERT,UPDATE,DELETE) on a transactional table in Hive.
-
-
 
 ### Create Transactional Table using Hive Connector
 
@@ -379,8 +372,6 @@ CREATE TABLE hive_acid_table (
   WITH (format='ORC', transactional=true);
 ```
 
-
-
 ### INSERT on transactional tables
 
 Insert operation remains same from end-user perspective for both transactional and non-transactional tables.
@@ -393,8 +384,6 @@ INSERT INTO hive_acid_table
      (1, 'foo'),
      (2, 'bar');
 ```
-
-
 
 ### UPDATE on transactional tables
 
@@ -466,8 +455,6 @@ lk:default> SELECT * FROM hive_acid_table;
 (1 row)
 ```
 
-
-
 ### VACUUM on transactional tables
 
 Hive maintains all transactions (INSERT/UPDATE/DELETE) in separate delta directories for bookkeeping purposes. DELETE transactions does not remove the old rows physically in stored data, instead they just mark them as deleted in a new file. UPDATE uses split-update mechanism  to update data. Due to these, read operations on table needs to read many files, which adds extra overhead. All these delta files needs to be merged to get consolidated data for faster processing. VACUUM operation in openLooKeng does the work of merging these delta files.
@@ -491,7 +478,9 @@ The above operation triggers the VACUUM on `hive_acid_table` to merge all delta 
 
 -----
 
-**NOTE**: Currently there is no command to fetch the result of asynchronous VACUUM, but it can be monitored from UI. 
+**NOTE**
+
+*Currently, there is no command to fetch the result of asynchronous VACUUM, but it can be monitored from UI.* 
 
 -----
 
@@ -505,11 +494,11 @@ VACUUM TABLE hive_acid_table
 
 ```
 
-The Above operation triggers the VACUUM FULL on `hive_acid_table` and once it reaches RUNNING state, it continues to run asynchronously, unblocking client. 
+The above operation triggers the VACUUM FULL on `hive_acid_table` and once it reaches RUNNING state, it continues to run asynchronously, unblocking client. 
 
 ##### VACUUM on partitioned table
 
-If the table is partitioned then  VACUUM operation can operate upon the specific partition separately instead of all partitions of the table together.  
+If the table is partitioned then VACUUM operation can operate upon the specific partition separately instead of all partitions of the table together.  
 
 Example: Creating the partition table and INSERT data:
 
@@ -541,7 +530,7 @@ If `PARTITION 'class=5' ` is not specified then vacuum operation will run on all
 
 ##### AND WAIT option
 
-By default, VACUUM operations runs in asynchronously, i.e. Once the query reaches RUNNING state, client will not wait anymore for completion of operation.
+By default, VACUUM operations runs in asynchronously, that is Once the query reaches RUNNING state, client will not wait anymore for completion of operation.
 
 Adding `AND WAIT` option to vacuum operation makes the client wait synchronously for the completion of  Vacuum operation.
 
@@ -716,7 +705,7 @@ Drop a schema:
 DROP SCHEMA hive.web
 ```
 
-## Metastore Cache:
+## Metastore Cache
 
 Hive connector maintains a metastore cache to service the metastore request faster to various operations. Loading, reloading and retention times of the cache entries can be configured in `hive.properties`.
 
@@ -730,7 +719,9 @@ Hive connector maintains a metastore cache to service the metastore request fast
   hive.metastore-db-refresh-interval=3m
   ```
 
-**Note:** In cases where user operates on the data directly and if hive metastore is modified externally (eg. directly by Hive, Spark), there is a possibility of cache having older data. For the same user should configure the cache refresh and eviction times accordingly.
+**Note** 
+
+*In cases where user operates on the data directly and if hive metastore is modified externally (for example, directly by Hive, Spark), there is a possibility of cache having older data. For the same user should configure the cache refresh and eviction times accordingly.*
 
 In order reduce the inconsistency, hive connector also validates the partition & its statistics cache entries `on read` against table and partition-names cache (which refreshes at higher frequency) in case the table refresh time is higher than `5mins`.
 
@@ -740,7 +731,7 @@ REFRESH META CACHE
 Additionally, metadata cache refresh command can be used to reload the metastore cache by user.
 
 
-## Performance tuning notes:
+## Performance Tuning Notes
 
 #### INSERT
 
@@ -792,14 +783,14 @@ Additionally, metadata cache refresh command can be used to reload the metastore
 
     ```properties
     hive.metastore-timeout=<TimeWithUnit>;
-
+    
     #Note: `TimeWithUnit' is the time with unit in seconds or minutes. 
     #Default: 10s (where 's' stands for seconds)
     #Recommended value: For operation in large partition table it can be 60s or higher. This needs to be configured according to the data volume. The values shown here are for reference only. It is recommended to adjust them according to the actual situation.
     ```
 
 
-  
+
 
 * ##### Parallel Metastore operations
 
@@ -813,8 +804,10 @@ Additionally, metadata cache refresh command can be used to reload the metastore
 
   Based on the number of thread pool that many parallel HMS operation can be called, this shall reduce the overall time to get the partitions.
 
-  **Note**: additionally, multiple Hive Metastore services can be added to the cluster, the same will be accessed in round-robin manner thereby ensuring better load over hive metastore.
+  **Note**
 
+  *Additionally, multiple Hive Metastore services can be added to the cluster, the same will be accessed in round-robin manner thereby ensuring better load over hive metastore.*
+  
   ``` properties
   hive.metastore-write-batch-size = 64
   #Default: 8
@@ -822,7 +815,9 @@ Additionally, metadata cache refresh command can be used to reload the metastore
   ```
   This reduces the round trip time between the HMS and openlookeng coordinator server.
   
-  **Note**: this can also be configured using hive session property `hive.metastore_write_batch_size`. 
+  **Note**
+  
+  *This can also be configured using hive session property `hive.metastore_write_batch_size`.* 
 
 
 * ##### Direct Delete for whole partition deletes

@@ -58,7 +58,7 @@ When Hive metastore accesses GCS, it will by default see fake POSIX permissions 
 data access. There are two possible solutions to this problem:
 
 -   Run openLooKeng service and Hive service as the same user.
--   Make sure Hive GCS configuration includes a`fs.gs.reported.permissions` property with a value of `777`.
+-   Ensure Hive GCS configuration includes a`fs.gs.reported.permissions` property with a value of `777`.
 
 Accessing GCS Data From openLooKeng for the First Time
 -----------------------------------------------
@@ -102,7 +102,7 @@ Writing GCS Data with openLooKeng
 
 ### Prerequisites
 
-Before you attempt to write data to GCS, ensure you have configured everything necessary to read data from GCS.
+Before you attempt to write data to GCS, ensure that you have configured everything necessary to read data from GCS.
 
 ### Create Export Schema
 

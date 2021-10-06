@@ -4,7 +4,7 @@ Thrift Connector
 
 The Thrift connector makes it possible to integrate with external storage systems without a custom openLooKeng connector implementation.
 
-In order to use the Thrift connector with an external system, you need to implement the `PrestoThriftService` interface, found below. Next, you configure the Thrift connector to point to a set of machines, called Thrift servers, that implement the interface. As part of the interface implementation, the Thrift servers will provide metadata, splits and data. The connector will randomly choose a server to talk to from the available instances for metadata calls, or for data calls unless the splits include a list of addresses. All requests are assumed to be idempotent and can be retried freely among any server.
+In order to use the Thrift connector with an external system, you need to implement the `PrestoThriftService` interface, found below. Next, you configure the Thrift connector to point to a set of machines, called Thrift servers, that implement the interface. As part of the interface implementation, the Thrift servers will provide metadata, splits and data. The connector chooses a server to talk to from the available instances for metadata calls randomly, or for data calls unless the splits include a list of addresses. All requests are assumed to be idempotent and can be retried freely among any server.
 
 Configuration
 -------------

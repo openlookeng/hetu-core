@@ -8,12 +8,19 @@
 The Carbondata connector allows querying data stored in a Carbondata warehouse. Carbondata is a combination of three components:
 
 - Data files in carbondata storage formats that are typically stored in the Hadoop Distributed File System (HDFS).
-- This metadata is only for table and column schema validation. carbondata metadata is stored along with the data files and is accessed via the Hive Metastore Service(HMS).
+- This metadata is only for table and column schema validation. carbondata metadata is stored along with the data files and is accessed through the Hive Metastore Service (HMS).
 - A query language called HiveQL/SparkSQL. This query language is executed on a distributed computing framework such as MapReduce or Spark.
 
-openLooKeng only uses the first two components: the data and the metadata. It does not use HiveQL/SparkSQL or any part of Hive’s execution environment.
+openLooKeng uses the first two components as follows:
 
-**Note:** *Carbondata 2.0.1 is supported from openLooKeng*
+- data 
+- metadata
+
+It does not use HiveQL/SparkSQL or any part of Hive’s execution environment.
+
+**Note** 
+
+*Carbondata 2.0.1 is supported from openLooKeng*.
 
 ## Configuration
 
@@ -60,51 +67,51 @@ The properties that apply to Carbondata connector security are listed in the [Ca
 
 ## Carbondata Configuration Properties
 
-| Property Name                           | Description                                                  | Default                                       |
-| --------------------------------------- | :----------------------------------------------------------- | --------------------------------------------- |
-| carbondata.store-location               | Specifies the location of the storage for carbondata warehouse. If not specified, it uses default hive warehouse path, i.e */user/hive/warehouse/**carbon.store*** | ${hive.metastore.warehouse.dir} /carbon.store |
-| carbondata.minor-vacuum-seg-count       | Specifies the number of segments that may be considered for Minor Vacuum on a Carbondata table. If not specified or set to a number < 2, all available segments are considered | NONE                                          |
-| carbondata.major-vacuum-seg-size        | Specifies the size limit (in GB) for Major Vacuum on a Carbondata table. All segments whose cumulative size is less than this threshold will be considered. If not specified, it uses default Vacuum value, that is 1GB | 1GB                                           |
-| hive.metastore                          | The type of Hive metastore to use. openLooKeng currently supports the default Hive Thrift metastore (thrift). | thrift                                        |
-| hive.config.resources                   | A comma-separated list of HDFS configuration files. These files must exist on the machines running openLooKeng.    Example: /etc/hdfs-site.xml |                                               |
-| hive.hdfs.authentication.type           | HDFS authentication type. Possible values are NONE or KERBEROS. | NONE                                          |
-| hive.hdfs.impersonation.enabled         | Enable HDFS end user impersonation.                          | false                                         |
-| hive.hdfs.presto.principal              | The Kerberos principal that openLooKeng will use when connecting to HDFS. |                                               |
-| hive.hdfs.presto.keytab                 | HDFS client keytab location.                                 |                                               |
-| hive.collect-column-statistics-on-write | Enables automatic column level statistics collection on write. See [Table Statistics](./hive.md#table-statistics) for details. | true                                          |
-| carbondata.vacuum-service-threads       | Specifies number of threads for Auto-Vacuum & Auto-cleanup. Min value is 1. | 2                                             |
-| carbondata.auto-vacuum-enabled          | Enable auto-vacuum on carbondata tables. To enable auto-vacuum on engine side, add auto-vacuum.enabled=true in config.properties of coordinator node(s). | false                                         |
+| Property Name                             | Description                                                  | Default                                         |
+| ----------------------------------------- | :----------------------------------------------------------- | ----------------------------------------------- |
+| `carbondata.store-location`               | Specifies the location of the storage for carbondata warehouse. If not specified, it uses default hive warehouse path, that is */user/hive/warehouse/**carbon.store*** | `${hive.metastore.warehouse.dir} /carbon.store` |
+| `carbondata.minor-vacuum-seg-count`       | Specifies the number of segments that may be considered for Minor Vacuum on a Carbondata table. If not specified or set to a number < 2, all available segments are considered | `NONE`                                          |
+| `carbondata.major-vacuum-seg-size`        | Specifies the size limit (in GB) for Major Vacuum on a Carbondata table. All segments whose cumulative size is less than this threshold will be considered. If not specified, it uses default Vacuum value, that is 1GB | `1GB`                                           |
+| `hive.metastore`                          | The type of Hive metastore to use. openLooKeng currently supports the default Hive Thrift metastore (thrift). | `thrift`                                        |
+| `hive.config.resources`                   | A comma-separated list of HDFS configuration files. These files must exist on the machines running openLooKeng.    Example: /etc/hdfs-site.xml |                                                 |
+| `hive.hdfs.authentication.type`           | HDFS authentication type. Possible values are NONE or KERBEROS. | `NONE`                                          |
+| `hive.hdfs.impersonation.enabled`         | Enable HDFS end user impersonation.                          | `false`                                         |
+| `hive.hdfs.presto.principal`              | The Kerberos principal that openLooKeng will use when connecting to HDFS. |                                                 |
+| `hive.hdfs.presto.keytab`                 | HDFS client keytab location.                                 |                                                 |
+| `hive.collect-column-statistics-on-write` | Enables automatic column level statistics collection on write. See [Table Statistics](./hive.md#table-statistics) for details. | `true`                                          |
+| `carbondata.vacuum-service-threads`       | Specifies number of threads for Auto-Vacuum & Auto-cleanup. Min value is 1. | `2`                                             |
+| `carbondata.auto-vacuum-enabled`          | Enable auto-vacuum on carbondata tables. To enable auto-vacuum on engine side, add auto-vacuum.enabled=true in config.properties of coordinator node(s). | `false`                                         |
 
 
 ## Hive Thrift Metastore Configuration Properties
 
-| Property Name                      | Description                                                  |
-| ---------------------------------- | ------------------------------------------------------------ |
-| hive.metastore.uri                 | The URI(s) of the Hive metastore to connect to using the Thrift protocol. If multiple URIs are provided, the first URI is used by default and the rest of the URIs are fallback metastores. This property is required.                                                               Example: thrift://192.0.2.3:9083 or thrift://192.0.2.3:9083,thrift://192.0.2.4:9083 |
-| hive.metastore.username            | The username openLooKeng will use to access the Hive metastore. |
-| hive.metastore.authentication.type | Hive metastore authentication type. Possible values are NONE or KERBEROS (defaults to NONE). |
-| hive.metastore.service.principal   | The Kerberos principal of the Hive metastore service.        |
-| hive.metastore.client.principal    | The Kerberos principal that openLooKeng will use when connecting to the Hive metastore service. |
-| hive.metastore.client.keytab       | Hive metastore client keytab location.                       |
+| Property Name                        | Description                                                  |
+| ------------------------------------ | ------------------------------------------------------------ |
+| `hive.metastore.uri`                 | The URI(s) of the Hive metastore to connect to using the Thrift protocol. If multiple URIs are provided, the first URI is used by default and the rest of the URIs are fallback metastores. This property is required.                                                               Example: `thrift://192.0.2.3:9083` or `thrift://192.0.2.3:9083,thrift://192.0.2.4:9083` |
+| `hive.metastore.username`            | The username openLooKeng will use to access the Hive metastore. |
+| `hive.metastore.authentication.type` | Hive metastore authentication type. Possible values are `NONE` or `KERBEROS` (defaults to `NONE`). |
+| `hive.metastore.service.principal`   | The Kerberos principal of the Hive metastore service.        |
+| `hive.metastore.client.principal`    | The Kerberos principal that openLooKeng will use when connecting to the Hive metastore service. |
+| `hive.metastore.client.keytab`       | Hive metastore client keytab location.                       |
 
 ## Table Statistics
 
-When writing data, the Carbondata connector always collects basic statistics (numFiles, numRows, rawDataSize, totalSize) and by default will also collect column level statistics:
+When writing data, the Carbondata connector always collects basic statistics (`numFiles`, `numRows`, `rawDataSize`, `totalSize`) and by default will also collect column level statistics:
 
 | Column Type      | Null-Count | Distinct values count | Min/Max |
 | ---------------- | ---------- | --------------------- | ------- |
-| SMALLINT  | Y          | Y                     | Y       |
-| INTEGER    | Y          | Y                     | Y       |
-| BIGINT     | Y          | Y                     | Y       |
-| DOUBLE    | Y          | Y                     | Y       |
-| REAL     | Y          | Y                     | Y       |
-| DECIMAL   | Y          | Y                     | Y       |
-| DATE     | Y          | Y                     | Y       |
-| TIMESTAMP | Y          | Y                     | N       |
-| VARCHAR    | Y          | Y                     | N       |
-| CHAR     | Y          | Y                     | N       |
-| VARBINARY  | Y          | N                     | N       |
-| BOOLEAN    | Y          | Y                     | N       |
+| `SMALLINT` | Y          | Y                     | Y       |
+| `INTEGER`  | Y          | Y                     | Y       |
+| `BIGINT`   | Y          | Y                     | Y       |
+| `DOUBLE`  | Y          | Y                     | Y       |
+| `REAL`   | Y          | Y                     | Y       |
+| `DECIMAL` | Y          | Y                     | Y       |
+| `DATE`   | Y          | Y                     | Y       |
+| `TIMESTAMP` | Y          | Y                     | N       |
+| `VARCHAR`  | Y          | Y                     | N       |
+| `CHAR`   | Y          | Y                     | N       |
+| `VARBINARY` | Y          | N                     | N       |
+| `BOOLEAN`  | Y          | Y                     | N       |
 
 ## Auto-cleanup
 
@@ -117,7 +124,7 @@ The Carbondata connector supports querying and manipulating Carbondata tables an
 
 ### Create Table
 
-Create a new table orders:
+Create a new table `orders`:
 
 ```sql
 CREATE TABLE orders (
@@ -136,7 +143,7 @@ Supported properties
 | -------- | ------------------------------------------------------------ | -------- |
 | location | Specified directory is used to store table data. <br />If absent, default file system location will be used. | Optional |
 
-Create a new table orders at specified location:
+Create a new table `orders` at specified location:
 
 ```sql
 CREATE TABLE orders_with_store_location (
@@ -148,9 +155,9 @@ CREATE TABLE orders_with_store_location (
 WITH ( location = '/store/path' );
 ```
 
-**Note**:
+**Note**
 
-- *If path is not fully qualified domain name, it will be stored in default file system.*
+*If path is not fully qualified domain name, it will be stored in default file system.*
 
 
 
@@ -171,7 +178,7 @@ WITH ( location = '/backup/store/path' )
 
 ### Insert
 
-Load additional rows into the orders table:
+Load additional rows into the `orders` table:
 
 ```sql
 INSERT INTO orders
@@ -194,7 +201,7 @@ SELECT * FROM delivered_orders;
 
 ### Update
 
-Update all rows of table orders:
+Update all rows of table `orders`:
 
 ```sql
 UPDATE orders SET orderstatus = 'Ready';
@@ -215,7 +222,7 @@ Delete all rows in table orders::
 DELETE FROM orders;
 ```
 
-Delete table orders with filter condition::
+Delete table `orders` with filter condition::
 
 ```sql
 DELETE FROM orders WHERE orderstatus = 'Not Available';
@@ -231,15 +238,15 @@ DROP TABLE orders;
 
 ### Vacuum
 
-Vacuum operation translates to compaction in Carbondata. In Carbondata, there are two types of vacuum operation, Major and Minor.
+Vacuum operation translates to `compaction` in Carbondata. In Carbondata, there are two types of vacuum operation, `Major` and `Minor`.
 
 The following is a short description of the mapping between VACUUM and Carbondata compaction-
 
-* VACUUM TABLE table_name FULL translates to Major compaction which compacts segments based on a cumulative size restriction.
+* `VACUUM TABLE table_name FULL` translates to Major compaction which compacts segments based on a cumulative size restriction.
 
-* VACUUM TABLE table_name translates to Minor compaction which compacts segments based on a count restriction.
+* `VACUUM TABLE table_name` translates to Minor compaction which compacts segments based on a count restriction.
 
-The below operation triggers Minor Vacuum on a table with name, carbondata_table to merge multiple segments to a single segment. 
+The below operation triggers Minor Vacuum on a table with name, `carbondata_table` to merge multiple segments to a single segment. 
 ```sql
 VACUUM TABLE carbondata_table;
 ```
@@ -263,7 +270,7 @@ This will also display the number of rows in the table that are being compacted.
 
 The following operations are not supported currently with Carbondata connector:
 
-- sort_by, bucketed_by and partitioned_by table properties are not supported while CREATE TABLE.
+- `sort_by`, `bucketed_by` and `partitioned_by` table properties are not supported while `CREATE TABLE`.
 - Materialized views are not supported.
 - Complex data types such as Arrays, Lists and Maps are not supported.
 - Alter table usage is not supported.

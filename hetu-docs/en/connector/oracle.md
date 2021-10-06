@@ -165,9 +165,9 @@ lk:default> SELECT * FROM oracle_table;
 
 | Configuration Item| Description| Default Value|
 |----------|----------|----------|
-| unsupported-type.handling-strategy| Specifies how to handle an unsupported column data type:<br />**FAIL** - report an error.<br />**IGNORE** \- The column cannot be accessed.<br /> **CONVERT_TO_VARCHAR** - Convert the column to a unbounded `VARCHAR`. | FAIL |
+| unsupported-type.handling-strategy| Specifies how to handle an unsupported column data type:<br />`FAIL` - report an error.<br />`IGNORE` \- The column cannot be accessed.<br /> `CONVERT_TO_VARCHAR` - Convert the column to a unbounded `VARCHAR`. | `FAIL` |
 | oracle.number.default-scale| If the precision and number of decimal places are not specified for the **number** data type in the Oracle database, the **number** data type is converted to an openLooKeng data type. The precision is converted based on this item.| 0|
-| oracle.number.rounding-mode| Rounding mode of the Oracle **NUMBER** data type. This item is useful when the size specified by the Oracle **NUMBER** data type is greater than that supported by Presto. The possible values are as follows:<br /> **UNNECESSARY** - Rounding mode, to assert that the requested operation has an accurate result, so no rounding is required.<br /> **CEILING** - Round to positive infinity. <br />**FLOOR** - Round to negative infinity. <br />**HALF_DOWN** - Rounds to the nearest neighbor. If the distances of two neighbors are the same, round down to the nearest neighbor.<br />**HALF_EVEN** - If the distances of two neighbors are the same, round down to the even neighbor.<br />**HALF_UP** \- Round to the nearest neighbor. If the distances of two neighbors are the same, round up to the nearest neighbor. <br />**UP** - Round up to zero.<br /> **DOWN** - Round down to zero. | UNNECESSARY |
+| oracle.number.rounding-mode| Rounding mode of the Oracle `NUMBER` data type. This item is useful when the size specified by the Oracle `NUMBER` data type is greater than that supported by Presto. The possible values are as follows:<br /> `UNNECESSARY` - Rounding mode, to assert that the requested operation has an accurate result, so no rounding is required.<br /> `CEILING` - Round to positive infinity. <br />`FLOOR` - Round to negative infinity. <br />`HALF_DOWN` - Rounds to the nearest neighbor. If the distances of two neighbors are the same, round down to the nearest neighbor.<br />`HALF_EVEN` - If the distances of two neighbors are the same, round down to the even neighbor.<br />`HALF_UP` \- Round to the nearest neighbor. If the distances of two neighbors are the same, round up to the nearest neighbor. <br />`UP` - Round up to zero.<br /> `DOWN` - Round down to zero. | `UNNECESSARY` |
 
 ### Type Mapping From Oracle to openLooKeng
 
@@ -274,7 +274,7 @@ openLooKeng supports the standard SQL:2003 syntax, which is different from the O
 
 ## Support for Oracle Synonyms
 
-To ensure performance, the openLooKeng disables the Oracle **SYNONYM** function by default. You can enable this function by the following configuration:
+To ensure performance, the openLooKeng disables the Oracle `SYNONYM` function by default. You can enable this function by the following configuration:
 
 ```
 oracle.synonyms.enabled=true

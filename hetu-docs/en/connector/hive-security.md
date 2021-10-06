@@ -7,31 +7,31 @@
 
 You can enable authorization checks for the [hive](./hive.md) by setting the `hive.security` property in the Hive catalog properties file. This property must be one of the following values:
 
-| Property Value         | Description                                                  |
-| :--------------------- | :----------------------------------------------------------- |
-| legacy (default value) | Few authorization checks are enforced, thus allowing most operations. The configuration properties **hive.allow-drop-table**, **hive.allow-rename-table**, **hive.allow-add-column**, **hive.allow-drop-column** and **hive.allow-rename-column** are used. |
-| read-only              | Operations that read data or metadata, such as SELECT, are permitted, but none of the operations that write data or metadata, such as CREATE, INSERT or DELETE, are allowed. |
-| file                   | Authorization checks are enforced using a config file specified by the Hive configuration property **security.config-file**. See [File Based Authorization](./hive-security.md#file-based-authorization) for details. |
-| sql-standard           | Users are permitted to perform the operations as long as they have the required privileges as per the SQL standard. In this mode, openLooKeng enforces the authorization checks for queries based on the privileges defined in Hive metastore. To alter these privileges, use the [GRANT](../sql/grant.md) and [REVOKE](../sql/revoke.md) commands.                                                                See [SQL Standard Based Authorization](./hive-security.md#sql-standard-based-authorization) for details. |
+| Property Value           | Description                                                  |
+| :----------------------- | :----------------------------------------------------------- |
+| `legacy` (default value) | Few authorization checks are enforced, thus allowing most operations. The configuration properties `hive.allow-drop-table`, `hive.allow-rename-table`, `hive.allow-add-column`, `hive.allow-drop-column` and `hive.allow-rename-column` are used. |
+| `read-only`              | Operations that read data or metadata, such as `SELECT`, are permitted, but none of the operations that write data or metadata, such as `CREATE`, `INSERT` or `DELETE`, are allowed. |
+| `file`                   | Authorization checks are enforced using a config file specified by the Hive configuration property `security.config-file`. See [File Based Authorization](./hive-security.md#file-based-authorization) for details. |
+| `sql-standard`           | Users are permitted to perform the operations as long as they have the required privileges as per the SQL standard. In this mode, openLooKeng enforces the authorization checks for queries based on the privileges defined in Hive metastore. To alter these privileges, use the [GRANT](../sql/grant.md) and [REVOKE](../sql/revoke.md) commands.                                                                See [SQL Standard Based Authorization](./hive-security.md#sql-standard-based-authorization) for details. |
 
 ### SQL Standard Based Authorization
 
-When sql-standard security is enabled, openLooKeng enforces the same SQL standard based authorization as Hive does.
+When `sql-standard` security is enabled, openLooKeng enforces the same SQL standard based authorization as Hive does.
 
-Since openLooKeng\'s ROLE syntax support matches the SQL standard, and Hive does not exactly follow the SQL standard, there are the following limitations and differences:
+Since openLooKeng\'s `ROLE` syntax support matches the SQL standard, and Hive does not exactly follow the SQL standard, there are the following limitations and differences:
 
--   CREATE ROLE role WITH ADMIN is not supported.
--   The admin role must be enabled to execute CREATE ROLE or DROP ROLE.
--   GRANT role TO user GRANTED BY someone is not supported.
--   REVOKE role FROM user GRANTED BY someone is not supported.
--   By default, all a user\'s roles except admin are enabled in a new user session.
--   One particular role can be selected by executing SET ROLE role.
--   SET ROLE ALL enables all of a user\'s roles except admin.
--   The admin role must be enabled explicitly by executingSET ROLE admin.
+-   `CREATE ROLE role WITH ADMIN` is not supported.
+-   The `admin` role must be enabled to execute `CREATE ROLE` or `DROP ROLE`.
+-   `GRANT role TO user GRANTED BY` someone is not supported.
+-   `REVOKE role FROM user GRANTED BY` someone is not supported.
+-   By default, all a user\'s roles except `admin` are enabled in a new user session.
+-   One particular role can be selected by executing `SET ROLE role`.
+-   `SET ROLE ALL` enables all of a user\'s roles except `admin`.
+-   The `admin` role must be enabled explicitly by executing `SET ROLE admin`.
 
 ## Authentication
 
-The default security configuration of the **/connector/hive** does not use
+The default security configuration of the `/connector/hive` does not use
 authentication when connecting to a Hadoop cluster. All queries are executed as the user who runs the openLooKeng process, regardless of which user submits the query.
 
 The Hive connector provides additional security options to support Hadoop clusters that have been configured to use [Kerberos](#kerberos-support).
@@ -60,32 +60,32 @@ Access to these services by the Hive connector is configured in the properties f
 
 **Note**
 
-*If your krb5.conf location is different from /etc/krb5.conf you must set it explicitly using the java.security.krb5.conf JVM property in jvm.config file.*
+*If your `krb5.conf` location is different from `/etc/krb5.conf` you must set it explicitly using the `java.security.krb5.conf` JVM property in `jvm.config` file.*
 
-*Example: -Djava.security.krb5.conf=/example/path/krb5.conf.*
+*Example: -`Djava.security.krb5.conf=/example/path/krb5.conf`.*
 
 
 ### Hive Metastore Thrift Service Authentication
 
 In a Kerberized Hadoop cluster, openLooKeng connects to the Hive metastore Thrift service using
-SASL (Simple Authentication and Security Layer) and authenticates using Kerberos. Kerberos authentication for the metastore is configured in the connector\'s properties file using the following properties:
+`SASL (Simple Authentication and Security Layer)` and authenticates using Kerberos. Kerberos authentication for the metastore is configured in the connector\'s properties file using the following properties:
 
-| Property Name                               | Description                                                  |
-| :------------------------------------------ | :----------------------------------------------------------- |
-| hive.metastore.authentication.type          | Hive metastore authentication type.                          |
-| hive.metastore.thrift.impersonation.enabled | Enable Hive metastore end user impersonation.                |
-| hive.metastore.service.principal            | The Kerberos principal of the Hive metastore service.        |
-| hive.metastore.client.principal             | The Kerberos principal that openLooKeng will use when connecting to the Hive metastore service. |
-| hive.metastore.client.keytab                | Hive metastore client keytab location.                       |
-| hive.metastore.krb5.conf.path               | The Kerberos configuration file location.                    |
+| Property Name                                 | Description                                                  |
+| :-------------------------------------------- | :----------------------------------------------------------- |
+| `hive.metastore.authentication.type`          | Hive metastore authentication type.                          |
+| `hive.metastore.thrift.impersonation.enabled` | Enable Hive metastore end user impersonation.                |
+| `hive.metastore.service.principal`            | The Kerberos principal of the Hive metastore service.        |
+| `hive.metastore.client.principal`             | The Kerberos principal that openLooKeng will use when connecting to the Hive metastore service. |
+| `hive.metastore.client.keytab`                | Hive metastore client keytab location.                       |
+| `hive.metastore.krb5.conf.path`               | The Kerberos configuration file location.                    |
 
-#### hive.metastore.authentication.type
+#### `hive.metastore.authentication.type`
 
-One of NONE or KERBEROS. When using the default value of NONE, Kerberos authentication is disabled and no other properties need to be configured.
+One of `NONE` or `KERBEROS`. When using the default value of `NONE`, Kerberos authentication is disabled and no other properties need to be configured.
 
-When set to KERBEROS the Hive connector will connect to the Hive metastore Thrift service using SASL and authenticate using Kerberos.
+When set to `KERBEROS` the Hive connector will connect to the Hive metastore Thrift service using SASL and authenticate using Kerberos.
 
-This property is optional; the default is NONE.
+This property is optional; the default is `NONE`.
 
 ####  hive.metastore.thrift.impersonation.enabled
 
@@ -93,7 +93,7 @@ Enable end-user Hive metastore impersonation.
 
 This property is optional; the default is `false`.
 
-#### hive.metastore.service.principal
+#### `hive.metastore.service.principal`
 
 The Kerberos principal of the Hive metastore service. The openLooKeng coordinator will use this to authenticate the Hive metastore.
 
@@ -103,7 +103,7 @@ Example: `hive/hive-server-host@EXAMPLE.COM` or `hive/_HOST@EXAMPLE.COM`.
 
 This property is optional; no default value.
 
-#### hive.metastore.client.principal
+#### `hive.metastore.client.principal`
 
 The Kerberos principal that openLooKeng will use when connecting to the Hive metastore.
 
@@ -121,13 +121,13 @@ will be removed, and the data will continue to consume disk space.
 This occurs because the Hive metastore is responsible for deleting the internal table data. When the metastore is configured to use Kerberos authentication, all of the HDFS operations performed by the metastore are impersonated. Errors deleting data are silently ignored.
 
 
-#### hive.metastore.client.keytab
+#### `hive.metastore.client.keytab`
 
 The path to the keytab file that contains a key for the principal specified by  `hive.metastore.client.principal`. This file must be readable by the operating system user running openLooKeng.
 
 This property is optional; no default value.
 
-#### hive.metastore.krb5.conf.path
+#### `hive.metastore.krb5.conf.path`
 The path of Kerberos configuration file. This file must be readable by the operating system user running openLooKeng.
 
 This property is optional; no default value.
@@ -161,21 +161,21 @@ Keytab files must be distributed to every node in the cluster that runs openLooK
 
 In a Kerberized Hadoop cluster, openLooKeng authenticates to HDFS using Kerberos. Kerberos authentication for HDFS is configured in the connector\'s properties file using the following properties:
 
-| Property Name                     | Description                                                  |
-| :-------------------------------- | :----------------------------------------------------------- |
-| hive.hdfs.authentication.type     | HDFS authentication type. Possible values are NONE or KERBEROS. |
-| hive.hdfs.impersonation.enabled   | Enable HDFS end-user impersonation.                          |
-| hive.hdfs.presto.principal        | The Kerberos principal that openLooKeng will use when connecting to HDFS. |
-| hive.hdfs.presto.keytab           | HDFS client keytab location.                                 |
-| hive.hdfs.wire-encryption.enabled | Enable HDFS wire encryption.                                 |
+| Property Name                       | Description                                                  |
+| :---------------------------------- | :----------------------------------------------------------- |
+| `hive.hdfs.authentication.type`     | HDFS authentication type. Possible values are `NONE` or `KERBEROS`. |
+| `hive.hdfs.impersonation.enabled`   | Enable HDFS end-user impersonation.                          |
+| `hive.hdfs.presto.principal`        | The Kerberos principal that openLooKeng will use when connecting to HDFS. |
+| `hive.hdfs.presto.keytab`           | HDFS client keytab location.                                 |
+| `hive.hdfs.wire-encryption.enabled` | Enable HDFS wire encryption.                                 |
 
 #### hive.hdfs.authentication.type
 
-One of NONE or KERBEROS. When using the default value of NONE, Kerberos authentication is disabled and no other properties need to be configured.
+One of `NONE` or `KERBEROS`. When using the default value of `NONE`, Kerberos authentication is disabled and no other properties need to be configured.
 
-When set to KERBEROS, the Hive connector authenticates to HDFS using Kerberos.
+When set to `KERBEROS`, the Hive connector authenticates to HDFS using Kerberos.
 
-This property is optional; the default is NONE.
+This property is optional; the default is `NONE`.
 
 #### `hive.hdfs.impersonation.enabled`
 
@@ -288,8 +288,7 @@ Keytab files contain encryption keys that are used to authenticate principals to
 In particular, access to keytab files should be limited to the accounts that actually need to use them to authenticate. In practice, this is the user that the openLooKeng process runs as. The ownership and permissions on
 keytab files should be set to prevent other users from reading or modifying the files.
 
-Keytab files need to be distributed to every node running openLooKeng. Under common deployment situations, the Hive connector configuration will be the same on all nodes. This means that the keytab needs to be in the
-same location on every node.
+Keytab files need to be distributed to every node running openLooKeng. Under common deployment situations, the Hive connector configuration will be the same on all nodes. This means that the keytab needs to be in the same location on every node.
 
 You should ensure that the keytab files have the correct permissions on every node after distributing them.
 
@@ -325,7 +324,7 @@ These rules govern who may set session properties.
 -   `allowed` (required): boolean indicating whether this session
     property may be set.
 
-See below for an example.
+See the following for an example.
 
 ``` json
 {

@@ -210,7 +210,7 @@ DAY_OF_MONTH($1)
 DAY_OF_YEAR($1)
 ```
 
-**Note**: 
+**Note**
 
 *The functions supported by openLooKeng can also be used in the ClickHouse connector, but functions not in the above list will not be pushed down.*
 

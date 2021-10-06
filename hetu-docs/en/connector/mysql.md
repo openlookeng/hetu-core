@@ -2,7 +2,7 @@
 MySQL Connector
 ===============
 
-The MySQL connector allows querying and creating tables in an external MySQL database. This can be used to join data between different systems like MySQL and Hive, or between two different MySQL instances.
+The MySQL connector allows querying and creating tables in an external MySQL database. This can be used to join data between different systems such as MySQL and Hive, or between two different MySQL instances.
 
 Configuration
 -------------
@@ -37,10 +37,9 @@ jdbc.pushdown-module=FULL_PUSHDOWN
 
 Registration of External Functions
 ----------------------------------
-MySQL connector support to register external functions.
-Config the external function namespace `catalog.schema` 
-which the external function will register to in the catalog property file.
+MySQL connector support to register external functions. Config the external function namespace `catalog.schema` which the external function will register to in the catalog property file.
 For example in the `etc/catalog/mysql.properties`, we can write:
+
 ```Properties
 jdbc.pushdown.remotenamespace=mysqlfun.default
 ```
@@ -50,8 +49,8 @@ External Function Push Down
 MySQL connector support to push external function down to data source.
 
 Config the function namespace `catalog.schema` in the catalog property file to declare
- which function namespaces the connector support to push down,
- for example in the `etc/catalog/mysql.properties`, we can write:
+ which function namespaces the connector support to push down, for example, you can write in the `etc/catalog/mysql.properties`:
+
 ```Properties
 jdbc.pushdown.remotenamespace=mysqlfun1.default|mysqlfun2.default|mysqlfun3.default
 #declare that Connector can support to push down external function register in mysqlfun1.default, mysqlfun2.default and mysqlfun3.default.
@@ -61,8 +60,8 @@ jdbc.pushdown.remotenamespace=mysqlfun1.default|mysqlfun2.default|mysqlfun3.defa
 Multiple MySQL Servers
 ----------------------
 
-You can have as many catalogs as you need, so if you have additional MySQL servers, simply add another properties file to `etc/catalog` with a different name (making sure it ends in `.properties`). For example, if
-you name the property file `sales.properties`, openLooKeng will create a catalog named `sales` using the configured connector.
+You can have as many catalogs as you need, so if you have additional MySQL servers, simply add another properties file to `etc/catalog` with a different name (Ensure it ends in `.properties`). For example, if
+you name the property file `sales.properties`, openLooKeng creates a catalog named `sales` using the configured connector.
 
 Querying MySQL
 --------------

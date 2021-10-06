@@ -2,7 +2,7 @@
 PostgreSQL Connector
 ====================
 
-The PostgreSQL connector allows querying and creating tables in an external PostgreSQL database. This can be used to join data between different systems like PostgreSQL and Hive, or between two different
+The PostgreSQL connector allows querying and creating tables in an external PostgreSQL database. This can be used to join data between different systems such as PostgreSQL and Hive, or between two different
 PostgreSQL instances.
 
 Configuration
@@ -22,7 +22,7 @@ connection-password=secret
 The PostgreSQL connector can only access a single database within a PostgreSQL server. Thus, if you have multiple PostgreSQL databases, or want to connect to multiple PostgreSQL servers, you must configure
 multiple instances of the PostgreSQL connector.
 
-To add another catalog, simply add another properties file to `etc/catalog` with a different name (making sure it ends in `.properties`). For example, if you name the property file `sales.properties`, openLooKeng will create a catalog named `sales` using the configured connector.
+To add another catalog, simply add another properties file to `etc/catalog` with a different name (ensure it ends in `.properties`). For example, if you name the property file `sales.properties`, openLooKeng will create a catalog named `sales` using the configured connector.
 
 Querying PostgreSQL
 -------------------

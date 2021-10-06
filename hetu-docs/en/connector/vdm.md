@@ -15,7 +15,7 @@ The VDM connector supports to:
 VDM uses openLooKeng metastore to store its database information. It can be stored either on HDFS or relational database, depending on the implementation of openLooKeng metastore. 
 
 Therefore metastore must be configured first. 
-* Here is an example of using RDBMS as metastore, create **etc/hetu-metastore.properties**:
+* Here is an example of using RDBMS as metastore, create `etc/hetu-metastore.properties`:
 ```
 # the type of metastore storage
 hetu.metastore.type=jdbc
@@ -26,7 +26,7 @@ hetu.metastore.db.user=root
 # the password of database 
 hetu.metastore.db.password=123456
 ```
-* Here is an example of using HDFS as metastore，create **etc/hetu-metastore.properties**：
+* Here is an example of using HDFS as metastore，create `etc/hetu-metastore.properties`：
 
     Path white list：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]
     
@@ -47,17 +47,17 @@ Check [filesystem](../develop/filesystem.md) for more information.
 
 For user interface, the connector can be accessed from JDBC or command line interface. Currently VDM only supports schemas and views. Tables are NOT supported.
 
-Schema operations are the same as usual openLooKeng catalogs, including **create schema**, **drop schema**, **rename schema** and **show schemas**. 
+Schema operations are the same as usual openLooKeng catalogs, including `create schema`, `drop schema`, `rename schema` and `show schemas`. 
 
 Views can be created under a specific schema: create view as ..., drop view.
 
 ## Example Usage
 
-Configure a data source **vdm1** by creating **vdm1.properties** in **etc/catalogs** with following contents:
+Configure a data source `vdm1` by creating `vdm1.properties` in `etc/catalogs` with following contents:
 
     connector.name=vdm
 
-This example creates a schema **schema1** in **vdm1** catalog, and creates two views from two other different data sources. 
+This example creates a schema `schema1` in `vdm1` catalog, and creates two views from two other different data sources. 
 
 **Note** 
 
@@ -75,18 +75,19 @@ VDM datasource can also be managed through dynamic catalog API. See [Dynamic Cat
 
 | Support operation               | External interface (SQL command) |
 | :------------------------------ | :------------------------------- |
-| Add VDM                         | create catalog(resulful)       |
-| Remove VDM                      | drop catalog(resulful)         |
-| Query all VDM                   | show catalogs                  |
-| Create schema                   | create schema                  |
-| Delete schema                   | drop schema                    |
-| Rename schema                   | rename schema                  |
-| Query all schemas under VDM     | show schemas                   |
-| Query all views in the schema   | show tables                    |
-| Create/Update View              | create [or replace] view       |
-| Delete view                     | drop view                      |
-| Query data by view              | select             |
-| Query view creation information | show create view               |
-| Query view column information   | describe                      |
+| Add VDM                         | `create catalog`(resulful)     |
+| Remove VDM                      | `drop catalog`(resulful)       |
+| Query all VDM                   | `show catalogs`                |
+| Create schema                   | `create schema`                |
+| Delete schema                   | `drop schema`                  |
+| Rename schema                   | `rename schema`              |
+| Query all schemas under VDM     | `show schemas`                 |
+| Query all views in the schema   | `show tables`                  |
+| Create/Update View              | `create [or replace] view`     |
+| Delete view                     | `drop view`                    |
+| Query data by view              | `select`           |
+| Query view creation information | `show create view`             |
+| Query view column information   | `describe`                    |
 
 See [SQL Statement Syntax](../sql/_index.md) topic for more information.
+

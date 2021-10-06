@@ -2,12 +2,12 @@
 System Connector
 ================
 
-The System connector provides information and metrics about the currently running openLooKeng cluster. It makes this available via normal SQL queries.
+The System connector provides information and metrics about the currently running openLooKeng cluster. It makes this available through normal SQL queries.
 
 Configuration
 -------------
 
-The System connector doesn\'t need to be configured: it is automatically available via a catalog named `system`.
+The System connector does not need to be configured: it is automatically available through a catalog named `system`.
 
 Using the System Connector
 --------------------------
@@ -68,5 +68,5 @@ System Connector Procedures
 
 **runtime.kill\_query(query\_id, message)**
 
-Kill the query identified by `query_id`. The query failure message will include the specified `message`.
+Kill the query identified by `query_id`. The query failure message includes the specified `message`.
 

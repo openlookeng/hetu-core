@@ -2,7 +2,7 @@
 Kylin Connector
 ===============
 
-The Kylin connector allows querying tables in an external Kylin database. This can be used to join data between different systems like Kylin and Hive, or between two different Kylin instances.
+The Kylin connector allows querying tables in an external Kylin database. This can be used to join data between different systems such as Kylin and Hive, or between two different Kylin instances.
 
 Configuration
 -------------

@@ -125,8 +125,8 @@ Kafka maintains topics only as byte messages and leaves it to producers and cons
 
 **Note**
 
-For textual topics that contain JSON data, it is entirely possible to not use any table definition files, but instead use the openLooKeng `/functions/json` to parse the `_message`
-column which contains the bytes mapped into an UTF-8 string. This is, however, pretty cumbersome and makes it difficult to write SQL queries.
+*For textual topics that contain JSON data, it is entirely possible to not use any table definition files, but instead use the openLooKeng `/functions/json` to parse the `_message`*
+*column which contains the bytes mapped into an UTF-8 string. This is, however, pretty cumbersome and makes it difficult to write SQL queries.*
 
 
 A table definition file consists of a JSON definition for a table. The name of the file can be arbitrary but must end in `.json`.
@@ -371,8 +371,6 @@ Table below lists supported openLooKeng types which can be used in `type` for th
 | `VARBINARY`              | `FIXED`, `BYTES`       |
 | `ARRAY`                  | `ARRAY`                |
 | `MAP`                    | `MAP`                  |
-
-
 
 #### Avro schema evolution
 

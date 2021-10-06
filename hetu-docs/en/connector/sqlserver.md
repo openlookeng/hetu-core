@@ -2,7 +2,7 @@
 SQL Server Connector
 ====================
 
-The SQL Server connector allows querying and creating tables in an external SQL Server database. This can be used to join data between different systems like SQL Server and Hive, or between two different SQL Server instances.
+The SQL Server connector allows querying and creating tables in an external SQL Server database. This can be used to join data between different systems such as SQL Server and Hive, or between two different SQL Server instances.
 
 Configuration
 -------------

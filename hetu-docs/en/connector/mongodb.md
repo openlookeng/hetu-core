@@ -8,7 +8,7 @@ The MongoDB connector allows MongoDB collections to be used as tables in the ope
 
 ## Configuration
 
-To configure the MongoDB connector, create a catalog property file **etc/catalog/mongodb.properties** by referring to the following content and replace the properties as required:
+To configure the MongoDB connector, create a catalog property file `etc/catalog/mongodb.properties` by referring to the following content and replace the properties as required:
 
 ```properties
 connector.name=mongodb
@@ -17,7 +17,7 @@ mongodb.seeds=host1,host:port
 
 ### Multiple MongoDB Clusters
 
-Multiple catalogs can be created as required. Therefore, if there is an additional MongoDB cluster, you only need to add another property file with a different name to **etc/catalog** (ensure that it ends with **.properties**). For example, if you name the property file as **sales.properties**, the openLooKeng will create a catalog named **sales** using the configured connector.
+Multiple catalogs can be created as required. Therefore, if there is an additional MongoDB cluster, you only need to add another property file with a different name to `etc/catalog` (ensure that it ends with `.properties`). For example, if you name the property file as `sales.properties`, the openLooKeng will create a catalog named `sales` using the configured connector.
 
 ## Configuring Properties
 
@@ -25,104 +25,104 @@ The following properties are available:
 
 | Property Name| Description|
 |----------|----------|
-| mongodb.seeds | List of all mongod servers|
-| mongodb.schema-collection | A collection of schema information|
-| mongodb.case-insensitive-name-matching | Case-insensitive matching between database and collection names|
-| mongodb.credentials | List of credentials|
-| mongodb.min-connections-per-host | Minimum number of the connection pools per host|
-| mongodb.connections-per-host | Maximum number of the connection pools per host|
-| mongodb.max-wait-time | Maximum waiting time|
-| mongodb.max-connection-idle-time | Maximum idle time of connection pooling|
-| mongodb.connection-timeout | Communication connection timeout|
-| mongodb.socket-timeout | Communication timeout|
-| mongodb.socket-keep-alive | Whether to enable the keep-alive function for each communication channel|
-| mongodb.ssl.enabled | Using TLS/SSL to connect to mongod/mongos|
-| mongodb.read-preference | Read preference|
-| mongodb.write-concern | Write policy|
-| mongodb.required-replica-set | Name of the required replica set|
-| mongodb.cursor-batch-size | Number of elements returned in a batch|
+| `mongodb.seeds` | List of all mongod servers|
+| `mongodb.schema-collection` | A collection of schema information|
+| `mongodb.case-insensitive-name-matching` | Case-insensitive matching between database and collection names|
+| `mongodb.credentials` | List of credentials|
+| `mongodb.min-connections-per-host` | Minimum number of the connection pools per host|
+| `mongodb.connections-per-host` | Maximum number of the connection pools per host|
+| `mongodb.max-wait-time` | Maximum waiting time|
+| `mongodb.max-connection-idle-time` | Maximum idle time of connection pooling|
+| `mongodb.connection-timeout` | Communication connection timeout|
+| `mongodb.socket-timeout` | Communication timeout|
+| `mongodb.socket-keep-alive` | Whether to enable the keep-alive function for each communication channel|
+| `mongodb.ssl.enabled` | Using TLS/SSL to connect to mongod/mongos|
+| `mongodb.read-preference` | Read preference|
+| `mongodb.write-concern` | Write policy|
+| `mongodb.required-replica-set` | Name of the required replica set|
+| `mongodb.cursor-batch-size` | Number of elements returned in a batch|
 
-### mongodb.seeds
+`mongodb.seeds`
 
-List of all mongod servers in the same replica set, which are separated using commas (,). The format is in **hostname[:port**]. Or list of mongos servers in the same sharded cluster. If port is not specified, port 27017 is used.
+List of all mongod servers in the same replica set, which are separated using commas (,). The format is in `hostname[:port]`. Or list of mongos servers in the same sharded cluster. If port is not specified, port 27017 is used.
 
 This property is mandatory. There is no default value, and at least one seed must be defined.
 
-### mongodb.schema-collection
+`mongodb.schema-collection`
 
 MongoDB is a document-oriented database, and there is no fixed schema information in the system. Therefore, a special collection in each MongoDB database should define the structure for all tables. For more information, see the [Table Definition](./mongodb.md#table-definition) section.
 
-At startup, this connector attempts to guess the type of the field, but the type may not match the collection you created. In this case, you need to manually modify it. **CREATE TABLE** and **CREATE TABLE AS SELECT** are used to create an entry for you.
+At startup, this connector attempts to guess the type of the field, but the type may not match the collection you created. In this case, you need to manually modify it. `CREATE TABLE` and `CREATE TABLE AS SELECT` are used to create an entry for you.
 
-This property is optional. The default value is **_schema**.
+This property is optional. The default value is `_schema`.	
 
-### mongodb.case-insensitive-name-matching
+`mongodb.case-insensitive-name-matching`
 
 Case-insensitive matching between database and collection names.
 
-This property is optional. The default value is **false**.
+This property is optional. The default value is `false`.
 
-### mongodb.credentials
+`mongodb.credentials`
 
-List of **username:password@collection** credentials separated by commas (,).
+List of `username:password@collection` credentials separated by commas (,).
 
 This property is optional. There is no default value.
 
-### mongodb.min-connections-per-host
+`mongodb.min-connections-per-host`
 
 Minimum number of connections per host in the MongoClient instance. These connections are retained in the connection pool when they are idle. Over time, the connection pool contains at least this minimum number of connections.
 
 This property is optional. The default value is `0`.
 
-### mongodb.connections-per-host
+`mongodb.connections-per-host`
 
 Maximum number of connections per host in the MongoClient instance. These connections are retained in the connection pool when they are idle. Once the connection pool resources are exhausted, any operation that requires a connection is blocked and waits for an available connection.
 
-This property is optional. The default value is **100**.
+This property is optional. The default value is `100`.
 
-### mongodb.max-wait-time
+`mongodb.max-wait-time`
 
-Maximum time (in milliseconds) that a thread can wait for a connection to become available. The value **0** indicates that the thread will not wait. A negative value indicates that the thread will wait will indefinitely for a connection to become available.
+Maximum time (in milliseconds) that a thread can wait for a connection to become available. The value `0` indicates that the thread will not wait. A negative value indicates that the thread will wait will indefinitely for a connection to become available.
 
-This property is optional. The default value is **120000**.
+This property is optional. The default value is `120000`.
 
-### mongodb.connections-timeout
+mongodb.connections-timeout
 
-Connection timeout interval (in milliseconds). The value **0** indicates that no timeout occurs. This property is used only when a new connection is set up.
+Connection timeout interval (in milliseconds). The value `0` indicates that no timeout occurs. This property is used only when a new connection is set up.
 
-This property is optional. The default value is **10000**.
+This property is optional. The default value is `10000`.
 
-### mongodb.socket-timeout
+`mongodb.socket-timeout`
 
 Socket timeout interval (in milliseconds). It is used for I/O socket read and write operations.
 
-This property is optional. The default value is **0**, indicating that no timeout occurs.
+This property is optional. The default value is `0`, indicating that no timeout occurs.
 
-### mongodb.socket-keep-alive
+`mongodb.socket-keep-alive`
 
 This property controls the socket keep-alive function, which keeps the connection alive through the firewall.
 
-This property is optional. The default value is false.
+This property is optional. The default value is `false`.
 
-### mongodb.ssl.enabled
+`mongodb.ssl.enabled`
 
 This property is used to enable the SSL connection with the MongoDB server.
 
-This property is optional. The default value is **false**.
+This property is optional. The default value is `false`.
 
-### mongodb.read-preference
+`mongodb.read-preference`
 
 The read preference are used for query, mapping restoration, aggregation, and counting. The value can be `PRIMARY`, `PRIMARY_PREFERRED`, `SECONDARY`, `SECONDARY_PREFERRED`, or `NEAREST`.
 
 This property is optional. The default value is `PRIMARY`.
 
-### `mongodb.write-concern`
+`mongodb.write-concern`
 
 Write policy. The value can be `ACKNOWLEDGED`, `FSYNC_SAFE`, `FSYNCED`, `JOURNAL_SAFEY`, `JOURNALED`, `MAJORITY`, `NORMAL`, `REPLICA_ACKNOWLEDGED`, `REPLICAS_SAFE`, or `UNACKNOWLEDGED`.
 
 This property is optional. The default value is `ACKNOWLEDGED`.
 
-### `mongodb.required-replica-set`
+`mongodb.required-replica-set`
 
 Name of the required replica set. After this property is set, the MongoClient instance performs the following operations:
 
@@ -132,7 +132,7 @@ Name of the required replica set. After this property is set, the MongoClient in
 
 This property is optional. There is no default value.
 
-### `mongodb.cursor-batch-size`
+`mongodb.cursor-batch-size`
 
 Limits the number of elements returned in a batch. A cursor typically fetches a batch of result objects and stores them locally. If **batchSize** is set to **0**, the default value of the driver is used. If the value of **batchSize** is positive, the value indicates the size of each batch of objects that are retrieved. The value can be adjusted to optimize performance and limit data transfer. If the value of **batchSize** is negative, it will limit the number of returned objects to the maximum batch size (typically 4 MB), and the cursor will be closed. For example, if **batchSize** is **-10**, the server will return up to 10 documents, return as many documents as possible in 4 MB, and then close the cursor.
 
@@ -144,7 +144,7 @@ This property is optional. The default value is **0**.
 
 ## Table Definition
 
-MongoDB maintains the table definition on the configuration special collection specified by **mongodb.schema-collection**.
+MongoDB maintains the table definition on the configuration special collection specified by `mongodb.schema-collection`.
 
 **Note**
 
@@ -167,8 +167,8 @@ A collection in a schema consists of MongoDB documents of a table.
 
 | Field| Mandatory or Optional| Type| Description|
 |:----------|:----------|:----------|:----------|
-| table | Mandatory| string| Name of the openLooKeng table|
-| fields | Mandatory| array| Field definition list. For each column definition, a new column is created in the openLooKeng table.|
+| `table` | Mandatory| string| Name of the openLooKeng table|
+| `fields` | Mandatory| array| Field definition list. For each column definition, a new column is created in the openLooKeng table.|
 
 The definition of each field is as follows:
 
@@ -180,15 +180,15 @@ The definition of each field is as follows:
 
 | Field| Mandatory or Optional| Type| Description|
 |:----------|:----------|:----------|:----------|
-| name | Mandatory| string| Name of a column in the openLooKeng table|
-| type | Mandatory| string| Type of a column|
-| hidden | Optional| boolean| Hides the column from the DESCRIBE <table name> and SELECT * results. The default value is false. |
+| `name` | Mandatory| string| Name of a column in the openLooKeng table|
+| `type` | Mandatory| string| Type of a column|
+| `hidden` | Optional| boolean| Hides the column from the `DESCRIBE` `<table name>` and `SELECT *` results. The default value is `false`. |
 
 There is no restriction on the field description of the key or message.
 
 ## ObjectId
 
-The MongoDB collection has a special field **_id**. The connector attempts to follow the same rules for this special field, so there will be a hidden field **_id**.
+The MongoDB collection has a special field `_id`. The connector attempts to follow the same rules for this special field, so there will be a hidden field `_id`.
 
 ```sql
     CREATE TABLE IF NOT EXISTS orders (
