@@ -15,7 +15,7 @@ openLooKeng Core is a standard Maven project. Simply run the following command f
 
     ./mvnw clean install
 
-On the first build, Maven will download all the dependencies from the internet and cache them in the local repository (`~/.m2/repository`), which can take a considerable amount of time. Subsequent builds will be faster.
+On the first build, Maven will download all the dependencies from the internet and cache them in the local repository (`~/.m2/repository`), which can take a considerable amount of time. Subsequent builds are faster.
 
 openLooKeng Core has a comprehensive set of unit tests that can take several minutes to run. You can disable the tests when building:
 
@@ -25,7 +25,7 @@ openLooKeng Core has a comprehensive set of unit tests that can take several min
 
 ### Overview
 
-After building openLooKeng Core for the first time, you can load the project into your IDE and run the server. We recommend using [IntelliJ IDEA](http://www.jetbrains.com/idea/). Because openLooKeng is a standard Maven project, you can import it into your IDE using the root `pom.xml` file. In IntelliJ, choose Open Project from the Quick Start box or choose Open from the File menu and select the root `pom.xml` file.
+After building openLooKeng Core for the first time, you can load the project into your IDE and run the server. It is recommended to use [IntelliJ IDEA](http://www.jetbrains.com/idea/). Because openLooKeng is a standard Maven project, you can import it into your IDE using the root `pom.xml` file. In IntelliJ, choose Open Project from the Quick Start box or choose Open from the File menu and select the root `pom.xml` file.
 
 After opening the project in IntelliJ, double check that the Java SDK is properly configured for the project:
 
@@ -62,7 +62,7 @@ Then add the following to the list of VM options:
 
 ### Logging
 
-Audit log functionality is disabled by default. To enable with default settings, modify configs in `etc/event-listener.properties` and ensure the process running the server has write permission to the audit log directory.
+Audit log functionality is disabled by default. To enable with default settings, modify configurations in `etc/event-listener.properties` and ensure the process running the server has write permission to the audit log directory.
 
 ### Running the CLI
 
@@ -80,7 +80,7 @@ In the sample configuration, the Hive connector is mounted in the `hive` catalog
 
 ## Code Style
 
-We recommend you use IntelliJ as your IDE. The code style template for the project can be found in the [codestyle](https://github.com/airlift/codestyle) repository along with our general programming and Java guidelines. In addition to those you should also adhere to the following:
+It is recommended you to use IntelliJ as your IDE. The code style template for the project can be found in the [codestyle](https://github.com/airlift/codestyle) repository along with our general programming and Java guidelines. In addition to those you should also adhere to the following:
 
 * Alphabetize sections in the documentation source files (both in table of contents files and other regular documentation files). In general, alphabetize methods/variables/sections if such ordering already exists in the surrounding code.
 * When appropriate, use the Java 8 stream API. However, note that the stream implementation does not perform well so avoid using it in inner loops or otherwise performance sensitive sections.

@@ -1,15 +1,15 @@
 
 # Example HTTP Connector
 
-The Example HTTP connector has a simple goal: it reads comma-separated data over HTTP. For example, if you have a large amount of data in a CSV format, you can point the example HTTP connector at this data and write a SQL query to process it.
+The Example HTTP connector has a simple goal: it reads comma-separated data over HTTP. For example, if you have a large amount of data in a CSV format, you can point the Example HTTP Connector at this data and write a SQL query to process it.
 
 ## Code
 
-The Example HTTP connector can be found in the `presto-example-http` directory in the root of the openLooKeng source tree.
+The Example HTTP Connector can be found in the `presto-example-http` directory in the root of the openLooKeng source tree.
 
 ## Plugin Implementation
 
-The plugin implementation in the Example HTTP connector looks very similar to other plugin implementations. Most of the implementation is devoted to handling optional configuration and the only function of interest is the following:
+The plugin implementation in the Example HTTP Connector looks very similar to other plugin implementations. Most of the implementation is devoted to handling optional configuration and the only function of interest is the following:
 
 ``` java
 @Override
@@ -67,9 +67,8 @@ The `ExampleMetadata` implementation delegates many of these calls to `ExampleCl
 
 ### Split Manager: ExampleSplitManager
 
-The split manager partitions the data for a table into the individual chunks that openLooKeng will distribute to workers for processing. In the case of the Example HTTP connector, each table contains one or more URIs
-pointing at the actual data. One split is created per URI.
+The split manager partitions the data for a table into the individual chunks that openLooKeng will distribute to workers for processing. In the case of the Example HTTP connector, each table contains one or more URIs pointing at the actual data. One split is created per URI.
 
 ### Record Set Provider: ExampleRecordSetProvider
 
-The record set provider creates a record set which in turn creates a record cursor that returns the actual data to openLooKeng. `ExampleRecordCursor` reads data from a URI via HTTP. Each line corresponds to a single row. Lines are split on comma into individual field values which are then returned to openLooKeng.
+The record set provider creates a record set which in turn creates a record cursor that returns the actual data to openLooKeng. `ExampleRecordCursor` reads data from a URI through HTTP. Each line corresponds to a single row. Lines are split on comma into individual field values which are then returned to openLooKeng.

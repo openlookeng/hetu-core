@@ -3,8 +3,7 @@
 
 ## Plugin Implementation
 
-The function framework is used to implement SQL functions. openLooKeng includes a number of built-in functions. In order to implement new functions, you can write a plugin that returns one more more functions from
-`getFunctions()`:
+The function framework is used to implement SQL functions. openLooKeng includes a number of built-in functions. In order to implement new functions, you can write a plugin that returns one more more functions from `getFunctions()`:
 
 ``` java
 public class ExampleFunctionsPlugin
@@ -24,13 +23,15 @@ public class ExampleFunctionsPlugin
 }
 ```
 
-Note that the `ImmutableSet` class is a utility class from Guava. The `getFunctions()` method contains all of the classes for the functions that we will implement below in this tutorial.
+**Note**
+
+*The `ImmutableSet` class is a utility class from Guava. The `getFunctions()` method contains all of the classes for the functions that we will implement below in this tutorial.*
 
 For a full example in the codebase, see either the `presto-ml` module for machine learning functions or the `presto-teradata-functions` module for Teradata-compatible functions, both in the root of the openLooKeng source.
 
 ## Scalar Function Implementation
 
-The function framework uses annotations to indicate relevant information about functions, including name, description, return type and parameter types. Below is a sample function which implements `is_null`:
+The function framework uses annotations to indicate relevant information about functions, including name, description, return type and parameter types. Following is a sample function which implements `is_null`:
 
 ``` java
 public class ExampleNullFunction
@@ -50,7 +51,11 @@ essentially a wrapper around `byte[]`, rather than `String` for its native conta
 
 -   `@SqlType`:
 
-    The `@SqlType` annotation is used to declare the return type and the argument types. Note that the return type and arguments of the Java code must match the native container types of the corresponding annotations.
+    The `@SqlType` annotation is used to declare the return type and the argument types. 
+    
+    Note 
+    
+    *The return type and arguments of the Java code must match the native container types of the corresponding annotations.*
     
 -   `@SqlNullable`:
 
@@ -59,7 +64,7 @@ essentially a wrapper around `byte[]`, rather than `String` for its native conta
 
 ## Parametric Scalar Functions
 
-Scalar functions that have type parameters have some additional complexity. To make our previous example work with any type we need the following:
+Scalar functions that have type parameters have some additional complexity. To make previous example work with any type, need the following:
 
 ``` java
 @ScalarFunction(name = "is_null")
@@ -140,8 +145,10 @@ public class ExampleStringFunction
 }
 ```
 
-Note that for most common string functions, including converting a string to lower case, the Slice library also provides implementations that work directly on the underlying `byte[]`, which have much better
-performance. This function has no `@SqlNullable` annotations, meaning that if the argument is `NULL`, the result will automatically be `NULL` (the function will not be called).
+**Note** 
+
+*For most common string functions, including converting a string to lower case, the Slice library also provides implementations that work directly on the underlying `byte[]`, which have much better*
+*performance. This function has no `@SqlNullable` annotations, meaning that if the argument is `NULL`, the result will automatically be `NULL` (the function will not be called).*
 
 ## Aggregation Function Implementation
 
@@ -211,8 +218,10 @@ An in-depth look at the various annotations relevant to writing an aggregation f
 -   `@InputFunction`:
 
     The `@InputFunction` annotation declares the function which accepts input rows and stores them in the `AccumulatorState`. Similar to scalar functions you must annotate the arguments with `@SqlType`.
-    Note that, unlike in the above scalar example where `Slice` is used to hold `VARCHAR`, the primitive `double` type is used for the argument to input. In this example, the input function simply keeps
-    track of the running count of rows (via `setLong()`) and the running sum (via `setDouble()`).
+    **Note**  
+    
+    *Unlike in the above scalar example where `Slice` is used to hold `VARCHAR`, the primitive `double` type is used for the argument to input. In this example, the input function simply keeps*
+    *track of the running count of rows (via `setLong()`) and the running sum (via `setDouble()`).*
     
 -   `@CombineFunction`:
 
@@ -225,4 +234,5 @@ An in-depth look at the various annotations relevant to writing an aggregation f
     
 -   Where does serialization happen, and what is `GroupedAccumulatorState`?
     
-The `@InputFunction` is usually run on a different worker from the`@CombineFunction`, so the state objects are serialized and transported between these workers by the aggregation framework. `GroupedAccumulatorState` is used when performing a `GROUP BY` aggregation, and an implementation will be automatically generated for you, if you don\'t specify a `AccumulatorStateFactory`
+
+The `@InputFunction` is usually run on a different worker from the`@CombineFunction`, so the state objects are serialized and transported between these workers by the aggregation framework. `GroupedAccumulatorState` is used when performing a `GROUP BY` aggregation, and an implementation will be automatically generated for you, if you do not specify a `AccumulatorStateFactory`

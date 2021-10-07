@@ -10,9 +10,10 @@ Function Registration in Connector
 The connector can register `external function` into openLooKeng.
 
 The user can find the example code about how to register `external function` through connector in `presto-mysql/src/main/java/io.prestosql/plugin/mysql/`.
-It is an example implement in mysql connector.
+It is an example of implementation in mysql connector.
 There are two steps to register external functions through a connector.
-1. Developer need to extend the interface 'ExternalFunctionHub' and implement the related method:
+
+1. Developer needs to extend the interface 'ExternalFunctionHub' and implement the related method:
 ```JAVA
 public interface ExternalFunctionHub
 {
@@ -25,9 +26,9 @@ public interface ExternalFunctionHub
 ```
 
 The `getExternalFunctions` method return the external function set.
-About how to implement it, we supply example code in the `MysqlExternalFunctionHub.java`.
+About how to implement it, you can supply example code in the `MysqlExternalFunctionHub.java`.
 In this example, about implementation of `ExternalFunctionHub#getExternalFunctions`, 
-we build `ExternalFunctionInfo` static instances and register them to return set.
+you build `ExternalFunctionInfo` static instances and register them to return set.
 Of course, you can build you code to load the set of `ExternalFunctionInfo` instances, for example, load an external file and serialize it to `ExternalFunctionInfo` instances.
 In this example, we only supply a general-purpose framework.
 

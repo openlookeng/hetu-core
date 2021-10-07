@@ -5,7 +5,7 @@ openLooKeng separates the concept of the principal who authenticates to the coor
 
 When running the openLooKeng CLI, for example, the openLooKeng username can be specified using the `--user` option.
 
-By default, the openLooKeng coordinator allows any principal to run queries as any openLooKeng user. In a secure environment, this is probably not desirable behavior and likely requires customization.
+By default, the openLooKeng coordinator allows any principal to run queries as any openLooKeng user. In a secure environment, this is probably not desirable behavior but requires customization.
 
 ## Implementation
 

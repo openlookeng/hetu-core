@@ -3,8 +3,7 @@
 
 ## Overview
 
-openLooKeng project includes a set of filesystem client utilities to help access and modifying files. Currently, two sets of filesystems are supported: HDFS and local filesystem. A ``HetuFileSystemClient`` interface is provided in the SPI, which defines the common file operations to be used in the project. The goal of this client is to provide unified interface, behaviors
-and exceptions across different filesystems. Therefore client code can easily reuse codes and transfer their logic without having to change the code.
+openLooKeng project includes a set of filesystem client utilities to help access and modifying files. Currently, two sets of filesystems are supported: HDFS and local filesystem. A ``HetuFileSystemClient`` interface is provided in the SPI, which defines the common file operations to be used in the project. The goal of this client is to provide unified interface, behaviors and exceptions across different filesystems. Therefore client code can easily reuse codes and transfer their logic without having to change the code.
 
 A utility class ``FileBasedLock`` located in SPI can provide exclusive access on a given filesystem. It takes advantage of the unified filesystem client interface thus works for different filesystems.
 
@@ -17,8 +16,7 @@ A filesystem profile must contain a type field:
 
 Additional configs used by the corresponding filesystem client can be provided. For example, hdfs filesystem needs paths to config resource files ``core-site.xml`` and ``hdfs-site.xml``. If the filesystem enables authentication, such as KERBEROS, credentials should be specified in the profile as well.
 
-Multiple profiles defining filesystem clients can be placed in ``etc/filesystem``.  Similar to catalogs, they will be loaded upon server start by a filesystem manager which also produce filesystem clients to users in ``presto-main``. Client modules can read profiles in this folder by themselves, but it is highly recommended that client modules obtain a client which is provided by the main module
-in order to prevent dependency issues.
+Multiple profiles defining filesystem clients can be placed in ``etc/filesystem``.  Similar to catalogs, they will be loaded upon server start by a filesystem manager which also produce filesystem clients to users in ``presto-main``. Client modules can read profiles in this folder by themselves, but it is highly recommended that client modules obtain a client which is provided by the main module in order to prevent dependency issues.
 
 A typical use case of having multiple profiles is when multiple hdfs are used and preset. In this case create a property file for each cluster and include their own authentication information in different profiles, for example ``hdfs1.properties`` and ``hdfs2.properties``. Client code will be able to access them by specifying the profile name (file name), such as ``getFileSystemClient("hdfs1", <rootPath>)`` from the ``FileSystemClientManager``.
 
@@ -47,7 +45,7 @@ The ultimate goal of doing all these unification is to increase the reusability 
 
 ### Method signatures and behaviors
 
-The methods follow the same signature as those in ``java.nio.file.spi.FileSystemProvider`` and ``java.nio.file.Files`` in order to maximize compatibility. There are also additional methods that are not available in ``java.nio`` package to supply useful functionalities (e.g. ``deleteRecursively()``).
+The methods follow the same signature as those in ``java.nio.file.spi.FileSystemProvider`` and ``java.nio.file.Files`` in order to maximize compatibility. There are also additional methods that are not available in ``java.nio`` package to supply useful functionalities (for example, ``deleteRecursively()``).
 
 ### Exceptions
 

@@ -1,14 +1,13 @@
 
 # Event Listener
 
-openLooKeng supports custom event listeners that are invoked for the following
-events:
+openLooKeng supports custom event listeners that are invoked for the following events:
 
 -   Query creation
 -   Query completion (success or failure)
 -   Split completion (success or failure)
 
-This functionality enables development of custom logging, debugging and performance analysis plugins. In a openLooKeng cluster, only a single event listener plugin can be active at a time .
+This functionality enables development of custom logging, debugging and performance analysis plugins. In a openLooKeng cluster, only a single event listener plugin can be active at a time.
 
 ## Implementation
 
@@ -22,10 +21,9 @@ The implementation of `EventListener` and `EventListenerFactory` must be wrapped
 After a plugin that implements `EventListener` and `EventListenerFactory` has been installed on the coordinator, it is configured using an `etc/event-listener.properties` file. All of the
 properties other than `event-listener.name` are specific to the `EventListener` implementation.
 
-The `event-listener.name` property is used by openLooKeng to find a registered `EventListenerFactory` based on the name returned by `EventListenerFactory.getName()`. The remaining properties are passed as
-a map to `EventListenerFactory.create()`.
+The `event-listener.name` property is used by openLooKeng to find a registered `EventListenerFactory` based on the name returned by `EventListenerFactory.getName()`. The remaining properties are passed as a map to `EventListenerFactory.create()`.
 
-Example configuration file:
+Example of configuration file:
 
 ``` properties
 event-listener.name=custom-event-listener

@@ -9,7 +9,7 @@ The SPI source can be found in the `presto-spi` directory in the root of the ope
 
 ## Plugin Metadata
 
-Each plugin identifies an entry point: an implementation of the `Plugin`interface. This class name is provided to openLooKeng via the standard Java `ServiceLoader` interface: the classpath contains a resource file named `io.prestosql.spi.Plugin` in the `META-INF/services` directory. The content of this file is a single line listing the name of the plugin class:
+Each plugin identifies an entry point: an implementation of the `Plugin`interface. This class name is provided to openLooKeng through the standard Java `ServiceLoader` interface: the classpath contains a resource file named `io.prestosql.spi.Plugin` in the `META-INF/services` directory. The content of this file is a single line listing the name of the plugin class:
 
 ``` 
 com.example.plugin.ExamplePlugin
@@ -23,9 +23,9 @@ For a built-in plugin that is included in the openLooKeng source code, this reso
 
 ## Plugin
 
-The `Plugin` interface is a good starting place for developers looking to understand the openLooKeng SPI. It contains access methods to retrieve various classes that a Plugin can provide. For example, the `getConnectorFactories()` method is a top-level function that openLooKeng calls to retrieve a `ConnectorFactory` when openLooKeng is ready to create an instance of a connector to back a catalog. There are similar methods for `Type`, `ParametricType`, `Function`, `SystemAccessControl`, and `EventListenerFactory` objects.
+The `Plugin` interface is a good starting place for developers to understand the openLooKeng SPI. It contains access methods to retrieve various classes that a Plugin can provide. For example, the `getConnectorFactories()` method is a top-level function that openLooKeng calls to retrieve a `ConnectorFactory` when openLooKeng is ready to create an instance of a connector to back a catalog. There are similar methods for `Type`, `ParametricType`, `Function`, `SystemAccessControl`, and `EventListenerFactory` objects.
 
-## Building Plugins via Maven
+## Building Plugins through Maven
 
 Plugins depend on the SPI from openLooKeng:
 
