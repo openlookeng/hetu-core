@@ -90,6 +90,94 @@ public abstract class AbstractTestStarTreeQueries
     }
 
     @Test
+    public void testAggregationsWithAverageAggregationFunction()
+    {
+        assertUpdate(sessionNoStarTree, "CREATE CUBE nation_aggregations_cube_2 ON nation " +
+                "WITH (AGGREGATIONS=(avg(nationkey), count(regionkey), sum(regionkey)," +
+                " min(regionkey), max(REGIONkey))," +
+                " group=(nationKEY), format= 'orc', partitioned_by = ARRAY['nationkey'])");
+        assertUpdate(sessionNoStarTree, "INSERT INTO CUBE nation_aggregations_cube_2", 25);
+
+        assertQuery(sessionStarTree, "SELECT avg(nationkey) from nation group by nationkey",
+                "SELECT avg(nationkey) from nation group by nationkey",
+                assertTableScan("nation_aggregations_cube_2"));
+
+        assertQuery(sessionStarTree, "SELECT avg(nationkey), avg(nationkey), sum(regionkey), count(regionkey) from nation group by nationkey",
+                "SELECT avg(nationkey), avg(nationkey), sum(regionkey), count(regionkey) from nation group by nationkey",
+                assertTableScan("nation_aggregations_cube_2"));
+
+        assertQuery(sessionStarTree, "SELECT avg(nationkey), sum(regionkey), count(regionkey) from nation group by nationkey",
+                "SELECT avg(nationkey), sum(regionkey), count(regionkey) from nation group by nationkey",
+                assertTableScan("nation_aggregations_cube_2"));
+
+        assertQuery(sessionStarTree, "SELECT avg(nationkey), sum(regionkey), sum(regionkey), count(regionkey) from nation group by nationkey",
+                "SELECT avg(nationkey), sum(regionkey), sum(regionkey), count(regionkey) from nation group by nationkey",
+                assertTableScan("nation_aggregations_cube_2"));
+
+        assertQuery(sessionStarTree, "SELECT count(regionkey), avg(nationkey), sum(regionkey), sum(regionkey), count(regionkey) from nation group by nationkey",
+                "SELECT count(regionkey), avg(nationkey), sum(regionkey), sum(regionkey), count(regionkey) from nation group by nationkey",
+                assertTableScan("nation_aggregations_cube_2"));
+
+        assertQuery(sessionStarTree, "SELECT sum(regionkey), avg(nationkey), avg(nationkey),  sum(regionkey), count(regionkey), count(regionkey) from nation group by nationkey",
+                "SELECT sum(regionkey), avg(nationkey), avg(nationkey),  sum(regionkey), count(regionkey), count(regionkey) from nation group by nationkey",
+                assertTableScan("nation_aggregations_cube_2"));
+
+        assertQuery(sessionStarTree, "SELECT sum(regionkey), avg(nationkey), avg(nationkey), count(regionkey) from nation group by nationkey",
+                "SELECT sum(regionkey), avg(nationkey), avg(nationkey), count(regionkey) from nation group by nationkey",
+                assertTableScan("nation_aggregations_cube_2"));
+
+        assertQuery(sessionStarTree, "SELECT avg(nationkey), min(regionkey), max(regionkey), sum(regionkey) from nation group by nationkey",
+                "SELECT avg(nationkey), min(regionkey), max(regionkey), sum(regionkey) from nation group by nationkey",
+                assertTableScan("nation_aggregations_cube_2"));
+
+        assertQuery(sessionStarTree, "SELECT avg(nationkey), min(regionkey), count(regionkey), max(regionkey), sum(regionkey) from nation group by nationkey",
+                "SELECT avg(nationkey), min(regionkey), count(regionkey), max(regionkey), sum(regionkey) from nation group by nationkey",
+                assertTableScan("nation_aggregations_cube_2"));
+
+        assertUpdate("DROP CUBE nation_aggregations_cube_2");
+    }
+
+    @Test
+    public void testAggregationsWithCaseSensitiveColumnInAggregationFunction()
+    {
+        assertUpdate(sessionNoStarTree, "CREATE CUBE nation_aggregations_cube_3 ON nation " +
+                "WITH (AGGREGATIONS=(avg(NationKEY), count(Regionkey), sum(regionkey)," +
+                " min(regionkey), max(REGIONkey), max(nationKey), min(Nationkey))," +
+                " group=(nationkey), format= 'orc', partitioned_by = ARRAY['nationkey'])");
+        assertUpdate(sessionNoStarTree, "INSERT INTO CUBE nation_aggregations_cube_3", 25);
+
+        assertQuery(sessionStarTree, "SELECT min(regionkey), max(regionkey), sum(regionkey), max(nationKey), min(Nationkey) from nation group by nationkey",
+                "SELECT min(regionkey), max(regionkey), sum(regionkey), max(nationKey), min(Nationkey) from nation group by nationkey",
+                assertTableScan("nation_aggregations_cube_3"));
+
+        assertQuery(sessionStarTree, "SELECT count(Regionkey), avg(nationkey) from nation group by nationkey",
+                "SELECT count(Regionkey), avg(nationkey) from nation group by nationkey",
+                assertTableScan("nation_aggregations_cube_3"));
+
+        assertUpdate("DROP CUBE nation_aggregations_cube_3");
+    }
+
+    @Test
+    public void testAggregationsWithCaseSensitiveColumnInGroupBy()
+    {
+        assertUpdate(sessionNoStarTree, "CREATE CUBE nation_aggregations_cube_4 ON nation " +
+                "WITH (AGGREGATIONS=(count(*), avg(nationkey), count(regionkey), sum(regionkey)," +
+                " min(regionkey), max(REGIONkey), max(nationKey), min(Nationkey))," +
+                " group=(nationKEY), format= 'orc', partitioned_by = ARRAY['nationkey'])");
+        assertUpdate(sessionNoStarTree, "INSERT INTO CUBE nation_aggregations_cube_4", 25);
+
+        assertQuery(sessionStarTree, "SELECT count(regionkey), count(*), max(nationKey), min(Nationkey), min(regionkey), max(regionkey), sum(regionkey) from nation group by nationkey",
+                "SELECT count(regionkey), count(*), max(nationKey), min(Nationkey), min(regionkey), max(regionkey), sum(regionkey) from nation group by nationkey",
+                assertTableScan("nation_aggregations_cube_4"));
+
+        assertQuery(sessionStarTree, "SELECT count(regionkey), avg(nationkey) from nation group by nationkey",
+                "SELECT count(regionkey), avg(nationkey) from nation group by nationkey",
+                assertTableScan("nation_aggregations_cube_4"));
+
+        assertUpdate("DROP CUBE nation_aggregations_cube_4");
+    }
+
+    @Test
     public void testShowCubes()
     {
         computeActual("CREATE TABLE nation_show_cube_table_1 AS SELECT * FROM nation");
