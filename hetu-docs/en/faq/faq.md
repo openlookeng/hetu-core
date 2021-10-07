@@ -16,15 +16,17 @@
 
 4. How do I report a bug?
    
-   > You can go the **Issues** tab page ( https://gitee.com/organizations/openLooKeng/issues ) of the openLooKeng community, find the repository to which the bug belongs, add an issue, and set the issue type to **Bug**.
+   > You can go to the **Issues** tab page ( https://gitee.com/organizations/openLooKeng/issues ) of the openLooKeng community, find the repository to which the bug belongs, add an issue, and set the issue type to **Bug**.
 
 5. How do I submit a patch?
    
-   > Any person can submit a patch in the form of pull request (PR) in the openLooKeng community. The PR will be reviewed, fed back, and integrated by the module maintainer. For details, visit https://gitee.com/help/articles/4122.
-
+   > Any person can submit a patch in the form of pull request (PR) in the openLooKeng community. The PR will be reviewed, provided feedback, and integrated by the module maintainer. 
+   >
+   > For details, visit https://gitee.com/help/articles/4122.
+   
 6. What are the version plan and roadmap of the openLooKeng community?
    
-   > On June 30, 2020, the code was released to the community in the openLooKeng v0.1.0 version for sharing with global developers. It is planned that an iterative version is released every three months to continuously launch new features. The roadmap of the openLooKeng will be released as required. For details, visit the openLooKeng commuity bi-weekly PMC meeting ( https://etherpad.openlookeng.io/p/PMC-weeklymeeting ) or the openLooKeng Slack channel ( https://openlookeng.io/communication.html  ).
+   > On June 30, 2020, the code was released to the community in the openLooKeng v0.1.0 version for sharing with global developers. It is planned that an iterative version is released every three months to launch new features continuously. The roadmap of the openLooKeng will be released as required. For details, visit the openLooKeng commuity bi-weekly PMC meeting ( https://etherpad.openlookeng.io/p/PMC-weeklymeeting ) or the openLooKeng Slack channel ( https://openlookeng.io/communication.html ).
 
 7. How can I obtain openLooKeng information and communicate with other developers about openLooKeng technologies?
    
@@ -44,7 +46,7 @@
 
 1. What connectors does the openLooKeng support?
    
-   > Data source connectors supported by the openLooKeng
+   > Data source connectors supported by the openLooKeng.
    > 
    > | Data Source| Performance Optimization|
    > ----------|----------
@@ -62,7 +64,7 @@
    >  MongoDB| No
    >  openGauss| No
 
-   > Other connectors supported by the openLooKeng
+   > Other connectors supported by the openLooKeng.
    >
    > | Connector | Description |
    >  ------------ | ------------------------------------------------------- 
@@ -77,12 +79,12 @@
 
 2. What external interfaces does the openLooKeng provide?
    
-   > openLooKeng provides the following external interfaces: JDBC, ODBC, and RESTful APIs. The SQL syntax complies with the SQL:2003 standard.
+   > The openLooKeng provides the following external interfaces: JDBC, ODBC, and RESTful APIs. The SQL syntax complies with the SQL:2003 standard.
 
 3. How do I develop UDFs for the openLooKeng?
    
-   > The openLooKeng provides the user-defined function feature. For details, see  https://openlookeng.io/docs/docs/develop/functions.html .   
-   > The openLooKeng also supports user-defined functions in the Hive data source. For details, see  https://openlookeng.io/docs/docs/migration/hetu-hive-functions.html .  
+   > The openLooKeng provides the user-defined function feature. For details, see  https://openlookeng.io/docs/docs/develop/functions.html.   
+   > The openLooKeng also supports user-defined functions in the Hive data source. For details, see  https://openlookeng.io/docs/docs/migration/hetu-hive-functions.html.  
 
 4. Can I manage manually added data sources after the dynamic directory function is enabled?
    
@@ -96,25 +98,25 @@
 
 6. Are there any cURL command examples for adding or deleting dynamic directories?
    
-   > cURL examples for performing operations on dynamic directories: Adding the dynamic data source MySQL
+   > cURL examples for performing operations on dynamic directories: Adding the dynamic data source MySQL.
    > 
    > ```
    > curl -X POST http://127.0.0.1:8080/v1/catalog -H 'X-Presto-User: admin' -F 'catalogInformation={ "catalogName" : "mysql",  "connectorName" : "mysql",  "properties" : { "connection-url" : "jdbc:mysql://127.0.0.1:3306/", "connection-user" : "mysql", "connection-password" : "password"}}'
    > ```
    > 
-   > Adding the dynamic data source memory
+   > Adding the dynamic data source memory.
    > 
    > ```
    > curl -X POST http://127.0.0.1:8080/v1/catalog -H 'X-Presto-User: admin' -F 'catalogInformation={ "catalogName" : "memory",  "connectorName" : "memory",  "properties" : { } }'
    > ```
    > 
-   > Adding the dynamic data source TPC-H
+   > Adding the dynamic data source TPC-H.
    > 
    > ```
    > `curl -X POST http://127.0.0.1:8080/v1/catalog -H 'X-Presto-User: admin' -F 'catalogInformation={ "catalogName" : "tpch",  "connectorName" : "tpch",  "properties" : { } }'`
    > ```
    > 
-   > Adding the dynamic data source Hive
+   > Adding the dynamic data source Hive.
    > 
    > ```
    > curl -X POST http://127.0.0.1:8080/v1/catalog  -H 'X-Presto-User: admin' 
@@ -123,7 +125,7 @@
    > -F 'catalogConfigurationFiles=@/path-dir/hdfs-site.xml'
    > ```
    > 
-   > Updating the dynamic data source Hive
+   > Updating the dynamic data source Hive.
    > 
    > ```
    > curl -X UPDATE http://127.0.0.1:8080/v1/catalog  -H 'X-Presto-User: admin' 
@@ -132,7 +134,7 @@
    > -F 'catalogConfigurationFiles=@/path-dir/hdfs-site.xml'
    > ```
    > 
-   > Deleting the dynamic data source TPC-H
+   > Deleting the dynamic data source TPC-H.
    > 
    > ```
    > curl -X DELETE -H "X-Presto-User: admin" "http://127.0.0.1:8080/v1/catalog/tpch"
@@ -212,22 +214,26 @@
 
 6. What do I do if the field association function on the RangerAdmin is unavailable when the openLooKeng is connected to the Ranger after Kerberos authentication is enabled?
    
-   > The association function of RangerAdmin needs to send SQL statements to query olk-related resources. Therefore, when adding the openLooKeng service on RangerAdmin, you need to add the Kerberos information to the **jdbc.url** parameter. An example is as follows:
-   > 
+   > The association function of RangerAdmin needs to send SQL statements to query olk-related resources. Therefore, when adding the openLooKeng service on RangerAdmin, you need to add the Kerberos information to the **jdbc.url** parameter. 
+   >
+   > An example is as follows:
+   >
    > ```
    > jdbc:lk://server1:10001/catalog?SSL=true&SSLKeyStorePath=/etc/openLooKeng_keystore.jks&SSLKeyStorePassword=keystore_password&KerberosRemoteServiceName=openLooKeng&KerberosConfigPath=/etc/krb5.conf&KerberosPrincipal=cpk@EXAMPLE.COM&KerberosKeytabPath=/etc/security/keytabs/cpk.keytab
    > ```
-
+   
 7. How do I connect the openLooKeng to two Hive data sources configured with Kerberos?
    
    > Ensure that the domain names of the two Hive data sources configured with Kerberos are different.
-   > 
+   >
    > Combine the **krb5.conf** files of the two data sources, and add the realm information of one data source to the **krb5.conf** file of the other data source.
-   > 
-   > Save the combined **krb5.conf** file to the path configured in **jvm.config**. An example is as follows:
-   > 
+   >
+   > Save the combined **krb5.conf** file to the path configured in **jvm.config**. 
+   >
+   > An example is as follows:
+   >
    > ![openlookeng_kerberos](../images/openlookeng_kerberos.png)
-
+   
 8. How do I connect the openLooKeng to a Hive data source configured with Kerberos and a Hive data source not configured with Kerberos at the same time?
    
    > Add the following configuration to the **core-site.xml** file of the Hive data source that is not configured with Kerberos:

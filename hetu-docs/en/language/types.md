@@ -1,9 +1,7 @@
-
-
 Data Types
 ==========
 
-openLooKeng has a set of built-in data types, described below. Additional types can be provided by plugins.
+openLooKeng has a set of built-in data types, described as follows. Additional types can be provided by plugins.
 
 
 **Note**
@@ -74,7 +72,7 @@ Fixed-Precision
 >
 > **Note**
 >
-> For compatibility reasons decimal literals without explicit type specifier (e.g. `1.2`) are treated as the values of the `DOUBLE` type by default, but this is subject to change in future releases. This
+> For compatibility reasons decimal literals without explicit type specifier (for example, `1.2`) are treated as the values of the `DOUBLE` type by default, but this is subject to change in future releases. This
 > behavior is controlled by:
 >
 > -   System wide property: `parse-decimal-literals-as-double`
@@ -100,16 +98,15 @@ String
 > A Unicode string is prefixed with `U&` and requires an escape
 > character before any Unicode character usage with 4 digits. In the
 > examples above `\2603` and `#2603` represent a snowman character. Long
-> Unicode codes with 6 digits require usage of the plus symbol before
-> the code. For example, you need to use `\+01F600` for a grinning face
-> emoji.
+> Unicode codes with 6 digits require usage of the plus symbol before the code. 
+> 
+> For example, you need to use `\+01F600` for a grinning face emoji.
 
 ### `CHAR`
 
-> Fixed length character data. A `CHAR` type without length specified has a default length of 1. A `CHAR(x)` value always has `x` characters. For instance, casting `dog` to `CHAR(7)` adds 4 implicit trailing spaces. Leading and trailing spaces are included in comparisons of `CHAR` values. As a result, two character values with different lengths (`CHAR(x)` and `CHAR(y)` where `x != y`) will never
-> be equal.
->
-> Example type definitions: `char`, `char(20)`
+> Fixed length character data. A `CHAR` type without length specified has a default length of 1. A `CHAR(x)` value always has `x` characters. For instance, casting `dog` to `CHAR(7)` adds 4 implicit trailing spaces. Leading and trailing spaces are included in comparisons of `CHAR` values. As a result, two character values with different lengths (`CHAR(x)` and `CHAR(y)` where `x != y`) will never be equal.
+> 
+>Example type definitions: `char`, `char(20)`
 
 ### `VARBINARY`
 
