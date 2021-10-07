@@ -24,7 +24,7 @@ the Example HTTP connector does), you may need to get creative about how you map
 ### ConnectorSplitManger
 
 The split manager partitions the data for a table into the individual chunks that openLooKeng will distribute to workers for processing. For example, the Hive connector lists the files for each Hive partition and creates
-one or more split per file. For data so urces that don\'t have partitioned data, a good strategy here is to simply return a single split for the entire table. This is the strategy employed by the Example HTTP connector.
+one or more split per file. For data sources that don\'t have partitioned data, a good strategy here is to simply return a single split for the entire table. This is the strategy employed by the Example HTTP connector.
 
 ### ConnectorRecordSetProvider
 
