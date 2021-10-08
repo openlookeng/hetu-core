@@ -16,8 +16,6 @@ Map Functions
 
 Returns the cardinality (size) of the map `x`.
 
-
-
 **element\_at(map(K,V), key)** -\> V
 
 Returns value for given `key`, or `NULL` if the key is not contained in the map.
@@ -25,14 +23,14 @@ Returns value for given `key`, or `NULL` if the key is not contained in the map.
 
 **map()** -\> map\<unknown, unknown\>
 
-Returns an empty map. :
+Returns an empty map:
 
     SELECT map(); -- {}
 
 
 **map(array(K), array(V))** -\> map(K,V)
 
-Returns a map created using the given key/value arrays. :
+Returns a map created using the given key/value arrays:
 
     SELECT map(ARRAY[1,3], ARRAY[2,4]); -- {1 -> 2, 3 -> 4}
 
@@ -40,19 +38,19 @@ See also `map_agg` and `multimap_agg` for creating a map as an aggregation.
 
 **map\_from\_entries(array(row(K,V)))** -\> map(K,V)
 
-Returns a map created from the given array of entries. :
+Returns a map created from the given array of entries:
 
     SELECT map_from_entries(ARRAY[(1, 'x'), (2, 'y')]); -- {1 -> 'x', 2 -> 'y'}
 
 **multimap\_from\_entries(array(row(K,V)))** -\> map(K,array(V))
 
-Returns a multimap created from the given array of entries. Each key can be associated with multiple values. :
+Returns a multimap created from the given array of entries. Each key can be associated with multiple values:
 
     SELECT multimap_from_entries(ARRAY[(1, 'x'), (2, 'y'), (1, 'z')]); -- {1 -> ['x', 'z'], 2 -> ['y']}
 
 **map\_entries(map(K,V))** -\> array(row(K,V))
 
-Returns an array of all entries in the given map. :
+Returns an array of all entries in the given map:
 
     SELECT map_entries(MAP(ARRAY[1, 2], ARRAY['x', 'y'])); -- [ROW(1, 'x'), ROW(2, 'y')]
 
@@ -81,7 +79,7 @@ Returns all the values in the map `x`.
 
 **map\_zip\_with(map(K,V1), map(K,V2), function(K,V1,V2,V3))** -\> map(K,V3)
 
-Merges the two given maps into a single map by applying `function` to the pair of values with the same key. For keys only presented in one map, NULL will be passed as the value for the missing key. :
+Merges the two given maps into a single map by applying `function` to the pair of values with the same key. For keys only presented in one map, NULL will be passed as the value for the missing key:
 
     SELECT map_zip_with(MAP(ARRAY[1, 2, 3], ARRAY['a', 'b', 'c']), -- {1 -> ad, 2 -> be, 3 -> cf}
                         MAP(ARRAY[1, 2, 3], ARRAY['d', 'e', 'f']),

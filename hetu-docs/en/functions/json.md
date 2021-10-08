@@ -5,9 +5,7 @@ JSON Functions and Operators
 Cast to JSON
 ------------
 
-Casting from `BOOLEAN`, `TINYINT`, `SMALLINT`, `INTEGER`, `BIGINT`, `REAL`, `DOUBLE` or `VARCHAR` is supported. Casting from `ARRAY`, `MAP` or `ROW` is supported when the element type of the array is one of the supported types, or when the key type of the map is `VARCHAR` and value type of the map is one of the supported types, or when every field type of the row is one of the supported types. Behaviors of the casts are shown with the examples below:
-
- 
+Casting from `BOOLEAN`, `TINYINT`, `SMALLINT`, `INTEGER`, `BIGINT`, `REAL`, `DOUBLE` or `VARCHAR` is supported. Casting from `ARRAY`, `MAP` or `ROW` is supported when the element type of the array is one of the supported types, or when the key type of the map is `VARCHAR` and value type of the map is one of the supported types, or when every field type of the row is one of the supported types. Behaviors of the casts are shown with the examples as follows:
 
 ```
 SELECT CAST(NULL AS JSON); -- NULL
@@ -25,13 +23,10 @@ SELECT CAST(CAST(ROW(123, 'abc', true) AS ROW(v1 BIGINT, v2 VARCHAR, v3 BOOLEAN)
 
 **Note**
 
-Casting from NULL to `JSON` is not straightforward. Casting from a standalone `NULL` will produce a SQL `NULL` instead of `JSON 'null'`. However, when casting from arrays or map containing `NULL`s, the
-produced `JSON` will have `null`s in it. 
+- *Casting from NULL to `JSON` is not straightforward. Casting from a standalone `NULL` will produce a SQL `NULL` instead of `JSON 'null'`. However, when casting from arrays or map containing `NULL`s, the*
+  *produced `JSON` will have `null`s in it.* 
 
-
-**Note**
-
-When casting from `ROW` to `JSON`, the result is a JSON array rather than a JSON object. This is because positions are more important than names for rows in SQL.
+- *When casting from `ROW` to `JSON`, the result is a JSON array rather than a JSON object. This is because positions are more important than names for rows in SQL.*
 
 
 Cast from JSON
@@ -59,16 +54,13 @@ Cast from JSON
 
 **Note**
 
-JSON arrays can have mixed element types and JSON maps can have mixed value types. This makes it impossible to cast them to SQL arrays and maps in some cases. To address this, openLooKeng supports partial casting of arrays and maps:
+- *JSON arrays can have mixed element types and JSON maps can have mixed value types. This makes it impossible to cast them to SQL arrays and maps in some cases. To address this, openLooKeng supports partial casting of arrays and maps:*
 
     SELECT CAST(JSON '[[1, 23], 456]' AS ARRAY(JSON)); -- [JSON '[1,23]', JSON '456']
     SELECT CAST(JSON '{"k1": [1, 23], "k2": 456}' AS MAP(VARCHAR, JSON)); -- {k1 = JSON '[1,23]', k2 = JSON '456'}
     SELECT CAST(JSON '[null]' AS ARRAY(JSON)); -- [JSON 'null']
 
-
-**Note**
-
-When casting from `JSON` to `ROW`, both JSON array and JSON object are supported.
+- *When casting from `JSON` to `ROW`, both JSON array and JSON object are supported.*
 
 
 JSON Functions
@@ -76,7 +68,7 @@ JSON Functions
 
 **is\_json\_scalar(json)** -\> boolean
 
-Determine if `json` is a scalar (i.e. a JSON number, a JSON string, `true`, `false` or `null`):
+Determine if `json` is a scalar (that is a JSON number, a JSON string, `true`, `false` or `null`):
 
     SELECT is_json_scalar('1'); -- true
     SELECT is_json_scalar('[1, 2, 3]'); -- false
@@ -88,7 +80,6 @@ Determine if `value` exists in `json` (a string containing a JSON array):
 
     SELECT json_array_contains('[1, 2, 3]', 2);
 
-
 **json\_array\_get(json\_array, index)** -\> json
 
 **Warning**
@@ -96,7 +87,7 @@ Determine if `value` exists in `json` (a string containing a JSON array):
 The semantics of this function are broken. If the extracted element is a string, it will be converted into an invalid `JSON` value that is not properly quoted (the value will not be surrounded by quotes and any
 interior quotes will not be escaped).
 
-We recommend against using this function. It cannot be fixed without impacting existing usages and may be removed in a future release.
+It is recommend against using this function. It cannot be fixed without impacting existing usages and may be removed in a future release.
 
 
 Returns the element at the specified index into the `json_array`. The index is zero-based:
@@ -131,12 +122,10 @@ Evaluates the [JSONPath](https://goessner.net/articles/JsonPath/)-like expressio
 
 **json\_extract\_scalar(json, json\_path)** -\> varchar
 
-Like `json_extract, but returns the result value as a string (as opposed to being encoded as JSON). The value referenced by `json_path` must be a scalar (boolean, number or
-string):
+Like `json_extract, but returns the result value as a string (as opposed to being encoded as JSON). The value referenced by `json_path` must be a scalar (boolean, number or string):
 
     SELECT json_extract_scalar('[1, 2, 3]', '$[2]');
     SELECT json_extract_scalar(json, '$.store.book[0].author');
-
 
 **json\_format(json)** -\> varchar
 

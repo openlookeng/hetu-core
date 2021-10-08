@@ -6,7 +6,7 @@ Node Resource
 
 - GET /v1/node
 
-Returns a list of nodes known to a openLooKeng Server. This call doesn\'t
+Returns a list of nodes known to a openLooKeng Server. This call does not
 require a query parameter of headers, it simply returns an array with
 each known node in a openLooKeng installation.
 
@@ -18,7 +18,7 @@ will drop to 367 in one minute.
 
 `age` shows you how long a particular node has been running, and uri
 points you to the HTTP server for a particular node. The last request
-and last response times show you how recently a node has been used.
+and last response times show you how a node is used recently.
 
 The following example response displays a single node which has not
 experienced any failure conditions. Each node also reports statistics
@@ -47,8 +47,8 @@ about traffic uptime, and failures.
 > ]
 > ```
 
-If a node is experiencing errors, you\'ll see a response that looks like
-the following. Here we have a node which has experienced a spate of
+If a node is experiencing errors, you can see a response that looks like
+the following example. Here, there is a node which has experienced a spate of
 errors. The recentFailuresByType field lists the Java exception which
 have occurred recently on a particular node.
 

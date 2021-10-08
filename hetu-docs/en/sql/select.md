@@ -224,7 +224,7 @@ times. This is why queries with a `UNION ALL` may produce inconsistent results w
 
 **CUBE**
 
-The `CUBE` operator generates all possible grouping sets (i.e. a power set) for a given set of columns. For example, the query:
+The `CUBE` operator generates all possible grouping sets (that is a power set) for a given set of columns. For example, the query:
 
     SELECT origin_state, destination_state, sum(package_weight)
     FROM shipping
@@ -575,8 +575,7 @@ Otherwise, it is arbitrary which rows are discarded. If the count specified in t
 LIMIT or FETCH FIRST Clauses
 ----------------------------
 
-The `LIMIT` or `FETCH FIRST` clause restricts the number of rows in the
-result set.
+The `LIMIT` or `FETCH FIRST` clause restricts the number of rows in the result set.
 
 ``` sql
 LIMIT { count | ALL }
@@ -850,8 +849,6 @@ A scalar subquery is a non-correlated subquery that returns zero or one row. It 
     FROM nation
     WHERE regionkey = (SELECT max(regionkey) FROM region)
 
-
-
 **Note**
 
-*Currently only single column can be returned from the scalar subquery.*
+*Currently, only single column can be returned from the scalar subquery.*

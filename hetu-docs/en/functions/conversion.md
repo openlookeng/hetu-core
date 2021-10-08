@@ -2,8 +2,7 @@
 Conversion Functions
 ====================
 
-openLooKeng will implicitly convert numeric and character values to the correct type if such a conversion is possible. For any other types, by default, openLooKeng will not convert it implicitly. For example, a query that expects a
-varchar will not automatically convert a bigint value to an equivalent varchar.
+openLooKeng implicitly converts numeric and character values to the correct type if such a conversion is possible. For any other types, by default, openLooKeng will not convert it implicitly. For example, a query that expects a varchar will not automatically convert a bigint value to an equivalent varchar.
 
 When necessary, values can be explicitly cast to a particular type.
 
@@ -79,7 +78,7 @@ In this way, user do not need to explicitly add `CAST` function to convert it.
 
 For example, a query that expects a varchar will automatically convert a bigint value to an equivalent varchar.
 
-Obviously, not all data types are compatible with each other, below table lists all the feasible conversion for all basic datatype.
+Obviously, not all data types are compatible with each other, following table lists all the feasible conversion for all basic datatype.
 
 |           | BOOLEAN | TINYINT | SMALLINT | INTEGER | BIGINT | REAL | DOUBLE | DECIMAL | VARCHAR | CHAR | VARBINARY | JSON | DATE  | TIME  | TIME WITH TIME ZONE | TIMESTAMP | TIMESTAMP WITH TIME ZONE |
 | --------- | ------- | ------- | -------- | ------- | ------ | ---- | ------ | ------- | ------- | ---- | --------- | ---- | ----- | ----- | ------------------- | --------- | ------------------------ |
@@ -104,10 +103,10 @@ Obviously, not all data types are compatible with each other, below table lists 
 | WITH TIME |         |         |          |         |        |      |        |         |         |      |           |      |       |       |                     |           |                          |
 | ZONE      |         |         |          |         |        |      |        |         |         |      |           |      |       |       |                     |           |                          |
 
-**Note:**
+**Note**
 
-- Y or Y(#): standard for support implicit convert. But there might be some limitation need your attention. please refer to below item.
-- N: standard for not support implicit convert
+- Y or Y(#): standard for support implicit convert. But there might be some limitation need your attention. Refer to the following items:
+- N: standard for not support implicit convert.
 
 (1): BOOLEAN-\>NUMBER the converted result can be only 0 or 1
 

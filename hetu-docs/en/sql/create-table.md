@@ -27,7 +27,7 @@ The optional `WITH` clause can be used to set properties on the newly created ta
 
     SELECT * FROM system.metadata.table_properties
 
-For example, to hive connector, below are some of available and frequently used table properties:
+For example, to hive connector, following are some of available and frequently used table properties:
 
 | Property Name    | data type      | Description                                                  | Default |
 | ---------------- | -------------- | ------------------------------------------------------------ | ------- |

@@ -12,7 +12,7 @@ ANALYZE table_name [ WITH ( property_name = expression [, ...] ) ]
 Description
 -----------
 
-Collects table and column statistics for a given table.
+Collects table and column statistics for a provided table.
 
 The optional `WITH` clause can be used to provide connector-specific properties. To list all available properties, run the following query:
 

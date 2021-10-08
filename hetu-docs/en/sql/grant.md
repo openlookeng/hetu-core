@@ -27,8 +27,7 @@ For `GRANT` statement to succeed, the user executing it should possess the speci
 Examples
 --------
 
-Grant `INSERT` and `SELECT` privileges on the table `orders` to user
-`alice`:
+Grant `INSERT` and `SELECT` privileges on the table `orders` to user`alice`:
 
     GRANT INSERT, SELECT ON orders TO alice;
 
