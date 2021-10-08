@@ -3,7 +3,7 @@
 
 
 
-In addition to the manual deployment of openLooKeng Sever, you can follow below guide to complete deployment faster and easier. The script is friendly to most of linux OS. However, to Ubuntu, you need to manually install the following dependencies:
+In addition to the manual deployment of openLooKeng Sever, you can follow the guide to complete deployment faster and easier. The script is friendly to most of linux OS. However, to Ubuntu, you need to manually install the following dependencies:
 
 > sshpass1.06 or above
 
@@ -21,7 +21,7 @@ or:
 wget -O - https://download.openlookeng.io/install.sh|bash
 ```
 
-Normally, you don\'t need to do any thing, except for the installation to complete. It will automatically start the service.
+Normally, you can complete the installation. It will automatically start the service.
 
 Execute below command to stop openLooKeng service.:
 
@@ -51,7 +51,7 @@ or:
 bash <(wget -qO- https://download.openlookeng.io/install.sh) --multi-node
 ```
 
-First of all, this command will download scripts and packages required by openLooKeng service. After the download is completed, it will check whether the dependent packages `expect` and `sshpass` are installed. If not, those dependencies will be installed automatically.
+Initially, this command will download scripts and packages required by openLooKeng service. After the download is completed, it will check whether the dependent packages `expect` and `sshpass` are installed. If not, those dependencies will be installed automatically.
 
 Besides, jdk version is required to be greater than 1.8.0\_151. If not, jdk1.8.0\_201 will be installed in the cluster. It is recommended to manually install these dependencies before installing openLooKeng service.
 
@@ -97,7 +97,7 @@ Execute below command to start openLooKeng Command Line client.:
 
 **Tips:**
 
-If you are going to deploy openLooKeng on a big cluster with lots of nodes, instead of inputting the nodes' IP address one by one. It is better to prepare a file containing all nodes' IP address then pass this file as parameter to the installation script. Here is the command:
+If you are going to deploy openLooKeng on a big cluster with lots of nodes, instead of inputting the nodes' space seperated IP address one by one. It is better to prepare a file containing all nodes' IP address then pass this file as parameter to the installation script. Here is the command:
 
 ```shell
 bash <(wget -qO- https://download.openlookeng.io/install.sh) -f <cluster_node_info_path>

@@ -57,7 +57,7 @@ Returns the percentage ranking of a value in group of values. The result is `(r 
 
 Returns the rank of a value in a group of values. The rank is one plus the number of rows preceding the row that are not peer with the row. 
 
-Thus, tie values in the ordering will produce gaps in the sequence. The ranking is performed for each window partition.
+Thus, tie values in the ordering produces gaps in the sequence. The ranking is performed for each window partition.
 
 **row\_number()** -\> bigint
 
@@ -87,10 +87,7 @@ Offsets start at `1`. The offset can be any scalar expression. If the offset is 
 Returns the value at `offset` rows after the current row in the window. Offsets start at `0`, which is the current row. The offset can be any scalar expression. The default `offset` is `1`. If the offset is null or
 larger than the window, the `default_value` is returned, or if it is not specified `null` is returned.
 
-
-
 **lag(x\[, offset \[, default\_value\]\])** -\> \[same as input\]
 
 Returns the value at `offset` rows before the current row in the window Offsets start at `0`, which is the current row. The offset can be any scalar expression. The default `offset` is `1`. If the offset is null or
 larger than the window, the `default_value` is returned, or if it is not specified `null` is returned.
-

@@ -24,8 +24,15 @@ Returns the rest of `binary` from the starting position `start`, measured in byt
 
 **substr(binary, start, length)** -\> varbinary
 
-Returns a substring from `binary` of length `length` from the starting position `start`, measured in bytes. Positions start with `1`. A negative starting position is interpreted as being relative to the end
-of the string.
+Returns a substring from string of length `length` from the starting position `start`. Positive value of `start` indicates from the beginning of the string and negative indicates from the end of the string.
+
+e.g.
+
+substr('openLooKeng', 1, 4)
+returns "open"
+
+substr('openLooKeng', -7, 3)
+returns "Loo"
 
 **to\_base64(binary)** -\> varchar
 

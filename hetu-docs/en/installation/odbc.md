@@ -12,7 +12,7 @@ The ODBC driver enables applications to connect to databases. This product is th
 
 ### Prerequisites
 
-**The following knowledge is required for using this product:**
+The following knowledge is required for using this product:
 
 * ANSI structured query language (SQL)
 
@@ -20,7 +20,7 @@ The ODBC driver enables applications to connect to databases. This product is th
 
 ### Supported Version
 
-**This product supports the following version:**
+This product supports the following version:
 
 - Windows 10 64-bit
 

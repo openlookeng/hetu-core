@@ -42,7 +42,7 @@ kadmin
 > ktadd -k /home/someuser/someuser.keytab someuser@EXAMPLE.COM
 ```
 
-Note
+**Note:**
 
 Running **ktadd** randomizes the principal’s keys. If you have just created the principal, this does not matter. If the principal already exists, and if existing users or services rely on being able to authenticate using a password or a keytab, use the `-norandkey` option to **ktadd**.
 
@@ -59,7 +59,7 @@ The Java 8 policy files are available [here](http://www.oracle.com/technetwork/j
 
 ### Java Keystore File for TLS
 
-Access to the openLooKeng coordinator must be through https when using Kerberos authentication. The openLooKeng coordinator uses a Java Keystore file for its TLS configuration. This file can be copied to the client machine and used for its configuration.
+Access to the openLooKeng coordinator must be through HTTPS when using Kerberos authentication. The openLooKeng coordinator uses a Java Keystore file for its TLS configuration. This file can be copied to the client machine and used for its configuration.
 
  
 

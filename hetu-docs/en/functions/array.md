@@ -74,7 +74,7 @@ Sorts and returns the array `x`. The elements of `x` must be orderable. Null ele
 
 **array\_sort(array(T), function(T,T,int)) ** -\> array(T)
 
-Sorts and returns the `array` based on the given comparator `function`. The comparator will take two nullable arguments representing two nullable elements of the `array`. It returns -1, 0, or 1 as the first
+Sorts and returns the `array` based on the given comparator `function`. The comparator takes two nullable arguments representing two nullable elements of the `array`. It returns -1, 0, or 1 as the first
 nullable element is less than, equal to, or greater than the second nullable element. If the comparator function returns other values (including `NULL`), the query will fail and raise an error :
 
     SELECT array_sort(ARRAY [3, 2, 5, 1, 2], (x, y) -> IF(x < y, 1, IF(x = y, 0, -1))); -- [5, 3, 2, 2, 1]

@@ -1,7 +1,7 @@
 
 # openLooKeng Verifier
 
-The openLooKeng Verifier can be used to test openLooKeng against another database (such as MySQL), or to test two openLooKeng clusters against each other. We use it to continuously test trunk against the previous release while developing openLooKeng. Create a MySQL database with the following table and load it with the queries you would like to run:
+The openLooKeng Verifier can be used to test openLooKeng against another database (such as MySQL), or to test two openLooKeng clusters against each other. We use it to test trunk continuously against the previous release while developing openLooKeng. Create a MySQL database with the following table and load it with the queries you would like to run:
 
 ``` sql
 CREATE TABLE verifier_queries(

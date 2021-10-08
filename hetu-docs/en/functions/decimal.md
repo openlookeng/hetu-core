@@ -7,7 +7,7 @@ Decimal Literals
 
 > Use `DECIMAL 'xxxxxxx.yyyyyyy'` syntax to define literal of DECIMAL type.
 > 
->The precision of DECIMAL type for literal will be equal to number of digits in literal (including trailing and leading zeros). The scale will be equal to number of digits in fractional part (including trailing zeros).
+>The precision of DECIMAL type for literal is equal to number of digits in literal (including trailing and leading zeros). The scale is equal to number of digits in fractional part (including trailing zeros).
 
 | Example literal                   | Data type         |
 | :-------------------------------- | :---------------- |

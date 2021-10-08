@@ -2,9 +2,6 @@
 Logical Operators
 =================
 
-Logical Operators
------------------
-
 | Operator | Description                  | Example |
 | :------- | :--------------------------- | :------ |
 | `AND`    | True if both values are true | a AND b |
@@ -32,8 +29,6 @@ The result of an `OR` comparison may be `NULL` if one or both sides of the expre
 
 The following truth table demonstrates the handling of `NULL` in `AND` and `OR`:
 
- 
-
 | a       | b       | a AND b | a OR b  |
 | :------ | :------ | :------ | :------ |
 | `TRUE`  | `TRUE`  | `TRUE`  | `TRUE`  |
@@ -46,9 +41,7 @@ The following truth table demonstrates the handling of `NULL` in `AND` and `OR`:
 | `NULL`  | `FALSE` | `FALSE` | `NULL`  |
 | `NULL`  | `NULL`  | `NULL`  | `NULL`  |
 
- 
-
-The logical complement of `NULL` is `NULL` as shown in the following example:
+ The logical complement of `NULL` is `NULL` as shown in the following example:
 
     SELECT NOT CAST(null AS boolean); -- null
 

@@ -71,7 +71,7 @@ When using Kerberos authentication, access to the openLooKeng  coordinator shoul
 
 ## System Access Control Plugin
 
-A openLooKeng  coordinator with Kerberos enabled will probably need a System Access Control plugin to achieve the desired level of security.
+The openLooKeng  coordinator with Kerberos enabled will probably need a System Access Control plugin to achieve the desired level of security.
 
  
 
@@ -122,7 +122,7 @@ Note
 
 `http-server.authentication.krb5.user-mapping.pattern` and `http-server.authentication.krb5.user-mapping.file` can not both be set.
 
-Monitor CPU usage on the openLooKeng coordinator after enabling HTTPS. Java prefers the more CPU-intensive cipher suites if you allow it to choose from a big list. If the CPU usage is unacceptably high after enabling HTTPS, you can configure Java to use specific cipher suites by setting the `http-server.https.included-cipher` property to only allow cheap ciphers. Non forward secrecy (FS) ciphers are disabled by default. As a result, if you want to choose non FS ciphers, you need to set the `http-server.https.excluded-cipher` property to an empty list in order to override the default exclusions.
+Monitor CPU usage on the openLooKeng coordinator after enabling HTTPS. Java prefers more CPU-intensive cipher suites if you allow it to choose from a big list. If the CPU usage is unacceptably high after enabling HTTPS, you can configure Java to use specific cipher suites by setting the `http-server.https.included-cipher` property to only allow cheap ciphers. Non forward secrecy (FS) ciphers are disabled by default. As a result, if you want to choose non FS ciphers, you need to set the `http-server.https.excluded-cipher` property to an empty list in order to override the default exclusions.
 
 ```properties
 http-server.https.included-cipher=TLS_RSA_WITH_AES_128_CBC_SHA,TLS_RSA_WITH_AES_128_CBC_SHA256

@@ -8,8 +8,8 @@ Functions providing information about the query execution environment.
 
 Returns the current user running the query.
 
-**Note**
+**Note**:
 
 This is part of the SQL standard and does not use parenthesis.
-   
+
    

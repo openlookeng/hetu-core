@@ -23,7 +23,7 @@ Apache Hudi is a fast growing data lake storage system that helps organizations 
 
 ## Configuration
 
-Typically, we ingest the data from external data sources(e.g. Kafka) and write it to a DFS file storage system, such as HDFS. Then we synchronize Hudi data from HDFS to the Hive table through the data synchronization tool provided by Hudi. The Hudi tables are stored as the external tables in Hive. After that, we query the Hudi table by connecting to the Hive Connector. For the generation of the Hudi table and the steps to synchronize to the Hive table, please refer to the official [Hudi demo example](https://hudi.apache.org/docs/docker_demo.html).
+Typically, you ingest the data from external data sources(e.g. Kafka) and write it to a DFS file storage system, such as HDFS. Then you synchronize Hudi data from HDFS to the Hive table through the data synchronization tool provided by Hudi. The Hudi tables are stored as the external tables in Hive. After that, you query the Hudi table by connecting to the Hive Connector. For the generation of the Hudi table and the steps to synchronize to the Hive table, please refer to the official [Hudi demo example](https://hudi.apache.org/docs/docker_demo.html).
 
 First, before you start using the Hudi connector, you should complete the following steps:
 
@@ -47,7 +47,7 @@ cd hudi-release-0.7.0
 mvn package -DskipTests
 ```
 
-After compilation, enter the folder `/opt/hudi-release-0.7.0/packaging/hudi-presto-bundle/target/`, move the `hudi-presto-bundle-0.7.0.jar` package into the openLooKeng plugin package folder. E.g. if the openLooKeng plugin package folder is **/opt/hetu-server-1.3.0-SNAPSHOT/plugin**, the use the following command: **cp /opt/hudi-presto-bundle-0.7.0.jar /opt/hetu-server-1.3.0-SNAPSHOT/plugin/hive-hadoop2**. At this point, to prevent dependency jar conflicts while reading the Hudi table, we should delete `hudi-common-0.8.0.jar` and `hudi-hadoop-mr-0.8.0.jar`. Meanwhile, we should copy the extra package `jackson-mapper-asl-1.9.13.jar` and `jackson-core-asl-1.9.13.jar` into the current hive-haddop2 plugin folder (After Hudi compilation, these two jars could be found in location /opt/hudi-release-0.7.0/hudi-cli/target/lib). 
+After compilation, enter the folder `/opt/hudi-release-0.7.0/packaging/hudi-presto-bundle/target/`, move the `hudi-presto-bundle-0.7.0.jar` package into the openLooKeng plugin package folder. E.g. if the openLooKeng plugin package folder is **/opt/hetu-server-1.3.0-SNAPSHOT/plugin**, the use the following command: **cp /opt/hudi-presto-bundle-0.7.0.jar /opt/hetu-server-1.3.0-SNAPSHOT/plugin/hive-hadoop2**. At this point, to prevent dependency jar conflicts while reading the Hudi table, you should delete `hudi-common-0.8.0.jar` and `hudi-hadoop-mr-0.8.0.jar`. Meanwhile, you should copy the extra package `jackson-mapper-asl-1.9.13.jar` and `jackson-core-asl-1.9.13.jar` into the current hive-haddop2 plugin folder (After Hudi compilation, these two jars could be found in location /opt/hudi-release-0.7.0/hudi-cli/target/lib). 
 
 ```properties
 # copy Hudi driver package
@@ -62,7 +62,7 @@ cp /opt/hudi-release-0.7.0/hudi-cli/target/lib/jackson-core-asl-1.9.13.jar .
 
 ## Query Hudi COW Table
 
-Refer to [Hudi demo example](https://hudi.apache.org/docs/docker_demo.html), we could generate Hudi COW table（**stock_ticks_cow**), then we could query the Hudi table using the following statement:
+Refer to [Hudi demo example](https://hudi.apache.org/docs/docker_demo.html), you could generate Hudi COW table（**stock_ticks_cow**), then you could query the Hudi table using the following statement:
 
     # COPY-ON-WRITE Queries: 
     select "_hoodie_commit_time", symbol, ts, volume, open, close from stock_ticks_cow where symbol = 'GOOG';
@@ -76,7 +76,7 @@ Current Query results（**Snapshot Queries**）：
       20210519083834    | GOOG   | 2018-08-31 10:59:00|  3391  |1227.1993| 1227.215
     (2 rows)
 
-As you can see from the current snapshot query, the latest ts time is 2018-08-31 10:59:00, which is already the most recently updated data
+As you can see from the current snapshot query, the latest ts time is 2018-08-31 10:59:00, which is already the most recently updated data.
 
 ## Query Hudi MOR Table
 
@@ -84,7 +84,7 @@ Refer to [Hudi demo example](https://hudi.apache.org/docs/docker_demo.html), we 
 
     # Merge-On-Read Queries:
     select "_hoodie_commit_time", symbol, ts, volume, open, close  from stock_ticks_mor_ro where  symbol = 'GOOG';
-    
+
 
 Current Query results（**Read Optimized Queries**）：
 
@@ -95,9 +95,9 @@ Current Query results（**Read Optimized Queries**）：
       20210519083634    | GOOG   | 2018-08-31 10:29:00|  3391  |1230.1899| 1230.085
     (2 rows)
 
-As you can see from the current read optimization query, the latest ts time is 2018-08-31 10:29:00, and we obtain this result by just reading base/columnar files in latest file versions
+As you can see from the current read optimization query, the latest ts time is 2018-08-31 10:29:00, and you obtain this result by just reading base/columnar files in latest file versions
 
-Refer to [Hudi demo example](https://hudi.apache.org/docs/docker_demo.html), we could generate Hudi COW table（**stock_ticks_mor_rt**), then we could query the Hudi table using the following statement:
+Refer to [Hudi demo example](https://hudi.apache.org/docs/docker_demo.html), you could generate Hudi COW table（**stock_ticks_mor_rt**), then you could query the Hudi table using the following statement:
 
     # Merge-On-Read Queries:
     select "_hoodie_commit_time", symbol, ts, volume, open, close  from stock_ticks_mor_rt where  symbol = 'GOOG';
@@ -111,7 +111,7 @@ Current Query results（**Snapshot Queries**）：
       20210519083834    | GOOG   | 2018-08-31 10:59:00|  3391  |1227.1993| 1227.215
     (2 rows)
 
-As you can see from the current snapshot query, the latest ts time is 2018-08-31 10:59:00, which is already the most recently updated data, indicating that we have merged the base and delta files of the latest file version on-the-fly
+As you can see from the current snapshot query, the latest ts time is 2018-08-31 10:59:00, which is already the most recently updated data, indicating that we have merged the base and delta files of the latest file version on-the-fly.
 
 ## Hudi Connector Limitations
 

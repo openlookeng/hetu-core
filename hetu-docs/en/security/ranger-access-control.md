@@ -12,7 +12,7 @@ Apache Ranger delivers a comprehensive approach to security for a Hadoop cluster
 Build Process
 -------------------------
 
-1. Check out [openlookeng-ranger-plugin](https://gitee.com/openlookeng/openlookeng-ranger-plugin) code from GIT repository
+1. Check out [openlookeng-ranger-plugin](https://gitee.com/openlookeng/openlookeng-ranger-plugin) code from GIT repository.
 
 2. On the root folder, please execute the following Maven command :
 

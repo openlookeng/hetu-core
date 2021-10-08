@@ -33,7 +33,7 @@ You must make the following changes to the environment prior to configuring the 
 > -   `ldap_server`
 > -   `server_java_keystore`
 
-You also need to make changes to the openLooKeng configuration files. LDAP authentication is configured on the coordinator in two parts. The first part is to enable HTTPS support and password authentication in the
+You also make changes to the openLooKeng configuration files. LDAP authentication is configured on the coordinator in two parts. The first part is to enable HTTPS support and password authentication in the
 coordinator\'s `config.properties` file. The second part is to configure LDAP as the password authenticator plugin.
 
 #### Server Config Properties
@@ -62,7 +62,7 @@ http-server.https.keystore.key=keystore_password
 | `http-server.authentication.password.user-mapping.pattern` | Regex to match against user. If matched, user will be replaced with first regex group. If not matched, authentication is denied. Default is `(.*)`. |
 | `http-server.authentication.password.user-mapping.file`    | JSON file containing rules for mapping user. See [Authentication User Mapping](./user-mapping.md) for more information. |
 
-Note
+**Note:**
 
 `http-server.authentication.password.user-mapping.pattern` and `http-server.authentication.password.user-mapping.file` can not both be set. 
 

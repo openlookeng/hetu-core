@@ -2,8 +2,7 @@
 Conversion Functions
 ====================
 
-openLooKeng will implicitly convert numeric and character values to the correct type if such a conversion is possible. For any other types, by default, openLooKeng will not convert it implicitly. For example, a query that expects a
-varchar will not automatically convert a bigint value to an equivalent varchar.
+openLooKeng implicitly converts numeric and character values to the correct type if such a conversion is possible. For any other types, by default, openLooKeng will not convert it implicitly. For example, a query that expects a varchar will not automatically convert a bigint value to an equivalent varchar.
 
 When necessary, values can be explicitly cast to a particular type.
 
@@ -79,7 +78,7 @@ In this way, user do not need to explicitly add `CAST` function to convert it.
 
 For example, a query that expects a varchar will automatically convert a bigint value to an equivalent varchar.
 
-Obviously, not all data types are compatible with each other, below table lists all the feasible conversion for all basic datatype.
+Obviously, not all data types are compatible with each other, following table lists all the feasible conversion for all basic datatype.
 
 |           | BOOLEAN | TINYINT | SMALLINT | INTEGER | BIGINT | REAL | DOUBLE | DECIMAL | VARCHAR | CHAR | VARBINARY | JSON | DATE  | TIME  | TIME WITH TIME ZONE | TIMESTAMP | TIMESTAMP WITH TIME ZONE |
 | --------- | ------- | ------- | -------- | ------- | ------ | ---- | ------ | ------- | ------- | ---- | --------- | ---- | ----- | ----- | ------------------- | --------- | ------------------------ |
@@ -106,8 +105,8 @@ Obviously, not all data types are compatible with each other, below table lists 
 
 **Note:**
 
-- Y or Y(#): standard for support implicit convert. But there might be some limitation need your attention. please refer to below item.
-- N: standard for not support implicit convert
+- Y or Y(#): standard for supporting implicit conversion. There are few limitations which might need your attention. Refer the list below.
+- N: standard for not supporting implicit conversion.
 
 (1): BOOLEAN-\>NUMBER the converted result can be only 0 or 1
 
@@ -117,15 +116,15 @@ Obviously, not all data types are compatible with each other, below table lists 
 
 (4): BIG PRECISION -\> SAMLL conversion will fail when data is out of range of SMALL
 
-(5): REAL/FLOAT -\>DECIMAL conversion will fail when data is out of range of DECIMAL. Scale will be cut off when out of range.
+(5): REAL/FLOAT -\>DECIMAL conversion will fail when data is out of range of DECIMAL. Scale will be cut off when out of range
 
-(6): DECIMAL-\>DECIMAL conversion will fail when data is out of range of DECIMAL. Scale will be cut off when out of range.
+(6): DECIMAL-\>DECIMAL conversion will fail when data is out of range of DECIMAL. Scale will be cut off when out of range
 
 (7): VARCHAR-\>BOOLEAN only \'0\',\'1\',\'TRUE\',\'FALSE\' can be converted. Others will be failed
 
-(8): VARCHAR-\>DECIMAL conversion will fail when its not an numeric or the converted value is out of range of DECIMAL. Scale will be cut off when out of range.
+(8): VARCHAR-\>DECIMAL conversion will fail when its not an numeric or the converted value is out of range of DECIMAL. Scale will be cut off when out of range
 
-(9): VARCHAR-\>CHAR if length of VARCHAR is larger than CHAR, it will be cut off.
+(9): VARCHAR-\>CHAR if length of VARCHAR is larger than CHAR, it will be cut off
 
 (10): VARCHAR-\>DATE The VARCHAR can only be formatted like:\'YYYY-MM-DD\', e.g. 2000-01-01
 

@@ -18,16 +18,16 @@ Examples
 --------
 
 Show all cache metadata
- 
+
 ```sql
-    SHOW CACHE;
+SHOW CACHE;
 ```
 
 Show cache metadata for sales table
 
 ```sql
-    SHOW CACHE sales;
-```  
+SHOW CACHE sales;
+```
 
 Limitations
 -----------

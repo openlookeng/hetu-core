@@ -9,20 +9,17 @@ installation.
 
 - GET /v1/query
 
-This service returns information and statistics about queries that are
-currently being executed on a openLooKeng coordinator.
+This service returns information and statistics about queries that are currently
+executed on a openLooKeng coordinator.
 
-When you point a web browser at a openLooKeng coordinate you\'ll see a rendered
-version of the output from this service which will display recent
-queries that have executed on a openLooKeng installation.
-   
+When you point a web browser at a openLooKeng coordinate, you can find a rendered
+version of the output from this service which displays recent queries that have executed on a openLooKeng installation.
+
 
 - GET /v1/query/{queryId}
 
-If you are looking to gather very detailed statistics about a query,
-this is the service you would call. If you load the web interface of a
-openLooKeng coordinator you will see a list of current queries. Clicking on a
-query will reveal a link to this service.
+If you look to gather very detailed statistics about a query, this is the service you would call. If you load the web interface of a openLooKeng coordinator you can see a list of current queries. Clicking on a
+query reveals a link to this service.
 
 **Example response**:
 
@@ -72,4 +69,4 @@ query will reveal a link to this service.
 > "outputStage" : ...
 > }
 > ```
-   
+

@@ -21,12 +21,7 @@ To enable SSL/TLS for openLooKeng internal communication, do the following:
     > 
     > **Warning**
     > 
-    > You can enable HTTPS while leaving HTTP enabled. In most cases
-    > this is a security hole. If you are certain you want to use this
-    > configuration, you should consider using an firewall to limit
-    > access to the HTTP endpoint to only those hosts that should be
-    > allowed to use it.
-    > 
+    > You can enable HTTPS while leaving HTTP enabled. You can use HTTPS while still using HTTP. In the  majority of circumstances, this is a security flaw. If you're sure you want to use this configuration, you should use a firewall to limit access to the HTTP endpoint to only the hosts that should be allowed to use it.
     
 2.  Configure the cluster to communicate using the fully qualified domain name (fqdn) of the cluster nodes. This can be done in either of the following ways:
     
@@ -44,7 +39,9 @@ To enable SSL/TLS for openLooKeng internal communication, do the following:
         node.internal-address=<node fqdn>
         ```
     
-3.  Generate a Java Keystore File. Every openLooKeng node must be able to connect to any other node within the same cluster. It is possible to create unique certificates for every node using the fully-qualified hostname of each host, create a keystore that contains all the public keys for all of the hosts, and specify it for the client (see step [8](#step08) below). In most cases it will be simpler to use a wildcard in the certificate as shown below.
+3.  Generate a Java Keystore File. Every node in the openLooKeng cluster must be able to communicate with any other node in the cluster. It is possible to create unique certificates for each node based on the fully qualified hostname of each host, create a keystore containing all of the public keys for all of the hosts, and specify it for the client. (see step [8](#step08) ). 
+    
+    In most cases, it will be simpler to use a wildcard in the certificate as follows:
     
     > ``` shell
     > keytool -genkeypair -alias openLooKeng -keyalg RSA -keystore keystore.jks -keysize 2048
@@ -70,35 +67,35 @@ To enable SSL/TLS for openLooKeng internal communication, do the following:
     > ```
     Suggested keysize should not be less than 2048.
     
-4.  Distribute the Java Keystore File across the openLooKeng cluster.
+4. Distribute the Java Keystore File across the openLooKeng cluster.
 
-5.  Enable the HTTPS endpoint.
+5. Enable the HTTPS endpoint.
 
-    > ``` properties
-    > http-server.https.enabled=true
-    > http-server.https.port=<https port>
-    > http-server.https.keystore.path=<keystore path>
-    > http-server.https.keystore.key=<keystore password>
-    > ```
+   > ``` properties
+   > http-server.https.enabled=true
+   > http-server.https.port=<https port>
+   > http-server.https.keystore.path=<keystore path>
+   > http-server.https.keystore.key=<keystore password>
+   > ```
 
-6.  Change the discovery uri to HTTPS.
+6. Change the discovery uri to HTTPS.
 
-    > ``` properties
-    > discovery.uri=https://<coordinator fqdn>:<https port>
-    > ```
+   > ``` properties
+   > discovery.uri=https://<coordinator fqdn>:<https port>
+   > ```
 
-7.  Configure the internal communication to require HTTPS.
+7. Configure the internal communication to require HTTPS.
 
-    > ``` properties
-    > internal-communication.https.required=true
-    > ```
+   > ``` properties
+   > internal-communication.https.required=true
+   > ```
 
-8.  <a name = "step08"></a>Configure the internal communication to use the Java keystore file.
+8. <a name = "step08"></a>Configure the internal communication to use the Java keystore file.
 
-    > ``` properties
-    > internal-communication.https.keystore.path=<keystore path>
-    > internal-communication.https.keystore.key=<keystore password>
-    > ```
+   > ``` properties
+   > internal-communication.https.keystore.path=<keystore path>
+   > internal-communication.https.keystore.key=<keystore password>
+   > ```
 
 ### Internal SSL/TLS communication with Kerberos
 
@@ -108,10 +105,9 @@ If [Kerberos](server.md) authentication is enabled, specify valid Kerberos crede
 > internal-communication.kerberos.enabled=true
 > ```
 
+**Note:**
 
-**Note**
-
-*The service name and keytab file used for internal Kerberos authentication is taken from server Kerberos authentication properties, documented in `Kerberos</security/server>`, `http.server.authentication.krb5.service-name` and `http.server.authentication.krb5.keytab` respectively. Make sure you have the Kerberos setup done on the worker nodes as well. The Kerberos principal for internal communication is built from `http.server.authentication.krb5.service-name` after appending it with the hostname of the node where openLooKeng is running on and default realm from Kerberos configuration.*
+The internal Kerberos authentication service name and keytab file are taken from the server Kerberos authentication properties, which are documented in`Kerberos/security/server>`, `http.server.authentication.krb5.service-name`, and `http.server.authentication.krb5.keytab`. Ensure that Kerberos is setup on the worker nodes as well. The Kerberos principal for internal communication is built by appending the hostname of the node where openLooKeng is running and the default realm from Kerberos configuration to `http.server.authentication.krb5.service-name`.
 
 
 Performance with SSL/TLS enabled
@@ -121,8 +117,7 @@ Enabling encryption impacts performance. The performance degradation can vary ba
 
 For queries that do not require transferring too much data between the openLooKeng nodes (e.g. `SELECT count(*) FROM table`), the performance impact is negligible.
 
-However, for CPU intensive queries which require a considerable amount of data to be transferred between the nodes (for example, distributed joins, aggregations and window functions, which require repartitioning),
-the performance impact might be considerable. The slowdown may vary from 10% to even 100%+, depending on the network traffic and the CPU utilization.
+However, for CPU intensive queries which require a considerable amount of data to be transferred between the nodes (for example, distributed joins, aggregations and window functions, which require repartitioning), the performance impact might be considerable. The slowdown may vary from 10% to even 100%+, depending on the network traffic and the CPU utilization.
 
 Advanced Performance Tuning
 ---------------------------

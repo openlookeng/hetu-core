@@ -2,10 +2,8 @@
 Task Resource
 =============
 
-The Task resource provides a set of REST endpoints that give openLooKeng
-servers the ability to communicate about tasks and task output. This
-isn\'t a service that will be used by end users, but it supports the
-execution of queries on a openLooKeng installation.
+The Task resource provides a set of REST endpoints that provide openLooKeng
+servers the ability to communicate about tasks and task output. This is not a service that will be used by end users, but it supports the execution of queries on a openLooKeng installation.
 
 - GET /v1/task
 
@@ -86,7 +84,7 @@ following high-level sections:
 
 This is the same output that is also present in the response from the
 Query resource which lists all of the stages and tasks involved in a
-particular query. This is call is used by openLooKeng to coordinate a queries.
+particular query. This call is used by openLooKeng to coordinate a query.
 
 **Example response**:
 

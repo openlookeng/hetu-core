@@ -18,7 +18,7 @@ All operations are permitted under this plugin. This plugin is enabled by defaul
 Read Only System Access Control
 -------------------------------
 
-Under this plugin, you are allowed to execute any operation that reads data or metadata, such as `SELECT` or `SHOW`. Setting system level or catalog level session properties is also permitted. However, any
+Under this plugin, user allowed to execute any operation that reads data or metadata, such as `SELECT` or `SHOW`. Setting system level or catalog level session properties is also permitted. However, any
 operation that writes data or metadata, such as `CREATE`, `INSERT` or `DELETE`, is prohibited. To use this plugin, add an `etc/access-control.properties` file with the following contents:
 
 ``` properties
@@ -59,10 +59,9 @@ composed of the following fields:
 -   `catalog` (optional): regex to match against catalog name. Defaults to `.*`.
 -   `allow` (required): boolean indicating whether a user has access to the catalog
 
+**Note:**
 
-**Note**
-
-*By default, all users have access to the `system` catalog. You can override this behavior by adding a rule.*
+By default, all users have access to the `system` catalog. You can override this behavior by adding a rule.
 
 
 For example, if you want to allow only the user `admin` to access the `mysql` and the `system` catalog, allow all users to access the `hive` catalog, and deny all other access, you can use the following rules:
@@ -141,10 +140,9 @@ based on the first matching rule read from top to bottom. If no rules are specif
     value of `allow`.
 -   `allow` (required): boolean indicating whether a principal can be authorized as a user.
 
+**Note:**
 
-**Note**
-
-*You would at least specify one criterion in a principal rule. If you specify both criteria in a principal rule, it will return the desired conclusion when either of criteria is satisfied.*
+You would at least specify one criteria in a principal rule. If you specify both criteria in a principal rule, it will return the desired conclusion when either of criteria is satisfied.
 
 The following implements an exact matching of the full principal name for LDAP and Kerberos authentication:
 
@@ -201,9 +199,9 @@ composed of the following fields:
 - `user` (optional): regex to match against user name. Defaults to `.*`.
 - `allow` (required): boolean indicating whether a user has access to the catalog
 
-**Note**
+**Note**:
 
-*By default, all users have no access to update the node state info. You can override this behavior by adding a rule.*
+By default, all users have no access to update the node state info. You can override this behavior by adding a rule.
 
 For example, if you want to allow only the user `admin` and `alice` to update the node state, and deny all other access, you can use the following rules:
 
@@ -235,7 +233,7 @@ Each rule is composed of the following fields:
 - `user` (required): regex to match against user name. Defaults to `.*`.
 - `privileges` (optional): list of privileges granted to user (`ALL`, `SHOW`, `CREATE`, `DROP`, `RENAME`, and `UPDATE`). Defaults to `ALL`.
 
-For example, here user `tom` can only execute `SHOW INDEX` or `CREATE INDEX` statements.
+For example, user `tom` can only execute `SHOW INDEX` or `CREATE INDEX` statements.
 But user `admin` can execute all statements `CREATE INDEX`, `SHOW INDEX`, `DROP INDEX`, etc.
 
 ```json

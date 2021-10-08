@@ -29,7 +29,7 @@ The file mapping rules allow for more complex mappings from the authentication u
 | user           | `$1`          | No       | Replacement string to substitute against pattern             |
 | allow          | true          | No       | Boolean indicating if the authentication should be allowed   |
 
-The following example maps all users like `alice@example.com` to just `alice`, except for the `test`user which is denied authentication, and it maps users like `bob@uk.example.com` to `bob_uk`:
+The following example maps all users like `alice@example.com` to just `alice`, except for the `test`user which is denied authentication, and it maps to users like `bob@uk.example.com` to `bob_uk`:
 
 ``` json
 {
