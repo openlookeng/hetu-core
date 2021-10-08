@@ -216,7 +216,7 @@ An in-depth look at the various annotations relevant to writing an aggregation f
     
 -   `@CombineFunction`:
 
-    The `@CombineFunction` annotation declares the function used to ombine two state objects. This function is used to merge all the partial aggregation states. It takes two state objects, and merges
+    The `@CombineFunction` annotation declares the function used to combine two state objects. This function is used to merge all the partial aggregation states. It takes two state objects, and merges
     the results into the first one (in the above example, just by adding them together).
     
 -   `@OutputFunction`:
