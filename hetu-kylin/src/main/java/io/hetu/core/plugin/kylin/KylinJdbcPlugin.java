@@ -15,8 +15,16 @@
 package io.hetu.core.plugin.kylin;
 
 import io.airlift.log.Logger;
+import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.JdbcPlugin;
 import io.prestosql.spi.function.ConnectorConfig;
+import io.prestosql.spi.queryeditorui.ConnectorUtil;
+import io.prestosql.spi.queryeditorui.ConnectorWithProperties;
+
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Optional;
 
 @ConnectorConfig(connectorLabel = "Kylin : Query  tables on an external Kylin database",
         propertiesEnabled = true,
@@ -31,5 +39,17 @@ public class KylinJdbcPlugin
     {
         super("kylin", new KylinClientModule());
         log.info("kylin plugin is registered");
+    }
+
+    @Override
+    public Optional<ConnectorWithProperties> getConnectorWithProperties()
+    {
+        ConnectorConfig connectorConfig = KylinJdbcPlugin.class.getAnnotation(ConnectorConfig.class);
+        ArrayList<Method> methods = new ArrayList<>();
+        methods.addAll(Arrays.asList(BaseJdbcConfig.class.getDeclaredMethods()));
+        methods.addAll(Arrays.asList(KylinConfig.class.getDeclaredMethods()));
+        Optional<ConnectorWithProperties> connectorWithProperties = ConnectorUtil.assembleConnectorProperties(connectorConfig, methods);
+        ConnectorUtil.addConnUrlProperty(connectorWithProperties, "jdbc:kylin://host:port");
+        return connectorWithProperties;
     }
 }

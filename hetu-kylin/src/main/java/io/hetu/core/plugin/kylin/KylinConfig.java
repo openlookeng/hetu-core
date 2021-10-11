@@ -133,11 +133,6 @@ public class KylinConfig
         return connectionUser;
     }
 
-    @Mandatory(name = "connection-user",
-            description = "User to connect to remote database",
-            defaultValue = "root",
-            required = true)
-    @Config("connection-user")
     public KylinConfig setConnectionUser(String connectionUser)
     {
         this.connectionUser = connectionUser;
@@ -149,10 +144,6 @@ public class KylinConfig
         return connectionPassword;
     }
 
-    @Mandatory(name = "connection-password",
-            description = "Password of user to connect to remote database",
-            defaultValue = "secret",
-            required = true)
     @Config("connection-password")
     @ConfigSecuritySensitive
     public KylinConfig setConnectionPassword(String connectionPassword)
