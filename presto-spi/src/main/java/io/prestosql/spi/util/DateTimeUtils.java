@@ -37,6 +37,7 @@ import static io.prestosql.spi.util.DateTimeZoneIndex.getDateTimeZone;
 import static io.prestosql.spi.util.DateTimeZoneIndex.packDateTimeWithZone;
 import static io.prestosql.spi.util.DateTimeZoneIndex.unpackChronology;
 import static io.prestosql.spi.util.DateTimeZoneIndex.unpackDateTimeZone;
+import static java.lang.Math.toIntExact;
 import static java.lang.String.format;
 
 public final class DateTimeUtils
@@ -49,7 +50,7 @@ public final class DateTimeUtils
 
     public static int parseDate(String value)
     {
-        return (int) TimeUnit.MILLISECONDS.toDays(DATE_FORMATTER.parseMillis(value));
+        return toIntExact(TimeUnit.MILLISECONDS.toDays(DATE_FORMATTER.parseMillis(value)));
     }
 
     public static String printDate(int days)
