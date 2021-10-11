@@ -149,8 +149,6 @@ Interval Functions
 
 The functions in this section support the following interval units:
 
- 
-
 | Unit          | Description        |
 | :------------ | :----------------- |
 | `millisecond` | Milliseconds       |
@@ -177,8 +175,6 @@ Duration Function
 -----------------
 
 The `parse_duration` function supports the following units:
-
- 
 
 | Unit | Description  |
 | :--- | :----------- |
@@ -320,7 +316,7 @@ Returns `field` from `x`.
 
 **Note**
 
-This SQL-standard function uses special syntax for specifying the arguments.
+*This SQL-standard function uses special syntax for specifying the arguments.*
 
    
 

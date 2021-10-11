@@ -4,9 +4,8 @@ Regular Expression Functions
 
 All of the regular expression functions use the [Java pattern](https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html) syntax, with a few notable exceptions:
 
--   When using multi-line mode (enabled via the `(?m)` flag), only `\n` is recognized as a line terminator. Additionally, the `(?d)` flag is not supported and must not be used.
--   Case-insensitive matching (enabled via the `(?i)` flag) is always performed in a Unicode-aware manner. However, context-sensitive and local-sensitive matching is not supported. Additionally, the `(?u)`
-    flag is not supported and must not be used.
+-   When using multi-line mode (enabled through the `(?m)` flag), only `\n` is recognized as a line terminator. Additionally, the `(?d)` flag is not supported and must not be used.
+-   Case-insensitive matching (enabled through the `(?i)` flag) is always performed in a Unicode-aware manner. However, context-sensitive and local-sensitive matching is not supported. Additionally, the `(?u)`flag is not supported and must not be used.
 -   Surrogate pairs are not supported. For example, `\uD800\uDC00` is not treated as `U+10000` and must be specified as `\x{10000}`. Boundaries (`\b`) are incorrectly handled for a non-spacing mark
     without a base character.
 -   `\Q` and `\E` are not supported in character classes (such as `[A-Z123]`) and are instead treated as literals.
@@ -66,9 +65,8 @@ group or `${name}` for a named group. A dollar sign (`$`) may be included in the
 
 **regexp\_replace(string, pattern, function)** -\> varchar
 
-Replaces every instance of the substring matched by the regular expression `pattern` in `string` using `function`. The `lambda expression <lambda>` `function` is
-invoked for each match with the [capturing groups](https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html#cg) passed as an array. Capturing group numbers start at one; there is no group for the entire match (if you need this, surround the entire expression with
-parenthesis). :
+Replaces every instance of the substring matched by the regular expression `pattern` in `string` using `function`. The `lambda expression <lambda>` `function` is invoked for each match with the [capturing groups](https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html#cg) passed as an array. Capturing group numbers start at one; there is no group for the entire match (if you need this, surround the entire expression with
+parenthesis) :
 
     SELECT regexp_replace('new york', '(\w)(\w*)', x -> upper(x[1]) || lower(x[2])); --'New York'
 
@@ -78,4 +76,3 @@ parenthesis). :
 Splits `string` using the regular expression `pattern` and returns an array. Trailing empty strings are preserved:
 
     SELECT regexp_split('1a 2b 14m', '\s*[a-z]+\s*'); -- [1, 2, 14, ]
-
