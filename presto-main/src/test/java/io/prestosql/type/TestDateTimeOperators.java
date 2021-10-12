@@ -409,6 +409,12 @@ public class TestDateTimeOperators
         assertInvalidFunction("DATE '392251590-07-12'", INVALID_CAST_ARGUMENT, "Value cannot be cast to date: 392251590-07-12");
     }
 
+    @Test
+    public void testDateCastParse()
+    {
+        assertInvalidFunction("DATE '5881580-07-12'", INVALID_CAST_ARGUMENT, "Value cannot be cast to date: 5881580-07-12");
+    }
+
     private static SqlDate toDate(DateTime dateTime)
     {
         return new SqlDate((int) TimeUnit.MILLISECONDS.toDays(dateTime.getMillis()));
