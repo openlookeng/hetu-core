@@ -20,3 +20,4 @@ Examples
 Change the comment for the `users` table to be `master table`:
 
     COMMENT ON TABLE users IS 'master table';
+

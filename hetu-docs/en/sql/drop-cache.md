@@ -12,8 +12,7 @@ DROP CACHE table WHERE condition;
 Description
 -----------
 
-`DROP CACHE` deletes cache metadata of the `table` from coordinator only. Workers\' caches purged automatically by expiry time 
-or by reaching size limit but recurring splits will not reuse any cached node assignments.
+`DROP CACHE` deletes cache metadata of the `table` from coordinator only. Workers\' caches purged automatically by expiry time or by reaching size limit but recurring splits will not reuse any cached node assignments.
 
 Examples
 --------
@@ -23,12 +22,12 @@ of `sale_id = 24` under the table of `sales`, then running the following query c
 affecting any other cache record:
 
 ```sql
-    DROP CACHE sales WHERE sale_id = 24;
+DROP CACHE sales WHERE sale_id = 24;
 ```
 Or simply drop all cache metadata for \'sales\' table by running:
 
 ```sql
-    DROP CACHE sales;
+DROP CACHE sales;
 ```
 
 Limitations

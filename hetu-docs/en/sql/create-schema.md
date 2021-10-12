@@ -17,7 +17,9 @@ Create a new, empty schema. A schema is a container that holds tables, views and
 
 The optional `IF NOT EXISTS` clause causes the error to be suppressed if the schema already exists.
 
-The optional `WITH` clause can be used to set properties on the newly created schema. To list all available schema properties, run the following query:
+The optional `WITH` clause can be used to set properties on the newly created schema. 
+
+To list all available schema properties, run the following query:
 
     SELECT * FROM system.metadata.schema_properties
 

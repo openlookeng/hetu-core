@@ -14,7 +14,7 @@ Description
 
 Execute the statement and show the distributed execution plan of the statement along with the cost of each operation.
 
-The `VERBOSE` option will give more detailed information and low-level statistics; understanding these may require knowledge of openLooKeng internals and implementation details.
+The `VERBOSE` option gives more detailed information and low-level statistics; understanding these may require knowledge of openLooKeng internals and implementation details.
 
 
 **Note**
@@ -24,8 +24,7 @@ The `VERBOSE` option will give more detailed information and low-level statistic
 Examples
 --------
 
-In the example below, you can see the CPU time spent in each stage, as well as the relative cost of each plan node in the stage. Note that the relative cost of the plan nodes is based on wall time, which may or may not be correlated to CPU time. For each plan node you can see some additional statistics (e.g: average input per node instance, average number of hash collisions for relevant plan nodes). Such statistics are
-useful when one wants to detect data anomalies for a query (skewness, abnormal hash collisions).
+In the following example, you can see the CPU time spent in each stage, as well as the relative cost of each plan node in the stage. Note that the relative cost of the plan nodes is based on wall time, which may or may not be correlated to CPU time. For each plan node you can see some additional statistics (for example, average input per node instance, average number of hash collisions for relevant plan nodes). Such statistics are useful when one wants to detect data anomalies for a query (skewness, abnormal hash collisions).
 
 ``` sql
 lk:sf1> EXPLAIN ANALYZE SELECT count(*), clerk FROM orders WHERE orderdate > date '1995-01-01' GROUP BY clerk;
