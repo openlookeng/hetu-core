@@ -517,6 +517,12 @@ final class ShowQueriesRewrite
         {
             QualifiedObjectName tableName = createQualifiedObjectName(session, showColumns, showColumns.getTable());
 
+            if (!metadata.getCatalogHandle(session, tableName.getCatalogName()).isPresent()) {
+                throw new SemanticException(MISSING_CATALOG, showColumns, "Catalog '%s' does not exist", tableName.getCatalogName());
+            }
+            if (!metadata.schemaExists(session, new CatalogSchemaName(tableName.getCatalogName(), tableName.getSchemaName()))) {
+                throw new SemanticException(MISSING_SCHEMA, showColumns, "Schema '%s' does not exist", tableName.getSchemaName());
+            }
             if (!metadata.getView(session, tableName).isPresent() &&
                     !metadata.getTableHandle(session, tableName).isPresent()) {
                 throw new SemanticException(MISSING_TABLE, showColumns, "Table '%s' does not exist", tableName);
