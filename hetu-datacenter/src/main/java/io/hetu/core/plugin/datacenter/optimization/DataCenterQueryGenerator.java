@@ -116,6 +116,20 @@ public class DataCenterQueryGenerator
                     .setSchemaTableName(Optional.of(new SchemaTableName(dcTableHandle.getSchemaName(), dcTableHandle.getTableName())))
                     .setSelections(selections)
                     .setFrom(Optional.of(table.toString()));
+
+            String catalogName = dcTableHandle.getCatalogName();
+            if (catalogName != null) {
+                contextBuilder.setRemoteCatalogName(catalogName);
+            }
+            String schemaName = dcTableHandle.getSchemaName();
+            if (schemaName != null) {
+                contextBuilder.setRemoteSchemaName(schemaName);
+            }
+            String tableName = dcTableHandle.getTableName();
+            if (tableName != null) {
+                contextBuilder.setRemoteTablename(tableName);
+            }
+
             // If LIMIT has been push down, add it to context
             if (dcTableHandle.getLimit().isPresent()) {
                 contextBuilder.setLimit(dcTableHandle.getLimit());

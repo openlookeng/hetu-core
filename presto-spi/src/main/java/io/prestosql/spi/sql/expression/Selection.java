@@ -44,9 +44,9 @@ public class Selection
         return alias;
     }
 
-    public boolean isAliased(boolean caseInsensitive)
+    public boolean isAliased(boolean caseSensitive)
     {
-        return caseInsensitive ? !this.alias.equals(expression) : !this.alias.toLowerCase(Locale.ENGLISH).equals(expression.toLowerCase(Locale.ENGLISH));
+        return caseSensitive ? !this.alias.equals(expression) : !this.alias.toLowerCase(Locale.ENGLISH).equals(expression.toLowerCase(Locale.ENGLISH));
     }
 
     @Override

@@ -50,7 +50,7 @@ public class KylinSqlStatementWriter
         else {
             StringJoiner joiner = new StringJoiner(", ");
             for (Selection selection : selections) {
-                if (selection.isAliased(pushDownParameter.getCaseInsensitiveParameter())) {
+                if (selection.isAliased(!pushDownParameter.getCaseInsensitiveParameter())) {
                     joiner.add(selection.getExpression() + " AS " + KylinKeywords.getAlias(selection.getAlias()));
                 }
                 else {
