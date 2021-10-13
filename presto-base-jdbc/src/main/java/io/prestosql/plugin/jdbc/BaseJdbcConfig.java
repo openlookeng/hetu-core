@@ -295,10 +295,6 @@ public class BaseJdbcConfig
         return connectionUrl;
     }
 
-    @Mandatory(name = "connection-url",
-            description = "the address of datasource",
-            defaultValue = "host1",
-            required = true)
     @Config("connection-url")
     public BaseJdbcConfig setConnectionUrl(String connectionUrl)
     {
