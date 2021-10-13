@@ -6,94 +6,79 @@ remote exchange (GATHER, SINGLE, [])
                     local exchange (GATHER, SINGLE, [])
                         partial hashaggregation over (ca_city, ca_city_106, ca_street_name, ca_street_name_103, ca_street_number, ca_street_number_102, ca_zip, ca_zip_109, d_year, d_year_26, d_year_55, i_item_sk, i_product_name, s_store_name, s_zip)
                             join (INNER, PARTITIONED):
-                                remote exchange (REPARTITION, HASH, ["cs_item_sk"])
-                                    join (INNER, PARTITIONED):
-                                        remote exchange (REPARTITION, HASH, ["hd_income_band_sk_94"])
-                                            join (INNER, PARTITIONED):
-                                                remote exchange (REPARTITION, HASH, ["hd_income_band_sk"])
-                                                    join (INNER, PARTITIONED):
-                                                        remote exchange (REPARTITION, HASH, ["c_current_addr_sk"])
-                                                            join (INNER, PARTITIONED):
-                                                                remote exchange (REPARTITION, HASH, ["ss_addr_sk"])
-                                                                    join (INNER, PARTITIONED):
-                                                                        remote exchange (REPARTITION, HASH, ["c_current_hdemo_sk"])
-                                                                            join (INNER, PARTITIONED):
-                                                                                remote exchange (REPARTITION, HASH, ["ss_hdemo_sk"])
-                                                                                    join (INNER, PARTITIONED):
-                                                                                        remote exchange (REPARTITION, HASH, ["ss_promo_sk"])
-                                                                                            join (INNER, PARTITIONED):
-                                                                                                remote exchange (REPARTITION, HASH, ["c_current_cdemo_sk"])
-                                                                                                    join (INNER, PARTITIONED):
-                                                                                                        remote exchange (REPARTITION, HASH, ["ss_cdemo_sk"])
-                                                                                                            join (INNER, PARTITIONED):
-                                                                                                                remote exchange (REPARTITION, HASH, ["c_first_shipto_date_sk"])
-                                                                                                                    join (INNER, PARTITIONED):
-                                                                                                                        remote exchange (REPARTITION, HASH, ["c_first_sales_date_sk"])
-                                                                                                                            join (INNER, PARTITIONED):
-                                                                                                                                remote exchange (REPARTITION, HASH, ["ss_customer_sk"])
-                                                                                                                                    join (INNER, PARTITIONED):
-                                                                                                                                        remote exchange (REPARTITION, HASH, ["ss_store_sk"])
-                                                                                                                                            join (INNER, PARTITIONED):
-                                                                                                                                                remote exchange (REPARTITION, HASH, ["ss_sold_date_sk"])
-                                                                                                                                                    join (INNER, PARTITIONED):
-                                                                                                                                                        remote exchange (REPARTITION, HASH, ["sr_item_sk"])
-                                                                                                                                                            join (INNER, REPLICATED):
-                                                                                                                                                                scan store_sales
-                                                                                                                                                                local exchange (GATHER, SINGLE, [])
-                                                                                                                                                                    remote exchange (REPLICATE, BROADCAST, [])
-                                                                                                                                                                        scan store_returns
-                                                                                                                                                        final hashaggregation over (cs_item_sk)
-                                                                                                                                                            local exchange (GATHER, SINGLE, [])
-                                                                                                                                                                remote exchange (REPARTITION, HASH, ["cs_item_sk"])
-                                                                                                                                                                    partial hashaggregation over (cs_item_sk)
-                                                                                                                                                                        join (INNER, PARTITIONED):
-                                                                                                                                                                            remote exchange (REPARTITION, HASH, ["cs_item_sk", "cs_order_number"])
-                                                                                                                                                                                scan catalog_sales
-                                                                                                                                                                            local exchange (GATHER, SINGLE, [])
-                                                                                                                                                                                remote exchange (REPARTITION, HASH, ["cr_item_sk", "cr_order_number"])
-                                                                                                                                                                                    scan catalog_returns
-                                                                                                                                                local exchange (GATHER, SINGLE, [])
-                                                                                                                                                    remote exchange (REPARTITION, HASH, ["d_date_sk"])
-                                                                                                                                                        scan date_dim (pushdown = true)
-                                                                                                                                        local exchange (GATHER, SINGLE, [])
-                                                                                                                                            remote exchange (REPARTITION, HASH, ["s_store_sk"])
-                                                                                                                                                scan store
-                                                                                                                                local exchange (GATHER, SINGLE, [])
-                                                                                                                                    remote exchange (REPARTITION, HASH, ["c_customer_sk"])
-                                                                                                                                        scan customer
-                                                                                                                        local exchange (GATHER, SINGLE, [])
-                                                                                                                            remote exchange (REPARTITION, HASH, ["d_date_sk_20"])
-                                                                                                                                scan date_dim
-                                                                                                                local exchange (GATHER, SINGLE, [])
-                                                                                                                    remote exchange (REPARTITION, HASH, ["d_date_sk_49"])
-                                                                                                                        scan date_dim
-                                                                                                        local exchange (GATHER, SINGLE, [])
-                                                                                                            remote exchange (REPARTITION, HASH, ["cd_demo_sk"])
-                                                                                                                scan customer_demographics
+                                join (INNER, REPLICATED):
+                                    join (INNER, REPLICATED):
+                                        join (INNER, REPLICATED):
+                                            join (INNER, REPLICATED):
+                                                join (INNER, REPLICATED):
+                                                    join (INNER, REPLICATED):
+                                                        join (INNER, REPLICATED):
+                                                            join (INNER, REPLICATED):
+                                                                join (INNER, REPLICATED):
+                                                                    join (INNER, REPLICATED):
+                                                                        join (INNER, REPLICATED):
+                                                                            join (INNER, REPLICATED):
+                                                                                join (INNER, REPLICATED):
+                                                                                    join (INNER, REPLICATED):
+                                                                                        join (INNER, PARTITIONED):
+                                                                                            remote exchange (REPARTITION, HASH, ["sr_item_sk"])
+                                                                                                join (INNER, REPLICATED):
+                                                                                                    scan store_sales
+                                                                                                    local exchange (GATHER, SINGLE, [])
+                                                                                                        remote exchange (REPLICATE, BROADCAST, [])
+                                                                                                            scan store_returns
+                                                                                            final hashaggregation over (cs_item_sk)
                                                                                                 local exchange (GATHER, SINGLE, [])
-                                                                                                    remote exchange (REPARTITION, HASH, ["cd_demo_sk_81"])
-                                                                                                        scan customer_demographics
+                                                                                                    remote exchange (REPARTITION, HASH, ["cs_item_sk"])
+                                                                                                        partial hashaggregation over (cs_item_sk)
+                                                                                                            join (INNER, PARTITIONED):
+                                                                                                                remote exchange (REPARTITION, HASH, ["cs_item_sk", "cs_order_number"])
+                                                                                                                    scan catalog_sales
+                                                                                                                local exchange (GATHER, SINGLE, [])
+                                                                                                                    remote exchange (REPARTITION, HASH, ["cr_item_sk", "cr_order_number"])
+                                                                                                                        scan catalog_returns
                                                                                         local exchange (GATHER, SINGLE, [])
-                                                                                            remote exchange (REPARTITION, HASH, ["p_promo_sk"])
-                                                                                                scan promotion
+                                                                                            remote exchange (REPLICATE, BROADCAST, [])
+                                                                                                scan date_dim (pushdown = true)
+                                                                                    local exchange (GATHER, SINGLE, [])
+                                                                                        remote exchange (REPLICATE, BROADCAST, [])
+                                                                                            scan store
                                                                                 local exchange (GATHER, SINGLE, [])
-                                                                                    remote exchange (REPARTITION, HASH, ["hd_demo_sk"])
-                                                                                        scan household_demographics
+                                                                                    remote exchange (REPLICATE, BROADCAST, [])
+                                                                                        scan customer
+                                                                            local exchange (GATHER, SINGLE, [])
+                                                                                remote exchange (REPLICATE, BROADCAST, [])
+                                                                                    scan date_dim
                                                                         local exchange (GATHER, SINGLE, [])
-                                                                            remote exchange (REPARTITION, HASH, ["hd_demo_sk_93"])
-                                                                                scan household_demographics
+                                                                            remote exchange (REPLICATE, BROADCAST, [])
+                                                                                scan date_dim
+                                                                    local exchange (GATHER, SINGLE, [])
+                                                                        remote exchange (REPLICATE, BROADCAST, [])
+                                                                            scan customer_demographics
                                                                 local exchange (GATHER, SINGLE, [])
-                                                                    remote exchange (REPARTITION, HASH, ["ca_address_sk"])
-                                                                        scan customer_address
+                                                                    remote exchange (REPLICATE, BROADCAST, [])
+                                                                        scan customer_demographics
+                                                            local exchange (GATHER, SINGLE, [])
+                                                                remote exchange (REPLICATE, BROADCAST, [])
+                                                                    scan promotion
                                                         local exchange (GATHER, SINGLE, [])
-                                                            remote exchange (REPARTITION, HASH, ["ca_address_sk_100"])
-                                                                scan customer_address
+                                                            remote exchange (REPLICATE, BROADCAST, [])
+                                                                scan household_demographics
+                                                    local exchange (GATHER, SINGLE, [])
+                                                        remote exchange (REPLICATE, BROADCAST, [])
+                                                            scan household_demographics
                                                 local exchange (GATHER, SINGLE, [])
-                                                    remote exchange (REPARTITION, HASH, ["ib_income_band_sk"])
-                                                        scan income_band
+                                                    remote exchange (REPLICATE, BROADCAST, [])
+                                                        scan customer_address
+                                            local exchange (GATHER, SINGLE, [])
+                                                remote exchange (REPLICATE, BROADCAST, [])
+                                                    scan customer_address
                                         local exchange (GATHER, SINGLE, [])
-                                            remote exchange (REPARTITION, HASH, ["ib_income_band_sk_115"])
+                                            remote exchange (REPLICATE, BROADCAST, [])
                                                 scan income_band
+                                    local exchange (GATHER, SINGLE, [])
+                                        remote exchange (REPLICATE, BROADCAST, [])
+                                            scan income_band
                                 local exchange (GATHER, SINGLE, [])
                                     remote exchange (REPARTITION, HASH, ["i_item_sk"])
                                         scan item (pushdown = true)
@@ -101,94 +86,79 @@ remote exchange (GATHER, SINGLE, [])
                     local exchange (GATHER, SINGLE, [])
                         partial hashaggregation over (ca_city_529, ca_city_543, ca_street_name_526, ca_street_name_540, ca_street_number_525, ca_street_number_539, ca_zip_532, ca_zip_546, d_year_341, d_year_370, d_year_399, i_item_sk_559, i_product_name_580, s_store_name_427, s_zip_447)
                             join (INNER, PARTITIONED):
-                                remote exchange (REPARTITION, HASH, ["cs_item_sk_268"])
-                                    join (INNER, PARTITIONED):
-                                        remote exchange (REPARTITION, HASH, ["hd_income_band_sk_518"])
-                                            join (INNER, PARTITIONED):
-                                                remote exchange (REPARTITION, HASH, ["hd_income_band_sk_512"])
-                                                    join (INNER, PARTITIONED):
-                                                        remote exchange (REPARTITION, HASH, ["c_current_addr_sk_456"])
-                                                            join (INNER, PARTITIONED):
-                                                                remote exchange (REPARTITION, HASH, ["ss_addr_sk_214"])
-                                                                    join (INNER, PARTITIONED):
-                                                                        remote exchange (REPARTITION, HASH, ["c_current_hdemo_sk_455"])
-                                                                            join (INNER, PARTITIONED):
-                                                                                remote exchange (REPARTITION, HASH, ["ss_hdemo_sk_213"])
-                                                                                    join (INNER, PARTITIONED):
-                                                                                        remote exchange (REPARTITION, HASH, ["ss_promo_sk_216"])
-                                                                                            join (INNER, PARTITIONED):
-                                                                                                remote exchange (REPARTITION, HASH, ["c_current_cdemo_sk_454"])
-                                                                                                    join (INNER, PARTITIONED):
-                                                                                                        remote exchange (REPARTITION, HASH, ["ss_cdemo_sk_212"])
-                                                                                                            join (INNER, PARTITIONED):
-                                                                                                                remote exchange (REPARTITION, HASH, ["c_first_shipto_date_sk_457"])
-                                                                                                                    join (INNER, PARTITIONED):
-                                                                                                                        remote exchange (REPARTITION, HASH, ["c_first_sales_date_sk_458"])
-                                                                                                                            join (INNER, PARTITIONED):
-                                                                                                                                remote exchange (REPARTITION, HASH, ["ss_customer_sk_211"])
-                                                                                                                                    join (INNER, PARTITIONED):
-                                                                                                                                        remote exchange (REPARTITION, HASH, ["ss_store_sk_215"])
-                                                                                                                                            join (INNER, PARTITIONED):
-                                                                                                                                                remote exchange (REPARTITION, HASH, ["ss_sold_date_sk_208"])
-                                                                                                                                                    join (INNER, PARTITIONED):
-                                                                                                                                                        remote exchange (REPARTITION, HASH, ["sr_item_sk_234"])
-                                                                                                                                                            join (INNER, REPLICATED):
-                                                                                                                                                                scan store_sales
-                                                                                                                                                                local exchange (GATHER, SINGLE, [])
-                                                                                                                                                                    remote exchange (REPLICATE, BROADCAST, [])
-                                                                                                                                                                        scan store_returns
-                                                                                                                                                        final hashaggregation over (cs_item_sk_268)
-                                                                                                                                                            local exchange (GATHER, SINGLE, [])
-                                                                                                                                                                remote exchange (REPARTITION, HASH, ["cs_item_sk_268"])
-                                                                                                                                                                    partial hashaggregation over (cs_item_sk_268)
-                                                                                                                                                                        join (INNER, PARTITIONED):
-                                                                                                                                                                            remote exchange (REPARTITION, HASH, ["cs_item_sk_268", "cs_order_number_270"])
-                                                                                                                                                                                scan catalog_sales
-                                                                                                                                                                            local exchange (GATHER, SINGLE, [])
-                                                                                                                                                                                remote exchange (REPARTITION, HASH, ["cr_item_sk_290", "cr_order_number_304"])
-                                                                                                                                                                                    scan catalog_returns
-                                                                                                                                                local exchange (GATHER, SINGLE, [])
-                                                                                                                                                    remote exchange (REPARTITION, HASH, ["d_date_sk_335"])
-                                                                                                                                                        scan date_dim (pushdown = true)
-                                                                                                                                        local exchange (GATHER, SINGLE, [])
-                                                                                                                                            remote exchange (REPARTITION, HASH, ["s_store_sk_422"])
-                                                                                                                                                scan store
-                                                                                                                                local exchange (GATHER, SINGLE, [])
-                                                                                                                                    remote exchange (REPARTITION, HASH, ["c_customer_sk_452"])
-                                                                                                                                        scan customer
-                                                                                                                        local exchange (GATHER, SINGLE, [])
-                                                                                                                            remote exchange (REPARTITION, HASH, ["d_date_sk_364"])
-                                                                                                                                scan date_dim
-                                                                                                                local exchange (GATHER, SINGLE, [])
-                                                                                                                    remote exchange (REPARTITION, HASH, ["d_date_sk_393"])
-                                                                                                                        scan date_dim
-                                                                                                        local exchange (GATHER, SINGLE, [])
-                                                                                                            remote exchange (REPARTITION, HASH, ["cd_demo_sk_471"])
-                                                                                                                scan customer_demographics
+                                join (INNER, REPLICATED):
+                                    join (INNER, REPLICATED):
+                                        join (INNER, REPLICATED):
+                                            join (INNER, REPLICATED):
+                                                join (INNER, REPLICATED):
+                                                    join (INNER, REPLICATED):
+                                                        join (INNER, REPLICATED):
+                                                            join (INNER, REPLICATED):
+                                                                join (INNER, REPLICATED):
+                                                                    join (INNER, REPLICATED):
+                                                                        join (INNER, REPLICATED):
+                                                                            join (INNER, REPLICATED):
+                                                                                join (INNER, REPLICATED):
+                                                                                    join (INNER, REPLICATED):
+                                                                                        join (INNER, PARTITIONED):
+                                                                                            remote exchange (REPARTITION, HASH, ["sr_item_sk_234"])
+                                                                                                join (INNER, REPLICATED):
+                                                                                                    scan store_sales
+                                                                                                    local exchange (GATHER, SINGLE, [])
+                                                                                                        remote exchange (REPLICATE, BROADCAST, [])
+                                                                                                            scan store_returns
+                                                                                            final hashaggregation over (cs_item_sk_268)
                                                                                                 local exchange (GATHER, SINGLE, [])
-                                                                                                    remote exchange (REPARTITION, HASH, ["cd_demo_sk_481"])
-                                                                                                        scan customer_demographics
+                                                                                                    remote exchange (REPARTITION, HASH, ["cs_item_sk_268"])
+                                                                                                        partial hashaggregation over (cs_item_sk_268)
+                                                                                                            join (INNER, PARTITIONED):
+                                                                                                                remote exchange (REPARTITION, HASH, ["cs_item_sk_268", "cs_order_number_270"])
+                                                                                                                    scan catalog_sales
+                                                                                                                local exchange (GATHER, SINGLE, [])
+                                                                                                                    remote exchange (REPARTITION, HASH, ["cr_item_sk_290", "cr_order_number_304"])
+                                                                                                                        scan catalog_returns
                                                                                         local exchange (GATHER, SINGLE, [])
-                                                                                            remote exchange (REPARTITION, HASH, ["p_promo_sk_491"])
-                                                                                                scan promotion
+                                                                                            remote exchange (REPLICATE, BROADCAST, [])
+                                                                                                scan date_dim (pushdown = true)
+                                                                                    local exchange (GATHER, SINGLE, [])
+                                                                                        remote exchange (REPLICATE, BROADCAST, [])
+                                                                                            scan store
                                                                                 local exchange (GATHER, SINGLE, [])
-                                                                                    remote exchange (REPARTITION, HASH, ["hd_demo_sk_511"])
-                                                                                        scan household_demographics
+                                                                                    remote exchange (REPLICATE, BROADCAST, [])
+                                                                                        scan customer
+                                                                            local exchange (GATHER, SINGLE, [])
+                                                                                remote exchange (REPLICATE, BROADCAST, [])
+                                                                                    scan date_dim
                                                                         local exchange (GATHER, SINGLE, [])
-                                                                            remote exchange (REPARTITION, HASH, ["hd_demo_sk_517"])
-                                                                                scan household_demographics
+                                                                            remote exchange (REPLICATE, BROADCAST, [])
+                                                                                scan date_dim
+                                                                    local exchange (GATHER, SINGLE, [])
+                                                                        remote exchange (REPLICATE, BROADCAST, [])
+                                                                            scan customer_demographics
                                                                 local exchange (GATHER, SINGLE, [])
-                                                                    remote exchange (REPARTITION, HASH, ["ca_address_sk_523"])
-                                                                        scan customer_address
+                                                                    remote exchange (REPLICATE, BROADCAST, [])
+                                                                        scan customer_demographics
+                                                            local exchange (GATHER, SINGLE, [])
+                                                                remote exchange (REPLICATE, BROADCAST, [])
+                                                                    scan promotion
                                                         local exchange (GATHER, SINGLE, [])
-                                                            remote exchange (REPARTITION, HASH, ["ca_address_sk_537"])
-                                                                scan customer_address
+                                                            remote exchange (REPLICATE, BROADCAST, [])
+                                                                scan household_demographics
+                                                    local exchange (GATHER, SINGLE, [])
+                                                        remote exchange (REPLICATE, BROADCAST, [])
+                                                            scan household_demographics
                                                 local exchange (GATHER, SINGLE, [])
-                                                    remote exchange (REPARTITION, HASH, ["ib_income_band_sk_551"])
-                                                        scan income_band
+                                                    remote exchange (REPLICATE, BROADCAST, [])
+                                                        scan customer_address
+                                            local exchange (GATHER, SINGLE, [])
+                                                remote exchange (REPLICATE, BROADCAST, [])
+                                                    scan customer_address
                                         local exchange (GATHER, SINGLE, [])
-                                            remote exchange (REPARTITION, HASH, ["ib_income_band_sk_555"])
+                                            remote exchange (REPLICATE, BROADCAST, [])
                                                 scan income_band
+                                    local exchange (GATHER, SINGLE, [])
+                                        remote exchange (REPLICATE, BROADCAST, [])
+                                            scan income_band
                                 local exchange (GATHER, SINGLE, [])
                                     remote exchange (REPARTITION, HASH, ["i_item_sk_559"])
                                         scan item (pushdown = true)

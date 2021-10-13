@@ -1,46 +1,44 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
-        join (INNER, PARTITIONED):
-            remote exchange (REPARTITION, HASH, ["ss_item_sk_48"])
+        join (INNER, REPLICATED):
+            join (INNER, REPLICATED):
                 join (INNER, PARTITIONED):
-                    remote exchange (REPARTITION, HASH, ["ss_item_sk"])
-                        join (INNER, PARTITIONED):
-                            remote exchange (REPARTITION, HASH, ["rank"])
-                                cross join:
-                                    local exchange (GATHER, SINGLE, [])
-                                        remote exchange (GATHER, SINGLE, [])
-                                            final hashaggregation over (ss_store_sk_13)
-                                                local exchange (GATHER, SINGLE, [])
-                                                    remote exchange (REPARTITION, HASH, ["ss_store_sk_13"])
-                                                        partial hashaggregation over (ss_store_sk_13)
-                                                            scan store_sales
-                                    local exchange (GATHER, SINGLE, [])
-                                        remote exchange (GATHER, SINGLE, [])
-                                            final hashaggregation over (ss_item_sk)
-                                                local exchange (GATHER, SINGLE, [])
-                                                    remote exchange (REPARTITION, HASH, ["ss_item_sk"])
-                                                        partial hashaggregation over (ss_item_sk)
-                                                            ReuseTableScan store_sales (Consumer)
+                    remote exchange (REPARTITION, HASH, ["rank"])
+                        cross join:
                             local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPARTITION, HASH, ["rank_114"])
-                                    cross join:
+                                remote exchange (GATHER, SINGLE, [])
+                                    final hashaggregation over (ss_store_sk_13)
                                         local exchange (GATHER, SINGLE, [])
-                                            remote exchange (GATHER, SINGLE, [])
-                                                final hashaggregation over (ss_store_sk_86)
-                                                    local exchange (GATHER, SINGLE, [])
-                                                        remote exchange (REPARTITION, HASH, ["ss_store_sk_86"])
-                                                            partial hashaggregation over (ss_store_sk_86)
-                                                                scan store_sales
+                                            remote exchange (REPARTITION, HASH, ["ss_store_sk_13"])
+                                                partial hashaggregation over (ss_store_sk_13)
+                                                    scan store_sales
+                            local exchange (GATHER, SINGLE, [])
+                                remote exchange (GATHER, SINGLE, [])
+                                    final hashaggregation over (ss_item_sk)
                                         local exchange (GATHER, SINGLE, [])
-                                            remote exchange (GATHER, SINGLE, [])
-                                                final hashaggregation over (ss_item_sk_48)
-                                                    local exchange (GATHER, SINGLE, [])
-                                                        remote exchange (REPARTITION, HASH, ["ss_item_sk_48"])
-                                                            partial hashaggregation over (ss_item_sk_48)
-                                                                ReuseTableScan store_sales (Producer)
+                                            remote exchange (REPARTITION, HASH, ["ss_item_sk"])
+                                                partial hashaggregation over (ss_item_sk)
+                                                    ReuseTableScan store_sales (Consumer)
                     local exchange (GATHER, SINGLE, [])
-                        remote exchange (REPARTITION, HASH, ["i_item_sk"])
-                            scan item
+                        remote exchange (REPARTITION, HASH, ["rank_114"])
+                            cross join:
+                                local exchange (GATHER, SINGLE, [])
+                                    remote exchange (GATHER, SINGLE, [])
+                                        final hashaggregation over (ss_store_sk_86)
+                                            local exchange (GATHER, SINGLE, [])
+                                                remote exchange (REPARTITION, HASH, ["ss_store_sk_86"])
+                                                    partial hashaggregation over (ss_store_sk_86)
+                                                        scan store_sales
+                                local exchange (GATHER, SINGLE, [])
+                                    remote exchange (GATHER, SINGLE, [])
+                                        final hashaggregation over (ss_item_sk_48)
+                                            local exchange (GATHER, SINGLE, [])
+                                                remote exchange (REPARTITION, HASH, ["ss_item_sk_48"])
+                                                    partial hashaggregation over (ss_item_sk_48)
+                                                        ReuseTableScan store_sales (Producer)
+                local exchange (GATHER, SINGLE, [])
+                    remote exchange (REPLICATE, BROADCAST, [])
+                        scan item
             local exchange (GATHER, SINGLE, [])
-                remote exchange (REPARTITION, HASH, ["i_item_sk_124"])
+                remote exchange (REPLICATE, BROADCAST, [])
                     scan item
