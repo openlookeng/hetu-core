@@ -148,6 +148,11 @@
 
     > 当前只有hive connector的orc数据格式，才支持创建索引。
 
+11. 使用JDBC发送SQL时，遇到问题Request header fields too large 或 Response header too large，怎么解决？
+    > 在config.properties 配置文件中增加如下参数，并配置为较大的值，例如：  
+    > http-server.max-request-header-size=64KB  
+    > http-server.max-response-header-size=64KB
+
 ## 数据源
 
 1. openLooKeng的SQL是否是大小写敏感的？如果数据源是大小写敏感的，openLooKeng如何处理？
