@@ -62,6 +62,10 @@ headless: true
     - [HIndex语句]({{< relref "./docs/indexer/hindex-statements.md" >}})
     - [new-index]({{< relref "./docs/indexer/new-index.md" >}})
 
+- [Star Tree多维数据集](#)
+    - [概述] ({{< relref "./docs/preagg/overview.md" >}}>)
+    - [语句] ({{< relref "./docs/preagg/statements.md" >}})
+
 - [连接器]({{< relref "./docs/connector/_index.md" >}})
     - [CarbonData]({{< relref "./docs/connector/carbondata.md" >}})
     - [ClickHouse]({{< relref "./docs/connector/clickhouse.md" >}})
