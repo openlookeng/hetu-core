@@ -65,7 +65,7 @@ headless: true
     
 - [Star Tree Cubes](#)
     - [Overview] ({{< relref "./docs/preagg/overview.md" >}}>)
-    - [Statements] ({{< "./docs/preagg/statements.md" >}})
+    - [Statements] ({{< relref "./docs/preagg/statements.md" >}})
   
 - [Connectors]({{< relref "./docs/connector/_index.md" >}})
     - [Carbondata]({{< relref "./docs/connector/carbondata.md" >}})
