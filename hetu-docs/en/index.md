@@ -62,7 +62,7 @@ headless: true
     - [BTree Index]({{< relref "./docs/indexer/btree.md" >}})
     - [HIndex Statements]({{< relref "./docs/indexer/hindex-statements.md" >}})
     - [New Index]({{< relref "./docs/indexer/new-index.md" >}})
-    - 
+    
 - [Star Tree Cubes](#)
     - [Overview] ({{< relref "./docs/preagg/overview.md" >}}>)
     - [Statements] ({{< "./docs/preagg/statements.md" >}})
