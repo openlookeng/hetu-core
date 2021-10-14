@@ -44,7 +44,7 @@ Create a new partitioned Cube `orders_cube`:
       partitioned_by = ARRAY['orderdate']
     )
 
-Create a new Cube `orders_cube` with some source data filter
+Create a new Cube `orders_cube` with some source data filter:
 
     CREATE CUBE orders_cube ON orders WITH (
       AGGREGATIONS = ( SUM(totalprice), COUNT DISTINCT(orderid) ),
@@ -52,7 +52,7 @@ Create a new Cube `orders_cube` with some source data filter
       FILTER = (orderdate BETWEEN 2512450 AND 2512460)
     )
 
-Create a new Cube `orders_cube` with some additional predicate on Cube columns
+Create a new Cube `orders_cube` with some additional predicate on Cube columns:
 
     CREATE CUBE orders_cube ON orders WITH (
       AGGREGATIONS = ( SUM(totalprice), COUNT DISTINCT(orderid) ),
@@ -60,7 +60,7 @@ Create a new Cube `orders_cube` with some additional predicate on Cube columns
       FILTER = (orderdate BETWEEN 2512450 AND 2512460)
     ) WHERE orderstatus = 'PENDING';
 
-This is same as following
+This is same as following:
     
     CREATE CUBE orders_cube ON orders WITH (
       AGGREGATIONS = ( SUM(totalprice), COUNT DISTINCT(orderid) ),
@@ -86,12 +86,12 @@ INSERT INTO CUBE cube_name [WHERE condition]
 ```
 
 ### Description
-`CREATE CUBE` statement creates Cube without any data. To insert data into Cube, use `INSERT INTO CUBE` sql.
+`CREATE CUBE` statement creates Cube without any data. To insert data into Cube, use `INSERT INTO CUBE` SQL.
 The `WHERE` clause is optional. If predicate is provided, only data matching the given predicate are processed from the source table and inserted into the Cube. 
 Otherwise, entire data from the source table is processed and inserted into Cube.
 
 ### Examples
-Insert data into the `orders_cube` Cube
+Insert data into the `orders_cube` Cube:
 
     INSERT INTO CUBE orders_cube WHERE orderdate > date '1999-01-01';
     INSERT INTO CUBE order_all_cube;

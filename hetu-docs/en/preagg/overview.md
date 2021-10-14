@@ -37,7 +37,7 @@ The following picture depicts the change in the logical plan after the optimizat
 ![img](../images/cube-logical-plan-optimizer.png)
 
 ## Recommended Usage
-1. Cubes are mose useful for iceberg queries that takes huge input and produces small input
+1. Cubes are most useful for iceberg queries that takes huge input and produces small input.
 2. Query performance is best when size of the Cube is less that on the actual table on which Cube was built.
 3. Cubes need to be rebuilt if the source table is updated. 
 
@@ -47,7 +47,7 @@ operation on the update is considered as a change in the existing data even if o
 can't be differentiated, Cubes can't be used as it might result in incorrect result. We are working on a solution to overcome this limitation.
 
 ## Supported Connectors
-The following are supported Connectors for storing a cube
+The following are supported Connectors for storing a Cube
 1. Hive
 2. Memory
 3. Clickhouse
@@ -58,7 +58,7 @@ The following are supported Connectors for storing a cube
 
    2.1. Overcome the limitation of Creating Cube for larger dataset.
 
-   2.2. Update cube if source table has been updated.
+   2.2. Update Cube if source table has been updated.
 
 ## Enabling and Disabling StarTree Cube
 To enable:
@@ -73,13 +73,13 @@ SET SESSION enable_star_tree_index=false;
 ## Configuration Properties
 | Property Name                                     | Default Value       | Required| Description|
 |---------------------------------------------------|---------------------|---------|--------------|
-| optimizer.enable-star-tree-index                  | false               | No      | Enables StarTree Cube|
-| cube.metadata-cache-size                          | 50                  | No      | The maximum number of metadata for StarTree Cubes that could be loaded into cache before eviction happens|
+| optimizer.enable-star-tree-index                  | false               | No      | Enables StarTree Cube |
+| cube.metadata-cache-size                          | 50                  | No      | The maximum number of metadata for StarTree Cubes that could be loaded into cache before eviction happens |
 | cube.metadata-cache-ttl                           | 1h                  | No      | The maximum time to live of StarTree Cubes that are be loaded into cache before eviction happens |
 
 ## Dependencies
 
-StarTree Cube relies on Hetu metastore to store the Cube related metadata.
+StarTree Cube relies on Hetu Metastore to store the Cube related metadata.
 Please check [Hetu Metastore](../admin/meta-store.md) for more information.
 
 ## Examples
@@ -118,11 +118,11 @@ SELECT nationkey, avg(nationkey), max(regionkey) FROM nation WHERE nationkey >= 
 Since the data inserted into the Cube was for `nationkey >= 5`, only queries matching this condition will utilize the Cube.
 Queries not matching the condition would continue to work but won't use the Cube.
 
-## Building Cube for Large dataset
+## Building Cube for Large Dataset
 One of the limitations with the current implementation is that Cube cannot be built for a larger dataset at once. This is due to the cluster memory limitation.
 Processing large number of rows requires more memory than cluster is configured with. This results in query failing with message **Query exceeded per-node user memory
-limit**. To overcome this issue, **INSERT INTO CUBE** sql support was added. The user has ability to build a Cube for larger data by executing multiple
-insert into cube statements. The insert statement accepts a where clause, and it can be used to limit the number of processed and inserted into Cube.
+limit**. To overcome this issue, **INSERT INTO CUBE** SQL support was added. The user has ability to build a Cube for larger data by executing multiple
+insert into Cube statements. The insert statement accepts a where clause, and it can be used to limit the number of processed and inserted into Cube.
 
 This section explains the steps to build a Cube for larger dataset.
 
@@ -146,7 +146,7 @@ INSERT INTO CUBE store_sales_cube WHERE ss_sold_date_sk BETWEEN 2451911 AND 2422
 ```
 
 ### Solution 1)
-To overcome this issue, multiple insert statements can be used into process rows and insert into cube and the number of rows can be limited by using where clause;
+To overcome this issue, multiple insert statements can be used to process rows and insert into Cube and the number of rows can be limited by using where clause;
 
 ```sql
 INSERT INTO CUBE store_sales_cube WHERE ss_sold_date_sk BETWEEN 2451911 AND 2452010;
@@ -157,8 +157,8 @@ INSERT INTO CUBE store_sales_cube WHERE ss_sold_date_sk BETWEEN 2452211 AND 2452
 
 ### Solution 2)
 CLI has been modified to support creating Cubes for larger dataset and without need for multiple insert statements. CLI internally handles this process.
-Once the user runs create cube statement with where clause, the CLI takes care of creating the cube as well as inserting the data into it. This process improves the user experience and
-improves the memory footprint based on the cluster memory limits. CLI internally parses the converts the statement into one create cube statement followed by 
+Once the user runs create Cube statement with where clause, the CLI takes care of creating the Cube as well as inserting the data into it. This process improves the user experience and
+improves the memory footprint based on the cluster memory limits. CLI internally parses the converts the statement into one create Cube statement followed by 
 one or more insert statements. This change is only works if user executes the command from CLI and not via any other means i.e. JDBC, etc...
 
 ```sql
@@ -183,13 +183,13 @@ SHOW CUBES;
    `Integer, TinyInt, SmallInt, BigInt, Date`
     
    For other data types, it is difficult to identify if two predicates are continuous therefore they cannot be merged together. And because of this issue, there is 
-   possibility that particular cube may not be used during query optimization even if the cube has all the required data. For example,
+   possibility that particular Cube may not be used during query optimization even if the Cube has all the required data. For example,
 
 ```sql
    INSERT INTO CUBE store_sales_cube WHERE store_id BETWEEN 'A01' AND 'A10';
    INSERT INTO CUBE store_sales_cube WHERE store_id BETWEEN 'A11' AND 'A20';
 ```
-   Here these two predicates cannot be merged into store_id BETWEEN 'A01' AND 'A20'; So the cube won't be used 
+   Here these two predicates cannot be merged into store_id BETWEEN 'A01' AND 'A20'; So the Cube won't be used 
    for queries that are spanning over two the predicates;
 
 ```sql
@@ -199,23 +199,23 @@ SHOW CUBES;
 
 ```sql   
    INSERT INTO CUBE store_sales_cube WHERE ss_sold_date_sk > 2451911; 
-```   
-   The predicate is rewriten as ss_sold_date_sk >= 2451912 to be prepare for merging continous predicates. 
+```
+   The predicate is rewritten as ss_sold_date_sk >= 2451912 to be prepare for merging continous predicates. 
    Since the predicate is rewritten, they query using ss_sold_date_sk > 2451911 predicate will not match with Cube predicate so Cube won't be used to 
    optimize the query. The same is applicable for predicates with <= operator. ie. ss_sold_date_sk <= 2451911 is rewritten as ss_sold_date_sk < 2451912
 
 ```sql   
    SELECT ss_sold_date_sk, .... FROM hive.tpcds_sf1.store_sales WHERE ss_sold_date_sk > 2451911
 ```   
-3. Only Single column predicates can be merged. 
+3. Only single column predicates can be merged. 
 
 ## Open issues and Limitations
 1. StarTree Cube is only effective when the group by cardinality is considerably fewer than the number of rows in source table.
 2. A significant amount of user effort required in maintaining Cubes for large datasets.
-3. Only incremental insert into cube is supported. Cannot delete specific rows from Cube.
+3. Only incremental insert into Cube is supported. Cannot delete specific rows from Cube.
 4. Cubes created on a transaction table may expire automatically even if the source table has not been updated. This is due to the compaction policy which
    merges delta files into single large ORC file which in turn changes the last modified of time of the table. Cube status is determined by comparing last modified
-   timestamp of table when cube was created with the last modified time of the table when queries are executed.
-5. Openlookeng CLI has been modified to ease the process of creating Cubes for larger datasets. But still there are limitations with this implementation
-   as the process involves merging multiple cube predicates into one. Only cube predicates defined on Integer, Long and Date types can be merged properly. Support for Char, 
+   timestamp of table when Cube was created with the last modified time of the table when queries are executed.
+5. OpenLooKeng CLI has been modified to ease the process of creating Cubes for larger datasets. But still there are limitations with this implementation
+   as the process involves merging multiple Cube predicates into one. Only Cube predicates defined on Integer, Long and Date types can be merged properly. Support for Char, 
    String types still need to be implemented.
