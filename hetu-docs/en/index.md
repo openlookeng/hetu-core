@@ -64,8 +64,8 @@ headless: true
     - [New Index]({{< relref "./docs/indexer/new-index.md" >}})
     
 - [Star Tree Cubes](#)
-    - [Overview] ({{< relref "./docs/preagg/overview.md" >}}>)
-    - [Statements] ({{< relref "./docs/preagg/statements.md" >}})
+    - [Overview]({{< relref "./docs/preagg/overview.md" >}}>)
+    - [Statements]({{< relref "./docs/preagg/statements.md" >}})
   
 - [Connectors]({{< relref "./docs/connector/_index.md" >}})
     - [Carbondata]({{< relref "./docs/connector/carbondata.md" >}})
