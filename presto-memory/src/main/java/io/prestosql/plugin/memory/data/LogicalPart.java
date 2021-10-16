@@ -15,6 +15,7 @@
 package io.prestosql.plugin.memory.data;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.io.BaseEncoding;
 import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
 import io.airlift.slice.InputStreamSliceInput;
@@ -22,6 +23,7 @@ import io.airlift.slice.OutputStreamSliceOutput;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
+import io.airlift.slice.Slices;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.PagesSerdeUtil;
@@ -888,6 +890,40 @@ public class LogicalPart
         return processingState;
     }
 
+    static Map<String, Page> partitionPage(Page page, List<String> partitionedBy, List<MemoryColumnHandle> columns, TypeManager typeManager)
+    {
+        // derive the channel numbers that corresponds to the partitionedBy list
+        List<MemoryColumnHandle> partitionChannels = new ArrayList<>(partitionedBy.size());
+        for (String name : partitionedBy) {
+            for (MemoryColumnHandle handle : columns) {
+                if (handle.getColumnName().equals(name)) {
+                    partitionChannels.add(handle);
+                }
+            }
+        }
+
+        // build the partitions
+        Map<String, Page> partitions = new HashMap<>();
+
+        MemoryColumnHandle partitionColumnHandle = partitionChannels.get(0);
+        Block block = page.getBlock(partitionColumnHandle.getColumnIndex());
+        Type type = partitionColumnHandle.getType(typeManager);
+        Map<Object, ArrayList<Integer>> uniqueValues = new HashMap<>();
+        for (int i = 0; i < page.getPositionCount(); i++) {
+            Object value = getNativeValue(type, block, i);
+            uniqueValues.putIfAbsent(value, new ArrayList<>());
+            uniqueValues.get(value).add(i);
+        }
+
+        for (Map.Entry<Object, ArrayList<Integer>> valueAndPosition : uniqueValues.entrySet()) {
+            int[] retainedPositions = valueAndPosition.getValue().stream().mapToInt(i -> i).toArray();
+            Object valueKey = valueAndPosition.getKey();
+            Page subPage = page.getPositions(retainedPositions, 0, retainedPositions.length);
+            partitions.put(valueKey.toString(), subPage);
+        }
+        return partitions;
+    }
+
     private static Object getNativeValue(Object object)
     {
         return object instanceof Slice ? ((Slice) object).toStringUtf8() : object;
@@ -899,10 +935,45 @@ public class LogicalPart
         Class<?> javaType = type.getJavaType();
 
         if (obj != null && javaType == Slice.class) {
-            obj = ((Slice) obj).toStringUtf8();
+            Slice slice = (Slice) obj;
+            TypeSignature typeSig = type.getTypeSignature();
+            if (typeSig.getBase().equals("uuid")) {
+                obj = BaseEncoding.base16().encode(slice.getBytes());
+            }
+            else {
+                obj = slice.toStringUtf8();
+            }
         }
-
         return obj;
+    }
+
+    // supported partition value types: BOOLEAN, All INT Types, CHAR, VARCHAR, DOUBLE, REAL, DECIMAL, DATE, TIME, UUID
+    public static Object deserializeTypedValueFromString(Type type, String serialized)
+    {
+        if (serialized == null) {
+            return null;
+        }
+        else if (type.getJavaType() == boolean.class) {
+            return Boolean.parseBoolean(serialized);
+        }
+        else if (type.getJavaType() == long.class) {
+            return Long.parseLong(serialized);
+        }
+        else if (type.getJavaType() == double.class) {
+            return Double.parseDouble(serialized);
+        }
+        else if (type.getJavaType() == Slice.class) {
+            TypeSignature typeSig = type.getTypeSignature();
+            if (typeSig.getBase().equals("uuid")) {
+                return Slices.wrappedBuffer(BaseEncoding.base16().decode(serialized));
+            }
+            else {
+                return Slices.utf8Slice(serialized);
+            }
+        }
+        else {
+            throw new IllegalStateException("Unable to deserialize value");
+        }
     }
 
     private void readObject(ObjectInputStream in)

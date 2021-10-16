@@ -104,14 +104,15 @@ memory.spill-path=/opt/hetu/data/spill
     CREATE TABLE memory.default.nation
     WITH (
         sorted_by=array['nationkey'],
-        index_columns=array['name', 'regionkey'],
+        partitioned_by=array['regionkey'],
+        index_columns=array['name'],
         spill_compression=true
     )
     AS SELECT * from tpch.tiny.nation;
 
 内存连接器会在后台自动排序数据并对`memory.default.nation`表创建索引。完成后针对对应列的查询会显著变快。
 
-目前，`sorted_by`仅支持对一列数据排序。
+目前，`sorted_by`和`partitioned_by`,仅支持对一列数据排序。
 
 ## 配置属性
 
@@ -133,6 +134,7 @@ memory.spill-path=/opt/hetu/data/spill
 | 属性名称                  | 属性类型                   | 是否必要                          | 描述        |
 |--------------------------|---------------------------|----------------------------------|------------       |
 | sorted_by                | `array['col']`            | 最多一个列，列数据必须是可比较的     | 排序并对该列创建索引 |
+| partitioned_by           | `array['col']`            |最多一个列                        | 在给定的列上对表进行分区 |
 | index_columns            | `array['col1', 'col2']`   | None                             | 在该列上创建索引|
 | spill_compression        | `boolean`                 | None                             | 在磁盘上持久化数据时是否启用压缩 |
 
@@ -200,4 +202,5 @@ LogicalPart 中创建了布隆过滤器、稀疏索引和 MinMax 索引。
 - 如果没有 State Store 和带有全局缓存的 Hetu Metastore，在 `DROP TABLE` 之后，内存不会立即释放到 worker 上。它将在下一个“CREATE TABLE”操作时被释放。
 - 当前`sorted_by`只支持按一个列排序。
 - 如果一个CTAS (CREATE TABLE AS)查询失败或被取消，一个无效的表的记录会留在系统中。该表将需要被手动删除。
+- 我们支持 BOOLEAN、所有 INT 类型、CHAR、VARCHAR、DOUBLE、REAL、DECIMAL、DATE、TIME、UUID 类型作为分区键。
 

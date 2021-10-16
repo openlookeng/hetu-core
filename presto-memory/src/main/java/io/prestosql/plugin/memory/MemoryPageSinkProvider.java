@@ -32,6 +32,9 @@ import javax.inject.Inject;
 
 import java.io.FileNotFoundException;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -83,6 +86,7 @@ public class MemoryPageSinkProvider
                 memoryOutputTableHandle.isAsyncProcessingEnabled(),
                 memoryOutputTableHandle.getColumns(),
                 memoryOutputTableHandle.getSortedBy(),
+                memoryOutputTableHandle.getPartitionedBy(),
                 memoryOutputTableHandle.getIndexColumns());
 
         try {
@@ -127,6 +131,7 @@ public class MemoryPageSinkProvider
                     memoryOutputTableHandle.isAsyncProcessingEnabled(),
                     memoryOutputTableHandle.getColumns(),
                     memoryOutputTableHandle.getSortedBy(),
+                    memoryOutputTableHandle.getPartitionedBy(),
                     memoryOutputTableHandle.getIndexColumns());
         }
         catch (Exception e) {
@@ -173,10 +178,10 @@ public class MemoryPageSinkProvider
         {
             if (sinkCount.decrementAndGet() == 0) {
                 tablesManager.finishUpdatingTable(tableId);
-                int logicalPartCount = tablesManager.getTableLpCount(tableId);
-                return completedFuture(ImmutableList.of(new MemoryDataFragment(currentHostAddress, addedRows, logicalPartCount).toSlice()));
+                Map<String, List<Integer>> logicalPartPartitionMap = tablesManager.getTableLogicalPartPartitionMap(tableId);
+                return completedFuture(ImmutableList.of(new MemoryDataFragment(currentHostAddress, addedRows, tablesManager.getTableLogicalPartCount(tableId), logicalPartPartitionMap).toSlice()));
             }
-            return completedFuture(ImmutableList.of(new MemoryDataFragment(currentHostAddress, addedRows, 0).toSlice()));
+            return completedFuture(ImmutableList.of(new MemoryDataFragment(currentHostAddress, addedRows, 0, Collections.emptyMap()).toSlice()));
         }
 
         @Override

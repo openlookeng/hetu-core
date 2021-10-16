@@ -148,7 +148,7 @@ public class MemoryTableManager
     /**
      * Initialize a table and store it in memory
      */
-    public synchronized void initialize(long tableId, boolean compressionEnabled, boolean asyncProcessingEnabled, List<MemoryColumnHandle> columns, List<SortingColumn> sortedBy, List<String> indexColumns)
+    public synchronized void initialize(long tableId, boolean compressionEnabled, boolean asyncProcessingEnabled, List<MemoryColumnHandle> columns, List<SortingColumn> sortedBy, List<String> partitionedBy, List<String> indexColumns)
     {
         if (!tables.containsKey(tableId)) {
             tables.put(tableId, new Table(tableId,
@@ -157,6 +157,7 @@ public class MemoryTableManager
                     spillRoot.resolve(String.valueOf(tableId)),
                     columns,
                     sortedBy,
+                    partitionedBy,
                     indexColumns,
                     pageSorter,
                     config,
@@ -176,7 +177,12 @@ public class MemoryTableManager
         table.add(page);
     }
 
-    public int getTableLpCount(long tableId)
+    public Map<String, List<Integer>> getTableLogicalPartPartitionMap(long tableId)
+    {
+        return tables.get(tableId).getLogicalPartPartitionMap();
+    }
+
+    public int getTableLogicalPartCount(long tableId)
     {
         return tables.get(tableId).getLogicalPartCount();
     }

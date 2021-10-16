@@ -112,14 +112,15 @@ Create a table using the Memory Connector with sorting, indices and spill compre
     CREATE TABLE memory.default.nation
     WITH (
         sorted_by=array['nationkey'],
-        index_columns=array['name', 'regionkey'],
+        partitioned_by=array['regionkey'],
+        index_columns=array['name'],
         spill_compression=true
     )
     AS SELECT * from tpch.tiny.nation;
 
 After table creation completes, the Memory Connector will start building indices and sorting data in the background. Once the processing is complete any queries using the sort or index columns will be faster and more efficient.
 
-For now, `sorted_by` only accepts a single column.
+For now, `sorted_by` and `partitioned_by` only accepts a single column.
 
 
 Configuration Properties
@@ -143,6 +144,7 @@ Use these properties when creating a table with the Memory Connector to make que
 | Property Name            | Argument type             | Requirements                     | Description|
 |--------------------------|---------------------------|----------------------------------|------------|
 | sorted_by                | `array['col']`            | Maximum of one column. Column type must be comparable.  | Sort and create indexes on the given column|
+| partitioned_by           | `array['col']`            | Maximum of one column. | Partition the table on the given column|
 | index_columns            | `array['col1', 'col2']`   | None                             | Create indexes on the given column|
 | spill_compression        | `boolean`           | None                             | Compress data when spilling to disk|
 
@@ -214,3 +216,4 @@ Limitations and known Issues
 - Without State Store and Hetu Metastore with global cache, after `DROP TABLE`, memory is not released immediately on the workers. It is released on the next `CREATE TABLE` operation.
 - Currently only a single column in ascending order is supported by `sorted_by`
 - If a CTAS (CREATE TABLE AS) query fails or is cancelled, an invalid table will remain. This table must be dropped manually.
+- And we support BOOLEAN, All INT Types, CHAR, VARCHAR, DOUBLE, REAL, DECIMAL, DATE, TIME, UUID types as partition keys.

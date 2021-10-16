@@ -38,6 +38,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -104,10 +105,12 @@ public class Table
 
     private final List<MemoryColumnHandle> columns;
     private final List<SortingColumn> sortedBy;
+    private final List<String> partitionedBy;
     private final List<String> indexColumns;
     private final long maxLogicalPartBytes;
     private final int maxPageSizeBytes;
-    private final List<LogicalPart> logicalParts; // actual data (pages) stored here
+    private final List<LogicalPart> logicalParts; // actual data structure that stores the LPs
+    private final Map<String, List<Integer>> logicalPartPartitionedMap;  // data structure to store the mapping between that partition value and LP index
     private final boolean compressionEnabled;
     private TableState tableState;
     private long byteSize;
@@ -121,7 +124,7 @@ public class Table
     private transient TypeManager typeManager;
 
     public Table(long id, boolean compressionEnabled, boolean asyncEnabled, Path tableDataRoot, List<MemoryColumnHandle> columns, List<SortingColumn> sortedBy,
-            List<String> indexColumns, PageSorter pageSorter, MemoryConfig config, TypeManager typeManager, PagesSerde pagesSerde)
+                 List<String> partitionedBy, List<String> indexColumns, PageSorter pageSorter, MemoryConfig config, TypeManager typeManager, PagesSerde pagesSerde)
     {
         this.id = id;
         this.tableDataRoot = tableDataRoot;
@@ -130,13 +133,14 @@ public class Table
         this.compressionEnabled = compressionEnabled;
         this.columns = requireNonNull(columns, "columns is null");
         this.sortedBy = requireNonNull(sortedBy, "sortedBy is null");
+        this.partitionedBy = requireNonNull(partitionedBy, "partitionedBy is null"); //only support one partition column
         this.indexColumns = requireNonNull(indexColumns, "indexColumns is null");
         this.pageSorter = requireNonNull(pageSorter, "pageSorter is null");
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.pagesSerde = requireNonNull(pagesSerde, "pagesSerde is null");
         this.asyncEnabled = asyncEnabled;
-
         this.logicalParts = new ArrayList<>();
+        this.logicalPartPartitionedMap = new HashMap<>();
     }
 
     /**
@@ -148,6 +152,7 @@ public class Table
         this.typeManager = typeManager;
         this.pagesSerde = pagesSerde;
         this.tableDataRoot = tableDataRoot;
+
         for (LogicalPart lp : logicalParts) {
             lp.restoreTransientObjects(pageSorter, typeManager, pagesSerde, tableDataRoot);
         }
@@ -160,18 +165,44 @@ public class Table
      */
     public void add(Page page)
     {
-        if (logicalParts.isEmpty() || !logicalParts.get(logicalParts.size() - 1).canAdd()) {
-            this.logicalParts.add(new LogicalPart(columns, sortedBy, indexColumns, tableDataRoot, pageSorter, maxLogicalPartBytes, maxPageSizeBytes, typeManager, pagesSerde, logicalParts.size() + 1, compressionEnabled));
+        // if there is no partition statement, just create one LP with the empty partition key
+        if (partitionedBy.isEmpty()) {
+            if (logicalParts.isEmpty() || !logicalParts.get(logicalParts.size() - 1).canAdd()) {
+                this.logicalParts.add(new LogicalPart(columns, sortedBy, indexColumns, tableDataRoot, pageSorter, maxLogicalPartBytes, maxPageSizeBytes, typeManager, pagesSerde, logicalParts.size() + 1, compressionEnabled));
+            }
+            logicalParts.get(logicalParts.size() - 1).add(page);
         }
-        logicalParts.get(logicalParts.size() - 1).add(page);
+
+        // if there is partitioned_by string,
+        // 1. get the partition values from the partitioned column;
+        // 2. partition the page to multiple subpages according to the values and add their indices to the logicalPartPartitionedMap accordingly
+        else {
+            Map<String, Page> partitions = LogicalPart.partitionPage(page, partitionedBy, columns, typeManager);
+            for (Map.Entry<String, Page> entry : partitions.entrySet()) {
+                String curPartitionKey = entry.getKey();
+                Page curSubPage = entry.getValue();
+                logicalPartPartitionedMap.putIfAbsent(curPartitionKey, new ArrayList<>());
+
+                List<Integer> logicalPartIndices = logicalPartPartitionedMap.get(curPartitionKey);
+                LogicalPart lastLogicalPart = logicalPartIndices.isEmpty() ? null : this.logicalParts.get(logicalPartIndices.get(logicalPartIndices.size() - 1) - 1);
+                if (lastLogicalPart == null || !lastLogicalPart.canAdd()) {
+                    int logicalPartNum = logicalParts.size() + 1;
+                    lastLogicalPart = new LogicalPart(columns, sortedBy, indexColumns, tableDataRoot, pageSorter, maxLogicalPartBytes, maxPageSizeBytes, typeManager, pagesSerde, logicalPartNum, compressionEnabled);
+                    logicalParts.add(lastLogicalPart);
+                    logicalPartIndices.add(logicalPartNum);
+                }
+                lastLogicalPart.add(curSubPage);
+            }
+        }
+
         byteSize += page.getSizeInBytes();
         tableState = TableState.MODIFIED;
     }
 
     public boolean allProcessed()
     {
-        for (LogicalPart logicalPart : logicalParts) {
-            if (logicalPart.getProcessingState().get() != LogicalPart.LogicalPartState.COMPLETED) {
+        for (LogicalPart lp : logicalParts) {
+            if (lp.getProcessingState().get() != LogicalPart.LogicalPartState.COMPLETED) {
                 return false;
             }
         }
@@ -184,6 +215,7 @@ public class Table
     public long rollBackUncommitted()
     {
         int size = 0;
+
         Iterator<LogicalPart> iterator = logicalParts.iterator();
         while (iterator.hasNext()) {
             LogicalPart lp = iterator.next();
@@ -193,6 +225,7 @@ public class Table
             }
         }
         byteSize -= size;
+
         return size;
     }
 
@@ -204,6 +237,7 @@ public class Table
     public void finishCreation(Runnable cleanup)
     {
         tableState = TableState.COMMITTED;
+
         List<Future<?>> futuresList = new ArrayList<>(logicalParts.size());
         for (int i = 0; i < logicalParts.size(); i++) {
             // for all new logical parts, set state to finished adding pages
@@ -264,9 +298,9 @@ public class Table
     {
         List<Page> list = new ArrayList<>();
         if (!logicalParts.isEmpty()) {
-            for (LogicalPart logicalPart : logicalParts) {
-                if (logicalPart.getLogicalPartNum() == logicalPartNum) {
-                    list.addAll(logicalPart.getPages());
+            for (LogicalPart lp : logicalParts) {
+                if (lp.getLogicalPartNum() == logicalPartNum) {
+                    list.addAll(lp.getPages());
                 }
             }
         }
@@ -280,11 +314,9 @@ public class Table
         }
 
         List<Page> list = new ArrayList<>();
-        if (!logicalParts.isEmpty()) {
-            for (LogicalPart logicalPart : logicalParts) {
-                if (logicalPart.getLogicalPartNum() == logicalPartNum) {
-                    list.addAll(logicalPart.getPages(predicate));
-                }
+        for (LogicalPart lp : logicalParts) {
+            if (lp.getLogicalPartNum() == logicalPartNum) {
+                list.addAll(lp.getPages(predicate));
             }
         }
         return list;
@@ -292,11 +324,16 @@ public class Table
 
     protected long getRows()
     {
-        int total = 0;
-        for (LogicalPart logicalPart : logicalParts) {
-            total += logicalPart.getRows();
+        long total = 0;
+        for (LogicalPart lp : logicalParts) {
+            total += lp.getRows();
         }
         return total;
+    }
+
+    protected Map<String, List<Integer>> getLogicalPartPartitionMap()
+    {
+        return logicalPartPartitionedMap;
     }
 
     protected int getLogicalPartCount()

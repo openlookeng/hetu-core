@@ -14,6 +14,8 @@
 package io.prestosql.plugin.memory;
 
 import com.google.common.collect.ImmutableList;
+import io.prestosql.plugin.memory.data.LogicalPart;
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorSplitManager;
@@ -21,10 +23,16 @@ import io.prestosql.spi.connector.ConnectorSplitSource;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.FixedSplitSource;
+import io.prestosql.spi.predicate.Domain;
+import io.prestosql.spi.predicate.SortedRangeSet;
+import io.prestosql.spi.type.Type;
 
 import javax.inject.Inject;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.OptionalLong;
 
 public final class MemorySplitManager
@@ -45,16 +53,53 @@ public final class MemorySplitManager
 
         List<MemoryDataFragment> dataFragments = metadata.getDataFragments(table.getId());
 
-        long totalRows = 0;
         ImmutableList.Builder<ConnectorSplit> splits = ImmutableList.builder();
 
         for (MemoryDataFragment dataFragment : dataFragments) {
-            long rows = dataFragment.getRows();
+            Map<String, List<Integer>> logicalPartPartitionMap = dataFragment.getLogicalPartPartitionMap();
             int logicalPartCount = dataFragment.getLogicalPartCount();
-            totalRows += rows;
+            long rows = dataFragment.getRows();
+
             // logicalPart ids are 1 based
-            for (int i = 1; i <= logicalPartCount; i++) {
-                splits.add(new MemorySplit(table.getId(), i, dataFragment.getHostAddress(), rows, OptionalLong.empty()));
+            if (logicalPartPartitionMap.size() == 0) {
+                for (int i = 1; i <= logicalPartCount; i++) {
+                    splits.add(new MemorySplit(table.getId(), i, dataFragment.getHostAddress(), rows, OptionalLong.empty()));
+                }
+            }
+            else {
+                // get the predicate from the MemoryTableHandle
+                // filter the splits based on the partitionKey and only schedule them
+                List<SortedRangeSet> partitionKeyRanges = new ArrayList<>();
+
+                // get the type of the column here so that the partitionKeyValue(Object) can be cast
+                for (Map.Entry<ColumnHandle, Domain> e : table.getPredicate().getDomains().orElse(Collections.emptyMap()).entrySet()) {
+                    if (!e.getKey().isPartitionKey()) {
+                        continue;
+                    }
+                    SortedRangeSet rangeSet = ((SortedRangeSet) e.getValue().getValues());
+                    partitionKeyRanges.add(rangeSet);
+                }
+
+                if (partitionKeyRanges.size() > 0) {
+                    for (Map.Entry<String, List<Integer>> entry : logicalPartPartitionMap.entrySet()) {
+                        for (SortedRangeSet rangeSet : partitionKeyRanges) {
+                            Type rangeSetType = rangeSet.getType();
+                            Object value = LogicalPart.deserializeTypedValueFromString(rangeSetType, entry.getKey());
+                            if (rangeSet.containsValue(value)) {
+                                for (Integer i : entry.getValue()) {
+                                    splits.add(new MemorySplit(table.getId(), i, dataFragment.getHostAddress(), rows, OptionalLong.empty()));
+                                }
+                            }
+                        }
+                    }
+                }
+                else {
+                    for (Map.Entry<String, List<Integer>> entry : logicalPartPartitionMap.entrySet()) {
+                        for (Integer i : entry.getValue()) {
+                            splits.add(new MemorySplit(table.getId(), i, dataFragment.getHostAddress(), rows, OptionalLong.empty()));
+                        }
+                    }
+                }
             }
         }
         return new FixedSplitSource(splits.build());
