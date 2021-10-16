@@ -63,7 +63,7 @@ headless: true
     - [new-index]({{< relref "./docs/indexer/new-index.md" >}})
 
 - [Star Tree多维数据集](#)
-    - [概述]({{< relref "./docs/preagg/overview.md" >}}>)
+    - [概述]({{< relref "./docs/preagg/overview.md" >}})
     - [语句]({{< relref "./docs/preagg/statements.md" >}})
 
 - [连接器]({{< relref "./docs/connector/_index.md" >}})
