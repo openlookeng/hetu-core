@@ -1390,4 +1390,37 @@ public class TestMathFunctions
 
         assertFunction("wilson_interval_upper(1250, 1310, 1.96e0)", DOUBLE, 0.9642524717143908);
     }
+
+    @Test
+    public void testRandomRange()
+    {
+        functionAssertions.tryEvaluateWithAll("random(TINYINT '3', TINYINT '5')", TINYINT, TEST_SESSION);
+        functionAssertions.tryEvaluateWithAll("random(TINYINT '-3', TINYINT '-1')", TINYINT, TEST_SESSION);
+        functionAssertions.tryEvaluateWithAll("random(TINYINT '-3', TINYINT '5')", TINYINT, TEST_SESSION);
+        functionAssertions.tryEvaluateWithAll("random(SMALLINT '20000', SMALLINT '30000')", SMALLINT, TEST_SESSION);
+        functionAssertions.tryEvaluateWithAll("random(SMALLINT '-20000', SMALLINT '-10000')", SMALLINT, TEST_SESSION);
+        functionAssertions.tryEvaluateWithAll("random(SMALLINT '-20000', SMALLINT '30000')", SMALLINT, TEST_SESSION);
+        functionAssertions.tryEvaluateWithAll("random(1000, 2000)", INTEGER, TEST_SESSION);
+        functionAssertions.tryEvaluateWithAll("random(-10, -5)", INTEGER, TEST_SESSION);
+        functionAssertions.tryEvaluateWithAll("random(-10, 10)", INTEGER, TEST_SESSION);
+        functionAssertions.tryEvaluateWithAll("random(-3000000000, -2000000000)", BIGINT, TEST_SESSION);
+        functionAssertions.tryEvaluateWithAll("random(-3000000000, 5000000000)", BIGINT, TEST_SESSION);
+
+        assertInvalidFunction("random(TINYINT '5', TINYINT '3')", "start value must be less than stop value");
+        assertInvalidFunction("random(TINYINT '5', TINYINT '5')", "start value must be less than stop value");
+        assertInvalidFunction("random(TINYINT '-5', TINYINT '-10')", "start value must be less than stop value");
+        assertInvalidFunction("random(TINYINT '-5', TINYINT '-5')", "start value must be less than stop value");
+        assertInvalidFunction("random(SMALLINT '30000', SMALLINT '10000')", "start value must be less than stop value");
+        assertInvalidFunction("random(SMALLINT '30000', SMALLINT '30000')", "start value must be less than stop value");
+        assertInvalidFunction("random(SMALLINT '-30000', SMALLINT '-31000')", "start value must be less than stop value");
+        assertInvalidFunction("random(SMALLINT '-30000', SMALLINT '-30000')", "start value must be less than stop value");
+        assertInvalidFunction("random(1000, 500)", "start value must be less than stop value");
+        assertInvalidFunction("random(500, 500)", "start value must be less than stop value");
+        assertInvalidFunction("random(-500, -600)", "start value must be less than stop value");
+        assertInvalidFunction("random(-500, -500)", "start value must be less than stop value");
+        assertInvalidFunction("random(3000000000, 1000000000)", "start value must be less than stop value");
+        assertInvalidFunction("random(3000000000, 3000000000)", "start value must be less than stop value");
+        assertInvalidFunction("random(-3000000000, -4000000000)", "start value must be less than stop value");
+        assertInvalidFunction("random(-3000000000, -3000000000)", "start value must be less than stop value");
+    }
 }

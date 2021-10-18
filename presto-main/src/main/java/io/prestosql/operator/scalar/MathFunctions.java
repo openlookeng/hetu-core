@@ -1247,6 +1247,42 @@ public final class MathFunctions
         return dotProduct / (normLeftMap * normRightMap);
     }
 
+    @Description("A pseudo-random number between start and stop (exclusive)")
+    @ScalarFunction(value = "random", alias = "rand", deterministic = false)
+    @SqlType(StandardTypes.TINYINT)
+    public static long randomTinyint(@SqlType(StandardTypes.TINYINT) long start, @SqlType(StandardTypes.TINYINT) long stop)
+    {
+        checkCondition(start < stop, INVALID_FUNCTION_ARGUMENT, "start value must be less than stop value");
+        return ThreadLocalRandom.current().nextLong(start, stop);
+    }
+
+    @Description("A pseudo-random number between start and stop (exclusive)")
+    @ScalarFunction(value = "random", alias = "rand", deterministic = false)
+    @SqlType(StandardTypes.SMALLINT)
+    public static long randomSmallint(@SqlType(StandardTypes.SMALLINT) long start, @SqlType(StandardTypes.SMALLINT) long stop)
+    {
+        checkCondition(start < stop, INVALID_FUNCTION_ARGUMENT, "start value must be less than stop value");
+        return ThreadLocalRandom.current().nextInt((int) start, (int) stop);
+    }
+
+    @Description("A pseudo-random number between start and stop (exclusive)")
+    @ScalarFunction(value = "random", alias = "rand", deterministic = false)
+    @SqlType(StandardTypes.INTEGER)
+    public static long randomInteger(@SqlType(StandardTypes.INTEGER) long start, @SqlType(StandardTypes.INTEGER) long stop)
+    {
+        checkCondition(start < stop, INVALID_FUNCTION_ARGUMENT, "start value must be less than stop value");
+        return ThreadLocalRandom.current().nextInt((int) start, (int) stop);
+    }
+
+    @Description("A pseudo-random number between start and stop (exclusive)")
+    @ScalarFunction(value = "random", alias = "rand", deterministic = false)
+    @SqlType(StandardTypes.BIGINT)
+    public static long random(@SqlType(StandardTypes.BIGINT) long start, @SqlType(StandardTypes.BIGINT) long stop)
+    {
+        checkCondition(start < stop, INVALID_FUNCTION_ARGUMENT, "start value must be less than stop value");
+        return ThreadLocalRandom.current().nextLong(start, stop);
+    }
+
     private static double mapDotProduct(Block leftMap, Block rightMap)
     {
         TypedSet rightMapKeys = new TypedSet(VARCHAR, rightMap.getPositionCount(), "cosine_similarity");
