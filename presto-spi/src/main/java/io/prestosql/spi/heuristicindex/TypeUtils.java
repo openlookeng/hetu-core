@@ -16,6 +16,7 @@
 package io.prestosql.spi.heuristicindex;
 
 import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.ConstantExpression;
@@ -82,8 +83,14 @@ public class TypeUtils
                 checkState(value instanceof Long);
                 return new BigDecimal(BigInteger.valueOf((Long) value), decimalType.getScale(), new MathContext(decimalType.getPrecision()));
             }
-            checkState(value instanceof Slice);
-            Slice slice = (Slice) value;
+            Slice slice;
+            if (value instanceof String) {
+                slice = Slices.utf8Slice((String) value);
+            }
+            else {
+                checkState(value instanceof Slice);
+                slice = (Slice) value;
+            }
             return new BigDecimal(decodeUnscaledValue(slice), decimalType.getScale(), new MathContext(decimalType.getPrecision()));
         }
         else if (type instanceof TimestampType) {
