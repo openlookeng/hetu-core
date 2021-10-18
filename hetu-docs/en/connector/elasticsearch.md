@@ -192,4 +192,4 @@ The array fields of this structure can be defined by using the following command
     
 ## Limitations
 1. openLooKeng does not support to query table in Elasticsearch which has duplicated columns, such as column "name" and "NAME";
-2. opneLooKeng does not support to query the table in Elasticsearch that the name has special characters, such as '-', '.', etc.
+2. openLooKeng does not support to query the table in Elasticsearch that the name has special characters, such as '-', '.', etc.
