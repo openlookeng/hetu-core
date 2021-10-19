@@ -16,6 +16,7 @@ package io.prestosql.plugin.hive;
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 import io.prestosql.spi.PrestoException;
+import org.apache.hadoop.hive.contrib.serde2.MultiDelimitSerDe;
 import org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat;
 import org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat;
 import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
@@ -93,6 +94,11 @@ public enum HiveStorageFormat
             new DataSize(8, Unit.MEGABYTE)),
     CSV(
             OpenCSVSerde.class.getName(),
+            TextInputFormat.class.getName(),
+            HiveIgnoreKeyTextOutputFormat.class.getName(),
+            new DataSize(8, Unit.MEGABYTE)),
+    MULTIDELIMIT(
+            MultiDelimitSerDe.class.getName(),
             TextInputFormat.class.getName(),
             HiveIgnoreKeyTextOutputFormat.class.getName(),
             new DataSize(8, Unit.MEGABYTE));

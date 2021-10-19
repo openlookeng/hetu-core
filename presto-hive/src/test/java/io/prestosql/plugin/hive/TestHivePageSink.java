@@ -110,8 +110,9 @@ public class TestHivePageSink
         try {
             HiveMetastore metastore = createTestingFileHiveMetastore(new File(tempDir, "metastore"));
             for (HiveStorageFormat format : HiveStorageFormat.values()) {
-                if (format == HiveStorageFormat.CSV) {
+                if (format == HiveStorageFormat.CSV || format == HiveStorageFormat.MULTIDELIMIT) {
                     // CSV supports only unbounded VARCHAR type, which is not provided by lineitem
+                    // MULTIDELIMIT is supported only when field.delim property is specified
                     continue;
                 }
                 config.setHiveStorageFormat(format);

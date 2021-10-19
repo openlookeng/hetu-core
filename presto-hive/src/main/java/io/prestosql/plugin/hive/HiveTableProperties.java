@@ -42,6 +42,7 @@ import static io.prestosql.spi.session.PropertyMetadata.stringProperty;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static java.lang.String.format;
 import static java.util.Locale.ENGLISH;
+import static org.apache.hadoop.hive.serde.serdeConstants.FIELD_DELIM;
 
 public class HiveTableProperties
 {
@@ -162,6 +163,11 @@ public class HiveTableProperties
                         TRANSACTIONAL,
                         "Is transactional property enabled",
                         false,
+                        false),
+                stringProperty(
+                        FIELD_DELIM,
+                        format("Field Delimiter for the table"),
+                        null,
                         false));
     }
 

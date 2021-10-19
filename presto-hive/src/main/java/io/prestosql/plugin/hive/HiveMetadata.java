@@ -192,6 +192,7 @@ import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
+import static org.apache.hadoop.hive.serde.serdeConstants.FIELD_DELIM;
 import static org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category.PRIMITIVE;
 
 public class HiveMetadata
@@ -926,6 +927,16 @@ public class HiveMetadata
 
         // Table comment property
         tableMetadata.getComment().ifPresent(value -> tableProperties.put(TABLE_COMMENT, value));
+
+        // field delimiter
+        Object fieldDelimit = tableMetadata.getProperties().get(FIELD_DELIM);
+        if (hiveStorageFormat.equals(HiveStorageFormat.MULTIDELIMIT) && fieldDelimit == null) {
+            throw new PrestoException(INVALID_TABLE_PROPERTY, "This table does not have serde property \"field.delim\"!");
+        }
+        if (fieldDelimit != null) {
+            checkFormatForProperty(hiveStorageFormat, HiveStorageFormat.MULTIDELIMIT, FIELD_DELIM);
+            tableProperties.put(FIELD_DELIM, fieldDelimit.toString());
+        }
 
         return tableProperties.build();
     }
