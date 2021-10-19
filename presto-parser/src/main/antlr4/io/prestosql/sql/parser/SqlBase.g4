@@ -151,6 +151,8 @@ statement
     | VACUUM TABLE qualifiedName (FULL (UNIFY)?)? (PARTITION partition=string)?
         (AND_WAIT)?                                                    #vacuumTable
     | REFRESH META CACHE (FOR (cluster=identifier '.')? catalog=identifier)?                   #refreshMetadataCache
+    | SHOW VIEWS ((FROM | IN) qualifiedName)?
+        (LIKE? pattern=string (ESCAPE escape=string)?)?                #showViews
     ;
 
 assignmentList
@@ -640,7 +642,7 @@ nonReserved
     | SHOW | SOME | START | STATS | SUBSTRING | SYSTEM
     | TABLES | TABLESAMPLE | TEXT | TIES | TIME | TIMESTAMP | TO | TRANSACTION | TRY_CAST | TYPE
     | UNBOUNDED | UNCOMMITTED | USE | USER
-    | VALIDATE | VERBOSE | VIEW
+    | VALIDATE | VERBOSE | VIEW | VIEWS
     | WORK | WRITE
     | YEAR
     | ZONE
@@ -853,6 +855,7 @@ VALIDATE: 'VALIDATE';
 VALUES: 'VALUES';
 VERBOSE: 'VERBOSE';
 VIEW: 'VIEW';
+VIEWS: 'VIEWS';
 WHEN: 'WHEN';
 WHERE: 'WHERE';
 WITH: 'WITH';

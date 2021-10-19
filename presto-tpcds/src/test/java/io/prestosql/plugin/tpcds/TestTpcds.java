@@ -84,6 +84,13 @@ public class TestTpcds
         assertQueryFails("SHOW TABLES FROM sf0", "line 1:1: Schema 'sf0' does not exist");
     }
 
+    @Test
+    public void testShowViewsInvalidSchemaCatalog()
+    {
+        assertQueryFails("SHOW VIEWS FROM tpch1", ".* Schema 'tpch1' does not exist");
+        assertQueryFails("SHOW VIEWS FROM xyz.tpch1", ".* Catalog 'xyz' does not exist");
+    }
+
     private Session createSession(String schemaName)
     {
         return testSessionBuilder()

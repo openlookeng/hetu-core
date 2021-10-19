@@ -168,6 +168,7 @@ import io.prestosql.sql.tree.ShowSchemas;
 import io.prestosql.sql.tree.ShowSession;
 import io.prestosql.sql.tree.ShowStats;
 import io.prestosql.sql.tree.ShowTables;
+import io.prestosql.sql.tree.ShowViews;
 import io.prestosql.sql.tree.SimpleCaseExpression;
 import io.prestosql.sql.tree.SimpleGroupBy;
 import io.prestosql.sql.tree.SingleColumn;
@@ -2186,6 +2187,19 @@ class AstBuilder
     public Node visitPathSpecification(SqlBaseParser.PathSpecificationContext context)
     {
         return new PathSpecification(getLocation(context), visit(context.pathElement(), PathElement.class));
+    }
+
+    @Override
+    public Node visitShowViews(SqlBaseParser.ShowViewsContext context)
+    {
+        return new ShowViews(
+                getLocation(context),
+                Optional.ofNullable(context.qualifiedName())
+                        .map(this::getQualifiedName),
+                getTextIfPresent(context.pattern)
+                        .map(AstBuilder::unquote),
+                getTextIfPresent(context.escape)
+                        .map(AstBuilder::unquote));
     }
 
     // ***************** helpers *****************
