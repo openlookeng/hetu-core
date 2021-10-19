@@ -13,7 +13,7 @@ Below is a high level overview of the `Type` interface, for more details see the
     
 -   Native encoding:
 
-    The interpretation of a value in its native container type form is defined by its `Type`. For some types, such as `BigintType`, it matches the Java interpretation of the native container type (64bit 2\'s complement). However, for other types such as `TimestampWithTimeZoneType`, which also uses `long` for its native container type, the value stored in the `long` is a 8byte binary value combining the timezone and the milliseconds since the unix  epoch. In particular, this means that you cannot compare two native values and expect a meaningful result, without knowing the native encoding.
+    The interpretation of a value in its native container type form is defined by its `Type`. For some types, such as `BigintType`, it matches the Java interpretation of the native container type (64bit 2\'s complement). However, for other types such as `TimestampWithTimeZoneType`, which also uses `long` for its native container type, the value stored in the `long` is a 8byte binary value combining the timezone and the milliseconds since the Unix epoch. In particular, this means that you cannot compare two native values and expect a meaningful result, without knowing the native encoding.
     
 -   Type signature:
 
