@@ -165,8 +165,8 @@ public class IndexCache
                     if (oldIndexMap.get(newIndexRecord.name) != newIndexRecord.lastModifiedTime) {
                         // update operation
                         updated = true;
+                        evictFromCache(newIndexRecord);
                         if (newIndexRecord.isAutoloadEnabled()) {
-                            evictFromCache(newIndexRecord);
                             preloadIndex(newIndexRecord);
                             LOG.debug("Index {%s} has been updated in cache.", newIndexRecord);
                         }
