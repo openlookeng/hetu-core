@@ -81,7 +81,7 @@ public class TableScanStatsRule
         Map<ColumnHandle, Symbol> assignments = ImmutableBiMap.copyOf(node.getAssignments()).inverse();
 
         boolean isPredicatesPushDown = false;
-        if (predicate.isAll()
+        if ((predicate.isAll() || predicate.getDomains().get().equals(node.getEnforcedConstraint().getDomains().get()))
                 && !(node.getEnforcedConstraint().isAll() || node.getEnforcedConstraint().isNone())) {
             predicate = node.getEnforcedConstraint();
             isPredicatesPushDown = true;
