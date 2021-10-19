@@ -3,7 +3,7 @@ External Function Registration and Push Down
 
 Introduction
 ------------
-The connector can register `external function` into openLooKeng. In Jdbc connector, openLookeng can push them down to data source which support to execute those functions.
+The connector can register `external function` into openLooKeng. In Jdbc connector, openLooKeng can push them down to data source which support to execute those functions.
 
 Function Registration in Connector
 ----------------------------------
