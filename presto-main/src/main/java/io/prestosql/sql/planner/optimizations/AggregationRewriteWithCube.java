@@ -322,6 +322,17 @@ public class AggregationRewriteWithCube
                                 cubeScanSymbols.add(originalAggOutputSymbol);
                                 aggregationColumns.add(new CubeRewriteResult.AggregatorSource(originalAggOutputSymbol, originalAggOutputSymbol));
                             }
+                            else {
+                                Symbol symbol = symbolAssignments.keySet()
+                                        .stream()
+                                        .filter(key -> cubeColHandle.equals(symbolAssignments.get(key)))
+                                        .findFirst().get();
+                                ColumnMetadata columnMetadata = metadata.getColumnMetadata(session, cubeTableHandle, cubeColHandle);
+                                symbolAssignments.put(originalAggOutputSymbol, cubeColHandle);
+                                symbolMetadataMap.put(originalAggOutputSymbol, columnMetadata);
+                                cubeScanSymbols.add(originalAggOutputSymbol);
+                                aggregationColumns.add(new CubeRewriteResult.AggregatorSource(originalAggOutputSymbol, symbol));
+                            }
                             break;
                         case "avg":
                             AggregationSignature sumSignature = new AggregationSignature(SUM.getName(), originalColumnName, distinct);
