@@ -99,39 +99,39 @@ public abstract class AbstractTestStarTreeQueries
         assertUpdate(sessionNoStarTree, "INSERT INTO CUBE nation_aggregations_cube_2", 25);
 
         assertQuery(sessionStarTree, "SELECT avg(nationkey) from nation group by nationkey",
-                "SELECT avg(nationkey) from nation group by nationkey",
+                sessionNoStarTree, "SELECT avg(nationkey) from nation group by nationkey",
                 assertTableScan("nation_aggregations_cube_2"));
 
         assertQuery(sessionStarTree, "SELECT avg(nationkey), avg(nationkey), sum(regionkey), count(regionkey) from nation group by nationkey",
-                "SELECT avg(nationkey), avg(nationkey), sum(regionkey), count(regionkey) from nation group by nationkey",
+                sessionNoStarTree, "SELECT avg(nationkey), avg(nationkey), sum(regionkey), count(regionkey) from nation group by nationkey",
                 assertTableScan("nation_aggregations_cube_2"));
 
         assertQuery(sessionStarTree, "SELECT avg(nationkey), sum(regionkey), count(regionkey) from nation group by nationkey",
-                "SELECT avg(nationkey), sum(regionkey), count(regionkey) from nation group by nationkey",
+                sessionNoStarTree, "SELECT avg(nationkey), sum(regionkey), count(regionkey) from nation group by nationkey",
                 assertTableScan("nation_aggregations_cube_2"));
 
         assertQuery(sessionStarTree, "SELECT avg(nationkey), sum(regionkey), sum(regionkey), count(regionkey) from nation group by nationkey",
-                "SELECT avg(nationkey), sum(regionkey), sum(regionkey), count(regionkey) from nation group by nationkey",
+                sessionNoStarTree, "SELECT avg(nationkey), sum(regionkey), sum(regionkey), count(regionkey) from nation group by nationkey",
                 assertTableScan("nation_aggregations_cube_2"));
 
         assertQuery(sessionStarTree, "SELECT count(regionkey), avg(nationkey), sum(regionkey), sum(regionkey), count(regionkey) from nation group by nationkey",
-                "SELECT count(regionkey), avg(nationkey), sum(regionkey), sum(regionkey), count(regionkey) from nation group by nationkey",
+                sessionNoStarTree, "SELECT count(regionkey), avg(nationkey), sum(regionkey), sum(regionkey), count(regionkey) from nation group by nationkey",
                 assertTableScan("nation_aggregations_cube_2"));
 
         assertQuery(sessionStarTree, "SELECT sum(regionkey), avg(nationkey), avg(nationkey),  sum(regionkey), count(regionkey), count(regionkey) from nation group by nationkey",
-                "SELECT sum(regionkey), avg(nationkey), avg(nationkey),  sum(regionkey), count(regionkey), count(regionkey) from nation group by nationkey",
+                sessionNoStarTree, "SELECT sum(regionkey), avg(nationkey), avg(nationkey),  sum(regionkey), count(regionkey), count(regionkey) from nation group by nationkey",
                 assertTableScan("nation_aggregations_cube_2"));
 
         assertQuery(sessionStarTree, "SELECT sum(regionkey), avg(nationkey), avg(nationkey), count(regionkey) from nation group by nationkey",
-                "SELECT sum(regionkey), avg(nationkey), avg(nationkey), count(regionkey) from nation group by nationkey",
+                sessionNoStarTree, "SELECT sum(regionkey), avg(nationkey), avg(nationkey), count(regionkey) from nation group by nationkey",
                 assertTableScan("nation_aggregations_cube_2"));
 
         assertQuery(sessionStarTree, "SELECT avg(nationkey), min(regionkey), max(regionkey), sum(regionkey) from nation group by nationkey",
-                "SELECT avg(nationkey), min(regionkey), max(regionkey), sum(regionkey) from nation group by nationkey",
+                sessionNoStarTree, "SELECT avg(nationkey), min(regionkey), max(regionkey), sum(regionkey) from nation group by nationkey",
                 assertTableScan("nation_aggregations_cube_2"));
 
         assertQuery(sessionStarTree, "SELECT avg(nationkey), min(regionkey), count(regionkey), max(regionkey), sum(regionkey) from nation group by nationkey",
-                "SELECT avg(nationkey), min(regionkey), count(regionkey), max(regionkey), sum(regionkey) from nation group by nationkey",
+                sessionNoStarTree, "SELECT avg(nationkey), min(regionkey), count(regionkey), max(regionkey), sum(regionkey) from nation group by nationkey",
                 assertTableScan("nation_aggregations_cube_2"));
 
         assertUpdate("DROP CUBE nation_aggregations_cube_2");
@@ -147,11 +147,11 @@ public abstract class AbstractTestStarTreeQueries
         assertUpdate(sessionNoStarTree, "INSERT INTO CUBE nation_aggregations_cube_3", 25);
 
         assertQuery(sessionStarTree, "SELECT min(regionkey), max(regionkey), sum(regionkey), max(nationKey), min(Nationkey) from nation group by nationkey",
-                "SELECT min(regionkey), max(regionkey), sum(regionkey), max(nationKey), min(Nationkey) from nation group by nationkey",
+                sessionNoStarTree, "SELECT min(regionkey), max(regionkey), sum(regionkey), max(nationKey), min(Nationkey) from nation group by nationkey",
                 assertTableScan("nation_aggregations_cube_3"));
 
         assertQuery(sessionStarTree, "SELECT count(Regionkey), avg(nationkey) from nation group by nationkey",
-                "SELECT count(Regionkey), avg(nationkey) from nation group by nationkey",
+                sessionNoStarTree, "SELECT count(Regionkey), avg(nationkey) from nation group by nationkey",
                 assertTableScan("nation_aggregations_cube_3"));
 
         assertUpdate("DROP CUBE nation_aggregations_cube_3");
@@ -167,14 +167,142 @@ public abstract class AbstractTestStarTreeQueries
         assertUpdate(sessionNoStarTree, "INSERT INTO CUBE nation_aggregations_cube_4", 25);
 
         assertQuery(sessionStarTree, "SELECT count(regionkey), count(*), max(nationKey), min(Nationkey), min(regionkey), max(regionkey), sum(regionkey) from nation group by nationkey",
-                "SELECT count(regionkey), count(*), max(nationKey), min(Nationkey), min(regionkey), max(regionkey), sum(regionkey) from nation group by nationkey",
+                sessionNoStarTree, "SELECT count(regionkey), count(*), max(nationKey), min(Nationkey), min(regionkey), max(regionkey), sum(regionkey) from nation group by nationkey",
                 assertTableScan("nation_aggregations_cube_4"));
 
         assertQuery(sessionStarTree, "SELECT count(regionkey), avg(nationkey) from nation group by nationkey",
-                "SELECT count(regionkey), avg(nationkey) from nation group by nationkey",
+                sessionNoStarTree, "SELECT count(regionkey), avg(nationkey) from nation group by nationkey",
                 assertTableScan("nation_aggregations_cube_4"));
 
         assertUpdate("DROP CUBE nation_aggregations_cube_4");
+    }
+
+    @Test
+    public void testAggregationsWithExactGroupByMatchWithAverageAndOneGroupByInSelectQuery()
+    {
+        assertUpdate(sessionNoStarTree, "CREATE CUBE lineitem_aggregations_cube_4 ON lineitem " +
+                "WITH (AGGREGATIONS=(avg(quantity), " +
+                " min(quantity), max(discount))," +
+                " group=(orderkey), format= 'orc')");
+        assertUpdate(sessionNoStarTree, "INSERT INTO CUBE lineitem_aggregations_cube_4", 15000);
+
+        assertQuery(sessionStarTree, "SELECT avg(quantity) from lineitem group by orderkey",
+                sessionNoStarTree, "SELECT avg(quantity) from lineitem group by orderkey",
+                assertTableScan("lineitem_aggregations_cube_4"));
+
+        assertUpdate("DROP CUBE lineitem_aggregations_cube_4");
+    }
+
+    @Test
+    public void testAggregationsWithExactGroupByMatchWithAverageAndTwoGroupByInSelectQuery()
+    {
+        assertUpdate(sessionNoStarTree, "CREATE CUBE lineitem_aggregations_cube_5 ON lineitem " +
+                "WITH (AGGREGATIONS=(avg(quantity), " +
+                " min(quantity), max(discount))," +
+                " group=(orderkey,partkey), format= 'orc')");
+        assertUpdate(sessionNoStarTree, "INSERT INTO CUBE lineitem_aggregations_cube_5", 60113);
+
+        assertQuery(sessionStarTree, "SELECT avg(quantity) from lineitem group by orderkey,partkey",
+                sessionNoStarTree, "SELECT avg(quantity) from lineitem group by orderkey,partkey",
+                assertTableScan("lineitem_aggregations_cube_5"));
+
+        assertUpdate("DROP CUBE lineitem_aggregations_cube_5");
+    }
+
+    @Test
+    public void testAggregationsWithExactGroupByMatchWithSumMinAndTwoGroupByInSelectQuery()
+    {
+        assertUpdate(sessionNoStarTree, "CREATE CUBE lineitem_aggregations_cube_6 ON lineitem " +
+                "WITH (AGGREGATIONS=(sum(discount), " +
+                " min(quantity), max(discount), min(discount))," +
+                " group=(orderkey,partkey), format= 'orc')");
+        assertUpdate(sessionNoStarTree, "INSERT INTO CUBE lineitem_aggregations_cube_6", 60113);
+
+        assertQuery(sessionStarTree, "SELECT sum(discount), min(quantity) from lineitem group by orderkey,partkey",
+                sessionNoStarTree, "SELECT sum(discount), min(quantity) from lineitem group by orderkey,partkey",
+                assertTableScan("lineitem_aggregations_cube_6"));
+
+        assertUpdate("DROP CUBE lineitem_aggregations_cube_6");
+    }
+
+    @Test
+    public void testAggregationsWithExactGroupByMatchWithTwoAverageAndTwoGroupByInSelectQuery()
+    {
+        assertUpdate(sessionNoStarTree, "CREATE CUBE lineitem_aggregations_cube_7 ON lineitem " +
+                "WITH (AGGREGATIONS=(avg(discount), " +
+                " avg(quantity), max(discount))," +
+                " group=(orderkey,partkey), format= 'orc')");
+        assertUpdate(sessionNoStarTree, "INSERT INTO CUBE lineitem_aggregations_cube_7", 60113);
+
+        assertQuery(sessionStarTree, "SELECT avg(discount), avg(quantity) from lineitem group by orderkey,partkey",
+                sessionNoStarTree, "SELECT avg(discount), avg(quantity) from lineitem group by orderkey,partkey",
+                assertTableScan("lineitem_aggregations_cube_7"));
+
+        assertUpdate("DROP CUBE lineitem_aggregations_cube_7");
+    }
+
+    @Test
+    public void testAggregationsWithoutExactGroupByMatchWithSumMinAndOneGroupByInSelectQuery()
+    {
+        assertUpdate(sessionNoStarTree, "CREATE CUBE lineitem_aggregations_cube_8 ON lineitem " +
+                "WITH (AGGREGATIONS=(sum(discount), " +
+                " min(quantity), max(discount), max(quantity))," +
+                " group=(orderkey, partkey), format= 'orc')");
+        assertUpdate(sessionNoStarTree, "INSERT INTO CUBE lineitem_aggregations_cube_8", 60113);
+
+        assertQuery(sessionStarTree, "SELECT sum(discount), min(quantity) from lineitem group by partkey",
+                sessionNoStarTree, "SELECT sum(discount), min(quantity) from lineitem group by partkey",
+                assertTableScan("lineitem_aggregations_cube_8"));
+
+        assertUpdate("DROP CUBE lineitem_aggregations_cube_8");
+    }
+
+    @Test
+    public void testAggregationsWithoutExactGroupByMatchWithOneAverageAndOneGroupByInSelectQuery()
+    {
+        assertUpdate(sessionNoStarTree, "CREATE CUBE lineitem_aggregations_cube_9 ON lineitem " +
+                "WITH (AGGREGATIONS=(avg(quantity), " +
+                " min(quantity), max(discount), avg(discount), max(quantity))," +
+                " group=(orderkey,discount), format= 'orc')");
+        assertUpdate(sessionNoStarTree, "INSERT INTO CUBE lineitem_aggregations_cube_9", 50470);
+
+        assertQuery(sessionStarTree, "SELECT avg(quantity) from lineitem group by orderkey",
+                sessionNoStarTree, "SELECT avg(quantity) from lineitem group by orderkey",
+                assertTableScan("lineitem_aggregations_cube_9"));
+
+        assertUpdate("DROP CUBE lineitem_aggregations_cube_9");
+    }
+
+    @Test
+    public void testAggregationsWithoutExactGroupByMatchWithTwoAverageAndOneGroupByInSelectQuery()
+    {
+        assertUpdate(sessionNoStarTree, "CREATE CUBE lineitem_aggregations_cube_10 ON lineitem " +
+                "WITH (AGGREGATIONS=(avg(discount), " +
+                " avg(quantity), min(discount), max(discount), min(quantity))," +
+                " group=(orderkey,partkey), format= 'orc')");
+        assertUpdate(sessionNoStarTree, "INSERT INTO CUBE lineitem_aggregations_cube_10", 60113);
+
+        assertQuery(sessionStarTree, "SELECT avg(discount), avg(quantity) from lineitem group by orderkey",
+                sessionNoStarTree, "SELECT avg(discount), avg(quantity) from lineitem group by orderkey",
+                assertTableScan("lineitem_aggregations_cube_10"));
+
+        assertUpdate("DROP CUBE lineitem_aggregations_cube_10");
+    }
+
+    @Test
+    public void testAggregationsWithoutExactGroupByMatchWithOneAverageAndNoGroupByInSelectQuery()
+    {
+        assertUpdate(sessionNoStarTree, "CREATE CUBE lineitem_aggregations_cube_11 ON lineitem " +
+                "WITH (AGGREGATIONS=(avg(quantity), " +
+                " min(quantity), max(discount), avg(discount), min(discount))," +
+                " group=(), format= 'orc')");
+        assertUpdate(sessionNoStarTree, "INSERT INTO CUBE lineitem_aggregations_cube_11", 1);
+
+        assertQuery(sessionStarTree, "SELECT avg(quantity) from lineitem",
+                sessionNoStarTree, "SELECT avg(quantity) from lineitem",
+                assertTableScan("lineitem_aggregations_cube_11"));
+
+        assertUpdate("DROP CUBE lineitem_aggregations_cube_11");
     }
 
     @Test

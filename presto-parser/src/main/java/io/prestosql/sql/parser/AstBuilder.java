@@ -385,6 +385,7 @@ class AstBuilder
                         newArguments));
             }
             else {
+                decomposedAggregations.add(aggItem);
                 decomposedAggregations.add(new FunctionCall(
                         aggItem.getLocation(),
                         QualifiedName.of("sum"),
