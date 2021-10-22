@@ -140,7 +140,7 @@ Hetu Filesystem 用于存储索引，在上面的例子Hetu Metastore中也使�
 
 *路径白名单：`["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`*
 
-有关Heuristic Index的完整配置列表，请参阅 [Configuration Properties](#configuration-properties) below
+有关Heuristic Index的完整配置列表，请参阅 [Configuration Properties](#索引配置属性) below
 and [Properties](../admin/properties.md).
 
 可以通过设置`set session heuristicindex_filter_enabled=false;`在引擎运行时禁用启发式索引。
@@ -153,7 +153,7 @@ and [Properties](../admin/properties.md).
 
     SELECT * FROM table1 WHERE id="abcd1234";
    
-如果id比较独特，bloom索引可以大大较少读取的分段数量。
+如果id比较独特，bloom索引可以大大减少读取的分段数量。
 
 在本教程中我们将以这个语句为例。
 
