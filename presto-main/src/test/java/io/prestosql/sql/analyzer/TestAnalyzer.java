@@ -458,6 +458,8 @@ public class TestAnalyzer
     {
         assertFails(MISSING_SCHEMA, "SHOW TABLES FROM NONEXISTENT_SCHEMA");
         assertFails(MISSING_SCHEMA, "SHOW TABLES IN NONEXISTENT_SCHEMA LIKE '%'");
+        assertFails(MISSING_SCHEMA, "SHOW VIEWS FROM NONEXISTENT_SCHEMA");
+        assertFails(MISSING_SCHEMA, "SHOW VIEWS IN NONEXISTENT_SCHEMA");
     }
 
     @Test

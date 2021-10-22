@@ -117,6 +117,7 @@ import io.prestosql.sql.tree.ShowSchemas;
 import io.prestosql.sql.tree.ShowSession;
 import io.prestosql.sql.tree.ShowStats;
 import io.prestosql.sql.tree.ShowTables;
+import io.prestosql.sql.tree.ShowViews;
 import io.prestosql.sql.tree.SingleColumn;
 import io.prestosql.sql.tree.SqlParameterDeclaration;
 import io.prestosql.sql.tree.StartTransaction;
@@ -1701,6 +1702,26 @@ public final class SqlFormatter
         {
             builder.append("SET PATH ");
             builder.append(Joiner.on(", ").join(node.getPathSpecification().getPath()));
+            return null;
+        }
+
+        @Override
+        protected Void visitShowViews(ShowViews node, Integer context)
+        {
+            builder.append("SHOW VIEWS");
+
+            node.getSchema().ifPresent(value ->
+                    builder.append(" FROM ")
+                            .append(formatName(value)));
+
+            node.getLikePattern().ifPresent(value ->
+                    builder.append(" LIKE ")
+                            .append(formatStringLiteral(value)));
+
+            node.getEscape().ifPresent(value ->
+                    builder.append(" ESCAPE ")
+                            .append(formatStringLiteral(value)));
+
             return null;
         }
 

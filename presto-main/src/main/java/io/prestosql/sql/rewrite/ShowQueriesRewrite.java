@@ -98,6 +98,7 @@ import io.prestosql.sql.tree.ShowRoles;
 import io.prestosql.sql.tree.ShowSchemas;
 import io.prestosql.sql.tree.ShowSession;
 import io.prestosql.sql.tree.ShowTables;
+import io.prestosql.sql.tree.ShowViews;
 import io.prestosql.sql.tree.SortItem;
 import io.prestosql.sql.tree.SqlParameterDeclaration;
 import io.prestosql.sql.tree.Statement;
@@ -127,6 +128,7 @@ import static io.prestosql.connector.informationschema.InformationSchemaMetadata
 import static io.prestosql.connector.informationschema.InformationSchemaMetadata.TABLE_SCHEMATA;
 import static io.prestosql.connector.informationschema.InformationSchemaMetadata.TABLE_TABLES;
 import static io.prestosql.connector.informationschema.InformationSchemaMetadata.TABLE_TABLE_PRIVILEGES;
+import static io.prestosql.connector.informationschema.InformationSchemaMetadata.TABLE_VIEWS;
 import static io.prestosql.cube.CubeManager.STAR_TREE;
 import static io.prestosql.metadata.FunctionAndTypeManager.qualifyObjectName;
 import static io.prestosql.metadata.MetadataListing.listCatalogs;
@@ -1000,6 +1002,48 @@ final class ShowQueriesRewrite
                             "session",
                             ImmutableList.of("name", "value", "default", "type", "description", "include")),
                     identifier("include"));
+        }
+
+        @Override
+        protected Node visitShowViews(ShowViews showViews, Void context)
+        {
+            CatalogSchemaName schema = createCatalogSchemaName(session, showViews, showViews.getSchema());
+
+            accessControl.checkCanShowTablesMetadata(session.getRequiredTransactionId(), session.getIdentity(), schema);
+
+            if (!metadata.catalogExists(session, schema.getCatalogName())) {
+                throw new SemanticException(MISSING_CATALOG, showViews, "Catalog '%s' does not exist", schema.getCatalogName());
+            }
+
+            if (!metadata.schemaExists(session, schema)) {
+                throw new SemanticException(MISSING_SCHEMA, showViews, "Schema '%s' does not exist", schema.getSchemaName());
+            }
+
+            Expression predicate = equal(identifier("table_schema"), new StringLiteral(schema.getSchemaName()));
+            Optional<String> likePattern = showViews.getLikePattern();
+            if (likePattern.isPresent()) {
+                /*
+                 * Given that hive supports regex '*' to match string wildcard pattern
+                 * we change '*' to '%' for hetu wildcard pattern matching
+                 * */
+                final char asterisk = '*';
+                final char percent = '%';
+                String likePatternStr = likePattern.get();
+                if (likePattern.get().indexOf(asterisk) >= 0) {
+                    likePatternStr = likePattern.get().replace(asterisk, percent);
+                }
+                Expression likePredicate = new LikePredicate(
+                        identifier("table_name"),
+                        new StringLiteral(likePatternStr),
+                        showViews.getEscape().map(StringLiteral::new));
+                predicate = logicalAnd(predicate, likePredicate);
+            }
+
+            return simpleQuery(
+                    selectList(aliasedName("table_name", "Table")),
+                    from(schema.getCatalogName(), TABLE_VIEWS),
+                    predicate,
+                    ordering(ascending("table_name")));
         }
 
         private Query parseView(String view, QualifiedObjectName name, Node node)
