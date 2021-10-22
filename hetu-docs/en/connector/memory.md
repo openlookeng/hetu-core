@@ -121,6 +121,33 @@ After table creation completes, the Memory Connector will start building indices
 
 For now, `sorted_by` only accepts a single column.
 
+Memory and Disk Usage via JMX
+-----------------------------
+JMX can be used to show memory and disk usage of memory connector tables
+Please refer to [JMX Connector](./jmx.md) for setup
+
+The `io.prestosql.plugin.memory.data:name=MemoryTableManager` table of `jmx.current` contains information on all the tables' memory and disk usage size in bytes
+
+    SELECT * FROM jmx.current."io.prestosql.plugin.memory.data:name=MemoryTableManager";
+
+```
+ currentbytes | alltablesdiskbyteusage | alltablesmemorybyteusage |   node   |                       object_name                       
+--------------+------------------------+--------------------------+----------+---------------------------------------------------------
+           23 |                   3456 |                       23 | example1 | io.prestosql.plugin.memory.data:name=MemoryTableManager 
+          253 |                   8713 |                      667 | example2 | io.prestosql.plugin.memory.data:name=MemoryTableManager 
+```
+
+Not all tables will be in memory since they some may be spilled to disk. `currentbytes` column will show the current memory occupied by tables which are in memory at the moment.
+
+The usage for each node is shown as a separate row, aggregation functions can be utilized to show total usage across the cluster. For example, to view total disk or memory usage on all nodes run:
+
+    SELECT sum(alltablesdiskbyteusage) as totaldiskbyteusage, sum(alltablesmemorybyteusage) as totalmemorybyteusage FROM jmx.current."io.prestosql.plugin.memory.data:name=MemoryTableManager";
+
+```
+totaldiskbyteusage | totalmemorybyteusage
+-------------------+---------------------
+             12169 |                  690
+```
 
 Configuration Properties
 ------------------------
@@ -137,7 +164,7 @@ Configuration Properties
 Path whitelist：`["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`
 
 Additional WITH properties
---------------
+--------------------------
 Use these properties when creating a table with the Memory Connector to make queries faster.
 
 | Property Name            | Argument type             | Requirements                     | Description|

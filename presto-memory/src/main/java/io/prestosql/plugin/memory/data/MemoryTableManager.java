@@ -30,6 +30,7 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.TypeManager;
+import org.weakref.jmx.Managed;
 
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
@@ -466,5 +467,35 @@ public class MemoryTableManager
             formatted[i] = NumberFormat.getIntegerInstance(Locale.US).format(numbers[i]);
         }
         LOG.debug(format, formatted);
+    }
+
+    @Managed
+    public long getCurrentBytes()
+    {
+        return currentBytes.get();
+    }
+
+    @Managed
+    public long getAllTablesMemoryByteUsage()
+    {
+        long totalBytes = 0L;
+        for (Table table : tables.values()) {
+            totalBytes += table.getByteSize();
+        }
+        return totalBytes;
+    }
+
+    @Managed
+    public long getAllTablesDiskByteUsage() throws IOException
+    {
+        long totalBytes = 0L;
+        for (long id : tables.keySet()) {
+            long diskUsageSize = Files.walk(spillRoot.resolve(String.valueOf(id)))
+                    .filter(p -> p.toFile().isFile())
+                    .mapToLong(p -> p.toFile().length())
+                    .sum();
+            totalBytes += diskUsageSize;
+        }
+        return totalBytes;
     }
 }

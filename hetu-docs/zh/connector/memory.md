@@ -113,6 +113,33 @@ memory.spill-path=/opt/hetu/data/spill
 
 目前，`sorted_by`仅支持对一列数据排序。
 
+## 使用JMX的内存和磁盘使用情况
+JMX可用于显示内存连接器表的内存和磁盘使用情况
+设置请参考[JMX Connector](./jmx.md)
+
+`jmx.current` 的 `io.prestosql.plugin.memory.data:name=MemoryTableManager` 表包含所有表的内存和磁盘使用大小的信息，以字节为单位
+
+    SELECT * FROM jmx.current."io.prestosql.plugin.memory.data:name=MemoryTableManager";
+
+```
+ currentbytes | alltablesdiskbyteusage | alltablesmemorybyteusage |   node   |                       object_name                       
+--------------+------------------------+--------------------------+----------+---------------------------------------------------------
+           23 |                   3456 |                       23 | example1 | io.prestosql.plugin.memory.data:name=MemoryTableManager 
+          253 |                   8713 |                      667 | example2 | io.prestosql.plugin.memory.data:name=MemoryTableManager 
+```
+
+并非所有表都在内存中，因为它们可能会溢出到磁盘中。`currentbytes`列将显示当前内存中的表占用的当前内存。
+
+每个节点的使用情况显示为单独的一行，可以使用聚合函数来显示整个集群的总使用情况。例如，要查看所有节点上的总磁盘或内存使用情况，请运行：
+
+    SELECT sum(alltablesdiskbyteusage) as totaldiskbyteusage, sum(alltablesmemorybyteusage) as totalmemorybyteusage FROM jmx.current."io.prestosql.plugin.memory.data:name=MemoryTableManager";
+
+```
+totaldiskbyteusage | totalmemorybyteusage
+-------------------+---------------------
+             12169 |                  690
+```
+
 ## 配置属性
 
 | 属性名称                         | 默认值   | 是否必要 | 描述               |
