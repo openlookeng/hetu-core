@@ -22,7 +22,7 @@ import io.prestosql.spi.relation.SpecialForm;
 public class ClassContext
 {
     public static final int SPLIT_EXPRESSION_WEIGHT_THRESHOLD = 16;
-    public static final int SPLIT_EXPRESSION_DEPTH_THRESHOLD = 64;
+    public static final int SPLIT_EXPRESSION_DEPTH_THRESHOLD = 32;
 
     interface FilterMethodGenerator
     {

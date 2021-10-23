@@ -158,6 +158,9 @@ public class RowExpressionCompiler
                     }
                     generator = new AndCodeGenerator();
                     break;
+                case BETWEEN_AND:
+                    generator = new AndCodeGenerator();
+                    break;
                 case OR:
                     classContext = functionContext;
                     if (classContext != null) {
@@ -191,14 +194,15 @@ public class RowExpressionCompiler
                 /* if (classContext.getWeight() >= SPLIT_EXPRESSION_WEIGHT) */
                 if (classContext.getWeight() > SPLIT_EXPRESSION_DEPTH_THRESHOLD) {
                     /* Generate a function and change the Scope variable */
-                    functionContext.incrementFuncSeq();
-                    String newFunctionName = "filterInternal" + functionContext.getFuncSeq();
+                    classContext.incrementFuncSeq();
+                    String newFunctionName = "filterInternal" + classContext.getFuncSeq();
+
+                    classContext.resetWeight();
 
                     /* call the new method and return the expression */
-                    bytecodeNode = functionContext.getFilterMethodGenerator()
+                    bytecodeNode = classContext.getFilterMethodGenerator()
                             .generateNewFilterMethod(newFunctionName, RowExpressionCompiler.this,
                                     generator, specialForm, context.getScope());
-                    classContext.resetWeight();
                 }
                 else {
                     bytecodeNode = generator.generateExpression(null, generatorContext, specialForm.getType(), specialForm.getArguments());
