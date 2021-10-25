@@ -5097,8 +5097,9 @@ public class TestHiveIntegrationSmokeTest
         Session session = getSession();
         ImmutableList.Builder<TestingHiveStorageFormat> formats = ImmutableList.builder();
         for (HiveStorageFormat hiveStorageFormat : HiveStorageFormat.values()) {
-            if (hiveStorageFormat == HiveStorageFormat.CSV) {
+            if (hiveStorageFormat == HiveStorageFormat.CSV || hiveStorageFormat == HiveStorageFormat.MULTIDELIMIT) {
                 // CSV supports only unbounded VARCHAR type
+                // MULTIDELIMIT is supported only when field.delim property is specified
                 continue;
             }
             formats.add(new TestingHiveStorageFormat(session, hiveStorageFormat));
@@ -6667,5 +6668,34 @@ public class TestHiveIntegrationSmokeTest
         assertQuery("SELECT * FROM test_acid_columnname_conflict", "VALUES (1, 2, 3, 4, 5)");
 
         assertUpdate(String.format("DROP TABLE test_acid_columnname_conflict"));
+    }
+
+    @Test
+    public void testMultiDelimitFormat()
+    {
+        assertUpdate(String.format("CREATE TABLE multi_delimit(id int, row int," +
+                " class int )"
+                + "with (format='MULTIDELIMIT', \"field.delim\"='#')"));
+        assertUpdate(String.format("INSERT INTO multi_delimit VALUES (1, 2, 3)"), 1);
+
+        assertQuery("SELECT * FROM multi_delimit", "VALUES (1, 2, 3)");
+
+        assertUpdate(String.format("DROP TABLE multi_delimit"));
+    }
+
+    @Test(expectedExceptions = RuntimeException.class)
+    public void testMultiDelimitFormatWithoutFieldDelim()
+    {
+        assertUpdate(String.format("CREATE TABLE multi_delimit_without_delim(id int, row int," +
+                " class int )"
+                + "with (format='MULTIDELIMIT')"));
+    }
+
+    @Test(expectedExceptions = RuntimeException.class)
+    public void testFieldDelimForORCFormat()
+    {
+        assertUpdate(String.format("CREATE TABLE multi_delimit_without_delim(id int, row int," +
+                " class int )"
+                + "with (format='ORC', \"field.delim\"='#')"));
     }
 }

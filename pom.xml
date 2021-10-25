@@ -1023,6 +1023,12 @@
                 <artifactId>hadoop-distcp</artifactId>
                 <version>2.10.1</version>
             </dependency>
+
+            <dependency>
+                <groupId>org.apache.hive</groupId>
+                <artifactId>hive-contrib</artifactId>
+                <version>3.1.2</version>
+            </dependency>
             
             <dependency>
                 <groupId>org.apache.hudi</groupId>
