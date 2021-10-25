@@ -29,7 +29,7 @@ import java.util.List;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.spi.function.OperatorType.GREATER_THAN_OR_EQUAL;
 import static io.prestosql.spi.function.OperatorType.LESS_THAN_OR_EQUAL;
-import static io.prestosql.spi.relation.SpecialForm.Form.AND;
+import static io.prestosql.spi.relation.SpecialForm.Form.BETWEEN_AND;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.sql.gen.BytecodeUtils.ifWasNullPopAndGoto;
 import static io.prestosql.sql.gen.RowExpressionCompiler.createTempVariableReferenceExpression;
@@ -51,7 +51,7 @@ public class BetweenCodeGenerator
         VariableReferenceExpression valueReference = createTempVariableReferenceExpression(firstValue, value.getType());
 
         SpecialForm newExpression = new SpecialForm(
-                AND,
+                BETWEEN_AND,
                 BOOLEAN,
                 call(
                         GREATER_THAN_OR_EQUAL.getFunctionName().getObjectName(),

@@ -117,5 +117,6 @@ public class SpecialForm
         DEREFERENCE,
         ROW_CONSTRUCTOR,
         BIND,
+        BETWEEN_AND,
     }
 }
