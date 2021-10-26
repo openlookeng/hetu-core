@@ -454,6 +454,56 @@ public class TestElasticsearchIntegrationSmokeTest
     }
 
     @Test
+    public void testMixedArray()
+            throws IOException
+    {
+        String indexName = "test_mixed_arrays";
+
+        embeddedElasticsearchNode.getClient()
+                .admin()
+                .indices()
+                .prepareCreate(indexName)
+                .addMapping("doc", "" +
+                                "{" +
+                                "      \"_meta\": {" +
+                                "        \"presto\": {" +
+                                "          \"a\": {" +
+                                "                \"isArray\": true" +
+                                "          }" +
+                                "        }" +
+                                "      }," +
+                                "      \"properties\": {" +
+                                "        \"a\": {" +
+                                "          \"type\": \"keyword\"" +
+                                "        }" +
+                                "      }" +
+                                "}",
+                        XContentType.JSON)
+                .get();
+
+        index(indexName, ImmutableMap.<String, Object>builder()
+                .build());
+
+        index(indexName, ImmutableMap.<String, Object>builder()
+                .put("a", "hello")
+                .build());
+
+        index(indexName, ImmutableMap.<String, Object>builder()
+                .put("a", ImmutableList.of("foo", "bar"))
+                .build());
+
+        embeddedElasticsearchNode.getClient()
+                .admin()
+                .indices()
+                .refresh(refreshRequest(indexName))
+                .actionGet();
+
+        assertQuery(
+                "SELECT a FROM test_mixed_arrays",
+                "VALUES NULL, ARRAY['hello'], ARRAY['foo', 'bar']");
+    }
+
+    @Test
     public void testQueryString()
     {
         MaterializedResult actual = computeActual("SELECT count(*) FROM \"orders: +packages -slyly\"");
