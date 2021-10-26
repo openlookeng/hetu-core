@@ -23,6 +23,7 @@ import io.prestosql.spi.type.TypeManager;
 
 import static io.airlift.configuration.ConfigBinder.configBinder;
 import static java.util.Objects.requireNonNull;
+import static org.weakref.jmx.guice.ExportBinder.newExporter;
 
 public class MemoryModule
         implements Module
@@ -53,5 +54,6 @@ public class MemoryModule
         binder.bind(MemoryTableProperties.class).in(Scopes.SINGLETON);
         binder.bind(MemoryConnector.class).in(Scopes.SINGLETON);
         configBinder(binder).bindConfig(MemoryConfig.class);
+        newExporter(binder).export(MemoryTableManager.class).withGeneratedName();
     }
 }

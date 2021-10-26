@@ -17,6 +17,7 @@ import com.google.inject.Injector;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.json.JsonModule;
 import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
+import io.prestosql.plugin.base.jmx.MBeanServerModule;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorContext;
@@ -28,6 +29,7 @@ import io.prestosql.spi.metastore.HetuMetastore;
 import io.prestosql.spi.relation.DeterminismEvaluator;
 import io.prestosql.spi.relation.RowExpressionService;
 import io.prestosql.spi.type.TypeManager;
+import org.weakref.jmx.guice.MBeanModule;
 
 import java.util.Map;
 
@@ -68,6 +70,8 @@ public class MemoryConnectorFactory
                         binder.bind(DeterminismEvaluator.class).toInstance(context.getRowExpressionService().getDeterminismEvaluator());
                         binder.bind(HetuMetastore.class).toInstance(context.getHetuMetastore());
                     },
+                    new MBeanModule(),
+                    new MBeanServerModule(),
                     new JsonModule(),
                     new MemoryModule(context.getTypeManager(),
                             context.getNodeManager(),
