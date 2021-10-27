@@ -116,6 +116,9 @@ public class ClientOptions
     @Option(name = "--debug", title = "debug", description = "Enable debug information")
     public boolean debug;
 
+    @Option(name = "--timeInMilliseconds", title = "timeInMilliseconds", description = "Enable elapsed time with milliseconds")
+    public boolean timeInMilliseconds;
+
     @Option(name = "--progress", title = "progress", description = "Show query progress in batch mode")
     public boolean progress;
 
@@ -196,7 +199,8 @@ public class ClientOptions
                 emptyMap(),
                 toExtraCredentials(extraCredentials),
                 null,
-                clientRequestTimeout);
+                clientRequestTimeout,
+                timeInMilliseconds);
     }
 
     public static URI parseServer(String server)

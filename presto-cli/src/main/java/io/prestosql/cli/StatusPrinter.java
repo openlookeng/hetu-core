@@ -59,6 +59,7 @@ public class StatusPrinter
     private final ConsolePrinter console;
 
     private boolean debug;
+    private boolean timeInMilliseconds;
 
     public StatusPrinter(StatementClient client, PrintStream out, boolean debug)
     {
@@ -66,6 +67,7 @@ public class StatusPrinter
         this.out = out;
         this.console = new ConsolePrinter(out);
         this.debug = debug;
+        this.timeInMilliseconds = client.isTimeInMilliseconds();
     }
 
 /*
@@ -212,7 +214,7 @@ Spilled: 20GB
 
         // 0:32 [2.12GB, 15M rows] [67MB/s, 463K rows/s]
         String statsLine = String.format("%s [%s rows, %s] [%s rows/s, %s]",
-                FormatUtils.formatTime(wallTime),
+                FormatUtils.formatTime(wallTime, timeInMilliseconds),
                 FormatUtils.formatCount(stats.getProcessedRows()),
                 FormatUtils.formatDataSize(bytes(stats.getProcessedBytes()), true),
                 FormatUtils.formatCountRate(stats.getProcessedRows(), wallTime, false),
@@ -244,7 +246,7 @@ Spilled: 20GB
                 reprintLine("80 characters wide");
                 reprintLine("");
                 reprintLine(stats.getState());
-                reprintLine(String.format("%s %d%%", FormatUtils.formatTime(wallTime), progressPercentage));
+                reprintLine(String.format("%s %d%%", FormatUtils.formatTime(wallTime, timeInMilliseconds), progressPercentage));
                 return;
             }
 
@@ -317,7 +319,7 @@ Spilled: 20GB
 
                 // 0:17 [ 103MB,  802K rows] [5.74MB/s, 44.9K rows/s] [=====>>                                   ] 10%
                 String progressLine = String.format("%s [%5s rows, %6s] [%5s rows/s, %8s] [%s] %d%%",
-                        FormatUtils.formatTime(wallTime),
+                        FormatUtils.formatTime(wallTime, timeInMilliseconds),
                         FormatUtils.formatCount(stats.getProcessedRows()),
                         FormatUtils.formatDataSize(bytes(stats.getProcessedBytes()), true),
                         FormatUtils.formatCountRate(stats.getProcessedRows(), wallTime, false),
@@ -332,7 +334,7 @@ Spilled: 20GB
 
                 // 0:17 [ 103MB,  802K rows] [5.74MB/s, 44.9K rows/s] [    <=>                                  ]
                 String progressLine = String.format("%s [%5s rows, %6s] [%5s rows/s, %8s] [%s]",
-                        FormatUtils.formatTime(wallTime),
+                        FormatUtils.formatTime(wallTime, timeInMilliseconds),
                         FormatUtils.formatCount(stats.getProcessedRows()),
                         FormatUtils.formatDataSize(bytes(stats.getProcessedBytes()), true),
                         FormatUtils.formatCountRate(stats.getProcessedRows(), wallTime, false),

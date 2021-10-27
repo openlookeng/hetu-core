@@ -505,6 +505,12 @@ public class DataCenterHTTPClientV1
     }
 
     @Override
+    public boolean isTimeInMilliseconds()
+    {
+        return false;
+    }
+
+    @Override
     public boolean applyDynamicFilters(Map<String, byte[]> dynamicFilters)
     {
         Request request = buildDynamicFilterRequest(this.clientId, session, queryId, dynamicFilters);

@@ -51,6 +51,7 @@ public class ClientSession
     private final Map<String, String> extraCredentials;
     private final String transactionId;
     private final Duration clientRequestTimeout;
+    private final boolean timeInMilliseconds;
 
     public static Builder builder(ClientSession clientSession)
     {
@@ -84,6 +85,30 @@ public class ClientSession
             String transactionId,
             Duration clientRequestTimeout)
     {
+        this(server, user, source, traceToken, clientTags, clientInfo, catalog, schema, path, timeZone, locale, resourceEstimates, properties, preparedStatements, roles, extraCredentials, transactionId, clientRequestTimeout, false);
+    }
+
+    public ClientSession(
+            URI server,
+            String user,
+            String source,
+            Optional<String> traceToken,
+            Set<String> clientTags,
+            String clientInfo,
+            String catalog,
+            String schema,
+            String path,
+            ZoneId timeZone,
+            Locale locale,
+            Map<String, String> resourceEstimates,
+            Map<String, String> properties,
+            Map<String, String> preparedStatements,
+            Map<String, ClientSelectedRole> roles,
+            Map<String, String> extraCredentials,
+            String transactionId,
+            Duration clientRequestTimeout,
+            boolean timeInMilliseconds)
+    {
         this.server = requireNonNull(server, "server is null");
         this.user = user;
         this.source = source;
@@ -102,6 +127,7 @@ public class ClientSession
         this.roles = ImmutableMap.copyOf(requireNonNull(roles, "roles is null"));
         this.extraCredentials = ImmutableMap.copyOf(requireNonNull(extraCredentials, "extraCredentials is null"));
         this.clientRequestTimeout = clientRequestTimeout;
+        this.timeInMilliseconds = timeInMilliseconds;
 
         for (String clientTag : clientTags) {
             checkArgument(!clientTag.contains(","), "client tag cannot contain ','");
@@ -230,6 +256,11 @@ public class ClientSession
         return clientRequestTimeout;
     }
 
+    public boolean isTimeInMilliseconds()
+    {
+        return timeInMilliseconds;
+    }
+
     @Override
     public String toString()
     {
@@ -270,6 +301,7 @@ public class ClientSession
         private Map<String, String> credentials;
         private String transactionId;
         private Duration clientRequestTimeout;
+        private boolean timeInMilliseconds;
 
         private Builder(ClientSession clientSession)
         {
@@ -292,6 +324,7 @@ public class ClientSession
             credentials = clientSession.getExtraCredentials();
             transactionId = clientSession.getTransactionId();
             clientRequestTimeout = clientSession.getClientRequestTimeout();
+            timeInMilliseconds = clientSession.isTimeInMilliseconds();
         }
 
         public Builder withCatalog(String catalog)
@@ -368,7 +401,8 @@ public class ClientSession
                     roles,
                     credentials,
                     transactionId,
-                    clientRequestTimeout);
+                    clientRequestTimeout,
+                    timeInMilliseconds);
         }
     }
 }
