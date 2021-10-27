@@ -106,10 +106,9 @@ If [Kerberos](server.md) authentication is enabled, specify valid Kerberos crede
 > internal-communication.kerberos.enabled=true
 > ```
 
+**Note:**
 
-**Note**
-
-*The service name and keytab file used for internal Kerberos authentication is taken from server Kerberos authentication properties, documented in `Kerberos</security/server>`, `http.server.authentication.krb5.service-name` and `http.server.authentication.krb5.keytab` respectively. Ensure that you have the Kerberos setup done on the worker nodes well. The Kerberos principal for internal communication is built from `http.server.authentication.krb5.service-name` after appending it with the hostname of the node where openLooKeng is running on and default realm from Kerberos configuration.*
+The service name and keytab file used for internal Kerberos authentication is taken from server Kerberos authentication properties, documented in `Kerberos</security/server>`, `http.server.authentication.krb5.service-name` and `http.server.authentication.krb5.keytab` respectively. Ensure that you have the Kerberos setup done on the worker nodes well. The Kerberos principal for internal communication is built from `http.server.authentication.krb5.service-name` after appending it with the hostname of the node where openLooKeng is running on and default realm from Kerberos configuration.
 
 
 Performance with SSL/TLS enabled
@@ -126,7 +125,7 @@ Advanced Performance Tuning
 
 In some cases, changing the source of random numbers will improve performance significantly.
 
-By default, TLS encryption uses the `/dev/urandom` system device as a source of entropy. This device has limited throughput, so on environments with high network bandwidth (for example, InfiniBand), it may become a bottleneck. In such situations, it is recommended to try to switch the random number generator algorithm to `SHA1PRNG`, by setting it via `http-server.https.secure-random-algorithm` property in `config.properties` on the coordinator and all of the workers:
+By default, TLS encryption uses the `/dev/urandom` system device as a source of entropy. This device has limited throughput, so on environments with high network bandwidth (e.g. InfiniBand), it may become a bottleneck. In such situations, it is recommended to try to switch the random number generator algorithm to `SHA1PRNG`, by setting it via `http-server.https.secure-random-algorithm` property in `config.properties` on the coordinator and all of the workers:
 
 > ``` properties
 > http-server.https.secure-random-algorithm=SHA1PRNG

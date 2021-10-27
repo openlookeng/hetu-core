@@ -224,7 +224,7 @@ times. This is why queries with a `UNION ALL` may produce inconsistent results w
 
 **CUBE**
 
-The `CUBE` operator generates all possible grouping sets (that is a power set) for a given set of columns. For example, the query:
+The `CUBE` operator generates all possible grouping sets (i.e. a power set) for a given set of columns. For example, the query:
 
     SELECT origin_state, destination_state, sum(package_weight)
     FROM shipping
@@ -665,9 +665,9 @@ This sampling method divides the table into logical segments of data and samples
 The rows selected in a system sampling will be dependent on which connector is used. For example, when used with Hive, it is dependent on how the data is laid out on HDFS. This method does not guarantee independent sampling probabilities.
 
 
-**Note**
+**Note**:
 
-*Neither of the two methods allow deterministic bounds on the number of* *rows returned.*
+Neither of the two methods allow deterministic bounds on the number of rows returned.
 
 Examples:
 

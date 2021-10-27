@@ -31,7 +31,7 @@ Limitations
 -   Direct column reference is supported, but NOT expression with column reference.
 -   `UPDATE` cannot be applied to view.
 -   `UPDATE` dose not support implicitly data type conversion, please use `CAST` when value does not match target column's data type.
--   If the table is partitioned and/or bucketed, bucket\_column and partition column cannot be updated that is they cannot be target of SET expression.
+-   If the table is partitioned and/or bucketed, bucket\_column and partition column cannot be updated i.e. they cannot be target of SET expression.
 
 See Also
 --------

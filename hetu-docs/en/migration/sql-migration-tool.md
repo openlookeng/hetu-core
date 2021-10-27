@@ -51,7 +51,7 @@ This tool also can take parameters and running in batch mode. It has five parame
 | `--config` or `-c`     | the config file of SQL Migration Tool.                       |
 | `--debug` or `-d`     | if set value to 'true', then print the debug information in console.                       |
 
-***Tip***
+***Tip***:
 
 *If user has large number of sql statements to convert, the suggested way is to consolidate all the statements into a single file, and use the batch mode.*
 

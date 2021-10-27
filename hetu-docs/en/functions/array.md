@@ -161,7 +161,7 @@ Returns `n`-grams (sub-sequences of adjacent `n` elements) for the `array`. The 
 **reduce(array(T), initialState S, inputFunction(S,T,S),
 outputFunction(S,R))** -\> R
 
-Returns a single value reduced from `array`. `inputFunction` will be invoked for each element in `array` in order. In addition to take the element, `inputFunction` takes the current state, initially `initialState`, and returns the new state. `outputFunction` will be invoked to turn the final state into the result value. It may be the identity function (`i -> i`). :
+Returns a single value reduced from `array`. `inputFunction` will be invoked for each element in `array` in order. In addition to taking the element, `inputFunction` takes the current state, initially `initialState`, and returns the new state. `outputFunction` will be invoked to turn the final state into the result value. It may be the identity function (`i -> i`). :
 
     SELECT reduce(ARRAY [], 0, (s, x) -> s + x, s -> s); -- 0
     SELECT reduce(ARRAY [5, 20, 50], 0, (s, x) -> s + x, s -> s); -- 75

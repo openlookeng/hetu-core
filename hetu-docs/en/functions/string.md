@@ -10,10 +10,10 @@ The `||` operator performs concatenation.
 String Functions
 ----------------
 
-**Note**
+**Note**:
 
-*These functions assume that the input strings contain valid UTF-8 encoded Unicode code points. There are no explicit checks for valid UTF-8 and the functions may return incorrect results on invalid UTF-8.*
-*Invalid UTF-8 data can be corrected with `from_utf8`.*
+These functions assume that the input strings contain valid UTF-8 encoded Unicode code points. There are no explicit checks for valid UTF-8 and the functions may return incorrect results on invalid UTF-8.
+Invalid UTF-8 data can be corrected with `from_utf8`.
 
 Additionally, the functions operate on Unicode code points and not user visible *characters* (or *grapheme clusters*). Some languages combine multiple code points into a single user-perceived *character*, the basic
 unit of a writing system for a language, but the functions will treat each code point as a separate unit.
@@ -36,10 +36,9 @@ Returns the concatenation of `string1`, `string2`, `...`, `stringN`. This functi
 
 **hamming\_distance(string1, string2)** -\> bigint
 
-Returns the Hamming distance of `string1` and `string2`, that is the number  of positions at which the corresponding characters are different.
+Returns the Hamming distance of `string1` and `string2`, i.e. the number  of positions at which the corresponding characters are different.
 
 Note that the two strings must have the same length.
-
 
 **length(string)** -\> bigint
 
@@ -158,9 +157,9 @@ Transforms `string` with the specified normalization form. `form` must be be one
 | `NFKD` | Compatibility Decomposition                                  |
 | `NFKC` | Compatibility Decomposition, followed by Canonical Composition |
 
-**Note**
+**Note**:
 
-*This SQL-standard function has special syntax and requires specifying `form` as a keyword, not as a string.*   
+This SQL-standard function has special syntax and requires specifying `form` as a keyword, not as a string.   
 
 **to\_utf8(string)** -\> varbinary
 

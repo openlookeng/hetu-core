@@ -58,8 +58,7 @@ Returns a geometry type linestring object from WKT representation.
 **ST\_LineString(array(Point))** -\> LineString
 
 Returns a LineString formed from an array of points. If there are fewer than two non-empty points in the input array, an empty LineString will be returned. Throws an exception if any element in the array is `NULL`
-or empty or same as the previous one. The returned geometry may not be simple, for example, may self-intersect or may contain duplicate vertexes depending on the input.
-
+or empty or same as the previous one. The returned geometry may not be simple, e.g. may self-intersect or may contain duplicate vertexes depending on the input.
 
 **ST\_MultiPoint(array(Point))** -\> MultiPoint
 

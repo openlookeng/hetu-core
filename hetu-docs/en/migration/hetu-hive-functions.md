@@ -5,14 +5,14 @@ In openLooKeng, dynamically loading user-defined Hive scalar functions are suppo
 ![image](../images/hetu-hive-functions.png)
 
 ### **Configuration**
-1.  In order to dynamically load Hive functions, users should add function metadata into `udf.properties`, with the format: `function_name class_path`. An example of configuration in `udf.properties` is presented as follows:
+1.  In order to dynamically load Hive functions, users should add function metadata into `udf.properties`, with the format: `function_name class_path`. An example configuration in `udf.properties` is as follows:
  ```
  booleanudf io.hetu.core.hive.dynamicfunctions.examples.udf.BooleanUDF
  shortudf io.hetu.core.hive.dynamicfunctions.examples.udf.ShortUDF
  byteudf io.hetu.core.hive.dynamicfunctions.examples.udf.ByteUDF
  intudf io.hetu.core.hive.dynamicfunctions.examples.udf.IntUDF
  ```
-2.  Users should upload Hive functions jars and **dependencies** onto a separate directory under `${node.data-dir}` which is setting in `node.properties`. The directory is user configurable by setting `external-functions.dir` and the default value is `externalFunctions`. An example of configuration in `config.properties` is presented as follows:
+2.  Users should upload Hive functions jars and **dependencies** onto a separate directory under `${node.data-dir}` which is setting in `node.properties`. The directory is user configurable by setting `external-functions.dir` and the default value is `externalFunctions`. An example configuration in `config.properties` is as follows:
 ```
 external-functions.dir=externalFunctions
 ```
@@ -28,13 +28,13 @@ Considering the system safety, we provide a mechanism to execute hive function a
 2. Users can limit the maximum running time of hive functions by setting `max-function-running-time-in-second`. The default value is `600 seconds`.
 3. Users can also limit the thread pool size of running the hive functions by setting `function-running-thread-pool-size`. The default value is `100`.
 
-An example configuration in `config.properties` is presented as follows:
+An example configuration in `config.properties` is as follows:
 ```
 max-function-running-time-enable=true
 max-function-running-time-in-second=300
 function-running-thread-pool-size=10
 ```
-**Attention: Since each row data of the table may use the hive function once, so enable the hive function asynchronous execution may lead to seriously performance degradation. Please choose a balance between security and performance according to the actual situation**
+**Attention: Since each row data of the table may use the hive function once, so enabling the hive function asynchronous execution may lead to seriously performance degradation. Please choose a balance between security and performance according to the actual situation**
 
 ### **Details**
 1.  In openLooKeng, we only support UDF with the following types:
@@ -52,7 +52,7 @@ List, Map
 
 **Notes for UDAF**
 
-*Currently, it is not supported loading user defined Hive UDAFs but user can still use their UDAF functions which are developed by the openLooKeng's [function framework](https://openlookeng.io/zh-cn/docs/docs/develop/functions.html) under this feature to use the asynchronous execution mechanism. User can copy the functions and dependencies into a directory under `${node.data-dir}` dir. The directory is also user configurable by setting `external-functions-plugin.dir` and the default value is `externalFunctionsPlugin`. An example of configuration in `config.properties` is presented as follows:*
+Currently, loading user defined Hive UDAFs is not supported. However user can use their UDAF functions developed by openLooKeng's [function framework](https://openlookeng.io/zh-cn/docs/docs/develop/functions.html) to use the asynchronous execution mechanism. User can copy the functions and dependencies into a directory under `${node.data-dir}` dir. The directory is also user configurable by setting `external-functions-plugin.dir` and the default value is `externalFunctionsPlugin`. An example configuration in `config.properties` is as follows:
 
 ```
 external-functions-plugin.dir=externalFunctionsPlugin

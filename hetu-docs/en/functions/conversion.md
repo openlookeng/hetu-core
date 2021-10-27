@@ -103,42 +103,42 @@ Obviously, not all data types are compatible with each other, following table li
 | WITH TIME |         |         |          |         |        |      |        |         |         |      |           |      |       |       |                     |           |                          |
 | ZONE      |         |         |          |         |        |      |        |         |         |      |           |      |       |       |                     |           |                          |
 
-**Note**
+**Note:**
 
-- Y or Y(#): standard for support implicit convert. But there might be some limitation need your attention. Refer to the following items:
-- N: standard for not support implicit convert.
+- Y or Y(#): standard for supporting implicit conversion. There are few limitations which might need your attention. Refer the list below.
+- N: standard for not supporting implicit conversion.
 
-(1): BOOLEAN-\>NUMBER the converted result can be only 0 or 1
+(1): BOOLEAN-\>NUMBER the converted result can be only 0 or 1.
 
-(2): BOOLEAN-\>VARCHAR the converted result can be only TRUE or FALSE
+(2): BOOLEAN-\>VARCHAR the converted result can be only TRUE or FALSE.
 
-(3): NUMBER -\> BOOLEAN 0 will be converted to false, others will be converted to true
+(3): NUMBER -\> BOOLEAN 0 will be converted to false, others will be converted to true.
 
-(4): BIG PRECISION -\> SAMLL conversion will fail when data is out of range of SMALL
+(4): BIG PRECISION -\> SAMLL conversion will fail when data is out of range of SMALL.
 
 (5): REAL/FLOAT -\>DECIMAL conversion will fail when data is out of range of DECIMAL. Scale will be cut off when out of range.
 
 (6): DECIMAL-\>DECIMAL conversion will fail when data is out of range of DECIMAL. Scale will be cut off when out of range.
 
-(7): VARCHAR-\>BOOLEAN only \'0\',\'1\',\'TRUE\',\'FALSE\' can be converted. Others will be failed
+(7): VARCHAR-\>BOOLEAN only \'0\',\'1\',\'TRUE\',\'FALSE\' can be converted. Others will be failed.
 
 (8): VARCHAR-\>DECIMAL conversion will fail when its not an numeric or the converted value is out of range of DECIMAL. Scale will be cut off when out of range.
 
 (9): VARCHAR-\>CHAR if length of VARCHAR is larger than CHAR, it will be cut off.
 
-(10): VARCHAR-\>DATE The VARCHAR can only be formatted like:\'YYYY-MM-DD\', e.g. 2000-01-01
+(10): VARCHAR-\>DATE The VARCHAR can only be formatted like:\'YYYY-MM-DD\', e.g. 2000-01-01.
 
-(11): VARCHAR-\>TIME The VARCHAR can only be formatted like:\'HH:MM:SS.XXX\'
+(11): VARCHAR-\>TIME The VARCHAR can only be formatted like:\'HH:MM:SS.XXX\'.
 
-(12): VARCHAR-\>TIME ZONE The VARCHAR can only be formatted like:\'HH:MM:SS.XXX XXX\', e.g. 01:02:03.456 America/Los\_Angeles
+(12): VARCHAR-\>TIME ZONE The VARCHAR can only be formatted like:\'HH:MM:SS.XXX XXX\', e.g. 01:02:03.456 America/Los\_Angeles.
 
-(13): VARCHAR-\>TIMESTAMP The VARCHAR can only be formatted like:YYYY-MM-DD HH:MM:SS.XXX
+(13): VARCHAR-\>TIMESTAMP The VARCHAR can only be formatted like:YYYY-MM-DD HH:MM:SS.XXX.
 
-(14): DATE-\>TIMESTAMP will auto padding the time with 0. e.g.\'2010-01-01\' -> 2010-01-01 00:00:00.000
+(14): DATE-\>TIMESTAMP will auto padding the time with 0. e.g.\'2010-01-01\' -> 2010-01-01 00:00:00.000.
 
-(15): TIME-\>TIME WITH TIME ZONE will auto padding the default time zone
+(15): TIME-\>TIME WITH TIME ZONE will auto padding the default time zone.
 
-(16): TIME-\>TIMESTAMP will auto add the default date:1970-01-01
+(16): TIME-\>TIMESTAMP will auto add the default date:1970-01-01.
 
 Miscellaneous
 -------------

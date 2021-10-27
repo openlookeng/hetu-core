@@ -108,8 +108,7 @@ Returns the day-to-second `interval` as milliseconds.
 
 Returns `timestamp` as a UNIX timestamp.
 
-
-**Note**
+**Note:**
 
 The following SQL-standard functions do not use parenthesis:
 
@@ -314,9 +313,9 @@ The types supported by the `extract` function vary depending on the field to be 
 
 Returns `field` from `x`.
 
-**Note**
+**Note**:
 
-*This SQL-standard function uses special syntax for specifying the arguments.*
+This SQL-standard function uses special syntax for specifying the arguments.
 
    
 

@@ -45,9 +45,9 @@ The format of the configuration file `jass.conf` to login the kerberos is as the
 | `principal` | The principal name to login the Kerberos|
 | `keyTab` | The location of the keytab that can be used to authenticate the Kerberos principal.|
 
-**Note**
+**Note**:
 
-*All of the nodes must use the same configuration, including the kerberos principal and keytab.*
+All of the nodes must use the same configuration, including the kerberos principal and keytab.
 
 
 ## Hazelcast SSL/TLS
