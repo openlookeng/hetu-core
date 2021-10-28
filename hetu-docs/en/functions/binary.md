@@ -28,10 +28,10 @@ Returns a substring from string of length `length` from the starting position `s
 
 e.g.
 
-substr("openLooKeng", 1, 4)
+substr('openLooKeng', 1, 4)
 returns "open"
 
-substr("openLooKeng", -7, 3)
+substr('openLooKeng', -7, 3)
 returns "Loo"
 
 **to\_base64(binary)** -\> varchar

@@ -34,7 +34,7 @@ max-function-running-time-enable=true
 max-function-running-time-in-second=300
 function-running-thread-pool-size=10
 ```
-**Attention: Since each row data of the table may use the hive function once, so enabling the hive function asynchronous execution may lead to seriously performance degradation. Please choose a balance between security and performance according to the actual situation**
+**Attention: Since each row data of the table may use the hive function once, so enabling the hive function asynchronous execution may lead to serious performance degradation. Please choose a balance between security and performance according to the actual situation.**
 
 ### **Details**
 1.  In openLooKeng, we only support UDF with the following types:

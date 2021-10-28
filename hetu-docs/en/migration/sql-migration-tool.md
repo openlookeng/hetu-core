@@ -197,7 +197,7 @@ Following Hive statements are not supported, because of feature differences:
 | SET                      |
 | RESET                    |
 
-## Check list of  Impala Statements:
+## Check list of  Impala Statements
 
 Following Impala statements are fully supported:
 

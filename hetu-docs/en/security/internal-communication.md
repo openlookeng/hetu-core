@@ -108,7 +108,7 @@ If [Kerberos](server.md) authentication is enabled, specify valid Kerberos crede
 
 **Note:**
 
-The service name and keytab file used for internal Kerberos authentication is taken from server Kerberos authentication properties, documented in `Kerberos</security/server>`, `http.server.authentication.krb5.service-name` and `http.server.authentication.krb5.keytab` respectively. Ensure that you have the Kerberos setup done on the worker nodes well. The Kerberos principal for internal communication is built from `http.server.authentication.krb5.service-name` after appending it with the hostname of the node where openLooKeng is running on and default realm from Kerberos configuration.
+The service name and keytab file used for internal Kerberos authentication is taken from server Kerberos authentication properties, documented in `Kerberos</security/server>`, `http.server.authentication.krb5.service-name` and `http.server.authentication.krb5.keytab` respectively. Ensure that you have the Kerberos setup done on the worker nodes as well. The Kerberos principal for internal communication is built from `http.server.authentication.krb5.service-name` after appending it with the hostname of the node where openLooKeng is running on and default realm from Kerberos configuration.
 
 
 Performance with SSL/TLS enabled
