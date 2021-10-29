@@ -351,7 +351,7 @@ public class SplitFiltering
 
             return filteredSplits;
         }
-        catch (Exception e) {
+        catch (Throwable e) {
             LOG.debug("Exception occurred while filtering. Returning original splits", e);
             return inputSplits;
         }
