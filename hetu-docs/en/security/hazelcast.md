@@ -2,12 +2,12 @@
 Hazelcast Security
 ===================================
 
-Hazelcast is embedded in the openLooKeng. When hazelcast is used in openLooKeng, in order to ensure the communication security between the client and the server of hazelcast, as well as between the members of each server.
+Hazelcast is embedded in the openLooKeng. Hazelcast is used in openLooKeng to ensure the communication is secured between the client and the server of hazelcast, as well as between the members of each server.
 It is recommended to enable hazelcast authentication and SSL/TLS channel encryption.
 
 ## Hazelcast Authentication
 
-Hazelcast only supports Kerberos authentication. Because the hazelcast is used by state-store module, so user wants to enable Hazelcast authentication, the state-store has to enable first.
+Hazelcast only supports Kerberos authentication. Since the hazelcast is used by state-store module, if user wants to enable Hazelcast authentication, then the state-store has to enable first.
 
 When state-store enabled, add the following configuration in the state-store.properties:
 
@@ -27,7 +27,7 @@ When state-store enabled, add the following configuration in the state-store.pro
 | `hazelcast.kerberos.krb5.conf` | The location of the Kerberos configuration file.|    
 | `hazelcast.kerberos.auth.login.config` |The location of the configuration file to login the kerberos|
 
-The format of the configuration file `jass.conf` to login the kerberos is as the following. User has to create a principal in the kerberos first and configure the principal and the keytab. 
+The format of the configuration file `jass.conf` to login the kerberos is as follows. User has to create a principal in the kerberos first and configure the principal and the keytab. 
 
 > ```properties
 > Hazelcast {
@@ -45,7 +45,7 @@ The format of the configuration file `jass.conf` to login the kerberos is as the
 | `principal` | The principal name to login the Kerberos|
 | `keyTab` | The location of the keytab that can be used to authenticate the Kerberos principal.|
 
-**Note**:
+**Note:**
 
 All of the nodes must use the same configuration, including the kerberos principal and keytab.
 

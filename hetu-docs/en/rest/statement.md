@@ -4,15 +4,25 @@ Statement Resource
 
 - POST /v1/statement
 
-query query: SQL Query to execute
+query 
 
-reqheader X-Presto-User: User to execute statement on behalf of (optional)
+: SQL Query to execute
 
-reqheader X-Presto-Source: Source of query
+reqheader X-Presto-User
 
-reqheader X-Presto-Catalog: Catalog to execute query against
+: User to execute statement on behalf of (optional)
 
-reqheader X-Presto-Schema: Schema to execute query against
+reqheader X-Presto-Source
+
+: Source of query
+
+reqheader X-Presto-Catalog
+
+: Catalog to execute query against
+
+reqheader X-Presto-Schema
+
+: Schema to execute query against
 
 Submits a statement to openLooKeng for execution. The openLooKeng client executes
 queries on behalf of a user against a catalog and a schema. When you run
@@ -83,9 +93,13 @@ When a client receives a response to this POST it will contain a "nextUri\" prop
 
 - GET /v1/statement/{queryId}/{token}
 
-query queryId:   The query identifier returned from the initial POST to /v1/statement
+query queryId
 
-query token:   The token returned from the initial POST to /v1/statement or from a
+:   The query identifier returned from the initial POST to /v1/statement
+
+query token
+
+:   The token returned from the initial POST to /v1/statement or from a
     previous call to this same call
 
 When a openLooKeng client submits a statement for execution, openLooKeng creates a
@@ -131,12 +145,22 @@ in progress or it can deliver the final results to the client.
 
 - DELETE /v1/statement/{queryId}/{token}
 
-query queryId: The query identifier returned from the initial POST to /v1/statement
+query queryId
 
-reqheader X-Presto-User: User to execute statement on behalf of (optional)
+: The query identifier returned from the initial POST to /v1/statement
 
-reqheader X-Presto-Source:  Source of query
+reqheader X-Presto-User
 
-reqheader X-Presto-Catalog: Catalog to execute query against
+: User to execute statement on behalf of (optional)
 
-reqheader X-Presto-Schema: Schema to execute query against
+reqheader X-Presto-Source
+
+:  Source of query
+
+reqheader X-Presto-Catalog
+
+: Catalog to execute query against
+
+reqheader X-Presto-Schema
+
+: Schema to execute query against

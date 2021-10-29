@@ -9,8 +9,8 @@ installation.
 
 - GET /v1/query
 
-This service returns information and statistics about queries that are
-executed on a openLooKeng coordinator currently.
+This service returns information and statistics about queries that are currently
+executed on a openLooKeng coordinator.
 
 When you point a web browser at a openLooKeng coordinate, you can find a rendered
 version of the output from this service which displays recent queries that have executed on a openLooKeng installation.

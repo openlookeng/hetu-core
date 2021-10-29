@@ -116,7 +116,7 @@ Performance with SSL/TLS enabled
 
 Enabling encryption impacts performance. The performance degradation can vary based on the environment, queries, and concurrency.
 
-For queries that do not require transferring too much data between the openLooKeng nodes (for example, `SELECT count(*) FROM table`), the performance impact is negligible.
+For queries that do not require transferring too much data between the openLooKeng nodes (e.g. `SELECT count(*) FROM table`), the performance impact is negligible.
 
 However, for CPU intensive queries which require a considerable amount of data to be transferred between the nodes (for example, distributed joins, aggregations and window functions, which require repartitioning), the performance impact might be considerable. The slowdown may vary from 10% to even 100%+, depending on the network traffic and the CPU utilization.
 
