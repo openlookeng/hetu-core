@@ -16,6 +16,7 @@
 package io.prestosql.plugin.memory;
 
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.MaterializedRow;
 import io.prestosql.tests.AbstractTestQueryFramework;
@@ -507,5 +508,121 @@ public class TestMemorySelection
         }
 
         return values;
+    }
+
+    @Test
+    public void testPartitionedTableSelection()
+    {
+        assertQuerySucceeds("CREATE TABLE test_nation WITH(async_processing=false) AS SELECT * FROM tpch.tiny.nation");
+
+        Pair<Integer, MaterializedResult> resultPairWithoutPartition = getSplitAndMaterializedResult("select * from test_nation");
+        int splitsWithoutPatition = resultPairWithoutPartition.getFirst();
+        MaterializedResult resultWithoutPartition = resultPairWithoutPartition.getSecond();
+        assertQuerySucceeds("DROP TABLE test_nation");
+
+        assertQuerySucceeds("CREATE TABLE test_nation2 WITH (partitioned_by=array['regionkey'], async_processing=false) AS SELECT * FROM tpch.tiny.nation");
+        Pair<Integer, MaterializedResult> resultPairWithPartition = getSplitAndMaterializedResult("select * from test_nation2");
+        int splitsWithPatition = resultPairWithPartition.getFirst();
+        MaterializedResult resultWithPartition = resultPairWithPartition.getSecond();
+        assertQuerySucceeds("DROP TABLE test_nation2");
+
+        assertTrue(splitsWithPatition > splitsWithoutPatition, "The splits with partition should be more since the data is partitioned.");
+        assertTrue(verifyEqualResults(resultWithoutPartition, resultWithPartition), "The results should be equal");
+    }
+
+    @Test
+    public void testPartitionedTableColumnTypes()
+    {
+        // test string column type
+        assertQuerySucceeds("CREATE TABLE test_orders WITH(async_processing=false) AS SELECT * FROM tpch.tiny.orders");
+        Pair<Integer, MaterializedResult> resultPairWithoutPartition = getSplitAndMaterializedResult("select * from test_orders where clerk = 'Clerk#000000828'");
+        MaterializedResult resultWithoutPartition = resultPairWithoutPartition.getSecond();
+        assertQuerySucceeds("DROP TABLE test_orders");
+
+        assertQuerySucceeds("CREATE TABLE test_orders2 WITH (partitioned_by=array['clerk'], async_processing=false) AS SELECT * FROM tpch.tiny.orders");
+        Pair<Integer, MaterializedResult> resultPairWithPartition = getSplitAndMaterializedResult("select * from test_orders2 where clerk = 'Clerk#000000828'");
+        MaterializedResult resultWithPartition = resultPairWithPartition.getSecond();
+        assertQuerySucceeds("DROP TABLE test_orders2");
+
+        assertTrue(verifyEqualResults(resultWithoutPartition, resultWithPartition), "The results should be equal");
+
+        // test bigint column type
+        assertQuerySucceeds("CREATE TABLE test_orders WITH(async_processing=false) AS SELECT * FROM tpch.tiny.orders");
+        resultPairWithoutPartition = getSplitAndMaterializedResult("select * from test_orders where orderkey=34085");
+        resultWithoutPartition = resultPairWithoutPartition.getSecond();
+        assertQuerySucceeds("DROP TABLE test_orders");
+
+        assertQuerySucceeds("CREATE TABLE test_orders2 WITH (partitioned_by=array['orderkey'], async_processing=false) AS SELECT * FROM tpch.tiny.orders");
+        resultPairWithPartition = getSplitAndMaterializedResult("select * from test_orders2 where orderkey=34085");
+        resultWithPartition = resultPairWithPartition.getSecond();
+        assertQuerySucceeds("DROP TABLE test_orders2");
+
+        assertTrue(verifyEqualResults(resultWithoutPartition, resultWithPartition), "The results should be equal");
+
+        // test decimal column type
+        assertQuerySucceeds("CREATE TABLE test_orders WITH(async_processing=false) AS SELECT * FROM tpch.tiny.orders");
+        resultPairWithoutPartition = getSplitAndMaterializedResult("select * from test_orders where totalprice < 100000");
+        resultWithoutPartition = resultPairWithoutPartition.getSecond();
+        assertQuerySucceeds("DROP TABLE test_orders");
+
+        assertQuerySucceeds("CREATE TABLE test_orders2 WITH (partitioned_by=array['totalprice'], async_processing=false) AS SELECT * FROM tpch.tiny.orders");
+        resultPairWithPartition = getSplitAndMaterializedResult("select * from test_orders2 where totalprice < 100000");
+        resultWithPartition = resultPairWithPartition.getSecond();
+        assertQuerySucceeds("DROP TABLE test_orders2");
+
+        assertTrue(verifyEqualResults(resultWithoutPartition, resultWithPartition), "The results should be equal");
+
+        // test date column type
+        assertQuerySucceeds("CREATE TABLE test_orders WITH(async_processing=false) AS SELECT * FROM tpch.tiny.orders");
+        resultPairWithoutPartition = getSplitAndMaterializedResult("select * from test_orders where orderdate=date'1993-06-11'");
+        resultWithoutPartition = resultPairWithoutPartition.getSecond();
+        assertQuerySucceeds("DROP TABLE test_orders");
+
+        assertQuerySucceeds("CREATE TABLE test_orders2 WITH (partitioned_by=array['orderdate'], async_processing=false) AS SELECT * FROM tpch.tiny.orders");
+        resultPairWithPartition = getSplitAndMaterializedResult("select * from test_orders2 where orderdate=date'1993-06-11'");
+        resultWithPartition = resultPairWithPartition.getSecond();
+        assertQuerySucceeds("DROP TABLE test_orders2");
+
+        assertTrue(verifyEqualResults(resultWithoutPartition, resultWithPartition), "The results should be equal");
+    }
+
+    Pair<Integer, MaterializedResult> getSplitAndMaterializedResult(String testerQuery)
+    {
+        // Select the entry with specifics
+        MaterializedResult queryResult = computeActual(testerQuery);
+
+        String doublyQuotedQuery = testerQuery.replaceAll("'", "''");
+
+        // Get queries executed and query ID to find the task with sum of splits
+        String splits = "select sum(splits) from system.runtime.tasks where query_id in " +
+                "(select query_id from system.runtime.queries " +
+                "where query='" + doublyQuotedQuery + "' order by created desc limit 1)";
+
+        MaterializedResult rows = computeActual(splits);
+
+        assertEquals(rows.getRowCount(), 1);
+
+        MaterializedRow materializedRow = rows.getMaterializedRows().get(0);
+        int fieldCount = materializedRow.getFieldCount();
+        assertEquals(fieldCount, 1,
+                "Expected only one column, but got '%d', fiedlCount: " + fieldCount);
+        Object value = materializedRow.getField(0);
+
+        return new Pair<>((int) (long) value, queryResult);
+    }
+
+    static boolean verifyEqualResults(MaterializedResult result1, MaterializedResult result2)
+    {
+        ArrayList<String> data1 = new ArrayList<>();
+        ArrayList<String> data2 = new ArrayList<>();
+        for (MaterializedRow item1 : result1.getMaterializedRows()) {
+            data1.add(item1.toString());
+        }
+        for (MaterializedRow item2 : result2.getMaterializedRows()) {
+            data2.add(item2.toString());
+        }
+        Collections.sort(data1);
+        Collections.sort(data2);
+        return data1.equals(data2);
     }
 }

@@ -110,11 +110,8 @@ public class MemoryTableProperties
     @SuppressWarnings("unchecked")
     public static List<String> getPartitionedBy(Map<String, Object> tableProperties)
     {
-        // TODO: support partitioning
-        throw new UnsupportedOperationException("Partitioning is not supported yet.");
-
-//        List<String> partitionedBy = (List<String>) tableProperties.get(PARTITIONED_BY_PROPERTY);
-//        return partitionedBy == null ? ImmutableList.of() : ImmutableList.copyOf(partitionedBy);
+        List<String> partitionedBy = (List<String>) tableProperties.get(PARTITIONED_BY_PROPERTY);
+        return partitionedBy == null ? ImmutableList.of() : ImmutableList.copyOf(partitionedBy);
     }
 
     @SuppressWarnings("unchecked")

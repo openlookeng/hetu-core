@@ -37,6 +37,7 @@ public final class MemoryWriteTableHandle
     private final Set<Long> activeTableIds;
     private final List<MemoryColumnHandle> columns;
     private final List<SortingColumn> sortedBy;
+    private final List<String> partitionedBy;
     private final List<String> indexColumns;
     private final String schemaName;
     private final String tableName;
@@ -51,6 +52,7 @@ public final class MemoryWriteTableHandle
             @JsonProperty("activeTableIds") Set<Long> activeTableIds,
             @JsonProperty("columns") List<MemoryColumnHandle> columns,
             @JsonProperty("sortedBy") List<SortingColumn> sortedBy,
+            @JsonProperty("partitionedBy") List<String> partitionedBy,
             @JsonProperty("indexColumns") List<String> indexColumns)
     {
         this.table = table;
@@ -60,6 +62,7 @@ public final class MemoryWriteTableHandle
         this.activeTableIds = requireNonNull(activeTableIds, "activeTableIds is null");
         this.columns = requireNonNull(columns, "columns is null");
         this.sortedBy = requireNonNull(sortedBy, "sortedBy is null");
+        this.partitionedBy = requireNonNull(partitionedBy, "partitionedBy is null");
         this.indexColumns = requireNonNull(indexColumns, "indexColumns is null");
         this.asyncProcessingEnabled = asyncProcessingEnabled;
     }
@@ -67,7 +70,7 @@ public final class MemoryWriteTableHandle
     @VisibleForTesting
     MemoryWriteTableHandle(long table, Set<Long> activeTableIds)
     {
-        this(table, "", "", SPILL_COMPRESSION_DEFAULT_VALUE, ASYNC_PROCESSING_DEFAULT_VALUE, activeTableIds, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+        this(table, "", "", SPILL_COMPRESSION_DEFAULT_VALUE, ASYNC_PROCESSING_DEFAULT_VALUE, activeTableIds, Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     }
 
     @JsonProperty
@@ -104,6 +107,12 @@ public final class MemoryWriteTableHandle
     public List<MemoryColumnHandle> getColumns()
     {
         return columns;
+    }
+
+    @JsonProperty
+    public List<String> getPartitionedBy()
+    {
+        return partitionedBy;
     }
 
     @JsonProperty

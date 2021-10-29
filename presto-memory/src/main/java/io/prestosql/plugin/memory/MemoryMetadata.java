@@ -306,6 +306,7 @@ public class MemoryMetadata
                 oldTableHandle.getActiveTableIds(),
                 oldTableHandle.getColumns(),
                 oldTableHandle.getSortedBy(),
+                oldTableHandle.getPartitionedBy(),
                 oldTableHandle.getIndexColumns());
 
         metastore.alterTable(MEM_KEY, oldInfo.getSchemaName(), oldInfo.getTableName(),
@@ -348,6 +349,22 @@ public class MemoryMetadata
             }
         }
 
+        List<String> partitionBy = MemoryTableProperties.getPartitionedBy(tableMetadata.getProperties());
+        if (partitionBy == null) {
+            partitionBy = Collections.emptyList();
+        }
+
+        if (partitionBy.size() > 1) {
+            throw new PrestoException(INVALID_TABLE_PROPERTY, "partition_by property currently only supports one column");
+        }
+
+        Set<String> partitionByColumnNames = new HashSet<>();
+        for (String p : partitionBy) {
+            if (!partitionByColumnNames.add(p)) {
+                throw new PrestoException(INVALID_TABLE_PROPERTY, "duplicate column(s) in partition_by property");
+            }
+        }
+
         List<String> indexColumns = MemoryTableProperties.getIndexedColumns(tableMetadata.getProperties());
         if (indexColumns == null) {
             indexColumns = Collections.emptyList();
@@ -368,7 +385,8 @@ public class MemoryMetadata
         Map<String, ColumnMetadata> columnNames = new HashMap<>();
         for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
             ColumnMetadata column = tableMetadata.getColumns().get(i);
-            columns.add(new MemoryColumnHandle(column.getName(), i, column.getType().getTypeSignature()));
+            boolean isPartitionKey = partitionBy.contains(column.getName());
+            columns.add(new MemoryColumnHandle(column.getName(), i, column.getType().getTypeSignature(), isPartitionKey));
             columnNames.put(column.getName(), column);
         }
 
@@ -378,6 +396,12 @@ public class MemoryMetadata
             }
             if (!columnNames.get(sortedByColumnName).getType().isComparable()) {
                 throw new PrestoException(INVALID_TABLE_PROPERTY, "column " + sortedByColumnName + " in sorted_by is not comparable");
+            }
+        }
+
+        for (String partitionByColumnName : partitionByColumnNames) {
+            if (!columnNames.containsKey(partitionByColumnName)) {
+                throw new PrestoException(INVALID_TABLE_PROPERTY, "column " + partitionByColumnName + " in partition_column does not exist");
             }
         }
 
@@ -422,6 +446,7 @@ public class MemoryMetadata
                 getTableIdSet(nextId),
                 columnHandles,
                 sortedBy,
+                partitionBy,
                 indexColumns);
     }
 
