@@ -1687,8 +1687,29 @@ public class TestSqlParser
                         ImmutableSet.of(
                                 new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("c"))),
                                 new FunctionCall(QualifiedName.of("sum"), ImmutableList.of(new Identifier("d"))),
+                                new FunctionCall(QualifiedName.of("avg"), ImmutableList.of(new Identifier("e"))),
                                 new FunctionCall(QualifiedName.of("sum"), ImmutableList.of(new Identifier("e"))),
                                 new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("e")))),
+                        false,
+                        ImmutableList.of(),
+                        Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10"))),
+                        null));
+
+        assertStatement("CREATE CUBE avgtestcube ON bar WITH (AGGREGATIONS=(count(c), sum(d), avg(e), avg(f)), GROUP = (a, b)) WHERE d1 > 10",
+                new CreateCube(QualifiedName.of("avgtestcube"),
+                        QualifiedName.of("bar"),
+                        ImmutableList.of(
+                                new Identifier("a"),
+                                new Identifier("b")),
+                        ImmutableSet.of(
+                                new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("c"))),
+                                new FunctionCall(QualifiedName.of("sum"), ImmutableList.of(new Identifier("d"))),
+                                new FunctionCall(QualifiedName.of("avg"), ImmutableList.of(new Identifier("e"))),
+                                new FunctionCall(QualifiedName.of("sum"), ImmutableList.of(new Identifier("e"))),
+                                new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("e"))),
+                                new FunctionCall(QualifiedName.of("avg"), ImmutableList.of(new Identifier("f"))),
+                                new FunctionCall(QualifiedName.of("sum"), ImmutableList.of(new Identifier("f"))),
+                                new FunctionCall(QualifiedName.of("count"), ImmutableList.of(new Identifier("f")))),
                         false,
                         ImmutableList.of(),
                         Optional.of(new ComparisonExpression(GREATER_THAN, new Identifier("d1"), new LongLiteral("10"))),

@@ -119,6 +119,20 @@ public final class QueryAssertions
         assertQuery(actualQueryRunner, session, actual, h2QueryRunner, expected, ensureOrdering, compareUpdate, Optional.of(planAssertion));
     }
 
+    public static void assertQuery(
+            QueryRunner actualQueryRunner,
+            Session actualQuerysession,
+            @Language("SQL") String actual,
+            H2QueryRunner h2QueryRunner,
+            Session expectedQuerysession,
+            @Language("SQL") String expected,
+            boolean ensureOrdering,
+            boolean compareUpdate,
+            Consumer<Plan> planAssertion)
+    {
+        assertQuery(actualQueryRunner, actualQuerysession, actual, h2QueryRunner, expectedQuerysession, expected, ensureOrdering, compareUpdate, Optional.of(planAssertion));
+    }
+
     private static void assertQuery(
             QueryRunner actualQueryRunner,
             Session session,
@@ -129,12 +143,26 @@ public final class QueryAssertions
             boolean compareUpdate,
             Optional<Consumer<Plan>> planAssertion)
     {
+        assertQuery(actualQueryRunner, session, actual, h2QueryRunner, session, expected, ensureOrdering, compareUpdate, planAssertion);
+    }
+
+    private static void assertQuery(
+            QueryRunner actualQueryRunner,
+            Session actualQuerySession,
+            @Language("SQL") String actual,
+            H2QueryRunner h2QueryRunner,
+            Session expectedQuerySession,
+            @Language("SQL") String expected,
+            boolean ensureOrdering,
+            boolean compareUpdate,
+            Optional<Consumer<Plan>> planAssertion)
+    {
         long start = System.nanoTime();
         Optional<MaterializedResult> actualResultsOp = Optional.empty();
         Plan queryPlan = null;
         if (planAssertion.isPresent()) {
             try {
-                MaterializedResultWithPlan resultWithPlan = actualQueryRunner.executeWithPlan(session, actual, WarningCollector.NOOP);
+                MaterializedResultWithPlan resultWithPlan = actualQueryRunner.executeWithPlan(actualQuerySession, actual, WarningCollector.NOOP);
                 queryPlan = resultWithPlan.getQueryPlan();
                 actualResultsOp = Optional.of(resultWithPlan.getMaterializedResult().toTestTypes());
             }
@@ -144,7 +172,7 @@ public final class QueryAssertions
         }
         else {
             try {
-                actualResultsOp = Optional.of(actualQueryRunner.execute(session, actual).toTestTypes());
+                actualResultsOp = Optional.of(actualQueryRunner.execute(actualQuerySession, actual).toTestTypes());
             }
             catch (RuntimeException ex) {
                 fail("Execution of 'actual' query failed: " + actual, ex);
@@ -158,7 +186,7 @@ public final class QueryAssertions
         long expectedStart = System.nanoTime();
         Optional<MaterializedResult> expectedResultsOp = Optional.empty();
         try {
-            expectedResultsOp = Optional.of(h2QueryRunner.execute(session, expected, actualResultsOp.get().getTypes()));
+            expectedResultsOp = Optional.of(h2QueryRunner.execute(expectedQuerySession, expected, actualResultsOp.get().getTypes()));
         }
         catch (RuntimeException ex) {
             fail("Execution of 'expected' query failed: " + expected, ex);

@@ -219,3 +219,12 @@ SHOW CUBES;
 5. OpenLooKeng CLI has been modified to ease the process of creating Cubes for larger datasets. But still there are limitations with this implementation
    as the process involves merging multiple Cube predicates into one. Only Cube predicates defined on Integer, Long and Date types can be merged properly. Support for Char, 
    String types still need to be implemented.
+   
+##Performance Optimizations on Star Tree
+1. Star Tree Query re-write optimization for same group by columns: If the group by columns of the cube and query matches, the query is 
+re-written internally to select the pre-aggregated data. If the group by columns does not matches, the additional aggregations are 
+internally applied on the re-written query.
+2. Star Tree table scan optimization for Average aggregation function: If the group by columns of the cube and query matches, the select query 
+is re-written internally to select the startree cube's pre-aggregated Average column data. If the group by columns does not match, 
+the select query is re-written internally to select the startree cube's pre-aggregated Sum and Count column data, from which the 
+average is later calculated.

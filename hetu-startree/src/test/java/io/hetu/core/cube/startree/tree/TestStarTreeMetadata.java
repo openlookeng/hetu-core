@@ -23,8 +23,10 @@ import io.hetu.core.spi.cube.CubeStatus;
 import org.testng.annotations.Test;
 
 import static io.hetu.core.spi.cube.aggregator.AggregationSignature.avg;
+import static io.hetu.core.spi.cube.aggregator.AggregationSignature.sum;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 
 public class TestStarTreeMetadata
@@ -41,6 +43,7 @@ public class TestStarTreeMetadata
                     new DimensionColumn("discount", "discount"),
                     new DimensionColumn("quantity", "quantity"),
                     new AggregateColumn("sum_quantity", "sum", "quantity", false),
+                    new AggregateColumn("avg_quantity", "avg", "quantity", false),
                     new AggregateColumn("sum_extendedprice", "sum", "extendedprice", false),
                     new AggregateColumn("count_quantity", "count", "quantity", false),
                     new AggregateColumn("count_extendprice", "count", "extendprice", false),
@@ -62,11 +65,72 @@ public class TestStarTreeMetadata
                     new DimensionColumn("discount", "discount"),
                     new DimensionColumn("quantity", "quantity"),
                     new AggregateColumn("sum_quantity", "sum", "quantity", false),
+                    new AggregateColumn("avg_quantity", "avg", "quantity", false),
                     new AggregateColumn("sum_extendedprice", "sum", "extendedprice", false),
                     new AggregateColumn("count_quantity", "count", "quantity", false),
                     new AggregateColumn("count_extendprice", "count", "extendprice", false),
                     new AggregateColumn("count_discount", "count", "discount", false)),
             ImmutableList.of(ImmutableSet.of()),
+            null,
+            1000,
+            CubeStatus.READY);
+
+    private final CubeMetadata metadataWithoutAvg = new StarTreeMetadata(
+            "memory.default.cube2",
+            "tpch.tiny.lineitem2",
+            100,
+            ImmutableList.of(
+                    new DimensionColumn("suppkey", "suppkey"),
+                    new DimensionColumn("returnflag", "returnflag"),
+                    new DimensionColumn("linestatus", "linestatus"),
+                    new DimensionColumn("shipdate", "shipdate"),
+                    new DimensionColumn("discount", "discount"),
+                    new DimensionColumn("quantity", "quantity"),
+                    new AggregateColumn("sum_quantity", "sum", "quantity", false),
+                    new AggregateColumn("sum_extendedprice", "sum", "extendedprice", false),
+                    new AggregateColumn("count_quantity", "count", "quantity", false),
+                    new AggregateColumn("count_extendprice", "count", "extendprice", false),
+                    new AggregateColumn("count_discount", "count", "discount", false)),
+            ImmutableList.of(ImmutableSet.of("returnflag", "linestatus")),
+            null,
+            1000,
+            CubeStatus.READY);
+
+    private final CubeMetadata metadataWithAvg = new StarTreeMetadata(
+            "memory.default.cube3",
+            "tpch.tiny.lineitem3",
+            100,
+            ImmutableList.of(
+                    new DimensionColumn("suppkey", "suppkey"),
+                    new DimensionColumn("returnflag", "returnflag"),
+                    new DimensionColumn("linestatus", "linestatus"),
+                    new DimensionColumn("shipdate", "shipdate"),
+                    new DimensionColumn("discount", "discount"),
+                    new DimensionColumn("quantity", "quantity"),
+                    new AggregateColumn("avg_quantity", "avg", "quantity", false),
+                    new AggregateColumn("sum_quantity", "sum", "quantity", false),
+                    new AggregateColumn("count_quantity", "count", "quantity", false),
+                    new AggregateColumn("avg_discount", "avg", "discount", false),
+                    new AggregateColumn("sum_discount", "sum", "discount", false),
+                    new AggregateColumn("count_discount", "count", "discount", false)),
+            ImmutableList.of(ImmutableSet.of("returnflag", "linestatus")),
+            null,
+            1000,
+            CubeStatus.READY);
+
+    private final CubeMetadata metadataWithAvgWithoutSumCount = new StarTreeMetadata(
+            "memory.default.cube4",
+            "tpch.tiny.lineitem4",
+            100,
+            ImmutableList.of(
+                    new DimensionColumn("suppkey", "suppkey"),
+                    new DimensionColumn("returnflag", "returnflag"),
+                    new DimensionColumn("linestatus", "linestatus"),
+                    new DimensionColumn("shipdate", "shipdate"),
+                    new DimensionColumn("discount", "discount"),
+                    new DimensionColumn("quantity", "quantity"),
+                    new AggregateColumn("avg_quantity", "avg", "quantity", false)),
+            ImmutableList.of(ImmutableSet.of("returnflag", "linestatus")),
             null,
             1000,
             CubeStatus.READY);
@@ -77,7 +141,7 @@ public class TestStarTreeMetadata
         assertEquals(metadata.getCubeName(), "memory.default.cube1", "incorrect name");
         assertEquals(metadata.getSourceTableName(), "tpch.tiny.lineitem", "incorrect table name");
         assertEquals(metadata.getLastUpdatedTime(), 1000, "incorrect updating time");
-        assertEquals(metadata.getAggregations(), ImmutableList.of("sum_quantity",
+        assertEquals(metadata.getAggregations(), ImmutableList.of("sum_quantity", "avg_quantity",
                 "sum_extendedprice", "count_quantity", "count_extendprice", "count_discount"));
         assertEquals(metadata.getGroup(), ImmutableSet.of("returnflag", "linestatus"));
         assertEquals(metadata.getDimensions(), ImmutableList.of("suppkey", "returnflag", "linestatus", "shipdate", "discount", "quantity"));
@@ -93,6 +157,30 @@ public class TestStarTreeMetadata
                 .groupBy("returnflag", "linestatus")
                 .build();
         assertTrue(metadata.matches(statement), "failed to match a valid cube statement");
+    }
+
+    @Test
+    public void testCubeMetadataWithoutAvg()
+    {
+        assertEquals(metadataWithoutAvg.getCubeName(), "memory.default.cube2", "incorrect name");
+        assertEquals(metadataWithoutAvg.getSourceTableName(), "tpch.tiny.lineitem2", "incorrect table name");
+        assertNotEquals(metadataWithoutAvg.getLastUpdatedTime(), 10000, "incorrect updating time");
+        assertEquals(metadataWithoutAvg.getAggregations(), ImmutableList.of("sum_quantity", "sum_extendedprice",
+                "count_quantity", "count_extendprice", "count_discount"));
+        assertEquals(metadataWithoutAvg.getGroup(), ImmutableSet.of("returnflag", "linestatus"));
+        assertEquals(metadataWithoutAvg.getDimensions(), ImmutableList.of("suppkey", "returnflag", "linestatus", "shipdate", "discount", "quantity"));
+    }
+
+    @Test
+    public void testMetadataMatchesCubeStatementWithoutAvg()
+    {
+        CubeStatement statement = CubeStatement.newBuilder()
+                .select("returnflag", "linestatus")
+                .aggregate(sum("quantity", false))
+                .from("tpch.tiny.lineitem2")
+                .groupBy("returnflag", "linestatus")
+                .build();
+        assertTrue(metadataWithoutAvg.matches(statement), "failed to match a valid cube statement");
     }
 
     @Test
@@ -116,5 +204,41 @@ public class TestStarTreeMetadata
                 .from("tpch.tiny.lineitem")
                 .build();
         assertTrue(emptyGroupMetadata.matches(statement));
+    }
+
+    @Test
+    public void testCubeMetadataWithAvg()
+    {
+        assertEquals(metadataWithAvg.getCubeName(), "memory.default.cube3", "incorrect name");
+        assertEquals(metadataWithAvg.getSourceTableName(), "tpch.tiny.lineitem3", "incorrect table name");
+        assertNotEquals(metadataWithAvg.getLastUpdatedTime(), 10000, "incorrect updating time");
+        assertEquals(metadataWithAvg.getAggregations(), ImmutableList.of("avg_quantity", "sum_quantity", "count_quantity", "avg_discount", "sum_discount", "count_discount"));
+        assertEquals(metadataWithAvg.getGroup(), ImmutableSet.of("returnflag", "linestatus"));
+        assertEquals(metadataWithAvg.getDimensions(), ImmutableList.of("suppkey", "returnflag", "linestatus", "shipdate", "discount", "quantity"));
+    }
+
+    @Test
+    public void testMetadataMatchesCubeStatementWithAvg()
+    {
+        CubeStatement statement = CubeStatement.newBuilder()
+                .select("returnflag", "linestatus")
+                .aggregate(avg("quantity", false))
+                .aggregate(avg("discount", false))
+                .from("tpch.tiny.lineitem3")
+                .groupBy("returnflag", "linestatus")
+                .build();
+        assertTrue(metadataWithAvg.matches(statement), "failed to match a valid cube statement");
+    }
+
+    @Test
+    public void testMetadataMatchesCubeStatementWithAvgWithoutSumCount()
+    {
+        CubeStatement statement = CubeStatement.newBuilder()
+                .select("returnflag", "linestatus")
+                .aggregate(avg("quantity", false))
+                .from("tpch.tiny.lineitem4")
+                .groupBy("returnflag", "linestatus")
+                .build();
+        assertFalse(metadataWithAvgWithoutSumCount.matches(statement), "failed to match a valid cube statement");
     }
 }

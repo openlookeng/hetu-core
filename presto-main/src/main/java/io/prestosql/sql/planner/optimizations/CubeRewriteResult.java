@@ -30,14 +30,16 @@ public class CubeRewriteResult
     private final Set<DimensionSource> dimensionColumns;
     private final Set<AggregatorSource> aggregationColumns;
     private final Set<AverageAggregatorSource> avgAggregationColumns;
+    private final boolean useAvgAggregationColumns;
 
-    public CubeRewriteResult(TableScanNode tableScanNode, Map<Symbol, ColumnMetadata> symbolMetadataMap, Set<DimensionSource> dimensionColumns, Set<AggregatorSource> aggregationColumns, Set<AverageAggregatorSource> avgAggregationColumns)
+    public CubeRewriteResult(TableScanNode tableScanNode, Map<Symbol, ColumnMetadata> symbolMetadataMap, Set<DimensionSource> dimensionColumns, Set<AggregatorSource> aggregationColumns, Set<AverageAggregatorSource> avgAggregationColumns, boolean useAvgAggregationColumns)
     {
         this.tableScanNode = tableScanNode;
         this.symbolMetadataMap = symbolMetadataMap;
         this.dimensionColumns = dimensionColumns;
         this.aggregationColumns = aggregationColumns;
         this.avgAggregationColumns = avgAggregationColumns;
+        this.useAvgAggregationColumns = useAvgAggregationColumns;
     }
 
     public TableScanNode getTableScanNode()
@@ -63,6 +65,11 @@ public class CubeRewriteResult
     public Set<AverageAggregatorSource> getAvgAggregationColumns()
     {
         return avgAggregationColumns;
+    }
+
+    public boolean getUseAvgAggregationColumns()
+    {
+        return useAvgAggregationColumns;
     }
 
     public static class DimensionSource
