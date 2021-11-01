@@ -30,7 +30,7 @@ CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.
 CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WHERE p in (part1, part2, part3);
 ```
 
-**注意:** 如果表使用多重分区（例如被colA和colB）两列分区，则索引创建仅支持使用**第一级**分区值。
+**注意:** 如果表使用多重分区（例如被colA和colB）两列分区，BTree索引仅支持使用**第一级**分区值。Bloom、Bitmap和Minmax索引则支持在任何一个（colA 或 colB）上创建。
 
 ## SHOW
 
