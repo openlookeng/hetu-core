@@ -591,14 +591,46 @@ public class LogicalPart
             return null;
         }
 
+        /*
+        This part of the code tries to include any additional "lower" pages that may contain our value(s)
+        Consider the following example (only showing the sorted column's values):
+        pages = pg1[a,a,b] pg2[b,b,b] pg3[c,d,null] pg4[null,null,null]
+
+        sparseIdx =
+        a -> {pgs=[1], last=b}
+        b -> {pgs=[2], last=b}
+        c -> {pgs=[3], last=null}
+
+        if user query is col=d, the sparseIdx returns no match, but we must also look floor entry of d,
+        i.e. entry c -> {pgs=[3], last=null}
+
+        in entry c the last value is null, so instead of looking through all the values in the page
+        we just return lastPageIdx (the else part below)
+
+        Consider another example:
+        pages = 1[a,a,b] 2[b,b,b] 3[c,d,e] 4[null,null,null]
+
+        sparseIdx =
+        a -> {pgs=[1], last=b}
+        b -> {pgs=[2], last=b}
+        c -> {pgs=[3], last=e}
+
+        In this case last value is e, so we compare with d and since value d could be in pg3 somewhere, we return lastPageIdx
+        */
+
         List<Integer> lowerPages = lowerSparseEntry.getValue().getPageIndices();
         Integer lastPageIdx = lowerPages.get(lowerPages.size() - 1);
         Comparable lastPageLastValue = lowerSparseEntry.getValue().getLast();
-        int comp = (lastPageLastValue).compareTo(lowBound);
-        if (comp > 0 || (comp == 0 && includeLowBound)) {
+        if (lastPageLastValue != null) {
+            int comp = (lastPageLastValue).compareTo(lowBound);
+            if (comp > 0 || (comp == 0 && includeLowBound)) {
+                return lastPageIdx;
+            }
+        }
+        else {
+            // if lastPageLastValue is null, null is larger than any value
             return lastPageIdx;
         }
-
         return null;
     }
 
