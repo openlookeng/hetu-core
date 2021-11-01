@@ -31,7 +31,7 @@ CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WITH ("bloom.
 CREATE INDEX index_name USING bloom ON hive.schema.table (column1) WHERE p in (part1, part2, part3);
 ```
 
-**Note:** If the table is multi-partitioned (for example, partitioned by colA and colB), only index creation on the **first** level is supported (colA).
+**Note:** If the table is multi-partitioned (for example, partitioned by colA and colB), for BTree index, only index creation on the **first** level is supported (colA). Bloom, Bitmap and Minmax index creation on either (colA or colB) is supported.
 
 ## SHOW
 
