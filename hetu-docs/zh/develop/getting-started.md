@@ -1,10 +1,10 @@
-# 入门指南
+``# 入门指南
 
 ## 要求
 
 * Mac OS X或Linux
 * Java 8 Update 161或更高版本(8u161+)（64位）。同时支持Oracle JDK和OpenJDK。
-* AArch64 ([Bisheng JDK 11 或更高版本](https://www.hikunpeng.com/developer/devkit/compiler?data=JDK))
+* AArch64 ([Bisheng JDK 1.8.262 或更高版本](https://www.hikunpeng.com/developer/devkit/compiler?data=JDK))
 * Maven 3.3.9+（用于构建）
 * Python 2.4+（与启动器脚本一起运行）
 
