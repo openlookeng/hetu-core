@@ -84,10 +84,41 @@ public class MemoryTableManager
     private final PagesSerde pagesSerde;
 
     @GuardedBy("this")
-    private final AtomicLong currentBytes = new AtomicLong();
+    private final AtomicLong currentBytes = new AtomicLong(); // Keep track of current byte usage in memory
+
+    // The following maps store the usage byte sizes with tableID as key and are used to update currentBytes.
 
     // in-memory LRU map of tableId -> table
     private final Map<Long, Table> tables = new LinkedHashMap<>(16, 0.75f, true);
+
+    // Processed bytes are spilled and updated current table memory usage sizes.
+    private final Map<Long, AtomicLong> tableProcessedBytes = new LinkedHashMap<>(16, 0.75f, true);
+
+    // Non-processed bytes are additional page sizes newly added to the table.
+    // The new bytes added are applied for memory and waiting to be spilled, updated and processed.
+    // Once processed, the corresponding usage size for the tableID in this map will be cleared to 0 or removed if the table is removed.
+    private final Map<Long, AtomicLong> tableNotProcessedBytes = new LinkedHashMap<>(16, 0.75f, true);
+
+    // For example:
+    // Table with ID 1 is created, then tableNotProcessedBytes stores [1, 0] and tableProcessedBytes also stores [1, 0] as size is 0.
+    // Consider that data is added to table 1, taking 23 bytes.
+    // The tableProcessedBytes map will have updated value of 23 bytes corresponding to table 1.
+    // There will be 23 * CREATION_SCALE_FACTOR = 23 * 4 = 92 bytes of memory to be applied. So, currentBytes will be 92 bytes.
+    // The tableNotProcessedBytes will then update table 1's byte value as 23 bytes once the memory is applied. The newly added bytes will wait to be processed.
+    // After spilling and updating, since the actual memory usage is 23 bytes and the CREATION_SCALE_FACTOR is 4,
+    // there will be 23 * (CREATION_SCALE_FACTOR - 1) = 23 * 3 = 69 bytes being released. Leaving currentBytes to be 23 bytes.
+    // The tableNotProcessedBytes will then update table 1's value to be 0 once memory is released, as bytes are now processed.
+    // When more data is inserted into table 1, considering an additional 23 bytes, the process repeats.
+    // There will be 23 * CREATION_SCALE_FACTOR = 23 * 4 = 92 bytes of additional memory to be applied.
+    // So, currentBytes will be 23 + 92 = 115 bytes. 23 bytes from previous operations and 92 bytes newly applied.
+    // The tableProcessedBytes will update table 1's value to be 23 + 23 = 46 bytes.
+    // The tableNotProcessedBytes will update table 1's value to be 23 bytes, since the newly inserted data is 23 bytes.
+    // After spills and updates, similar from previous calculations, the currentBytes will be 23 + 23 = 46 bytes, since two data insertions both using 23 bytes.
+    // Once bytes are processed, the tableNotProcessedBytes update table 1's value to be 0 bytes again.
+    // This process repeats until the table is removed or fully released from memory.
+    // If the table is removed, the two maps will simply not contain the key with tableID and no corresponding value.
+    // If the table is released from memory, then the memory released is the corresponding value found using tableID in tableProcessedBytes.
+    // Once releases are complete, currentBytes will be 0 bytes indicating no memory usage.
 
     @Inject
     public MemoryTableManager(MemoryConfig config, PageSorter pageSorter, TypeManager typeManager, PagesSerde pagesSerde)
@@ -132,12 +163,16 @@ public class MemoryTableManager
     {
         tables.get(id).finishCreation(() -> {
             // this should only be called once entire table has been processed
-            if (tables.containsKey(id) && tables.get(id).allProcessed()) {
+            if (tables.containsKey(id) && tables.get(id).allProcessed() && !tables.get(id).isSpilled()) {
                 try {
                     // first spill the table to disk
                     spillTable(id);
                     // release memory overhead used during processing
-                    releaseMemory(tables.get(id).getByteSize() * (CREATION_SCALE_FACTOR - 1), "Finish processing table " + id);
+                    // Release amount of bytes not yet processed times (CREATION_SCALE_FACTOR - 1)
+                    // For example, 23 bytes are not yet processed, store in tableNotProcessedBytes corresponding to tableID 1.
+                    // This means that 23 * CREATION_SCALE_FACTOR = 23 * 4 = 92 bytes was applied earlier.
+                    // Then, 23 * (CREATION_SCALE_FACTOR - 1) = 23 * 3 = 69 bytes need to be released for spilling.
+                    releaseMemory(tableNotProcessedBytes.get(id).get() * (CREATION_SCALE_FACTOR - 1), id, "Finish processing table " + id);
                 }
                 catch (Exception e) {
                     LOG.error("Failed to serialize table " + id, e);
@@ -164,6 +199,10 @@ public class MemoryTableManager
                     config,
                     typeManager,
                     pagesSerde));
+            AtomicLong newUsageLong = new AtomicLong(0L);
+            AtomicLong newAddedLong = new AtomicLong(0L);
+            tableProcessedBytes.put(tableId, newUsageLong);
+            tableNotProcessedBytes.put(tableId, newAddedLong);
         }
     }
 
@@ -174,7 +213,8 @@ public class MemoryTableManager
         }
         page.compact();
         Table table = tables.get(tableId); // get current table to make sure it's not LRU
-        applyForMemory(page.getSizeInBytes() * CREATION_SCALE_FACTOR, tableId, () -> {}, () -> releaseMemory(table.rollBackUncommitted() * CREATION_SCALE_FACTOR, "Rolling back."));
+        applyForMemory(page.getSizeInBytes() * CREATION_SCALE_FACTOR, tableId, () -> {}, () -> releaseMemory(table.rollBackUncommitted() * CREATION_SCALE_FACTOR, tableId, "Rolling back."));
+        tableNotProcessedBytes.get(tableId).set(page.getSizeInBytes()); // Additional byte size is recorded.
         table.add(page);
     }
 
@@ -272,10 +312,11 @@ public class MemoryTableManager
     {
         if (tables.containsKey(tableId)) {
             try {
-                Table table = tables.get(tableId);
-                long toRelease = table.isSpilled() ? table.getByteSize() : table.getByteSize() * CREATION_SCALE_FACTOR;
-                releaseMemory(toRelease, "Cleaning table");
+                releaseMemory(tableProcessedBytes.get(tableId).get(), tableId, "Cleaning table");
+                // Remove tableID from corresponding maps
                 tables.remove(tableId);
+                tableProcessedBytes.remove(tableId);
+                tableNotProcessedBytes.remove(tableId);
             }
             catch (Exception e) {
                 LOG.error(e, "Unable to clean table " + tableId);
@@ -309,7 +350,9 @@ public class MemoryTableManager
             Map.Entry<Long, Table> tablePagesEntry = tableDataIterator.next();
             Long tableId = tablePagesEntry.getKey();
             if (tableId < latestTableId && !activeTableIds.contains(tableId)) {
-                releaseMemory(tablePagesEntry.getValue().getByteSize(), "Table refresh");
+                if (tableProcessedBytes.keySet().contains(tableId)) { // Ensure tableID is valid in map
+                    releaseMemory(tableProcessedBytes.get(tableId).get(), tableId, "Table refresh");
+                }
                 tableDataIterator.remove();
                 LOG.info("[TableRefresh] Dropped table %s from memory", tableId);
             }
@@ -437,9 +480,12 @@ public class MemoryTableManager
             Map.Entry<Long, Table> lru = tables.entrySet().iterator().next();
             if (lru != null && lru.getKey() != reserved && lru.getValue().isSpilled()) {
                 // if there is any LRU table available to be dropped, evict it to make space for current
-                releaseMemory(lru.getValue().getByteSize(), "Offloading LRU");
+                releaseMemory(tableProcessedBytes.get(lru.getKey()).get(), lru.getKey(), "Offloading LRU");
                 tables.get(lru.getKey()).offLoadPages(); // clean reference and help GC
+                // Remove tableID from corresponding maps
                 tables.remove(lru.getKey());
+                tableProcessedBytes.remove(lru.getKey());
+                tableNotProcessedBytes.remove(lru.getKey());
                 logNumFormat("Released %s bytes by offloading LRU table %s. Current bytes after offloading: %s", lru.getValue().getByteSize(), lru.getKey(), currentBytes.get());
                 newSize = currentBytes.get() + bytes;
             }
@@ -452,14 +498,19 @@ public class MemoryTableManager
                         NumberFormat.getIntegerInstance(Locale.US).format(bytes)));
             }
         }
-        currentBytes.set(newSize);
-        onSuccess.run();
-        logNumFormat("Fulfilled %s bytes for Table %s. Current: %s", bytes, reserved, currentBytes.get());
+        if (tables.keySet().contains(reserved)) { // Ensure valid tableID
+            currentBytes.set(newSize);
+            tableProcessedBytes.get(reserved).set(newSize); // New table byte size
+            onSuccess.run();
+            logNumFormat("Fulfilled %s bytes for Table %s. Current: %s", bytes, reserved, currentBytes.get());
+        }
     }
 
-    private synchronized void releaseMemory(long bytes, String reason)
+    private synchronized void releaseMemory(long bytes, long tableId, String reason)
     {
-        currentBytes.addAndGet(-bytes);
+        currentBytes.addAndGet(-bytes); // CurrentBytes reduce by bytes variable
+        tableProcessedBytes.get(tableId).addAndGet(-bytes); // Reduce bytes usage correspondingly
+        tableNotProcessedBytes.get(tableId).set(0L); // Newly added bytes has been freed
         logNumFormat("Released %s bytes. Current: %s. Caused by: " + reason, bytes, currentBytes.get());
     }
 
