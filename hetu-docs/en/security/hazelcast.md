@@ -7,7 +7,7 @@ It is recommended to enable hazelcast authentication and SSL/TLS channel encrypt
 
 ## Hazelcast Authentication
 
-Hazelcast only supports Kerberos authentication. Since the hazelcast is used by state-store module, if user wants to enable Hazelcast authentication, then the state-store has to enable first.
+Only Kerberos authentication is supported by Hazelcast. Because the state-store module uses hazelcast, if the user wants to use Hazelcast authentication, the state-store must first be enabled.
 
 When state-store enabled, add the following configuration in the state-store.properties:
 
@@ -27,7 +27,7 @@ When state-store enabled, add the following configuration in the state-store.pro
 | `hazelcast.kerberos.krb5.conf` | The location of the Kerberos configuration file.|    
 | `hazelcast.kerberos.auth.login.config` |The location of the configuration file to login the kerberos|
 
-The format of the configuration file `jass.conf` to login the kerberos is as follows. User has to create a principal in the kerberos first and configure the principal and the keytab. 
+The format of the configuration file `jass.conf` to login the kerberos is as follows. The user must first create a kerberos principal and configure the principal and keytab.
 
 > ```properties
 > Hazelcast {
@@ -40,10 +40,10 @@ The format of the configuration file `jass.conf` to login the kerberos is as fol
 > };
 > ```
 
-| Property                                             | Description                                                  |
-| :--------------------------------------------------- | :----------------------------------------------------------- |
-| `principal` | The principal name to login the Kerberos|
-| `keyTab` | The location of the keytab that can be used to authenticate the Kerberos principal.|
+| Property    | Description                                                  |
+| :---------- | :----------------------------------------------------------- |
+| `principal` | The principal name to login the Kerberos                     |
+| `keyTab`    | The location of the keytab that can be used to authenticate the Kerberos principal. |
 
 **Note:**
 
@@ -56,7 +56,7 @@ SSL/TLS is configured in the `state-store.properties`. The same configuration is
 
 To enable SSL/TLS for Hazelcast, do the following:
 
-1. Generate Java keystore file. You can use the fully-qualified host name of each host to create a unique certificate for each node, which contains the key store of all public keys of all hosts, and provides a specifies the keystore. 
+1. Generate Java keystore file. You can construct a unique certificate for each node using the fully-qualified host name of each host, which contains the key store of all public keys of all hosts and specifies the keystore.
    In most cases, it is more convenient to use wildcards to create certificates, as follows:
 
     > ``` 
