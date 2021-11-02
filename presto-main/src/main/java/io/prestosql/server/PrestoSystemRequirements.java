@@ -115,11 +115,15 @@ final class PrestoSystemRequirements
     {
         String javaVersion = StandardSystemProperty.JAVA_VERSION.value();
         JavaVersion version = JavaVersion.parse(javaVersion);
-        if (version.getMajor() >= 11) {
+        if (version.getMajor() == 8 && version.getUpdate().isPresent() && version.getUpdate().getAsInt() >= 262) {
             return;
         }
 
-        failRequirement("Hetu requires Java 11.0+ for arm (found %s)", javaVersion);
+        if (version.getMajor() >= 9) {
+            return;
+        }
+
+        failRequirement("Hetu requires Java 8u262+ for arm (found %s)", javaVersion);
     }
 
     private static void verifyUsingG1Gc()
