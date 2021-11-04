@@ -285,6 +285,15 @@ public class TestDistributedExecutionPlanner
         assertTrue(wrong.isEmpty(), "Wrong dependency: " + wrong);
     }
 
+    private void testExact(SubPlan root, Multimap<String, String> expected)
+    {
+        planner.plan(root, session, SNAPSHOT, null, 0);
+        Multimap<String, String> missing = Multimaps.filterEntries(expected, e -> !dependencies.containsEntry(e.getKey(), e.getValue()));
+        assertTrue(missing.isEmpty(), "Missing dependency: " + missing);
+        Multimap<String, String> wrong = Multimaps.filterEntries(dependencies, e -> !expected.containsEntry(e.getKey(), e.getValue()));
+        assertTrue(wrong.isEmpty(), "Wrong dependency: " + wrong);
+    }
+
     @Test
     public void testExchangeUnion()
     {
@@ -365,6 +374,43 @@ public class TestDistributedExecutionPlanner
         assertEquals(b.getNextSnapshotId(), 7);
     }
 
+    @Test
+    public void testSimpleExchangeAndJoin()
+    {
+        SubPlan root = makePlan(1,
+                join(
+                        union(source("A"), source("B")),
+                        source("C")
+                ), ImmutableList.of());
+        test(root, ImmutableMultimap.of("A", "C"),
+                ImmutableMultimap.of(
+                        "A", "B",
+                        "B", "C"));
+    }
+
+    @Test
+    public void testComplexExchangeAndJoin()
+    {
+        SubPlan root = makePlan(1,
+                join(
+                        union(ImmutableList.of(
+                                join(source("A"), source("B")),
+                                join(
+                                        union(source("C"), source("D")),
+                                        source("E")),
+                                source("F"))),
+                        union(
+                                join(source("G"), source("H")),
+                                join(source("I"), source("J")))),
+                ImmutableList.of());
+        testExact(root, ImmutableMultimap.of(
+                "A", "B",
+                "A", "G",
+                "C", "E",
+                "G", "H",
+                "I", "J"));
+    }
+
     private SubPlan makePlan(int fragmentId, PlanNode node, List<SubPlan> children)
     {
         PlanFragment fragment = new PlanFragment(
@@ -430,13 +476,18 @@ public class TestDistributedExecutionPlanner
 
     private ExchangeNode union(PlanNode left, PlanNode right)
     {
+        return union(ImmutableList.of(left, right));
+    }
+
+    private ExchangeNode union(ImmutableList<PlanNode> subPlans)
+    {
         return new ExchangeNode(
                 new PlanNodeId(String.valueOf(++nodeId)),
                 GATHER,
                 LOCAL,
                 new PartitioningScheme(Partitioning.create(SINGLE_DISTRIBUTION, ImmutableList.of()), ImmutableList.of(symbol)),
-                ImmutableList.of(left, right),
-                ImmutableList.of(ImmutableList.of(symbol), ImmutableList.of(symbol)),
+                subPlans,
+                subPlans.stream().map(p -> ImmutableList.of(symbol)).collect(ImmutableList.toImmutableList()),
                 Optional.empty(),
                 HASH);
     }
