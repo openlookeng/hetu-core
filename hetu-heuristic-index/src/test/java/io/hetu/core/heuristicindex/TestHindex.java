@@ -31,7 +31,7 @@ import static org.testng.Assert.assertTrue;
 public class TestHindex
         extends TestIndexResources
 {
-    private static final long INDEX_LOAD_WAIT_TIME = 500;
+    private static final long INDEX_LOAD_WAIT_TIME = 600;
 
     // Tests the supported data types with the different index types while queries utilize the BETWEEN operator.
     // Tests omit BitmapIndex because BitmapIndex's row filtering should have combined inserts, it is tested separately
