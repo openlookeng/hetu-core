@@ -14,7 +14,7 @@ Description
 
 `DROP ROLE` drops the specified role in the current catalog.
 
-For `DROP ROLE` statement to succeed, the user executing it should possess admin privileges for the given role.
+For `DROP ROLE` statement to succeed, the user executing it should possess admin privileges for the provided role.
 
 Examples
 --------

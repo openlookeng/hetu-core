@@ -575,8 +575,7 @@ Otherwise, it is arbitrary which rows are discarded. If the count specified in t
 LIMIT or FETCH FIRST Clauses
 ----------------------------
 
-The `LIMIT` or `FETCH FIRST` clause restricts the number of rows in the
-result set.
+The `LIMIT` or `FETCH FIRST` clause restricts the number of rows in the result set.
 
 ``` sql
 LIMIT { count | ALL }
@@ -665,10 +664,9 @@ This sampling method divides the table into logical segments of data and samples
 
 The rows selected in a system sampling will be dependent on which connector is used. For example, when used with Hive, it is dependent on how the data is laid out on HDFS. This method does not guarantee independent sampling probabilities.
 
+**Note:**
 
-**Note**
-
-*Neither of the two methods allow deterministic bounds on the number of* *rows returned.*
+Neither of the two methods allow deterministic bounds on the number of rows returned.
 
 Examples:
 
@@ -821,10 +819,9 @@ Subqueries
 
 A subquery is an expression which is composed of a query. The subquery is correlated when it refers to columns outside of the subquery. Logically, the subquery will be evaluated for each row in the surrounding query. The referenced columns will thus be constant during any single evaluation of the subquery.
 
+**Note:**
 
-**Note**
-
-*Support for correlated subqueries is limited. Not every standard form is* *supported.*
+Support for correlated subqueries is limited. Not every standard form is supported.
 
 ### EXISTS
 
@@ -850,8 +847,6 @@ A scalar subquery is a non-correlated subquery that returns zero or one row. It 
     FROM nation
     WHERE regionkey = (SELECT max(regionkey) FROM region)
 
+**Note:**
 
-
-**Note**
-
-*Currently only single column can be returned from the scalar subquery.*
+Currently only single column can be returned from the scalar subquery.

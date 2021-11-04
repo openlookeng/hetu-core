@@ -12,7 +12,10 @@ INSERT OVERWRITE [TABLE] table_name [ ( column [, ... ] ) ] query
 Description
 -----------
 
-Insert overwrite basically do two things: 1) drop the data rows according to the dataset created by the query. 2) insert the new data created by query.
+Insert overwrite do two things basically :
+
+1) drop the data rows according to the dataset created by the query. 
+2) insert the new data created by query.
 
 Insert overwrite can work on both partition and non-partition table, but the behaviors are different:
 
@@ -24,7 +27,7 @@ If the list of column names is specified, they must exactly match the list of co
 Examples
 --------
 
-Assume `orders` is not a partitioned table, and have 100 rows, then execute below insert overwrite statement:
+Assume `orders` is not a partitioned table, and have 100 rows, then execute following insert overwrite statement:
 
     INSERT OVERWRITE orders VALUES (1, 'SUCCESS', '10.25', DATA '2020-01-01');
 

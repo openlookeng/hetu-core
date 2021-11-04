@@ -16,7 +16,7 @@ BigData systems usually use HDFS as the storage to achieve durability and transp
 
 For example, in Hive Connector you can update or delete ORC transactional table row by row. But whenever run update, an new delta and delete\_delta file will be generated in HDFS file system. Use `VACUUM` can merge all those small files to a larger file, and optimize parallelism and performance
 
-**Types of VACUUMs:**
+**Types of VACUUMs**
 
 **Default**
 

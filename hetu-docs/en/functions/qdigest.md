@@ -29,8 +29,6 @@ Returns the approximate percentile values as an array given the input quantile d
 
 Returns the `qdigest` which is composed of all input values of `x`.
 
-
-
 **qdigest\_agg(x, w)** -\> qdigest\<\[same as x\]\>
 
 Returns the `qdigest` which is composed of all input values of `x` using the per-item weight `w`.

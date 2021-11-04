@@ -41,7 +41,7 @@ Returns the WKB representation of the geometry.
 
 **ST\_AsText(Geometry)** -\> varchar
 
-Returns the WKT representation of the geometry. For empty geometries, `ST_AsText(ST_LineFromText('LINESTRING EMPTY'))` will produce `'MULTILINESTRING EMPTY'` and `ST_AsText(ST_Polygon('POLYGON EMPTY'))` will produce `'MULTIPOLYGON EMPTY'`.
+Returns the WKT representation of the geometry. For empty geometries, `ST_AsText(ST_LineFromText('LINESTRING EMPTY'))` produces `'MULTILINESTRING EMPTY'` and `ST_AsText(ST_Polygon('POLYGON EMPTY'))` produces `'MULTIPOLYGON EMPTY'`.
 
 **ST\_GeometryFromText(varchar)** -\> Geometry
 
@@ -59,7 +59,6 @@ Returns a geometry type linestring object from WKT representation.
 
 Returns a LineString formed from an array of points. If there are fewer than two non-empty points in the input array, an empty LineString will be returned. Throws an exception if any element in the array is `NULL`
 or empty or same as the previous one. The returned geometry may not be simple, e.g. may self-intersect or may contain duplicate vertexes depending on the input.
-
 
 **ST\_MultiPoint(array(Point))** -\> MultiPoint
 
@@ -135,8 +134,7 @@ Operations
 
 **geometry\_union(array(Geometry))** -\> Geometry
 
-Returns a geometry that represents the point set union of the input geometries. Performance of this function, in conjunction with `array_agg` to first aggregate the input
-geometries, may be better than `geometry_union_agg`, at the expense of higher memory utilization.
+Returns a geometry that represents the point set union of the input geometries. Performance of this function, in conjunction with `array_agg` to first aggregate the input geometries, may be better than `geometry_union_agg`, at the expense of higher memory utilization.
 
 **ST\_Boundary(Geometry)** -\> Geometry
 
@@ -221,9 +219,8 @@ Returns the great-circle distance in meters between two SphericalGeography point
 
 **ST\_GeometryN(Geometry, index)** -\> Geometry
 
-Returns the geometry element at a given index (indices start at 1). If the geometry is a collection of geometries (e.g., GEOMETRYCOLLECTION or MULTI\*), returns the geometry at a given index. If the given index is less than 1 or greater than the total number of elements in the collection, returns `NULL`. Use
-`` `ST_NumGeometries ` to find out the total number of elements. Singular geometries (e.g., POINT, LINESTRING, POLYGON), are treated as collections of one element. Empty geometries are treated as empty collections.
-
+Returns the geometry element at a given index (indices start at 1). If the geometry is a collection of geometries (for example, GEOMETRYCOLLECTION or MULTI\*), returns the geometry at a given index. If the given index is less than 1 or greater than the total number of elements in the collection, returns `NULL`. Use
+`` `ST_NumGeometries ` to find out the total number of elements. Singular geometries (for example, POINT, LINESTRING, POLYGON), are treated as collections of one element. Empty geometries are treated as empty collections.
 
 **ST\_InteriorRingN(Geometry, index)** -\> Geometry
 
@@ -316,7 +313,7 @@ polygon.
 
 **ST\_NumGeometries(Geometry)** -\> bigint
 
-Returns the number of geometries in the collection. If the geometry is a collection of geometries (e.g., GEOMETRYCOLLECTION or MULTI\*), returns the number of geometries, for single geometries returns 1, for empty geometries returns 0.
+Returns the number of geometries in the collection. If the geometry is a collection of geometries (for example, GEOMETRYCOLLECTION or MULTI\*), returns the number of geometries, for single geometries returns 1, for empty geometries returns 0.
 
 
 **ST\_Geometries(Geometry)** -\> Geometry

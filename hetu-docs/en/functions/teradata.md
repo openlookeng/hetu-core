@@ -60,4 +60,3 @@ Parses `string` into a `TIMESTAMP` using `format`.
 **to\_date(string**, format) -\> date
 
 Parses `string` into a `DATE` using `format`.
-

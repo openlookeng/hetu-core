@@ -4,8 +4,7 @@
 SQL Migration tool helps user to transform SQL Syntax to ANSI 2003 SQL syntax. Currently, only Hive and Impala SQL syntax are supported.
 
 ## Usage of SQL Migration Tool
-Download `hetu-sql-migration-cli-{version number}-executable.jar`, rename it to `openlk-sql-migration-cli`, make
-it executable with `chmod +x`, then run it.
+Download `hetu-sql-migration-cli-{version number}-executable.jar`, rename it to `openlk-sql-migration-cli`, make it executable with `chmod +x`, then run it.
 
 **Interactive mode**
 
@@ -28,7 +27,7 @@ INSERT INTO table1
 
 | Parameter    | Description                                                  |
 | ------------ | ------------------------------------------------------------ |
-| `--type` or `-t` | The type of input SQL statement, such as `hive`, `impala`. It\'s optional parameter and the default value is `hive`. |
+| `--type` or `-t` | The type of input SQL statement, such as `hive`, `impala`. It is optional parameter and the default value is `hive`. |
 
 
 Here are some frequently used command:
@@ -40,11 +39,9 @@ Here are some frequently used command:
 | `history`        | to get the previous input statements |
 | `help`           | displace the help information        |
 
+**Batch Mode**
 
-
-**Batch mode**
-
-This tool also can take parameters and running in batch mode. It has five parameters, \"file\", \"sourceType\", \"execute\", \"output\" and \"config\".  The meaning of each parameters lists as below:
+This tool also can take parameters and running in batch mode. It has five parameters, \"file\", \"sourceType\", \"execute\", \"output\" and \"config\".  The meaning of each parameters lists as follows:
 
 | Parameter    | Description                                                  |
 | ------------ | ------------------------------------------------------------ |
@@ -54,7 +51,7 @@ This tool also can take parameters and running in batch mode. It has five parame
 | `--config` or `-c`     | the config file of SQL Migration Tool.                       |
 | `--debug` or `-d`     | if set value to 'true', then print the debug information in console.                       |
 
-*Tip:*
+***Tip***:
 
 *If user has large number of sql statements to convert, the suggested way is to consolidate all the statements into a single file, and use the batch mode.*
 
@@ -71,8 +68,7 @@ Here is an example of batch mode usage:
 When `file` is specified, parameter `output` must be provided. The converted result will be a html file in `output` directory. 
 You can open that html file via any web browser, and then review the conversion details. 
 
-
-**Execute mode**
+**Execute Mode**
 
 It is possible to execute a query directly with the command and have the tool exit after transformation completion. Here is the example of using  `execute`:
 
@@ -91,9 +87,9 @@ INSERT INTO t1
 
 If user specify the parameter `execute` only, the converted result will be printed onto the screen. Optionally, user can specify `output` parameter, the result will be saved into target file.
 
-User can also provide `config` parameter to control the conversion behavior. Below is an example for `config`:
+User can also provide `config` parameter to control the conversion behavior. Following is an example for `config`:
 
-file name "config.properties" with content as below:
+The file name "config.properties" with content is as follows:
 
 ``` shell
 convertDecimalLiteralsAsDouble=true
@@ -112,9 +108,9 @@ SELECT (DECIMAL '2.0' * 3)
 Currently, the config file only supports one property `convertDecimalLiteralsAsDouble`. It means whether to convert decimal literals as double or not. The default value is `false`,  which means converting decimal literals to type \"decimal\" . 
 
 
-## Check list of  Hive Statements:
+## Check list of  Hive Statements
 
-Below Hive statements are fully supported:
+Following Hive statements are fully supported:
 
 | SQL                 |
 | ------------------- |
@@ -137,7 +133,7 @@ Below Hive statements are fully supported:
 | SHOW FUCNTIONS      |
 
 
-Below Hive statements are partially supported, which mean some keywords or attributes are not supported:
+Following Hive statements are partially supported, which mean some keywords or attributes are not supported:
 
 | SQL                    | Description                                                  | openLooKeng Syntax Reference                     |
 | ---------------------- | ------------------------------------------------------------ | ------------------------------------------------ |
@@ -156,7 +152,7 @@ Below Hive statements are partially supported, which mean some keywords or attri
 | SELECT                 | statement with  "cluster by",  "offset" is not supported     | [SELECT](../sql/select.md)                       |
 
 
-Below Hive statements are not supported, because of feature differences:
+Following Hive statements are not supported, because of feature differences:
 
 | SQL                      |
 | ------------------------ |
@@ -201,9 +197,9 @@ Below Hive statements are not supported, because of feature differences:
 | SET                      |
 | RESET                    |
 
-## Check list of  Impala Statements:
+## Check list of  Impala Statements
 
-Below Impala statements are fully supported:
+Following Impala statements are fully supported:
 
  SQL                 |
 | ------------------- |
@@ -216,7 +212,7 @@ Below Impala statements are fully supported:
 | SHOW ROLES          |
 | EXPLAIN             |
 
-Below Impala statements are partially supported, which mean some keywords or attributes are not supported:
+Following Impala statements are partially supported, which mean some keywords or attributes are not supported:
 
 | SQL                    | Description                                                  | openLooKeng Syntax Reference                     |
 | ---------------------- | ------------------------------------------------------------ | ------------------------------------------------ |
@@ -241,7 +237,7 @@ Below Impala statements are partially supported, which mean some keywords or att
 | SHOW FUNCTIONS         | Only support show all functions or statement with "LIKE".                          | [SHOW FUNCTIONS](../sql/show-functions.md)                       |
 
 
-Below Impala statements are not supported, because of feature differences:
+Following Impala statements are not supported, because of feature differences:
 
 | SQL                      |
 | ------------------------ |
@@ -270,8 +266,6 @@ Below Impala statements are not supported, because of feature differences:
 | LOAD DATA           |
 | REFRESH META           |
 | REFRESH AUTH           |
-
-
 
 
 ## Limitations

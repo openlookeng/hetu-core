@@ -7,8 +7,7 @@ openLooKeng implements the `approx_distinct` function using the [HyperLogLog](ht
 Data Structures
 ---------------
 
-openLooKeng implements HyperLogLog data sketches as a set of 32-bit buckets which store a *maximum hash*. They can be stored sparsely (as a map from bucket ID to bucket), or densely (as a contiguous memory block). The
-HyperLogLog data structure starts as the sparse representation, switching to dense when it is more efficient. The P4HyperLogLog structure is initialized densely and remains dense for its lifetime.
+openLooKeng implements HyperLogLog data sketches as a set of 32-bit buckets which store a *maximum hash*. They can be stored sparsely (as a map from bucket ID to bucket), or densely (as a contiguous memory block). The HyperLogLog data structure starts as the sparse representation, switching to dense when it is more efficient. The P4HyperLogLog structure is initialized densely and remains dense for its lifetime.
 
 `hyperloglog_type` implicitly casts to `p4hyperloglog_type`, while one can explicitly cast `HyperLogLog` to `P4HyperLogLog`:
 
@@ -22,7 +21,7 @@ cost.
 
 For example, calculating the `HyperLogLog` for daily unique users will allow weekly or monthly unique users to be calculated incrementally by combining the dailies. This is similar to computing weekly revenue by
 summing daily revenue. Uses of `approx_distinct` with `GROUPING SETS` can be converted to use `HyperLogLog`.
-Examples:
+**Examples**
 
     CREATE TABLE visit_summaries (
       visit_date date,

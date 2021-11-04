@@ -10,7 +10,7 @@ The `||` operator performs concatenation.
 String Functions
 ----------------
 
-**Note**
+**Note:**
 
 These functions assume that the input strings contain valid UTF-8 encoded Unicode code points. There are no explicit checks for valid UTF-8 and the functions may return incorrect results on invalid UTF-8.
 Invalid UTF-8 data can be corrected with `from_utf8`.
@@ -38,14 +38,11 @@ Returns the concatenation of `string1`, `string2`, `...`, `stringN`. This functi
 
 Returns the Hamming distance of `string1` and `string2`, i.e. the number  of positions at which the corresponding characters are different.
 
-Note
-that the two strings must have the same length.
-
+Note that the two strings must have the same length.
 
 **length(string)** -\> bigint
 
 Returns the length of `string` in characters.
-
 
 **levenshtein\_distance(string1, string2)** -\> bigint
 
@@ -160,7 +157,7 @@ Transforms `string` with the specified normalization form. `form` must be be one
 | `NFKD` | Compatibility Decomposition                                  |
 | `NFKC` | Compatibility Decomposition, followed by Canonical Composition |
 
-**Note**
+**Note:**
 
 This SQL-standard function has special syntax and requires specifying `form` as a keyword, not as a string.   
 

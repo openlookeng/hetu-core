@@ -4,25 +4,25 @@ Statement Resource
 
 - POST /v1/statement
 
-query query
+query 
 
-:   SQL Query to execute
+: SQL Query to execute
 
 reqheader X-Presto-User
 
-:   User to execute statement on behalf of (optional)
+: User to execute statement on behalf of (optional)
 
 reqheader X-Presto-Source
 
-:   Source of query
+: Source of query
 
 reqheader X-Presto-Catalog
 
-:   Catalog to execute query against
+: Catalog to execute query against
 
 reqheader X-Presto-Schema
 
-:   Schema to execute query against
+: Schema to execute query against
 
 Submits a statement to openLooKeng for execution. The openLooKeng client executes
 queries on behalf of a user against a catalog and a schema. When you run
@@ -41,10 +41,8 @@ root stage and the root stage is given a stage identifier of \"0\" as
 shown in the following example response.
 
 This root stage aggregates the responses from other stages running on
-openLooKeng workers and delivers them to the client via the openLooKeng coordinator.
-When a client receives a response to this POST it will contain a
-\"nextUri\" property which directs the client to query this address for
-additional results from the query.
+openLooKeng workers and delivers them to the client through the openLooKeng coordinator.
+When a client receives a response to this POST it will contain a "nextUri\" property which directs the client to query this address for additional results from the query.
 
 **Example request**:
 
@@ -91,7 +89,7 @@ additional results from the query.
 >
 > }
 > ```
-   
+
 
 - GET /v1/statement/{queryId}/{token}
 
@@ -143,26 +141,26 @@ in progress or it can deliver the final results to the client.
 > "processedRows":1, "processedBytes":27, "subStages":[] } ] }
 > } }
 > ```
-   
+
 
 - DELETE /v1/statement/{queryId}/{token}
 
 query queryId
 
-:   The query identifier returned from the initial POST to /v1/statement
+: The query identifier returned from the initial POST to /v1/statement
 
 reqheader X-Presto-User
 
-:   User to execute statement on behalf of (optional)
+: User to execute statement on behalf of (optional)
 
 reqheader X-Presto-Source
 
-:   Source of query
+:  Source of query
 
 reqheader X-Presto-Catalog
 
-:   Catalog to execute query against
+: Catalog to execute query against
 
 reqheader X-Presto-Schema
 
-:   Schema to execute query against
+: Schema to execute query against
