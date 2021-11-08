@@ -112,6 +112,81 @@ public class TestMySqlIntegrationSmokeTest
     }
 
     @Test
+    public void testDateTime()
+            throws Exception
+    {
+        Session session = testSessionBuilder()
+                .setCatalog("mysql")
+                .setSchema("test_database")
+                .build();
+
+        assertUpdate("CREATE TABLE mysql.test_database.testDateTime(a date,b time,c timestamp)");
+        assertUpdate("INSERT INTO mysql.test_database.testDateTime VALUES (date '2001-08-22', TIME '23:00:01.000',timestamp '2001-08-22 03:04:05')", 1);
+        assertQuery("SELECT * FROM mysql.test_database.testDateTime", "SELECT '2001-08-22' a,'23:00:01.000' b, '2001-08-22 03:04:05' c");
+        assertUpdate("DROP TABLE mysql.test_database.testDateTime");
+    }
+
+    @Test
+    public void integerColumn()
+            throws Exception
+    {
+        Session session = testSessionBuilder()
+                .setCatalog("mysql")
+                .setSchema("test_database")
+                .build();
+
+        assertUpdate("CREATE TABLE mysql.test_database.testInteger(a tinyint, b smallint, c integer, d bigint)");
+        assertUpdate("INSERT INTO mysql.test_database.testInteger VALUES (tinyint '-2', smallint '1', 5, 158)", 1);
+        assertQuery("SELECT * FROM mysql.test_database.testInteger", "SELECT -2 a, 1 b, 5 c, 158 d");
+        assertUpdate("DROP TABLE mysql.test_database.testInteger");
+    }
+
+    @Test
+    public void floatingPointColumn()
+            throws Exception
+    {
+        Session session = testSessionBuilder()
+                .setCatalog("mysql")
+                .setSchema("test_database")
+                .build();
+
+        assertUpdate("CREATE TABLE mysql.test_database.testFloating(a real, b double)");
+        assertUpdate("INSERT INTO mysql.test_database.testFloating VALUES (1.987, 3.1487596)", 1);
+        assertQuery("SELECT * FROM mysql.test_database.testFloating", "SELECT 1.987 a, 3.1487596 b");
+        assertUpdate("DROP TABLE mysql.test_database.testFloating");
+    }
+
+    @Test
+    public void fixedPrecisionColumn()
+            throws Exception
+    {
+        Session session = testSessionBuilder()
+                .setCatalog("mysql")
+                .setSchema("test_database")
+                .build();
+
+        assertUpdate("CREATE TABLE mysql.test_database.testFixed(a decimal(10,3))");
+        assertUpdate("INSERT INTO mysql.test_database.testFixed VALUES (1234567.123)", 1);
+        assertQuery("SELECT * FROM mysql.test_database.testFixed", "SELECT 1234567.123 a");
+        assertUpdate("DROP TABLE mysql.test_database.testFixed");
+    }
+
+    @Test
+    public void stringColumn()
+            throws Exception
+    {
+        Session session = testSessionBuilder()
+                .setCatalog("mysql")
+                .setSchema("test_database")
+                .build();
+
+        assertUpdate("CREATE TABLE mysql.test_database.testString(a string, b varchar(5), c char(5), d json)");
+        assertUpdate("INSERT INTO mysql.test_database.testString VALUES ('olk', 'abcd', 'ftr', json '[{\"street\": \"street address\", \"city\": \"Berlin\"}]')", 1);
+        assertQuery("SELECT * FROM mysql.test_database.testString", "SELECT 'olk' a, 'abcd' b, 'ftr' c , '[{\"street\": \"street address\", \"city\": \"Berlin\"}]' d");
+        assertUpdate("DROP TABLE mysql.test_database.testString");
+    }
+
+    @Test
     public void testNameEscaping()
     {
         Session session = testSessionBuilder()
