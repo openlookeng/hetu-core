@@ -16,6 +16,7 @@ package io.prestosql.sql.planner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.log.Logger;
 import io.hetu.core.spi.cube.CubeFilter;
 import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.CubeStatus;
@@ -64,6 +65,7 @@ import io.prestosql.sql.analyzer.RelationType;
 import io.prestosql.sql.analyzer.Scope;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.planner.StatisticsAggregationPlanner.TableStatisticAggregation;
+import io.prestosql.sql.planner.iterative.IterativeOptimizer;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
@@ -157,8 +159,8 @@ public class LogicalPlanner
         CREATED, OPTIMIZED, OPTIMIZED_AND_VALIDATED
     }
 
+    private static final Logger log = Logger.get(LogicalPlanner.class);
     private final PlanNodeIdAllocator idAllocator;
-
     private final Session session;
     private final List<PlanOptimizer> planOptimizers;
     private final PlanSanityChecker planSanityChecker;
@@ -225,6 +227,7 @@ public class LogicalPlanner
                 if (OptimizerUtils.isEnabledLegacy(optimizer, session, root) && OptimizerUtils.canApplyOptimizer(optimizer, optimizationLevel)) {
                     root = optimizer.optimize(root, session, planSymbolAllocator.getTypes(), planSymbolAllocator, idAllocator,
                             warningCollector);
+                    log.debug("Rules called: %s", optimizer instanceof IterativeOptimizer ? ((IterativeOptimizer) optimizer).getRules() : optimizer.toString());
                     requireNonNull(root, format("%s returned a null plan", optimizer.getClass().getName()));
                     optimizationLevel = optimizationLevel == APPLY_ALL_RULES ? root.getSkipOptRuleLevel() : optimizationLevel;
                 }

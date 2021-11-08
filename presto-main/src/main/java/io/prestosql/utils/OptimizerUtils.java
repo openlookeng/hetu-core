@@ -35,6 +35,8 @@ import io.prestosql.sql.planner.iterative.rule.RowExpressionRewriteRuleSet;
 import io.prestosql.sql.planner.optimizations.ApplyConnectorOptimization;
 import io.prestosql.sql.planner.optimizations.LimitPushDown;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
+import io.prestosql.sql.planner.optimizations.PruneUnreferencedOutputs;
+import io.prestosql.sql.planner.optimizations.StatsRecordingPlanOptimizer;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.Arrays;
@@ -137,6 +139,9 @@ public class OptimizerUtils
             return true;
         }
 
+        if (!(optimizer instanceof IterativeOptimizer) && !(optimizer instanceof StatsRecordingPlanOptimizer) && !(optimizer instanceof PruneUnreferencedOutputs)) {
+            return false;
+        }
         // If it is IterativeOptimizer, then only rule as per level selected can be applied.
         return !(optimizer instanceof IterativeOptimizer)
                 || (((optimizationLevel != APPLY_ALL_LEGACY_AND_ROWEXPR

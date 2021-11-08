@@ -14,6 +14,7 @@
  */
 package io.prestosql.query;
 
+import io.airlift.log.Logger;
 import io.prestosql.Session;
 import io.prestosql.cost.CachingCostProvider;
 import io.prestosql.cost.CachingStatsProvider;
@@ -31,6 +32,7 @@ import io.prestosql.sql.planner.LogicalPlanner;
 import io.prestosql.sql.planner.Plan;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.iterative.IterativeOptimizer;
 import io.prestosql.sql.planner.optimizations.BeginTableWrite;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.planner.sanity.PlanSanityChecker;
@@ -48,6 +50,7 @@ import static java.util.Objects.requireNonNull;
 public class HetuLogicalPlanner
         extends LogicalPlanner
 {
+    private static final Logger log = Logger.get(HetuLogicalPlanner.class);
     private final PlanNodeIdAllocator idAllocator;
 
     private final Session session;
@@ -104,6 +107,7 @@ public class HetuLogicalPlanner
                     if (OptimizerUtils.canApplyOptimizer(optimizer, optimizationLevel)) {
                         root = optimizer.optimize(root, session, planSymbolAllocator.getTypes(), planSymbolAllocator, idAllocator,
                                 warningCollector);
+                        log.debug("Rules called: %s", optimizer instanceof IterativeOptimizer ? ((IterativeOptimizer) optimizer).getRules() : optimizer.toString());
                         requireNonNull(root, format("%s returned a null plan", optimizer.getClass().getName()));
                         optimizationLevel = optimizationLevel == APPLY_ALL_RULES ? root.getSkipOptRuleLevel() : optimizationLevel;
                     }
