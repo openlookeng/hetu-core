@@ -121,16 +121,16 @@ public final class QueryAssertions
 
     public static void assertQuery(
             QueryRunner actualQueryRunner,
-            Session actualQuerysession,
+            Session actualQuerySession,
             @Language("SQL") String actual,
             H2QueryRunner h2QueryRunner,
-            Session expectedQuerysession,
+            Session expectedQuerySession,
             @Language("SQL") String expected,
             boolean ensureOrdering,
             boolean compareUpdate,
             Consumer<Plan> planAssertion)
     {
-        assertQuery(actualQueryRunner, actualQuerysession, actual, h2QueryRunner, expectedQuerysession, expected, ensureOrdering, compareUpdate, Optional.of(planAssertion));
+        assertQuery(actualQueryRunner, actualQuerySession, actual, h2QueryRunner, expectedQuerySession, expected, ensureOrdering, compareUpdate, Optional.of(planAssertion));
     }
 
     private static void assertQuery(
