@@ -45,7 +45,7 @@ Returns the rank of a value in a group of values. This is similar to `rank`, exc
 **ntile(n)** -\> bigint
 
 Divides the rows for each window partition into `n` buckets ranging from `1` to at most `n`. Bucket values will differ by at most `1`. If the number of rows in the partition does not divide evenly into the number
-of buckets, then the remainder values are distributed one per bucket,starting with the first bucket.
+of buckets, then the remainder values are distributed one per bucket, starting with the first bucket.
 
 For example, with `6` rows and `4` buckets, the bucket values would be as follows: `1` `1` `2` `2` `3` `4`
 
