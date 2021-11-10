@@ -37,7 +37,7 @@ memory.spill-path=/opt/hetu/data/spill
   hetu.metastore.cache.type=local
   ```
   ##### Multi-Node Setup
-  - This section will give an example configuration for Memory Connector an a cluster with more than one node.
+  - This section will give an example configuration for Memory Connector and a cluster with more than one node.
   - Create a file `etc/catalog/memory.properties` with the following information:
   ``` properties
   connector.name=memory
@@ -80,10 +80,10 @@ memory.spill-path=/opt/hetu/data/spill
 **Note:**
 - `spill-path` should be set to a directory with enough free space to hold
  the table data.
-- See **Configuration Properties** section for additional properties and
+- See [**Configuration Properties**](#configuration-properties) section for additional properties and
  details.
-- In `etc/config.properties` ensure that `task.writer-count` is set to
- `>=` number of nodes in the cluster running openLooKeng. This will help
+- In `etc/config.properties` ensure that `task.writer-count` is set
+ `>=` to number of nodes in the cluster running openLooKeng. This will help
   distribute the data uniformly between all the workers.
 
 Examples
@@ -138,9 +138,9 @@ The `io.prestosql.plugin.memory.data:name=MemoryTableManager` table of `jmx.curr
           253 |                   8713 |                      667 | example2 | io.prestosql.plugin.memory.data:name=MemoryTableManager 
 ```
 
-Not all tables will be in memory since they some may be spilled to disk. `currentbytes` column will show the current memory occupied by tables which are in memory at the moment.
+Not all tables will be in memory since some may have been spilled to disk. `currentbytes` column will show the current memory occupied by tables which are in memory now.
 
-The usage for each node is shown as a separate row, aggregation functions can be utilized to show total usage across the cluster. For example, to view total disk or memory usage on all nodes run:
+The usage for each node is shown as a separate row, aggregation functions can be utilized to show total usage across the cluster. For example, to view total disk or memory usage on all nodes, run:
 
     SELECT sum(alltablesdiskbyteusage) as totaldiskbyteusage, sum(alltablesmemorybyteusage) as totalmemorybyteusage FROM jmx.current."io.prestosql.plugin.memory.data:name=MemoryTableManager";
 
@@ -150,7 +150,7 @@ totaldiskbyteusage | totalmemorybyteusage
              12169 |                  690
 ```
 
-Configuration Properties
+# Configuration Properties
 ------------------------
 
 | Property Name                         | Default Value   | Required| Description               |
@@ -162,7 +162,7 @@ Configuration Properties
 | `memory.logical-part-processing-delay`  | 5s            | No      | The delay between when the table is created/updated and LogicalPart processing starts. Default value is recommended.|
 | `memory.thread-pool-size             `  | Half of threads available to the JVM | No      | Maximum threads to allocate for background processing (e.g. sorting, index creation, cleanup, etc)|
 
-Path whitelist：`["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`
+Path whitelist:  `["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`
 
 Additional WITH properties
 --------------------------
@@ -178,8 +178,7 @@ Use these properties when creating a table with the Memory Connector to make que
 
 Index Types
 --------------
-These are the types of indices that are built on the columns you specify in `sorted_by` or `index_columns`. If a query operator is not supported by a particular index you can still
-use that operator, but the query will not benefit from the index.
+These are the types of indices that are built on the columns you specify in `sorted_by` or `index_columns`. If a query operator is not supported by a particular index, you can still use that operator, but the query will not benefit from the index.
 
 | Index ID                          |Built for Columns In | Supported query operators             |
 |-----------------------------------|----------------------------------------|---------------------------------------|
@@ -195,20 +194,11 @@ This section outlines the overall design of the Memory Connector, as shown in th
 ![Memory Connector Overall Design](../images/memory-connector-design.png)
 
 ### Scheduling Process
-The data to be processed are stored in pages, which are distributed to different worker nodes in openLooKeng.
-In the Memory Connector, each worker has a number of LogicalParts.
-During table creation, LogicalParts in the workers are filled with the input pages in a round-robin fashion.
-Table data will be automatically spilled to disk as part of a background process as well. 
-If there is not enough memory to hold the entire data, the tables can be released from memory according to LRU rule.
-HetuMetastore is used to persist table metadata.
-At query time, when Tablescan operation is scheduled, the LogicalParts will be scheduled.
+The data to be processed are stored in pages, which are distributed to different worker nodes in openLooKeng. In the Memory Connector, each worker has several LogicalParts. During table creation, LogicalParts in the workers are filled with the input pages in a round-robin fashion. Table data will be automatically spilled to disk as part of a background process as well.  If there is not enough memory to hold the entire data, the tables can be released from memory according to LRU rule. HetuMetastore is used to persist table metadata. At query time, when Tablescan operation is scheduled, the LogicalParts will be scheduled.
 
 ### LogicalPart
-As shown in the lower part of the design figure, LogicalPart is the data structure that contains both indexes and data.
-The sorting and indexing are handled in a background process allowing faster querying,
-but the table is still queriable during processing.
-LogicalParts have a maximum configurable size (default 256 MB). 
-New LogicalParts are created once the previous one is full.
+As shown in the lower part of the design figure, LogicalPart is the data structure that contains both indexes and data. The sorting and indexing are handled in a background process allowing faster querying,
+but the table is still queriable during processing. LogicalParts have a maximum configurable size (default 256 MB).  New LogicalParts are created once the previous one is full.
 
 
 ### Indices
