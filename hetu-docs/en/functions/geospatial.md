@@ -245,7 +245,7 @@ Returns `true` if this Geometry is an empty geometrycollection, polygon, point e
 
 **ST\_IsSimple(Geometry)** -\> boolean
 
-Returns `true` if this Geometry has no anomalous geometric points, such as self intersection or self tangency.
+Returns `true` if this Geometry has no anomalous geometric points, such as self-intersection or self-tangency.
 
 **ST\_IsRing(Geometry)** -\> boolean
 
