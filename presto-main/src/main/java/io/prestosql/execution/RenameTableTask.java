@@ -14,7 +14,9 @@
 package io.prestosql.execution;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import io.hetu.core.spi.cube.io.CubeMetaStore;
 import io.prestosql.Session;
+import io.prestosql.cube.CubeManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControl;
@@ -25,11 +27,15 @@ import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.RenameTable;
 import io.prestosql.transaction.TransactionManager;
 
+import javax.inject.Inject;
+
 import java.util.List;
 import java.util.Optional;
 
 import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static io.prestosql.cube.CubeManager.STAR_TREE;
 import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
+import static io.prestosql.sql.analyzer.SemanticErrorCode.ALTER_TABLE_ON_CUBE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_CATALOG;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_TABLE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.NOT_SUPPORTED;
@@ -38,6 +44,14 @@ import static io.prestosql.sql.analyzer.SemanticErrorCode.TABLE_ALREADY_EXISTS;
 public class RenameTableTask
         implements DataDefinitionTask<RenameTable>
 {
+    private final CubeManager cubeManager;
+
+    @Inject
+    public RenameTableTask(CubeManager cubeManager)
+    {
+        this.cubeManager = cubeManager;
+    }
+
     @Override
     public String getName()
     {
@@ -49,6 +63,10 @@ public class RenameTableTask
     {
         Session session = stateMachine.getSession();
         QualifiedObjectName tableName = createQualifiedObjectName(session, statement, statement.getSource());
+        Optional<CubeMetaStore> optionalCubeMetaStore = this.cubeManager.getMetaStore(STAR_TREE);
+        if (optionalCubeMetaStore.isPresent() && optionalCubeMetaStore.get().getMetadataFromCubeName(tableName.toString()).isPresent()) {
+            throw new SemanticException(ALTER_TABLE_ON_CUBE, statement, "Operation not permitted. %s is a Cube table, use CUBE statements instead.", tableName);
+        }
         Optional<TableHandle> tableHandle = metadata.getTableHandle(session, tableName);
         if (!tableHandle.isPresent()) {
             throw new SemanticException(MISSING_TABLE, statement, "Table '%s' does not exist", tableName);
