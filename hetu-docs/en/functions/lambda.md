@@ -13,7 +13,7 @@ Lambda expressions are written with `->`:
     x -> CAST(x AS JSON)
     x -> x + TRY(1 / 0)
 
-Most SQL expressions can be used in a lambda body, with a fewexceptions:
+Most SQL expressions can be used in a lambda body, with a few exceptions:
 
 -   Subqueries are not supported. `x -> 2 + (SELECT 3)`
 -   Aggregations are not supported. `x -> max(y)`
