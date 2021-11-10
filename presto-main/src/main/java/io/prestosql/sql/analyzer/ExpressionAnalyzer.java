@@ -966,6 +966,18 @@ public class ExpressionAnalyzer
                 process(expression, context);
             }
 
+            if (QualifiedName.of("LISTAGG").equals(node.getName())) {
+                // Due to fact that the LISTAGG function is transformed out of pragmatic reasons
+                // in a synthetic function call, the type expression of this function call is evaluated
+                // explicitly here in order to make sure that it is a varchar.
+                List<Expression> arguments = node.getArguments();
+                Expression expression = arguments.get(0);
+                Type expressionType = process(expression, context);
+                if (!(expressionType instanceof VarcharType)) {
+                    throw new SemanticException(TYPE_MISMATCH, node, format("Expected expression of varchar, but '%s' has %s type", expression, expressionType.getDisplayName()));
+                }
+            }
+
             List<TypeSignatureProvider> argumentTypes = getCallArgumentTypes(node.getArguments(), context);
             FunctionHandle function = resolveFunction(session.getTransactionId(), node, argumentTypes, metadata.getFunctionAndTypeManager());
             FunctionMetadata functionMetadata = functionAndTypeManager.getFunctionMetadata(function);

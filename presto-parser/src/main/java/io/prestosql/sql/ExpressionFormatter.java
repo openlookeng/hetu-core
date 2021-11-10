@@ -364,6 +364,10 @@ public final class ExpressionFormatter
         @Override
         protected String visitFunctionCall(FunctionCall node, Void context)
         {
+            if (QualifiedName.of("LISTAGG").equals(node.getName())) {
+                return visitListagg(node);
+            }
+
             StringBuilder builder = new StringBuilder();
 
             String arguments = joinExpressions(node.getArguments());
@@ -393,6 +397,53 @@ public final class ExpressionFormatter
 
             if (node.getWindow().isPresent()) {
                 builder.append(" OVER ").append(visitWindow(node.getWindow().get(), context));
+            }
+
+            return builder.toString();
+        }
+
+        private String visitListagg(FunctionCall node)
+        {
+            StringBuilder builder = new StringBuilder();
+
+            List<Expression> arguments = node.getArguments();
+            Expression expression = arguments.get(0);
+            Expression separator = arguments.get(1);
+            BooleanLiteral overflowError = (BooleanLiteral) arguments.get(2);
+            Expression overflowFiller = arguments.get(3);
+            BooleanLiteral showOverflowEntryCount = (BooleanLiteral) arguments.get(4);
+
+            String innerArguments = joinExpressions(ImmutableList.of(expression, separator));
+            if (node.isDistinct()) {
+                innerArguments = "DISTINCT " + innerArguments;
+            }
+
+            builder.append("LISTAGG")
+                    .append('(').append(innerArguments);
+
+            builder.append(" ON OVERFLOW ");
+            if (overflowError.getValue()) {
+                builder.append(" ERROR");
+            }
+            else {
+                builder.append(" TRUNCATE")
+                        .append(' ')
+                        .append(process(overflowFiller, null));
+                if (showOverflowEntryCount.getValue()) {
+                    builder.append(" WITH COUNT");
+                }
+                else {
+                    builder.append(" WITHOUT COUNT");
+                }
+            }
+
+            builder.append(')');
+
+            if (node.getOrderBy().isPresent()) {
+                builder.append(" WITHIN GROUP ")
+                        .append('(')
+                        .append(formatOrderBy(node.getOrderBy().get(), parameters))
+                        .append(')');
             }
 
             return builder.toString();

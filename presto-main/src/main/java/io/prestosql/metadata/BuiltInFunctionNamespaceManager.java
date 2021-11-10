@@ -238,6 +238,7 @@ import static io.prestosql.operator.aggregation.QuantileDigestAggregationFunctio
 import static io.prestosql.operator.aggregation.QuantileDigestAggregationFunction.QDIGEST_AGG_WITH_WEIGHT_AND_ERROR;
 import static io.prestosql.operator.aggregation.RealAverageAggregation.REAL_AVERAGE_AGGREGATION;
 import static io.prestosql.operator.aggregation.ReduceAggregationFunction.REDUCE_AGG;
+import static io.prestosql.operator.aggregation.listagg.ListaggAggregationFunction.LISTAGG;
 import static io.prestosql.operator.aggregation.minmaxby.MaxByAggregationFunction.MAX_BY;
 import static io.prestosql.operator.aggregation.minmaxby.MaxByNAggregationFunction.MAX_BY_N_AGGREGATION;
 import static io.prestosql.operator.aggregation.minmaxby.MinByAggregationFunction.MIN_BY;
@@ -621,6 +622,7 @@ public class BuiltInFunctionNamespaceManager
                 .functions(new MapSubscriptOperator(featuresConfig.isLegacyMapSubscript()))
                 .functions(MAP_CONSTRUCTOR, MAP_TO_JSON, JSON_TO_MAP, JSON_STRING_TO_MAP)
                 .functions(MAP_AGG, MAP_UNION)
+                .function(LISTAGG)
                 .function(REDUCE_AGG)
                 .function(new MultimapAggregationFunction(featuresConfig.getMultimapAggGroupImplementation()))
                 .functions(DECIMAL_TO_VARCHAR_CAST, DECIMAL_TO_INTEGER_CAST, DECIMAL_TO_BIGINT_CAST, DECIMAL_TO_DOUBLE_CAST, DECIMAL_TO_REAL_CAST, DECIMAL_TO_BOOLEAN_CAST, DECIMAL_TO_TINYINT_CAST, DECIMAL_TO_SMALLINT_CAST)
