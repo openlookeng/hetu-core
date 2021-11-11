@@ -3,13 +3,13 @@
 
 
 
-In addition to the manual deployment of openLooKeng Sever, you can follow below guide to complete deployment faster and easier. The script is friendly to most of linux OS. However, to Ubuntu, you need to manually install the following dependencies:
+In addition to the manual deployment of openLooKeng Sever, you can follow below guide to complete the deployment faster and easier. The script is friendly to most of Linux OS. However, to Ubuntu, you need to manually install the following dependencies:
 
 > sshpass1.06 or above
 
 ## Deploying openLooKeng on a Single Node
 
-Execute below command can help you download the necessary packages and deploy openLooKeng server in one-click:
+Executing the below command can help you download the necessary packages and deploy openLooKeng server in one-click:
 
 ```shell
 bash <(wget -qO- https://download.openlookeng.io/install.sh)
@@ -21,7 +21,7 @@ or:
 wget -O - https://download.openlookeng.io/install.sh|bash
 ```
 
-Normally, you don\'t need to do any thing, except for the installation to complete. It will automatically start the service.
+Normally, you don\'t need to do anything, except waiting for the installation to complete. It will automatically start the service.
 
 Execute below command to stop openLooKeng service.:
 
@@ -51,13 +51,13 @@ or:
 bash <(wget -qO- https://download.openlookeng.io/install.sh) --multi-node
 ```
 
-First of all, this command will download scripts and packages required by openLooKeng service. After the download is completed, it will check whether the dependent packages `expect` and `sshpass` are installed. If not, those dependencies will be installed automatically.
+First, this command will download scripts and packages required by openLooKeng service. After the download is completed, it will check whether the dependent packages `expect` and `sshpass` are installed. If not, those dependencies will be installed automatically.
 
 Besides, jdk version is required to be greater than 1.8.0\_151. If not, jdk1.8.0\_201 will be installed in the cluster. It is recommended to manually install these dependencies before installing openLooKeng service.
 
 Secondly, the script will download openLooKeng-server tarball and copy that tarball to all the nodes in the cluster. Then install the openLooKeng-server by using this tarball.
 
-Lastly, the script will setup openLooKeng server with the standard configurations, includes configurations for JVM, Node and also for build-in catalogs like `tpch`, `tpcds`, `memory connector`.
+Lastly, the script will setup openLooKeng server with the standard configurations, includes configurations for JVM, Node and for built-in catalogs like `tpch`, `tpcds`, `memory connector`.
 
 By design, the script will check if there are existing configuration under directory:
 `/home/openlkadmin/.openlkadmin/cluster_node_info`
@@ -79,9 +79,9 @@ The general configurations for openLooKeng\'s coordinator, workers are taken fro
 `/home/openlkadmin/.openlkadmin/cluster_config_info` and configurations for connectors are taken from the directory `/home/openlkadmin/.openlkadmin/catalog` respectively. If these directories or any required configuration files are absent during the deploy script running, default configuration files will be generated
 automatically and deployed to all nodes.
 
-Which means, alternatively, you can add those configuration files before running this deploy script, if you want to customized the deployment.
+Which means, alternatively, you can add those configuration files before running this deploy script, if you want to customize the deployment.
 
-If above process all succeed, the deploy script will automatically start the openLooKeng Service for you. Execute below command to stop openLooKeng service.:
+If all the above processes succeed, the deploy script will automatically start the openLooKeng Service for you. Execute below command to stop openLooKeng service.:
 
 ```shell
 /opt/openlookeng/bin/stop.sh
@@ -108,7 +108,7 @@ bash <(wget -qO- https://download.openlookeng.io/install.sh) --file <cluster_nod
 ```
 
 
-For more help message,execute below command to deploy single node cluster:
+For more help, execute below command to deploy single node cluster:
 ```shell
 bash <(wget -qO- https://download.openlookeng.io/install.sh) -h
 ```
@@ -150,9 +150,9 @@ execute below command to deploy the configurations to openLooKeng cluster:
 bash /opt/openlookeng/bin/configuration_deploy.sh
 ```
 
-Note, if you want to add more configrations or customize the configurations, you can add properties to the templates into file located at `/home/openlkadmin/.openlkadmin/.etc_template/coordinator` or `/home/openlkadmin/.openlkadmin/.etc_template/worker`.
+Note, if you want to add more configurations or customize the configurations, you can add properties to the templates into file located at `/home/openlkadmin/.openlkadmin/.etc_template/coordinator` or `/home/openlkadmin/.openlkadmin/.etc_template/worker`.
 
-The property format has to be key=\<value\>, where value is wrapped with \'\<\' and \'\>\', which means it it a dynamic value. For example:
+The property format must be key=\<value\>, where value is wrapped with \'\<\' and \'\>\', which means it is a dynamic value. For example:
 
 ``` properties
 http-server.http.port=<http-server.http.port>
@@ -174,7 +174,7 @@ It is very easy and straight forward to uninstall openLooKeng Service, simply ru
 bash /opt/openlookeng/bin/uninstall.sh
 ```
 
-This will uninstall openLooKeng Service by removing directory `/opt/openlookeng` and all files inside it. However, the `openlkadmin` user and all the configuration files under`/home/openlkadmin/` will not be removed. If you wan to delete user and configuration files, you need to run the below command:
+This will uninstall openLooKeng Service by removing directory `/opt/openlookeng` and all files inside it. However, the `openlkadmin` user and all the configuration files under`/home/openlkadmin/` will not be removed. If you want to delete user and configuration files, you need to run the below command:
 
 ```shell
 bash /opt/openlookeng/bin/uninstall.sh --all
@@ -190,7 +190,7 @@ If you can't access the download URL from the machine where you want to install 
 
 1. Also save third party dependencies under `/opt/openlookeng/resource`. That is, download all files from either `https://download.openlookeng.io/auto-install/third-resource/x86/` or `https://download.openlookeng.io/auto-install/third-resource/aarch64/`, depending on the machine's architecture. This should include 1 `OpenJDK` file and 2 `sshpass` files.
 
-1. If you plan to perform multi-node installation, and some nodes in the cluster have a different architecture type from the current machine, then also download the `OpenJDK` file for the other architecture, and save it under `/opt/openlookeng/resource/<arch>`, where `<arch>` is either `x86` or `aarch64`, corresponding to the other architecture.
+1. If you plan to perform multi-node installation, and some nodes in the cluster have a different architecture type from the current machine, then also download the `OpenJDK` file for the other architecture and save it under `/opt/openlookeng/resource/<arch>`, where `<arch>` is either `x86` or `aarch64`, corresponding to the other architecture.
 
 After all resources are available, execute below command to deploy single node cluster:
 
@@ -217,7 +217,7 @@ bash /opt/openlookeng/bin/install_offline.sh --help
 
 ## Adding Node to Cluster
 
-If you want to add node to make the cluster bigger,execute the below command:
+If you want to add node to make the cluster bigger, execute the below command:
 
 ```shell
 bash /opt/openlookeng/bin/add_cluster_node.sh -n <ip_address_1,……ip_address_N>
@@ -238,11 +238,11 @@ or:
 bash /opt/openlookeng/bin/add_cluster_node.sh --file <add_nodes_file_path>
 ```
 
-If there are multiple nodes, separated by commas(,). add_ nodes_ File example: ip_address_1,ip_address_2……,ip_address_N.
+If there are multiple nodes, separated by commas (,). add_ nodes_ File example: ip_address_1,ip_address_2……,ip_address_N.
 
 ## Removing Node to Cluster
 
-If you want to remove node to make the cluster smaller,execute the below command:
+If you want to remove node to make the cluster smaller, execute the below command:
 
 ```shell
 bash /opt/openlookeng/bin/remove_cluster_node.sh -n <ip_address_1,……ip_address_N>
@@ -263,7 +263,7 @@ or:
 bash /opt/openlookeng/bin/remove_cluster_node.sh --file <remove_nodes_file_path>
 ```
 
-If there are multiple nodes, separate them with commas(,). add_ nodes_ File example: ip_address_1,ip_address_2……,ip_address_N.
+If there are multiple nodes, separate them with commas (,). add_ nodes_ File example: ip_address_1,ip_address_2……,ip_address_N.
 
 ## See Also
 
