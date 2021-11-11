@@ -95,7 +95,8 @@ headless: true
     - [TPCH]({{< relref "./docs/connector/tpch.md" >}})
     - [VDM]({{< relref "./docs/connector/vdm.md" >}})
     - [Kylin]({{< relref "./docs/connector/kylin.md" >}})
-
+    - [OmniData]({{< relref "./docs/connector/omnidata.md" >}})
+    
 - [函数和运算符]("#")
     - [逻辑运算符]({{< relref "./docs/functions/logical.md" >}})
     - [比较函数和运算符]({{< relref "./docs/functions/comparison.md" >}})
