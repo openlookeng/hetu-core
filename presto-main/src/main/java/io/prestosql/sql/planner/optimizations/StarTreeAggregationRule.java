@@ -15,7 +15,6 @@
 
 package io.prestosql.sql.planner.optimizations;
 
-import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import io.hetu.core.spi.cube.CubeFilter;
 import io.hetu.core.spi.cube.CubeMetadata;
@@ -33,7 +32,6 @@ import io.prestosql.matching.Pattern;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TableMetadata;
 import io.prestosql.spi.PrestoWarning;
-import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.FilterNode;
@@ -43,9 +41,6 @@ import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.predicate.TupleDomain;
-import io.prestosql.spi.relation.CallExpression;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.ExpressionUtils;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.parser.ParsingOptions;
@@ -55,19 +50,14 @@ import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.Rule;
-import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.BooleanLiteral;
-import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.Identifier;
-import io.prestosql.sql.tree.Literal;
-import io.prestosql.sql.tree.SymbolReference;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -108,21 +98,6 @@ public class StarTreeAggregationRule
 {
     private static final Logger LOGGER = Logger.get(StarTreeAggregationRule.class);
 
-    public static final String AVG = "avg";
-
-    public static final String COUNT = "count";
-
-    public static final String SUM = "sum";
-
-    public static final String MIN = "min";
-
-    public static final String MAX = "max";
-
-    /**
-     * Aggregation functions supported by the Star-Tree index.
-     */
-    private static final Set<String> SUPPORTED_FUNCTIONS = ImmutableSet.of(AVG, COUNT, SUM, MIN, MAX);
-
     private static final Capture<Optional<PlanNode>> OPTIONAL_PRE_PROJECT_ONE = newCapture();
 
     private static final Capture<Optional<PlanNode>> OPTIONAL_PRE_PROJECT_TWO = newCapture();
@@ -146,7 +121,7 @@ public class StarTreeAggregationRule
      * .  .  .  .  |- TableScanNode
      */
     private static final Pattern<AggregationNode> PATTERN = aggregation()
-            .matching(StarTreeAggregationRule::isSupportedAggregation)
+            .matching(CubeOptimizerUtil::isSupportedAggregation)
             .with(optionalSource(ProjectNode.class)
                     .matching(anyPlan().capturedAsIf(node -> node instanceof ProjectNode, OPTIONAL_PRE_PROJECT_ONE)
                             .with(optionalSource(ProjectNode.class)
@@ -211,9 +186,9 @@ public class StarTreeAggregationRule
         TableScanNode tableScanNode = captures.get(TABLE_SCAN);
 
         // Check if project nodes are supported
-        if (!supportedProjectNode(preProjectNodeOne) ||
-                !supportedProjectNode(preProjectNodeTwo) ||
-                !supportedProjectNode(postProjectNode)) {
+        if (!CubeOptimizerUtil.supportedProjectNode(preProjectNodeOne) ||
+                !CubeOptimizerUtil.supportedProjectNode(preProjectNodeTwo) ||
+                !CubeOptimizerUtil.supportedProjectNode(postProjectNode)) {
             // Unsupported ProjectNode is detected
             return Result.empty();
         }
@@ -222,9 +197,8 @@ public class StarTreeAggregationRule
         preProjectNodeOne.ifPresent(planNode -> projectNodes.add((ProjectNode) planNode));
         preProjectNodeTwo.ifPresent(planNode -> projectNodes.add((ProjectNode) planNode));
         postProjectNode.ifPresent(planNode -> projectNodes.add((ProjectNode) planNode));
-
-        Map<String, Object> symbolMappings = buildSymbolMappings(node, projectNodes, filterNode, tableScanNode);
-
+        TableMetadata tableMetadata = metadata.getTableMetadata(context.getSession(), tableScanNode.getTable());
+        Map<String, Object> symbolMappings = CubeOptimizerUtil.buildSymbolMappings(node, projectNodes, filterNode, tableScanNode, tableMetadata);
         try {
             return optimize(node,
                     filterNode.orElse(null),
@@ -454,153 +428,5 @@ public class StarTreeAggregationRule
             return false;
         }
         return leftDecomposed.getTupleDomain().equals(rightDecomposed.getTupleDomain());
-    }
-
-    /**
-     * Construct a map of symbols mapping to constant value or the underlying column name.
-     *
-     * @param projections the list of ProjectNodes in between the aggregation node and the tableScan node
-     * @param tableScanNode the table scan node
-     * @return output symbols to constant or actual column name mapping
-     */
-    public static Map<String, Object> buildSymbolMappings(AggregationNode aggregationNode,
-            List<ProjectNode> projections,
-            Optional<PlanNode> filterNode,
-            TableScanNode tableScanNode)
-    {
-        // Initialize a map with outputSymbols mapping to themselves
-        Map<String, Object> symbolMapping = new HashMap<>();
-        aggregationNode.getOutputSymbols().stream().map(Symbol::getName).forEach(symbol -> symbolMapping.put(symbol, symbol));
-        aggregationNode.getAggregations().values().forEach(aggregation -> SymbolsExtractor.extractUnique(aggregation).stream().map(Symbol::getName)
-                .forEach(symbol -> symbolMapping.put(symbol, symbol)));
-        filterNode.ifPresent(planNode -> (SymbolsExtractor.extractUnique(((FilterNode) planNode).getPredicate())).stream()
-                .map(Symbol::getName)
-                .forEach(symbol -> symbolMapping.put(symbol, symbol)));
-
-        // Track how a symbol name is renamed throughout all project nodes
-        for (ProjectNode node : projections) {
-            Map<Symbol, RowExpression> assignments = node.getAssignments().getMap();
-            // ProjectNode is identity
-            for (Map.Entry<String, Object> symbolEntry : symbolMapping.entrySet()) {
-                RowExpression rowExpression = assignments.get(new Symbol(String.valueOf(symbolEntry.getValue())));
-                if (rowExpression == null) {
-                    continue;
-                }
-                if (OriginalExpressionUtils.isExpression(rowExpression)) {
-                    Expression expression = castToExpression(rowExpression);
-                    if (expression instanceof Cast) {
-                        expression = ((Cast) expression).getExpression();
-                    }
-
-                    if (expression instanceof SymbolReference) {
-                        symbolEntry.setValue(((SymbolReference) expression).getName());
-                    }
-                    else if (expression instanceof Literal) {
-                        symbolEntry.setValue(expression);
-                    }
-                }
-                else {
-                    if (rowExpression instanceof CallExpression) {
-                        // Extract the column symbols from CAST expressions
-                        while (rowExpression instanceof CallExpression) {
-                            rowExpression = ((CallExpression) rowExpression).getArguments().get(0);
-                        }
-                    }
-
-                    if (!(rowExpression instanceof VariableReferenceExpression)) {
-                        continue;
-                    }
-                    symbolEntry.setValue(((VariableReferenceExpression) rowExpression).getName());
-                }
-            }
-        }
-
-        // Update the map by actual outputSymbols being mapped by the symbol
-        Map<Symbol, ColumnHandle> assignments = tableScanNode.getAssignments();
-        for (Map.Entry<String, Object> symbolMappingEntry : symbolMapping.entrySet()) {
-            Object symbolName = symbolMappingEntry.getValue();
-            //read remaining Symbol name entries from map
-            if (symbolName instanceof String) {
-                ColumnHandle columnHandle = assignments.get(new Symbol((String) symbolName));
-                if (columnHandle != null) {
-                    symbolMappingEntry.setValue(columnHandle);
-                }
-            }
-        }
-        return symbolMapping;
-    }
-
-    /**
-     * Checks if aggregation node can be optimized by this rule. Only if the AggregationNode has
-     * supporting functions, it will return true.
-     *
-     * @param aggregationNode the aggregation node
-     * @return true if aggregators are supported
-     */
-    static boolean isSupportedAggregation(AggregationNode aggregationNode)
-    {
-        if (aggregationNode.getOutputSymbols().isEmpty()) {
-            return false;
-        }
-
-        return aggregationNode.getAggregations()
-                .values()
-                .stream()
-                .allMatch(StarTreeAggregationRule::isSupported);
-    }
-
-    static boolean isSupported(AggregationNode.Aggregation aggregation)
-    {
-        return SUPPORTED_FUNCTIONS.contains(aggregation.getFunctionCall().getDisplayName()) &&
-                aggregation.getFunctionCall().getArguments().size() <= 1 &&
-                (!aggregation.isDistinct() || aggregation.getFunctionCall().getDisplayName().equals(COUNT));
-    }
-
-    /**
-     * Checks if projection node can be optimized by this rule. Only if the PlanNode is a ProjectNode
-     * and only has SymbolReference or Literal expressions in projections.
-     *
-     * @param planNode the ProjectNode
-     * @return true if the planNode meets the requirements of ProjectNode
-     */
-    static boolean supportedProjectNode(Optional<PlanNode> planNode)
-    {
-        if (!planNode.isPresent()) {
-            // Project node is optional
-            return true;
-        }
-
-        if (!(planNode.get() instanceof ProjectNode)) {
-            return false;
-        }
-
-        for (Map.Entry<Symbol, RowExpression> assignment : ((ProjectNode) planNode.get()).getAssignments().entrySet()) {
-            RowExpression rowExpression = assignment.getValue();
-            if (OriginalExpressionUtils.isExpression(rowExpression)) {
-                Expression expression = castToExpression(assignment.getValue());
-                if (expression instanceof SymbolReference || expression instanceof Literal) {
-                    continue;
-                }
-
-                if (expression instanceof Cast) {
-                    expression = ((Cast) expression).getExpression();
-                    return (expression instanceof SymbolReference || expression instanceof Literal);
-                }
-            }
-            else {
-                if (rowExpression instanceof VariableReferenceExpression) {
-                    continue;
-                }
-                if (rowExpression instanceof CallExpression) {
-                    // Extract the column symbols from CAST expressions
-                    while (rowExpression instanceof CallExpression) {
-                        rowExpression = ((CallExpression) rowExpression).getArguments().get(0);
-                    }
-                    return rowExpression instanceof VariableReferenceExpression;
-                }
-            }
-            return false;
-        }
-        return true;
     }
 }

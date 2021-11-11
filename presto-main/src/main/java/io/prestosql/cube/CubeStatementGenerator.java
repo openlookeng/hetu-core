@@ -22,7 +22,6 @@ import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
-import io.prestosql.sql.planner.optimizations.StarTreeAggregationRule;
 import io.prestosql.sql.relational.OriginalExpressionUtils;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.LongLiteral;
@@ -31,6 +30,12 @@ import io.prestosql.sql.tree.SymbolReference;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
+import static io.hetu.core.spi.cube.CubeAggregateFunction.AVG;
+import static io.hetu.core.spi.cube.CubeAggregateFunction.COUNT;
+import static io.hetu.core.spi.cube.CubeAggregateFunction.MAX;
+import static io.hetu.core.spi.cube.CubeAggregateFunction.MIN;
+import static io.hetu.core.spi.cube.CubeAggregateFunction.SUM;
 
 public class CubeStatementGenerator
 {
@@ -109,30 +114,25 @@ public class CubeStatementGenerator
         Map<Symbol, AggregationSignature> signature = Collections.emptyMap();
         if (argument instanceof ColumnHandle) {
             String columnName = ((ColumnHandle) argument).getColumnName();
-            if (StarTreeAggregationRule.SUM.equals(aggregationName)) {
-                // SUM aggregation
+            if (SUM.getName().equals(aggregationName)) {
                 signature = Collections.singletonMap(symbol, AggregationSignature.sum(columnName, distinct));
             }
-            else if (StarTreeAggregationRule.AVG.equals(aggregationName)) {
-                // AVG aggregation
+            else if (AVG.getName().equals(aggregationName)) {
                 signature = Collections.singletonMap(symbol, AggregationSignature.avg(columnName, distinct));
             }
-            else if (StarTreeAggregationRule.COUNT.equals(aggregationName)) {
-                // COUNT(columnName)
+            else if (COUNT.getName().equals(aggregationName)) {
                 signature = Collections.singletonMap(symbol, AggregationSignature.count(columnName, distinct));
             }
-            else if (StarTreeAggregationRule.MIN.equals(aggregationName)) {
-                // MIN aggregation
+            else if (MIN.getName().equals(aggregationName)) {
                 signature = Collections.singletonMap(symbol, AggregationSignature.min(columnName, distinct));
             }
-            else if (StarTreeAggregationRule.MAX.equals(aggregationName)) {
-                // MAX aggregation
+            else if (MAX.getName().equals(aggregationName)) {
                 signature = Collections.singletonMap(symbol, AggregationSignature.max(columnName, distinct));
             }
         }
         else if (argument == null || (argument instanceof LongLiteral && ((LongLiteral) argument).getValue() == 1)) {
             // COUNT aggregation
-            if (StarTreeAggregationRule.COUNT.equals(aggregationName) && !aggregation.isDistinct()) {
+            if (COUNT.getName().equals(aggregationName) && !aggregation.isDistinct()) {
                 // COUNT(1)
                 // TODO: Validate the assumption: Non distinct count is always count(*)
                 signature = Collections.singletonMap(symbol, AggregationSignature.count());

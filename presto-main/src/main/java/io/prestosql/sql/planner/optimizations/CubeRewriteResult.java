@@ -30,7 +30,7 @@ public class CubeRewriteResult
     private final Set<DimensionSource> dimensionColumns;
     private final Set<AggregatorSource> aggregationColumns;
     private final Set<AverageAggregatorSource> avgAggregationColumns;
-    private final boolean useAvgAggregationColumns;
+    private final boolean computeAvgDividingSumByCount;
 
     public CubeRewriteResult(TableScanNode tableScanNode, Map<Symbol, ColumnMetadata> symbolMetadataMap, Set<DimensionSource> dimensionColumns, Set<AggregatorSource> aggregationColumns, Set<AverageAggregatorSource> avgAggregationColumns, boolean useAvgAggregationColumns)
     {
@@ -39,7 +39,7 @@ public class CubeRewriteResult
         this.dimensionColumns = dimensionColumns;
         this.aggregationColumns = aggregationColumns;
         this.avgAggregationColumns = avgAggregationColumns;
-        this.useAvgAggregationColumns = useAvgAggregationColumns;
+        this.computeAvgDividingSumByCount = useAvgAggregationColumns;
     }
 
     public TableScanNode getTableScanNode()
@@ -67,9 +67,9 @@ public class CubeRewriteResult
         return avgAggregationColumns;
     }
 
-    public boolean getUseAvgAggregationColumns()
+    public boolean getComputeAvgDividingSumByCount()
     {
-        return useAvgAggregationColumns;
+        return computeAvgDividingSumByCount;
     }
 
     public static class DimensionSource

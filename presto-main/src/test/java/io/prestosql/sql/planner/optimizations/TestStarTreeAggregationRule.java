@@ -33,7 +33,9 @@ import io.prestosql.plugin.tpch.TpchTableLayoutHandle;
 import io.prestosql.plugin.tpch.TpchTransactionHandle;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
+import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.cube.CubeProvider;
 import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.metadata.TableHandle;
@@ -74,6 +76,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -122,6 +125,7 @@ public class TestStarTreeAggregationRule
     private Map<Symbol, ColumnHandle> assignments;
     private TableHandle ordersTableHandle;
     private TableScanNode baseTableScan;
+    private TableMetadata baseTableMetadata;
     private FeaturesConfig config;
     private CubeManager cubeManager;
     private CubeProvider provider;
@@ -168,10 +172,16 @@ public class TestStarTreeAggregationRule
         columnOrderDate = symbolAllocator.newSymbol("orderdate", DATE);
         columnCustkey = symbolAllocator.newSymbol("custkey", BIGINT);
         columnTotalprice = symbolAllocator.newSymbol("totalprice", DOUBLE);
+
         orderkeyHandle = new TpchColumnHandle("orderkey", BIGINT);
         orderdateHandle = new TpchColumnHandle("orderdate", DATE);
         custkeyHandle = new TpchColumnHandle("custkey", BIGINT);
         totalpriceHandle = new TpchColumnHandle("totalprice", DOUBLE);
+
+        ColumnMetadata orderKeyColumnMetadata = new ColumnMetadata(orderkeyHandle.getColumnName(), orderkeyHandle.getType());
+        ColumnMetadata orderDateColumnMetadata = new ColumnMetadata(orderdateHandle.getColumnName(), orderdateHandle.getType());
+        ColumnMetadata custKeyColumnMetadata = new ColumnMetadata(custkeyHandle.getColumnName(), custkeyHandle.getType());
+        ColumnMetadata totalPriceColumnMetadata = new ColumnMetadata(totalpriceHandle.getColumnName(), totalpriceHandle.getType());
 
         output = symbolAllocator.newSymbol("output", DOUBLE);
         assignments = ImmutableMap.<Symbol, ColumnHandle>builder()
@@ -196,6 +206,13 @@ public class TestStarTreeAggregationRule
                 new UUID(0, 0),
                 0,
                 false);
+
+        QualifiedObjectName baseTableName = QualifiedObjectName.valueOf(baseTableScan.getTable().getFullyQualifiedName());
+        baseTableMetadata = new TableMetadata(
+                ordersTableHandle.getCatalogName(),
+                new ConnectorTableMetadata(
+                        new SchemaTableName(baseTableName.getSchemaName(), baseTableName.getObjectName()),
+                        Arrays.asList(orderKeyColumnMetadata, orderDateColumnMetadata, custKeyColumnMetadata, totalPriceColumnMetadata)));
 
         columnCountAll = symbolAllocator.newSymbol("count_all", BIGINT);
         columnSumTotalPrice = symbolAllocator.newSymbol("sum_totalprice", DOUBLE);
@@ -394,7 +411,7 @@ public class TestStarTreeAggregationRule
                 newId(),
                 baseTableScan,
                 assignment1));
-        assertTrue(StarTreeAggregationRule.supportedProjectNode(planNode1));
+        assertTrue(CubeOptimizerUtil.supportedProjectNode(planNode1));
 
         //not projectNode
         ListMultimap<Symbol, Symbol> mappings = ImmutableListMultimap.<Symbol, Symbol>builder()
@@ -406,7 +423,7 @@ public class TestStarTreeAggregationRule
                 ImmutableList.of(baseTableScan, baseTableScan),
                 mappings,
                 ImmutableList.copyOf(mappings.keySet())));
-        assertFalse(StarTreeAggregationRule.supportedProjectNode(planNode2));
+        assertFalse(CubeOptimizerUtil.supportedProjectNode(planNode2));
 
         //expression not instance of Cast
         Assignments assignment2 = Assignments.builder()
@@ -416,7 +433,7 @@ public class TestStarTreeAggregationRule
                 newId(),
                 baseTableScan,
                 assignment2));
-        assertFalse(StarTreeAggregationRule.supportedProjectNode(planNode3));
+        assertFalse(CubeOptimizerUtil.supportedProjectNode(planNode3));
 
         //expression is instance of SymbolReference OR Literal
         Assignments assignment3 = Assignments.builder()
@@ -426,11 +443,11 @@ public class TestStarTreeAggregationRule
                 newId(),
                 baseTableScan,
                 assignment3));
-        assertTrue(StarTreeAggregationRule.supportedProjectNode(planNode4));
+        assertTrue(CubeOptimizerUtil.supportedProjectNode(planNode4));
 
         //empty node
         Optional<PlanNode> emptyPlanNode = Optional.empty();
-        assertTrue(StarTreeAggregationRule.supportedProjectNode(emptyPlanNode));
+        assertTrue(CubeOptimizerUtil.supportedProjectNode(emptyPlanNode));
     }
 
     @Test
@@ -458,7 +475,7 @@ public class TestStarTreeAggregationRule
                 Optional.empty(),
                 AggregationNode.AggregationType.HASH,
                 Optional.empty());
-        assertTrue(StarTreeAggregationRule.isSupportedAggregation(countAgg));
+        assertTrue(CubeOptimizerUtil.isSupportedAggregation(countAgg));
 
         AggregationNode countDistinctNode = new AggregationNode(
                 newId(),
@@ -481,7 +498,7 @@ public class TestStarTreeAggregationRule
                 Optional.empty(),
                 AggregationNode.AggregationType.HASH,
                 Optional.empty());
-        assertTrue(StarTreeAggregationRule.isSupportedAggregation(countDistinctNode));
+        assertTrue(CubeOptimizerUtil.isSupportedAggregation(countDistinctNode));
 
         AggregationNode sumAgg = new AggregationNode(
                 newId(),
@@ -504,7 +521,7 @@ public class TestStarTreeAggregationRule
                 Optional.empty(),
                 AggregationNode.AggregationType.HASH,
                 Optional.empty());
-        assertFalse(StarTreeAggregationRule.isSupportedAggregation(sumAgg));
+        assertFalse(CubeOptimizerUtil.isSupportedAggregation(sumAgg));
 
         AggregationNode avgAgg = new AggregationNode(
                 newId(),
@@ -527,7 +544,7 @@ public class TestStarTreeAggregationRule
                 Optional.empty(),
                 AggregationNode.AggregationType.HASH,
                 Optional.empty());
-        assertFalse(StarTreeAggregationRule.isSupportedAggregation(avgAgg));
+        assertFalse(CubeOptimizerUtil.isSupportedAggregation(avgAgg));
 
         AggregationNode minAgg = new AggregationNode(
                 newId(),
@@ -550,7 +567,7 @@ public class TestStarTreeAggregationRule
                 Optional.empty(),
                 AggregationNode.AggregationType.HASH,
                 Optional.empty());
-        assertTrue(StarTreeAggregationRule.isSupportedAggregation(minAgg));
+        assertTrue(CubeOptimizerUtil.isSupportedAggregation(minAgg));
 
         AggregationNode maxAgg = new AggregationNode(
                 newId(),
@@ -573,7 +590,7 @@ public class TestStarTreeAggregationRule
                 Optional.empty(),
                 AggregationNode.AggregationType.HASH,
                 Optional.empty());
-        assertTrue(StarTreeAggregationRule.isSupportedAggregation(maxAgg));
+        assertTrue(CubeOptimizerUtil.isSupportedAggregation(maxAgg));
 
         //function not supported
         AggregationNode lagAgg = new AggregationNode(
@@ -597,11 +614,11 @@ public class TestStarTreeAggregationRule
                 Optional.empty(),
                 AggregationNode.AggregationType.HASH,
                 Optional.empty());
-        assertFalse(StarTreeAggregationRule.isSupportedAggregation(lagAgg));
+        assertFalse(CubeOptimizerUtil.isSupportedAggregation(lagAgg));
 
         //empty node
         AggregationNode emptyAggNode = planBuilder.aggregation(PlanBuilder.AggregationBuilder::singleGroupingSet);
-        assertFalse(StarTreeAggregationRule.isSupportedAggregation(emptyAggNode));
+        assertFalse(CubeOptimizerUtil.isSupportedAggregation(emptyAggNode));
     }
 
     @Test
@@ -637,7 +654,7 @@ public class TestStarTreeAggregationRule
                 Optional.empty(),
                 AggregationNode.AggregationType.HASH,
                 Optional.empty());
-        Map<String, Object> columnMapping = StarTreeAggregationRule.buildSymbolMappings(countAggNode, projectNodes, Optional.of(filterNode), baseTableScan);
+        Map<String, Object> columnMapping = CubeOptimizerUtil.buildSymbolMappings(countAggNode, projectNodes, Optional.of(filterNode), baseTableScan, baseTableMetadata);
         assertEquals(columnMapping.size(), 4);
         assertEquals(new ArrayList<>(columnMapping.keySet()).toString(), "[orderkey, custkey, totalprice, orderdate]");
         assertTrue(columnMapping.values().containsAll(assignments.values()) && assignments.values().containsAll(columnMapping.values()));
@@ -649,7 +666,7 @@ public class TestStarTreeAggregationRule
                 .build();
         ProjectNode projectNode2 = new ProjectNode(newId(), filterNode, assignment2);
         List<ProjectNode> projections2 = ImmutableList.of(projectNode2);
-        columnMapping = StarTreeAggregationRule.buildSymbolMappings(countAggNode, projections2, Optional.of(filterNode), baseTableScan);
+        columnMapping = CubeOptimizerUtil.buildSymbolMappings(countAggNode, projections2, Optional.of(filterNode), baseTableScan, baseTableMetadata);
         assertEquals(new ArrayList(columnMapping.values()).get(1), testDouble);
 
         //expression instanceof Cast/SymbolReference
@@ -659,7 +676,7 @@ public class TestStarTreeAggregationRule
                 .build();
         ProjectNode planNode3 = new ProjectNode(newId(), baseTableScan, assignment3);
         List<ProjectNode> projections3 = ImmutableList.of(planNode3);
-        columnMapping = StarTreeAggregationRule.buildSymbolMappings(countAggNode, projections3, Optional.of(filterNode), baseTableScan);
+        columnMapping = CubeOptimizerUtil.buildSymbolMappings(countAggNode, projections3, Optional.of(filterNode), baseTableScan, baseTableMetadata);
         assertEquals(new ArrayList(columnMapping.values()).get(1), custkeyHandle);
 
         //expression instanceof Cast/Literal
@@ -669,7 +686,7 @@ public class TestStarTreeAggregationRule
                 .build();
         ProjectNode planNode4 = new ProjectNode(newId(), baseTableScan, assignment4);
         List<ProjectNode> projections4 = ImmutableList.of(planNode4);
-        columnMapping = StarTreeAggregationRule.buildSymbolMappings(countAggNode, projections4, Optional.of(filterNode), baseTableScan);
+        columnMapping = CubeOptimizerUtil.buildSymbolMappings(countAggNode, projections4, Optional.of(filterNode), baseTableScan, baseTableMetadata);
         assertEquals(new ArrayList(columnMapping.values()).get(1), testDouble);
     }
 
