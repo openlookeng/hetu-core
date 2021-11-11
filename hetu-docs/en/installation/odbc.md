@@ -61,7 +61,7 @@ Before an application uses the openLooKeng ODBC driver, the data source DSN must
 
 ### Opening the ODBC Data Source Administrator (64-bit)
 
-1. Click **Start**, and choose **Control Panel**.
+1. Click **Start** and choose **Control Panel**.
 
 2. In **Control Panel**, click **System and Security**, and then click **Administrative Tools**.
 
@@ -171,6 +171,6 @@ You can obtain the details about data types by calling **SQLGetTypInfo** in **Ca
 
 The openLooKeng ODBC driver supports **both ANSI and Unicode** applications. The default connection character set is the system default character set for ANSI applications and utf8 for Unicode applications. If the character set used by the application is different from the above-mentioned character set,  it may cause garbled characters. For this, the user should specify the connection character set to adapt to the character set required by the application. The corresponding configuration of the connection character set is described as follows.
 
-When calling the ODBC API to retrieve data, if bound to the SQL_C_WCHAR C data type buffer, the driver will return the Unicode encoded result for both ANSI and Unicode applications. When bound to the SQL_C_CHAR C data type buffer, by deafult, the driver will return to the ANSI application the result  encoded in system default character set, and for Unicode application the driver will return the result encoded in utf8. If the encoding character set used by the application does not match the default, the result may be garbled. To this end, the user should configure the connection character set to specify the encoding of the result. For example, if the application has garbled Chinese characters, you can try to configure the connection character set to GBK or GB2312.
+When calling the ODBC API to retrieve data, if bound to the SQL_C_WCHAR C data type buffer, the driver will return the Unicode encoded result for both ANSI and Unicode applications. When bound to the SQL_C_CHAR C data type buffer, by default, the driver will return to the ANSI application the result  encoded in system default character set, and for Unicode application the driver will return the result encoded in utf8. If the encoding character set used by the application does not match the default, the result may be garbled. To this end, the user should configure the connection character set to specify the encoding of the result. For example, if the application has garbled Chinese characters, you can try to configure the connection character set to GBK or GB2312.
 
 While configuring data source all connection character sets supported by the openLooKeng ODBC driver can be set in the **Character Set** drop-down box on the page 3 of the User interface. User can select the connection character from the drop-down box after the **Test DSN** is success.

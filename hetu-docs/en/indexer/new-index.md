@@ -10,17 +10,13 @@ The `getID()` method in the `Index` interface returns the ID of this index type 
 
 ### Level
 
-A heuristic index stores additional and usually partial information of a dataset in a more compact way to speed up lookups in various ways. Therefore, each index must 
-have a domain on which it is applied. For instance, if an index marks the max value of a data set, we must know how big the data set is when we define the "max" value (i.e. 
-it can be the max of a group of rows, a data partition, or even a whole table). When a new index type is created, it must implement a method `Set<Level> getSupportedIndexLevels();` 
-which returns the data set level it can support. The levels are defined as an enum in `Index` interface.
+A heuristic index stores additional and usually partial information of a dataset in a more compact way to speed up lookups in various ways. Therefore, each index must have a domain on which it is applied. For instance, if an index marks the max value of a data set, we must know how big the data set is when we define the "max" value (i.e.  it can be the max of a group of rows, a data partition, or even a whole table). When a new index type is created, it must implement a method `Set<Level> getSupportedIndexLevels();`  which returns the data set level it can support. The levels are defined as an enum in `Index` interface.
 
 ## Interface overlook
 
 ### Indexing methods
 
-Apart from the methods metioned above, this section gives a quick guide on the most important methods needed to create a new index type. For the complete 
-document on `Index` interface, please refer to the Java Doc of the source code.
+Apart from the methods mentioned above, this section gives a quick guide on the most important methods needed to create a new index type. For the complete document on `Index` interface, please refer to the Java Doc of the source code.
 
 There are two main functionalities in the `Index` interface:
 
@@ -46,7 +42,7 @@ boolean addValues(Map<String, List<Object>> values) throws IOException;
 Index deserialize(InputStream in) throws IOException;
 
 void serialize(OutputStream out) throws IOException;
-``` 
+```
 
 The usage of them are pretty straightforward. A good example to help understand their usage is the source code of `MinMaxIndex`, where adding values is just to 
 update the `max` and `min` variables according to the input number, and `serialize()/deserialize()`
