@@ -96,7 +96,8 @@ headless: true
     - [TPCH]({{< relref "./docs/connector/tpch.md" >}})
     - [VDM]({{< relref "./docs/connector/vdm.md" >}})
     - [Kylin]({{< relref "./docs/connector/kylin.md" >}})
-
+    - [OmniData]({{< relref "./docs/connector/omnidata.md" >}})
+    
 - [Functions and Operators]("#")
     - [Logical Operators]({{< relref "./docs/functions/logical.md" >}})
     - [Comparison Functions and Operators]({{< relref "./docs/functions/comparison.md" >}})
