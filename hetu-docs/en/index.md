@@ -62,10 +62,10 @@ headless: true
     - [BTree Index]({{< relref "./docs/indexer/btree.md" >}})
     - [HIndex Statements]({{< relref "./docs/indexer/hindex-statements.md" >}})
     - [New Index]({{< relref "./docs/indexer/new-index.md" >}})
-    - 
+    
 - [Star Tree Cubes](#)
-    - [Overview] ({{< relref "./docs/preagg/overview.md" >}}>)
-    - [Statements] ({{< "./docs/preagg/statements.md" >}})
+    - [Overview]({{< relref "./docs/preagg/overview.md" >}})
+    - [Statements]({{< relref "./docs/preagg/statements.md" >}})
   
 - [Connectors]({{< relref "./docs/connector/_index.md" >}})
     - [Carbondata]({{< relref "./docs/connector/carbondata.md" >}})
@@ -158,8 +158,6 @@ headless: true
     - [GRANT ROLES]({{< relref "./docs/sql/grant-roles.md" >}})
     - [INSERT]({{< relref "./docs/sql/insert.md" >}})
     - [INSERT OVERWRITE]({{< relref "./docs/sql/insert-overwrite.md" >}})
-    - [INSERT CUBE]({{< relref "./docs/sql/insert-cube.md" >}})
-    - [INSERT OVERWRITE CUBE]({{< relref "./docs/sql/insert-overwrite-cube.md" >}})
     - [JMX]({{< relref "./docs/sql/jmx.md" >}})
     - [PREPARE]({{< relref "./docs/sql/prepare.md" >}})
     - [RESET SESSION]({{< relref "./docs/sql/reset-session.md" >}})
@@ -174,7 +172,6 @@ headless: true
     - [SHOW COLUMNS]({{< relref "./docs/sql/show-columns.md" >}})
     - [SHOW CREATE TABLE]({{< relref "./docs/sql/show-create-table.md" >}})
     - [SHOW CREATE VIEW]({{< relref "./docs/sql/show-create-view.md" >}})
-    - [SHOW CUBES]({{< relref "./docs/sql/show-cubes.md" >}})
     - [SHOW FUNCTIONS]({{< relref "./docs/sql/show-functions.md" >}})
     - [SHOW EXTERNAL FUNCTION]({{< relref "./docs/sql/show-external-function.md" >}})
     - [SHOW GRANTS]({{< relref "./docs/sql/show-grants.md" >}})
@@ -217,6 +214,8 @@ headless: true
     - [Task Resource]({{< relref "./docs/rest/task.md" >}})
 
 - [Release Notes]("#")
+    - [1.4.1 (12 Nov 2021)]({{< relref "./docs/releasenotes/releasenotes-1.4.1.md" >}})
+    - [1.4.0 (15 Oct 2021)]({{< relref "./docs/releasenotes/releasenotes-1.4.0.md" >}})
     - [1.3.0 (30 Jun 2021)]({{< relref "./docs/releasenotes/releasenotes-1.3.0.md" >}})
     - [1.2.0 (31 Mar 2021)]({{< relref "./docs/releasenotes/releasenotes-1.2.0.md" >}})
     - [1.1.0 (30 Dec 2020)]({{< relref "./docs/releasenotes/releasenotes-1.1.0.md" >}})
