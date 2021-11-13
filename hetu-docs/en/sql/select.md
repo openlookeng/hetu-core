@@ -508,7 +508,7 @@ _col0
 **INTERSECT**
 
 `INTERSECT` returns only the rows that are in the result sets of both the first and the second queries. The following is an example of one of the simplest possible `INTERSECT` clauses. It selects the values `13`
-and `42` and combines this result set with a second query that selects the value `13`. Since `42` is only in the result set of the first query, it is not included in the final results.:
+and `42` and combines this result set with a second query that selects the value `13`. Since `42` is only in the result set of the first query, it is not included in the final results:
 
     SELECT * FROM (VALUES 13, 42)
     INTERSECT
@@ -524,7 +524,7 @@ _col0
 **EXCEPT**
 
 `EXCEPT` returns the rows that are in the result set of the first query, but not the second. The following is an example of one of the simplest possible `EXCEPT` clauses. It selects the values `13` and `42` and
-combines this result set with a second query that selects the value `13`. Since `13` is also in the result set of the second query, it is not included in the final result.:
+combines this result set with a second query that selects the value `13`. Since `13` is also in the result set of the second query, it is not included in the final result:
 
     SELECT * FROM (VALUES 13, 42)
     EXCEPT
@@ -746,7 +746,7 @@ Joins allow you to combine data from multiple relations.
 
 ### CROSS JOIN
 
-A cross join returns the Cartesian product (all combinations) of two relations. Cross joins can either be specified using the explit `CROSS JOIN` syntax or by specifying multiple relations in the `FROM` clause.
+A cross join returns the Cartesian product (all combinations) of two relations. Cross joins can either be specified using the explicit `CROSS JOIN` syntax or by specifying multiple relations in the `FROM` clause.
 
 Both of the following queries are equivalent:
 
