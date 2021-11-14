@@ -38,7 +38,7 @@ Cache data with complex predicate string:
 Limitations
 -----------
 
-- Only Hive connector(ORC Format) support this functionality at this time. See connector documentation for more details.
+- Only Hive connector (ORC Format) support this functionality at this time. See connector documentation for more details.
 - Does not support `LIKE` in `WHERE` clause.
 - Does not support 'OR' operator in complex predicate.
 
