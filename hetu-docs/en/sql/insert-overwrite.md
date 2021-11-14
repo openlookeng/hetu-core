@@ -28,7 +28,7 @@ Assume `orders` is not a partitioned table, and have 100 rows, then execute belo
 
     INSERT OVERWRITE orders VALUES (1, 'SUCCESS', '10.25', DATA '2020-01-01');
 
-Then the `orders` table will only have 1 rows, that is the data specified in the `VALUE` clause.
+Then the `orders` table will only have 1 row that is the data specified in the `VALUE` clause.
 
 Assume `users` has 3 columns: (`id`, `name`, `state`) and partitioned by `state`, and the existing data has follow rows:
 
