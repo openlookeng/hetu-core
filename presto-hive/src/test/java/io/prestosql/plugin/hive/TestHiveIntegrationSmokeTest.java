@@ -6698,4 +6698,62 @@ public class TestHiveIntegrationSmokeTest
                 " class int )"
                 + "with (format='ORC', \"field.delim\"='#')"));
     }
+
+    @Test
+    public void testShowViews()
+    {
+        List<String> views = new ArrayList<>(Arrays.asList("v1", "v2", "a1"));
+        List<String> viewsStartingWith = new ArrayList<>(Arrays.asList("v1", "v2"));
+        List<String> viewsEndingWith = new ArrayList<>(Arrays.asList("v1", "a1"));
+        assertUpdate(String.format("CREATE TABLE table1 (id int, row int)"));
+        assertUpdate(String.format("INSERT INTO table1 VALUES(1, 10), (2, 20)"), 2);
+        assertUpdate(String.format("CREATE TABLE table2 (id int, row int)"));
+        assertUpdate(String.format("INSERT INTO table2 VALUES(1, 10), (2, 20)"), 2);
+        assertUpdate(String.format("CREATE TABLE table3 (id int, row int)"));
+        assertUpdate(String.format("INSERT INTO table3 VALUES(1, 10), (2, 20)"), 2);
+        assertUpdate(String.format("CREATE VIEW v1 AS SELECT * FROM table1"));
+        assertUpdate(String.format("CREATE VIEW v2 AS SELECT * FROM table2"));
+        assertUpdate(String.format("CREATE VIEW a1 AS SELECT * FROM table3"));
+        assertTrue(computeActual("SHOW VIEWS").getOnlyColumn().collect(Collectors.toList()).containsAll(views));
+        assertTrue(computeActual("SHOW VIEWS LIKE \'v*\'").getOnlyColumn().collect(Collectors.toList()).containsAll(viewsStartingWith));
+        assertTrue(computeActual("SHOW VIEWS LIKE \'v%\'").getOnlyColumn().collect(Collectors.toList()).containsAll(viewsStartingWith));
+        assertTrue(computeActual("SHOW VIEWS LIKE \'*1\'").getOnlyColumn().collect(Collectors.toList()).containsAll(viewsEndingWith));
+        assertTrue(computeActual("SHOW VIEWS LIKE \'%1\'").getOnlyColumn().collect(Collectors.toList()).containsAll(viewsEndingWith));
+        assertUpdate(String.format("DROP VIEW v1"));
+        assertUpdate(String.format("DROP VIEW v2"));
+        assertUpdate(String.format("DROP VIEW a1"));
+        assertUpdate(String.format("DROP TABLE table1"));
+        assertUpdate(String.format("DROP TABLE table2"));
+        assertUpdate(String.format("DROP TABLE table3"));
+    }
+
+    @Test
+    public void testShowViewsFrom()
+    {
+        List<String> viewsFromFirstSchema = new ArrayList<>(Arrays.asList("v1", "a1"));
+        List<String> viewsFromSecondSchema = new ArrayList<>(Arrays.asList("v2"));
+        assertUpdate(String.format("CREATE SCHEMA schema1"));
+        assertUpdate(String.format("CREATE SCHEMA schema2"));
+        assertUpdate(String.format("CREATE TABLE schema1.table1 (id int, row int)"));
+        assertUpdate(String.format("INSERT INTO schema1.table1 VALUES(1, 10), (2, 20)"), 2);
+        assertUpdate(String.format("CREATE TABLE schema1.table2 (id int, row int)"));
+        assertUpdate(String.format("INSERT INTO schema1.table2 VALUES(1, 10), (2, 20)"), 2);
+        assertUpdate(String.format("CREATE TABLE schema2.table3 (id int, row int)"));
+        assertUpdate(String.format("INSERT INTO schema2.table3 VALUES(1, 10), (2, 20)"), 2);
+        assertUpdate(String.format("CREATE VIEW schema1.v1 AS SELECT * FROM schema1.table1"));
+        assertUpdate(String.format("CREATE VIEW schema1.a1 AS SELECT * FROM schema1.table2"));
+        assertUpdate(String.format("CREATE VIEW schema2.v2 AS SELECT * FROM schema2.table3"));
+        assertTrue(computeActual("SHOW VIEWS FROM schema1").getOnlyColumn().collect(Collectors.toList()).containsAll(viewsFromFirstSchema));
+        assertTrue(computeActual("SHOW VIEWS IN schema1").getOnlyColumn().collect(Collectors.toList()).containsAll(viewsFromFirstSchema));
+        assertTrue(computeActual("SHOW VIEWS FROM schema2").getOnlyColumn().collect(Collectors.toList()).containsAll(viewsFromSecondSchema));
+        assertTrue(computeActual("SHOW VIEWS IN schema2").getOnlyColumn().collect(Collectors.toList()).containsAll(viewsFromSecondSchema));
+        assertUpdate(String.format("DROP VIEW schema1.v1"));
+        assertUpdate(String.format("DROP VIEW schema2.v2"));
+        assertUpdate(String.format("DROP VIEW schema1.a1"));
+        assertUpdate(String.format("DROP TABLE schema1.table1"));
+        assertUpdate(String.format("DROP TABLE schema1.table2"));
+        assertUpdate(String.format("DROP TABLE schema2.table3"));
+        assertUpdate(String.format("DROP SCHEMA schema1"));
+        assertUpdate(String.format("DROP SCHEMA schema2"));
+    }
 }
