@@ -26,6 +26,7 @@ import static io.airlift.units.DataSize.Unit.BYTE;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 public final class FormatUtils
@@ -157,13 +158,17 @@ public final class FormatUtils
         return word;
     }
 
-    public static String formatTime(Duration duration)
+    public static String formatTime(Duration duration, boolean timeInMilliseconds)
     {
-        int totalSeconds = Ints.saturatedCast(duration.roundTo(SECONDS));
+        int totalMilliSeconds = Ints.saturatedCast(duration.roundTo(MILLISECONDS));
+        int totalSeconds = totalMilliSeconds / 1000;
         int minutes = totalSeconds / 60;
         int seconds = totalSeconds % 60;
+        int milliSeconds = totalMilliSeconds % 1000;
 
-        return format("%s:%02d", minutes, seconds);
+        // Avoid 00:00 in CLI output
+        String time = format("%s:%02d", minutes, seconds) + ((totalSeconds < 1 && timeInMilliseconds) ? format(".%03d", milliSeconds) : "");
+        return time;
     }
 
     /**

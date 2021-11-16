@@ -96,6 +96,7 @@ class StatementClientV1
     private final Duration requestTimeoutNanos;
     private final String user;
     private final String clientCapabilities;
+    private final boolean timeInMilliseconds;
 
     private final AtomicReference<State> state = new AtomicReference<>(State.RUNNING);
 
@@ -111,6 +112,7 @@ class StatementClientV1
         this.requestTimeoutNanos = session.getClientRequestTimeout();
         this.user = session.getUser();
         this.clientCapabilities = Joiner.on(",").join(ClientCapabilities.values());
+        this.timeInMilliseconds = session.isTimeInMilliseconds();
 
         Request request = buildQueryRequest(session, query);
 
@@ -486,6 +488,12 @@ class StatementClientV1
         if (uri != null) {
             httpDelete(uri);
         }
+    }
+
+    @Override
+    public boolean isTimeInMilliseconds()
+    {
+        return timeInMilliseconds;
     }
 
     @Override
