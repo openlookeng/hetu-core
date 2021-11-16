@@ -73,7 +73,9 @@ public class Pager
             throws IOException
     {
         try {
-            super.write(b);
+            if (b != 0) {
+                super.write(b);
+            }
         }
         catch (IOException e) {
             throw propagateIOException(e);
