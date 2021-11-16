@@ -3150,10 +3150,10 @@ public class TestHiveIntegrationSmokeTest
 
         assertUpdate(createTable, "SELECT count(*) FROM orders");
         assertUpdate("ALTER TABLE test_rename_column RENAME COLUMN orderkey TO new_orderkey");
-        assertQuery("SELECT new_orderkey, orderstatus FROM test_rename_column", "SELECT NULL, orderstatus FROM orders where orderstatus != 'dfd'");
+        assertQuery("SELECT new_orderkey, orderstatus FROM test_rename_column", "SELECT orderkey, orderstatus FROM orders where orderstatus != 'dfd'");
         assertQueryFails("ALTER TABLE test_rename_column RENAME COLUMN \"$path\" TO test", ".* Cannot rename hidden column");
         assertQueryFails("ALTER TABLE test_rename_column RENAME COLUMN orderstatus TO new_orderstatus", "Renaming partition columns is not supported");
-        assertQuery("SELECT new_orderkey, orderstatus FROM test_rename_column", "SELECT NULL, orderstatus FROM orders");
+        assertQuery("SELECT new_orderkey, orderstatus FROM test_rename_column", "SELECT orderkey, orderstatus FROM orders");
         assertUpdate("DROP TABLE test_rename_column");
     }
 
@@ -6755,5 +6755,77 @@ public class TestHiveIntegrationSmokeTest
         assertUpdate(String.format("DROP TABLE schema2.table3"));
         assertUpdate(String.format("DROP SCHEMA schema1"));
         assertUpdate(String.format("DROP SCHEMA schema2"));
+    }
+
+    @Test
+    public void testAlterTableRenameColumn()
+    {
+        assertUpdate(String.format("CREATE TABLE alter_table_1(id int, name string, age int)"));
+        assertUpdate(String.format("CREATE TABLE alter_table_2(id int, name string, age int) with (transactional=true)"));
+        assertUpdate(String.format("CREATE TABLE alter_table_3(id int, name string, age int) with (partitioned_by=ARRAY['age'])"));
+        assertUpdate(String.format("INSERT INTO alter_table_1 VALUES (1, 'table_1', 10)"), 1);
+        assertUpdate(String.format("INSERT INTO alter_table_2 VALUES (1, 'table_2', 10)"), 1);
+        assertUpdate(String.format("INSERT INTO alter_table_3 VALUES (1, 'table_3', 10)"), 1);
+        assertQuery("SELECT * FROM alter_table_1", "VALUES (1, 'table_1', 10)");
+        assertQuery("SELECT * FROM alter_table_2", "VALUES (1, 'table_2', 10)");
+        assertQuery("SELECT * FROM alter_table_3", "VALUES (1, 'table_3', 10)");
+        assertUpdate(String.format("ALTER TABLE alter_table_1 RENAME COLUMN id to id_new"));
+        assertUpdate(String.format("ALTER TABLE alter_table_2 RENAME COLUMN id to id_new"));
+        assertUpdate(String.format("ALTER TABLE alter_table_3 RENAME COLUMN id to id_new"));
+        assertQuery("SELECT * FROM alter_table_1", "VALUES (1, 'table_1', 10)");
+        assertQuery("SELECT * FROM alter_table_2", "VALUES (1, 'table_2', 10)");
+        assertQuery("SELECT * FROM alter_table_3", "VALUES (1, 'table_3', 10)");
+        assertUpdate(String.format("DROP TABLE alter_table_1"));
+        assertUpdate(String.format("DROP TABLE alter_table_2"));
+        assertUpdate(String.format("DROP TABLE alter_table_3"));
+    }
+
+    @Test
+    public void testAlterTableAddColumn()
+    {
+        assertUpdate(String.format("CREATE TABLE alter_table_4(id int, name string, age int)"));
+        assertUpdate(String.format("CREATE TABLE alter_table_5(id int, name string, age int) with (transactional=true)"));
+        assertUpdate(String.format("CREATE TABLE alter_table_6(id int, name string, age int) with (partitioned_by=ARRAY['age'])"));
+        assertUpdate(String.format("INSERT INTO alter_table_4 VALUES (1, 'table_1', 10)"), 1);
+        assertUpdate(String.format("INSERT INTO alter_table_5 VALUES (1, 'table_2', 10)"), 1);
+        assertUpdate(String.format("INSERT INTO alter_table_6 VALUES (1, 'table_3', 10)"), 1);
+        assertQuery("SELECT * FROM alter_table_4", "VALUES (1, 'table_1', 10)");
+        assertQuery("SELECT * FROM alter_table_5", "VALUES (1, 'table_2', 10)");
+        assertQuery("SELECT * FROM alter_table_6", "VALUES (1, 'table_3', 10)");
+        assertUpdate(String.format("ALTER TABLE alter_table_4 ADD COLUMN new_column int"));
+        assertUpdate(String.format("ALTER TABLE alter_table_5 ADD COLUMN new_column int"));
+        assertUpdate(String.format("ALTER TABLE alter_table_6 ADD COLUMN new_column int"));
+        assertUpdate(String.format("INSERT INTO alter_table_4 VALUES (2, 'table_1', 20, 200)"), 1);
+        assertUpdate(String.format("INSERT INTO alter_table_5 VALUES (2, 'table_2', 20, 200)"), 1);
+        assertUpdate(String.format("INSERT INTO alter_table_6 VALUES (2, 'table_3', 200, 20), (3, 'table_3', 300, 10)"), 2);
+        assertQuery("SELECT * FROM alter_table_4", "VALUES (1, 'table_1', 10, NULL), (2, 'table_1', 20, 200)");
+        assertQuery("SELECT * FROM alter_table_5", "VALUES (1, 'table_2', 10, NULL), (2, 'table_2', 20, 200)");
+        assertQuery("SELECT * FROM alter_table_6", "VALUES (1, 'table_3', NULL, 10), (2, 'table_3', 200, 20), (3, 'table_3', NULL, 10)");
+        assertUpdate(String.format("DROP TABLE alter_table_4"));
+        assertUpdate(String.format("DROP TABLE alter_table_5"));
+        assertUpdate(String.format("DROP TABLE alter_table_6"));
+    }
+
+    @Test
+    public void testAlterTableDropColumn()
+    {
+        assertUpdate(String.format("CREATE TABLE alter_table_7(id int, name int, age int)"));
+        assertUpdate(String.format("CREATE TABLE alter_table_8(id int, name int, age int) with (transactional=true)"));
+        assertUpdate(String.format("CREATE TABLE alter_table_9(id int, name int, age int) with (partitioned_by=ARRAY['age'])"));
+        assertUpdate(String.format("INSERT INTO alter_table_7 VALUES (1, 10, 100)"), 1);
+        assertUpdate(String.format("INSERT INTO alter_table_8 VALUES (1, 10, 100)"), 1);
+        assertUpdate(String.format("INSERT INTO alter_table_9 VALUES (1, 10, 100)"), 1);
+        assertQuery("SELECT * FROM alter_table_7", "VALUES (1, 10, 100)");
+        assertQuery("SELECT * FROM alter_table_8", "VALUES (1, 10, 100)");
+        assertQuery("SELECT * FROM alter_table_9", "VALUES (1, 10, 100)");
+        assertUpdate(String.format("ALTER TABLE alter_table_7 DROP COLUMN id"));
+        assertUpdate(String.format("ALTER TABLE alter_table_8 DROP COLUMN id"));
+        assertUpdate(String.format("ALTER TABLE alter_table_9 DROP COLUMN id"));
+        assertQuery("SELECT * FROM alter_table_7", "VALUES (1, 10)");
+        assertQuery("SELECT * FROM alter_table_8", "VALUES (1, 10)");
+        assertQuery("SELECT * FROM alter_table_9", "VALUES (1, 100)");
+        assertUpdate(String.format("DROP TABLE alter_table_7"));
+        assertUpdate(String.format("DROP TABLE alter_table_8"));
+        assertUpdate(String.format("DROP TABLE alter_table_9"));
     }
 }

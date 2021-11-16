@@ -620,6 +620,36 @@ The following operations are not supported when `avro_schema_url` is set:
     columns are not supported in `CREATE TABLE`.
 -   `ALTER TABLE` commands modifying columns are not supported.
 
+## Drop Column Behavior
+
+Syntax supported for Drop Column is as follows:
+
+```sql
+ALTER TABLE 'name' DROP COLUMN 'column_name'
+```
+
+In case of Hive connector, DROP COLUMN drops column which is at the end of existing columns. Hive doesn't support DROP COLUMN syntax, however closest DDL supported by Hive which enumerates the above is REPLACE COLUMNS. REPLACE COLUMNS removes all existing columns and adds the new set of columns whereas DROP COLUMN does remove all existing columns and add the same set of columns excluding column specified in the query, manifesting as it dropped the column.
+
+For example, consider a table with columns **a**, **b** and **c**.
+
+```sql
+lk:default> SELECT * FROM hive_table;
+ a | b  |  c
+---+----+-----
+ 1 | 10 | 100
+(1 row)
+```
+
+ On dropping column **a**:
+
+```sql
+lk:default> SELECT * FROM hive_table;
+  b | c
+---+----
+ 1 | 10
+(1 row)
+```
+
 ## Procedures
 
 
@@ -716,7 +746,7 @@ Drop a schema:
 DROP SCHEMA hive.web
 ```
 
-## Metastore Cache:
+## Metastore Cache
 
 Hive connector maintains a metastore cache to service the metastore request faster to various operations. Loading, reloading and retention times of the cache entries can be configured in `hive.properties`.
 
@@ -740,7 +770,7 @@ REFRESH META CACHE
 Additionally, metadata cache refresh command can be used to reload the metastore cache by user.
 
 
-## Performance tuning notes:
+## Performance tuning notes
 
 #### INSERT
 
