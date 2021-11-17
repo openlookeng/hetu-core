@@ -70,7 +70,8 @@ DROP INDEX index_name where p=part1;
 ## 资源使用说明
 
 ### 磁盘使用
-启发式索引使用本地临时文件夹存储创建的索引，然后打包上传至hdfs。因此，它需要临时文件夹（例如，linux上的`/tmp`)挂载的磁盘分区在本地有足够的可用空间。如果挂载的磁盘分区可用空间不足，用户可以在worker节点的`jvm.config`中通过`-Djava.io.tmpdir`来指定使用的临时路径：
+启发式索引使用本地临时文件夹创建和处理索引（Linux 上默认为`/tmp`）。
+因此，临时文件夹应该有足够的空间。请在 `etc/jvm.config` 中设置以下属性来指定使用的临时文件夹的路径：
 
 ```
 -Djava.io.tmpdir=/path/to/another/dir
