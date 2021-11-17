@@ -18,6 +18,7 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import io.airlift.log.Logger;
+import io.airlift.units.Duration;
 import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.HetuConstant;
@@ -114,7 +115,7 @@ public class SplitFiltering
 
         if (preloadIndexNames.contains(PRELOAD_ALL_KEY)) {
             indexToPreload = indexClient.getAllIndexRecords();
-            LOG.info("Preloading all indices : " + indexToPreload.stream().map(r -> r.name).collect(Collectors.joining(",")));
+            LOG.info("Preloading all indices: " + indexToPreload.stream().map(r -> r.name).collect(Collectors.joining(",")));
         }
         else {
             for (String indexName : preloadIndexNames) {
@@ -129,8 +130,9 @@ public class SplitFiltering
         }
 
         for (IndexRecord record : indexToPreload) {
-            LOG.info("Preloading index for split filtering: " + record);
-            indexCache.preloadIndex(record);
+            LOG.info("Preloading index %s to cache...", record.name);
+            Duration timeElapsed = indexCache.loadIndexToCache(record);
+            LOG.info("Index %s was loaded to cache. (Time elapsed: %s)", record.name, timeElapsed.toString());
         }
     }
 
