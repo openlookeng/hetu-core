@@ -53,53 +53,79 @@ public final class MemorySplitManager
 
         List<MemoryDataFragment> dataFragments = metadata.getDataFragments(table.getId());
 
+        // check if there is a predicate on the partition column
+        List<SortedRangeSet> partitionKeyRanges = new ArrayList<>();
+        for (Map.Entry<ColumnHandle, Domain> e : table.getPredicate().getDomains().orElse(Collections.emptyMap()).entrySet()) {
+            if (!e.getKey().isPartitionKey()) {
+                continue;
+            }
+
+            // in LogicalPart#partitionPage null partition is a special case
+            // although the partition map in LogicalPart class can have null keys
+            // when the map is sent to coordinator via MemoryDataFragment the null
+            // keys are skipped because the JSON parser can't handle null keys in a map
+            // therefore when query predicate contains a null value, we MUST NOT
+            // do any partition filtering because we would miss data
+            //
+            // e.g. if query is: select * from table where column is null
+            // then schedule all the splits
+            //
+            // see comment in LogicalPart#partitionPage also
+            if (e.getValue().isNullAllowed()) {
+                return allSplits(dataFragments, table);
+            }
+            SortedRangeSet rangeSet = ((SortedRangeSet) e.getValue().getValues());
+            partitionKeyRanges.add(rangeSet);
+        }
+
         ImmutableList.Builder<ConnectorSplit> splits = ImmutableList.builder();
+
+        if (partitionKeyRanges.isEmpty()) {
+            return allSplits(dataFragments, table);
+        }
 
         for (MemoryDataFragment dataFragment : dataFragments) {
             Map<String, List<Integer>> logicalPartPartitionMap = dataFragment.getLogicalPartPartitionMap();
-            int logicalPartCount = dataFragment.getLogicalPartCount();
             long rows = dataFragment.getRows();
 
-            // logicalPart ids are 1 based
             if (logicalPartPartitionMap.size() == 0) {
+                int logicalPartCount = dataFragment.getLogicalPartCount();
+                // logicalPart ids are 1 based
                 for (int i = 1; i <= logicalPartCount; i++) {
                     splits.add(new MemorySplit(table.getId(), i, dataFragment.getHostAddress(), rows, OptionalLong.empty()));
                 }
             }
             else {
-                // get the predicate from the MemoryTableHandle
                 // filter the splits based on the partitionKey and only schedule them
-                List<SortedRangeSet> partitionKeyRanges = new ArrayList<>();
-
-                // get the type of the column here so that the partitionKeyValue(Object) can be cast
-                for (Map.Entry<ColumnHandle, Domain> e : table.getPredicate().getDomains().orElse(Collections.emptyMap()).entrySet()) {
-                    if (!e.getKey().isPartitionKey()) {
-                        continue;
-                    }
-                    SortedRangeSet rangeSet = ((SortedRangeSet) e.getValue().getValues());
-                    partitionKeyRanges.add(rangeSet);
-                }
-
-                if (partitionKeyRanges.size() > 0) {
-                    for (Map.Entry<String, List<Integer>> entry : logicalPartPartitionMap.entrySet()) {
-                        for (SortedRangeSet rangeSet : partitionKeyRanges) {
-                            Type rangeSetType = rangeSet.getType();
-                            Object value = LogicalPart.deserializeTypedValueFromString(rangeSetType, entry.getKey());
-                            if (rangeSet.containsValue(value)) {
-                                for (Integer i : entry.getValue()) {
-                                    splits.add(new MemorySplit(table.getId(), i, dataFragment.getHostAddress(), rows, OptionalLong.empty()));
-                                }
+                for (Map.Entry<String, List<Integer>> entry : logicalPartPartitionMap.entrySet()) {
+                    for (SortedRangeSet rangeSet : partitionKeyRanges) {
+                        Type rangeSetType = rangeSet.getType();
+                        Object value = LogicalPart.deserializeTypedValueFromString(rangeSetType, entry.getKey());
+                        if (rangeSet.containsValue(value)) {
+                            for (Integer i : entry.getValue()) {
+                                splits.add(new MemorySplit(table.getId(), i, dataFragment.getHostAddress(), rows, OptionalLong.empty()));
                             }
                         }
                     }
                 }
-                else {
-                    for (Map.Entry<String, List<Integer>> entry : logicalPartPartitionMap.entrySet()) {
-                        for (Integer i : entry.getValue()) {
-                            splits.add(new MemorySplit(table.getId(), i, dataFragment.getHostAddress(), rows, OptionalLong.empty()));
-                        }
-                    }
-                }
+            }
+        }
+        return new FixedSplitSource(splits.build());
+    }
+
+    /**
+     * Schedule entire table
+     */
+    private ConnectorSplitSource allSplits(List<MemoryDataFragment> dataFragments, MemoryTableHandle table)
+    {
+        ImmutableList.Builder<ConnectorSplit> splits = ImmutableList.builder();
+
+        for (MemoryDataFragment dataFragment : dataFragments) {
+            int logicalPartCount = dataFragment.getLogicalPartCount();
+            long rows = dataFragment.getRows();
+            // logicalPart ids are 1 based
+            for (int i = 1; i <= logicalPartCount; i++) {
+                splits.add(new MemorySplit(table.getId(), i, dataFragment.getHostAddress(), rows, OptionalLong.empty()));
             }
         }
         return new FixedSplitSource(splits.build());

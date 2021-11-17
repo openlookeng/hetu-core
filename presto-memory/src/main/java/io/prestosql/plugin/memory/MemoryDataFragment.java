@@ -87,7 +87,7 @@ public class MemoryDataFragment
         return MEMORY_DATA_FRAGMENT_CODEC.fromJson(fragment.getBytes());
     }
 
-    public static Map<String, List<Integer>> getMergedCount(Map<String, List<Integer>> a, Map<String, List<Integer>> b)
+    public static Map<String, List<Integer>> getMergedPartitionMap(Map<String, List<Integer>> a, Map<String, List<Integer>> b)
     {
         Map<String, List<Integer>> result = new HashMap<>();
         for (Map.Entry<String, List<Integer>> entry : a.entrySet()) {
@@ -113,7 +113,7 @@ public class MemoryDataFragment
             return new MemoryDataFragment(a.getHostAddress(), a.getRows() + b.getRows(), Math.max(a.getLogicalPartCount(), b.getLogicalPartCount()), Collections.emptyMap());
         }
         else {
-            return new MemoryDataFragment(a.getHostAddress(), a.getRows() + b.getRows(), 0, getMergedCount(a.getLogicalPartPartitionMap(), b.getLogicalPartPartitionMap()));
+            return new MemoryDataFragment(a.getHostAddress(), a.getRows() + b.getRows(), Math.max(a.getLogicalPartCount(), b.getLogicalPartCount()), getMergedPartitionMap(a.getLogicalPartPartitionMap(), b.getLogicalPartPartitionMap()));
         }
     }
 }

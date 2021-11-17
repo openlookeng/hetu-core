@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.plugin.memory.MemoryErrorCode.MISSING_DATA;
@@ -176,9 +177,15 @@ public class MemoryPageSinkProvider
         @Override
         public CompletableFuture<Collection<Slice>> finish()
         {
+            // there could be multiple writers in parallel, wait until the last one
             if (sinkCount.decrementAndGet() == 0) {
                 tablesManager.finishUpdatingTable(tableId);
-                Map<String, List<Integer>> logicalPartPartitionMap = tablesManager.getTableLogicalPartPartitionMap(tableId);
+                // the JSON parser can't handle null keys in a map, so they must be skipped
+                // see LogicalPart#partitionPage and MemorySplitManager#getSplits for details
+                Map<String, List<Integer>> logicalPartPartitionMap =
+                        tablesManager.getTableLogicalPartPartitionMap(tableId).entrySet().stream()
+                        .filter(e -> e.getKey() != null)
+                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
                 return completedFuture(ImmutableList.of(new MemoryDataFragment(currentHostAddress, addedRows, tablesManager.getTableLogicalPartCount(tableId), logicalPartPartitionMap).toSlice()));
             }
             return completedFuture(ImmutableList.of(new MemoryDataFragment(currentHostAddress, addedRows, 0, Collections.emptyMap()).toSlice()));
