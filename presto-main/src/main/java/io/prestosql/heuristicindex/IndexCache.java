@@ -21,6 +21,7 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.airlift.log.Logger;
+import io.airlift.units.Duration;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.CreateIndexMetadata;
@@ -167,8 +168,9 @@ public class IndexCache
                         updated = true;
                         evictFromCache(newIndexRecord);
                         if (newIndexRecord.isAutoloadEnabled()) {
-                            preloadIndex(newIndexRecord);
-                            LOG.debug("Index {%s} has been updated in cache.", newIndexRecord);
+                            LOG.debug("Index %s was updated: reloading to cache...", newIndexRecord.name);
+                            Duration timeElapsed = loadIndexToCache(newIndexRecord);
+                            LOG.debug("Index %s was reloaded to cache. (Time elapsed: %s)", newIndexRecord.name, timeElapsed.toString());
                         }
                     }
                 }
@@ -176,8 +178,9 @@ public class IndexCache
                     // create operation
                     created = true;
                     if (newIndexRecord.isAutoloadEnabled()) {
-                        preloadIndex(newIndexRecord);
-                        LOG.debug("Index {%s} has been inserted to cache.", newIndexRecord);
+                        LOG.debug("New index %s was created: loading to cache...", newIndexRecord.name);
+                        Duration timeElapsed = loadIndexToCache(newIndexRecord);
+                        LOG.debug("New index %s was loaded to cache. (Time elapsed: %s)", newIndexRecord.name, timeElapsed.toString());
                     }
                 }
             }
@@ -189,7 +192,7 @@ public class IndexCache
                     // drop operation
                     dropped = true;
                     evictFromCache(oldIndexRecord);
-                    LOG.debug("Index {%s} has been evicted from cache because the index has been dropped.", oldIndexRecord);
+                    LOG.debug("Index %s was dropped: evicting from cache.", oldIndexRecord.name);
                 }
             }
         }
@@ -197,8 +200,9 @@ public class IndexCache
         return (dropped || created || updated);
     }
 
-    public void preloadIndex(IndexRecord record)
+    public Duration loadIndexToCache(IndexRecord record)
     {
+        long before = System.currentTimeMillis();
         String table = record.qualifiedTable;
         String column = String.join(",", record.columns);
         String type = record.indexType;
@@ -207,7 +211,7 @@ public class IndexCache
         String filterKeyPath = table + "/" + column + "/" + type;
         IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, LAST_MODIFIED_TIME_PLACE_HOLDER, record, level);
         filterKey.setNoCloseFlag(true);
-        executor.schedule(() -> {
+        executor.execute(() -> {
             List<IndexMetadata> allLoaded;
             try {
                 // Load index for the whole table with dummy last modified time first
@@ -255,7 +259,9 @@ public class IndexCache
             catch (ExecutionException e) {
                 LOG.debug("Failed to load into cache: " + filterKey, e);
             }
-        }, 0, TimeUnit.MILLISECONDS);
+        });
+        long msElapsed = System.currentTimeMillis() - before;
+        return new Duration(msElapsed, TimeUnit.MILLISECONDS);
     }
 
     public List<IndexMetadata> getIndices(String table, String column, Split split)
