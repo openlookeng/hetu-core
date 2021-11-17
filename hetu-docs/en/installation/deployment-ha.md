@@ -25,7 +25,7 @@ The above properties are described below:
 - `hetu.multiple-coordinator.enabled`: Enable multiple coordinators.
 - `hetu.embedded-state-store.enabled`: Enable coordinators to start embedded state store. 
 
-Note: It is suggested to enable embedded state store on all coordinators(or at least 3) to guarantee the high availability of service when node/network is down.
+Note: It is suggested to enable embedded state store on all coordinators (or at least 3) to guarantee the high availability of service when node/network is down.
 
 ###Configuring State Store
 Please refer to the section [State Store](../admin/state-store.md) to configure state store.
