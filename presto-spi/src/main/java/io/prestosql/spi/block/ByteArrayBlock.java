@@ -35,11 +35,11 @@ public class ByteArrayBlock
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(ByteArrayBlock.class).instanceSize();
 
-    private final int arrayOffset;
+    protected final int arrayOffset;
     private final int positionCount;
     @Nullable
-    private final boolean[] valueIsNull;
-    private final byte[] values;
+    protected final boolean[] valueIsNull;
+    protected final byte[] values;
 
     private final long sizeInBytes;
     private final long retainedSizeInBytes;

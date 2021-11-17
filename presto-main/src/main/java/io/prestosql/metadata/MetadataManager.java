@@ -13,6 +13,7 @@
  */
 package io.prestosql.metadata;
 
+import com.esotericsoftware.kryo.Kryo;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.HashMultimap;
@@ -201,7 +202,7 @@ public final class MetadataManager
     public static MetadataManager createTestMetadataManager(TransactionManager transactionManager, FeaturesConfig featuresConfig)
     {
         return new MetadataManager(
-                new FunctionAndTypeManager(transactionManager, featuresConfig, new HandleResolver(), ImmutableSet.of()),
+                new FunctionAndTypeManager(transactionManager, featuresConfig, new HandleResolver(), ImmutableSet.of(), new Kryo()),
                 featuresConfig,
                 new SessionPropertyManager(),
                 new SchemaPropertyManager(),

@@ -21,11 +21,16 @@ import java.util.List;
 
 public interface SingleStreamSpillerFactory
 {
-    SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext);
+    default SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext)
+    {
+        return create(types, spillContext, memoryContext, false);
+    }
+
+    SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext, boolean useDirect);
 
     static SingleStreamSpillerFactory unsupportedSingleStreamSpillerFactory()
     {
-        return (types, spillContext, memoryContext) -> {
+        return (types, spillContext, memoryContext, useDirect) -> {
             throw new UnsupportedOperationException();
         };
     }

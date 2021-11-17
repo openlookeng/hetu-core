@@ -13,6 +13,9 @@
  */
 package io.prestosql.spi.block;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
 
@@ -20,7 +23,7 @@ import static io.prestosql.spi.block.EncoderUtil.decodeNullBits;
 import static io.prestosql.spi.block.EncoderUtil.encodeNullsAsBits;
 
 public class LongArrayBlockEncoding
-        implements BlockEncoding
+        extends AbstractBlockEncoding<LongArrayBlock>
 {
     public static final String NAME = "LONG_ARRAY";
 
@@ -60,5 +63,31 @@ public class LongArrayBlockEncoding
         }
 
         return new LongArrayBlock(0, positionCount, valueIsNull, values);
+    }
+
+    @Override
+    public void write(Kryo kryo, Output output, LongArrayBlock block)
+    {
+        int positionCount = block.getPositionCount();
+        output.writeInt(positionCount);
+
+        output.writeBoolean(block.mayHaveNull());
+        if (block.mayHaveNull()) {
+            output.writeBooleans(block.valueIsNull, 0, positionCount);
+        }
+
+        output.writeLongs(block.values, block.arrayOffset, positionCount);
+    }
+
+    @Override
+    public LongArrayBlock read(Kryo kryo, Input input, Class<? extends LongArrayBlock> aClass)
+    {
+        int positionCount = input.readInt();
+        boolean[] valuesIsNull = null;
+        if (input.readBoolean()) {
+            valuesIsNull = input.readBooleans(positionCount);
+        }
+        long[] values = input.readLongs(positionCount);
+        return new LongArrayBlock(0, positionCount, valuesIsNull, values);
     }
 }

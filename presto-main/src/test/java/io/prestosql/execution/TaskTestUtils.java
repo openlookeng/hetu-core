@@ -161,10 +161,10 @@ public final class TaskTestUtils
                 new JoinFilterFunctionCompiler(metadata),
                 new IndexJoinLookupStats(),
                 new TaskManagerConfig(),
-                new GenericSpillerFactory((types, spillContext, memoryContext) -> {
+                new GenericSpillerFactory((types, spillContext, memoryContext, useDirect) -> {
                     throw new UnsupportedOperationException();
                 }),
-                (types, spillContext, memoryContext) -> {
+                (types, spillContext, memoryContext, useDirect) -> {
                     throw new UnsupportedOperationException();
                 },
                 (types, partitionFunction, spillContext, memoryContext) -> {

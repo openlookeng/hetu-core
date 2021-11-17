@@ -37,7 +37,6 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 
 import javax.annotation.Nullable;
-
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.io.UnsupportedEncodingException;

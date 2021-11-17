@@ -118,7 +118,8 @@ public class BenchmarkBinaryFileSpiller
                     ImmutableList.of(SPILL_PATH),
                     1.0,
                     compressionEnabled,
-                    encryptionEnabled);
+                    encryptionEnabled,
+                    false);
             spillerFactory = new GenericSpillerFactory(singleStreamSpillerFactory);
             pages = createInputPages();
             readSpiller = spillerFactory.create(TYPES, bytes -> {}, newSimpleAggregatedMemoryContext());

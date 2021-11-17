@@ -31,7 +31,6 @@ import io.prestosql.sql.analyzer.FeaturesConfig;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
-
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileStore;
@@ -67,6 +66,7 @@ public class FileSingleStreamSpillerFactory
     private final SpillerStats spillerStats;
     private final double maxUsedSpaceThreshold;
     private final boolean spillEncryptionEnabled;
+    private final boolean spillDirectEnabled;
     private int roundRobinIndex;
 
     @Inject
@@ -81,7 +81,8 @@ public class FileSingleStreamSpillerFactory
                 requireNonNull(featuresConfig, "featuresConfig is null").getSpillerSpillPaths(),
                 requireNonNull(featuresConfig, "featuresConfig is null").getSpillMaxUsedSpaceThreshold(),
                 requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillCompressionEnabled(),
-                requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillEncryptionEnabled());
+                requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillEncryptionEnabled(),
+                requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillDirectEnabled());
     }
 
     @VisibleForTesting
@@ -92,9 +93,10 @@ public class FileSingleStreamSpillerFactory
             List<Path> spillPaths,
             double maxUsedSpaceThreshold,
             boolean spillCompressionEnabled,
-            boolean spillEncryptionEnabled)
+            boolean spillEncryptionEnabled,
+            boolean spillDirectEnabled)
     {
-        this.serdeFactory = new PagesSerdeFactory(blockEncodingSerde, spillCompressionEnabled);
+        this.serdeFactory = new PagesSerdeFactory(blockEncodingSerde, spillCompressionEnabled, spillDirectEnabled);
         this.executor = requireNonNull(executor, "executor is null");
         this.spillerStats = requireNonNull(spillerStats, "spillerStats can not be null");
         requireNonNull(spillPaths, "spillPaths is null");
@@ -115,6 +117,7 @@ public class FileSingleStreamSpillerFactory
         this.maxUsedSpaceThreshold = maxUsedSpaceThreshold;
         this.spillEncryptionEnabled = spillEncryptionEnabled;
         this.roundRobinIndex = 0;
+        this.spillDirectEnabled = spillDirectEnabled;
     }
 
     @PostConstruct
@@ -148,14 +151,14 @@ public class FileSingleStreamSpillerFactory
     }
 
     @Override
-    public SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext)
+    public SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext, boolean useDirect)
     {
         Optional<SpillCipher> spillCipher = Optional.empty();
         if (spillEncryptionEnabled) {
             spillCipher = Optional.of(new AesSpillCipher());
         }
-        PagesSerde serde = serdeFactory.createPagesSerdeForSpill(spillCipher);
-        return new FileSingleStreamSpiller(serde, executor, getNextSpillPath(), spillerStats, spillContext, memoryContext, spillCipher);
+        PagesSerde serde = serdeFactory.createPagesSerdeForSpill(spillCipher, useDirect);
+        return new FileSingleStreamSpiller(serde, executor, getNextSpillPath(), spillerStats, spillContext, memoryContext, spillCipher, useDirect);
     }
 
     private synchronized Path getNextSpillPath()

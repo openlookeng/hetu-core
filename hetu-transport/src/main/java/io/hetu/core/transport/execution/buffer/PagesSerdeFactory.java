@@ -26,25 +26,36 @@ public class PagesSerdeFactory
 {
     private final BlockEncodingSerde blockEncodingSerde;
     private final boolean compressionEnabled;
+    private final boolean directSerDe;
 
     public PagesSerdeFactory(BlockEncodingSerde blockEncodingSerde, boolean compressionEnabled)
     {
+        this(blockEncodingSerde, compressionEnabled, false);
+    }
+
+    public PagesSerdeFactory(BlockEncodingSerde blockEncodingSerde, boolean compressionEnabled, boolean directSerDe)
+    {
         this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");
         this.compressionEnabled = compressionEnabled;
+        this.directSerDe = directSerDe;
     }
 
     public PagesSerde createPagesSerde()
     {
-        return createPagesSerdeInternal(Optional.empty());
+        return createPagesSerdeInternal(Optional.empty(), false);
     }
 
-    public PagesSerde createPagesSerdeForSpill(Optional<SpillCipher> spillCipher)
+    public PagesSerde createPagesSerdeForSpill(Optional<SpillCipher> spillCipher, boolean useDirect)
     {
-        return createPagesSerdeInternal(spillCipher);
+        return createPagesSerdeInternal(spillCipher, useDirect);
     }
 
-    private PagesSerde createPagesSerdeInternal(Optional<SpillCipher> spillCipher)
+    private PagesSerde createPagesSerdeInternal(Optional<SpillCipher> spillCipher, boolean useDirect)
     {
+        if (directSerDe || useDirect) {
+            return new KryoPageSerializer(blockEncodingSerde);
+        }
+
         if (compressionEnabled) {
             return new PagesSerde(blockEncodingSerde, Optional.of(new ZstdCompressor()), Optional.of(new ZstdDecompressor()), spillCipher);
         }

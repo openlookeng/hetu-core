@@ -13,17 +13,24 @@
  */
 package io.prestosql.spi.block;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.Serializer;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
+import io.prestosql.spi.PrestoException;
 
 import static io.airlift.slice.SizeOf.SIZE_OF_INT;
+import static io.airlift.slice.SizeOf.sizeOf;
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.block.EncoderUtil.decodeNullBits;
 import static io.prestosql.spi.block.EncoderUtil.encodeNullsAsBits;
 
 public class VariableWidthBlockEncoding
-        implements BlockEncoding
+        extends AbstractBlockEncoding<VariableWidthBlock>
 {
     public static final String NAME = "VARIABLE_WIDTH";
 
@@ -71,5 +78,37 @@ public class VariableWidthBlockEncoding
         Slice slice = sliceInput.readSlice(blockSize);
 
         return new VariableWidthBlock(0, positionCount, slice, offsets, valueIsNull);
+    }
+
+    @Override
+    public void write(Kryo kryo, Output output, VariableWidthBlock block)
+    {
+        int positionCount = block.getPositionCount();
+        output.writeInt(positionCount);
+        output.writeInts(block.offsets, block.arrayOffset, positionCount + 1);
+
+        output.writeBoolean(block.mayHaveNull());
+        if (block.mayHaveNull()) {
+            output.writeBooleans(block.valueIsNull, 0, positionCount);
+        }
+
+        int totalSize = block.offsets[block.arrayOffset + positionCount] - block.offsets[block.arrayOffset];
+        output.writeInt(totalSize);
+        output.write(block.getRawSlice(0).byteArray(), block.offsets[block.arrayOffset], totalSize);
+    }
+
+    @Override
+    public VariableWidthBlock read(Kryo kryo, Input input, Class<? extends VariableWidthBlock> aClass)
+    {
+        int positionCount = input.readInt();
+        int[] offsets = input.readInts(positionCount + 1);
+        boolean[] valuesIsNull = null;
+        if (input.readBoolean()) {
+            valuesIsNull = input.readBooleans(positionCount);
+        }
+        int blockSize = input.readInt();
+        Slice slice = Slices.wrappedBuffer(input.readBytes(blockSize));
+
+        return new VariableWidthBlock(0, positionCount, slice, offsets, valuesIsNull);
     }
 }

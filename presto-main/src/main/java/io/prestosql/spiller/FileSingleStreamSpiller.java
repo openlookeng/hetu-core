@@ -13,6 +13,8 @@
  */
 package io.prestosql.spiller;
 
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
@@ -35,7 +37,6 @@ import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.spiller.SpillCipher;
 
 import javax.annotation.concurrent.NotThreadSafe;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,8 +45,8 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
 
@@ -79,9 +80,10 @@ public class FileSingleStreamSpiller
     private boolean writable = true;
     private long spilledPagesInMemorySize;
     private ListenableFuture<?> spillInProgress = Futures.immediateFuture(null);
+    private boolean useDirect;
 
     // Snapshot: capture page sizes that are used to update localSpillContext and spillerStats during resume
-    private List<Long> pageSizeList = new ArrayList<>();
+    private List<Long> pageSizeList = new LinkedList<>();
 
     public FileSingleStreamSpiller(
             PagesSerde serde,
@@ -90,7 +92,8 @@ public class FileSingleStreamSpiller
             SpillerStats spillerStats,
             SpillContext spillContext,
             LocalMemoryContext memoryContext,
-            Optional<SpillCipher> spillCipher)
+            Optional<SpillCipher> spillCipher,
+            boolean useDirect)
     {
         this.serde = requireNonNull(serde, "serde is null");
         this.executor = requireNonNull(executor, "executor is null");
@@ -117,6 +120,8 @@ public class FileSingleStreamSpiller
         catch (IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to create spill file", e);
         }
+
+        this.useDirect = useDirect;
     }
 
     @Override
@@ -124,7 +129,12 @@ public class FileSingleStreamSpiller
     {
         requireNonNull(pageIterator, "pageIterator is null");
         checkNoSpillInProgress();
-        spillInProgress = executor.submit(() -> writePages(pageIterator));
+        if (useDirect) {
+            spillInProgress = executor.submit(() -> writePagesDirect(pageIterator));
+        }
+        else {
+            spillInProgress = executor.submit(() -> writePages(pageIterator));
+        }
         return spillInProgress;
     }
 
@@ -167,6 +177,25 @@ public class FileSingleStreamSpiller
         }
     }
 
+    private void writePagesDirect(Iterator<Page> pageIterator)
+    {
+        checkState(writable, "Spilling no longer allowed. The spiller has been made non-writable on first read for subsequent reads to be consistent");
+        try (Output output = new Output(targetFile.newOutputStream(APPEND), BUFFER_SIZE)) {
+            while (pageIterator.hasNext()) {
+                Page page = pageIterator.next();
+                long pageSize = page.getSizeInBytes();
+                spilledPagesInMemorySize += pageSize;
+                localSpillContext.updateBytes(pageSize);
+                spillerStats.addToTotalSpilledBytes(pageSize);
+                pageSizeList.add(pageSize);
+                serde.serialize(output, page);
+            }
+        }
+        catch (UncheckedIOException | IOException e) {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to spill pages", e);
+        }
+    }
+
     private Iterator<Page> readPages()
     {
         checkState(writable, "Repeated reads are disallowed to prevent potential resource leaks");
@@ -174,7 +203,14 @@ public class FileSingleStreamSpiller
 
         try {
             InputStream input = closer.register(targetFile.newInputStream());
-            Iterator<Page> pages = PagesSerdeUtil.readPages(serde, new InputStreamSliceInput(input, BUFFER_SIZE));
+            Iterator<Page> pages;
+
+            if (useDirect) {
+                pages = PagesSerdeUtil.readPagesDirect(serde, new Input(input, BUFFER_SIZE));
+            }
+            else {
+                pages = PagesSerdeUtil.readPages(serde, new InputStreamSliceInput(input, BUFFER_SIZE));
+            }
             return closeWhenExhausted(pages, input);
         }
         catch (IOException e) {

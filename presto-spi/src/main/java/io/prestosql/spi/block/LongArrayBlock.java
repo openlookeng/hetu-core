@@ -39,11 +39,11 @@ public class LongArrayBlock
     //can we intro operations at block level?, for example join of blocks?
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(LongArrayBlock.class).instanceSize();
 
-    private final int arrayOffset;
+    protected final int arrayOffset;
     private final int positionCount;
     @Nullable
-    private final boolean[] valueIsNull;
-    private final long[] values; //change to use offheap --> accessible by RDMA
+    protected final boolean[] valueIsNull;
+    protected final long[] values; //change to use offheap --> accessible by RDMA
 
     private final long sizeInBytes;
     private final long retainedSizeInBytes;

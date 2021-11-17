@@ -145,5 +145,10 @@
             <groupId>io.airlift</groupId>
             <artifactId>joni</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.esotericsoftware</groupId>
+            <artifactId>kryo</artifactId>
+            <version>5.0.3</version>
+        </dependency>
     </dependencies>
 </project>

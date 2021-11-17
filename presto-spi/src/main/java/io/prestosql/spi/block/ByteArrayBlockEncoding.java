@@ -13,6 +13,9 @@
  */
 package io.prestosql.spi.block;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
 
@@ -20,7 +23,7 @@ import static io.prestosql.spi.block.EncoderUtil.decodeNullBits;
 import static io.prestosql.spi.block.EncoderUtil.encodeNullsAsBits;
 
 public class ByteArrayBlockEncoding
-        implements BlockEncoding
+        extends AbstractBlockEncoding<ByteArrayBlock>
 {
     public static final String NAME = "BYTE_ARRAY";
 
@@ -59,6 +62,31 @@ public class ByteArrayBlockEncoding
             }
         }
 
+        return new ByteArrayBlock(0, positionCount, valueIsNull, values);
+    }
+
+    @Override
+    public void write(Kryo kryo, Output output, ByteArrayBlock block)
+    {
+        int positionCount = block.getPositionCount();
+        output.writeInt(positionCount);
+        output.writeBoolean(block.mayHaveNull());
+        if (block.mayHaveNull()) {
+            output.writeBooleans(block.valueIsNull, 0, positionCount);
+        }
+
+        output.writeBytes(block.values, block.arrayOffset, positionCount);
+    }
+
+    @Override
+    public ByteArrayBlock read(Kryo kryo, Input input, Class<? extends ByteArrayBlock> aClass)
+    {
+        int positionCount = input.readInt();
+        boolean[] valueIsNull = null;
+        if (input.readBoolean()) {
+            valueIsNull = input.readBooleans(positionCount);
+        }
+        byte[] values = input.readBytes(positionCount);
         return new ByteArrayBlock(0, positionCount, valueIsNull, values);
     }
 }

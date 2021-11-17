@@ -13,9 +13,25 @@
  */
 package io.prestosql.spi.block;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import com.google.common.base.Stopwatch;
 import io.airlift.slice.DynamicSliceOutput;
+import io.airlift.slice.OutputStreamSliceOutput;
+import io.airlift.slice.InputStreamSliceInput;
 import io.prestosql.spi.type.Type;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
+import org.testng.annotations.BeforeClass;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.concurrent.TimeUnit;
 
 import static io.prestosql.spi.block.TestingSession.SESSION;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
@@ -24,6 +40,36 @@ import static org.testng.Assert.assertEquals;
 public class TestVariableWidthBlockEncoding
 {
     private final BlockEncodingSerde blockEncodingSerde = new TestingBlockEncodingSerde();
+    private String storePath = "./target/store";
+
+    private Kryo kryo;
+    private Output output;
+    private Input input;
+
+    @BeforeClass
+    public void init()
+    {
+        kryo = new Kryo();
+        kryo.register(VariableWidthBlock.class);
+
+        File dir = new File(storePath);
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+    }
+
+    @AfterClass
+    public void teardown()
+    {
+        File dir = new File(storePath);
+        if (dir.exists()) {
+            File[] files = dir.listFiles();
+            for (File file: files) {
+                file.delete();
+            }
+            dir.delete();
+        }
+    }
 
     @Test
     public void testRoundTrip()
@@ -39,6 +85,87 @@ public class TestVariableWidthBlockEncoding
         blockEncodingSerde.writeBlock(sliceOutput, expectedBlock);
         Block actualBlock = blockEncodingSerde.readBlock(sliceOutput.slice().getInput());
         assertBlockEquals(VARCHAR, actualBlock, expectedBlock);
+    }
+
+    @Test
+    public void testRoundTripKryo() throws FileNotFoundException
+    {
+        output = new Output(new FileOutputStream(storePath + "/" + "file.dat"));
+        input = new Input(new FileInputStream(storePath + "/" + "file.dat"));
+
+        BlockBuilder expectedBlockBuilder = VARCHAR.createBlockBuilder(null, 4);
+        VARCHAR.writeString(expectedBlockBuilder, "alice");
+        VARCHAR.writeString(expectedBlockBuilder, "bob");
+        VARCHAR.writeString(expectedBlockBuilder, "charlie");
+        VARCHAR.writeString(expectedBlockBuilder, "dave");
+        Block expectedBlock = expectedBlockBuilder.build();
+
+        kryo.writeObject(output, expectedBlock);
+        output.close();
+
+        Block actualBlock = kryo.readObject(input, VariableWidthBlock.class);
+        assertBlockEquals(VARCHAR, actualBlock, expectedBlock);
+        input.close();
+    }
+
+    @Test
+    public void testRoundTripKryoPerf100000000() throws IOException
+    {
+        int LOOP_COUNT = 1000;
+        for (int i=1; i<=5; i++) {
+            LOOP_COUNT *= 10;
+            loopReadWritePerfTest(LOOP_COUNT);
+        }
+    }
+
+    private void loopReadWritePerfTest(int LOOP_COUNT) throws IOException
+    {
+        output = new Output(new FileOutputStream(storePath + "/" + "file.dat"));
+        input = new Input(new FileInputStream(storePath + "/" + "file.dat"));
+
+        OutputStreamSliceOutput sliceOutput = new OutputStreamSliceOutput(new FileOutputStream(storePath + "/" + "sliceFile.dat"));
+        InputStreamSliceInput sliceInput = new InputStreamSliceInput(new FileInputStream(storePath + "/" + "sliceFile.dat"));
+
+        BlockBuilder expectedBlockBuilder = VARCHAR.createBlockBuilder(null, 4);
+        VARCHAR.writeString(expectedBlockBuilder, "alice");
+        VARCHAR.writeString(expectedBlockBuilder, "bob");
+        VARCHAR.writeString(expectedBlockBuilder, "charlie");
+        VARCHAR.writeString(expectedBlockBuilder, "dave");
+        Block expectedBlock = expectedBlockBuilder.build();
+
+        Stopwatch watchKryoWrite = Stopwatch.createStarted();
+        for (int i=0; i < LOOP_COUNT; i++) {
+            kryo.writeObject(output, expectedBlock);
+        }
+        watchKryoWrite.stop();
+        System.out.println(String.format("[Pages: %,11d] Time to write       [Kryo]: %,7d ms", LOOP_COUNT, watchKryoWrite.elapsed(TimeUnit.MILLISECONDS)));
+        output.close();
+
+        Stopwatch watchSerDeWrite = Stopwatch.createStarted();
+        for (int i=0; i < LOOP_COUNT; i++) {
+            blockEncodingSerde.writeBlock(sliceOutput, expectedBlock);
+        }
+        watchSerDeWrite.stop();
+        System.out.println(String.format("[Pages: %,11d] Time to write [BlockSerDe]: %,7d ms", LOOP_COUNT, watchSerDeWrite.elapsed(TimeUnit.MILLISECONDS)));
+        sliceOutput.close();
+
+        Stopwatch watchKryoRead = Stopwatch.createStarted();
+        for (int i=0; i < LOOP_COUNT; i++) {
+            Block actualBlock = kryo.readObject(input, VariableWidthBlock.class);
+            //assertBlockEquals(VARCHAR, actualBlock, expectedBlock);
+        }
+        watchKryoRead.stop();
+        System.out.println(String.format("[Pages: %,11d] Time to read        [Kryo]: %,7d ms", LOOP_COUNT, watchKryoRead.elapsed(TimeUnit.MILLISECONDS)));
+        input.close();
+
+        Stopwatch watchSerDeRead = Stopwatch.createStarted();
+        for (int i=0; i < LOOP_COUNT; i++) {
+            Block actualBlock = blockEncodingSerde.readBlock(sliceInput);
+            //assertBlockEquals(VARCHAR, actualBlock, expectedBlock);
+        }
+        watchSerDeRead.stop();
+        System.out.println(String.format("[Pages: %,11d] Time to read  [BlockSerDe]: %,7d ms", LOOP_COUNT, watchSerDeRead.elapsed(TimeUnit.MILLISECONDS)));
+        input.close();
     }
 
     private static void assertBlockEquals(Type type, Block actual, Block expected)

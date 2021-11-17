@@ -1755,7 +1755,7 @@ public class TestHashJoinOperator
         }
 
         @Override
-        public SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext)
+        public SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext, boolean useDirect)
         {
             return new SingleStreamSpiller()
             {

@@ -13,6 +13,10 @@
  */
 package io.hetu.core.transport.block;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.Serializer;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
@@ -41,8 +45,18 @@ public final class BlockSerdeUtil
         return blockEncodingSerde.readBlock(input);
     }
 
+    public static Block readBlock(Kryo kryo, Serializer blockEncodingSerde, Input input)
+    {
+        return (Block) blockEncodingSerde.read(kryo, input, null);
+    }
+
     public static void writeBlock(BlockEncodingSerde blockEncodingSerde, SliceOutput output, Block block)
     {
         blockEncodingSerde.writeBlock(output, block);
+    }
+
+    public static void writeBlock(Kryo kryo, Serializer blockEncodingSerde, Output output, Block block)
+    {
+        blockEncodingSerde.write(kryo, output, block);
     }
 }
