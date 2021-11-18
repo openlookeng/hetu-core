@@ -13,9 +13,16 @@
  */
 package io.prestosql.spi.block;
 
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.StandardErrorCode;
+
+import java.io.InputStream;
+import java.io.OutputStream;
 
 public class DictionaryBlockEncoding
         implements BlockEncoding
@@ -75,5 +82,58 @@ public class DictionaryBlockEncoding
         // As a result, setting dictionaryIsCompacted to true is not appropriate here.
         // TODO: fix DictionaryBlock so that dictionaryIsCompacted can be set to true when the underlying block over-retains memory.
         return new DictionaryBlock(positionCount, dictionaryBlock, ids, false, new DictionaryId(mostSignificantBits, leastSignificantBits, sequenceId));
+    }
+
+    @Override
+    public Block readBlock(BlockEncodingSerde blockEncodingSerde, InputStream inputStream)
+    {
+        if (!(inputStream instanceof Input)) {
+            throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Wrong inputStream for Dictionary ReadBlock");
+        }
+
+        Input input = (Input) inputStream;
+        int positionCount = input.readInt();
+
+        // dictionary
+        Block dictionaryBlock = blockEncodingSerde.readBlock(input);
+
+        // ids
+        int[] ids = input.readInts(positionCount);
+
+        // instance id
+        long mostSignificantBits = input.readLong();
+        long leastSignificantBits = input.readLong();
+        long sequenceId = input.readLong();
+
+        return new DictionaryBlock(positionCount, dictionaryBlock, ids, false, new DictionaryId(mostSignificantBits, leastSignificantBits, sequenceId));
+    }
+
+    @Override
+    public void writeBlock(BlockEncodingSerde blockEncodingSerde, OutputStream outputStream, Block block)
+    {
+        if (!(outputStream instanceof Output)) {
+            throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Wrong outputStream for SingleMap WriteBlock");
+        }
+
+        Output output = (Output) outputStream;
+        DictionaryBlock dictionaryBlock = (DictionaryBlock) block;
+
+        dictionaryBlock = dictionaryBlock.compact();
+
+        // positionCount
+        int positionCount = dictionaryBlock.getPositionCount();
+        output.writeInt(positionCount);
+
+        // dictionary
+        Block dictionary = dictionaryBlock.getDictionary();
+        blockEncodingSerde.writeBlock(output, dictionary);
+
+        // ids
+        output.writeInts(dictionaryBlock.ids, dictionaryBlock.idsOffset, positionCount);
+
+        // instance id
+        output.writeLong(dictionaryBlock.getDictionarySourceId().getMostSignificantBits());
+        output.writeLong(dictionaryBlock.getDictionarySourceId().getLeastSignificantBits());
+        output.writeLong(dictionaryBlock.getDictionarySourceId().getSequenceId());
     }
 }

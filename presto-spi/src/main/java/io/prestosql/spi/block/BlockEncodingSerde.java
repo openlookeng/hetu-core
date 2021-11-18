@@ -54,4 +54,10 @@ public interface BlockEncodingSerde
     {
         throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not supported");
     }
+
+    /* give out context object if any */
+    default Object getContext()
+    {
+        return null;
+    }
 }

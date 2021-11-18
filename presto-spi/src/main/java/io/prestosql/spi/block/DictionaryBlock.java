@@ -41,8 +41,8 @@ public class DictionaryBlock<T>
 
     private final int positionCount;
     private final Block<T> dictionary;
-    private final int idsOffset;
-    private final int[] ids;
+    protected final int idsOffset;
+    protected final int[] ids;
     private final long retainedSizeInBytes;
     private volatile long sizeInBytes = -1;
     private volatile long logicalSizeInBytes = -1;

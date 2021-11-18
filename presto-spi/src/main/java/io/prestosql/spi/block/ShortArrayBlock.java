@@ -35,11 +35,11 @@ public class ShortArrayBlock
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(ShortArrayBlock.class).instanceSize();
 
-    private final int arrayOffset;
+    protected final int arrayOffset;
     private final int positionCount;
     @Nullable
-    private final boolean[] valueIsNull;
-    private final short[] values;
+    protected final boolean[] valueIsNull;
+    protected final short[] values;
 
     private final long sizeInBytes;
     private final long retainedSizeInBytes;

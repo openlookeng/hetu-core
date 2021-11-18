@@ -20,6 +20,11 @@ import io.airlift.slice.Slice;
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.StandardErrorCode;
+
+import java.io.InputStream;
+import java.io.OutputStream;
 
 import static io.airlift.slice.SizeOf.SIZE_OF_INT;
 import static io.prestosql.spi.block.EncoderUtil.decodeNullBits;
@@ -106,5 +111,39 @@ public class VariableWidthBlockEncoding
         Slice slice = Slices.wrappedBuffer(input.readBytes(blockSize));
 
         return new VariableWidthBlock(0, positionCount, slice, offsets, valuesIsNull);
+    }
+
+    /**
+     * Read a block from the specified input.  The returned
+     * block should begin at the specified position.
+     *
+     * @param blockEncodingSerde
+     * @param input
+     */
+    @Override
+    public Block readBlock(BlockEncodingSerde blockEncodingSerde, InputStream input)
+    {
+        if (!(blockEncodingSerde.getContext() instanceof Kryo) || !(input instanceof Input)) {
+            throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Generic readblock not supported for VariableWidthBlock");
+        }
+
+        return this.read((Kryo) blockEncodingSerde.getContext(), (Input) input, VariableWidthBlock.class);
+    }
+
+    /**
+     * Write the specified block to the specified output
+     *
+     * @param blockEncodingSerde
+     * @param output
+     * @param block
+     */
+    @Override
+    public void writeBlock(BlockEncodingSerde blockEncodingSerde, OutputStream output, Block block)
+    {
+        if (!(blockEncodingSerde.getContext() instanceof Kryo) || !(output instanceof Output)) {
+            throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Generic write not supported for VariableWidthBlock");
+        }
+
+        this.write((Kryo) blockEncodingSerde.getContext(), (Output) output, (VariableWidthBlock) block);
     }
 }

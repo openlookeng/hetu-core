@@ -35,11 +35,11 @@ public class IntArrayBlock
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(IntArrayBlock.class).instanceSize();
 
-    private final int arrayOffset;
+    protected final int arrayOffset;
     private final int positionCount;
     @Nullable
-    private final boolean[] valueIsNull;
-    private final int[] values;
+    protected final boolean[] valueIsNull;
+    protected final int[] values;
 
     private final long sizeInBytes;
     private final long retainedSizeInBytes;

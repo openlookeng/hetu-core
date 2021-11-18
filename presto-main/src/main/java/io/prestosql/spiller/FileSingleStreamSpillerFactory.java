@@ -158,8 +158,8 @@ public class FileSingleStreamSpillerFactory
         if (spillEncryptionEnabled) {
             spillCipher = Optional.of(new AesSpillCipher());
         }
-        PagesSerde serde = serdeFactory.createPagesSerdeForSpill(spillCipher, useDirect);
-        return new FileSingleStreamSpiller(serde, executor, getNextSpillPath(), spillerStats, spillContext, memoryContext, spillCipher, useDirect);
+        PagesSerde serde = serdeFactory.createPagesSerdeForSpill(spillCipher, useDirect || spillDirectEnabled);
+        return new FileSingleStreamSpiller(serde, executor, getNextSpillPath(), spillerStats, spillContext, memoryContext, spillCipher, useDirect || spillDirectEnabled);
     }
 
     private synchronized Path getNextSpillPath()

@@ -107,7 +107,6 @@ public class TestVariableWidthBlockEncoding
         input.close();
     }
 
-    @Test
     public void testRoundTripKryoPerf100000000() throws IOException
     {
         int loopCount = 1000;

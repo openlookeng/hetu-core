@@ -18,6 +18,11 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.StandardErrorCode;
+
+import java.io.InputStream;
+import java.io.OutputStream;
 
 import static io.prestosql.spi.block.EncoderUtil.decodeNullBits;
 import static io.prestosql.spi.block.EncoderUtil.encodeNullsAsBits;
@@ -88,5 +93,39 @@ public class ByteArrayBlockEncoding
         }
         byte[] values = input.readBytes(positionCount);
         return new ByteArrayBlock(0, positionCount, valueIsNull, values);
+    }
+
+    /**
+     * Read a block from the specified input.  The returned
+     * block should begin at the specified position.
+     *
+     * @param blockEncodingSerde
+     * @param input
+     */
+    @Override
+    public Block readBlock(BlockEncodingSerde blockEncodingSerde, InputStream input)
+    {
+        if (!(blockEncodingSerde.getContext() instanceof Kryo) || !(input instanceof Input)) {
+            throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Generic readblock not supported for ByteArrayBlock");
+        }
+
+        return this.read((Kryo) blockEncodingSerde.getContext(), (Input) input, ByteArrayBlock.class);
+    }
+
+    /**
+     * Write the specified block to the specified output
+     *
+     * @param blockEncodingSerde
+     * @param output
+     * @param block
+     */
+    @Override
+    public void writeBlock(BlockEncodingSerde blockEncodingSerde, OutputStream output, Block block)
+    {
+        if (!(blockEncodingSerde.getContext() instanceof Kryo) || !(output instanceof Output)) {
+            throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Generic write not supported for ByteArrayBlock");
+        }
+
+        this.write((Kryo) blockEncodingSerde.getContext(), (Output) output, (ByteArrayBlock) block);
     }
 }

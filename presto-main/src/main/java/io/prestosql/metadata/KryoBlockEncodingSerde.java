@@ -28,7 +28,6 @@ import io.prestosql.spi.block.BlockEncodingSerde;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import static io.prestosql.spi.StandardErrorCode.TYPE_NOT_FOUND;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
@@ -47,6 +46,12 @@ public class KryoBlockEncodingSerde
     public Kryo getKryo()
     {
         return kryo;
+    }
+
+    @Override
+    public Object getContext()
+    {
+        return getKryo();
     }
 
     /**
@@ -71,7 +76,8 @@ public class KryoBlockEncodingSerde
         BlockEncoding blockEncoding = functionAndTypeManager.getBlockEncoding(encodingName);
         Serializer<?> serializer = getSerializerFromBlockEncoding(blockEncoding);
         if (serializer == null) {
-            throw new PrestoException(TYPE_NOT_FOUND, "BlockEncoding Type not implemented: " + blockEncoding);
+            //throw new PrestoException(TYPE_NOT_FOUND, "BlockEncoding Type not implemented: " + blockEncoding);
+            return (Block) blockEncoding.readBlock(this, inputStream);
         }
         return (Block) serializer.read(kryo, input, null);
     }
@@ -95,15 +101,17 @@ public class KryoBlockEncodingSerde
         String encodingName = block.getEncodingName();
         BlockEncoding blockEncoding = functionAndTypeManager.getBlockEncoding(encodingName);
         Serializer<Block<?>> serializer = getSerializerFromBlockEncoding(blockEncoding);
-        if (serializer == null) {
-            throw new PrestoException(TYPE_NOT_FOUND, "BlockEncoding Type not implemented: " + blockEncoding);
-        }
 
         // write the name to the output
         writeLengthPrefixedString(output, encodingName);
 
-        // write the block to the output
-        serializer.write(kryo, output, block);
+        if (serializer == null) {
+            blockEncoding.writeBlock(this, outputStream, block);
+        }
+        else {
+            // write the block to the output
+            serializer.write(kryo, output, block);
+        }
     }
 
     private Serializer<Block<?>> getSerializerFromBlockEncoding(BlockEncoding blockEncoding)
