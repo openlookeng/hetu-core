@@ -16,6 +16,7 @@ package io.prestosql.snapshot;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.execution.TaskId;
+import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.DriverContext;
 import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorContext;
@@ -39,6 +40,7 @@ import static io.prestosql.SessionTestUtils.TEST_SNAPSHOT_SESSION;
 import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static org.mockito.Matchers.anyBoolean;
+import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -64,15 +66,18 @@ public class TestSingleInputSnapshotState
     private TaskSnapshotManager snapshotManager;
     private TestingRestorable restorable;
     private SingleInputSnapshotState state;
+    private LocalMemoryContext snapshotMemoryContext;
 
     @BeforeMethod
     public void setup()
             throws Exception
     {
         snapshotManager = mock(TaskSnapshotManager.class);
+        snapshotMemoryContext = mock(LocalMemoryContext.class);
+        when(snapshotMemoryContext.trySetBytes(anyLong())).thenReturn(true);
         restorable = new TestingRestorable();
         restorable.state = 100;
-        state = new SingleInputSnapshotState(restorable, snapshotManager, null, TestSingleInputSnapshotState::createSnapshotStateId, TestSingleInputSnapshotState::createSnapshotStateId);
+        state = new SingleInputSnapshotState(restorable, snapshotManager, null, TestSingleInputSnapshotState::createSnapshotStateId, TestSingleInputSnapshotState::createSnapshotStateId, snapshotMemoryContext);
     }
 
     private boolean processPage(Page page)
@@ -199,7 +204,7 @@ public class TestSingleInputSnapshotState
     public void testResumeBacktrack()
             throws Exception
     {
-        SingleInputSnapshotState state = new SingleInputSnapshotState(restorable, snapshotManager, null, TestSingleInputSnapshotState::createSnapshotStateId, TestSingleInputSnapshotState::createSnapshotStateId);
+        SingleInputSnapshotState state = new SingleInputSnapshotState(restorable, snapshotManager, null, TestSingleInputSnapshotState::createSnapshotStateId, TestSingleInputSnapshotState::createSnapshotStateId, snapshotMemoryContext);
         state.processPage(regularPage);
         restorable.state++;
         int saved1 = restorable.state;
@@ -222,7 +227,8 @@ public class TestSingleInputSnapshotState
                 snapshotManager,
                 null,
                 TestSingleInputSnapshotState::createSnapshotStateId,
-                TestSingleInputSnapshotState::createSnapshotStateId);
+                TestSingleInputSnapshotState::createSnapshotStateId,
+                snapshotMemoryContext);
         state.processPage(marker1);
         when(snapshotManager.loadState(anyObject())).thenReturn(Optional.of(1));
         when(snapshotManager.loadFile(anyObject(), anyObject()))
@@ -250,7 +256,8 @@ public class TestSingleInputSnapshotState
                 snapshotManager,
                 null,
                 TestSingleInputSnapshotState::createSnapshotStateId,
-                TestSingleInputSnapshotState::createSnapshotStateId);
+                TestSingleInputSnapshotState::createSnapshotStateId,
+                snapshotMemoryContext);
         state.processPage(marker1);
         when(snapshotManager.loadConsolidatedState(anyObject())).thenReturn(Optional.of(0));
         state.processPage(resume1);
@@ -271,7 +278,8 @@ public class TestSingleInputSnapshotState
                 snapshotManager,
                 null,
                 TestSingleInputSnapshotState::createSnapshotStateId,
-                TestSingleInputSnapshotState::createSnapshotStateId);
+                TestSingleInputSnapshotState::createSnapshotStateId,
+                snapshotMemoryContext);
         state.processPage(marker1);
         when(snapshotManager.loadState(anyObject())).thenReturn(Optional.of(0));
         state.processPage(resume1);
@@ -304,6 +312,12 @@ public class TestSingleInputSnapshotState
         public boolean supportsConsolidatedWrites()
         {
             return this.supportsConsolidatedWrites;
+        }
+
+        @Override
+        public long getUsedMemory()
+        {
+            return 0;
         }
 
         public void setSupportsConsolidatedWrites(boolean supportsConsolidatedWrites)

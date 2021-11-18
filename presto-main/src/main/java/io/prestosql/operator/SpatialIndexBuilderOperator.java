@@ -263,6 +263,9 @@ public class SpatialIndexBuilderOperator
     @Override
     public void close()
     {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
         index.clear();
         localUserMemoryContext.setBytes(index.getEstimatedSize().toBytes());
     }

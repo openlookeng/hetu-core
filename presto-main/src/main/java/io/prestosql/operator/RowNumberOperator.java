@@ -394,6 +394,14 @@ public class RowNumberOperator
     }
 
     @Override
+    public void close()
+    {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         RowNumberOperatorState myState = new RowNumberOperatorState();

@@ -151,6 +151,9 @@ public class WorkProcessorOperatorAdapter
     public void close()
             throws Exception
     {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
         workProcessorOperator.close();
     }
 

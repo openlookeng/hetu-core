@@ -369,6 +369,9 @@ public class TableFinishOperator
     public void close()
             throws Exception
     {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
         statisticsAggregationOperator.close();
     }
 

@@ -397,6 +397,9 @@ public class HashAggregationOperator
     public void close()
     {
         closeAggregationBuilder();
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
     }
 
     protected void closeAggregationBuilder()

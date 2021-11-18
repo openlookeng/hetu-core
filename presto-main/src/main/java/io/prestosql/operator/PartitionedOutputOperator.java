@@ -613,6 +613,14 @@ public class PartitionedOutputOperator
     }
 
     @Override
+    public void close()
+    {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         PartitionedOutputOperatorState myState = new PartitionedOutputOperatorState();

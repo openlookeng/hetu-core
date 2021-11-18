@@ -196,6 +196,14 @@ public class CrossRegionDynamicFilterOperator
     }
 
     @Override
+    public void close()
+    {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         CrossRegionDynamicFilterOperatorState myState = new CrossRegionDynamicFilterOperatorState();

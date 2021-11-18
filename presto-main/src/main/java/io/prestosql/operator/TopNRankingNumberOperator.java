@@ -335,6 +335,14 @@ public class TopNRankingNumberOperator
     }
 
     @Override
+    public void close()
+    {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         TopNRankingNumberOperatorState myState = new TopNRankingNumberOperatorState();

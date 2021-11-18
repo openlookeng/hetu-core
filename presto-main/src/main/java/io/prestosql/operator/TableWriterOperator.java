@@ -383,6 +383,9 @@ public class TableWriterOperator
     public void close()
             throws Exception
     {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
         closeImpl(pageSink::abort);
     }
 

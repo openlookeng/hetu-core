@@ -267,6 +267,12 @@ public class OperatorContext
         return new InternalLocalMemoryContext(operatorMemoryContext.newSystemMemoryContext(allocationTag), memoryFuture, this::updatePeakMemoryReservations, true);
     }
 
+    // caller should close this context as it's a new context
+    public LocalMemoryContext newLocalUserMemoryContext(String allocationTag)
+    {
+        return new InternalLocalMemoryContext(operatorMemoryContext.newUserMemoryContext(allocationTag), memoryFuture, this::updatePeakMemoryReservations, true);
+    }
+
     // caller shouldn't close this context as it's managed by the OperatorContext
     public LocalMemoryContext localUserMemoryContext()
     {
@@ -337,6 +343,11 @@ public class OperatorContext
     public long getReservedRevocableBytes()
     {
         return operatorMemoryContext.getRevocableMemory();
+    }
+
+    public long getTotalMemoryBytes()
+    {
+        return operatorMemoryContext.getUserMemory() + operatorMemoryContext.getSystemMemory();
     }
 
     private static void updateMemoryFuture(ListenableFuture<?> memoryPoolFuture, AtomicReference<SettableFuture<?>> targetFutureReference)

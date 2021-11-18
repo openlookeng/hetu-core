@@ -135,6 +135,9 @@ public class AggregationOperator
     {
         userMemoryContext.setBytes(0);
         systemMemoryContext.close();
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
     }
 
     @Override

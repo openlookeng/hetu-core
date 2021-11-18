@@ -50,4 +50,14 @@ public interface Restorable
     {
         return true;
     }
+
+    /**
+     * Finds the memory used to capture this object in a snapshot
+     *
+     * @return The size of the object created to be created in capture in bytes
+     */
+    default long getUsedMemory()
+    {
+        throw new UnsupportedOperationException();
+    }
 }

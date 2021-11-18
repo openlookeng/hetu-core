@@ -367,6 +367,9 @@ public class SortAggregationOperator
     public void close()
     {
         closeAggregationBuilder();
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
     }
 
     protected void closeAggregationBuilder()

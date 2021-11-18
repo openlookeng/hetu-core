@@ -156,6 +156,14 @@ public class ValuesOperator
     }
 
     @Override
+    public void close()
+    {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         return operatorContext.capture(serdeProvider);

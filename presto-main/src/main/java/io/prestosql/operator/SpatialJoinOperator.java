@@ -368,7 +368,9 @@ public class SpatialJoinOperator
             return;
         }
         closed = true;
-
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
         pagesSpatialIndexFuture = null;
         onClose.run();
     }

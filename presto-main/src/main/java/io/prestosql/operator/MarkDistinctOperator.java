@@ -230,6 +230,14 @@ public class MarkDistinctOperator
     }
 
     @Override
+    public void close()
+    {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         MarkDistinctOperatorState myState = new MarkDistinctOperatorState();

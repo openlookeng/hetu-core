@@ -589,6 +589,11 @@ public class LookupJoinOperator
 
             closer.register(pageBuilder::reset);
             closer.register(() -> Optional.ofNullable(lookupSourceProvider).ifPresent(LookupSourceProvider::close));
+            closer.register(() -> {
+                if (snapshotState != null) {
+                    snapshotState.close();
+                }
+            });
             spiller.ifPresent(closer::register);
         }
         catch (IOException e) {

@@ -418,6 +418,9 @@ public class OrderByOperator
     @Override
     public void close()
     {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
         pageIndex.clear();
         sortedPages = null;
         spiller.ifPresent(Spiller::close);

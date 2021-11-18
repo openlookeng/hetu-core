@@ -120,6 +120,8 @@ public class TestWindowOperator
     private static final List<WindowFunctionDefinition> LEAD = ImmutableList.of(
             window(new ReflectionWindowFunctionSupplier<>("lead", VARCHAR, ImmutableList.of(VARCHAR, BIGINT, VARCHAR), LeadFunction.class), VARCHAR, UNBOUNDED_FRAME, 1, 3, 4));
 
+    private static final long defaultMemoryLimit = 1L << 28;
+
     private ExecutorService executor;
     private ScheduledExecutorService scheduledExecutor;
     private DummySpillerFactory spillerFactory;
@@ -1223,7 +1225,7 @@ public class TestWindowOperator
                 spillerFactory,
                 new OrderingCompiler());
 
-        DriverContext driverContext = createDriverContext(0, TEST_SNAPSHOT_SESSION);
+        DriverContext driverContext = createDriverContext(defaultMemoryLimit, TEST_SNAPSHOT_SESSION);
         WindowOperator windowOperator = (WindowOperator) operatorFactory.createOperator(driverContext);
 
         // Step1: add the first 2 pages
@@ -1340,7 +1342,7 @@ public class TestWindowOperator
                 ImmutableList.copyOf(new SortOrder[] {SortOrder.ASC_NULLS_LAST}),
                 false);
 
-        DriverContext driverContext = createDriverContext(0, TEST_SNAPSHOT_SESSION);
+        DriverContext driverContext = createDriverContext(defaultMemoryLimit, TEST_SNAPSHOT_SESSION);
         WindowOperator windowOperator = (WindowOperator) operatorFactory.createOperator(driverContext);
 
         // Step1: add the first 2 pages
