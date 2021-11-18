@@ -18,19 +18,18 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.google.common.base.Stopwatch;
 import io.airlift.slice.DynamicSliceOutput;
-import io.airlift.slice.OutputStreamSliceOutput;
 import io.airlift.slice.InputStreamSliceInput;
+import io.airlift.slice.OutputStreamSliceOutput;
 import io.prestosql.spi.type.Type;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.Test;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.concurrent.TimeUnit;
 
 import static io.prestosql.spi.block.TestingSession.SESSION;
@@ -64,7 +63,7 @@ public class TestVariableWidthBlockEncoding
         File dir = new File(storePath);
         if (dir.exists()) {
             File[] files = dir.listFiles();
-            for (File file: files) {
+            for (File file : files) {
                 file.delete();
             }
             dir.delete();
@@ -111,14 +110,14 @@ public class TestVariableWidthBlockEncoding
     @Test
     public void testRoundTripKryoPerf100000000() throws IOException
     {
-        int LOOP_COUNT = 1000;
-        for (int i=1; i<=5; i++) {
-            LOOP_COUNT *= 10;
-            loopReadWritePerfTest(LOOP_COUNT);
+        int loopCount = 1000;
+        for (int i = 1; i <= 5; i++) {
+            loopCount *= 10;
+            loopReadWritePerfTest(loopCount);
         }
     }
 
-    private void loopReadWritePerfTest(int LOOP_COUNT) throws IOException
+    private void loopReadWritePerfTest(int loopCount) throws IOException
     {
         output = new Output(new FileOutputStream(storePath + "/" + "file.dat"));
         input = new Input(new FileInputStream(storePath + "/" + "file.dat"));
@@ -134,37 +133,37 @@ public class TestVariableWidthBlockEncoding
         Block expectedBlock = expectedBlockBuilder.build();
 
         Stopwatch watchKryoWrite = Stopwatch.createStarted();
-        for (int i=0; i < LOOP_COUNT; i++) {
+        for (int i = 0; i < loopCount; i++) {
             kryo.writeObject(output, expectedBlock);
         }
         watchKryoWrite.stop();
-        System.out.println(String.format("[Pages: %,11d] Time to write       [Kryo]: %,7d ms", LOOP_COUNT, watchKryoWrite.elapsed(TimeUnit.MILLISECONDS)));
+        System.out.println(String.format("[Pages: %,11d] Time to write       [Kryo]: %,7d ms", loopCount, watchKryoWrite.elapsed(TimeUnit.MILLISECONDS)));
         output.close();
 
         Stopwatch watchSerDeWrite = Stopwatch.createStarted();
-        for (int i=0; i < LOOP_COUNT; i++) {
+        for (int i = 0; i < loopCount; i++) {
             blockEncodingSerde.writeBlock(sliceOutput, expectedBlock);
         }
         watchSerDeWrite.stop();
-        System.out.println(String.format("[Pages: %,11d] Time to write [BlockSerDe]: %,7d ms", LOOP_COUNT, watchSerDeWrite.elapsed(TimeUnit.MILLISECONDS)));
+        System.out.println(String.format("[Pages: %,11d] Time to write [BlockSerDe]: %,7d ms", loopCount, watchSerDeWrite.elapsed(TimeUnit.MILLISECONDS)));
         sliceOutput.close();
 
         Stopwatch watchKryoRead = Stopwatch.createStarted();
-        for (int i=0; i < LOOP_COUNT; i++) {
+        for (int i = 0; i < loopCount; i++) {
             Block actualBlock = kryo.readObject(input, VariableWidthBlock.class);
             //assertBlockEquals(VARCHAR, actualBlock, expectedBlock);
         }
         watchKryoRead.stop();
-        System.out.println(String.format("[Pages: %,11d] Time to read        [Kryo]: %,7d ms", LOOP_COUNT, watchKryoRead.elapsed(TimeUnit.MILLISECONDS)));
+        System.out.println(String.format("[Pages: %,11d] Time to read        [Kryo]: %,7d ms", loopCount, watchKryoRead.elapsed(TimeUnit.MILLISECONDS)));
         input.close();
 
         Stopwatch watchSerDeRead = Stopwatch.createStarted();
-        for (int i=0; i < LOOP_COUNT; i++) {
+        for (int i = 0; i < loopCount; i++) {
             Block actualBlock = blockEncodingSerde.readBlock(sliceInput);
             //assertBlockEquals(VARCHAR, actualBlock, expectedBlock);
         }
         watchSerDeRead.stop();
-        System.out.println(String.format("[Pages: %,11d] Time to read  [BlockSerDe]: %,7d ms", LOOP_COUNT, watchSerDeRead.elapsed(TimeUnit.MILLISECONDS)));
+        System.out.println(String.format("[Pages: %,11d] Time to read  [BlockSerDe]: %,7d ms", loopCount, watchSerDeRead.elapsed(TimeUnit.MILLISECONDS)));
         input.close();
     }
 

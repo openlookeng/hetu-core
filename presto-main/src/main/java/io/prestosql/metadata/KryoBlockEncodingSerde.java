@@ -33,7 +33,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
 public class KryoBlockEncodingSerde
-    implements BlockEncodingSerde
+        implements BlockEncodingSerde
 {
     private final FunctionAndTypeManager functionAndTypeManager;
     private final Kryo kryo;

@@ -24,17 +24,15 @@ import io.prestosql.spi.block.BlockEncodingSerde;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.util.Optional;
 import java.util.Properties;
 
-import static io.hetu.core.transport.block.BlockSerdeUtil.readBlock;
-import static io.hetu.core.transport.block.BlockSerdeUtil.writeBlock;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
-public class KryoPageSerializer extends PagesSerde
+public class KryoPageSerializer
+        extends PagesSerde
 {
     BlockEncodingSerde serde;
     Serializer<Page> serializer = new Serializer<Page>()
@@ -78,7 +76,8 @@ public class KryoPageSerializer extends PagesSerde
                 Properties pros = new Properties();
                 try {
                     pros.load(new ByteArrayInputStream(pageMetadataBytes));
-                } catch (IOException e) {
+                }
+                catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
 

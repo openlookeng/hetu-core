@@ -155,6 +155,12 @@
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-spi</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.objenesis</groupId>
+                    <artifactId>objenesis</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>io.hetu.core</groupId>

@@ -37,6 +37,7 @@ import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.spiller.SpillCipher;
 
 import javax.annotation.concurrent.NotThreadSafe;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;

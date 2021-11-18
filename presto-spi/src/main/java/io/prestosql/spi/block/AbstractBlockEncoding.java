@@ -16,7 +16,8 @@ package io.prestosql.spi.block;
 
 import com.esotericsoftware.kryo.Serializer;
 
-public abstract class AbstractBlockEncoding<T> extends Serializer<T>
-    implements BlockEncoding
+public abstract class AbstractBlockEncoding<T>
+        extends Serializer<T>
+        implements BlockEncoding
 {
 }

@@ -423,7 +423,10 @@ public class TestFileSingleStreamSpiller
             Iterator<Page> spilledPagesIterator = spillers.get(i).getSpilledPages();
             WorkProcessor<Page> workProcessor = WorkProcessor.fromIterator(spilledPagesIterator);
 
-            workProcessor.iterator().forEachRemaining(page1 -> { page1.getLoadedPage(); pageCount.getAndIncrement();});
+            workProcessor.iterator().forEachRemaining(page1 -> {
+                page1.getLoadedPage();
+                pageCount.getAndIncrement();
+            });
             assertEquals(memoryContext.getBytes(), FileSingleStreamSpiller.BUFFER_SIZE);
         }
         spillTimer.stop();
