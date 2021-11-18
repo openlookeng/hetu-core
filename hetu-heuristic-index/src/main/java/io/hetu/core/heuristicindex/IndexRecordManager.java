@@ -52,8 +52,6 @@ public class IndexRecordManager
      */
     public List<IndexRecord> getIndexRecords()
     {
-        long startTime = System.currentTimeMillis();
-
         List<IndexRecord> records = new ArrayList<>();
         for (CatalogEntity catalogEntity : metastore.getCatalogs()) {
             for (DatabaseEntity databaseEntity : metastore.getAllDatabases(catalogEntity.getName())) {
@@ -66,8 +64,6 @@ public class IndexRecordManager
                 }
             }
         }
-
-        LOG.debug("%dms spent on index record scan from hetu metastore", System.currentTimeMillis() - startTime);
         return records;
     }
 
