@@ -77,7 +77,7 @@ public class FileSingleStreamSpillerFactory
                 listeningDecorator(newFixedThreadPool(
                         requireNonNull(featuresConfig, "featuresConfig is null").getSpillerThreads(),
                         daemonThreadsNamed("binary-spiller-%s"))),
-                requireNonNull(metadata, "metadata is null").getFunctionAndTypeManager().getBlockEncodingSerde(),
+                requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillDirectEnabled() ? requireNonNull(metadata, "metadata is null").getFunctionAndTypeManager().getBlockKryoEncodingSerde() : requireNonNull(metadata, "metadata is null").getFunctionAndTypeManager().getBlockEncodingSerde(),
                 spillerStats,
                 requireNonNull(featuresConfig, "featuresConfig is null").getSpillerSpillPaths(),
                 requireNonNull(featuresConfig, "featuresConfig is null").getSpillMaxUsedSpaceThreshold(),

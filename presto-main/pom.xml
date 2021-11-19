@@ -305,8 +305,20 @@
 
         <dependency>
             <groupId>org.mockito</groupId>
-            <artifactId>mockito-all</artifactId>
-            <version>1.10.19</version>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.objenesis</groupId>
+                    <artifactId>objenesis</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest-core</artifactId>
+            <version>1.1</version>
             <scope>test</scope>
         </dependency>
 
@@ -426,7 +438,6 @@
         <dependency>
             <groupId>com.esotericsoftware</groupId>
             <artifactId>kryo</artifactId>
-            <version>5.0.3</version>
         </dependency>
 
         <!-- for testing -->
@@ -474,8 +485,8 @@
             <scope>test</scope>
             <exclusions>
                 <exclusion>
-                    <groupId>org.objenesis</groupId>
-                    <artifactId>objenesis</artifactId>
+                    <groupId>com.esotericsoftware</groupId>
+                    <artifactId>kryo</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
