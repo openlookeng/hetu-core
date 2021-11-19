@@ -951,7 +951,20 @@ public class LogicalPart
             int[] retainedPositions = valueAndPosition.getValue().stream().mapToInt(i -> i).toArray();
             Object valueKey = valueAndPosition.getKey();
             Page subPage = page.getPositions(retainedPositions, 0, retainedPositions.length);
-            partitions.put(valueKey.toString(), subPage);
+            // NOTE: null partition key is allowed here in the map
+            // but when this partition map is sent to coordinator via MemoryDataFragment
+            // the JSON parser fails and can't handle null keys in the map
+            // the JSON parser will ignore null keys
+            // therefore during scheduling if the query predicate is for null
+            // we MUST NOT do any partition filtering because the partition map
+            // the coordinator has is missing null partitions
+            // the coordinator must schedule all splits if the query predicate is null
+            // see: MemorySplitManager#getSplits
+            //
+            // note: the other option is to use an empty string as the null key
+            // then the JSON parser could send the key to the coordinator
+            // but then this would cause conflicts with actual empty string values
+            partitions.put(valueKey == null ? null : valueKey.toString(), subPage);
         }
         return partitions;
     }
