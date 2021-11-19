@@ -46,6 +46,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -200,6 +201,10 @@ public class IndexCache
         return (dropped || created || updated);
     }
 
+    /**
+     * Loads the provided index record into cache.
+     * This method blocks until the loading is complete.
+     */
     public Duration loadIndexToCache(IndexRecord record)
     {
         long before = System.currentTimeMillis();
@@ -211,7 +216,7 @@ public class IndexCache
         String filterKeyPath = table + "/" + column + "/" + type;
         IndexCacheKey filterKey = new IndexCacheKey(filterKeyPath, LAST_MODIFIED_TIME_PLACE_HOLDER, record, level);
         filterKey.setNoCloseFlag(true);
-        executor.execute(() -> {
+        Future<?> future = executor.submit(() -> {
             List<IndexMetadata> allLoaded;
             try {
                 // Load index for the whole table with dummy last modified time first
@@ -260,6 +265,13 @@ public class IndexCache
                 LOG.debug("Failed to load into cache: " + filterKey, e);
             }
         });
+        // block until loading is complete
+        try {
+            future.get();
+        }
+        catch (InterruptedException | ExecutionException e) {
+            LOG.debug("Failed to load into cache: " + filterKey, e);
+        }
         long msElapsed = System.currentTimeMillis() - before;
         return new Duration(msElapsed, TimeUnit.MILLISECONDS);
     }
