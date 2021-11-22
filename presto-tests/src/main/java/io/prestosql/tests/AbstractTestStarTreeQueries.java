@@ -553,6 +553,20 @@ public abstract class AbstractTestStarTreeQueries
     }
 
     @Test
+    public void testAlterOnCube()
+    {
+        computeActual("CREATE TABLE nation_table_alter_on_cube_test_1 AS SELECT * FROM nation");
+        assertUpdate("CREATE CUBE nation_alter_on_cube_1 ON nation_table_alter_on_cube_test_1 WITH (AGGREGATIONS=(count(*), COUNT(distinct nationkey), count(distinct regionkey), avg(nationkey), count(regionkey), sum(regionkey), min(regionkey), max(regionkey), max(nationkey), min(nationkey)), group=(nationkey), format= 'orc', partitioned_by = ARRAY['nationkey'])");
+        assertUpdate("INSERT INTO CUBE nation_alter_on_cube_1 where nationkey > 5", 19);
+        assertQueryFails("ALTER Table nation_alter_on_cube_1 RENAME TO nation_delete_from_cube_1", "line 1:1: Operation not permitted. hive.tpch.nation_alter_on_cube_1 is a Cube table, use CUBE statements instead.");
+        assertQueryFails("ALTER Table nation_alter_on_cube_1 RENAME COLUMN OldName to NewName", "line 1:1: Operation not permitted. hive.tpch.nation_alter_on_cube_1 is a Cube table, use CUBE statements instead.");
+        assertQueryFails("ALTER Table nation_alter_on_cube_1 DROP COLUMN columnName", "line 1:1: Operation not permitted. hive.tpch.nation_alter_on_cube_1 is a Cube table, use CUBE statements instead.");
+        assertQueryFails("ALTER Table nation_alter_on_cube_1 ADD COLUMN columnName INT", "line 1:1: Operation not permitted. hive.tpch.nation_alter_on_cube_1 is a Cube table, use CUBE statements instead.");
+        assertUpdate("DROP CUBE nation_alter_on_cube_1");
+        assertUpdate("DROP TABLE nation_table_alter_on_cube_test_1");
+    }
+
+    @Test
     public void testUpdateCube()
     {
         computeActual("CREATE TABLE nation_table_update_cube_test_1 AS SELECT * FROM nation");

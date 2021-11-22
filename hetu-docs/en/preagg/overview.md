@@ -37,7 +37,7 @@ The following picture depicts the change in the logical plan after the optimizat
 ![img](../images/cube-logical-plan-optimizer.png)
 
 ## Recommended Usage
-1. Cubes are most useful for iceberg queries that takes huge input and produces small input.
+1. Cubes are most useful for iceberg queries that takes huge input and produces small output.
 2. Query performance is best when size of the Cube is less that on the actual table on which Cube was built.
 3. Cubes need to be rebuilt if the source table is updated. 
 
@@ -47,7 +47,11 @@ operation on the update is considered as a change in the existing data even if o
 can't be differentiated, Cubes can't be used as it might result in incorrect result. We are working on a solution to overcome this limitation.
 
 ## Supported Connectors
-The following are supported Connectors for storing a Cube
+Star Tree Cube can be stored in following Connectors
+1. Hive
+2. Memory
+   
+Tables from following Connectors can be used as source to build a StarTree Cube.
 1. Hive
 2. Memory
 3. Clickhouse
