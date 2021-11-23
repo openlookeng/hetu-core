@@ -82,6 +82,7 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.nullToEmpty;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static io.prestosql.orc.OrcReader.INITIAL_BATCH_SIZE;
@@ -111,6 +112,7 @@ import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static java.lang.String.format;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
+import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 import static org.apache.hadoop.hive.ql.io.AcidUtils.isFullAcidTable;
 
@@ -124,6 +126,7 @@ public class OrcPageSourceFactory
     public static final String ACID_COLUMN_ROW_ID = "rowId";
     public static final String ACID_COLUMN_CURRENT_TRANSACTION = "currentTransaction";
     public static final String ACID_COLUMN_ROW_STRUCT = "row";
+    public static final Integer SKIP_ORC_FILE_COLUMNS = 7;
     public static final List<String> EAGER_LOAD_INDEX_ID = ImmutableList.of("BITMAP");
 
     private static final Pattern DEFAULT_HIVE_COLUMN_NAME_PATTERN = Pattern.compile("_col\\d+");
@@ -324,7 +327,7 @@ public class OrcPageSourceFactory
                     fileColumns = ImmutableList.of();
                 }
                 else {
-                    fileColumns = acidColumnsByName.get(ACID_COLUMN_ROW_STRUCT).getNestedColumns();
+                    fileColumns = ensureColumnNameConsistency(acidColumnsByName.get(ACID_COLUMN_ROW_STRUCT).getNestedColumns(), columns);
                 }
 
                 fileReadColumns.add(acidColumnsByName.get(ACID_COLUMN_ORIGINAL_TRANSACTION.toLowerCase(ENGLISH)));
@@ -595,5 +598,38 @@ public class OrcPageSourceFactory
                     HIVE_BAD_DATA,
                     format("ORC ACID file %s column should be type %s: %s", columnName, columnType, path));
         }
+    }
+
+    /**
+     * Recreate the list of fileColumns, updating the names of any whose names have changed in the
+     * corresponding elements of the desiredColumns list.  NOTE: this renaming is only applied to
+     * top-level columns, not nested columns.
+     *
+     * @param fileColumns All OrcColumns nested in the root column of the table.
+     * @param desiredColumns HiveColumnHandles for the metastore's table columns.
+     * @return Return the fileColumns list with any OrcColumn corresponding to a desiredColumn renamed if
+     * the names differ from those specified in the desiredColumns.
+     */
+    private static List<OrcColumn> ensureColumnNameConsistency(List<OrcColumn> fileColumns, List<HiveColumnHandle> desiredColumns)
+    {
+        Map<Integer, HiveColumnHandle> desiredColumnsByNumber = desiredColumns.stream().filter(column -> !(column.getHiveColumnIndex() < 0))
+                .collect(toImmutableMap(HiveColumnHandle::getHiveColumnIndex, identity()));
+
+        int columnCount = Math.min(fileColumns.size(), desiredColumnsByNumber.size());
+        ImmutableList.Builder<OrcColumn> builder = ImmutableList.builderWithExpectedSize(columnCount);
+
+        List<Integer> desiredColumnsIndex = desiredColumnsByNumber.keySet().stream().collect(Collectors.toList());
+        Map<Integer, OrcColumn> fileColumnsByNumber = fileColumns.stream()
+                .collect(toImmutableMap(orcColumn -> orcColumn.getColumnId().getId(), identity()));
+
+        for (int index = 0; index < columnCount; index++) {
+            OrcColumn column = fileColumnsByNumber.get(desiredColumnsIndex.get(index) + SKIP_ORC_FILE_COLUMNS);
+            HiveColumnHandle handle = desiredColumnsByNumber.get(desiredColumnsIndex.get(index));
+            if (handle != null && !column.getColumnName().equals(handle.getName())) {
+                column = new OrcColumn(column.getPath(), column.getColumnId(), handle.getName(), column.getColumnType(), column.getOrcDataSourceId(), column.getNestedColumns());
+            }
+            builder.add(column);
+        }
+        return builder.build();
     }
 }

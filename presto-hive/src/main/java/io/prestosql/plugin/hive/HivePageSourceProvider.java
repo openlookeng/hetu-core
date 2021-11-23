@@ -191,7 +191,7 @@ public class HivePageSourceProvider
 
         List<String> tableColumns = hiveColumns.stream().map(cols -> cols.getName()).collect(toList());
 
-        List<String> missingColumns = tableColumns.stream().filter(cols -> !partitionColumnNames.contains(cols)).collect(toList());
+        List<String> missingColumns = tableColumns.stream().skip(partitionColumnNames.size()).collect(toList());
 
         List<IndexMetadata> indexes = new ArrayList<>();
         if (indexCache != null && session.isHeuristicIndexFilterEnabled()) {
