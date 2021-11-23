@@ -27,9 +27,11 @@ import io.prestosql.spi.block.BlockEncodingSerde;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.Iterator;
 import java.util.Properties;
+import java.util.function.Predicate;
 
 import static io.hetu.core.transport.block.BlockSerdeUtil.readBlock;
 import static io.hetu.core.transport.block.BlockSerdeUtil.writeBlock;
@@ -173,9 +175,9 @@ public class PagesSerdeUtil
         return new PageReader(serde, sliceInput);
     }
 
-    public static Iterator<Page> readPagesDirect(GenericPagesSerde serde, Input input)
+    public static Iterator<Page> readPagesDirect(GenericPagesSerde serde, InputStream input, Predicate<InputStream> eof)
     {
-        return new PageReaderDirect(serde, input);
+        return new PageReaderDirect(serde, input, eof);
     }
 
     private static class PageReader
@@ -205,18 +207,20 @@ public class PagesSerdeUtil
             extends AbstractIterator<Page>
     {
         private final GenericPagesSerde serde;
-        private final Input input;
+        private final InputStream input;
+        private final Predicate<InputStream> eof;
 
-        PageReaderDirect(GenericPagesSerde serde, Input input)
+        PageReaderDirect(GenericPagesSerde serde, InputStream input, Predicate<InputStream> eof)
         {
             this.serde = requireNonNull(serde, "serde is null");
             this.input = requireNonNull(input, "input is null");
+            this.eof = requireNonNull(eof, "End of data needs to passed");
         }
 
         @Override
         protected Page computeNext()
         {
-            if (input.end()) {
+            if (eof.test(input)) {
                 return endOfData();
             }
 

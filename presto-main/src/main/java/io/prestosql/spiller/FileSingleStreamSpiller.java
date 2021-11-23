@@ -16,6 +16,7 @@ package io.prestosql.spiller;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
@@ -41,6 +42,7 @@ import javax.annotation.concurrent.NotThreadSafe;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -50,6 +52,8 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.hetu.core.transport.execution.buffer.PagesSerdeUtil.writeSerializedPage;
@@ -82,6 +86,7 @@ public class FileSingleStreamSpiller
     private long spilledPagesInMemorySize;
     private ListenableFuture<?> spillInProgress = Futures.immediateFuture(null);
     private boolean useDirect;
+    private boolean useKryo;
 
     // Snapshot: capture page sizes that are used to update localSpillContext and spillerStats during resume
     private List<Long> pageSizeList = new LinkedList<>();
@@ -94,7 +99,8 @@ public class FileSingleStreamSpiller
             SpillContext spillContext,
             LocalMemoryContext memoryContext,
             Optional<SpillCipher> spillCipher,
-            boolean useDirect)
+            boolean useDirect,
+            boolean useKryo)
     {
         this.serde = requireNonNull(serde, "serde is null");
         this.executor = requireNonNull(executor, "executor is null");
@@ -123,6 +129,7 @@ public class FileSingleStreamSpiller
         }
 
         this.useDirect = useDirect;
+        this.useKryo = useKryo;
     }
 
     @Override
@@ -162,6 +169,7 @@ public class FileSingleStreamSpiller
     {
         checkState(writable, "Spilling no longer allowed. The spiller has been made non-writable on first read for subsequent reads to be consistent");
         try (SliceOutput output = new OutputStreamSliceOutput(targetFile.newOutputStream(APPEND), BUFFER_SIZE)) {
+            Stopwatch timer = Stopwatch.createStarted();
             while (pageIterator.hasNext()) {
                 Page page = pageIterator.next();
                 spilledPagesInMemorySize += page.getSizeInBytes();
@@ -172,16 +180,28 @@ public class FileSingleStreamSpiller
                 pageSizeList.add(pageSize);
                 writeSerializedPage(output, serializedPage);
             }
+            timer.stop();
+            localSpillContext.updateWriteTime(timer.elapsed(TimeUnit.MILLISECONDS));
         }
         catch (UncheckedIOException | IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to spill pages", e);
         }
     }
 
+    private OutputStream getStreamForWriting(OutputStream outputStream, int bufferSize)
+    {
+        if (useKryo) {
+            return new Output(outputStream, bufferSize);
+        }
+
+        return new OutputStreamSliceOutput(outputStream, bufferSize);
+    }
+
     private void writePagesDirect(Iterator<Page> pageIterator)
     {
         checkState(writable, "Spilling no longer allowed. The spiller has been made non-writable on first read for subsequent reads to be consistent");
-        try (Output output = new Output(targetFile.newOutputStream(APPEND), BUFFER_SIZE)) {
+        try (OutputStream output = getStreamForWriting(targetFile.newOutputStream(APPEND), BUFFER_SIZE)) {
+            Stopwatch timer = Stopwatch.createStarted();
             while (pageIterator.hasNext()) {
                 Page page = pageIterator.next();
                 long pageSize = page.getSizeInBytes();
@@ -191,10 +211,30 @@ public class FileSingleStreamSpiller
                 pageSizeList.add(pageSize);
                 serde.serialize(output, page);
             }
+            timer.stop();
+            localSpillContext.updateWriteTime(timer.elapsed(TimeUnit.MILLISECONDS));
         }
         catch (UncheckedIOException | IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to spill pages", e);
         }
+    }
+
+    private InputStream getStreamForReading(InputStream inputStream, int bufferSize)
+    {
+        if (useKryo) {
+            return new Input(inputStream, bufferSize);
+        }
+
+        return new InputStreamSliceInput(inputStream, bufferSize);
+    }
+
+    private Predicate<InputStream> getStreamEndOfData()
+    {
+        if (useKryo) {
+            return (input) -> ((Input) input).end();
+        }
+
+        return (input) -> !((InputStreamSliceInput) input).isReadable();
     }
 
     private Iterator<Page> readPages()
@@ -207,12 +247,12 @@ public class FileSingleStreamSpiller
             Iterator<Page> pages;
 
             if (useDirect) {
-                pages = PagesSerdeUtil.readPagesDirect(serde, new Input(input, BUFFER_SIZE));
+                pages = PagesSerdeUtil.readPagesDirect(serde, getStreamForReading(input, BUFFER_SIZE), getStreamEndOfData());
             }
             else {
                 pages = PagesSerdeUtil.readPages(serde, new InputStreamSliceInput(input, BUFFER_SIZE));
             }
-            return closeWhenExhausted(pages, input);
+            return closeWhenExhausted(pages, input, localSpillContext);
         }
         catch (IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to read spilled pages", e);
@@ -237,26 +277,36 @@ public class FileSingleStreamSpiller
         checkState(spillInProgress.isDone(), "spill in progress");
     }
 
-    private static <T> Iterator<T> closeWhenExhausted(Iterator<T> iterator, Closeable resource)
+    private static <T> Iterator<T> closeWhenExhausted(Iterator<T> iterator, Closeable resource, SpillContext spillerStats)
     {
         requireNonNull(iterator, "iterator is null");
         requireNonNull(resource, "resource is null");
 
         return new AbstractIterator<T>()
         {
+            Stopwatch stopwatch = Stopwatch.createUnstarted();
+
             @Override
             protected T computeNext()
             {
-                if (iterator.hasNext()) {
-                    return iterator.next();
-                }
                 try {
-                    resource.close();
+                    stopwatch.reset();
+                    stopwatch.start();
+                    if (iterator.hasNext()) {
+                        return iterator.next();
+                    }
+                    try {
+                        resource.close();
+                    }
+                    catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                    return endOfData();
                 }
-                catch (IOException e) {
-                    throw new UncheckedIOException(e);
+                finally {
+                    stopwatch.stop();
+                    spillerStats.updateReadTime(stopwatch.elapsed(TimeUnit.MILLISECONDS));
                 }
-                return endOfData();
             }
         };
     }

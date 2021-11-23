@@ -21,6 +21,7 @@ import io.airlift.log.Logger;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.metadata.KryoBlockEncodingSerde;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.SpillContext;
 import io.prestosql.spi.PrestoException;
@@ -39,6 +40,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.prestosql.spi.StandardErrorCode.OUT_OF_SPILL_SPACE;
@@ -68,6 +70,7 @@ public class FileSingleStreamSpillerFactory
     private final double maxUsedSpaceThreshold;
     private final boolean spillEncryptionEnabled;
     private final boolean spillDirectEnabled;
+    private final boolean useKryo;
     private int roundRobinIndex;
 
     @Inject
@@ -77,13 +80,14 @@ public class FileSingleStreamSpillerFactory
                 listeningDecorator(newFixedThreadPool(
                         requireNonNull(featuresConfig, "featuresConfig is null").getSpillerThreads(),
                         daemonThreadsNamed("binary-spiller-%s"))),
-                requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillDirectEnabled() ? requireNonNull(metadata, "metadata is null").getFunctionAndTypeManager().getBlockKryoEncodingSerde() : requireNonNull(metadata, "metadata is null").getFunctionAndTypeManager().getBlockEncodingSerde(),
+                requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillUseKryoSerialization() ? requireNonNull(metadata, "metadata is null").getFunctionAndTypeManager().getBlockKryoEncodingSerde() : requireNonNull(metadata, "metadata is null").getFunctionAndTypeManager().getBlockEncodingSerde(),
                 spillerStats,
                 requireNonNull(featuresConfig, "featuresConfig is null").getSpillerSpillPaths(),
                 requireNonNull(featuresConfig, "featuresConfig is null").getSpillMaxUsedSpaceThreshold(),
                 requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillCompressionEnabled(),
                 requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillEncryptionEnabled(),
-                requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillDirectEnabled());
+                requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillDirectEnabled(),
+                requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillUseKryoSerialization());
     }
 
     @VisibleForTesting
@@ -97,6 +101,26 @@ public class FileSingleStreamSpillerFactory
             boolean spillEncryptionEnabled,
             boolean spillDirectEnabled)
     {
+        this(executor, blockEncodingSerde, spillerStats, spillPaths, maxUsedSpaceThreshold,
+                spillCompressionEnabled, spillEncryptionEnabled, spillDirectEnabled, false);
+    }
+
+    @VisibleForTesting
+    public FileSingleStreamSpillerFactory(
+            ListeningExecutorService executor,
+            BlockEncodingSerde blockEncodingSerde,
+            SpillerStats spillerStats,
+            List<Path> spillPaths,
+            double maxUsedSpaceThreshold,
+            boolean spillCompressionEnabled,
+            boolean spillEncryptionEnabled,
+            boolean spillDirectEnabled,
+            boolean useKryo)
+    {
+        checkArgument(!(blockEncodingSerde instanceof KryoBlockEncodingSerde)
+                || (blockEncodingSerde instanceof KryoBlockEncodingSerde && spillDirectEnabled),
+                "Kryo serialization should enable DirectSpill");
+
         this.serdeFactory = new PagesSerdeFactory(blockEncodingSerde, spillCompressionEnabled, spillDirectEnabled);
         this.executor = requireNonNull(executor, "executor is null");
         this.spillerStats = requireNonNull(spillerStats, "spillerStats can not be null");
@@ -119,6 +143,7 @@ public class FileSingleStreamSpillerFactory
         this.spillEncryptionEnabled = spillEncryptionEnabled;
         this.roundRobinIndex = 0;
         this.spillDirectEnabled = spillDirectEnabled;
+        this.useKryo = useKryo;
     }
 
     @PostConstruct
@@ -158,8 +183,8 @@ public class FileSingleStreamSpillerFactory
         if (spillEncryptionEnabled) {
             spillCipher = Optional.of(new AesSpillCipher());
         }
-        PagesSerde serde = serdeFactory.createPagesSerdeForSpill(spillCipher, useDirect || spillDirectEnabled);
-        return new FileSingleStreamSpiller(serde, executor, getNextSpillPath(), spillerStats, spillContext, memoryContext, spillCipher, useDirect || spillDirectEnabled);
+        PagesSerde serde = serdeFactory.createPagesSerdeForSpill(spillCipher, useDirect || spillDirectEnabled, useKryo);
+        return new FileSingleStreamSpiller(serde, executor, getNextSpillPath(), spillerStats, spillContext, memoryContext, spillCipher, useDirect || spillDirectEnabled, useKryo);
     }
 
     private synchronized Path getNextSpillPath()

@@ -24,10 +24,13 @@ import io.prestosql.spi.block.BlockEncodingSerde;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.util.Optional;
 import java.util.Properties;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
@@ -95,14 +98,16 @@ public class KryoPageSerializer
     }
 
     @Override
-    public void serialize(Output output, Page page)
+    public void serialize(OutputStream output, Page page)
     {
-        serializer.write(null, output, page);
+        checkArgument(output instanceof Output, "Page serializer does not support (" + output.getClass().getSimpleName() + ") for writing");
+        serializer.write(null, (Output) output, page);
     }
 
     @Override
-    public Page deserialize(Input input)
+    public Page deserialize(InputStream input)
     {
-        return serializer.read(null, input, Page.class);
+        checkArgument(input instanceof Input, "Page serializer does not support (" + input.getClass().getSimpleName() + ") for reading");
+        return serializer.read(null, (Input) input, Page.class);
     }
 }

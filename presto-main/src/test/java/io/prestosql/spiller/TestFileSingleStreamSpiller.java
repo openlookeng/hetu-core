@@ -181,41 +181,50 @@ public class TestFileSingleStreamSpiller
     public void testSpillWithSingleFile()
             throws Exception
     {
-        assertSpillBenchmark(false, false, "1GB", 1, false);
+        assertSpillBenchmark(false, false, "1GB", 1, false, false);
     }
 
     @Test
     public void testSpillWithMultiFile()
             throws Exception
     {
-        assertSpillBenchmark(false, false, "2MB", 500, false);
+        assertSpillBenchmark(false, false, "2MB", 500, false, false);
     }
 
     @Test
     public void testSpillWithSingleFileWithKryo()
             throws Exception
     {
-        assertSpillBenchmark(false, false, "1GB", 1, true);
+        assertSpillBenchmark(false, false, "1GB", 1, true, true);
     }
 
     @Test
     public void testSpillWithMultiFileWithKryo()
             throws Exception
     {
-        assertSpillBenchmark(false, false, "2MB", 2, true);
+        assertSpillBenchmark(false, false, "2MB", 2, true, true);
     }
 
     @Test
     public void testSpillWithSingleSpillerConsolidatedWithoutWorkProcessor()
             throws Exception
     {
-        assertSpillBenchmark(false, false, "1GB", 1, false);
-        assertSpillBenchmark(false, false, "1GB", 1, true);
-        assertSpillBenchmark(false, false, "2MB", 512, false);
-        assertSpillBenchmark(false, false, "2MB", 512, true);
+        assertSpillBenchmark(false, false, "1GB", 1, false, false);
+        assertSpillBenchmark(false, false, "1GB", 1, true, true);
+        assertSpillBenchmark(false, false, "2MB", 512, false, false);
+        assertSpillBenchmark(false, false, "2MB", 512, true, true);
     }
 
-    private void assertSpillBenchmark(boolean compression, boolean encryption, String pageSize, int fileCount, boolean useKryo)
+    @Test
+    public void testSpillWithSingleSpillerConsolidatedDirectWriteCompare()
+            throws Exception
+    {
+        assertSpillBenchmark(false, false, "1GB", 1, false, false);
+        assertSpillBenchmark(false, false, "1GB", 1, false, true);
+        assertSpillBenchmark(false, false, "1GB", 1, true, true);
+    }
+
+    private void assertSpillBenchmark(boolean compression, boolean encryption, String pageSize, int fileCount, boolean useKryo, boolean useDirect)
             throws Exception
     {
         List<FileSingleStreamSpiller> spillers = new ArrayList<>();
@@ -227,6 +236,7 @@ public class TestFileSingleStreamSpiller
                 1.0,
                 compression,
                 encryption,
+                useDirect,
                 useKryo);
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         long startTime = System.currentTimeMillis();
@@ -301,53 +311,80 @@ public class TestFileSingleStreamSpiller
     private Page buildPageBenchmark()
     {
         BlockBuilder col1 = BIGINT.createBlockBuilder(null, 1);
+        BlockBuilder col2 = DOUBLE.createBlockBuilder(null, 1);
+        BlockBuilder col3 = VARBINARY.createBlockBuilder(null, 1);
+
         while (col1.getSizeInBytes() < 4 * 1024) {
             col1.writeLong(42).writeLong(45).writeLong(45).writeLong(45).writeLong(45).writeLong(45);
         }
         col1.closeEntry();
 
-        return new Page(col1.build());
+        while (col2.getSizeInBytes() < 4 * 1024) {
+            col2.writeLong(doubleToLongBits(43.0)).writeLong(doubleToLongBits(43.0)).writeLong(doubleToLongBits(43.0)).writeLong(doubleToLongBits(43.0)).writeLong(doubleToLongBits(43.0)).writeLong(doubleToLongBits(43.0));
+        }
+        col2.closeEntry();
+
+        while (col3.getSizeInBytes() < 4 * 1024) {
+            col3.writeLong(doubleToLongBits(43.0)).writeLong(doubleToLongBits(43.0)).writeLong(doubleToLongBits(43.0)).writeLong(doubleToLongBits(43.0)).writeLong(doubleToLongBits(43.0)).writeLong(doubleToLongBits(43.0)).writeLong(1);
+        }
+        col3.closeEntry();
+
+        //return new Page(col1.build(), col2.build(), col3.build());
+        return new Page(col1.build(), col3.build());
     }
 
     @Test
     public void testSpillWithSingleSpillerConsolidated()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, false);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, false, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, true, true);
     }
 
     @Test
     public void testSpillWithSingleFileAndWorkProcessor()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false, false);
     }
 
     @Test
     public void testSpillWithMultiFileAndWorkProcessor()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 500, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 500, false, false);
     }
 
     @Test
     public void testSpillWithSingleFileAndWorkProcessorWithKryo()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, true);
     }
 
     @Test
     public void testSpillWithMultiFileAndWorkProcessorWithKryo()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 500, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 500, true, true);
     }
 
-    private void assertSpillBenchmarkReadingUsingWorkProcessor(boolean compression, boolean encryption, String pageSize, int fileCount, boolean useKryo)
+    @Test
+    public void testSpillWithSingleSpillerConsolidatedDirectWriteCompareWithWorkProcessor()
+            throws Exception
+    {
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, true);
+
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, false, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, false, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, true, true);
+    }
+
+    private void assertSpillBenchmarkReadingUsingWorkProcessor(boolean compression, boolean encryption, String pageSize, int fileCount, boolean useKryo, boolean useDirect)
             throws Exception
     {
         List<FileSingleStreamSpiller> spillers = new ArrayList<>();
@@ -359,6 +396,7 @@ public class TestFileSingleStreamSpiller
                 1.0,
                 compression,
                 encryption,
+                useDirect,
                 useKryo);
 
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");

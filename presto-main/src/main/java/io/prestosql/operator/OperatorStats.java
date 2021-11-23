@@ -78,6 +78,8 @@ public class OperatorStats
     private final DataSize peakTotalMemoryReservation;
 
     private final DataSize spilledDataSize;
+    private final Duration spillReadTime;
+    private final Duration spillWriteTime;
 
     private final Optional<BlockedReason> blockedReason;
 
@@ -128,6 +130,8 @@ public class OperatorStats
             @JsonProperty("peakTotalMemoryReservation") DataSize peakTotalMemoryReservation,
 
             @JsonProperty("spilledDataSize") DataSize spilledDataSize,
+            @JsonProperty("spillReadTime") Duration spillReadTime,
+            @JsonProperty("spillWriteTime") Duration spillWriteTime,
 
             @JsonProperty("blockedReason") Optional<BlockedReason> blockedReason,
 
@@ -181,6 +185,8 @@ public class OperatorStats
         this.peakTotalMemoryReservation = requireNonNull(peakTotalMemoryReservation, "peakTotalMemoryReservation is null");
 
         this.spilledDataSize = requireNonNull(spilledDataSize, "spilledDataSize is null");
+        this.spillReadTime = requireNonNull(spillReadTime, "spillReadTime is null");
+        this.spillWriteTime = requireNonNull(spillWriteTime, "spillWriteTime is null");
 
         this.blockedReason = blockedReason;
 
@@ -398,6 +404,18 @@ public class OperatorStats
     }
 
     @JsonProperty
+    public Duration getSpillReadTime()
+    {
+        return spillReadTime;
+    }
+
+    @JsonProperty
+    public Duration getSpillWriteTime()
+    {
+        return spillWriteTime;
+    }
+
+    @JsonProperty
     public Optional<BlockedReason> getBlockedReason()
     {
         return blockedReason;
@@ -454,6 +472,8 @@ public class OperatorStats
         long peakTotalMemory = this.peakTotalMemoryReservation.toBytes();
 
         long spilledDataSize = this.spilledDataSize.toBytes();
+        long spillReadTime = this.spillReadTime.roundTo(NANOSECONDS);
+        long spillWriteTime = this.spillWriteTime.roundTo(NANOSECONDS);
 
         Optional<BlockedReason> blockedReason = this.blockedReason;
 
@@ -499,6 +519,8 @@ public class OperatorStats
             peakTotalMemory = max(peakTotalMemory, operator.getPeakTotalMemoryReservation().toBytes());
 
             spilledDataSize += operator.getSpilledDataSize().toBytes();
+            spillReadTime += operator.getSpillReadTime().roundTo(NANOSECONDS);
+            spillWriteTime += operator.getSpillWriteTime().roundTo(NANOSECONDS);
 
             if (operator.getBlockedReason().isPresent()) {
                 blockedReason = operator.getBlockedReason();
@@ -554,7 +576,8 @@ public class OperatorStats
                 succinctBytes(peakTotalMemory),
 
                 succinctBytes(spilledDataSize),
-
+                new Duration(spillReadTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
+                new Duration(spillWriteTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
                 blockedReason,
 
                 (OperatorInfo) base);
@@ -614,6 +637,8 @@ public class OperatorStats
                 peakRevocableMemoryReservation,
                 peakTotalMemoryReservation,
                 spilledDataSize,
+                spillReadTime,
+                spillWriteTime,
                 blockedReason,
                 (info != null && info.isFinal()) ? info : null);
     }

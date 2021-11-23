@@ -27,6 +27,7 @@ public class NodeSpillConfig
     private boolean spillEncryptionEnabled;
 
     private boolean spillDirectEnabled;
+    private boolean spillUseKryoSerialization;
 
     @NotNull
     public DataSize getMaxSpillPerNode()
@@ -88,5 +89,16 @@ public class NodeSpillConfig
     {
         this.spillDirectEnabled = spillDirectEnabled;
         return this;
+    }
+
+    public boolean isSpillUseKryoSerialization()
+    {
+        return spillUseKryoSerialization;
+    }
+
+    @Config("experimental.spill-use-kryo-serialization")
+    public void setSpillUseKryoSerialization(boolean spillUseKryoSerialization)
+    {
+        this.spillUseKryoSerialization = spillUseKryoSerialization;
     }
 }

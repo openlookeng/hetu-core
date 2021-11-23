@@ -14,11 +14,12 @@
  */
 package io.hetu.core.transport.execution.buffer;
 
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.StandardErrorCode;
+
+import java.io.InputStream;
+import java.io.OutputStream;
 
 public interface GenericPagesSerde
 {
@@ -32,12 +33,12 @@ public interface GenericPagesSerde
         throw new PrestoException(StandardErrorCode.NOT_FOUND, "Implementations for step deserialization not found");
     }
 
-    default void serialize(Output output, Page page)
+    default void serialize(OutputStream output, Page page)
     {
         throw new PrestoException(StandardErrorCode.NOT_FOUND, "Implementations for step serialization not found");
     }
 
-    default Page deserialize(Input input)
+    default Page deserialize(InputStream input)
     {
         throw new PrestoException(StandardErrorCode.NOT_FOUND, "Implementations for step deserialization not found");
     }
