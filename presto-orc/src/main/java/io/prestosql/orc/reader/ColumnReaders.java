@@ -19,6 +19,7 @@ import io.prestosql.orc.OrcBlockFactory.NestedBlockFactory;
 import io.prestosql.orc.OrcColumn;
 import io.prestosql.orc.OrcCorruptionException;
 import io.prestosql.orc.OrcRowDataCacheKey;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.type.Type;
 
@@ -27,7 +28,7 @@ public final class ColumnReaders
     private ColumnReaders() {}
 
     public static ColumnReader createColumnReader(Type type, OrcColumn column, AggregatedMemoryContext systemMemoryContext, NestedBlockFactory blockFactory)
-            throws OrcCorruptionException
+            throws OrcCorruptionException, PrestoException
     {
         switch (column.getColumnType()) {
             case BOOLEAN:

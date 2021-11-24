@@ -27,6 +27,7 @@ import io.prestosql.spi.type.DateType;
 import io.prestosql.spi.type.IntegerType;
 import io.prestosql.spi.type.SmallintType;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.VarcharType;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
@@ -75,7 +76,7 @@ public abstract class AbstractNumericColumnReader<T>
             throws OrcCorruptionException
     {
         requireNonNull(type, "type is null");
-        verifyStreamType(column, type, t -> t instanceof BigintType || t instanceof IntegerType || t instanceof SmallintType || t instanceof DateType);
+        verifyStreamType(column, type, t -> t instanceof BigintType || t instanceof IntegerType || t instanceof SmallintType || t instanceof DateType || t instanceof VarcharType);
         this.column = requireNonNull(column, "column is null");
         this.systemMemoryContext = requireNonNull(systemMemoryContext, "systemMemoryContext is null");
     }

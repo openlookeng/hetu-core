@@ -17,15 +17,22 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.orc.metadata.OrcColumnId;
 import io.prestosql.orc.metadata.OrcType;
+import io.prestosql.orc.reader.ColumnReader;
 import io.prestosql.orc.reader.ColumnReaders;
+import io.prestosql.orc.reader.DateColumnReader;
+import io.prestosql.orc.reader.IntegerColumnReader;
+import io.prestosql.orc.reader.LongColumnReader;
+import io.prestosql.orc.reader.ShortColumnReader;
 import io.prestosql.spi.type.VarcharType;
 import org.testng.annotations.Test;
+
+import static io.prestosql.testing.assertions.Assert.assertEquals;
 
 public class TestAbstractNumbericColumnReader
 {
     private VarcharType type = VarcharType.VARCHAR;
 
-    @Test (expectedExceptions = OrcCorruptionException.class)
+    @Test
     public void testTypeCoercionShort()
             throws OrcCorruptionException
     {
@@ -36,10 +43,12 @@ public class TestAbstractNumbericColumnReader
                 OrcType.OrcTypeKind.SHORT,
                 new OrcDataSourceId("hdfs://hacluster/user/hive/warehouse/tpcds_orc_hive_1000.db/catalog_sales/cs_sold_date_sk=2452268/000896_0"),
                 ImmutableList.of());
-        ColumnReaders.createColumnReader(type, column, AggregatedMemoryContext.newSimpleAggregatedMemoryContext(), null);
+        ColumnReader actualShortColumnReader = ColumnReaders.createColumnReader(type, column, AggregatedMemoryContext.newSimpleAggregatedMemoryContext(), null);
+        ShortColumnReader expectedShortColumnReader = new ShortColumnReader(type, column, AggregatedMemoryContext.newSimpleAggregatedMemoryContext().newLocalMemoryContext(ColumnReaders.class.getSimpleName()));
+        assertEquals(actualShortColumnReader.toString(), expectedShortColumnReader.toString());
     }
 
-    @Test (expectedExceptions = OrcCorruptionException.class)
+    @Test
     public void testTypeCoercionInteger()
             throws OrcCorruptionException
     {
@@ -50,10 +59,12 @@ public class TestAbstractNumbericColumnReader
                 OrcType.OrcTypeKind.INT,
                 new OrcDataSourceId("hdfs://hacluster/user/hive/warehouse/tpcds_orc_hive_1000.db/catalog_sales/cs_sold_date_sk=2452268/000896_0"),
                 ImmutableList.of());
-        ColumnReaders.createColumnReader(type, column, AggregatedMemoryContext.newSimpleAggregatedMemoryContext(), null);
+        ColumnReader actualIntegerColumnReader = ColumnReaders.createColumnReader(type, column, AggregatedMemoryContext.newSimpleAggregatedMemoryContext(), null);
+        IntegerColumnReader expectedIntegerColumnReader = new IntegerColumnReader(type, column, AggregatedMemoryContext.newSimpleAggregatedMemoryContext().newLocalMemoryContext(ColumnReaders.class.getSimpleName()));
+        assertEquals(actualIntegerColumnReader.toString(), expectedIntegerColumnReader.toString());
     }
 
-    @Test (expectedExceptions = OrcCorruptionException.class)
+    @Test
     public void testTypeCoercionBigInt()
             throws OrcCorruptionException
     {
@@ -64,10 +75,12 @@ public class TestAbstractNumbericColumnReader
                 OrcType.OrcTypeKind.LONG,
                 new OrcDataSourceId("hdfs://hacluster/user/hive/warehouse/tpcds_orc_hive_1000.db/catalog_sales/cs_sold_date_sk=2452268/000896_0"),
                 ImmutableList.of());
-        ColumnReaders.createColumnReader(type, column, AggregatedMemoryContext.newSimpleAggregatedMemoryContext(), null);
+        ColumnReader actualLongColumnReader = ColumnReaders.createColumnReader(type, column, AggregatedMemoryContext.newSimpleAggregatedMemoryContext(), null);
+        LongColumnReader expectedLongColumnReader = new LongColumnReader(type, column, AggregatedMemoryContext.newSimpleAggregatedMemoryContext().newLocalMemoryContext(ColumnReaders.class.getSimpleName()));
+        assertEquals(actualLongColumnReader.toString(), expectedLongColumnReader.toString());
     }
 
-    @Test (expectedExceptions = OrcCorruptionException.class)
+    @Test
     public void testTypeCoercionDate()
             throws OrcCorruptionException
     {
@@ -78,6 +91,8 @@ public class TestAbstractNumbericColumnReader
                 OrcType.OrcTypeKind.DATE,
                 new OrcDataSourceId("hdfs://hacluster/user/hive/warehouse/tpcds_orc_hive_1000.db/catalog_sales/cs_sold_date_sk=2452268/000896_0"),
                 ImmutableList.of());
-        ColumnReaders.createColumnReader(type, column, AggregatedMemoryContext.newSimpleAggregatedMemoryContext(), null);
+        ColumnReader actualDateColumnReader = ColumnReaders.createColumnReader(type, column, AggregatedMemoryContext.newSimpleAggregatedMemoryContext(), null);
+        DateColumnReader expectedDateColumnReader = new DateColumnReader(type, column, AggregatedMemoryContext.newSimpleAggregatedMemoryContext().newLocalMemoryContext(ColumnReaders.class.getSimpleName()));
+        assertEquals(actualDateColumnReader.toString(), expectedDateColumnReader.toString());
     }
 }

@@ -137,6 +137,12 @@ public class IntArrayBlock
     }
 
     @Override
+    public String getString(int position, int offset, int length)
+    {
+        return String.valueOf(getInt(position, offset));
+    }
+
+    @Override
     public boolean mayHaveNull()
     {
         return valueIsNull != null;

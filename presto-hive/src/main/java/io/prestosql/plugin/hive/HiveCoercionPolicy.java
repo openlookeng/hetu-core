@@ -56,13 +56,13 @@ public class HiveCoercionPolicy
             return fromHiveType.equals(HiveType.HIVE_BYTE) || fromHiveType.equals(HiveType.HIVE_SHORT) || fromHiveType.equals(HiveType.HIVE_INT) || fromHiveType.equals(HiveType.HIVE_LONG);
         }
         if (fromHiveType.equals(HiveType.HIVE_BYTE)) {
-            return toHiveType.equals(HiveType.HIVE_SHORT) || toHiveType.equals(HiveType.HIVE_INT) || toHiveType.equals(HiveType.HIVE_LONG);
+            return toHiveType.equals(HiveType.HIVE_SHORT) || toHiveType.equals(HiveType.HIVE_INT) || toHiveType.equals(HiveType.HIVE_LONG) || toType instanceof DecimalType || toHiveType.equals(HiveType.HIVE_FLOAT) || toHiveType.equals(HiveType.HIVE_DOUBLE);
         }
         if (fromHiveType.equals(HiveType.HIVE_SHORT)) {
-            return toHiveType.equals(HiveType.HIVE_INT) || toHiveType.equals(HiveType.HIVE_LONG);
+            return toHiveType.equals(HiveType.HIVE_INT) || toHiveType.equals(HiveType.HIVE_LONG) || toType instanceof DecimalType || toHiveType.equals(HiveType.HIVE_FLOAT) || toHiveType.equals(HiveType.HIVE_DOUBLE);
         }
         if (fromHiveType.equals(HiveType.HIVE_INT)) {
-            return toHiveType.equals(HiveType.HIVE_LONG);
+            return toHiveType.equals(HiveType.HIVE_LONG) || toType instanceof DecimalType || toHiveType.equals(HiveType.HIVE_FLOAT) || toHiveType.equals(HiveType.HIVE_DOUBLE);
         }
         if (fromHiveType.equals(HiveType.HIVE_FLOAT)) {
             return toHiveType.equals(HiveType.HIVE_DOUBLE) || toType instanceof DecimalType;
@@ -70,7 +70,7 @@ public class HiveCoercionPolicy
         if (fromHiveType.equals(HiveType.HIVE_DOUBLE)) {
             return toHiveType.equals(HiveType.HIVE_FLOAT) || toType instanceof DecimalType;
         }
-        if (fromType instanceof DecimalType) {
+        if (fromType instanceof DecimalType || fromHiveType.equals(HiveType.HIVE_LONG)) {
             return toType instanceof DecimalType || toHiveType.equals(HiveType.HIVE_FLOAT) || toHiveType.equals(HiveType.HIVE_DOUBLE);
         }
 
