@@ -28,6 +28,8 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Objects;
 
+import static java.util.Objects.requireNonNull;
+
 public final class MemoryColumnHandle
         implements ColumnHandle, Serializable
 {
@@ -46,10 +48,10 @@ public final class MemoryColumnHandle
             @JsonProperty("typeSignature") TypeSignature typeSignature,
             @JsonProperty("isPartitionKey") boolean isPartitionKey)
     {
-        this.columnName = columnName;
-        this.columnIndex = columnIndex;
-        this.typeSignature = typeSignature;
-        this.isPartitionKey = isPartitionKey;
+        this.columnName = requireNonNull(columnName, "columnName is null");
+        this.columnIndex = requireNonNull(columnIndex, "columnIndex is null");
+        this.typeSignature = requireNonNull(typeSignature, "typeSignature is null");
+        this.isPartitionKey = requireNonNull(isPartitionKey, "isPartitionKey is null");
     }
 
     @JsonProperty
