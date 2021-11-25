@@ -36,6 +36,12 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.runner.Runner;
+import org.openjdk.jmh.runner.RunnerException;
+import org.openjdk.jmh.runner.options.Options;
+import org.openjdk.jmh.runner.options.OptionsBuilder;
+import org.openjdk.jmh.runner.options.VerboseMode;
+import org.testng.annotations.Test;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -101,6 +107,9 @@ public class BenchmarkBinaryFileSpiller
         @Param("true")
         private boolean encryptionEnabled;
 
+        @Param("false")
+        private boolean directSerdeEnabled;
+
         private List<Page> pages;
         private Spiller readSpiller;
 
@@ -118,7 +127,8 @@ public class BenchmarkBinaryFileSpiller
                     ImmutableList.of(SPILL_PATH),
                     1.0,
                     compressionEnabled,
-                    encryptionEnabled);
+                    encryptionEnabled,
+                    directSerdeEnabled);
             spillerFactory = new GenericSpillerFactory(singleStreamSpillerFactory);
             pages = createInputPages();
             readSpiller = spillerFactory.create(TYPES, bytes -> {}, newSimpleAggregatedMemoryContext());
@@ -171,5 +181,26 @@ public class BenchmarkBinaryFileSpiller
         {
             return spillerFactory.create(TYPES, bytes -> {}, newSimpleAggregatedMemoryContext());
         }
+    }
+
+    @Test
+    public void testBenchmark() throws ExecutionException, InterruptedException
+    {
+        BenchmarkData ctx = new BenchmarkData();
+        ctx.setup();
+        read(ctx);
+        write(ctx);
+        ctx.tearDown();
+    }
+
+    public static void main(String[] args)
+            throws RunnerException
+    {
+        Options options = new OptionsBuilder()
+                .verbosity(VerboseMode.NORMAL)
+                .include(".*" + BenchmarkBinaryFileSpiller.class.getSimpleName() + ".*")
+                .build();
+
+        new Runner(options).run();
     }
 }

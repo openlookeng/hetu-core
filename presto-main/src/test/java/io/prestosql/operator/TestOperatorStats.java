@@ -75,6 +75,8 @@ public class TestOperatorStats
             new DataSize(24, BYTE),
             new DataSize(25, BYTE),
             new DataSize(26, BYTE),
+            new Duration(27, NANOSECONDS),
+            new Duration(28, NANOSECONDS),
             Optional.empty(),
             NON_MERGEABLE_INFO);
 
@@ -121,6 +123,8 @@ public class TestOperatorStats
             new DataSize(24, BYTE),
             new DataSize(25, BYTE),
             new DataSize(26, BYTE),
+            new Duration(27, NANOSECONDS),
+            new Duration(28, NANOSECONDS),
             Optional.empty(),
             MERGEABLE_INFO);
 
@@ -176,6 +180,8 @@ public class TestOperatorStats
         assertEquals(actual.getPeakRevocableMemoryReservation(), new DataSize(24, BYTE));
         assertEquals(actual.getPeakTotalMemoryReservation(), new DataSize(25, BYTE));
         assertEquals(actual.getSpilledDataSize(), new DataSize(26, BYTE));
+        assertEquals(actual.getSpillReadTime(), new Duration(27, NANOSECONDS));
+        assertEquals(actual.getSpillWriteTime(), new Duration(28, NANOSECONDS));
         assertEquals(actual.getInfo().getClass(), SplitOperatorInfo.class);
         assertEquals(((SplitOperatorInfo) actual.getInfo()).getSplitInfo(), NON_MERGEABLE_INFO.getSplitInfo());
     }
@@ -223,6 +229,8 @@ public class TestOperatorStats
         assertEquals(actual.getPeakRevocableMemoryReservation(), new DataSize(24, BYTE));
         assertEquals(actual.getPeakTotalMemoryReservation(), new DataSize(25, BYTE));
         assertEquals(actual.getSpilledDataSize(), new DataSize(3 * 26, BYTE));
+        assertEquals(actual.getSpillReadTime(), new Duration(3 * 27, NANOSECONDS));
+        assertEquals(actual.getSpillWriteTime(), new Duration(3 * 28, NANOSECONDS));
         assertNull(actual.getInfo());
     }
 
@@ -269,6 +277,8 @@ public class TestOperatorStats
         assertEquals(actual.getPeakRevocableMemoryReservation(), new DataSize(24, BYTE));
         assertEquals(actual.getPeakTotalMemoryReservation(), new DataSize(25, BYTE));
         assertEquals(actual.getSpilledDataSize(), new DataSize(3 * 26, BYTE));
+        assertEquals(actual.getSpillReadTime(), new Duration(3 * 27, NANOSECONDS));
+        assertEquals(actual.getSpillWriteTime(), new Duration(3 * 28, NANOSECONDS));
         assertEquals(actual.getInfo().getClass(), PartitionedOutputInfo.class);
         assertEquals(((PartitionedOutputInfo) actual.getInfo()).getPagesAdded(), 3 * MERGEABLE_INFO.getPagesAdded());
     }

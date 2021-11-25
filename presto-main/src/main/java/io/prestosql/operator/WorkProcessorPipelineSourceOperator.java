@@ -323,6 +323,7 @@ public class WorkProcessorPipelineSourceOperator
                         succinctBytes(context.peakRevocableMemoryReservation.get()),
                         succinctBytes(context.peakTotalMemoryReservation.get()),
                         new DataSize(0, BYTE),
+                        ZERO_DURATION, ZERO_DURATION,
                         operatorContext.isWaitingForMemory().isDone() ? Optional.empty() : Optional.of(WAITING_FOR_MEMORY),
                         null))
                 .collect(toImmutableList());

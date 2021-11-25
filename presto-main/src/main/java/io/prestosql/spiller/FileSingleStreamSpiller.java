@@ -14,12 +14,15 @@
 package io.prestosql.spiller;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
+import io.airlift.compress.snappy.SnappyFramedInputStream;
+import io.airlift.compress.snappy.SnappyFramedOutputStream;
 import io.airlift.slice.InputStreamSliceInput;
 import io.airlift.slice.OutputStreamSliceOutput;
 import io.airlift.slice.SliceOutput;
@@ -35,19 +38,25 @@ import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.spiller.SpillCipher;
 
 import javax.annotation.concurrent.NotThreadSafe;
+import javax.crypto.Cipher;
+import javax.crypto.CipherInputStream;
+import javax.crypto.CipherOutputStream;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.hetu.core.transport.execution.buffer.PagesSerdeUtil.writeSerializedPage;
@@ -60,7 +69,7 @@ import static java.util.Objects.requireNonNull;
 @NotThreadSafe
 
 @RestorableConfig(uncapturedFields = {"closer", "serde",
-        "spillerStats", "localSpillContext", "memoryContext", "executor", "spillInProgress"})
+        "spillerStats", "localSpillContext", "memoryContext", "executor", "spillInProgress", "cipherIV", "spillCipher"})
 public class FileSingleStreamSpiller
         implements SingleStreamSpiller
 {
@@ -79,9 +88,13 @@ public class FileSingleStreamSpiller
     private boolean writable = true;
     private long spilledPagesInMemorySize;
     private ListenableFuture<?> spillInProgress = Futures.immediateFuture(null);
+    private boolean useDirectSerde;
+    private boolean compressionEnabled;
+    private Optional<SpillCipher> spillCipher;
+    private byte[] cipherIV;
 
     // Snapshot: capture page sizes that are used to update localSpillContext and spillerStats during resume
-    private List<Long> pageSizeList = new ArrayList<>();
+    private List<Long> pageSizeList = new LinkedList<>();
 
     public FileSingleStreamSpiller(
             PagesSerde serde,
@@ -90,7 +103,9 @@ public class FileSingleStreamSpiller
             SpillerStats spillerStats,
             SpillContext spillContext,
             LocalMemoryContext memoryContext,
-            Optional<SpillCipher> spillCipher)
+            Optional<SpillCipher> spillCipher,
+            boolean compressionEnabled,
+            boolean useDirectSerde)
     {
         this.serde = requireNonNull(serde, "serde is null");
         this.executor = requireNonNull(executor, "executor is null");
@@ -117,6 +132,10 @@ public class FileSingleStreamSpiller
         catch (IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to create spill file", e);
         }
+
+        this.useDirectSerde = useDirectSerde;
+        this.compressionEnabled = compressionEnabled;
+        this.spillCipher = spillCipher;
     }
 
     @Override
@@ -124,7 +143,12 @@ public class FileSingleStreamSpiller
     {
         requireNonNull(pageIterator, "pageIterator is null");
         checkNoSpillInProgress();
-        spillInProgress = executor.submit(() -> writePages(pageIterator));
+        if (useDirectSerde) {
+            spillInProgress = executor.submit(() -> writePagesDirect(pageIterator));
+        }
+        else {
+            spillInProgress = executor.submit(() -> writePages(pageIterator));
+        }
         return spillInProgress;
     }
 
@@ -151,6 +175,7 @@ public class FileSingleStreamSpiller
     {
         checkState(writable, "Spilling no longer allowed. The spiller has been made non-writable on first read for subsequent reads to be consistent");
         try (SliceOutput output = new OutputStreamSliceOutput(targetFile.newOutputStream(APPEND), BUFFER_SIZE)) {
+            Stopwatch timer = Stopwatch.createStarted();
             while (pageIterator.hasNext()) {
                 Page page = pageIterator.next();
                 spilledPagesInMemorySize += page.getSizeInBytes();
@@ -161,10 +186,65 @@ public class FileSingleStreamSpiller
                 pageSizeList.add(pageSize);
                 writeSerializedPage(output, serializedPage);
             }
+            timer.stop();
+            localSpillContext.updateWriteTime(timer.elapsed(TimeUnit.MILLISECONDS));
         }
         catch (UncheckedIOException | IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to spill pages", e);
         }
+    }
+
+    private OutputStream getStreamForWriting(OutputStream outputStream, int bufferSize) throws IOException
+    {
+        if (spillCipher.isPresent()) {
+            Cipher cipher = spillCipher.get().getEncryptionCipher();
+            byte[] cipherIV = cipher.getIV();
+            this.cipherIV = new byte[cipherIV.length];
+            System.arraycopy(cipherIV, 0, this.cipherIV, 0, cipherIV.length);
+            outputStream = new CipherOutputStream(outputStream, cipher);
+        }
+        if (compressionEnabled) {
+            outputStream = new SnappyFramedOutputStream(outputStream);
+        }
+        return new OutputStreamSliceOutput(outputStream, bufferSize);
+    }
+
+    private void writePagesDirect(Iterator<Page> pageIterator)
+    {
+        checkState(writable, "Spilling no longer allowed. The spiller has been made non-writable on first read for subsequent reads to be consistent");
+        try (OutputStream output = getStreamForWriting(targetFile.newOutputStream(APPEND), BUFFER_SIZE)) {
+            Stopwatch timer = Stopwatch.createStarted();
+            while (pageIterator.hasNext()) {
+                Page page = pageIterator.next();
+                long pageSize = page.getSizeInBytes();
+                spilledPagesInMemorySize += pageSize;
+                localSpillContext.updateBytes(pageSize);
+                spillerStats.addToTotalSpilledBytes(pageSize);
+                pageSizeList.add(pageSize);
+                serde.serialize(output, page);
+            }
+            timer.stop();
+            localSpillContext.updateWriteTime(timer.elapsed(TimeUnit.MILLISECONDS));
+        }
+        catch (UncheckedIOException | IOException e) {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to spill pages", e);
+        }
+    }
+
+    private InputStream getStreamForReading(InputStream inputStream, int bufferSize) throws IOException
+    {
+        if (spillCipher.isPresent()) {
+            inputStream = new CipherInputStream(inputStream, spillCipher.get().getDecryptionCipher(cipherIV));
+        }
+        if (compressionEnabled) {
+            inputStream = new SnappyFramedInputStream(inputStream);
+        }
+        return new InputStreamSliceInput(inputStream, bufferSize);
+    }
+
+    private Predicate<InputStream> getStreamEndOfData()
+    {
+        return (input) -> !((InputStreamSliceInput) input).isReadable();
     }
 
     private Iterator<Page> readPages()
@@ -174,8 +254,15 @@ public class FileSingleStreamSpiller
 
         try {
             InputStream input = closer.register(targetFile.newInputStream());
-            Iterator<Page> pages = PagesSerdeUtil.readPages(serde, new InputStreamSliceInput(input, BUFFER_SIZE));
-            return closeWhenExhausted(pages, input);
+            Iterator<Page> pages;
+
+            if (useDirectSerde) {
+                pages = PagesSerdeUtil.readPagesDirect(serde, getStreamForReading(input, BUFFER_SIZE), getStreamEndOfData());
+            }
+            else {
+                pages = PagesSerdeUtil.readPages(serde, new InputStreamSliceInput(input, BUFFER_SIZE));
+            }
+            return closeWhenExhausted(pages, input, localSpillContext);
         }
         catch (IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to read spilled pages", e);
@@ -189,6 +276,7 @@ public class FileSingleStreamSpiller
         closer.register(() -> memoryContext.setBytes(0));
         try {
             closer.close();
+            cipherIV = null;
         }
         catch (IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to close spiller", e);
@@ -200,26 +288,36 @@ public class FileSingleStreamSpiller
         checkState(spillInProgress.isDone(), "spill in progress");
     }
 
-    private static <T> Iterator<T> closeWhenExhausted(Iterator<T> iterator, Closeable resource)
+    private static <T> Iterator<T> closeWhenExhausted(Iterator<T> iterator, Closeable resource, SpillContext spillerStats)
     {
         requireNonNull(iterator, "iterator is null");
         requireNonNull(resource, "resource is null");
 
         return new AbstractIterator<T>()
         {
+            Stopwatch stopwatch = Stopwatch.createUnstarted();
+
             @Override
             protected T computeNext()
             {
-                if (iterator.hasNext()) {
-                    return iterator.next();
-                }
                 try {
-                    resource.close();
+                    stopwatch.reset();
+                    stopwatch.start();
+                    if (iterator.hasNext()) {
+                        return iterator.next();
+                    }
+                    try {
+                        resource.close();
+                    }
+                    catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                    return endOfData();
                 }
-                catch (IOException e) {
-                    throw new UncheckedIOException(e);
+                finally {
+                    stopwatch.stop();
+                    spillerStats.updateReadTime(stopwatch.elapsed(TimeUnit.MILLISECONDS));
                 }
-                return endOfData();
             }
         };
     }
@@ -244,6 +342,8 @@ public class FileSingleStreamSpiller
         state.spilledPagesInMemorySize = spilledPagesInMemorySize;
         state.pageSizeList = this.pageSizeList;
         state.targetFile = this.targetFile.getFilePath().toAbsolutePath().toString();
+        state.compressionEnabled = this.compressionEnabled;
+        state.useDirectSerde = this.useDirectSerde;
         return state;
     }
 
@@ -265,6 +365,8 @@ public class FileSingleStreamSpiller
                 this.localSpillContext.updateBytes(pageSize);
                 this.spillerStats.addToTotalSpilledBytes(pageSize);
             }
+            this.compressionEnabled = myState.compressionEnabled;
+            this.useDirectSerde = myState.useDirectSerde;
         }
         catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -278,5 +380,7 @@ public class FileSingleStreamSpiller
         private long spilledPagesInMemorySize;
         private List<Long> pageSizeList;
         private String targetFile;
+        private boolean compressionEnabled;
+        private boolean useDirectSerde;
     }
 }

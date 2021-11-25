@@ -86,6 +86,7 @@ public class TestFileSingleStreamSpillerFactory
                 spillPaths,
                 1.0,
                 false,
+                false,
                 false);
 
         assertEquals(listFiles(spillPath1.toPath()).size(), 0);
@@ -125,6 +126,7 @@ public class TestFileSingleStreamSpillerFactory
                 spillPaths,
                 0.0,
                 false,
+                false,
                 false);
 
         spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"));
@@ -141,6 +143,7 @@ public class TestFileSingleStreamSpillerFactory
                 new SpillerStats(),
                 spillPaths,
                 1.0,
+                false,
                 false,
                 false);
         spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"));
@@ -170,6 +173,7 @@ public class TestFileSingleStreamSpillerFactory
                 new SpillerStats(),
                 spillPaths,
                 1.0,
+                false,
                 false,
                 false);
         spillerFactory.cleanupOldSpillFiles();

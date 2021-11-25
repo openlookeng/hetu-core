@@ -23,9 +23,11 @@ import io.prestosql.spi.block.BlockEncodingSerde;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.Iterator;
 import java.util.Properties;
+import java.util.function.Predicate;
 
 import static io.hetu.core.transport.block.BlockSerdeUtil.readBlock;
 import static io.hetu.core.transport.block.BlockSerdeUtil.writeBlock;
@@ -145,18 +147,23 @@ public class PagesSerdeUtil
         return size;
     }
 
-    public static Iterator<Page> readPages(PagesSerde serde, SliceInput sliceInput)
+    public static Iterator<Page> readPages(GenericPagesSerde serde, SliceInput sliceInput)
     {
         return new PageReader(serde, sliceInput);
+    }
+
+    public static Iterator<Page> readPagesDirect(GenericPagesSerde serde, InputStream input, Predicate<InputStream> eof)
+    {
+        return new PageReaderDirect(serde, input, eof);
     }
 
     private static class PageReader
             extends AbstractIterator<Page>
     {
-        private final PagesSerde serde;
+        private final GenericPagesSerde serde;
         private final SliceInput input;
 
-        PageReader(PagesSerde serde, SliceInput input)
+        PageReader(GenericPagesSerde serde, SliceInput input)
         {
             this.serde = requireNonNull(serde, "serde is null");
             this.input = requireNonNull(input, "input is null");
@@ -170,6 +177,31 @@ public class PagesSerdeUtil
             }
 
             return serde.deserialize(readSerializedPage(input));
+        }
+    }
+
+    private static class PageReaderDirect
+            extends AbstractIterator<Page>
+    {
+        private final GenericPagesSerde serde;
+        private final InputStream input;
+        private final Predicate<InputStream> eof;
+
+        PageReaderDirect(GenericPagesSerde serde, InputStream input, Predicate<InputStream> eof)
+        {
+            this.serde = requireNonNull(serde, "serde is null");
+            this.input = requireNonNull(input, "input is null");
+            this.eof = requireNonNull(eof, "End of data needs to passed");
+        }
+
+        @Override
+        protected Page computeNext()
+        {
+            if (eof.test(input)) {
+                return endOfData();
+            }
+
+            return serde.deserialize(input);
         }
     }
 

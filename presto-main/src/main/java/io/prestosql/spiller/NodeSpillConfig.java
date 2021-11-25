@@ -26,6 +26,8 @@ public class NodeSpillConfig
     private boolean spillCompressionEnabled;
     private boolean spillEncryptionEnabled;
 
+    private boolean spillDirectSerdeEnabled;
+
     @NotNull
     public DataSize getMaxSpillPerNode()
     {
@@ -73,6 +75,18 @@ public class NodeSpillConfig
     public NodeSpillConfig setSpillEncryptionEnabled(boolean spillEncryptionEnabled)
     {
         this.spillEncryptionEnabled = spillEncryptionEnabled;
+        return this;
+    }
+
+    public boolean isSpillDirectSerdeEnabled()
+    {
+        return spillDirectSerdeEnabled;
+    }
+
+    @Config("experimental.spill-direct-serde-enabled")
+    public NodeSpillConfig setSpillDirectSerdeEnabled(boolean spillDirectSerdeEnabled)
+    {
+        this.spillDirectSerdeEnabled = spillDirectSerdeEnabled;
         return this;
     }
 }
