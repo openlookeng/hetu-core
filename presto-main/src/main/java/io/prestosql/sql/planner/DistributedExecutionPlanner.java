@@ -678,7 +678,7 @@ public class DistributedExecutionPlanner
         private final long nextSnapshotId;
         // Which are the corresponding "left" sources from join nodes while visiting the "right" nodes.
         // Value can be SplitSource, ValuesNode, or RemoteSourceNode
-        private final Stack<Object> sourceStack;
+        private Stack<Object> sourceStack;
         private Object leftmostSource;
         private int pendingJoins;
 
@@ -714,10 +714,16 @@ public class DistributedExecutionPlanner
             unionSources.add(sources);
 
             ImmutableMap.Builder<PlanNodeId, SplitSource> result = ImmutableMap.builder();
+            boolean isLeft = true;
             for (PlanNode child : node.getSources()) {
                 // Backup the current left-most source
                 Object prevLeftmost = leftmostSource;
                 leftmostSource = null;
+                // Save our sourceStack and recurse with empty stack if this is not the left child
+                Stack<Object> savedSourceStack = sourceStack;
+                if (!isLeft) {
+                    sourceStack = new Stack<>();
+                }
                 result.putAll(child.accept(this, context));
                 // Collect left-most source of this union member
                 sources.add(leftmostSource);
@@ -725,6 +731,9 @@ public class DistributedExecutionPlanner
                 if (prevLeftmost != null) {
                     leftmostSource = prevLeftmost;
                 }
+                // Recover original stack
+                sourceStack = savedSourceStack;
+                isLeft = false;
             }
 
             return result.build();
