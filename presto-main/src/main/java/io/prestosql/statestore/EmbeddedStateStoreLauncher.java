@@ -15,6 +15,7 @@
 package io.prestosql.statestore;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import com.google.inject.Inject;
 import io.airlift.http.server.HttpServerInfo;
 import io.airlift.log.Logger;
@@ -22,6 +23,7 @@ import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.server.InternalCommunicationConfig;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.filesystem.FileBasedLock;
+import io.prestosql.spi.seedstore.Seed;
 import io.prestosql.spi.seedstore.SeedStoreSubType;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.spi.statestore.StateMap;
@@ -146,6 +148,7 @@ public class EmbeddedStateStoreLauncher
 
     private void launchStateStoreFromSeedStore(Map<String, String> properties) throws IOException
     {
+        URI externalUri = httpServerInfo.getHttpExternalUri() != null ? httpServerInfo.getHttpExternalUri() : httpServerInfo.getHttpsExternalUri();
         // Get all seeds
         Set<String> locations = seedStoreManager.getAllSeeds(SeedStoreSubType.HAZELCAST)
                 .stream()
@@ -162,6 +165,14 @@ public class EmbeddedStateStoreLauncher
         if (launchStateStore(locations, properties) != null) {
             // Add seed to seed store if and only if state store launched successfully
             seedStoreManager.addSeed(SeedStoreSubType.HAZELCAST, currentLocation, true);
+        }
+        // Also add this hazelcast state store uri to the on-yarn seedstore
+        if (seedStoreManager.getSeedStore(SeedStoreSubType.ON_YARN) != null) {
+            Map<String, String> seedProperties = ImmutableMap.of(
+                    Seed.LOCATION_PROPERTY_NAME, externalUri.toString(),
+                    Seed.TIMESTAMP_PROPERTY_NAME, String.valueOf(System.currentTimeMillis()),
+                    Seed.INTERNAL_STATE_STORE_URI_PROPERTY_NAME, currentLocation);
+            seedStoreManager.updateSeed(SeedStoreSubType.ON_YARN, externalUri.toString(), seedProperties);
         }
     }
 
@@ -300,6 +311,7 @@ public class EmbeddedStateStoreLauncher
 
     private void handleNodeFailure(Object failureMember)
     {
+        LOG.debug("EmbeddedStateStoreLauncher::handleNodeFailure invoked on %s", (String) failureMember);
         if (hetuConfig.isMultipleCoordinatorEnabled()) {
             // failureMember format host:port
             String failureMemberHost = ((String) failureMember).split(":")[0];
@@ -312,6 +324,15 @@ public class EmbeddedStateStoreLauncher
             }
             catch (Exception e) {
                 LOG.error("Cannot remove failure node %s from seed store: %s", failureMember, e.getMessage());
+            }
+        }
+
+        if (seedStoreManager.getSeedStore(SeedStoreSubType.ON_YARN) != null) {
+            try {
+                seedStoreManager.removeSeed(SeedStoreSubType.ON_YARN, (String) failureMember);
+            }
+            catch (Exception e) {
+                LOG.error("Cannot remove failure node %s from seeds-resources.json: %s", (String) failureMember, e.getMessage());
             }
         }
     }

@@ -26,7 +26,7 @@ public class FileBasedSeedConstants
     static final String SEED_FILE_NAME = "seeds.txt";
 
     // ON-YARN seed file name
-    static final String ON_YARN_SEED_FILE_NAME = "seeds.json";
+    static final String ON_YARN_SEED_FILE_NAME = "seeds-resources.json";
 
     // dir config properties name
     static final String SEED_STORE_FILESYSTEM_DIR = "seed-store.filesystem.seed-dir";

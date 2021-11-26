@@ -36,6 +36,11 @@ public interface Seed
     String TIMESTAMP_PROPERTY_NAME = "timestamp";
 
     /**
+     * Internal state store URI (currently only used in FileBasedSeedOnYarn)
+     */
+    String INTERNAL_STATE_STORE_URI_PROPERTY_NAME = "internal-state-store-uri";
+
+    /**
      * Get location of seed
      *
      * @return location of seed
@@ -62,6 +67,13 @@ public interface Seed
      * @return void
      */
     void setTimestamp(long timestamp);
+
+    /**
+     * Get attribute of seed
+     * @param key
+     * @return value of attribute
+     */
+    String getUniqueInstanceId();
 
     /**
      * Serialize seed object to string and return

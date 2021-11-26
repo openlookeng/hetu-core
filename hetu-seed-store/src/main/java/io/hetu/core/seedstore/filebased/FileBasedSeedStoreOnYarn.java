@@ -52,12 +52,12 @@ public class FileBasedSeedStoreOnYarn
         implements SeedStore
 {
     private static final Logger LOG = Logger.get(FileBasedSeedStoreOnYarn.class);
-    private static final JsonCodec<List<FileBasedSeed>> LIST_FILE_BASED_SEED_CODEC = listJsonCodec(FileBasedSeed.class);
+    private static final JsonCodec<List<FileBasedSeedOnYarn>> LIST_FILE_BASED_SEED_CODEC = listJsonCodec(FileBasedSeedOnYarn.class);
     private HetuFileSystemClient fs;
     private Map<String, String> config;
     private String name;          // seed store name represents the sub-folder where a seed file is located
     private Path seedFileFolder;  // seed file folder
-    private Path seedFilePath;    // seed file full path, = <seedFileFolder>/<name>/seeds.json
+    private Path seedFilePath;    // seed file full path, = <seedFileFolder>/<name>/seeds-resources.json
 
     /**
      * Constructor for file based seed store - on YARN
@@ -104,17 +104,17 @@ public class FileBasedSeedStoreOnYarn
         Lock lock = new FileBasedLock(fs, lockPath);
         try {
             lock.lock();
-            Set<FileBasedSeed> latestSeeds = new HashSet<>();
+            Set<FileBasedSeedOnYarn> latestSeeds = new HashSet<>();
             // add all new seeds
             latestSeeds.addAll(
                     seeds.stream()
-                            .filter(s -> (s instanceof FileBasedSeed))
-                            .map(s -> (FileBasedSeed) s)
+                            .filter(s -> (s instanceof FileBasedSeedOnYarn))
+                            .map(s -> (FileBasedSeedOnYarn) s)
                             .collect(Collectors.toList()));
             // load existing seeds and filter out repeated seed compared to new seeds
             if (fs.exists(seedFilePath)) {
                 String json = loadFromFile(seedFilePath);
-                List<FileBasedSeed> existingSeeds = LIST_FILE_BASED_SEED_CODEC.fromJson(json);
+                List<FileBasedSeedOnYarn> existingSeeds = LIST_FILE_BASED_SEED_CODEC.fromJson(json);
                 latestSeeds.addAll(
                         existingSeeds.stream()
                                 .filter(s -> !latestSeeds.contains(s))
@@ -166,12 +166,12 @@ public class FileBasedSeedStoreOnYarn
             Set<Seed> outputs = new HashSet<>();
             if (fs.exists(seedFilePath)) {
                 String json = loadFromFile(seedFilePath);
-                List<FileBasedSeed> existingSeeds = LIST_FILE_BASED_SEED_CODEC.fromJson(json);
-                Set<FileBasedSeed> latestSeeds = new HashSet<>(existingSeeds);
+                List<FileBasedSeedOnYarn> existingSeeds = LIST_FILE_BASED_SEED_CODEC.fromJson(json);
+                Set<FileBasedSeedOnYarn> latestSeeds = new HashSet<>(existingSeeds);
                 latestSeeds.removeAll(
                         seeds.stream()
-                                .filter(s -> (s instanceof FileBasedSeed))
-                                .map(s -> (FileBasedSeed) s)
+                                .filter(s -> (s instanceof FileBasedSeedOnYarn))
+                                .map(s -> (FileBasedSeedOnYarn) s)
                                 .collect(Collectors.toList()));
                 String output = LIST_FILE_BASED_SEED_CODEC.toJson(ImmutableList.copyOf(latestSeeds));
                 writeToFile(seedFilePath, output, true);
@@ -193,11 +193,13 @@ public class FileBasedSeedStoreOnYarn
         String location = properties.get(Seed.LOCATION_PROPERTY_NAME);
         String timestamp = properties.get(Seed.TIMESTAMP_PROPERTY_NAME);
         // add more properties if interfaces change
+        String internalStateStoreUri = properties.keySet().contains(Seed.INTERNAL_STATE_STORE_URI_PROPERTY_NAME) ?
+                properties.get(FileBasedSeedOnYarn.INTERNAL_STATE_STORE_URI_PROPERTY_NAME) : "none";
         if (location == null || location.isEmpty()) {
             throw new NullPointerException("Cannot create file-based seed since location is null or empty");
         }
 
-        return new FileBasedSeed(location, Long.parseLong(timestamp));
+        return new FileBasedSeedOnYarn(location, Long.parseLong(timestamp), internalStateStoreUri);
     }
 
     @Override

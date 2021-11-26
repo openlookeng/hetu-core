@@ -146,6 +146,12 @@ public class PrestoServer
             fileSystemClientManager.loadFactoryConfigs();
 
             injector.getInstance(SeedStoreManager.class).loadSeedStore();
+            if (injector.getInstance(SeedStoreManager.class).isSeedStoreOnYarnEnabled()) {
+                addSeedOnYarnInformation(
+                        injector.getInstance(ServerConfig.class),
+                        injector.getInstance(SeedStoreManager.class),
+                        (HetuHttpServerInfo) injector.getInstance(HttpServerInfo.class));
+            }
             launchEmbeddedStateStore(injector.getInstance(HetuConfig.class), injector.getInstance(StateStoreLauncher.class));
             injector.getInstance(StateStoreProvider.class).loadStateStore();
             injector.getInstance(HetuMetaStoreManager.class).loadHetuMetastore(fileSystemClientManager); // relies on state-store
@@ -161,13 +167,6 @@ public class PrestoServer
             injector.getInstance(PasswordAuthenticatorManager.class).loadPasswordAuthenticator();
             injector.getInstance(EventListenerManager.class).loadConfiguredEventListener();
             injector.getInstance(GroupProviderManager.class).loadConfiguredGroupProvider();
-
-            if (injector.getInstance(SeedStoreManager.class).isSeedStoreOnYarnEnabled()) {
-                addSeedOnYarnInformation(
-                        injector.getInstance(ServerConfig.class),
-                        injector.getInstance(SeedStoreManager.class),
-                        (HetuHttpServerInfo) injector.getInstance(HttpServerInfo.class));
-            }
 
             // preload index (on coordinator only)
             if (injector.getInstance(ServerConfig.class).isCoordinator()) {

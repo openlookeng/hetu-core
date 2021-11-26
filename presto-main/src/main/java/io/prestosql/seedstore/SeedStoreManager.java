@@ -15,6 +15,7 @@
 package io.prestosql.seedstore;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.inject.Inject;
@@ -38,6 +39,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -328,7 +330,18 @@ public class SeedStoreManager
         }
 
         refreshableSeedsMap.remove(seedLocation);
-        Optional<Seed> seedOptional = seedStore.get().stream().filter(s -> s.getLocation().equals(seedLocation)).findFirst();
+        Optional<Seed> seedOptional;
+        if (subType == SeedStoreSubType.ON_YARN) {
+            seedOptional = seedStore.get()
+                    .stream()
+                    .filter(s -> {
+                        return s.getLocation().equals(seedLocation) || s.getUniqueInstanceId().equals(seedLocation);
+                    })
+                    .findFirst();
+        }
+        else {
+            seedOptional = seedStore.get().stream().filter(s -> s.getLocation().equals(seedLocation)).findFirst();
+        }
 
         if (seedOptional.isPresent()) {
             seeds = seedStore.remove(Lists.newArrayList(seedOptional.get()));
@@ -362,6 +375,38 @@ public class SeedStoreManager
         }
         catch (RuntimeException e) {
             LOG.warn("clearExpiredSeed failed with following message: %s", e.getMessage());
+        }
+    }
+
+    /**
+     * Update the existing seed at seedLocation with new properties
+     * @param subType
+     * @param seedLocation
+     * @param updatedProperties
+     */
+    public void updateSeed(SeedStoreSubType subType, String seedLocation, Map<String, String> updatedProperties)
+    {
+        SeedStore seedStore = getSeedStore(subType);
+        if (seedStore == null) {
+            throw new PrestoException(SEED_STORE_FAILURE, "Seed store is null");
+        }
+
+        try {
+            Collection<Seed> existingSeeds = seedStore.get();
+            List<Seed> toUpdate = existingSeeds.stream()
+                    .filter(s -> {
+                        return s.getLocation().equals(seedLocation);
+                    })
+                    .collect(Collectors.toList());
+            LOG.debug("SeedStoreManager::updateSeed toUpdate.size() is %s", Integer.toString(toUpdate.size()));
+            for (Seed s : toUpdate) {
+                seedStore.remove(ImmutableList.of(s));
+                Seed newSeed = seedStore.create(updatedProperties);
+                addSeed(subType, newSeed);
+            }
+        }
+        catch (IOException e) {
+            LOG.warn("Update seed %s failed with error: %s", seedLocation, e.getMessage());
         }
     }
 
