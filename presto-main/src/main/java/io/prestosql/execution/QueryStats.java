@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import java.util.List;
 import java.util.OptionalDouble;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.units.DataSize.succinctBytes;
@@ -599,5 +600,23 @@ public class QueryStats
         return succinctBytes(operatorSummaries.stream()
                 .mapToLong(stats -> stats.getSpilledDataSize().toBytes())
                 .sum());
+    }
+
+    @JsonProperty
+    public Duration getSpilledReadTime()
+    {
+        return new Duration(operatorSummaries.stream()
+                    .mapToLong(stats -> stats.getSpillReadTime().toMillis())
+                    .sum(),
+                TimeUnit.MILLISECONDS).convertToMostSuccinctTimeUnit();
+    }
+
+    @JsonProperty
+    public Duration getSpilledWriteTime()
+    {
+        return new Duration(operatorSummaries.stream()
+                .mapToLong(stats -> stats.getSpillWriteTime().toMillis())
+                .sum(),
+                TimeUnit.MILLISECONDS).convertToMostSuccinctTimeUnit();
     }
 }

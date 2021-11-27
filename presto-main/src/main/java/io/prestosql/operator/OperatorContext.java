@@ -56,6 +56,7 @@ import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static java.lang.Math.max;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 /**
@@ -545,6 +546,8 @@ public class OperatorContext
 
                 succinctBytes(spillContext.getSpilledBytes()),
 
+                new Duration(spillContext.getSpillReadTime(), MILLISECONDS).convertToMostSuccinctTimeUnit(),
+                new Duration(spillContext.getSpillWriteTime(), MILLISECONDS).convertToMostSuccinctTimeUnit(),
                 memoryFuture.get().isDone() ? Optional.empty() : Optional.of(WAITING_FOR_MEMORY),
                 info);
     }
@@ -597,6 +600,8 @@ public class OperatorContext
         private final DriverContext driverContext;
         private final AtomicLong reservedBytes = new AtomicLong();
         private final AtomicLong spilledBytes = new AtomicLong();
+        private final AtomicLong spillWriteTime = new AtomicLong();
+        private final AtomicLong spillReadTime = new AtomicLong();
 
         public OperatorSpillContext(DriverContext driverContext)
         {
@@ -617,9 +622,35 @@ public class OperatorContext
             }
         }
 
+        @Override
+        public void updateWriteTime(long millis)
+        {
+            if (millis > 0) {
+                spillWriteTime.addAndGet(millis);
+            }
+        }
+
+        @Override
+        public void updateReadTime(long millis)
+        {
+            if (millis > 0) {
+                spillReadTime.addAndGet(millis);
+            }
+        }
+
         public long getSpilledBytes()
         {
             return spilledBytes.longValue();
+        }
+
+        public long getSpillWriteTime()
+        {
+            return spillWriteTime.longValue();
+        }
+
+        public long getSpillReadTime()
+        {
+            return spillReadTime.longValue();
         }
 
         private long decrementSpilledReservation(long reservedBytes, long bytesBeingFreed)

@@ -74,6 +74,8 @@ public class TestQueryStats
                     succinctBytes(129L),
                     succinctBytes(130L),
                     succinctBytes(131L),
+                    new Duration(133, NANOSECONDS),
+                    new Duration(134, NANOSECONDS),
                     Optional.empty(),
                     null),
             new OperatorStats(
@@ -112,6 +114,8 @@ public class TestQueryStats
                     succinctBytes(229L),
                     succinctBytes(230L),
                     succinctBytes(231L),
+                    new Duration(233, NANOSECONDS),
+                    new Duration(234, NANOSECONDS),
                     Optional.empty(),
                     null),
             new OperatorStats(
@@ -150,6 +154,8 @@ public class TestQueryStats
                     succinctBytes(329L),
                     succinctBytes(330L),
                     succinctBytes(331L),
+                    new Duration(333, NANOSECONDS),
+                    new Duration(334, NANOSECONDS),
                     Optional.empty(),
                     null));
 

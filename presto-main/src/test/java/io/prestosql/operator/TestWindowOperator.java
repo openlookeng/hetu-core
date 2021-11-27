@@ -1171,7 +1171,7 @@ public class TestWindowOperator
                 createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(),
                 new SpillerStats(),
                 ImmutableList.of(spillPath),
-                1.0, false, false);
+                1.0, false, false, false);
         return new GenericSpillerFactory(streamSpillerFactory);
     }
 

@@ -831,6 +831,8 @@ public class Query
                 .setProcessedBytes(queryStats.getRawInputDataSize().toBytes())
                 .setPeakMemoryBytes(queryStats.getPeakUserMemoryReservation().toBytes())
                 .setSpilledBytes(queryStats.getSpilledDataSize().toBytes())
+                .setSpilledReadTimeMillis(queryStats.getSpilledReadTime().toMillis())
+                .setSpilledWriteTimeMillis(queryStats.getSpilledWriteTime().toMillis())
                 .setRootStage(toStageStats(outputStage))
                 .build();
     }

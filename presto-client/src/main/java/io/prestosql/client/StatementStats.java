@@ -44,6 +44,8 @@ public class StatementStats
     private final long processedBytes;
     private final long peakMemoryBytes;
     private final long spilledBytes;
+    private long elapsedSpillReadTimeMillis;
+    private long elapsedSpillWriteTimeMillis;
     private final StageStats rootStage;
 
     @JsonCreator
@@ -64,6 +66,8 @@ public class StatementStats
             @JsonProperty("processedBytes") long processedBytes,
             @JsonProperty("peakMemoryBytes") long peakMemoryBytes,
             @JsonProperty("spilledBytes") long spilledBytes,
+            @JsonProperty("elapsedSpillReadTimeMillis") long elapsedSpillReadTimeMillis,
+            @JsonProperty("elapsedSpillWriteTimeMillis") long elapsedSpillWriteTimeMillis,
             @JsonProperty("rootStage") StageStats rootStage)
     {
         this.state = requireNonNull(state, "state is null");
@@ -82,6 +86,8 @@ public class StatementStats
         this.processedBytes = processedBytes;
         this.peakMemoryBytes = peakMemoryBytes;
         this.spilledBytes = spilledBytes;
+        this.elapsedSpillReadTimeMillis = elapsedSpillReadTimeMillis;
+        this.elapsedSpillWriteTimeMillis = elapsedSpillWriteTimeMillis;
         this.rootStage = rootStage;
     }
 
@@ -197,6 +203,18 @@ public class StatementStats
         return spilledBytes;
     }
 
+    @JsonProperty
+    public long getElapsedSpillReadTimeMillis()
+    {
+        return elapsedSpillReadTimeMillis;
+    }
+
+    @JsonProperty
+    public long getElapsedSpillWriteTimeMillis()
+    {
+        return elapsedSpillWriteTimeMillis;
+    }
+
     @Override
     public String toString()
     {
@@ -217,6 +235,8 @@ public class StatementStats
                 .add("processedBytes", processedBytes)
                 .add("peakMemoryBytes", peakMemoryBytes)
                 .add("spilledBytes", spilledBytes)
+                .add("elapsedSpillReadTime", elapsedSpillReadTimeMillis)
+                .add("elapsedSpillWriteTime", elapsedSpillWriteTimeMillis)
                 .add("rootStage", rootStage)
                 .toString();
     }
@@ -245,6 +265,8 @@ public class StatementStats
         private long peakMemoryBytes;
         private long spilledBytes;
         private StageStats rootStage;
+        private long spillReadTimeMillis;
+        private long spillWriteTimeMillis;
 
         private Builder() {}
 
@@ -344,6 +366,18 @@ public class StatementStats
             return this;
         }
 
+        public Builder setSpilledWriteTimeMillis(long spillTime)
+        {
+            this.spillWriteTimeMillis = spillTime;
+            return this;
+        }
+
+        public Builder setSpilledReadTimeMillis(long spillTime)
+        {
+            this.spillReadTimeMillis = spillTime;
+            return this;
+        }
+
         public Builder setRootStage(StageStats rootStage)
         {
             this.rootStage = rootStage;
@@ -369,6 +403,8 @@ public class StatementStats
                     processedBytes,
                     peakMemoryBytes,
                     spilledBytes,
+                    spillReadTimeMillis,
+                    spillWriteTimeMillis,
                     rootStage);
         }
     }
