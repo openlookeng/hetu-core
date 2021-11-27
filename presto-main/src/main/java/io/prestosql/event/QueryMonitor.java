@@ -413,18 +413,24 @@ public class QueryMonitor
             List<StageInfo> stages = StageInfo.getAllStages(queryInfo.getOutputStage());
             // long lastSchedulingCompletion = 0;
             long firstTaskStartTime = queryEndTime.getMillis();
+            long firstStageFirstTaskStartTime = queryEndTime.getMillis();
             long lastTaskStartTime = queryStartTime.getMillis() + planning;
             long lastTaskEndTime = queryStartTime.getMillis() + planning;
             for (StageInfo stage : stages) {
-                // only consider leaf stages
-                if (!stage.getSubStages().isEmpty()) {
-                    continue;
-                }
-
                 for (TaskInfo taskInfo : stage.getTasks()) {
                     TaskStats taskStats = taskInfo.getStats();
 
                     DateTime firstStartTime = taskStats.getFirstStartTime();
+                    if (firstStartTime != null) {
+                        firstStageFirstTaskStartTime = Math.min(firstStartTime.getMillis(), firstStageFirstTaskStartTime);
+                    }
+
+                    // only consider leaf stages for other stats.
+                    if (!stage.getSubStages().isEmpty()) {
+                        continue;
+                    }
+
+                    firstStartTime = taskStats.getFirstStartTime();
                     if (firstStartTime != null) {
                         firstTaskStartTime = Math.min(firstStartTime.getMillis(), firstTaskStartTime);
                     }
@@ -442,7 +448,10 @@ public class QueryMonitor
             }
 
             long elapsed = max(queryEndTime.getMillis() - queryStartTime.getMillis(), 0);
-            long scheduling = max(firstTaskStartTime - queryStartTime.getMillis() - planning, 0);
+            // scheduling time is starting from end of plan time to  start of first task execution corresponding to any first stage.
+            long scheduling = max(firstStageFirstTaskStartTime - queryStartTime.getMillis() - planning, 0);
+            // executionInitializationTime is starting from first task of first stage to first task of leaf stage.
+            long executionInitializationTime = max(firstTaskStartTime - firstStageFirstTaskStartTime, 0);
             long running = max(lastTaskEndTime - firstTaskStartTime, 0);
             long finishing = max(queryEndTime.getMillis() - lastTaskEndTime, 0);
 
@@ -457,6 +466,7 @@ public class QueryMonitor
                     distributedPlanning,
                     waiting,
                     scheduling,
+                    executionInitializationTime,
                     running,
                     finishing,
                     queryStartTime,
@@ -492,6 +502,7 @@ public class QueryMonitor
                 0,
                 0,
                 0,
+                0,
                 queryStartTime,
                 queryEndTime);
     }
@@ -507,12 +518,13 @@ public class QueryMonitor
             long distributedPlanningMillis,
             long waitingMillis,
             long schedulingMillis,
+            long executionInitializationTimeMillis,
             long runningMillis,
             long finishingMillis,
             DateTime queryStartTime,
             DateTime queryEndTime)
     {
-        log.info("TIMELINE: Query %s :: Transaction:[%s] :: elapsed %sms :: syntaxAnalysisTime %sms :: planning %sms :: logicalPlanningMillis %sms :: physicalPlanningMillis %sms :: distributionPlanTime %sms :: waiting %sms :: scheduling %sms :: running %sms :: finishing %sms :: begin %s :: end %s",
+        log.info("TIMELINE: Query %s :: Transaction:[%s] :: elapsed %sms :: syntaxAnalysisTime %sms :: planning %sms :: logicalPlanningMillis %sms :: physicalPlanningMillis %sms :: distributionPlanTime %sms :: waiting %sms :: scheduling %sms :: executionInitializationTime %sms :: running %sms :: finishing %sms :: begin %s :: end %s",
                 queryId,
                 transactionId,
                 elapsedMillis,
@@ -523,6 +535,7 @@ public class QueryMonitor
                 distributedPlanningMillis,
                 (waitingMillis - syntaxAnalysisTime) < 0 ? 0 : waitingMillis - syntaxAnalysisTime,
                 schedulingMillis - waitingMillis,
+                executionInitializationTimeMillis,
                 runningMillis,
                 finishingMillis,
                 queryStartTime,
