@@ -189,6 +189,12 @@ public final class VarcharType
     }
 
     @Override
+    public void writeLong(BlockBuilder blockBuilder, long value)
+    {
+        writeSlice(blockBuilder, Slices.utf8Slice(String.valueOf(value)));
+    }
+
+    @Override
     public void writeSlice(BlockBuilder blockBuilder, Slice value)
     {
         writeSlice(blockBuilder, value, 0, value.length());
