@@ -48,6 +48,7 @@ import io.prestosql.execution.QueryStats;
 import io.prestosql.execution.StageInfo;
 import io.prestosql.execution.TaskInfo;
 import io.prestosql.operator.ExchangeClient;
+import io.prestosql.operator.PipelineStats;
 import io.prestosql.operator.TaskLocation;
 import io.prestosql.spi.ErrorCode;
 import io.prestosql.spi.Page;
@@ -85,6 +86,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -818,7 +820,7 @@ public class Query
                 .setState(queryInfo.getState().toString())
                 .setQueued(queryInfo.getState() == QueryState.QUEUED)
                 .setScheduled(queryInfo.isScheduled())
-                .setNodes(globalUniqueNodes(outputStage).size())
+                .setNodes(globalUniqueNodes(outputStage, false).size())
                 .setTotalSplits(queryStats.getTotalDrivers())
                 .setQueuedSplits(queryStats.getQueuedDrivers())
                 .setRunningSplits(queryStats.getRunningDrivers() + queryStats.getBlockedDrivers())
@@ -833,6 +835,7 @@ public class Query
                 .setSpilledBytes(queryStats.getSpilledDataSize().toBytes())
                 .setSpilledReadTimeMillis(queryStats.getSpilledReadTime().toMillis())
                 .setSpilledWriteTimeMillis(queryStats.getSpilledWriteTime().toMillis())
+                .setSpilledNodes(globalUniqueNodes(outputStage, true).size())
                 .setRootStage(toStageStats(outputStage))
                 .build();
     }
@@ -874,20 +877,32 @@ public class Query
                 .build();
     }
 
-    private static Set<String> globalUniqueNodes(StageInfo stageInfo)
+    public static Set<String> globalUniqueNodes(StageInfo stageInfo, boolean getSpilledNodes)
     {
+        boolean isSpilledNode = false;
+
         if (stageInfo == null) {
             return ImmutableSet.of();
         }
         ImmutableSet.Builder<String> nodes = ImmutableSet.builder();
         for (TaskInfo task : stageInfo.getTasks()) {
+            if (getSpilledNodes) {
+                for (PipelineStats pipeline : task.getStats().getPipelines()) {
+                    isSpilledNode = pipeline.getOperatorSummaries().stream().filter(operatorStats -> operatorStats.getSpilledDataSize().toBytes() > 0).collect(Collectors.toList()).size() > 0;
+                    if (isSpilledNode) {
+                        break;
+                    }
+                }
+            }
             // todo add nodeId to TaskInfo
-            URI uri = task.getTaskStatus().getSelf();
-            nodes.add(uri.getHost() + ":" + uri.getPort());
+            if (isSpilledNode || !getSpilledNodes) {
+                URI uri = task.getTaskStatus().getSelf();
+                nodes.add(uri.getHost() + ":" + uri.getPort());
+            }
         }
 
         for (StageInfo subStage : stageInfo.getSubStages()) {
-            nodes.addAll(globalUniqueNodes(subStage));
+            nodes.addAll(globalUniqueNodes(subStage, getSpilledNodes));
         }
         return nodes.build();
     }

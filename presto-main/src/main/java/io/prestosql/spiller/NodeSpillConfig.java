@@ -16,6 +16,8 @@ package io.prestosql.spiller;
 import io.airlift.configuration.Config;
 import io.airlift.units.DataSize;
 
+import javax.validation.constraints.Max;
+import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
 public class NodeSpillConfig
@@ -27,6 +29,8 @@ public class NodeSpillConfig
     private boolean spillEncryptionEnabled;
 
     private boolean spillDirectSerdeEnabled;
+
+    private int spillPrefetchReadPages = 1;
 
     @NotNull
     public DataSize getMaxSpillPerNode()
@@ -87,6 +91,20 @@ public class NodeSpillConfig
     public NodeSpillConfig setSpillDirectSerdeEnabled(boolean spillDirectSerdeEnabled)
     {
         this.spillDirectSerdeEnabled = spillDirectSerdeEnabled;
+        return this;
+    }
+
+    @Min(1)
+    @Max(100)
+    public int getSpillPrefetchReadPages()
+    {
+        return spillPrefetchReadPages;
+    }
+
+    @Config("experimental.spill-prefetch-read-pages")
+    public NodeSpillConfig setSpillPrefetchReadPages(int spillPrefetchedReadPages)
+    {
+        this.spillPrefetchReadPages = spillPrefetchedReadPages;
         return this;
     }
 }

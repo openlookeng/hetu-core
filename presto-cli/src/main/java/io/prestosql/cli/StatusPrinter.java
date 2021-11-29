@@ -206,11 +206,11 @@ Spilled: 20GB
             // Peak Memory: 1.97GB
             reprintLine("Peak Memory: " + FormatUtils.formatDataSize(bytes(stats.getPeakMemoryBytes()), true));
 
-            // Spilled Data: 20GB, Writing Time: 22s, Reading Time: 1.2s
+            // Spilled Data: 20GB, Writing Time Per Node: 22s, Reading Time Per Node: 1.2s
             if (stats.getSpilledBytes() > 0) {
-                Duration readTime = millis(stats.getElapsedSpillReadTimeMillis());
-                Duration writeTime = millis(stats.getElapsedSpillWriteTimeMillis());
-                String summary = String.format("Spilled: %s, Writing Time: %.1fs, Reading Time: %.1fs",
+                Duration readTime = millis(stats.getElapsedSpillReadTimeMillis() / stats.getSpilledNodes());
+                Duration writeTime = millis(stats.getElapsedSpillWriteTimeMillis() / stats.getSpilledNodes());
+                String summary = String.format("Spilled: %s, Writing Time Per Node: %.1fs, Reading Time Per Node: %.1fs",
                         FormatUtils.formatDataSize(bytes(stats.getSpilledBytes()), true),
                         writeTime.getValue(SECONDS),
                         readTime.getValue(SECONDS));
@@ -310,8 +310,8 @@ Spilled: 20GB
 
                 // Spilled Data: 20GB, Writing Time: 25s, Reading Time: 8s
                 if (stats.getSpilledBytes() > 0) {
-                    Duration readTime = millis(stats.getElapsedSpillReadTimeMillis());
-                    Duration writeTime = millis(stats.getElapsedSpillWriteTimeMillis());
+                    Duration readTime = millis(stats.getElapsedSpillReadTimeMillis() / stats.getSpilledNodes());
+                    Duration writeTime = millis(stats.getElapsedSpillWriteTimeMillis() / stats.getSpilledNodes());
                     String summary = String.format("Spilled: %s, Writing Time: %.1fs, Reading Time: %.1fs",
                             FormatUtils.formatDataSize(bytes(stats.getSpilledBytes()), true),
                             writeTime.getValue(SECONDS),

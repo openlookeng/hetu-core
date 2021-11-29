@@ -150,7 +150,9 @@ public class TestFeaturesConfig
                 .setSortBasedAggregationEnabled(false)
                 .setPrcntDriversForPartialAggr(5)
                 .setSkipAttachingStatsWithPlan(true)
-                .setSkipNonApplicableRulesEnabled(false));
+                .setSkipNonApplicableRulesEnabled(false)
+                .setPrioritizeLargerSpiltsMemoryRevoke(true)
+                .setRevocableMemorySelectionThreshold(new DataSize(512, MEGABYTE)));
     }
 
     @Test
@@ -253,6 +255,8 @@ public class TestFeaturesConfig
                 .put("sort.prcnt-drivers-for-partial-aggr", "55")
                 .put("optimizer.skip-attaching-stats-with-plan", "false")
                 .put("optimizer.skip-non-applicable-rules-enabled", "true")
+                .put("experimental.prioritize-larger-spilts-memory-revoke", "false")
+                .put("experimental.revocable-memory-selection-threshold", "500MB")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -352,7 +356,9 @@ public class TestFeaturesConfig
                 .setSortBasedAggregationEnabled(true)
                 .setPrcntDriversForPartialAggr(55)
                 .setSkipAttachingStatsWithPlan(false)
-                .setSkipNonApplicableRulesEnabled(true);
+                .setSkipNonApplicableRulesEnabled(true)
+                .setPrioritizeLargerSpiltsMemoryRevoke(false)
+                .setRevocableMemorySelectionThreshold(new DataSize(500, MEGABYTE));
 
         assertFullMapping(properties, expected);
     }

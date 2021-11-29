@@ -351,7 +351,7 @@ public class TestOrderByOperator
                 createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(),
                 new SpillerStats(),
                 ImmutableList.of(spillPath),
-                1.0, false, false, false);
+                1.0, false, false, false, 1);
         return new GenericSpillerFactory(streamSpillerFactory);
     }
 

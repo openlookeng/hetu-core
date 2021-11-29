@@ -138,7 +138,7 @@ public class TestMemoryRevokingScheduler
         OperatorContext operatorContext5 = driverContext211.addOperatorContext(5, new PlanNodeId("na"), "na");
 
         Collection<SqlTask> tasks = ImmutableList.of(sqlTask1, sqlTask2);
-        MemoryRevokingScheduler scheduler = new MemoryRevokingScheduler(singletonList(memoryPool), () -> tasks, executor, 1.0, 1.0);
+        MemoryRevokingScheduler scheduler = new MemoryRevokingScheduler(singletonList(memoryPool), () -> tasks, executor, 1.0, 1.0, false, new DataSize(512, MEGABYTE).toBytes());
 
         allOperatorContexts = ImmutableSet.of(operatorContext1, operatorContext2, operatorContext3, operatorContext4, operatorContext5);
         assertMemoryRevokingNotRequested();
@@ -205,7 +205,7 @@ public class TestMemoryRevokingScheduler
         OperatorContext operatorContext2 = createContexts(sqlTask2);
 
         List<SqlTask> tasks = ImmutableList.of(sqlTask1, sqlTask2);
-        MemoryRevokingScheduler scheduler = new MemoryRevokingScheduler(asList(memoryPool, anotherMemoryPool), () -> tasks, executor, 1.0, 1.0);
+        MemoryRevokingScheduler scheduler = new MemoryRevokingScheduler(asList(memoryPool, anotherMemoryPool), () -> tasks, executor, 1.0, 1.0, false, new DataSize(512, MEGABYTE).toBytes());
         allOperatorContexts = ImmutableSet.of(operatorContext1, operatorContext2);
 
         /*
@@ -240,7 +240,7 @@ public class TestMemoryRevokingScheduler
 
         allOperatorContexts = ImmutableSet.of(operatorContext);
         List<SqlTask> tasks = ImmutableList.of(sqlTask);
-        MemoryRevokingScheduler scheduler = new MemoryRevokingScheduler(singletonList(memoryPool), () -> tasks, executor, 1.0, 1.0);
+        MemoryRevokingScheduler scheduler = new MemoryRevokingScheduler(singletonList(memoryPool), () -> tasks, executor, 1.0, 1.0, false, new DataSize(512, MEGABYTE).toBytes());
         scheduler.registerPoolListeners(); // no periodic check initiated
 
         // When

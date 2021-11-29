@@ -67,6 +67,7 @@ import java.util.stream.Collectors;
 
 import static io.prestosql.execution.QueryState.FAILED;
 import static io.prestosql.execution.QueryState.QUEUED;
+import static io.prestosql.server.protocol.Query.globalUniqueNodes;
 import static io.prestosql.sql.planner.planprinter.PlanPrinter.textDistributedPlan;
 import static java.lang.Math.max;
 import static java.lang.Math.toIntExact;
@@ -392,6 +393,7 @@ public class QueryMonitor
     {
         try {
             QueryStats queryStats = queryInfo.getQueryStats();
+            StageInfo outputStage = queryInfo.isRunningAsync() ? null : queryInfo.getOutputStage().orElse(null);
             DateTime queryStartTime = queryStats.getCreateTime();
             DateTime queryEndTime = queryStats.getEndTime();
 
@@ -454,6 +456,9 @@ public class QueryMonitor
             long executionInitializationTime = max(firstTaskStartTime - firstStageFirstTaskStartTime, 0);
             long running = max(lastTaskEndTime - firstTaskStartTime, 0);
             long finishing = max(queryEndTime.getMillis() - lastTaskEndTime, 0);
+            int spilledNodes = globalUniqueNodes(outputStage, true).size();
+            long spilledWriteTimeMillisPerNode = spilledNodes > 0 ? (queryStats.getSpilledWriteTime().toMillis() / spilledNodes) : 0;
+            long spilledReadTimeMillisPerNode = spilledNodes > 0 ? (queryStats.getSpilledReadTime().toMillis() / spilledNodes) : 0;
 
             logQueryTimeline(
                     queryInfo.getQueryId(),
@@ -470,7 +475,9 @@ public class QueryMonitor
                     running,
                     finishing,
                     queryStartTime,
-                    queryEndTime);
+                    queryEndTime,
+                    spilledWriteTimeMillisPerNode,
+                    spilledReadTimeMillisPerNode);
         }
         catch (Exception e) {
             log.error(e, "Error logging query timeline");
@@ -504,7 +511,7 @@ public class QueryMonitor
                 0,
                 0,
                 queryStartTime,
-                queryEndTime);
+                queryEndTime, 0, 0);
     }
 
     private static void logQueryTimeline(
@@ -522,9 +529,11 @@ public class QueryMonitor
             long runningMillis,
             long finishingMillis,
             DateTime queryStartTime,
-            DateTime queryEndTime)
+            DateTime queryEndTime,
+            long spilledWriteTimeMillisPerNode,
+            long spilledReadTimeMillisPerNode)
     {
-        log.info("TIMELINE: Query %s :: Transaction:[%s] :: elapsed %sms :: syntaxAnalysisTime %sms :: planning %sms :: logicalPlanningMillis %sms :: physicalPlanningMillis %sms :: distributionPlanTime %sms :: waiting %sms :: scheduling %sms :: executionInitializationTime %sms :: running %sms :: finishing %sms :: begin %s :: end %s",
+        log.info("TIMELINE: Query %s :: Transaction:[%s] :: elapsed %sms :: syntaxAnalysisTime %sms :: planning %sms :: logicalPlanningMillis %sms :: physicalPlanningMillis %sms :: distributionPlanTime %sms :: waiting %sms :: scheduling %sms :: executionInitializationTime %sms :: running %sms :: spilledWriteTimeMillisPerNode %sms :: spilledReadTimeMillisPerNode %sms :: finishing %sms :: begin %s :: end %s",
                 queryId,
                 transactionId,
                 elapsedMillis,
@@ -537,6 +546,8 @@ public class QueryMonitor
                 schedulingMillis - waitingMillis,
                 executionInitializationTimeMillis,
                 runningMillis,
+                spilledWriteTimeMillisPerNode,
+                spilledReadTimeMillisPerNode,
                 finishingMillis,
                 queryStartTime,
                 queryEndTime);

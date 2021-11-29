@@ -110,6 +110,9 @@ public class BenchmarkBinaryFileSpiller
         @Param("false")
         private boolean directSerdeEnabled;
 
+        @Param("1")
+        private int spillPrefetchReadPages = 1;
+
         private List<Page> pages;
         private Spiller readSpiller;
 
@@ -128,7 +131,8 @@ public class BenchmarkBinaryFileSpiller
                     1.0,
                     compressionEnabled,
                     encryptionEnabled,
-                    directSerdeEnabled);
+                    directSerdeEnabled,
+                    spillPrefetchReadPages);
             spillerFactory = new GenericSpillerFactory(singleStreamSpillerFactory);
             pages = createInputPages();
             readSpiller = spillerFactory.create(TYPES, bytes -> {}, newSimpleAggregatedMemoryContext());
