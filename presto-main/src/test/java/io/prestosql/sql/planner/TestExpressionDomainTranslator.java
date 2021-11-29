@@ -47,6 +47,7 @@ import io.prestosql.sql.tree.NotExpression;
 import io.prestosql.sql.tree.NullLiteral;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.StringLiteral;
+import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.testing.assertions.Assert;
 import io.prestosql.type.TypeCoercion;
 import org.joda.time.DateTime;
@@ -60,6 +61,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
@@ -99,6 +101,7 @@ import static java.lang.String.format;
 import static java.util.Collections.nCopies;
 import static java.util.Objects.requireNonNull;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -1319,6 +1322,46 @@ public class TestExpressionDomainTranslator
         testSmallIntType();
         testDateType();
         testVarcharType();
+    }
+
+    @Test
+    public void testCubeRangeVisitorLeftSymbolReferenceComparisonExpression()
+    {
+        CubeRangeCanonicalizer.CubeRangeVisitor visitor = new CubeRangeCanonicalizer.CubeRangeVisitor(TYPES, metadata, TEST_SESSION.toConnectorSession());
+        Expression cubePredicate = new ComparisonExpression(EQUAL, new SymbolReference(C_TINYINT.getName()), new LongLiteral("1"));
+        List<Expression> predicates = ExpressionUtils.extractDisjuncts(cubePredicate);
+        Expression transformed = ExpressionUtils.or(predicates.stream().map(visitor::process).collect(Collectors.toList()));
+        assertNotNull(transformed);
+    }
+
+    @Test
+    public void testCubeRangeVisitorRightSymbolReferenceComparisonExpression()
+    {
+        CubeRangeCanonicalizer.CubeRangeVisitor visitor = new CubeRangeCanonicalizer.CubeRangeVisitor(TYPES, metadata, TEST_SESSION.toConnectorSession());
+        Expression cubePredicate = new ComparisonExpression(EQUAL, new LongLiteral("1"), new SymbolReference(C_TINYINT.getName()));
+        List<Expression> predicates = ExpressionUtils.extractDisjuncts(cubePredicate);
+        Expression transformed = ExpressionUtils.or(predicates.stream().map(visitor::process).collect(Collectors.toList()));
+        assertNotNull(transformed);
+    }
+
+    @Test
+    public void testCubeRangeVisitorLeftCastedSymbolReferenceComparisonExpression()
+    {
+        CubeRangeCanonicalizer.CubeRangeVisitor visitor = new CubeRangeCanonicalizer.CubeRangeVisitor(TYPES, metadata, TEST_SESSION.toConnectorSession());
+        Expression cubePredicate = new ComparisonExpression(EQUAL, new Cast(new SymbolReference(C_TINYINT.getName()), "integer"), new LongLiteral("1"));
+        List<Expression> predicates = ExpressionUtils.extractDisjuncts(cubePredicate);
+        Expression transformed = ExpressionUtils.or(predicates.stream().map(visitor::process).collect(Collectors.toList()));
+        assertNotNull(transformed);
+    }
+
+    @Test
+    public void testCubeRangeVisitorRightCastedSymbolReferenceComparisonExpression()
+    {
+        CubeRangeCanonicalizer.CubeRangeVisitor visitor = new CubeRangeCanonicalizer.CubeRangeVisitor(TYPES, metadata, TEST_SESSION.toConnectorSession());
+        Expression cubePredicate = new ComparisonExpression(EQUAL, new LongLiteral("1"), new Cast(new SymbolReference(C_TINYINT.getName()), "integer"));
+        List<Expression> predicates = ExpressionUtils.extractDisjuncts(cubePredicate);
+        Expression transformed = ExpressionUtils.or(predicates.stream().map(visitor::process).collect(Collectors.toList()));
+        assertNotNull(transformed);
     }
 
     private void testVarcharType()

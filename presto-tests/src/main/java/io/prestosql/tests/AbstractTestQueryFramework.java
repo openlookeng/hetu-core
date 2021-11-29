@@ -120,6 +120,13 @@ public abstract class AbstractTestQueryFramework
         return queryRunner.execute(session, sql).toTestTypes();
     }
 
+    protected MaterializedResult computeActualAndAssertPlan(Session session, @Language("SQL") String sql, Consumer<Plan> planAssertion)
+    {
+        QueryRunner.MaterializedResultWithPlan resultWithPlan = queryRunner.executeWithPlan(session, sql, WarningCollector.NOOP);
+        planAssertion.accept(resultWithPlan.getQueryPlan());
+        return resultWithPlan.getMaterializedResult().toTestTypes();
+    }
+
     protected Object computeScalar(@Language("SQL") String sql)
     {
         return computeActual(sql).getOnlyValue();

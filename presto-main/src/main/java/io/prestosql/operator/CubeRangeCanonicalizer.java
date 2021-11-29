@@ -91,7 +91,7 @@ public class CubeRangeCanonicalizer
         return domainTranslator.toPredicate(result.getTupleDomain());
     }
 
-    private static class CubeRangeVisitor
+    public static class CubeRangeVisitor
             extends AstVisitor<Expression, Void>
     {
         private final TypeProvider types;
@@ -119,12 +119,22 @@ public class CubeRangeCanonicalizer
             ComparisonExpression.Operator operator = comparisonExpression.getOperator();
             SymbolReference symbolReference;
             Expression value;
-            if (comparisonExpression.getLeft() instanceof SymbolReference) {
-                symbolReference = (SymbolReference) comparisonExpression.getLeft();
+            if (comparisonExpression.getLeft() instanceof SymbolReference || comparisonExpression.getLeft() instanceof Cast) {
+                if (comparisonExpression.getLeft() instanceof Cast) {
+                    symbolReference = ((SymbolReference) ((Cast) comparisonExpression.getLeft()).getExpression());
+                }
+                else {
+                    symbolReference = (SymbolReference) comparisonExpression.getLeft();
+                }
                 value = comparisonExpression.getRight();
             }
             else {
-                symbolReference = (SymbolReference) comparisonExpression.getRight();
+                if (comparisonExpression.getRight() instanceof Cast) {
+                    symbolReference = ((SymbolReference) ((Cast) comparisonExpression.getRight()).getExpression());
+                }
+                else {
+                    symbolReference = (SymbolReference) comparisonExpression.getRight();
+                }
                 value = comparisonExpression.getLeft();
             }
             Type type = types.get(new Symbol(symbolReference.getName()));
