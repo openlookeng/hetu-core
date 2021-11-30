@@ -53,6 +53,7 @@ import static io.prestosql.spi.util.DateTimeZoneIndex.getDateTimeZone;
 import static io.prestosql.spi.util.DateTimeZoneIndex.packDateTimeWithZone;
 import static io.prestosql.spi.util.DateTimeZoneIndex.unpackChronology;
 import static io.prestosql.type.DateTimeOperators.modulo24Hour;
+import static io.prestosql.type.TimestampOperators.castToTimestampWithTimeZone;
 import static io.prestosql.util.Failures.checkCondition;
 import static java.lang.Math.toIntExact;
 import static java.lang.String.format;
@@ -175,16 +176,23 @@ public final class DateTimeFunctions
 
     @ScalarFunction("to_unixtime")
     @SqlType(StandardTypes.DOUBLE)
-    public static double toUnixTime(@SqlType(StandardTypes.TIMESTAMP) long timestamp)
+    public static double toUnixTime(ConnectorSession session, @SqlType(StandardTypes.TIMESTAMP) long timestamp)
     {
-        return timestamp / 1000.0;
+        // Timestamp should use Session timezone
+        long timestampWithZone = castToTimestampWithTimeZone(session, timestamp);
+        return unpackMillisUtc(timestampWithZone) / 1000.0;
     }
 
     @ScalarFunction("to_unixtime")
     @SqlType(StandardTypes.DOUBLE)
-    public static double toUnixTimeFromTimestampWithTimeZone(@SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE) long timestampWithTimeZone)
+    public static double toUnixTimeFromTimestampWithTimeZone(ConnectorSession session, @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE) long timestampWithTimeZone)
     {
-        return unpackMillisUtc(timestampWithTimeZone) / 1000.0;
+        ISOChronology localChronology = getChronology(session.getTimeZoneKey());
+        long localMillis = localChronology.getZone().convertUTCToLocal(unpackMillisUtc(timestampWithTimeZone));
+
+        ISOChronology zoneChronology = unpackChronology(timestampWithTimeZone);
+        long zoneMillis = zoneChronology.getZone().convertLocalToUTC(localMillis, false);
+        return zoneMillis / 1000.0;
     }
 
     @ScalarFunction("to_iso8601")

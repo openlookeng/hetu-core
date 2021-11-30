@@ -49,6 +49,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.SystemSessionProperties.SNAPSHOT_ENABLED;
+import static io.prestosql.SystemSessionProperties.TIME_ZONE_ID;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.connector.CatalogName.createInformationSchemaCatalogName;
 import static io.prestosql.spi.connector.CatalogName.createSystemTablesCatalogName;
@@ -197,7 +198,11 @@ public final class Session
 
     public TimeZoneKey getTimeZoneKey()
     {
-        return timeZoneKey;
+        String timeZoneId = getSystemProperty(TIME_ZONE_ID, String.class);
+        if (timeZoneId == null) {
+            return timeZoneKey;
+        }
+        return TimeZoneKey.getTimeZoneKey(timeZoneId);
     }
 
     public Locale getLocale()
