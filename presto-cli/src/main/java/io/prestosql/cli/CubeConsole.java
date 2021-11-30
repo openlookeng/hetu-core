@@ -398,8 +398,8 @@ public class CubeConsole
                     case DATATYPE_DOUBLE: {
                         double parsedMinVal = Double.valueOf(minItem);
                         double parsedMaxVal = Double.valueOf(maxItem);
-                        double userMinVal = Double.valueOf(left.toString().replace(DATATYPE_DOUBLE, "").replaceAll(QUOTE_STRING, ""));
-                        double userMaxVal = Double.valueOf(right.toString().replace(DATATYPE_DOUBLE, "").replaceAll(QUOTE_STRING, ""));
+                        double userMinVal = Double.valueOf(left.toString().toLowerCase(Locale.ENGLISH).replace(DATATYPE_DOUBLE, "").replaceAll(QUOTE_STRING, ""));
+                        double userMaxVal = Double.valueOf(right.toString().toLowerCase(Locale.ENGLISH).replace(DATATYPE_DOUBLE, "").replaceAll(QUOTE_STRING, ""));
 
                         if (parsedMinVal > userMinVal) {
                             finalPredicateMinExp = left;
@@ -420,8 +420,8 @@ public class CubeConsole
                     case DATATYPE_REAL: {
                         double parsedMinVal = Double.valueOf(minItem);
                         double parsedMaxVal = Double.valueOf(maxItem);
-                        double userMinVal = Double.valueOf(left.toString().replace(DATATYPE_REAL_QUOTE, "").replaceAll(QUOTE_STRING, ""));
-                        double userMaxVal = Double.valueOf(right.toString().replace(DATATYPE_REAL_QUOTE, "").replaceAll(QUOTE_STRING, ""));
+                        double userMinVal = Double.valueOf(left.toString().toLowerCase(Locale.ENGLISH).replace(DATATYPE_REAL_QUOTE, "").replaceAll(QUOTE_STRING, ""));
+                        double userMaxVal = Double.valueOf(right.toString().toLowerCase(Locale.ENGLISH).replace(DATATYPE_REAL_QUOTE, "").replaceAll(QUOTE_STRING, ""));
 
                         if (parsedMinVal > userMinVal) {
                             finalPredicateMinExp = left;
@@ -442,8 +442,8 @@ public class CubeConsole
                     case DATATYPE_DECIMAL: {
                         double parsedMinVal = Double.valueOf(minItem);
                         double parsedMaxVal = Double.valueOf(maxItem);
-                        double userMinVal = Double.valueOf(left.toString().replace(DATATYPE_DECIMAL, "").replaceAll(QUOTE_STRING, ""));
-                        double userMaxVal = Double.valueOf(right.toString().replace(DATATYPE_DECIMAL, "").replaceAll(QUOTE_STRING, ""));
+                        double userMinVal = Double.valueOf(left.toString().toLowerCase(Locale.ENGLISH).replace(DATATYPE_DECIMAL, "").replaceAll(QUOTE_STRING, ""));
+                        double userMaxVal = Double.valueOf(right.toString().toLowerCase(Locale.ENGLISH).replace(DATATYPE_DECIMAL, "").replaceAll(QUOTE_STRING, ""));
 
                         if (parsedMinVal > userMinVal) {
                             finalPredicateMinExp = left;
@@ -464,8 +464,8 @@ public class CubeConsole
                     case DATATYPE_DATE: {
                         LocalDate parsedMinVal = LocalDate.parse(minItem);
                         LocalDate parsedMaxVal = LocalDate.parse(maxItem);
-                        LocalDate userMinVal = LocalDate.parse(left.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_DATE_QUOTE, ""));
-                        LocalDate userMaxVal = LocalDate.parse(right.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_DATE_QUOTE, ""));
+                        LocalDate userMinVal = LocalDate.parse(left.toString().toLowerCase(Locale.ENGLISH).substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_DATE_QUOTE, ""));
+                        LocalDate userMaxVal = LocalDate.parse(right.toString().toLowerCase(Locale.ENGLISH).substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_DATE_QUOTE, ""));
 
                         if (parsedMinVal.compareTo(userMinVal) > 0) {
                             finalPredicateMinExp = left;
@@ -486,8 +486,8 @@ public class CubeConsole
                     case DATATYPE_TIMESTAMP: {
                         Timestamp parsedMinVal = Timestamp.valueOf(minItem);
                         Timestamp parsedMaxVal = Timestamp.valueOf(maxItem);
-                        Timestamp userMinVal = Timestamp.valueOf(left.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_TIMESTAMP_QUOTE, ""));
-                        Timestamp userMaxVal = Timestamp.valueOf(right.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_TIMESTAMP_QUOTE, ""));
+                        Timestamp userMinVal = Timestamp.valueOf(left.toString().toLowerCase(Locale.ENGLISH).substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_TIMESTAMP_QUOTE, ""));
+                        Timestamp userMaxVal = Timestamp.valueOf(right.toString().toLowerCase(Locale.ENGLISH).substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_TIMESTAMP_QUOTE, ""));
 
                         if (parsedMinVal.compareTo(userMinVal) > 0) {
                             finalPredicateMinExp = left;
@@ -508,8 +508,8 @@ public class CubeConsole
                     case DATATYPE_TINYINT: {
                         int parsedMinVal = Integer.parseInt(minItem);
                         int parsedMaxVal = Integer.parseInt(maxItem);
-                        int userMinVal = Integer.parseInt(left.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_TINYINT_QUOTE, ""));
-                        int userMaxVal = Integer.parseInt(right.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_TINYINT_QUOTE, ""));
+                        int userMinVal = Integer.parseInt(left.toString().toLowerCase(Locale.ENGLISH).substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_TINYINT_QUOTE, ""));
+                        int userMaxVal = Integer.parseInt(right.toString().toLowerCase(Locale.ENGLISH).substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_TINYINT_QUOTE, ""));
 
                         if (parsedMinVal > userMinVal) {
                             finalPredicateMinExp = left;
@@ -530,8 +530,8 @@ public class CubeConsole
                     case DATATYPE_BIGINT: {
                         BigInteger parsedMinVal = new BigInteger(minItem);
                         BigInteger parsedMaxVal = new BigInteger(maxItem);
-                        BigInteger userMinVal = new BigInteger(left.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_BIGINT_QUOTE, ""));
-                        BigInteger userMaxVal = new BigInteger(right.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_BIGINT_QUOTE, ""));
+                        BigInteger userMinVal = new BigInteger(left.toString().toLowerCase(Locale.ENGLISH).substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_BIGINT_QUOTE, ""));
+                        BigInteger userMaxVal = new BigInteger(right.toString().toLowerCase(Locale.ENGLISH).substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_BIGINT_QUOTE, ""));
 
                         if (parsedMinVal.compareTo(userMinVal) > 0) {
                             finalPredicateMinExp = left;
@@ -552,8 +552,8 @@ public class CubeConsole
                     case DATATYPE_SMALLINT: {
                         int parsedMinVal = Integer.parseInt(minItem);
                         int parsedMaxVal = Integer.parseInt(maxItem);
-                        int userMinVal = Integer.parseInt(left.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_SMALLINT_QUOTE, ""));
-                        int userMaxVal = Integer.parseInt(right.toString().substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_SMALLINT_QUOTE, ""));
+                        int userMinVal = Integer.parseInt(left.toString().toLowerCase(Locale.ENGLISH).substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_SMALLINT_QUOTE, ""));
+                        int userMaxVal = Integer.parseInt(right.toString().toLowerCase(Locale.ENGLISH).substring(0, right.toString().length() - 1).replaceFirst(DATATYPE_SMALLINT_QUOTE, ""));
 
                         if (parsedMinVal > userMinVal) {
                             finalPredicateMinExp = left;
