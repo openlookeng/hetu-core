@@ -6828,4 +6828,24 @@ public class TestHiveIntegrationSmokeTest
         assertUpdate(String.format("DROP TABLE alter_table_8"));
         assertUpdate(String.format("DROP TABLE alter_table_9"));
     }
+
+    @Test
+    public void testEscapeCharacter()
+    {
+        testWithAllStorageFormats(this::testEscapeCharacter);
+    }
+
+    private void testEscapeCharacter(Session session, HiveStorageFormat storageFormat)
+    {
+        String tableName = format("test_escape_character_%s", storageFormat);
+        assertUpdate(session, format("CREATE TABLE %s (id varchar) WITH (format = '%s')", tableName, storageFormat));
+        assertUpdate(session, format("INSERT INTO %s VALUES ('\0')", tableName), 1);
+
+        MaterializedResult result = getQueryRunner().execute(session, format("SELECT * FROM %s", tableName));
+        assertEquals(result.getRowCount(), 1);
+        MaterializedRow actualRow = result.getMaterializedRows().get(0);
+        assertEquals(actualRow.getField(0), String.valueOf('\0'));
+
+        assertUpdate(session, format("DROP TABLE %s", tableName));
+    }
 }

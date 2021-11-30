@@ -30,6 +30,7 @@ import static io.airlift.slice.SliceUtf8.offsetOfCodePoint;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.text.StringEscapeUtils.unescapeJava;
 
 // faster versions of org.apache.hadoop.io.WritableUtils methods adapted for Slice
 public final class RcFileDecoderUtils
@@ -266,5 +267,10 @@ public final class RcFileDecoderUtils
             return length;
         }
         return indexEnd - offset;
+    }
+
+    public static String unescapeText(String text)
+    {
+        return unescapeJava(text);
     }
 }

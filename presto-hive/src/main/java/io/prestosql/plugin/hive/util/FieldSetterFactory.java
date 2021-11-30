@@ -61,6 +61,7 @@ import static io.prestosql.plugin.hive.HiveWriteUtils.getHiveDecimal;
 import static java.lang.Float.intBitsToFloat;
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.text.StringEscapeUtils.unescapeJava;
 
 public final class FieldSetterFactory
 {
@@ -299,7 +300,12 @@ public final class FieldSetterFactory
         public void setField(Block block, int position)
         {
             value.set(type.getSlice(block, position).getBytes());
-            rowInspector.setStructFieldData(row, field, value);
+            rowInspector.setStructFieldData(row, field, unescapeText(value.toString()));
+        }
+
+        private Text unescapeText(String text)
+        {
+            return new Text(unescapeJava(text));
         }
     }
 

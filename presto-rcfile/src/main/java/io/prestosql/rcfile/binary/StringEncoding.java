@@ -25,6 +25,7 @@ import static io.airlift.slice.Slices.EMPTY_SLICE;
 import static io.prestosql.rcfile.RcFileDecoderUtils.calculateTruncationLength;
 import static io.prestosql.rcfile.RcFileDecoderUtils.decodeVIntSize;
 import static io.prestosql.rcfile.RcFileDecoderUtils.readVInt;
+import static io.prestosql.rcfile.RcFileDecoderUtils.unescapeText;
 import static io.prestosql.rcfile.RcFileDecoderUtils.writeVInt;
 import static java.lang.Math.toIntExact;
 
@@ -50,7 +51,13 @@ public class StringEncoding
                     output.writeByte(HIVE_EMPTY_STRING_BYTE);
                 }
                 else {
-                    output.writeBytes(slice);
+                    String escapedValue = unescapeText(new String(slice.getBytes()));
+                    if (escapedValue.getBytes().length < slice.getBytes().length) {
+                        output.writeBytes(escapedValue.getBytes());
+                    }
+                    else {
+                        output.writeBytes(slice);
+                    }
                 }
             }
             encodeOutput.closeEntry();

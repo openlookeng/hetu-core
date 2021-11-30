@@ -23,6 +23,7 @@ import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.type.Type;
 
 import static io.prestosql.rcfile.RcFileDecoderUtils.calculateTruncationLength;
+import static io.prestosql.rcfile.RcFileDecoderUtils.unescapeText;
 
 public class StringEncoding
         implements TextColumnEncoding
@@ -50,7 +51,13 @@ public class StringEncoding
                 if (escapeByte != null && slice.indexOfByte(escapeByte) < 0) {
                     throw new IllegalArgumentException("escape not implemented");
                 }
-                output.writeBytes(slice);
+                String escapedValue = unescapeText(new String(slice.getBytes()));
+                if (escapedValue.getBytes().length < slice.getBytes().length) {
+                    output.writeBytes(escapedValue.getBytes());
+                }
+                else {
+                    output.writeBytes(slice);
+                }
             }
             encodeOutput.closeEntry();
         }
