@@ -262,6 +262,12 @@ public class TestSeedStoreManager
         }
 
         @Override
+        public String getUniqueInstanceId()
+        {
+            return "none";
+        }
+
+        @Override
         public String serialize()
                 throws IOException
         {

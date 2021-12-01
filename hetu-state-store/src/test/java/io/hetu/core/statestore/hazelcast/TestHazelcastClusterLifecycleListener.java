@@ -149,6 +149,12 @@ public class TestHazelcastClusterLifecycleListener
         }
 
         @Override
+        public String getUniqueInstanceId()
+        {
+            return "none";
+        }
+
+        @Override
         public String serialize()
                 throws IOException
         {

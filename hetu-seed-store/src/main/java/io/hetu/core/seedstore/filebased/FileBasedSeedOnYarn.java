@@ -29,43 +29,49 @@ import java.util.Base64;
 import java.util.Objects;
 
 /**
- * FileBasedSeed is used for starting state store cluster
+ * FileBasedSeedOnYarn is used for storing seed store on yarn information
  *
  * @since 2020-03-08
  */
 
-public class FileBasedSeed
+public class FileBasedSeedOnYarn
         implements Seed
 {
     private static final long serialVersionUID = 4L;
 
+    // External URI (for instance, http://ip:8080)
     private String location;
+    // Timestamp for this seed
     private long timestamp;
+    // Hazelcast state store URI (for instance, ip:5701)
+    private String internalStateStoreUri;
 
     @JsonCreator
-    public FileBasedSeed(
+    public FileBasedSeedOnYarn(
             @JsonProperty("location") String location,
-            @JsonProperty("timestamp") long timestamp)
+            @JsonProperty("timestamp") long timestamp,
+            @JsonProperty("internal-state-store-uri") String internalStateStoreUri)
     {
         this.location = location;
         this.timestamp = timestamp;
+        this.internalStateStoreUri = internalStateStoreUri;
     }
 
     /**
-     * Deserialize FileBasedSeed serialized string to FileBasedSeed Object
+     * Deserialize FileBasedSeedOnyarn serialized string to FileBasedSeedOnyarn Object
      *
-     * @param serialized FileBasedSeed serialized String to be converted
-     * @return FileBasedSeed Object
+     * @param serialized FileBasedSeedOnyarn serialized String to be converted
+     * @return FileBasedSeedOnyarn Object
      * @throws IOException if an I/O error occurs while reading string
-     * @throws ClassNotFoundException if serialized string cannot be deserialized to FileBasedSeed Object
+     * @throws ClassNotFoundException if serialized string cannot be deserialized to FileBasedSeedOnyarn Object
      */
-    public static FileBasedSeed deserialize(String serialized)
+    public static FileBasedSeedOnYarn deserialize(String serialized)
             throws IOException, ClassNotFoundException
     {
         byte[] datas = Base64.getDecoder().decode(serialized);
         try (ObjectInputStream ois = new SecureObjectInputStream(new ByteArrayInputStream(datas),
-                FileBasedSeed.class.getName())) {
-            FileBasedSeed obj = (FileBasedSeed) ois.readObject();
+                FileBasedSeedOnYarn.class.getName())) {
+            FileBasedSeedOnYarn obj = (FileBasedSeedOnYarn) ois.readObject();
             return obj;
         }
     }
@@ -98,10 +104,22 @@ public class FileBasedSeed
         this.timestamp = timestamp;
     }
 
+    @JsonProperty
+    public String getInternalStateStoreUri()
+    {
+        return internalStateStoreUri;
+    }
+
     @Override
     public String getUniqueInstanceId()
     {
-        return "none";
+        return this.internalStateStoreUri;
+    }
+
+    @JsonProperty
+    public void setInternalStateStoreUri(String internalStateStoreUri)
+    {
+        this.internalStateStoreUri = internalStateStoreUri;
     }
 
     @Override
@@ -124,8 +142,8 @@ public class FileBasedSeed
         if (obj == null || getClass() != obj.getClass()) {
             return false;
         }
-        FileBasedSeed fileBasedSeed = (FileBasedSeed) obj;
-        return location.equals(fileBasedSeed.location);
+        FileBasedSeedOnYarn fileBasedSeed = (FileBasedSeedOnYarn) obj;
+        return location.equals(fileBasedSeed.location) && internalStateStoreUri.equals(fileBasedSeed.internalStateStoreUri);
     }
 
     @Override
@@ -137,8 +155,9 @@ public class FileBasedSeed
     @Override
     public String toString()
     {
-        return "FileBasedSeed{"
+        return "FileBasedSeedOnyarn{"
                 + "location='" + location + '\''
-                + ", timestamp=" + timestamp + '}';
+                + ", timestamp=" + timestamp + '\''
+                + ", internalStateStoreUri='" + internalStateStoreUri + "\'}";
     }
 }
