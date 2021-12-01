@@ -205,6 +205,14 @@ public class HandTpchQuery1
         }
 
         @Override
+        public void close()
+        {
+            if (snapshotState != null) {
+                snapshotState.close();
+            }
+        }
+
+        @Override
         public boolean isFinished()
         {
             if (snapshotState != null && snapshotState.hasMarker()) {

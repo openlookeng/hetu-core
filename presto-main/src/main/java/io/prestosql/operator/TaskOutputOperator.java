@@ -212,6 +212,14 @@ public class TaskOutputOperator
     }
 
     @Override
+    public void close()
+    {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         TaskOutputOperatorState myState = new TaskOutputOperatorState();

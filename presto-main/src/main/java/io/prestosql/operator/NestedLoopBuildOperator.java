@@ -154,6 +154,14 @@ public class NestedLoopBuildOperator
     }
 
     @Override
+    public void close()
+    {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         NestedLoopBuildOperatorState myState = new NestedLoopBuildOperatorState();

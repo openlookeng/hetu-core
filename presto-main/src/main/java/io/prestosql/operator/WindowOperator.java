@@ -1272,6 +1272,9 @@ public class WindowOperator
     @Override
     public void close()
     {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
         driverWindowInfo.set(Optional.of(windowInfo.build()));
         spillablePagesToPagesIndexes.ifPresent(SpillablePagesToPagesIndexes::closeSpiller);
     }

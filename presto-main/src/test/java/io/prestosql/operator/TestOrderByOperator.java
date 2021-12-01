@@ -84,6 +84,8 @@ import static org.testng.Assert.assertTrue;
 @Test(singleThreaded = true)
 public class TestOrderByOperator
 {
+    private static final long defaultMemoryLimit = 1L << 28;
+
     private ExecutorService executor;
     private ScheduledExecutorService scheduledExecutor;
     private DummySpillerFactory spillerFactory;
@@ -404,7 +406,7 @@ public class TestOrderByOperator
                 Optional.of(spillerFactory),
                 new OrderingCompiler());
 
-        DriverContext driverContext = createDriverContext(8, TEST_SNAPSHOT_SESSION);
+        DriverContext driverContext = createDriverContext(defaultMemoryLimit, TEST_SNAPSHOT_SESSION);
         driverContext.getPipelineContext().getTaskContext().getSnapshotManager().setTotalComponents(1);
         OrderByOperator orderByOperator = (OrderByOperator) operatorFactory.createOperator(driverContext);
 
@@ -426,7 +428,7 @@ public class TestOrderByOperator
         }
 
         // Step5: assume the task is rescheduled due to failure and everything is re-constructed
-        driverContext = createDriverContext(8, TEST_SNAPSHOT_SESSION);
+        driverContext = createDriverContext(defaultMemoryLimit, TEST_SNAPSHOT_SESSION);
         operatorFactory = new OrderByOperatorFactory(
                 0,
                 new PlanNodeId("test"),

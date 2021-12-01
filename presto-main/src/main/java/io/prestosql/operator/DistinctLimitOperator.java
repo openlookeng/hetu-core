@@ -290,6 +290,14 @@ public class DistinctLimitOperator
     }
 
     @Override
+    public void close()
+    {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         DistinctLimitOperatorState myState = new DistinctLimitOperatorState();

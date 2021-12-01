@@ -330,6 +330,14 @@ public class StreamingAggregationOperator
     }
 
     @Override
+    public void close()
+    {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         StreamingAggregationOperatorState myState = new StreamingAggregationOperatorState();

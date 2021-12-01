@@ -128,4 +128,13 @@ public interface Operator
     {
         close();
     }
+
+    /**
+     * Estimate the total memory used in an operator state by copying the total memory used by this operator
+     */
+    @Override
+    default long getUsedMemory()
+    {
+        return getOperatorContext().getTotalMemoryBytes();
+    }
 }

@@ -68,6 +68,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
+@Test(singleThreaded = true)
 public class TestSqlStageExecution
 {
     private ExecutorService executor;

@@ -135,6 +135,14 @@ public class FilterAndProjectOperator
     }
 
     @Override
+    public void close()
+    {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         FilterAndProjectOperatorState myState = new FilterAndProjectOperatorState();

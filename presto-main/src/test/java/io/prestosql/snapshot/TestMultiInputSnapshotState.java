@@ -516,6 +516,12 @@ public class TestMultiInputSnapshotState
             return this.supportsConsolidatedWrites;
         }
 
+        @Override
+        public long getUsedMemory()
+        {
+            return 0;
+        }
+
         public void setSupportsConsolidatedWrites(boolean supportsConsolidatedWrites)
         {
             this.supportsConsolidatedWrites = supportsConsolidatedWrites;

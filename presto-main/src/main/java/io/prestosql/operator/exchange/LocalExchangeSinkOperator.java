@@ -177,6 +177,9 @@ public class LocalExchangeSinkOperator
     @Override
     public void close()
     {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
         finish();
     }
 

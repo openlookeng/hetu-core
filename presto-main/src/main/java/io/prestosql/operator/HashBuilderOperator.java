@@ -697,6 +697,11 @@ public class HashBuilderOperator
             spiller.ifPresent(closer::register);
             closer.register(() -> localUserMemoryContext.setBytes(0));
             closer.register(() -> localRevocableMemoryContext.setBytes(0));
+            closer.register(() -> {
+                if (snapshotState != null) {
+                    snapshotState.close();
+                }
+            });
         }
         catch (IOException e) {
             throw new RuntimeException(e);

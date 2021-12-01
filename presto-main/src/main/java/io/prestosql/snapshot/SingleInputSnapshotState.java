@@ -16,6 +16,7 @@ package io.prestosql.snapshot;
 
 import io.airlift.log.Logger;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorContext;
 import io.prestosql.spi.Page;
@@ -35,6 +36,7 @@ import static java.util.Objects.requireNonNull;
  * This is a utility class used by non-source operators, which only receive inputs from a single source.
  * When an input is received from addInput(Page), the operator first calls the processPage() method to perform snapshot related processing.
  * When getOutput() is called, the operator calls the pollMarker() method to determine if a marker page needs to be returned.
+ * Any instance of this class created through forOperator needs to be closed
  */
 public class SingleInputSnapshotState
 {
@@ -52,6 +54,8 @@ public class SingleInputSnapshotState
     private final Function<Long, SnapshotStateId> spillStateIdGenerator;
     // Markers to be returned to the restorable object. The "nextMarker" method polls this list.
     private final Queue<MarkerPage> markers = new LinkedList<>();
+    // For recording snapshot memory usage
+    private final LocalMemoryContext snapshotMemoryContext;
 
     public static SingleInputSnapshotState forOperator(Operator operator, OperatorContext operatorContext)
     {
@@ -60,14 +64,16 @@ public class SingleInputSnapshotState
                 operatorContext.getDriverContext().getPipelineContext().getTaskContext().getSnapshotManager(),
                 operatorContext.getDriverContext().getSerde(),
                 snapshotId -> SnapshotStateId.forOperator(snapshotId, operatorContext),
-                snapshotId -> SnapshotStateId.forDriverComponent(snapshotId, operatorContext, operatorContext.getOperatorId() + "-spill"));
+                snapshotId -> SnapshotStateId.forDriverComponent(snapshotId, operatorContext, operatorContext.getOperatorId() + "-spill"),
+                operatorContext.newLocalUserMemoryContext(SingleInputSnapshotState.class.getSimpleName()));
     }
 
     SingleInputSnapshotState(Restorable restorable,
-            TaskSnapshotManager snapshotManager,
-            PagesSerde pagesSerde,
-            Function<Long, SnapshotStateId> snapshotStateIdGenerator,
-            Function<Long, SnapshotStateId> spillStateIdGenerator)
+                             TaskSnapshotManager snapshotManager,
+                             PagesSerde pagesSerde,
+                             Function<Long, SnapshotStateId> snapshotStateIdGenerator,
+                             Function<Long, SnapshotStateId> spillStateIdGenerator,
+                             LocalMemoryContext snapshotMemoryContext)
     {
         this.restorable = requireNonNull(restorable, "restorable is null");
         this.restorableId = String.format("%s (%s)", restorable.getClass().getSimpleName(), snapshotStateIdGenerator.apply(0L).getId());
@@ -75,6 +81,12 @@ public class SingleInputSnapshotState
         this.snapshotStateIdGenerator = requireNonNull(snapshotStateIdGenerator, "snapshotStateIdGenerator is null");
         this.spillStateIdGenerator = requireNonNull(spillStateIdGenerator, "spillStateIdGenerator is null");
         this.pagesSerde = pagesSerde;
+        this.snapshotMemoryContext = snapshotMemoryContext;
+    }
+
+    public void close()
+    {
+        snapshotMemoryContext.close();
     }
 
     /**
@@ -154,6 +166,12 @@ public class SingleInputSnapshotState
     private void captureState(long snapshotId, boolean record)
     {
         SnapshotStateId componentId = snapshotStateIdGenerator.apply(snapshotId);
+        long stateMemory = restorable.getUsedMemory();
+        if (!snapshotMemoryContext.trySetBytes(stateMemory)) {
+            LOG.warn("Insufficient memory on worker node to take snapshot");
+            snapshotManager.failedToCapture(componentId);
+            return;
+        }
         try {
             if (restorable.supportsConsolidatedWrites()) {
                 snapshotManager.storeConsolidatedState(componentId, restorable.capture(pagesSerde));
@@ -175,6 +193,9 @@ public class SingleInputSnapshotState
         catch (Exception e) {
             LOG.warn(e, "Failed to capture and store snapshot state");
             snapshotManager.failedToCapture(componentId);
+        }
+        finally {
+            snapshotMemoryContext.setBytes(0);
         }
     }
 

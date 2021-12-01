@@ -229,6 +229,14 @@ public class StatisticsWriterOperator
     }
 
     @Override
+    public void close()
+    {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         StatisticsWriterOperatorState myState = new StatisticsWriterOperatorState();

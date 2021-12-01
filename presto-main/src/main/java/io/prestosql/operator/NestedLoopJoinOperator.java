@@ -259,6 +259,9 @@ public class NestedLoopJoinOperator
         if (closed) {
             return;
         }
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
         closed = true;
         // `afterClose` must be run last.
         afterClose.run();

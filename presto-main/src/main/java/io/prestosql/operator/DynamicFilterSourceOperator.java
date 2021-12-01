@@ -232,6 +232,14 @@ public class DynamicFilterSourceOperator
     }
 
     @Override
+    public void close()
+    {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         DynamicFilterSourceOperatorState myState = new DynamicFilterSourceOperatorState();

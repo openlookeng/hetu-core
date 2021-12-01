@@ -162,6 +162,14 @@ public class EnforceSingleRowOperator
     }
 
     @Override
+    public void close()
+    {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         EnforceSingleRowOperatorState myState = new EnforceSingleRowOperatorState();

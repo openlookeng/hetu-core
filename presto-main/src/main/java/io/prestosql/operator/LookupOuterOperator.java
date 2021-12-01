@@ -290,6 +290,9 @@ public class LookupOuterOperator
         if (closed) {
             return;
         }
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
         closed = true;
         pageBuilder.reset();
         onClose.run();
