@@ -172,6 +172,8 @@ public class FeaturesConfig
     private int prcntDriversForPartialAggr = 5;
     private boolean skipAttachingStatsWithPlan = true;
     private boolean skipNonApplicableRulesEnabled;
+    private boolean prioritizeLargerSpiltsMemoryRevoke = true;
+    private DataSize revocableMemorySelectionThreshold = new DataSize(512, MEGABYTE);
 
     public enum JoinReorderingStrategy
     {
@@ -1399,6 +1401,30 @@ public class FeaturesConfig
     public FeaturesConfig setSkipNonApplicableRulesEnabled(boolean skipNonApplicableRulesEnabled)
     {
         this.skipNonApplicableRulesEnabled = skipNonApplicableRulesEnabled;
+        return this;
+    }
+
+    public boolean isPrioritizeLargerSpiltsMemoryRevoke()
+    {
+        return prioritizeLargerSpiltsMemoryRevoke;
+    }
+
+    @Config("experimental.prioritize-larger-spilts-memory-revoke")
+    public FeaturesConfig setPrioritizeLargerSpiltsMemoryRevoke(boolean prioritizeLargerSpiltsMemoryRevoke)
+    {
+        this.prioritizeLargerSpiltsMemoryRevoke = prioritizeLargerSpiltsMemoryRevoke;
+        return this;
+    }
+
+    public long getRevocableMemorySelectionThreshold()
+    {
+        return revocableMemorySelectionThreshold.toBytes();
+    }
+
+    @Config("experimental.revocable-memory-selection-threshold")
+    public FeaturesConfig setRevocableMemorySelectionThreshold(DataSize revocableMemorySelectionThreshold)
+    {
+        this.revocableMemorySelectionThreshold = revocableMemorySelectionThreshold;
         return this;
     }
 }

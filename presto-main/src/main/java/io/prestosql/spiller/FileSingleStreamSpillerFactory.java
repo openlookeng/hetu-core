@@ -70,6 +70,7 @@ public class FileSingleStreamSpillerFactory
     private final boolean spillDirectSerdeEnabled;
     private final boolean spillCompressionEnabled;
     private int roundRobinIndex;
+    private int spillPrefetchReadPages;
 
     @Inject
     public FileSingleStreamSpillerFactory(Metadata metadata, SpillerStats spillerStats, FeaturesConfig featuresConfig, NodeSpillConfig nodeSpillConfig)
@@ -84,7 +85,8 @@ public class FileSingleStreamSpillerFactory
                 requireNonNull(featuresConfig, "featuresConfig is null").getSpillMaxUsedSpaceThreshold(),
                 requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillCompressionEnabled(),
                 requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillEncryptionEnabled(),
-                requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillDirectSerdeEnabled());
+                requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillDirectSerdeEnabled(),
+                requireNonNull(nodeSpillConfig, "featuresConfig is null").getSpillPrefetchReadPages());
     }
 
     @VisibleForTesting
@@ -96,7 +98,8 @@ public class FileSingleStreamSpillerFactory
             double maxUsedSpaceThreshold,
             boolean spillCompressionEnabled,
             boolean spillEncryptionEnabled,
-            boolean spillDirectSerdeEnabled)
+            boolean spillDirectSerdeEnabled,
+            int spillPrefetchReadPages)
     {
         this.serdeFactory = new PagesSerdeFactory(blockEncodingSerde, spillCompressionEnabled);
         this.executor = requireNonNull(executor, "executor is null");
@@ -121,6 +124,7 @@ public class FileSingleStreamSpillerFactory
         this.spillCompressionEnabled = spillCompressionEnabled;
         this.roundRobinIndex = 0;
         this.spillDirectSerdeEnabled = spillDirectSerdeEnabled;
+        this.spillPrefetchReadPages = spillPrefetchReadPages;
     }
 
     @PostConstruct
@@ -161,7 +165,7 @@ public class FileSingleStreamSpillerFactory
             spillCipher = Optional.of(new AesSpillCipher());
         }
         PagesSerde serde = serdeFactory.createPagesSerdeForSpill(spillCipher, spillDirectSerdeEnabled);
-        return new FileSingleStreamSpiller(serde, executor, getNextSpillPath(), spillerStats, spillContext, memoryContext, spillCipher, spillCompressionEnabled, spillDirectSerdeEnabled);
+        return new FileSingleStreamSpiller(serde, executor, getNextSpillPath(), spillerStats, spillContext, memoryContext, spillCipher, spillCompressionEnabled, spillDirectSerdeEnabled, spillPrefetchReadPages);
     }
 
     private synchronized Path getNextSpillPath()

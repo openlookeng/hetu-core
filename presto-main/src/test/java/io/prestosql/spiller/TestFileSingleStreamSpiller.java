@@ -127,7 +127,7 @@ public class TestFileSingleStreamSpiller
                 1.0,
                 compression,
                 encryption,
-                false);
+                false, 1);
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext);
         assertTrue(singleStreamSpiller instanceof FileSingleStreamSpiller);
@@ -208,7 +208,7 @@ public class TestFileSingleStreamSpiller
                 1.0,
                 compression,
                 encryption,
-                useDirectSerde);
+                useDirectSerde, 1);
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         long startTime = System.currentTimeMillis();
         Stopwatch spillTimer = Stopwatch.createStarted();
@@ -289,46 +289,64 @@ public class TestFileSingleStreamSpiller
     public void testSpillWithSingleSpillerConsolidatedWithCompression()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, false);
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, false, 1);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, true, 1);
+
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, false, 25);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, true, 25);
     }
 
     @Test
     public void testSpillWithSingleSpillerConsolidatedWithCompressionMultiFile()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, false);
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, false, 1);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, true, 1);
+
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, false, 25);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, true, 25);
     }
 
     @Test
     public void testSpillWithSingleSpillerConsolidatedWithoutCompression()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false, 1);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, 1);
+
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false, 25);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, 25);
     }
 
     @Test
     public void testSpillWithSingleSpillerConsolidatedWithoutCompressionMultiFile()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, false);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, false, 1);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, true, 1);
+
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, false, 25);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, true, 25);
     }
 
     @Test
     public void testSpillWithSingleSpillerConsolidatedWithEncryption()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, true, "1GB", 1, false);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, true, "1GB", 1, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, true, "1GB", 1, false, 1);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, true, "1GB", 1, true, 1);
 
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, false);
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, false, 1);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, true, 1);
+
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, true, "1GB", 1, false, 25);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, true, "1GB", 1, true, 25);
+
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, false, 25);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, true, 25);
     }
 
-    private void assertSpillBenchmarkReadingUsingWorkProcessor(boolean compression, boolean encryption, String pageSize, int fileCount, boolean useDirectSerde)
+    private void assertSpillBenchmarkReadingUsingWorkProcessor(boolean compression, boolean encryption, String pageSize, int fileCount, boolean useDirectSerde, int spillPrefetchReadPages)
             throws Exception
     {
         List<FileSingleStreamSpiller> spillers = new ArrayList<>();
@@ -340,7 +358,8 @@ public class TestFileSingleStreamSpiller
                 1.0,
                 compression,
                 encryption,
-                useDirectSerde);
+                useDirectSerde,
+                spillPrefetchReadPages);
 
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         long startTime = System.currentTimeMillis();

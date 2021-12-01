@@ -240,6 +240,34 @@ This section describes the most important config properties that may be used to 
 >
 > Enables using a randomly generated secret key (per spill file) to encrypt and decrypt data spilled to disk
 
+### `experimental.spill-direct-serde-enabled`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Enables to serialize/read the page directly to/from the stream.
+
+### `experimental.spill-prefetch-read-pages`
+
+> -   **Type:** `integer`
+> -   **Default value:** `1`
+>
+> Sets number of pages prefetched while reading from spilled files.
+
+### `experimental.revocable-memory-selection-threshold`
+
+> -   **Type:** `data size`
+> -   **Default value:** `512 MB`
+>
+> Sets memory selection threshold for revocable memory of operator to directly allocate revocable memory for remaining bytes ready to revoke. 
+
+### `experimental.prioritize-larger-spilts-memory-revoke`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `true`
+>
+> Enables to prioritize splits with larger revocable memory.
+
 ## Exchange Properties
 
 Exchanges transfer data between openLooKeng nodes for different stages of a query. Adjusting these properties may help to resolve inter-node communication issues or improve network utilization.

@@ -398,6 +398,17 @@ public class OperatorContext
         return memoryRevokingRequested;
     }
 
+    public long getRevocableMemory()
+    {
+        long revocableMemory = 0L;
+        synchronized (this) {
+            if (operatorMemoryContext.getRevocableMemory() > 0) {
+                revocableMemory = operatorMemoryContext.getRevocableMemory();
+            }
+        }
+        return revocableMemory;
+    }
+
     /**
      * Returns how much revocable memory will be revoked by the operator
      */

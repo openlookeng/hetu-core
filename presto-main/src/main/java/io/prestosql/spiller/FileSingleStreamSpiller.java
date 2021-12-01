@@ -95,6 +95,7 @@ public class FileSingleStreamSpiller
 
     // Snapshot: capture page sizes that are used to update localSpillContext and spillerStats during resume
     private List<Long> pageSizeList = new LinkedList<>();
+    private final int spillPrefetchReadPages;
 
     public FileSingleStreamSpiller(
             PagesSerde serde,
@@ -105,7 +106,8 @@ public class FileSingleStreamSpiller
             LocalMemoryContext memoryContext,
             Optional<SpillCipher> spillCipher,
             boolean compressionEnabled,
-            boolean useDirectSerde)
+            boolean useDirectSerde,
+            int spillPrefetchReadPages)
     {
         this.serde = requireNonNull(serde, "serde is null");
         this.executor = requireNonNull(executor, "executor is null");
@@ -132,7 +134,7 @@ public class FileSingleStreamSpiller
         catch (IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to create spill file", e);
         }
-
+        this.spillPrefetchReadPages = spillPrefetchReadPages;
         this.useDirectSerde = useDirectSerde;
         this.compressionEnabled = compressionEnabled;
         this.spillCipher = spillCipher;
@@ -257,10 +259,10 @@ public class FileSingleStreamSpiller
             Iterator<Page> pages;
 
             if (useDirectSerde) {
-                pages = PagesSerdeUtil.readPagesDirect(serde, getStreamForReading(input, BUFFER_SIZE), getStreamEndOfData());
+                pages = PagesSerdeUtil.readPagesDirect(serde, getStreamForReading(input, BUFFER_SIZE), getStreamEndOfData(), spillPrefetchReadPages);
             }
             else {
-                pages = PagesSerdeUtil.readPages(serde, new InputStreamSliceInput(input, BUFFER_SIZE));
+                pages = PagesSerdeUtil.readPages(serde, new InputStreamSliceInput(input, BUFFER_SIZE), spillPrefetchReadPages);
             }
             return closeWhenExhausted(pages, input, localSpillContext);
         }

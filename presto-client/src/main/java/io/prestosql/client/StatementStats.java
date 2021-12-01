@@ -46,6 +46,7 @@ public class StatementStats
     private final long spilledBytes;
     private long elapsedSpillReadTimeMillis;
     private long elapsedSpillWriteTimeMillis;
+    private int spilledNodes;
     private final StageStats rootStage;
 
     @JsonCreator
@@ -68,6 +69,7 @@ public class StatementStats
             @JsonProperty("spilledBytes") long spilledBytes,
             @JsonProperty("elapsedSpillReadTimeMillis") long elapsedSpillReadTimeMillis,
             @JsonProperty("elapsedSpillWriteTimeMillis") long elapsedSpillWriteTimeMillis,
+            @JsonProperty("spilledNodes") int spilledNodes,
             @JsonProperty("rootStage") StageStats rootStage)
     {
         this.state = requireNonNull(state, "state is null");
@@ -88,6 +90,7 @@ public class StatementStats
         this.spilledBytes = spilledBytes;
         this.elapsedSpillReadTimeMillis = elapsedSpillReadTimeMillis;
         this.elapsedSpillWriteTimeMillis = elapsedSpillWriteTimeMillis;
+        this.spilledNodes = spilledNodes;
         this.rootStage = rootStage;
     }
 
@@ -215,6 +218,12 @@ public class StatementStats
         return elapsedSpillWriteTimeMillis;
     }
 
+    @JsonProperty
+    public int getSpilledNodes()
+    {
+        return spilledNodes;
+    }
+
     @Override
     public String toString()
     {
@@ -267,6 +276,7 @@ public class StatementStats
         private StageStats rootStage;
         private long spillReadTimeMillis;
         private long spillWriteTimeMillis;
+        private int spilledNodes;
 
         private Builder() {}
 
@@ -378,6 +388,12 @@ public class StatementStats
             return this;
         }
 
+        public Builder setSpilledNodes(int spilledNodes)
+        {
+            this.spilledNodes = spilledNodes;
+            return this;
+        }
+
         public Builder setRootStage(StageStats rootStage)
         {
             this.rootStage = rootStage;
@@ -405,6 +421,7 @@ public class StatementStats
                     spilledBytes,
                     spillReadTimeMillis,
                     spillWriteTimeMillis,
+                    spilledNodes,
                     rootStage);
         }
     }
