@@ -34,6 +34,7 @@ import java.io.Serializable;
 import java.nio.file.Path;
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -187,7 +188,16 @@ public class Table
                 LogicalPart lastLogicalPart = logicalPartIndices.isEmpty() ? null : this.logicalParts.get(logicalPartIndices.get(logicalPartIndices.size() - 1) - 1);
                 if (lastLogicalPart == null || !lastLogicalPart.canAdd()) {
                     int logicalPartNum = logicalParts.size() + 1;
-                    lastLogicalPart = new LogicalPart(columns, sortedBy, indexColumns, tableDataRoot, pageSorter, maxLogicalPartBytes, maxPageSizeBytes, typeManager, pagesSerde, logicalPartNum, compressionEnabled);
+                    if (sortedBy.isEmpty()) {
+                        //  1. partitioned only -> force sorting on partition column
+                        //  2. partitioned and sorted_by on different columns -> sort on the specified column.
+                        //  The purpose is to prevent generating many small pages.
+                        List<SortingColumn> convertedSortingCol = Arrays.asList(new SortingColumn(partitionedBy.get(0), SortOrder.ASC_NULLS_LAST));
+                        lastLogicalPart = new LogicalPart(columns, convertedSortingCol, indexColumns, tableDataRoot, pageSorter, maxLogicalPartBytes, maxPageSizeBytes, typeManager, pagesSerde, logicalPartNum, compressionEnabled);
+                    }
+                    else {
+                        lastLogicalPart = new LogicalPart(columns, sortedBy, indexColumns, tableDataRoot, pageSorter, maxLogicalPartBytes, maxPageSizeBytes, typeManager, pagesSerde, logicalPartNum, compressionEnabled);
+                    }
                     logicalParts.add(lastLogicalPart);
                     logicalPartIndices.add(logicalPartNum);
                 }
