@@ -43,6 +43,7 @@ public class MemoryConfig
     private Duration processingDelay = new Duration(5, TimeUnit.SECONDS);
     private Path spillRoot;
     private int threadPoolSize = Math.max((Runtime.getRuntime().availableProcessors() / 2), 1);
+    private boolean tableStatisticsEnabled; //default value is false unless specified in memory config file
 
     @NotNull
     public Path getSpillRoot()
@@ -104,6 +105,19 @@ public class MemoryConfig
     {
         this.maxLogicalPartSize = maxLogicalPartSize;
         return this;
+    }
+
+    @Config("memory.table-statistics-enabled")
+    @ConfigDescription("Enable use of table statistics.") // currently, the table statistics are collected by running analyze statement on tables
+    public MemoryConfig setTableStatisticsEnabled(boolean tableStatisticsEnabled)
+    {
+        this.tableStatisticsEnabled = tableStatisticsEnabled;
+        return this;
+    }
+
+    public boolean isTableStatisticsEnabled()
+    {
+        return tableStatisticsEnabled;
     }
 
     @MinDataSize("1kB")

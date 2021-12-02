@@ -151,6 +151,8 @@ totaldiskbyteusage | totalmemorybyteusage
 | `memory.max-page-size                `  | 1MB           | No      | 每个Page的大小限制 |
 | `memory.logical-part-processing-delay`  | 5s            | No      | 表创建后建立索引和写入磁盘前的等待时间 |
 | `memory.thread-pool-size             `  | Half of threads available to the JVM | No      | 后台线程（排序，清理数据，写入磁盘等）使用的线程池大小 |
+| `memory.table-statistics-enabled`       | False         | No      | 启用后，用户可以运行分析来收集统计信息并利用该信息来加速查询。|
+
 
 路径配置白名单：["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", 工作目录]
 
@@ -165,6 +167,7 @@ totaldiskbyteusage | totalmemorybyteusage
 | index_columns            | `array['col1', 'col2']`   | None                             | 在该列上创建索引|
 | spill_compression        | `boolean`                 | None                             | 在磁盘上持久化数据时是否启用压缩 |
 
+
 ## 索引类型
 内存连接器支持使用索引来加速某些算子的执行速度。支持的索引类型如下：
 
@@ -173,6 +176,21 @@ totaldiskbyteusage | totalmemorybyteusage
 | Bloom        | 两者都可                                 | `=` `IN`                             |                   
 | MinMax       | 仅`sorted_by`                           | `=` `>` `>=` `<` `<=` `IN` `BETWEEN` |
 | Sparse       | 仅`sorted_by`                           | `=` `>` `>=` `<` `<=` `IN` `BETWEEN` |
+
+使用统计信息
+-----------------
+如果开启了统计配置，可以参考下面的例子来使用。
+
+使用内存连接器创建一个表：
+
+    CREATE TABLE memory.default.nation AS
+    SELECT * from tpch.tiny.nation;
+
+运行ANALYZE以收集统计信息：
+
+    ANALYZE memory.default.nation;
+
+然后运行查询。请注意，目前我们不支持自动统计更新，因此如果表更新，您将需要再次运行 ANALYZE。
 
 ## 开发者信息
 

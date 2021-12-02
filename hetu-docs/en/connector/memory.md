@@ -161,6 +161,7 @@ totaldiskbyteusage | totalmemorybyteusage
 | `memory.max-page-size                `  | 512KB         | No      | Memory limit for each page. Default value is recommended.|
 | `memory.logical-part-processing-delay`  | 5s            | No      | The delay between when the table is created/updated and LogicalPart processing starts. Default value is recommended.|
 | `memory.thread-pool-size             `  | Half of threads available to the JVM | No      | Maximum threads to allocate for background processing (e.g. sorting, index creation, cleanup, etc)|
+| `memory.table-statistics-enabled`       | False         | No      | When enabled, user can run analyze to collect statistics and leverage that information for accelerating queries.|
 
 Path whitelist:  `["/tmp", "/opt/hetu", "/opt/openlookeng", "/etc/hetu", "/etc/openlookeng", current workspace]`
 
@@ -185,6 +186,23 @@ These are the types of indices that are built on the columns you specify in `sor
 | Bloom   | `sorted_by,index_columns`                                 | `=` `IN`                             |                   
 | MinMax  | `sorted_by,index_columns`                            | `=` `>` `>=` `<` `<=` `IN` `BETWEEN` |
 | Sparse  | `sorted_by`                            | `=` `>` `>=` `<` `<=` `IN` `BETWEEN` |
+
+
+Using statistics
+-----------------
+If the statistic configuration is enabled, you can refer to the example below to use it.
+
+Create a table using the Memory Connector:
+
+    CREATE TABLE memory.default.nation AS
+    SELECT * from tpch.tiny.nation;
+
+Run Analyze to collect the statistic information:
+
+    ANALYZE memory.default.nation;
+
+And then run the queries. Note that currently we do not support automatic statistic update, so you will need to run ANALYZE again if the table is updated.
+
 
 Developer Information
 ----------------------------

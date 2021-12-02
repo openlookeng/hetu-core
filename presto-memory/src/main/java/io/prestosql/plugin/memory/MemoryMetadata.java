@@ -15,14 +15,18 @@ package io.prestosql.plugin.memory;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.prestosql.plugin.memory.data.MemoryTableManager;
+import io.prestosql.plugin.memory.statistics.StatisticsUtils;
+import io.prestosql.plugin.memory.statistics.TableStatisticsData;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.Node;
 import io.prestosql.spi.NodeManager;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorInsertTableHandle;
@@ -47,7 +51,12 @@ import io.prestosql.spi.metastore.model.CatalogEntity;
 import io.prestosql.spi.metastore.model.DatabaseEntity;
 import io.prestosql.spi.metastore.model.TableEntity;
 import io.prestosql.spi.metastore.model.TableEntityType;
+import io.prestosql.spi.statistics.ColumnStatisticMetadata;
+import io.prestosql.spi.statistics.ColumnStatisticType;
 import io.prestosql.spi.statistics.ComputedStatistics;
+import io.prestosql.spi.statistics.TableStatisticType;
+import io.prestosql.spi.statistics.TableStatistics;
+import io.prestosql.spi.statistics.TableStatisticsMetadata;
 import io.prestosql.spi.type.TypeManager;
 
 import javax.annotation.concurrent.ThreadSafe;
@@ -70,11 +79,15 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.airlift.json.JsonCodec.jsonCodec;
 import static io.prestosql.spi.StandardErrorCode.ALREADY_EXISTS;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_USER_ERROR;
 import static io.prestosql.spi.StandardErrorCode.INVALID_TABLE_PROPERTY;
 import static io.prestosql.spi.StandardErrorCode.SCHEMA_NOT_EMPTY;
+import static io.prestosql.spi.statistics.TableStatisticType.ROW_COUNT;
+import static io.prestosql.spi.type.BigintType.BIGINT;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
@@ -87,10 +100,12 @@ public class MemoryMetadata
     public static final String MEM_KEY = "memory"; // memory metadata all under this catalog
     public static final String DEFAULT_SCHEMA = "default";
     public static final String TABLE_ID_KEY = "id"; // used as param key in TableEntity
+    public static final String TABLE_STATS_KEY = "table_statistics";
     public static final String TABLE_OUTPUT_HANDLE = "output_handle"; // used as param key in TableEntity
     public static final String NEXT_ID_KEY = "_NEXT_ID_"; // used as param key in CatalogEntity
     private static final JsonCodec<ConnectorViewDefinition> VIEW_CODEC = jsonCodec(ConnectorViewDefinition.class);
     private static final JsonCodec<MemoryWriteTableHandle> OUTPUT_TABLE_HANDLE_JSON_CODEC = jsonCodec(MemoryWriteTableHandle.class);
+    private static final JsonCodec<TableStatisticsData> STATS_JSON_CODEC = jsonCodec(TableStatisticsData.class);
     private static final long metastoreCheckInterval = 10L; // time between scheduled metastore check to remove spilled data
 
     private final NodeManager nodeManager;
@@ -103,6 +118,7 @@ public class MemoryMetadata
     // tables and views are cached here
     private final Map<Long, TableInfo> tables = new ConcurrentHashMap<>();
     private final Map<SchemaTableName, ConnectorViewDefinition> views = new ConcurrentHashMap<>();
+    private Map<Long, TableStatistics> tableStats = new ConcurrentHashMap<>();
 
     private boolean refreshScheduled; // used to make sure that refresh is only scheduled once
 
@@ -196,6 +212,80 @@ public class MemoryMetadata
     }
 
     @Override
+    public TableStatisticsMetadata getStatisticsCollectionMetadataForWrite(ConnectorSession session, ConnectorTableMetadata tableMetadata)
+    {
+        if (!config.isTableStatisticsEnabled()) {
+            return TableStatisticsMetadata.empty();
+        }
+        return getStatisticsCollectionMetadata(session, tableMetadata);
+    }
+
+    @Override
+    public ConnectorTableHandle getTableHandleForStatisticsCollection(ConnectorSession session, SchemaTableName tableName, Map<String, Object> analyzeProperties)
+    {
+        MemoryTableHandle handle = (MemoryTableHandle) getTableHandle(session, tableName);
+        return handle;
+    }
+
+    @Override
+    public TableStatisticsMetadata getStatisticsCollectionMetadata(ConnectorSession session, ConnectorTableMetadata tableMetadata)
+    {
+        Set<ColumnStatisticMetadata> columnStatistics = tableMetadata.getColumns().stream()
+                .filter(column -> !column.isHidden())
+                .map(this::getColumnStatisticMetadata)
+                .flatMap(List::stream)
+                .collect(toImmutableSet());
+        Set<TableStatisticType> tableStatistics = ImmutableSet.of(ROW_COUNT);
+        return new TableStatisticsMetadata(columnStatistics, tableStatistics, Collections.emptyList());
+    }
+
+    private List<ColumnStatisticMetadata> getColumnStatisticMetadata(ColumnMetadata columnMetadata)
+    {
+        return getColumnStatisticMetadata(columnMetadata.getName(), StatisticsUtils.getSupportedColumnStatistics(columnMetadata.getType()));
+    }
+
+    private List<ColumnStatisticMetadata> getColumnStatisticMetadata(String columnName, Set<ColumnStatisticType> statisticTypes)
+    {
+        return statisticTypes.stream()
+                .map(type -> new ColumnStatisticMetadata(columnName, type))
+                .collect(toImmutableList());
+    }
+
+    @Override
+    public ConnectorTableHandle beginStatisticsCollection(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        return tableHandle;
+    }
+
+    @Override
+    public void finishStatisticsCollection(ConnectorSession session, ConnectorTableHandle tableHandle, Collection<ComputedStatistics> computedStatistics)
+    {
+        long rowCount = 0;
+        for (ComputedStatistics stat : computedStatistics) {
+            Block value = stat.getTableStatistics().get(ROW_COUNT);
+            if (value != null) {
+                rowCount = BIGINT.getLong(value, 0);
+                break;
+            }
+        }
+
+        Map<String, ColumnHandle> columnHandles = getColumnHandles(session, tableHandle);
+        TableStatisticsData tableStatistics = StatisticsUtils.fromComputedStatistics(session, computedStatistics, rowCount, columnHandles, typeManager);
+        String statsInfo = Base64.getEncoder().encodeToString(STATS_JSON_CODEC.toJsonBytes(tableStatistics));
+
+        // store the stats info into metastore
+        MemoryTableHandle handle = (MemoryTableHandle) tableHandle;
+        metastore.alterTableParameter(MEM_KEY,
+                handle.getSchemaName(),
+                handle.getTableName(),
+                TABLE_STATS_KEY,
+                statsInfo);
+
+        // also update the in-memory cache
+        tableStats.put(handle.getId(), tableStatistics.toTableStatistics(columnHandles));
+    }
+
+    @Override
     public ConnectorTableMetadata getTableMetadata(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         MemoryTableHandle handle = (MemoryTableHandle) tableHandle;
@@ -251,6 +341,30 @@ public class MemoryMetadata
         return getTableInfo(handle.getId())
                 .getColumn(columnHandle)
                 .getMetadata(typeManager);
+    }
+
+    @Override
+    public TableStatistics getTableStatistics(ConnectorSession session, ConnectorTableHandle tableHandle, Constraint constraint, boolean includeColumnStatistics)
+    {
+        if (!config.isTableStatisticsEnabled()) {
+            return TableStatistics.empty();
+        }
+
+        MemoryTableHandle memoryTableHandle = (MemoryTableHandle) tableHandle;
+        TableStatistics stat = tableStats.get(memoryTableHandle.getId());
+        if (stat == null) {
+            TableInfo tableInfo = getTableInfo(memoryTableHandle.getId());
+            String creationHandleStr = getTableEntity(tableInfo.getSchemaTableName(), false).getParameters().get(TABLE_STATS_KEY);
+            if (creationHandleStr == null) {
+                return TableStatistics.empty();
+            }
+
+            TableStatisticsData result = STATS_JSON_CODEC.fromJson(Base64.getDecoder().decode(creationHandleStr));
+            Map<String, ColumnHandle> columnHandles = getColumnHandles(session, tableHandle);
+            stat = result.toTableStatistics(columnHandles);
+            tableStats.put(memoryTableHandle.getId(), stat);
+        }
+        return stat;
     }
 
     @Override
@@ -523,6 +637,15 @@ public class MemoryMetadata
         MemoryWriteTableHandle memoryInsertHandle = (MemoryWriteTableHandle) insertHandle;
 
         updateRowsOnHosts(memoryInsertHandle.getTable(), fragments);
+
+        // invalidate table stats in cache and metastore when new data is inserted
+        tableStats.remove(memoryInsertHandle.getTable());
+        metastore.alterTableParameter(MEM_KEY,
+                memoryInsertHandle.getSchemaName(),
+                memoryInsertHandle.getTableName(),
+                TABLE_STATS_KEY,
+                null);
+
         return Optional.empty();
     }
 
