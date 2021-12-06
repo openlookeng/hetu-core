@@ -68,13 +68,24 @@ public class IndexCache
 
     public IndexCache(CacheLoader loader, IndexClient indexClient)
     {
+        this(loader, indexClient, true);
+    }
+
+    /**
+     * during some testing we don't want auto refresh occurring
+     */
+    @VisibleForTesting
+    protected IndexCache(CacheLoader loader, IndexClient indexClient, boolean autoRefreshEnabled)
+    {
         // If the static variables have not been initialized
         if (PropertyService.getBooleanProperty(HetuConstant.FILTER_ENABLED)) {
             loadDelay = PropertyService.getDurationProperty(HetuConstant.FILTER_CACHE_LOADING_DELAY).toMillis();
             // in millisecond
             long refreshRate = Math.max(loadDelay / 2, 5000L);
             int numThreads = Math.min(Runtime.getRuntime().availableProcessors(), PropertyService.getLongProperty(HetuConstant.FILTER_CACHE_LOADING_THREADS).intValue());
-            executor = Executors.newScheduledThreadPool(numThreads, threadFactory);
+            if (executor == null) {
+                executor = Executors.newScheduledThreadPool(numThreads, threadFactory);
+            }
             CacheBuilder<IndexCacheKey, List<IndexMetadata>> cacheBuilder = CacheBuilder.newBuilder()
                     .removalListener(e -> {
                         try {
@@ -103,19 +114,22 @@ public class IndexCache
                 cacheBuilder.softValues();
             }
 
-            executor.scheduleAtFixedRate(() -> {
-                // This thread automatically keep the cache updated every 5 secs in the background.
-                try {
-                    List<IndexRecord> newRecords = indexClient.getAllIndexRecords();
-                    boolean success = autoUpdateCache(newRecords);
-                    if (success) {
-                        LOG.debug("Cache refreshed");
+            if (autoRefreshEnabled) {
+                executor.scheduleAtFixedRate(() -> {
+                    // This thread automatically keep the cache updated every 5 secs in the background.
+                    try {
+                        List<IndexRecord> newRecords = indexClient.getAllIndexRecords();
+                        boolean success = autoUpdateCache(newRecords);
+                        if (success) {
+                            LOG.debug("Cache refreshed");
+                        }
                     }
-                }
-                catch (Exception e) {
-                    LOG.debug(e, "Error using index records to refresh cache");
-                }
-            }, loadDelay, refreshRate, TimeUnit.MILLISECONDS);
+                    catch (Exception e) {
+                        LOG.debug(e, "Error using index records to refresh cache");
+                    }
+                }, loadDelay, refreshRate, TimeUnit.MILLISECONDS);
+            }
+
             cache = cacheBuilder.build(loader);
         }
     }
