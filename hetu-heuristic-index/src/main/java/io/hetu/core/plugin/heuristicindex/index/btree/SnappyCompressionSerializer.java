@@ -133,7 +133,6 @@ public class SnappyCompressionSerializer<E>
         }
         else {
             int length = in.unpackInt() - 1;
-            int startPosition = in.getPos();
             if (length == -1) {
                 return this.serializer.valueArrayDeserialize(in, size);
             }
