@@ -317,11 +317,11 @@ public class CarbondataHetuFilterUtil
             if (rawData instanceof Slice) {
                 String value = ((Slice) rawData).toStringUtf8();
                 if (type.getTypeInfo() instanceof CharTypeInfo) {
-                    String padding = "";
+                    StringBuilder padding = new StringBuilder();
                     int paddedLength = ((CharTypeInfo) type.getTypeInfo()).getLength();
                     int truncatedLength = value.length();
                     for (int i = 0; i < paddedLength - truncatedLength; i++) {
-                        padding += " ";
+                        padding.append(" ");
                     }
                     return value + padding;
                 }
