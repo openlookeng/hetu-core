@@ -17,6 +17,7 @@ package io.hetu.core.plugin.heuristicindex.index.bloom;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.log.Logger;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.Pair;
@@ -48,7 +49,7 @@ public class BloomIndex
     public static final String ID = "BLOOM";
     private Properties properties;
     private BloomFilter filter;
-
+    private static final Logger log = Logger.get(BloomIndex.class);
     private int expectedNumOfEntries;
 
     private static final String FPP_KEY = "bloom.fpp";
@@ -194,7 +195,9 @@ public class BloomIndex
     {
         if (file == null) {
             file = File.createTempFile("bloomindex", UUID.randomUUID().toString());
-            file.delete();
+            if (!file.delete()) {
+                log.error("could not delete file");
+            }
             file.deleteOnExit();
         }
         return file;
@@ -204,7 +207,9 @@ public class BloomIndex
     public void close() throws IOException
     {
         if (isMmapEnabled()) {
-            getFile().delete();
+            if (!getFile().delete()) {
+                log.error("could not delete file");
+            }
         }
     }
 
