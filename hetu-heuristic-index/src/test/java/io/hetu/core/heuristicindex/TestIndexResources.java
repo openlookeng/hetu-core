@@ -508,12 +508,12 @@ public class TestIndexResources
 
     String getNewTableName()
     {
-        return "hive.test.t" + Integer.valueOf(count.getAndIncrement()).toString();
+        return "hive.test.t" + Integer.valueOf(count.getAndIncrement());
     }
 
     String getNewIndexName()
     {
-        return "idx" + Integer.valueOf(count.getAndIncrement()).toString();
+        return "idx" + Integer.valueOf(count.getAndIncrement());
     }
 
     Pair<Integer, MaterializedResult> runTwiceGetSplitAndMaterializedResult(String testerQuery)
