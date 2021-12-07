@@ -51,7 +51,6 @@ public class TestSnappyCompressionSerializer
                     .create();
             int entries = 200;
             String value = "001:3,002:3,003:3,004:3,005:3,006:3,007:3,008:3,009:3,002:3,010:3,002:3,011:3,012:3,101:3,102:3,103:3,104:3,105:3,106:3,107:3,108:3,109:3,102:3,110:3,102:3,111:3,112:3";
-            byte[] valueBytes = value.getBytes();
             for (int i = 0; i < entries; i++) {
                 btree.put(i + "", value);
             }
