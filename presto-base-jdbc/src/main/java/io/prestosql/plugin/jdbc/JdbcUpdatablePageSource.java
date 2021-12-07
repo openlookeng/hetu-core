@@ -45,7 +45,7 @@ public class JdbcUpdatablePageSource
     private final JdbcClient jdbcClient;
     private final JdbcSplit jdbcSplit;
     private final Connection connection;
-    private final int batchSizeLimit = 1000;
+    private static final int batchSizeLimit = 1000;
     private boolean dmlStatementsCommittedAsAnTransaction;
 
     public JdbcUpdatablePageSource(RecordSet recordSet, ConnectorSession session,
