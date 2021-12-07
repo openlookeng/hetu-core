@@ -39,9 +39,6 @@ import static org.testng.Assert.assertEquals;
 
 public class TestPartitionIndexWriter
 {
-    private String tableName = "testTable";
-    private String columnName = "testColumn";
-
     @Test
     public void testAddValue()
             throws IOException
