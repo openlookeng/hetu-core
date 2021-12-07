@@ -14,6 +14,8 @@
  */
 package io.hetu.core.plugin.hbase.metadata;
 
+import io.airlift.log.Logger;
+
 import java.io.File;
 import java.io.IOException;
 
@@ -24,6 +26,8 @@ import java.io.IOException;
  */
 public class TestingHBaseTableUtils
 {
+    private static final Logger log = Logger.get(TestingHBaseTableUtils.class);
+
     private TestingHBaseTableUtils() {}
 
     /**
@@ -32,7 +36,9 @@ public class TestingHBaseTableUtils
     public static void delFile(String file)
     {
         File pfile = new File(file);
-        pfile.delete();
+        if (!pfile.delete()) {
+            log.info("File %s deletion failed", file);
+        }
     }
 
     /**
