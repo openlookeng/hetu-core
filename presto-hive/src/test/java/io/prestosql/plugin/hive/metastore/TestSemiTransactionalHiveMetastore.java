@@ -56,7 +56,6 @@ public class TestSemiTransactionalHiveMetastore
     private static final HiveIdentity IDENTITY = new HiveIdentity(SESSION);
     private MockThriftMetastoreClient mockClient;
     private ThriftHiveMetastore thriftHiveMetastore;
-    private ThriftMetastoreStats stats;
 
     protected String database;
     protected HdfsEnvironment hdfsEnvironment;
@@ -100,7 +99,6 @@ public class TestSemiTransactionalHiveMetastore
         mockClient = new MockThriftMetastoreClient();
         MetastoreLocator metastoreLocator = new MockMetastoreLocator(mockClient);
         thriftHiveMetastore = new ThriftHiveMetastore(metastoreLocator, new ThriftHiveMetastoreConfig());
-        stats = thriftHiveMetastore.getStats();
     }
 
     private void updatePartitionsStatistics()
