@@ -62,7 +62,6 @@ public class TestCarbondataAutoCleanup
     public void setup() throws Exception
     {
         logger.info("Setup begin: " + this.getClass().getSimpleName());
-        String dataPath = rootPath + "/src/test/resources/alldatatype.csv";
 
         CarbonProperties.getInstance().addProperty(CarbonCommonConstants.CARBON_WRITTEN_BY_APPNAME, "HetuTest");
         CarbonProperties.getInstance().addProperty(CarbonCommonConstants.MAX_QUERY_EXECUTION_TIME, "0");
