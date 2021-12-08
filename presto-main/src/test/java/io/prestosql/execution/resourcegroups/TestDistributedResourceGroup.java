@@ -317,7 +317,7 @@ public class TestDistributedResourceGroup
         synchronized (lock) {
             DistributedResourceGroup root = new DistributedResourceGroup(Optional.empty(), "root", (group, export) -> {}, directExecutor(), statestore);
             resourceGroupBasicSetUp(root, ONE_BYTE, 3, 4);
-            Set<MockManagedQueryExecution> queries = new HashSet<>();
+
             // query1 running in remote
             MockManagedQueryExecution query1 = new MockManagedQueryExecution(2);
             query1.startWaitingForResources();
@@ -461,12 +461,12 @@ public class TestDistributedResourceGroup
             root.setHardCpuLimit(new Duration(2, SECONDS));
             root.setCpuQuotaGenerationMillisPerSecond(2000);
 
-            Set<MockManagedQueryExecution> queries = new HashSet<>();
+
             MockManagedQueryExecution query1 = new MockManagedQueryExecution(1, "query_id", 1, new Duration(1, SECONDS));
             root.run(query1);
             assertEquals(query1.getState(), RUNNING);
             query1.setResourceGroupId(root.getId());
-            queries.add(query1);
+
             query1.complete();
             updateQueryStateCache(query1);
 
@@ -675,7 +675,7 @@ public class TestDistributedResourceGroup
             DistributedResourceGroup root = new DistributedResourceGroup(Optional.empty(), "root", (group, export) -> {}, directExecutor(), statestore);
             resourceGroupBasicSetUp(root, FIVE_BYTE, 3, 4);
             root.setKillPolicy(KillPolicy.HIGH_MEMORY_QUERIES);
-            Set<MockManagedQueryExecution> queries = new HashSet<>();
+
             // query1 running in remote
             MockManagedQueryExecution query1 = new MockManagedQueryExecution(2, "q1");
             query1.startWaitingForResources();
@@ -715,7 +715,7 @@ public class TestDistributedResourceGroup
             DistributedResourceGroup root = new DistributedResourceGroup(Optional.empty(), "root", (group, export) -> {}, directExecutor(), statestore);
             resourceGroupBasicSetUp(root, new DataSize(130, BYTE), 3, 4);
             root.setKillPolicy(KillPolicy.HIGH_MEMORY_QUERIES);
-            Set<MockManagedQueryExecution> queries = new HashSet<>();
+
             // query1 running in remote
             MockManagedQueryExecution query1 = new MockManagedQueryExecution(2, "q1");
             query1.startWaitingForResources();
@@ -756,7 +756,7 @@ public class TestDistributedResourceGroup
             DistributedResourceGroup root = new DistributedResourceGroup(Optional.empty(), "root", (group, export) -> {}, directExecutor(), statestore);
             resourceGroupBasicSetUp(root, new DataSize(12, BYTE), 4, 4);
             root.setKillPolicy(KillPolicy.FINISH_PERCENTAGE_QUERIES);
-            Set<MockManagedQueryExecution> queries = new HashSet<>();
+
             // query1 running in remote
             MockManagedQueryExecution query1 = new MockManagedQueryExecution(2, "q1", 30.0);
             query1.startWaitingForResources();
