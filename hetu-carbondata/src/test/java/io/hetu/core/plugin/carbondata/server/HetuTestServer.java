@@ -123,13 +123,19 @@ public class HetuTestServer
     public List<Map<String, Object>> executeQuery(String query) throws SQLException
     {
         logger.info(">>>>> Executing Query: " + query);
+        ResultSet rs = null;
         try {
-            ResultSet rs = statement.executeQuery(query);
+            rs = statement.executeQuery(query);
             return convertResultSetToList(rs);
         }
         catch (SQLException e) {
             logger.error("Exception Occured: " + e.getMessage() + "\n Failed Query: " + query);
             throw e;
+        }
+        finally {
+            if (rs != null) {
+                rs.close();
+            }
         }
     }
 
