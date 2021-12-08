@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 
 /**
  * TestHBaseTableHandle
@@ -105,7 +106,7 @@ public class TestHBaseTableHandle
         if (hBaseTableHandle == null) {
             testCreateHBaseTableHandle();
         }
-        this.hBaseTableHandle.hashCode();
+        assertNotEquals(0, hBaseTableHandle.hashCode());
         this.hBaseTableHandle.toSchemaTableName();
         assertEquals("hbase.table-1", this.hBaseTableHandle.getFullTableName());
         this.hBaseTableHandle.equals(this.hBaseTableHandle);
