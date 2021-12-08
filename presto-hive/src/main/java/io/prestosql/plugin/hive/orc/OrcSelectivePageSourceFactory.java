@@ -191,7 +191,6 @@ public class OrcSelectivePageSourceFactory
                 && additionPredicates.get().size() > 0
                 && !additionPredicates.get().get(0).isAll()
                 && !additionPredicates.get().get(0).isNone()) {
-            List<ConnectorPageSource> pageSources = new ArrayList<>();
             List<Integer> positions = new ArrayList<>(10);
 
             return Optional.of(createOrcPageSource(
@@ -458,7 +457,6 @@ public class OrcSelectivePageSourceFactory
                 else if (isFullAcid && readType instanceof RowType && column.getName().equalsIgnoreCase("row__id")) {
                     HiveType hiveType = column.getHiveType();
                     StructTypeInfo structTypeInfo = (StructTypeInfo) hiveType.getTypeInfo();
-                    ImmutableList.Builder<ColumnAdaptation> builder = new ImmutableList.Builder<>();
                     ArrayList<String> fieldNames = structTypeInfo.getAllStructFieldNames();
                     List<ColumnAdaptation> adaptations = fieldNames.stream()
                             .map(acidColumnNames::indexOf)
