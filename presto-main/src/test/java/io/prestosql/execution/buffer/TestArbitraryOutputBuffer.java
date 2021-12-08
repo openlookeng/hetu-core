@@ -73,6 +73,7 @@ import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -337,7 +338,8 @@ public class TestArbitraryOutputBuffer
         assertEquals(buffer.getInfo().getBuffers().stream().map(BufferInfo::getPagesSent).collect(Collectors.toList()), Arrays.asList(3L, 2L));
 
         // New buffer receives pending markers
-        outputBuffers.withBuffer(THIRD, BROADCAST_PARTITION_ID);
+        OutputBuffers outputBuffers1 = outputBuffers.withBuffer(THIRD, BROADCAST_PARTITION_ID);
+        assertNotNull(outputBuffers1);
         buffer.setOutputBuffers(outputBuffers);
         assertBufferResultEquals(TYPES, getBufferResult(buffer, THIRD, 0, sizeOfPages(3), NO_WAIT),
                 bufferResult(0, marker1, marker2));
