@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.testng.Assert.assertTrue;
+import static org.testng.AssertJUnit.assertNotNull;
 
 public class TestCarbonAutoVacuum
 {
@@ -145,6 +146,7 @@ public class TestCarbonAutoVacuum
 
         try {
             CarbondataAutoVacuumThread.enableTracingVacuumTask(true);
+            assertNotNull(catalog);
             connector = catalog.getConnector(catalog.getConnectorCatalogName());
             connectorMetadata = connector.getConnectorMetadata();
             connectorMetadata.getTablesForVacuum();
