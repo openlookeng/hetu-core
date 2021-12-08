@@ -103,7 +103,6 @@ public class CarbondataHetuOutputFormat<T>
         OutputCommitter carbonOutputCommitter = super.getOutputCommitter(context);
         JobContextImpl jobContext = new JobContextImpl(jc, new JobID());
         carbonOutputCommitter.setupJob(jobContext);
-        CarbonLoadModel updatedCarbonLoadModel = CarbonTableOutputFormat.getLoadModel(jc);
         org.apache.hadoop.mapreduce.RecordWriter re = super.getRecordWriter(context);
         return new FileSinkOperator.RecordWriter()
         {
