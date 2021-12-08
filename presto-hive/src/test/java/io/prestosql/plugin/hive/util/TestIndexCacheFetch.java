@@ -50,7 +50,7 @@ import static org.testng.Assert.assertEquals;
  */
 public class TestIndexCacheFetch
 {
-    private final String catalog = "test_catalog";
+    private static final String catalog = "test_catalog";
     private final String table = "schema_name.table_name";
     private final long testLastModifiedTime = 1;
     private final String testPath = "/user/hive/schema.db/table/001.orc";
