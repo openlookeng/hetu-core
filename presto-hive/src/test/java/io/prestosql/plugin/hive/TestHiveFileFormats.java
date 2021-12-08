@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import io.airlift.compress.lzo.LzoCodec;
 import io.airlift.compress.lzo.LzopCodec;
+import io.airlift.log.Logger;
 import io.airlift.slice.Slices;
 import io.prestosql.orc.OrcCacheStore;
 import io.prestosql.orc.OrcWriterOptions;
@@ -89,6 +90,7 @@ import static org.testng.Assert.fail;
 public class TestHiveFileFormats
         extends AbstractTestHiveFileFormats
 {
+    private static final Logger LOG = Logger.get(TestHiveFileFormats.class);
     private static final FileFormatDataSourceStats STATS = new FileFormatDataSourceStats();
     private static TestingConnectorSession parquetPageSourceSession = new TestingConnectorSession(new HiveSessionProperties(createParquetHiveConfig(false), new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
     private static TestingConnectorSession parquetPageSourceSessionUseName = new TestingConnectorSession(new HiveSessionProperties(createParquetHiveConfig(true), new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
@@ -831,7 +833,11 @@ public class TestHiveFileFormats
                     .orElse("");
 
             File file = File.createTempFile("presto_test", formatName + compressionSuffix);
-            file.delete();
+
+            if (!file.delete()) {
+                LOG.error("File deletion failed");
+            }
+
             try {
                 FileSplit split;
                 if (fileWriterFactory != null) {
