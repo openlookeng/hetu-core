@@ -306,7 +306,8 @@ public class TestBTreeIndex
         }
         File file = File.createTempFile("test-serialize-", UUID.randomUUID().toString());
         index.serialize(new FileOutputStream(file));
-        file.delete();
+
+        assertTrue(file.delete());
         index.close();
     }
 
