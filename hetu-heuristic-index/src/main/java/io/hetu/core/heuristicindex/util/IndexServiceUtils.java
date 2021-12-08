@@ -40,7 +40,6 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.Optional;
 import java.util.Properties;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -236,7 +235,6 @@ public class IndexServiceUtils
     public static void writeToHdfs(HetuFileSystemClient srcFs, HetuFileSystemClient targetFs, Path srcDir, Path tarPath)
             throws IOException
     {
-        AtomicReference<String> tarFileName = new AtomicReference<>();
         Collection<File> filesToArchive = srcFs
                 .list(srcDir)
                 .map(Path::toFile)
