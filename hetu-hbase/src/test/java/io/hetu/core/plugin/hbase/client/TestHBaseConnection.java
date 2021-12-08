@@ -63,7 +63,7 @@ public class TestHBaseConnection
     /**
      * mockito hbase admin
      */
-    public static HBaseAdmin admin;
+    public static final HBaseAdmin admin;
 
     /**
      * mockito hbase admin
