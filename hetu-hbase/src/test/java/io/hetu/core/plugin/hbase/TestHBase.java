@@ -67,6 +67,7 @@ import java.util.OptionalLong;
 import static io.prestosql.spi.connector.ConnectorPageSink.NOT_BLOCKED;
 import static java.lang.String.format;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 /**
  * TestHBase
@@ -133,13 +134,13 @@ public class TestHBase
     @Test
     public void testHBaseErrorCode()
     {
-        HBaseErrorCode.HBASE_TABLE_DNE.toErrorCode();
-        HBaseErrorCode.HBASE_TABLE_EXISTS.toErrorCode();
-        HBaseErrorCode.UNEXPECTED_HBASE_ERROR.toErrorCode();
-        HBaseErrorCode.ZOOKEEPER_ERROR.toErrorCode();
-        HBaseErrorCode.IO_ERROR.toErrorCode();
-        HBaseErrorCode.MINI_HBASE.toErrorCode();
-        HBaseErrorCode.HBASE_CREATE_ERROR.toErrorCode();
+        assertNotNull(HBaseErrorCode.HBASE_TABLE_DNE.toErrorCode());
+        assertNotNull(HBaseErrorCode.HBASE_TABLE_EXISTS.toErrorCode());
+        assertNotNull(HBaseErrorCode.UNEXPECTED_HBASE_ERROR.toErrorCode());
+        assertNotNull(HBaseErrorCode.ZOOKEEPER_ERROR.toErrorCode());
+        assertNotNull(HBaseErrorCode.IO_ERROR.toErrorCode());
+        assertNotNull(HBaseErrorCode.MINI_HBASE.toErrorCode());
+        assertNotNull(HBaseErrorCode.HBASE_CREATE_ERROR.toErrorCode());
     }
 
     /**
