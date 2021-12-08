@@ -153,7 +153,7 @@ public class MetastoreHiveStatisticsProvider
             partitionsSample = getPartitionsSample(partitions, sampleSize);
             samplePartitionCache.put(table, new SamplePartition(partitions.size(), partitionsSample));
         }
-        else if (sample != null) {
+        else {
             partitionsSample = sample.partitionsSample;
         }
         try {
