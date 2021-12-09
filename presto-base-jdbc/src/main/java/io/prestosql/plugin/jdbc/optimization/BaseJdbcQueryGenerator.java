@@ -419,6 +419,20 @@ public class BaseJdbcQueryGenerator
                     .setSchemaTableName(Optional.of(jdbcTableHandle.getSchemaTableName()))
                     .setSelections(selections)
                     .setFrom(Optional.of(table.toString()));
+
+            String catalogName = jdbcTableHandle.getCatalogName();
+            if (catalogName != null) {
+                contextBuilder.setRemoteCatalogName(catalogName);
+            }
+            String schemaName = jdbcTableHandle.getSchemaName();
+            if (schemaName != null) {
+                contextBuilder.setRemoteSchemaName(schemaName);
+            }
+            String tableName = jdbcTableHandle.getTableName();
+            if (tableName != null) {
+                contextBuilder.setRemoteTablename(tableName);
+            }
+
             // If LIMIT has been push down, add it to context
             if (jdbcTableHandle.getLimit().isPresent()) {
                 contextBuilder.setLimit(jdbcTableHandle.getLimit());

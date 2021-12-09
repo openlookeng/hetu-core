@@ -61,7 +61,7 @@ public class BaseJdbcSqlStatementWriter
         else {
             StringJoiner joiner = new StringJoiner(", ");
             for (Selection selection : selections) {
-                if (selection.isAliased(nameCaseInsensitive)) {
+                if (selection.isAliased(!nameCaseInsensitive)) {
                     joiner.add(selection.getExpression() + " AS " + selection.getAlias());
                 }
                 else {

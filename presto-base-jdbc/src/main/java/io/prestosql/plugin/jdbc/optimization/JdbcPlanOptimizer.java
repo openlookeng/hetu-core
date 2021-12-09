@@ -281,9 +281,9 @@ public class JdbcPlanOptimizer
                     context.getCatalogName().get(),
                     new JdbcTableHandle(
                             context.getSchemaTableName().get(),
-                            context.getCatalogName().get().getCatalogName(),
-                            context.getSchemaTableName().get().getSchemaName(),
-                            context.getSchemaTableName().get().getTableName(),
+                            context.getRemoteCatalogName(),
+                            context.getRemoteSchemaName(),
+                            context.getRemoteTableName(),
                             TupleDomain.all(),
                             OptionalLong.empty(),
                             Optional.of(new GeneratedSql(sql, true)),

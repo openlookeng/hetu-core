@@ -317,7 +317,7 @@ public class TestBaseBaseJdbcQueryGenerator
                                                 Optional.of(endValue.getName())))),
                         symbol("city"),
                         scanNode)),
-                "SELECT regionid, city, amount_out FROM (SELECT regionid, city, fare, amount, startvalue, endvalue, min(amount) OVER (RANGE BETWEEN startValue PRECEDING AND endValue FOLLOWING) AS amount_out FROM (SELECT regionid, city, fare, amount, startValue, endValue FROM 'table') hetu_table_1) hetu_table_2");
+                "SELECT regionid, city, amount_out FROM (SELECT regionid, city, fare, amount, startvalue, endvalue, min(amount) OVER (RANGE BETWEEN startValue PRECEDING AND endValue FOLLOWING) AS amount_out FROM (SELECT regionid, city, fare, amount, startValue AS startvalue, endValue AS endvalue FROM 'table') hetu_table_1) hetu_table_2");
         testJQL(planBuilder -> planBuilder.project(
                 Assignments.builder()
                         .put(symbol("regionid"), variable("regionid"))
@@ -348,6 +348,6 @@ public class TestBaseBaseJdbcQueryGenerator
                                                 Optional.empty()))),
                         symbol("city"),
                         scanNode)),
-                "SELECT regionid, city, amount_out FROM (SELECT regionid, city, fare, amount, startvalue, endvalue, min(amount) OVER ( ORDER BY fare ASC NULLS FIRST ROWS BETWEEN startValue PRECEDING AND UNBOUNDED FOLLOWING) AS amount_out FROM (SELECT regionid, city, fare, amount, startValue, endValue FROM 'table') hetu_table_1) hetu_table_2");
+                "SELECT regionid, city, amount_out FROM (SELECT regionid, city, fare, amount, startvalue, endvalue, min(amount) OVER ( ORDER BY fare ASC NULLS FIRST ROWS BETWEEN startValue PRECEDING AND UNBOUNDED FOLLOWING) AS amount_out FROM (SELECT regionid, city, fare, amount, startValue AS startvalue, endValue AS endvalue FROM 'table') hetu_table_1) hetu_table_2");
     }
 }
