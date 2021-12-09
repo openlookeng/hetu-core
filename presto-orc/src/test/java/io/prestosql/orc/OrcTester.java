@@ -714,7 +714,7 @@ public class OrcTester
     private static void assertColumnValueEquals(Type type, Object actual, Object expected)
     {
         if (actual == null) {
-            assertEquals(actual, expected);
+            assertNull(expected);
             return;
         }
         String baseType = type.getTypeSignature().getBase();
