@@ -67,6 +67,7 @@ import java.util.OptionalLong;
 import static io.prestosql.spi.connector.ConnectorPageSink.NOT_BLOCKED;
 import static java.lang.String.format;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 /**
  * TestHBase
@@ -414,9 +415,13 @@ public class TestHBase
                     hpsp.createPageSink(
                             new HBaseTransactionHandle(), session, (ConnectorInsertTableHandle) insertHandler);
 
-            cps.getCompletedBytes();
-            cps.getSystemMemoryUsage();
-            cps.getValidationCpuNanos();
+            long completedBytes = cps.getCompletedBytes();
+            long sysMemUsage = cps.getSystemMemoryUsage();
+            long cpuNanos = cps.getValidationCpuNanos();
+
+            assertTrue(cpuNanos >= 0);
+            assertTrue(sysMemUsage >= 0);
+            assertTrue(completedBytes >= 0);
 
             int[] offsets = {0, 4};
             Block rowkey = new VariableWidthBlock(1, TestSliceUtils.createSlice("0001"), offsets, Optional.empty());
