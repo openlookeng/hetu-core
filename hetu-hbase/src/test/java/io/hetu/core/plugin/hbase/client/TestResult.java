@@ -16,6 +16,9 @@ package io.hetu.core.plugin.hbase.client;
 
 import org.apache.hadoop.hbase.client.Result;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+
 /**
  * TestResult
  *
@@ -37,26 +40,30 @@ public class TestResult
     @Override
     public byte[] getValue(byte[] family, byte[] qualifier)
     {
-        if ("name".getBytes().equals(family) && "nick_name".getBytes().equals(qualifier)) {
-            return ("nick_name_" + num).getBytes();
+        if (Arrays.equals(family, "name".getBytes(StandardCharsets.UTF_8))
+                && Arrays.equals(qualifier, "nick_name".getBytes(StandardCharsets.UTF_8))) {
+            return ("nick_name_" + num).getBytes(StandardCharsets.UTF_8);
         }
-        else if ("age".getBytes().equals(family) && "lit_age".getBytes().equals(qualifier)) {
-            return "12".getBytes();
+        else if (Arrays.equals(family, "age".getBytes(StandardCharsets.UTF_8))
+                && Arrays.equals(qualifier, "lit_age".getBytes(StandardCharsets.UTF_8))) {
+            return "12".getBytes(StandardCharsets.UTF_8);
         }
-        else if ("gender".getBytes().equals(family) && "gender".getBytes().equals(qualifier)) {
-            return "2019-06-11".getBytes();
+        else if (Arrays.equals(family, "gender".getBytes(StandardCharsets.UTF_8))
+                && Arrays.equals(qualifier, "gender".getBytes(StandardCharsets.UTF_8))) {
+            return "2019-06-11".getBytes(StandardCharsets.UTF_8);
         }
-        else if ("t".getBytes().equals(family) && "t".getBytes().equals(qualifier)) {
-            return "20".getBytes();
+        else if (Arrays.equals("t".getBytes(StandardCharsets.UTF_8), family)
+                && Arrays.equals("t".getBytes(StandardCharsets.UTF_8), qualifier)) {
+            return "20".getBytes(StandardCharsets.UTF_8);
         }
         else {
-            return "".getBytes();
+            return "".getBytes(StandardCharsets.UTF_8);
         }
     }
 
     @Override
     public byte[] getRow()
     {
-        return "nick_name_1 12 2019-06-11 20".getBytes();
+        return "nick_name_1 12 2019-06-11 20".getBytes(StandardCharsets.UTF_8);
     }
 }
