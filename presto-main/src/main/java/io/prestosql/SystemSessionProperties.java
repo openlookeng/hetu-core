@@ -22,6 +22,7 @@ import io.prestosql.memory.MemoryManagerConfig;
 import io.prestosql.snapshot.SnapshotConfig;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.session.PropertyMetadata;
+import io.prestosql.spi.type.TimeZoneKey;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
@@ -75,6 +76,7 @@ public final class SystemSessionProperties
     public static final String QUERY_MAX_CPU_TIME = "query_max_cpu_time";
     public static final String QUERY_MAX_STAGE_COUNT = "query_max_stage_count";
     public static final String REDISTRIBUTE_WRITES = "redistribute_writes";
+    public static final String TIME_ZONE_ID = "time_zone_id";
     // redistribute writes type session property key
     public static final String REDISTRIBUTE_WRITES_TYPE = "redistribute_writes_type";
     public static final String SCALE_WRITERS = "scale_writers";
@@ -281,6 +283,16 @@ public final class SystemSessionProperties
                         "Force parallel distributed writes",
                         featuresConfig.isRedistributeWrites(),
                         false),
+                stringProperty(
+                        TIME_ZONE_ID,
+                        "Time Zone Id for the current session",
+                        null,
+                        value -> {
+                            if (value != null) {
+                                TimeZoneKey.getTimeZoneKey(value);
+                            }
+                        },
+                        true),
                 // redistribute writes type config
                 enumProperty(
                         REDISTRIBUTE_WRITES_TYPE,

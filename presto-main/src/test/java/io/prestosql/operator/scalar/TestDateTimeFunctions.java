@@ -29,6 +29,8 @@ import java.time.LocalTime;
 import java.time.OffsetTime;
 import java.time.ZoneOffset;
 
+import static io.prestosql.SystemSessionProperties.TIME_ZONE_ID;
+import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.TimeWithTimeZoneType.TIME_WITH_TIME_ZONE;
 import static io.prestosql.spi.type.TimeZoneKey.UTC_KEY;
 import static io.prestosql.spi.type.TimeZoneKey.getTimeZoneKey;
@@ -138,5 +140,38 @@ public class TestDateTimeFunctions
             localAssertion.assertFunctionString("CURRENT_TIMESTAMP", TIMESTAMP_WITH_TIME_ZONE, "2017-03-01 14:30:00.000 " + DATE_TIME_ZONE.getID());
             localAssertion.assertFunctionString("NOW()", TIMESTAMP_WITH_TIME_ZONE, "2017-03-01 14:30:00.000 " + DATE_TIME_ZONE.getID());
         }
+    }
+
+    @Test
+    public void testToUnixtime()
+    {
+        assertFunction("to_unixtime(TIMESTAMP'2021-07-25 17:10:00')", DOUBLE, 1.6271862E9);
+
+        String timeZoneId = "Asia/Shanghai";
+        Session localSession = Session.builder(session)
+                .setSystemProperty(TIME_ZONE_ID, timeZoneId)
+                .build();
+        try (FunctionAssertions localAssertion = new FunctionAssertions(localSession)) {
+            localAssertion.assertFunction("to_unixtime(TIMESTAMP'2021-07-25 17:10:00')", DOUBLE, 1.6272042E9);
+        }
+        assertFunction(String.format("to_unixtime(at_timezone(timestamp'2021-07-25 17:10:00', '%s'))", timeZoneId), DOUBLE, 1.6272042E9);
+
+        timeZoneId = "Europe/London";
+        localSession = Session.builder(session)
+                .setSystemProperty(TIME_ZONE_ID, timeZoneId)
+                .build();
+        try (FunctionAssertions localAssertion = new FunctionAssertions(localSession)) {
+            localAssertion.assertFunction("to_unixtime(TIMESTAMP'2021-07-25 17:10:00')", DOUBLE, 1.6272294E9);
+        }
+        assertFunction(String.format("to_unixtime(at_timezone(timestamp'2021-07-25 17:10:00', '%s'))", timeZoneId), DOUBLE, 1.6272294E9);
+
+        timeZoneId = "America/New_York";
+        localSession = Session.builder(session)
+                .setSystemProperty(TIME_ZONE_ID, timeZoneId)
+                .build();
+        try (FunctionAssertions localAssertion = new FunctionAssertions(localSession)) {
+            localAssertion.assertFunction("to_unixtime(TIMESTAMP'2021-07-25 17:10:00')", DOUBLE, 1.6272474E9);
+        }
+        assertFunction(String.format("to_unixtime(at_timezone(timestamp'2021-07-25 17:10:00', '%s'))", timeZoneId), DOUBLE, 1.6272474E9);
     }
 }

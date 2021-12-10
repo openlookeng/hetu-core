@@ -28,6 +28,7 @@ import io.prestosql.spi.function.SqlNullable;
 import io.prestosql.spi.function.SqlType;
 import io.prestosql.spi.type.AbstractLongType;
 import io.prestosql.spi.type.StandardTypes;
+import io.prestosql.spi.type.TimeZoneKey;
 import org.joda.time.chrono.ISOChronology;
 
 import java.util.concurrent.TimeUnit;
@@ -149,11 +150,12 @@ public final class TimestampOperators
     @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE)
     public static long castToTimestampWithTimeZone(ConnectorSession session, @SqlType(StandardTypes.TIMESTAMP) long value)
     {
-        ISOChronology localChronology = getChronology(session.getTimeZoneKey());
+        TimeZoneKey timeZoneKey = session.getTimeZoneKey();
+        ISOChronology localChronology = getChronology(timeZoneKey);
 
         // This cast does treat TIMESTAMP as wall time in session TZ. This means that in order to get
         // its UTC representation we need to shift the value by the offset of TZ.
-        return packDateTimeWithZone(localChronology.getZone().convertLocalToUTC(value, false), session.getTimeZoneKey());
+        return packDateTimeWithZone(localChronology.getZone().convertLocalToUTC(value, false), timeZoneKey);
     }
 
     @ScalarOperator(CAST)
