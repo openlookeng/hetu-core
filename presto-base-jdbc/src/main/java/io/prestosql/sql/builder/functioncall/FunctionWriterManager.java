@@ -139,4 +139,9 @@ public final class FunctionWriterManager
             throw new UnsupportedOperationException(exceptionStr);
         }
     }
+
+    public String getVersionName()
+    {
+        return versionName;
+    }
 }
