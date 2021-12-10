@@ -21,7 +21,6 @@ import io.prestosql.orc.OrcDataSourceId;
 import io.prestosql.orc.OrcRecordReader;
 import io.prestosql.plugin.hive.FileFormatDataSourceStats;
 import io.prestosql.plugin.hive.HiveErrorCode;
-import io.prestosql.plugin.hive.HiveType;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
@@ -31,7 +30,6 @@ import io.prestosql.spi.block.RowBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.type.Type;
-import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo;
 
 import java.io.IOException;
@@ -320,10 +318,6 @@ public class OrcPageSource
         @Override
         public Block block(Page sourcePage, OrcDeletedRows.MaskDeletedRowsFunction maskDeletedRowsFunction)
         {
-            List<Type> types = structTypeInfo.getAllStructFieldTypeInfos().stream()
-                    .map(typeInfo -> HiveType
-                            .getPrimitiveType((PrimitiveTypeInfo.class.cast(typeInfo))))
-                    .collect(Collectors.toList());
             List<Block> fieldBlocks = columnAdaptations.stream().map(adaptation -> adaptation.block(sourcePage, maskDeletedRowsFunction)).collect(Collectors.toList());
             Block block = RowBlock.fromFieldBlocks(sourcePage.getPositionCount(), Optional.empty(), fieldBlocks.toArray(new Block[fieldBlocks.size()]));
             return new LazyBlock(maskDeletedRowsFunction.getPositionCount(), new SourceColumn.MaskingBlockLoader(maskDeletedRowsFunction, block));
