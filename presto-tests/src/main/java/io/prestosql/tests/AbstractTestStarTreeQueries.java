@@ -27,12 +27,15 @@ import io.prestosql.testing.MaterializedRow;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
@@ -975,50 +978,95 @@ public abstract class AbstractTestStarTreeQueries
     }
 
     @Test
-    public void testCubeRangeVisitorComparisonExpression()
+    public void testCubeRangeVisitorAggregateComparison()
     {
         // Table creation
-        assertQuerySucceeds(sessionStarTree, "CREATE TABLE test_cube_range_visitor_comparison_table(cint int, csmallint smallint, cbigint bigint, ctinyint tinyint)");
-        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_comparison_table VALUES(1,smallint '1',bigint '1',tinyint '1')");
-        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_comparison_table VALUES(2,smallint '2',bigint '2',tinyint '2')");
-        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_comparison_table VALUES(3,smallint '3',bigint '3',tinyint '3')");
-        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_comparison_table VALUES(4,smallint '4',bigint '4',tinyint '4')");
-        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_comparison_table VALUES(5,smallint '5',bigint '5',tinyint '5')");
+        assertQuerySucceeds(sessionStarTree, "CREATE TABLE test_cube_range_visitor_aggregation_comparison(cint int, csmallint smallint, cbigint bigint, ctinyint tinyint)");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_aggregation_comparison VALUES(1,smallint '1',bigint '1',tinyint '1')");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_aggregation_comparison VALUES(2,smallint '2',bigint '2',tinyint '2')");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_aggregation_comparison VALUES(3,smallint '3',bigint '3',tinyint '3')");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_aggregation_comparison VALUES(4,smallint '4',bigint '4',tinyint '4')");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_aggregation_comparison VALUES(5,smallint '5',bigint '5',tinyint '5')");
 
-        // Cube creations
-        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_comparison_1 ON test_cube_range_visitor_comparison_table WITH (AGGREGATIONS = (count(cint)), GROUP = (csmallint, cbigint, ctinyint))");
+        // To ensure that tests do not disturb one another, since some queries use same types, the following are tested individually:
+        // Comparison tests with cube creation, query, assert and drop
+        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_comparison_1 ON test_cube_range_visitor_aggregation_comparison WITH (AGGREGATIONS = (count(cint), sum(ctinyint)), GROUP = (csmallint, cbigint, ctinyint), PARTITIONED_BY = array['cint'])");
         assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_comparison_1 WHERE ctinyint = 3");
-        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_comparison_2 ON test_cube_range_visitor_comparison_table WITH (AGGREGATIONS = (count(cint)), GROUP = (csmallint, cbigint, ctinyint))");
-        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_comparison_2 WHERE csmallint >= 3");
-        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_comparison_3 ON test_cube_range_visitor_comparison_table WITH (AGGREGATIONS = (count(cint)), GROUP = (csmallint, cbigint, ctinyint))");
-        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_comparison_3 WHERE cbigint <= 3");
-        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_comparison_4 ON test_cube_range_visitor_comparison_table WITH (AGGREGATIONS = (count(cint)), GROUP = (csmallint, cbigint, ctinyint))");
-        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_comparison_4 WHERE ctinyint <> 3");
-
-        // Querying test
         MaterializedResult result1 = computeActualAndAssertPlan(sessionStarTree,
-                "SELECT count(cint) FROM test_cube_range_visitor_comparison_table WHERE ctinyint = 3",
+                "SELECT sum(ctinyint) FROM test_cube_range_visitor_aggregation_comparison WHERE ctinyint = 3 GROUP BY csmallint, cbigint, ctinyint",
                 assertTableScan("test_cube_range_visitor_comparison_1"));
-        MaterializedResult result2 = computeActualAndAssertPlan(sessionStarTree,
-                "SELECT count(cint) FROM test_cube_range_visitor_comparison_table WHERE csmallint >= 3",
-                assertTableScan("test_cube_range_visitor_comparison_2"));
-        MaterializedResult result3 = computeActualAndAssertPlan(sessionStarTree,
-                "SELECT count(cint) FROM test_cube_range_visitor_comparison_table WHERE cbigint <= 3",
-                assertTableScan("test_cube_range_visitor_comparison_3"));
-        MaterializedResult result4 = computeActualAndAssertPlan(sessionStarTree,
-                "SELECT count(cint) FROM test_cube_range_visitor_comparison_table WHERE ctinyint <> 3",
-                assertTableScan("test_cube_range_visitor_comparison_4"));
-
-        // Result assertions
         assertEquals(result1.getRowCount(), 1);
-        assertEquals(result2.getRowCount(), 1);
-        assertEquals(result3.getRowCount(), 1);
-        assertEquals(result4.getRowCount(), 1);
-        assertTrue(result1.getMaterializedRows().get(0).getField(0).toString().equals("1"));
-        assertTrue(result2.getMaterializedRows().get(0).getField(0).toString().equals("3"));
-        assertTrue(result3.getMaterializedRows().get(0).getField(0).toString().equals("3"));
-        assertTrue(result4.getMaterializedRows().get(0).getField(0).toString().equals("4"));
-        assertUpdate("DROP TABLE test_cube_range_visitor_comparison_table");
+        assertFalse(result1.getMaterializedRows().get(0).getField(0).toString().equals("NULL"));
+        assertTrue(result1.getMaterializedRows().get(0).getField(0).toString().equals("3"));
+        assertUpdate("DROP CUBE test_cube_range_visitor_comparison_1");
+
+        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_comparison_2 ON test_cube_range_visitor_aggregation_comparison WITH (AGGREGATIONS = (count(cint), sum(ctinyint)), GROUP = (csmallint, cbigint, ctinyint), PARTITIONED_BY = array['cint'])");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_comparison_2 WHERE ctinyint <> 3");
+        MaterializedResult result2 = computeActualAndAssertPlan(sessionStarTree,
+                "SELECT sum(ctinyint) FROM test_cube_range_visitor_aggregation_comparison WHERE ctinyint <> 3 GROUP BY csmallint, cbigint, ctinyint",
+                assertTableScan("test_cube_range_visitor_comparison_2"));
+        assertEquals(result2.getRowCount(), 4);
+        List<String> results2 = Arrays.asList(result2.getMaterializedRows().get(0).getField(0).toString(),
+                result2.getMaterializedRows().get(1).getField(0).toString(),
+                result2.getMaterializedRows().get(2).getField(0).toString(),
+                result2.getMaterializedRows().get(3).getField(0).toString()).stream().sorted().collect(Collectors.toList());
+        assertFalse(results2.contains("NULL"));
+        System.out.println(results2);
+        assertTrue(results2.equals(Arrays.asList("1", "2", "4", "5")));
+        assertUpdate("DROP CUBE test_cube_range_visitor_comparison_2");
+
+        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_comparison_3 ON test_cube_range_visitor_aggregation_comparison WITH (AGGREGATIONS = (count(cint), sum(csmallint)), GROUP = (csmallint, cbigint, ctinyint), PARTITIONED_BY = array['cint'])");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_comparison_3 WHERE csmallint >= 3");
+        MaterializedResult result3 = computeActualAndAssertPlan(sessionStarTree,
+                "SELECT sum(csmallint) FROM test_cube_range_visitor_aggregation_comparison WHERE csmallint >= 3 GROUP BY csmallint, cbigint, ctinyint",
+                assertTableScan("test_cube_range_visitor_comparison_3"));
+        assertEquals(result3.getRowCount(), 3);
+        List<String> results3 = Arrays.asList(result3.getMaterializedRows().get(0).getField(0).toString(),
+                result3.getMaterializedRows().get(1).getField(0).toString(),
+                result3.getMaterializedRows().get(2).getField(0).toString()).stream().sorted().collect(Collectors.toList());
+        assertFalse(results3.contains("NULL"));
+        assertTrue(results3.equals(Arrays.asList("3", "4", "5")));
+        assertUpdate("DROP CUBE test_cube_range_visitor_comparison_3");
+
+        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_comparison_4 ON test_cube_range_visitor_aggregation_comparison WITH (AGGREGATIONS = (count(cint), sum(cbigint)), GROUP = (csmallint, cbigint, ctinyint), PARTITIONED_BY = array['cint'])");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_comparison_4 WHERE cbigint <= 3");
+        MaterializedResult result4 = computeActualAndAssertPlan(sessionStarTree,
+                "SELECT sum(cbigint) FROM test_cube_range_visitor_aggregation_comparison WHERE cbigint <= 3 GROUP BY csmallint, cbigint, ctinyint",
+                assertTableScan("test_cube_range_visitor_comparison_4"));
+        assertEquals(result4.getRowCount(), 3);
+        List<String> results4 = Arrays.asList(result4.getMaterializedRows().get(0).getField(0).toString(),
+                result4.getMaterializedRows().get(1).getField(0).toString(),
+                result4.getMaterializedRows().get(2).getField(0).toString()).stream().sorted().collect(Collectors.toList());
+        assertFalse(results4.contains("NULL"));
+        assertTrue(results4.equals(Arrays.asList("1", "2", "3")));
+        assertUpdate("DROP CUBE test_cube_range_visitor_comparison_4");
+
+        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_comparison_5 ON test_cube_range_visitor_aggregation_comparison WITH (AGGREGATIONS = (count(cint), sum(csmallint)), GROUP = (csmallint, cbigint, ctinyint), PARTITIONED_BY = array['cint'])");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_comparison_5 WHERE csmallint > 3");
+        MaterializedResult result5 = computeActualAndAssertPlan(sessionStarTree,
+                "SELECT sum(csmallint) FROM test_cube_range_visitor_aggregation_comparison WHERE csmallint > 3 GROUP BY csmallint, cbigint, ctinyint",
+                assertTableScan("test_cube_range_visitor_comparison_5"));
+        assertEquals(result5.getRowCount(), 2);
+        List<String> results5 = Arrays.asList(result5.getMaterializedRows().get(0).getField(0).toString(),
+                result5.getMaterializedRows().get(1).getField(0).toString()).stream().sorted().collect(Collectors.toList());
+        assertFalse(results5.contains("NULL"));
+        assertTrue(results5.equals(Arrays.asList("4", "5")));
+        assertUpdate("DROP CUBE test_cube_range_visitor_comparison_5");
+
+        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_comparison_6 ON test_cube_range_visitor_aggregation_comparison WITH (AGGREGATIONS = (count(cint), sum(cbigint)), GROUP = (csmallint, cbigint, ctinyint), PARTITIONED_BY = array['cint'])");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_comparison_6 WHERE cbigint < 3");
+        MaterializedResult result6 = computeActualAndAssertPlan(sessionStarTree,
+                "SELECT sum(cbigint) FROM test_cube_range_visitor_aggregation_comparison WHERE cbigint < 3 GROUP BY csmallint, cbigint, ctinyint",
+                assertTableScan("test_cube_range_visitor_comparison_6"));
+        assertEquals(result6.getRowCount(), 2);
+        List<String> results6 = Arrays.asList(result6.getMaterializedRows().get(0).getField(0).toString(),
+                result6.getMaterializedRows().get(1).getField(0).toString()).stream().sorted().collect(Collectors.toList());
+        assertFalse(results6.contains("NULL"));
+        assertTrue(results6.equals(Arrays.asList("1", "2")));
+        assertUpdate("DROP CUBE test_cube_range_visitor_comparison_6");
+
+        // Drop table
+        assertUpdate("DROP TABLE test_cube_range_visitor_aggregation_comparison");
     }
 
     @Test
