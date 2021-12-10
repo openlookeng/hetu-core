@@ -672,13 +672,13 @@ public class CubeConsole
                         return false;
                     }
 
-                    if (queryRunner.getSession().getCatalog() != null) {
-                        catalogName = queryRunner.getSession().getCatalog();
+                    if (sourceTableName.getPrefix().isPresent() && sourceTableName.getPrefix().get().getPrefix().isPresent()) {
+                        catalogName = sourceTableName.getPrefix().get().getPrefix().get().toString();
                         checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
                         columnDataTypeQuery = String.format(SELECT_DATA_TYPE_STRING, catalogName, tableName, columnName);
                     }
-                    else if (sourceTableName.getPrefix().isPresent() && sourceTableName.getPrefix().get().getPrefix().isPresent()) {
-                        catalogName = sourceTableName.getPrefix().get().getPrefix().get().toString();
+                    else if (queryRunner.getSession().getCatalog() != null) {
+                        catalogName = queryRunner.getSession().getCatalog();
                         checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
                         columnDataTypeQuery = String.format(SELECT_DATA_TYPE_STRING, catalogName, tableName, columnName);
                     }
@@ -758,17 +758,16 @@ public class CubeConsole
                         return false;
                     }
 
-                    if (queryRunner.getSession().getCatalog() != null) {
-                        catalogName = queryRunner.getSession().getCatalog();
-                        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
-                        columnDataTypeQuery = String.format(SELECT_DATA_TYPE_STRING, catalogName, tableName, columnName);
-                    }
-                    else if (sourceTableName.getPrefix().isPresent() && sourceTableName.getPrefix().get().getPrefix().isPresent()) {
+                    if (sourceTableName.getPrefix().isPresent() && sourceTableName.getPrefix().get().getPrefix().isPresent()) {
                         catalogName = sourceTableName.getPrefix().get().getPrefix().get().toString();
                         checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
                         columnDataTypeQuery = String.format(SELECT_DATA_TYPE_STRING, catalogName, tableName, columnName);
                     }
-
+                    else if (queryRunner.getSession().getCatalog() != null) {
+                        catalogName = queryRunner.getSession().getCatalog();
+                        checkArgument(catalogName.matches("[\\p{Alnum}_]+"), "Invalid catalog name");
+                        columnDataTypeQuery = String.format(SELECT_DATA_TYPE_STRING, catalogName, tableName, columnName);
+                    }
                     else {
                         return false;
                     }
