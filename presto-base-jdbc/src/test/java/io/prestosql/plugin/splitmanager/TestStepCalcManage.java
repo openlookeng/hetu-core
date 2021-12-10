@@ -15,6 +15,7 @@
 package io.prestosql.plugin.splitmanager;
 
 import com.google.common.collect.ImmutableList;
+import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import org.testng.annotations.Test;
 
@@ -27,6 +28,8 @@ import static org.testng.Assert.assertTrue;
 
 public class TestStepCalcManage
 {
+    private static final Logger log = Logger.get(TestStepCalcManage.class);
+
     @Test
     // all splits are equally distributed, no adjust
     public void testDynamicStepCalc0()
@@ -677,7 +680,7 @@ public class TestStepCalcManage
             Thread.sleep(10);
         }
         catch (InterruptedException e) {
-            e.getMessage();
+            log.debug("Interrupted Exception %s", e.getMessage());
         }
         result = stepCalcManager.getAdjustSplitList(tableConfig.getCatalogName(), tableConfig.getSchemaName(), tableConfig.getTableName());
         assertEquals(result, null);
@@ -708,7 +711,7 @@ public class TestStepCalcManage
             Thread.sleep(10);
         }
         catch (InterruptedException e) {
-            e.getMessage();
+            log.debug("Interrupted Exception %s", e.getMessage());
         }
         result = stepCalcManager.getAdjustSplitList(tableConfig.getCatalogName(), tableConfig.getSchemaName(), tableConfig.getTableName());
         assertEquals(result, null);
