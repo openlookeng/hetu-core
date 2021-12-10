@@ -978,36 +978,36 @@ public abstract class AbstractTestStarTreeQueries
     public void testCubeRangeVisitorComparisonExpression()
     {
         // Table creation
-        assertQuerySucceeds(sessionStarTree, "CREATE TABLE test_cube_range_visitor_table(cint int, csmallint smallint, cbigint bigint, ctinyint tinyint)");
-        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_table VALUES(1,smallint '1',bigint '1',tinyint '1')");
-        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_table VALUES(2,smallint '2',bigint '2',tinyint '2')");
-        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_table VALUES(3,smallint '3',bigint '3',tinyint '3')");
-        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_table VALUES(4,smallint '4',bigint '4',tinyint '4')");
-        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_table VALUES(5,smallint '5',bigint '5',tinyint '5')");
+        assertQuerySucceeds(sessionStarTree, "CREATE TABLE test_cube_range_visitor_comparison_table(cint int, csmallint smallint, cbigint bigint, ctinyint tinyint)");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_comparison_table VALUES(1,smallint '1',bigint '1',tinyint '1')");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_comparison_table VALUES(2,smallint '2',bigint '2',tinyint '2')");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_comparison_table VALUES(3,smallint '3',bigint '3',tinyint '3')");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_comparison_table VALUES(4,smallint '4',bigint '4',tinyint '4')");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_comparison_table VALUES(5,smallint '5',bigint '5',tinyint '5')");
 
         // Cube creations
-        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_1 ON test_cube_range_visitor_table WITH (AGGREGATIONS = (count(cint)), GROUP = (csmallint, cbigint, ctinyint))");
-        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_1 WHERE ctinyint = 3");
-        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_2 ON test_cube_range_visitor_table WITH (AGGREGATIONS = (count(cint)), GROUP = (csmallint, cbigint, ctinyint))");
-        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_2 WHERE csmallint >= 3");
-        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_3 ON test_cube_range_visitor_table WITH (AGGREGATIONS = (count(cint)), GROUP = (csmallint, cbigint, ctinyint))");
-        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_3 WHERE cbigint <= 3");
-        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_4 ON test_cube_range_visitor_table WITH (AGGREGATIONS = (count(cint)), GROUP = (csmallint, cbigint, ctinyint))");
-        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_4 WHERE ctinyint <> 3");
+        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_comparison_1 ON test_cube_range_visitor_comparison_table WITH (AGGREGATIONS = (count(cint)), GROUP = (csmallint, cbigint, ctinyint))");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_comparison_1 WHERE ctinyint = 3");
+        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_comparison_2 ON test_cube_range_visitor_comparison_table WITH (AGGREGATIONS = (count(cint)), GROUP = (csmallint, cbigint, ctinyint))");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_comparison_2 WHERE csmallint >= 3");
+        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_comparison_3 ON test_cube_range_visitor_comparison_table WITH (AGGREGATIONS = (count(cint)), GROUP = (csmallint, cbigint, ctinyint))");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_comparison_3 WHERE cbigint <= 3");
+        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_comparison_4 ON test_cube_range_visitor_comparison_table WITH (AGGREGATIONS = (count(cint)), GROUP = (csmallint, cbigint, ctinyint))");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_comparison_4 WHERE ctinyint <> 3");
 
         // Querying test
         MaterializedResult result1 = computeActualAndAssertPlan(sessionStarTree,
-                "SELECT count(cint) FROM test_cube_range_visitor_table WHERE ctinyint = 3",
-                assertTableScan("test_cube_range_visitor_1"));
+                "SELECT count(cint) FROM test_cube_range_visitor_comparison_table WHERE ctinyint = 3",
+                assertTableScan("test_cube_range_visitor_comparison_1"));
         MaterializedResult result2 = computeActualAndAssertPlan(sessionStarTree,
-                "SELECT count(cint) FROM test_cube_range_visitor_table WHERE csmallint >= 3",
-                assertTableScan("test_cube_range_visitor_2"));
+                "SELECT count(cint) FROM test_cube_range_visitor_comparison_table WHERE csmallint >= 3",
+                assertTableScan("test_cube_range_visitor_comparison_2"));
         MaterializedResult result3 = computeActualAndAssertPlan(sessionStarTree,
-                "SELECT count(cint) FROM test_cube_range_visitor_table WHERE cbigint <= 3",
-                assertTableScan("test_cube_range_visitor_3"));
+                "SELECT count(cint) FROM test_cube_range_visitor_comparison_table WHERE cbigint <= 3",
+                assertTableScan("test_cube_range_visitor_comparison_3"));
         MaterializedResult result4 = computeActualAndAssertPlan(sessionStarTree,
-                "SELECT count(cint) FROM test_cube_range_visitor_table WHERE ctinyint <> 3",
-                assertTableScan("test_cube_range_visitor_4"));
+                "SELECT count(cint) FROM test_cube_range_visitor_comparison_table WHERE ctinyint <> 3",
+                assertTableScan("test_cube_range_visitor_comparison_4"));
 
         // Result assertions
         assertEquals(result1.getRowCount(), 1);
@@ -1018,7 +1018,47 @@ public abstract class AbstractTestStarTreeQueries
         assertTrue(result2.getMaterializedRows().get(0).getField(0).toString().equals("3"));
         assertTrue(result3.getMaterializedRows().get(0).getField(0).toString().equals("3"));
         assertTrue(result4.getMaterializedRows().get(0).getField(0).toString().equals("4"));
-        assertUpdate("DROP TABLE test_cube_range_visitor_table");
+        assertUpdate("DROP TABLE test_cube_range_visitor_comparison_table");
+    }
+
+    @Test
+    public void testCubeRangeVisitorBetweenExpression()
+    {
+        // Table creation
+        assertQuerySucceeds(sessionStarTree, "CREATE TABLE test_cube_range_visitor_between_table(cint int, csmallint smallint, cbigint bigint, ctinyint tinyint)");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_between_table VALUES(1,smallint '1',bigint '1',tinyint '1')");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_between_table VALUES(2,smallint '2',bigint '2',tinyint '2')");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_between_table VALUES(3,smallint '3',bigint '3',tinyint '3')");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_between_table VALUES(4,smallint '4',bigint '4',tinyint '4')");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO test_cube_range_visitor_between_table VALUES(5,smallint '5',bigint '5',tinyint '5')");
+
+        // Cube creations
+        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_between_1 ON test_cube_range_visitor_between_table WITH (AGGREGATIONS = (count(cint)), GROUP = (csmallint, cbigint, ctinyint))");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_between_1 WHERE ctinyint BETWEEN 2 AND 4");
+        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_between_2 ON test_cube_range_visitor_between_table WITH (AGGREGATIONS = (count(cint)), GROUP = (csmallint, cbigint, ctinyint))");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_between_2 WHERE csmallint BETWEEN 2 AND 4");
+        assertQuerySucceeds(sessionStarTree, "CREATE CUBE test_cube_range_visitor_between_3 ON test_cube_range_visitor_between_table WITH (AGGREGATIONS = (count(cint)), GROUP = (csmallint, cbigint, ctinyint))");
+        assertQuerySucceeds(sessionStarTree, "INSERT INTO CUBE test_cube_range_visitor_between_3 WHERE cbigint BETWEEN 2 AND 4");
+
+        // Querying test
+        MaterializedResult result1 = computeActualAndAssertPlan(sessionStarTree,
+                "SELECT count(cint) FROM test_cube_range_visitor_between_table WHERE ctinyint BETWEEN 2 AND 4",
+                assertTableScan("test_cube_range_visitor_between_1"));
+        MaterializedResult result2 = computeActualAndAssertPlan(sessionStarTree,
+                "SELECT count(cint) FROM test_cube_range_visitor_between_table WHERE csmallint BETWEEN 2 AND 4",
+                assertTableScan("test_cube_range_visitor_between_2"));
+        MaterializedResult result3 = computeActualAndAssertPlan(sessionStarTree,
+                "SELECT count(cint) FROM test_cube_range_visitor_between_table WHERE cbigint BETWEEN 2 AND 4",
+                assertTableScan("test_cube_range_visitor_between_3"));
+
+        // Result assertions
+        assertEquals(result1.getRowCount(), 1);
+        assertEquals(result2.getRowCount(), 1);
+        assertEquals(result3.getRowCount(), 1);
+        assertTrue(result1.getMaterializedRows().get(0).getField(0).toString().equals("3"));
+        assertTrue(result2.getMaterializedRows().get(0).getField(0).toString().equals("3"));
+        assertTrue(result3.getMaterializedRows().get(0).getField(0).toString().equals("3"));
+        assertUpdate("DROP TABLE test_cube_range_visitor_between_table");
     }
 
     private Consumer<Plan> assertInTableScans(String tableName)

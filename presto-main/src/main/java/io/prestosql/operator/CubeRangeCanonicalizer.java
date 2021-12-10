@@ -184,7 +184,14 @@ public class CubeRangeCanonicalizer
         @Override
         public Expression visitBetweenPredicate(BetweenPredicate predicate, Void ignored)
         {
-            SymbolReference symbolReference = (SymbolReference) predicate.getValue();
+            SymbolReference symbolReference;
+            if (predicate.getValue() instanceof Cast) {
+                symbolReference = ((SymbolReference) ((Cast) predicate.getValue()).getExpression());
+            }
+            else {
+                // instance of SymbolReference
+                symbolReference = (SymbolReference) predicate.getValue();
+            }
             Type type = types.get(new Symbol(symbolReference.getName()));
             if (isTypeNotSupported(type)) {
                 return super.visitBetweenPredicate(predicate, ignored);
