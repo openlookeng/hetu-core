@@ -21,6 +21,8 @@ import org.testng.annotations.Test;
 import java.util.Optional;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 /**
  * TestHBaseColumnHandle
@@ -90,9 +92,9 @@ public class TestHBaseColumnHandle
         }
         this.columnHandle.toString();
         this.columnHandle.parseToJson();
-        this.columnHandle.hashCode();
+        assertTrue(this.columnHandle.hashCode() != 0);
         this.columnHandle.getColumnMetadata();
         this.columnHandle.equals(this.columnHandle);
-        this.columnHandle.equals(null);
+        assertNotNull(this.columnHandle);
     }
 }
