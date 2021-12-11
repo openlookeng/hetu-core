@@ -47,8 +47,7 @@ public class TestFunctionWriterManagerGroup
         DefaultUdfRewriteConfigSupplier defaultUdfRewriteConfigSupplier = new DefaultUdfRewriteConfigSupplier(Test_UDF_REWRITE_PATTERNS);
         DefaultConnectorConfigFunctionRewriter defaultConnectorConfigFunctionRewriter = new DefaultConnectorConfigFunctionRewriter(connectorName, defaultUdfRewriteConfigSupplier);
 
-        functionWriterManager1 = FunctionWriterManagerGroup.newFunctionWriterManagerInstance(connectorName,
-                versionName, functionCallRewriterMap, defaultConnectorConfigFunctionRewriter);
+        setFunctionWriterManager(connectorName, versionName, functionCallRewriterMap, defaultConnectorConfigFunctionRewriter);
 
         FunctionWriterManager functionWriterManager2 = FunctionWriterManagerGroup.newFunctionWriterManagerInstance(connectorName,
                 versionName, functionCallRewriterMap, defaultConnectorConfigFunctionRewriter);
@@ -108,5 +107,11 @@ public class TestFunctionWriterManagerGroup
         catch (UnsupportedOperationException exception) {
             assertEquals(exception.getMessage(), "jdbc_connector Connector does not support function call of LO10");
         }
+    }
+
+    private static void setFunctionWriterManager(String connectorName, String versionName, Map<String, FunctionCallRewriter> functionCallRewriterMap, DefaultConnectorConfigFunctionRewriter defaultConnectorConfigFunctionRewriter)
+    {
+        functionWriterManager1 = FunctionWriterManagerGroup.newFunctionWriterManagerInstance(connectorName,
+                versionName, functionCallRewriterMap, defaultConnectorConfigFunctionRewriter);
     }
 }
