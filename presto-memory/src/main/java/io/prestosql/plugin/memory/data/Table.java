@@ -82,6 +82,7 @@ public class Table
                     Number.class.getCanonicalName(),
                     Integer.class.getCanonicalName(),
                     Long.class.getCanonicalName(),
+                    Double.class.getCanonicalName(),
                     Table.class.getName(),
                     AtomicInteger.class.getName(),
                     List.class.getName(),
