@@ -140,9 +140,6 @@ public class MemoryTableProperties
             name = name.substring(0, name.length() - 4).trim();
         }
         else if (lower.endsWith(" DESC")) {
-            name = name.substring(0, name.length() - 5).trim();
-            order = SortOrder.DESC_NULLS_LAST;
-
             // TODO: support DESC
             throw new UnsupportedOperationException("DESC sort is not supported yet.");
         }
