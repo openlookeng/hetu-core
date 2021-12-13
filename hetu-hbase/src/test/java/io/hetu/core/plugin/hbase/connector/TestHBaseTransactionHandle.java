@@ -19,6 +19,7 @@ import org.testng.annotations.Test;
 import java.util.UUID;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 
 /**
  * TestHBaseTransactionHandle
@@ -44,7 +45,7 @@ public class TestHBaseTransactionHandle
         assertEquals(true, uuid.equals(hBaseTransactionHandle2.getUuid()));
 
         assertEquals(false, hBaseTransactionHandle.equals(hBaseTransactionHandle2));
-        hBaseTransactionHandle2.hashCode();
+        assertNotEquals(0, hBaseTransactionHandle2.hashCode());
         hBaseTransactionHandle.toString();
         assertEquals(true, hBaseTransactionHandle.equals(hBaseTransactionHandle));
         assertEquals(false, hBaseTransactionHandle.equals(null));
