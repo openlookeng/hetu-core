@@ -622,14 +622,31 @@ public class OrcPageSourceFactory
         Map<Integer, OrcColumn> fileColumnsByNumber = fileColumns.stream()
                 .collect(toImmutableMap(orcColumn -> orcColumn.getColumnId().getId(), identity()));
 
+        int skipStructColumnCount = 0;
+        HiveColumnHandle handle = null;
+        OrcColumn column = null;
+
         for (int index = 0; index < columnCount; index++) {
-            OrcColumn column = fileColumnsByNumber.get(desiredColumnsIndex.get(index) + SKIP_ORC_FILE_COLUMNS);
-            HiveColumnHandle handle = desiredColumnsByNumber.get(desiredColumnsIndex.get(index));
+            skipStructColumnCount += handle != null && column != null ? getSkipStructColumnCount(column) : 0;
+            column = fileColumnsByNumber.get(desiredColumnsIndex.get(index) + SKIP_ORC_FILE_COLUMNS + skipStructColumnCount);
+            handle = desiredColumnsByNumber.get(desiredColumnsIndex.get(index));
             if (handle != null && !column.getColumnName().equals(handle.getName())) {
                 column = new OrcColumn(column.getPath(), column.getColumnId(), handle.getName(), column.getColumnType(), column.getOrcDataSourceId(), column.getNestedColumns());
             }
             builder.add(column);
         }
         return builder.build();
+    }
+
+    private static int getSkipStructColumnCount(OrcColumn orcColumn)
+    {
+        switch (orcColumn.getColumnType()) {
+            case LIST:
+            case STRUCT:
+            case MAP:
+                return orcColumn.getNestedColumns().size() + orcColumn.getNestedColumns().stream().map(column -> getSkipStructColumnCount(column)).mapToInt(Integer::valueOf).sum();
+            default:
+                return 0;
+        }
     }
 }

@@ -6848,4 +6848,44 @@ public class TestHiveIntegrationSmokeTest
 
         assertUpdate(session, format("DROP TABLE %s", tableName));
     }
+
+    @Test
+    public void testReadFromTableWithStructDataTypeColumns()
+    {
+        assertUpdate("CREATE SCHEMA testReadSchema");
+        assertUpdate("CREATE TABLE testReadSchema.testReadStruct1 (orderkey array(varchar), orderstatus row(big int), lables map(varchar, integer))  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema.testReadStruct1 VALUES (ARRAY ['YOUNG', 'FASION', 'STYLE'], row(111), MAP(ARRAY ['type', 'grand'], ARRAY [1, 2]))", 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema.testReadStruct1").getRowCount(), 1);
+        assertUpdate("CREATE TABLE testReadSchema.testReadStruct2 (orderkey array(varchar), orderstatus row(big int, big1 int), lables map(varchar, integer))  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema.testReadStruct2 VALUES (ARRAY ['YOUNG', 'FASION', 'STYLE'], row(111,222), MAP(ARRAY ['type', 'grand'], ARRAY[1, 2]))", 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema.testReadStruct2").getRowCount(), 1);
+        assertUpdate("CREATE TABLE testReadSchema.testReadStruct3 (orderkey array(varchar), orderstatus row(big int, big1 int), lables map(varchar, array(int)), orderstatus1 row(big2 int))  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema.testReadStruct3 VALUES (ARRAY ['YOUNG', 'FASION', 'STYLE'], row(111,222), MAP(ARRAY ['type', 'grand'], ARRAY [ARRAY[1, 2], ARRAY[1,2]]), row(333))", 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema.testReadStruct3").getRowCount(), 1);
+        assertUpdate("CREATE TABLE testReadSchema.testReadStruct4 (orderkey array(varchar), orderstatus row(big int, big1 int), lables map(varchar, array(int)), orderstatus1 row(big2 int))  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema.testReadStruct4 VALUES (ARRAY ['YOUNG', 'FASION', 'STYLE'], row(111,222), MAP(ARRAY ['type', 'grand'], ARRAY [ARRAY[1, 2], ARRAY[1,2]]), row(111))", 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema.testReadStruct4").getRowCount(), 1);
+        assertUpdate("CREATE TABLE testReadSchema.testReadStruct5 (orderkey array(varchar), orderstatus row(big row(big1 int)), lables map(varchar, array(int)), orderstatus1 row(big2 int))  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema.testReadStruct5 VALUES (ARRAY ['YOUNG', 'FASION', 'STYLE'], row(row(111)), MAP(ARRAY ['type', 'grand'], ARRAY [ARRAY[1, 2], ARRAY[1,2]]), row(111))", 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema.testReadStruct5").getRowCount(), 1);
+        assertUpdate("DROP TABLE testReadSchema.testReadStruct1");
+        assertUpdate("DROP TABLE testReadSchema.testReadStruct2");
+        assertUpdate("DROP TABLE testReadSchema.testReadStruct3");
+        assertUpdate("DROP TABLE testReadSchema.testReadStruct4");
+        assertUpdate("DROP TABLE testReadSchema.testReadStruct5");
+        assertUpdate("DROP SCHEMA testReadSchema");
+    }
+
+    @Test
+    public void testAlterTableWithStructDataTypeColumns()
+    {
+        assertUpdate("CREATE SCHEMA testReadSchema1");
+        assertUpdate("CREATE TABLE testReadSchema1.testReadStruct6 (orderkey array(varchar), orderstatus array(row(big int)), lables map(varchar, array(int)), orderstatus1 row(big2 int))  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema1.testReadStruct6 VALUES (ARRAY ['YOUNG', 'FASION', 'STYLE'], ARRAY[row(111), row(222)], MAP(ARRAY ['type', 'grand'], ARRAY [ARRAY[1, 2], ARRAY[1,2]]), row(111))", 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema1.testReadStruct6").getRowCount(), 1);
+        assertUpdate("ALTER TABLE testReadSchema1.testReadStruct6 RENAME COLUMN orderstatus to new_orderstatus");
+        assertEquals(computeActual("SELECT * FROM testReadSchema1.testReadStruct6").getRowCount(), 1);
+        assertUpdate("DROP TABLE testReadSchema1.testReadStruct6");
+        assertUpdate("DROP SCHEMA testReadSchema1");
+    }
 }
