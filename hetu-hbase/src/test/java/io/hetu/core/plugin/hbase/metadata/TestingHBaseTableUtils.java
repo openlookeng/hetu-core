@@ -14,8 +14,10 @@
  */
 package io.hetu.core.plugin.hbase.metadata;
 
+import io.airlift.log.Logger;
 import java.io.File;
 import java.io.IOException;
+import io.prestosql.execution.SqlQueryManager;
 
 /**
  * TestJsonHBaseTableUtils
@@ -29,10 +31,13 @@ public class TestingHBaseTableUtils
     /**
      * delFile
      */
+    private static final Logger log = Logger.get(TestingHBaseTableUtils.class);
     public static void delFile(String file)
     {
         File pfile = new File(file);
-        pfile.delete();
+        if(!pfile.delete()) {
+            log.error("file was not deleted");
+        }
     }
 
     /**
