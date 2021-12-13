@@ -36,7 +36,7 @@ public class MemoryThreadManager
      * @param size
      * @return
      */
-    public static ScheduledExecutorService initSharedThreadPool(int size)
+    public static synchronized ScheduledExecutorService initSharedThreadPool(int size)
     {
         if (executor == null) {
             executor = Executors.newScheduledThreadPool(Math.max(size, 1), threadFactory);
