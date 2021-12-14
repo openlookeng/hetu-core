@@ -57,8 +57,10 @@ public class TestMemoryTableManager
     public void setUp()
             throws IOException
     {
-        if (!MemoryThreadManager.isSharedThreadPoolInitilized()) {
-            MemoryThreadManager.initSharedThreadPool(4);
+        synchronized (MemoryThreadManager.class) {
+            if (!MemoryThreadManager.isSharedThreadPoolInitilized()) {
+                MemoryThreadManager.initSharedThreadPool(4);
+            }
         }
         pagesStore = new MemoryTableManager(
                 new MemoryConfig().setMaxDataPerNode(new DataSize(1, DataSize.Unit.MEGABYTE)).setSpillRoot(Files.createTempDirectory("test-memory-table").toString()),
