@@ -25,6 +25,7 @@ import io.prestosql.server.testing.TestingPrestoServer;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.MapType;
+import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.SqlTimestamp;
 import io.prestosql.spi.type.SqlTimestampWithTimeZone;
 import io.prestosql.spi.type.Type;
@@ -44,11 +45,13 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -69,6 +72,7 @@ import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
+import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.testing.MaterializedResult.DEFAULT_PRECISION;
 import static io.prestosql.type.IntervalDayTimeType.INTERVAL_DAY_TIME;
 import static io.prestosql.type.IntervalYearMonthType.INTERVAL_YEAR_MONTH;
@@ -240,6 +244,13 @@ public class TestingPrestoClient
             return ((List<Object>) value).stream()
                     .map(element -> convertToRowValue(((ArrayType) type).getElementType(), element))
                     .collect(toList());
+        }
+        else if (type instanceof RowType) {
+            AtomicInteger index = new AtomicInteger();
+            return ((LinkedHashMap<Object, Object>) value).entrySet().stream()
+                    .collect(Collectors.toMap(
+                            rowElement -> convertToRowValue(VARCHAR, rowElement.getKey()),
+                            rowElement -> convertToRowValue(type.getTypeParameters().get(index.getAndIncrement()), rowElement.getValue())));
         }
         else if (type instanceof MapType) {
             return ((Map<Object, Object>) value).entrySet().stream()
