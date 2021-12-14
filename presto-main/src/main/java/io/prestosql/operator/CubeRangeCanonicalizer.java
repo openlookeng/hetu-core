@@ -155,20 +155,12 @@ public class CubeRangeCanonicalizer
                         new ComparisonExpression(LESS_THAN, symbolReference, high));
             }
             else if (operator == LESS_THAN_OR_EQUAL) {
-                value = encoder.toExpression(LiteralInterpreter.evaluate(metadata, session, value), type);
-                return new ComparisonExpression(LESS_THAN_OR_EQUAL, symbolReference, value);
-            }
-            else if (operator == LESS_THAN) {
-                value = encoder.toExpression(LiteralInterpreter.evaluate(metadata, session, value), type);
+                value = encoder.toExpression(((Long) LiteralInterpreter.evaluate(metadata, session, value) + 1), type);
                 return new ComparisonExpression(LESS_THAN, symbolReference, value);
             }
-            else if (operator == GREATER_THAN_OR_EQUAL) {
-                value = encoder.toExpression(LiteralInterpreter.evaluate(metadata, session, value), type);
-                return new ComparisonExpression(GREATER_THAN_OR_EQUAL, symbolReference, value);
-            }
             else if (operator == GREATER_THAN) {
-                value = encoder.toExpression(LiteralInterpreter.evaluate(metadata, session, value), type);
-                return new ComparisonExpression(GREATER_THAN, symbolReference, value);
+                value = encoder.toExpression(((Long) LiteralInterpreter.evaluate(metadata, session, value) + 1), type);
+                return new ComparisonExpression(GREATER_THAN_OR_EQUAL, symbolReference, value);
             }
             return super.visitComparisonExpression(comparisonExpression, ignored);
         }

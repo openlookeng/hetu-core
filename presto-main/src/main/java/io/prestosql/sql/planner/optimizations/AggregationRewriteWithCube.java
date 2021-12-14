@@ -23,6 +23,7 @@ import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.aggregator.AggregationSignature;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.TableMetadata;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.SymbolAllocator;
@@ -45,7 +46,6 @@ import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.type.Type;
-import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.sql.analyzer.TypeSignatureProvider;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.SymbolsExtractor;
@@ -60,6 +60,7 @@ import io.prestosql.sql.tree.LongLiteral;
 import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -67,6 +68,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static io.hetu.core.spi.cube.CubeAggregateFunction.COUNT;
@@ -85,6 +87,7 @@ public class AggregationRewriteWithCube
     private final Metadata metadata;
     private final PlanNodeIdAllocator idAllocator;
     private final Map<String, Object> symbolMappings;
+    private final Map<String, Symbol> rewrittenMappings = new HashMap<>();
     private final CubeMetadata cubeMetadata;
     private final TypeProvider typeProvider;
 
@@ -105,7 +108,8 @@ public class AggregationRewriteWithCube
         TableHandle cubeTableHandle = metadata.getTableHandle(session, starTreeTableName)
                 .orElseThrow(() -> new CubeNotFoundException(starTreeTableName.toString()));
         Map<String, ColumnHandle> cubeColumnsMap = metadata.getColumnHandles(session, cubeTableHandle);
-
+        TableMetadata cubeTableMetadata = metadata.getTableMetadata(session, cubeTableHandle);
+        List<ColumnMetadata> cubeColumnMetadataList = cubeTableMetadata.getColumns();
         // Add group by
         List<Symbol> groupings = new ArrayList<>(originalAggregationNode.getGroupingKeys().size());
         for (Symbol symbol : originalAggregationNode.getGroupingKeys()) {
@@ -121,29 +125,30 @@ public class AggregationRewriteWithCube
             exactGroupsMatch = groupings.stream().map(Symbol::getName).map(String::toLowerCase).allMatch(cubeGroups::contains);
         }
 
-        CubeRewriteResult cubeRewriteResult = createScanNode(originalAggregationNode, filterNode, cubeTableHandle, cubeColumnsMap, exactGroupsMatch);
+        CubeRewriteResult cubeRewriteResult = createScanNode(originalAggregationNode, filterNode, cubeTableHandle, cubeColumnsMap, cubeColumnMetadataList, exactGroupsMatch);
         PlanNode planNode = cubeRewriteResult.getTableScanNode();
 
         // Add filter node
         if (filterNode != null) {
             Expression expression = castToExpression(((FilterNode) filterNode).getPredicate());
-            expression = rewriteSymbolReferenceUsingColumnName(expression, symbolMappings);
+            expression = rewriteExpression(expression, rewrittenMappings);
             planNode = new FilterNode(idAllocator.getNextId(), planNode, castToRowExpression(expression));
         }
 
         if (!exactGroupsMatch) {
+            Map<Symbol, Symbol> cubeScanToAggOutputMap = new HashMap<>();
             // Rewrite AggregationNode using Cube table
             ImmutableMap.Builder<Symbol, AggregationNode.Aggregation> aggregationsBuilder = ImmutableMap.builder();
             for (CubeRewriteResult.AggregatorSource aggregatorSource : cubeRewriteResult.getAggregationColumns()) {
-                Type type = cubeRewriteResult.getSymbolMetadataMap().get(aggregatorSource.getOriginalAggSymbol()).getType();
-                TypeSignature typeSignature = type.getTypeSignature();
                 ColumnHandle cubeColHandle = cubeRewriteResult.getTableScanNode().getAssignments().get(aggregatorSource.getScanSymbol());
-                ColumnMetadata cubeColumnMetadata = metadata.getColumnMetadata(session, cubeTableHandle, cubeColHandle);
+                ColumnMetadata cubeColumnMetadata = cubeRewriteResult.getSymbolMetadataMap().get(aggregatorSource.getScanSymbol());
+                Type type = cubeColumnMetadata.getType();
                 AggregationSignature aggregationSignature = cubeMetadata.getAggregationSignature(cubeColumnMetadata.getName())
                         .orElseThrow(() -> new ColumnNotFoundException(new SchemaTableName(starTreeTableName.getSchemaName(), starTreeTableName.getObjectName()), cubeColHandle.getColumnName()));
                 String aggFunction = COUNT.getName().equals(aggregationSignature.getFunction()) ? "sum" : aggregationSignature.getFunction();
                 SymbolReference argument = toSymbolReference(aggregatorSource.getScanSymbol());
-                FunctionHandle functionHandle = metadata.getFunctionAndTypeManager().lookupFunction(aggFunction, TypeSignatureProvider.fromTypeSignatures(typeSignature));
+                FunctionHandle functionHandle = metadata.getFunctionAndTypeManager().lookupFunction(aggFunction, TypeSignatureProvider.fromTypeSignatures(type.getTypeSignature()));
+                cubeScanToAggOutputMap.put(aggregatorSource.getScanSymbol(), aggregatorSource.getOriginalAggSymbol());
                 aggregationsBuilder.put(aggregatorSource.getOriginalAggSymbol(), new AggregationNode.Aggregation(
                         new CallExpression(
                                 aggFunction,
@@ -157,69 +162,66 @@ public class AggregationRewriteWithCube
                         Optional.empty()));
             }
 
+            List<Symbol> groupingKeys = originalAggregationNode.getGroupingKeys()
+                    .stream()
+                    .map(Symbol::getName)
+                    .map(rewrittenMappings::get)
+                    .collect(Collectors.toList());
+
             planNode = new AggregationNode(idAllocator.getNextId(),
                     planNode,
                     aggregationsBuilder.build(),
-                    singleGroupingSet(groupings),
+                    singleGroupingSet(groupingKeys),
                     ImmutableList.of(),
                     AggregationNode.Step.SINGLE,
                     Optional.empty(),
                     Optional.empty(),
                     AggregationNode.AggregationType.HASH,
                     Optional.empty());
-        }
+            AggregationNode aggNode = (AggregationNode) planNode;
 
-        if (!cubeRewriteResult.getAvgAggregationColumns().isEmpty()) {
-            if (!cubeRewriteResult.getComputeAvgDividingSumByCount()) {
-                Map<Symbol, Expression> aggregateAssignments = new HashMap<>();
-                for (CubeRewriteResult.AggregatorSource aggregatorSource : cubeRewriteResult.getAggregationColumns()) {
-                    aggregateAssignments.put(aggregatorSource.getOriginalAggSymbol(), toSymbolReference(aggregatorSource.getScanSymbol()));
-                }
-                planNode = new ProjectNode(idAllocator.getNextId(),
-                        planNode,
-                        new Assignments(aggregateAssignments
-                                .entrySet()
-                                .stream()
-                                .collect(Collectors.toMap(Map.Entry::getKey, entry -> castToRowExpression(entry.getValue())))));
-            }
-            else {
-                // If there was an AVG aggregation, map it to AVG = SUM/COUNT
-                Set<Symbol> generatedSymbols = new HashSet<>();
-                cubeRewriteResult.getAvgAggregationColumns().forEach(source -> {
-                    generatedSymbols.add(source.getCount());
-                    generatedSymbols.add(source.getSum());
-                });
-                Map<Symbol, Expression> assignments = new HashMap<>();
-                // Add all original symbols as symbol reference
-                for (Symbol symbol : originalAggregationNode.getOutputSymbols()) {
-                    Object originalColumn = symbolMappings.get(symbol.getName());
-                    if (originalColumn instanceof ColumnHandle) {
-                        //Refer to outputs of TableScanNode
-                        ColumnHandle cubeColumn = cubeColumnsMap.get(((ColumnHandle) originalColumn).getColumnName());
-                        Symbol cubeScanSymbol = new Symbol(cubeColumn.getColumnName());
-                        generatedSymbols.add(cubeScanSymbol);
-                        assignments.put(cubeScanSymbol, toSymbolReference(cubeScanSymbol));
+            if (!cubeRewriteResult.getAvgAggregationColumns().isEmpty()) {
+                if (!cubeRewriteResult.getComputeAvgDividingSumByCount()) {
+                    Map<Symbol, Expression> aggregateAssignments = new HashMap<>();
+                    for (CubeRewriteResult.AggregatorSource aggregatorSource : cubeRewriteResult.getAggregationColumns()) {
+                        aggregateAssignments.put(aggregatorSource.getOriginalAggSymbol(), toSymbolReference(aggregatorSource.getScanSymbol()));
                     }
+                    planNode = new ProjectNode(idAllocator.getNextId(),
+                            aggNode,
+                            new Assignments(aggregateAssignments
+                                    .entrySet()
+                                    .stream()
+                                    .collect(Collectors.toMap(Map.Entry::getKey, entry -> castToRowExpression(entry.getValue())))));
                 }
-                for (Symbol symbol : cubeRewriteResult.getTableScanNode().getOutputSymbols()) {
-                    if (!generatedSymbols.contains(symbol)) {
-                        assignments.put(symbol, toSymbolReference(symbol));
-                    }
-                }
+                else {
+                    // If there was an AVG aggregation, map it to AVG = SUM/COUNT
+                    Map<Symbol, Expression> projections = new HashMap<>();
 
-                // Add AVG = SUM / COUNT
-                for (CubeRewriteResult.AverageAggregatorSource avgAggSource : cubeRewriteResult.getAvgAggregationColumns()) {
-                    ArithmeticBinaryExpression division = new ArithmeticBinaryExpression(ArithmeticBinaryExpression.Operator.DIVIDE,
-                            toSymbolReference(avgAggSource.getSum()), new Cast(toSymbolReference(avgAggSource.getCount()), cubeRewriteResult.getSymbolMetadataMap().get(avgAggSource.getSum()).getType().getTypeSignature().toString()));
-                    Type avgType = typeProvider.get(avgAggSource.getOriginalAggSymbol());
-                    assignments.put(avgAggSource.getOriginalAggSymbol(), new Cast(division, avgType.getTypeSignature().toString()));
+                    aggNode.getGroupingKeys().forEach(symbol -> projections.put(symbol, toSymbolReference(symbol)));
+                    aggNode.getAggregations().keySet()
+                            .stream()
+                            .filter(symbol -> symbolMappings.containsValue(symbol.getName()))
+                            .forEach(aggSymbol -> projections.put(aggSymbol, toSymbolReference(aggSymbol)));
+
+                    // Add AVG = SUM / COUNT
+                    for (CubeRewriteResult.AverageAggregatorSource avgAggSource : cubeRewriteResult.getAvgAggregationColumns()) {
+                        Symbol sumSymbol = cubeScanToAggOutputMap.get(avgAggSource.getSum());
+                        Type sumType = cubeRewriteResult.getSymbolMetadataMap().get(sumSymbol).getType();
+                        Symbol countSymbol = cubeScanToAggOutputMap.get(avgAggSource.getCount());
+                        ArithmeticBinaryExpression division = new ArithmeticBinaryExpression(
+                                ArithmeticBinaryExpression.Operator.DIVIDE,
+                                toSymbolReference(sumSymbol),
+                                new Cast(toSymbolReference(countSymbol), sumType.getTypeSignature().toString()));
+                        Type avgType = typeProvider.get(avgAggSource.getOriginalAggSymbol());
+                        projections.put(avgAggSource.getOriginalAggSymbol(), new Cast(division, avgType.getTypeSignature().toString()));
+                    }
+                    planNode = new ProjectNode(idAllocator.getNextId(),
+                            aggNode,
+                            new Assignments(projections
+                                    .entrySet()
+                                    .stream()
+                                    .collect(Collectors.toMap(Map.Entry::getKey, entry -> castToRowExpression(entry.getValue())))));
                 }
-                planNode = new ProjectNode(idAllocator.getNextId(),
-                        planNode,
-                        new Assignments(assignments
-                                .entrySet()
-                                .stream()
-                                .collect(Collectors.toMap(Map.Entry::getKey, entry -> castToRowExpression(entry.getValue())))));
             }
         }
 
@@ -227,13 +229,11 @@ public class AggregationRewriteWithCube
         if (!planNode.getOutputSymbols().equals(originalAggregationNode.getOutputSymbols())) {
             // Map new symbol names to the old symbols
             Map<Symbol, Expression> assignments = new HashMap<>();
+            Set<Symbol> planNodeOutput = new HashSet<>(planNode.getOutputSymbols());
             for (Symbol originalAggOutputSymbol : originalAggregationNode.getOutputSymbols()) {
-                Object originalColumn = symbolMappings.get(originalAggOutputSymbol.getName());
-                if (originalColumn instanceof ColumnHandle) {
-                    //Refer to outputs of TableScanNode
-                    ColumnHandle cubeColumn = cubeColumnsMap.get(((ColumnHandle) originalColumn).getColumnName());
-                    // Intermediate nodes may have a different name for the original column name
-                    assignments.put(originalAggOutputSymbol, new SymbolReference(cubeColumn.getColumnName()));
+                if (!planNodeOutput.contains(originalAggOutputSymbol)) {
+                    // Must be grouping key
+                    assignments.put(originalAggOutputSymbol, toSymbolReference(rewrittenMappings.get(originalAggOutputSymbol.getName())));
                 }
                 else {
                     // Should be an expression and must have the same name in the new plan node
@@ -250,21 +250,20 @@ public class AggregationRewriteWithCube
         return planNode;
     }
 
-    private static Expression rewriteSymbolReferenceUsingColumnName(Expression expression, Map<String, Object> mapping)
+    private static Expression rewriteExpression(Expression expression, Map<String, Symbol> mapping)
     {
-        return ExpressionTreeRewriter.rewriteWith(new ExpressionRewriter<Map<String, Object>>()
+        return ExpressionTreeRewriter.rewriteWith(new ExpressionRewriter<Map<String, Symbol>>()
         {
             @Override
-            public Expression rewriteSymbolReference(SymbolReference node, Map<String, Object> symbolMapping, ExpressionTreeRewriter<Map<String, Object>> treeRewriter)
+            public Expression rewriteSymbolReference(SymbolReference node, Map<String, Symbol> rewrittenMappings, ExpressionTreeRewriter<Map<String, Symbol>> treeRewriter)
             {
-                ColumnHandle columnHandle = (ColumnHandle) symbolMapping.get(node.getName());
-                return new SymbolReference(columnHandle.getColumnName());
+                return toSymbolReference(rewrittenMappings.get(node.getName()));
             }
         }, expression, mapping);
     }
 
     public CubeRewriteResult createScanNode(AggregationNode originalAggregationNode, PlanNode filterNode, TableHandle cubeTableHandle,
-                                            Map<String, ColumnHandle> cubeColumnsMap, boolean exactGroupsMatch)
+            Map<String, ColumnHandle> cubeColumnsMap, List<ColumnMetadata> cubeColumnsMetadata, boolean exactGroupsMatch)
     {
         Set<Symbol> cubeScanSymbols = new HashSet<>();
         Map<Symbol, ColumnHandle> symbolAssignments = new HashMap<>();
@@ -272,20 +271,24 @@ public class AggregationRewriteWithCube
         Set<CubeRewriteResult.AggregatorSource> aggregationColumns = new HashSet<>();
         Set<CubeRewriteResult.AverageAggregatorSource> averageAggregationColumns = new HashSet<>();
         Map<Symbol, ColumnMetadata> symbolMetadataMap = new HashMap<>();
+        Map<String, ColumnMetadata> columnMetadataMap = cubeColumnsMetadata.stream().collect(Collectors.toMap(ColumnMetadata::getName, Function.identity()));
         boolean computeAvgDividingSumByCount = true;
-
         Set<Symbol> filterSymbols = new HashSet<>();
         if (filterNode != null) {
             filterSymbols.addAll(SymbolsExtractor.extractUnique(((FilterNode) filterNode).getPredicate()));
         }
+
         for (Symbol filterSymbol : filterSymbols) {
             if (symbolMappings.containsKey(filterSymbol.getName()) && symbolMappings.get(filterSymbol.getName()) instanceof ColumnHandle) {
                 //output symbol references of the columns in original table
                 ColumnHandle originalColumn = (ColumnHandle) symbolMappings.get(filterSymbol.getName());
                 ColumnHandle cubeScanColumn = cubeColumnsMap.get(originalColumn.getColumnName());
-                Symbol cubeScanSymbol = new Symbol(cubeScanColumn.getColumnName());
+                ColumnMetadata columnMetadata = columnMetadataMap.get(cubeScanColumn.getColumnName());
+                Symbol cubeScanSymbol = symbolAllocator.newSymbol(cubeScanColumn.getColumnName(), columnMetadata.getType());
                 cubeScanSymbols.add(cubeScanSymbol);
                 symbolAssignments.put(cubeScanSymbol, cubeScanColumn);
+                symbolMetadataMap.put(cubeScanSymbol, columnMetadata);
+                rewrittenMappings.put(filterSymbol.getName(), cubeScanSymbol);
                 dimensionSymbols.add(new CubeRewriteResult.DimensionSource(filterSymbol, cubeScanSymbol));
             }
         }
@@ -295,10 +298,23 @@ public class AggregationRewriteWithCube
                 //output symbol references of the columns in original table - column part of group by clause
                 ColumnHandle originalColumn = (ColumnHandle) symbolMappings.get(originalAggOutputSymbol.getName());
                 ColumnHandle cubeScanColumn = cubeColumnsMap.get(originalColumn.getColumnName());
-                Symbol cubeScanSymbol = new Symbol(cubeScanColumn.getColumnName());
-                cubeScanSymbols.add(cubeScanSymbol);
-                symbolAssignments.put(cubeScanSymbol, cubeScanColumn);
-                dimensionSymbols.add(new CubeRewriteResult.DimensionSource(originalAggOutputSymbol, cubeScanSymbol));
+                ColumnMetadata columnMetadata = columnMetadataMap.get(cubeScanColumn.getColumnName());
+                if (!symbolAssignments.containsValue(cubeScanColumn)) {
+                    Symbol cubeScanSymbol = symbolAllocator.newSymbol(cubeScanColumn.getColumnName(), columnMetadata.getType());
+                    cubeScanSymbols.add(cubeScanSymbol);
+                    symbolAssignments.put(cubeScanSymbol, cubeScanColumn);
+                    symbolMetadataMap.put(cubeScanSymbol, columnMetadata);
+                    rewrittenMappings.put(originalAggOutputSymbol.getName(), cubeScanSymbol);
+                    dimensionSymbols.add(new CubeRewriteResult.DimensionSource(originalAggOutputSymbol, cubeScanSymbol));
+                }
+                else {
+                    Symbol cubeScanSymbol = symbolAssignments.keySet()
+                            .stream()
+                            .filter(key -> cubeScanColumn.equals(symbolAssignments.get(key)))
+                            .findFirst().get();
+                    rewrittenMappings.put(originalAggOutputSymbol.getName(), cubeScanSymbol);
+                    dimensionSymbols.add(new CubeRewriteResult.DimensionSource(originalAggOutputSymbol, cubeScanSymbol));
+                }
             }
             else if (originalAggregationNode.getAggregations().containsKey(originalAggOutputSymbol)) {
                 //output symbol is mapped to an aggregation
@@ -321,11 +337,13 @@ public class AggregationRewriteWithCube
                                 .orElseThrow(() -> new PrestoException(CUBE_ERROR, "Cannot find column associated with aggregation " + aggregationSignature));
                         ColumnHandle cubeColHandle = cubeColumnsMap.get(cubeColumnName);
                         if (!symbolAssignments.containsValue(cubeColHandle)) {
-                            ColumnMetadata columnMetadata = metadata.getColumnMetadata(session, cubeTableHandle, cubeColHandle);
-                            cubeScanSymbols.add(originalAggOutputSymbol);
-                            symbolMetadataMap.put(originalAggOutputSymbol, columnMetadata);
-                            symbolAssignments.put(originalAggOutputSymbol, cubeColHandle);
-                            aggregationColumns.add(new CubeRewriteResult.AggregatorSource(originalAggOutputSymbol, originalAggOutputSymbol));
+                            ColumnMetadata columnMetadata = columnMetadataMap.get(cubeColHandle.getColumnName());
+                            Symbol cubeScanSymbol = symbolAllocator.newSymbol(cubeColHandle.getColumnName(), columnMetadata.getType());
+                            cubeScanSymbols.add(cubeScanSymbol);
+                            symbolMetadataMap.put(cubeScanSymbol, columnMetadata);
+                            symbolAssignments.put(cubeScanSymbol, cubeColHandle);
+                            rewrittenMappings.put(originalAggOutputSymbol.getName(), cubeScanSymbol);
+                            aggregationColumns.add(new CubeRewriteResult.AggregatorSource(originalAggOutputSymbol, cubeScanSymbol));
                         }
                     }
                 }
@@ -342,22 +360,25 @@ public class AggregationRewriteWithCube
                                     .orElseThrow(() -> new PrestoException(CUBE_ERROR, "Cannot find column associated with aggregation " + aggregationSignature));
                             ColumnHandle cubeColHandle = cubeColumnsMap.get(cubeColumnName);
                             if (!symbolAssignments.containsValue(cubeColHandle)) {
-                                ColumnMetadata columnMetadata = metadata.getColumnMetadata(session, cubeTableHandle, cubeColHandle);
-                                symbolAssignments.put(originalAggOutputSymbol, cubeColHandle);
-                                symbolMetadataMap.put(originalAggOutputSymbol, columnMetadata);
-                                cubeScanSymbols.add(originalAggOutputSymbol);
-                                aggregationColumns.add(new CubeRewriteResult.AggregatorSource(originalAggOutputSymbol, originalAggOutputSymbol));
+                                ColumnMetadata columnMetadata = columnMetadataMap.get(cubeColHandle.getColumnName());
+                                Symbol cubeScanSymbol = symbolAllocator.newSymbol(cubeColHandle.getColumnName(), columnMetadata.getType());
+                                cubeScanSymbols.add(cubeScanSymbol);
+                                symbolAssignments.put(cubeScanSymbol, cubeColHandle);
+                                symbolMetadataMap.put(cubeScanSymbol, columnMetadata);
+                                rewrittenMappings.put(originalAggOutputSymbol.getName(), cubeScanSymbol);
+                                aggregationColumns.add(new CubeRewriteResult.AggregatorSource(originalAggOutputSymbol, cubeScanSymbol));
                             }
                             else {
-                                Symbol symbol = symbolAssignments.keySet()
+                                ColumnMetadata columnMetadata = columnMetadataMap.get(cubeColHandle.getColumnName());
+                                Symbol cubeScanSymbol = symbolAssignments.keySet()
                                         .stream()
                                         .filter(key -> cubeColHandle.equals(symbolAssignments.get(key)))
                                         .findFirst().get();
-                                ColumnMetadata columnMetadata = metadata.getColumnMetadata(session, cubeTableHandle, cubeColHandle);
-                                symbolAssignments.put(originalAggOutputSymbol, cubeColHandle);
-                                symbolMetadataMap.put(originalAggOutputSymbol, columnMetadata);
-                                cubeScanSymbols.add(originalAggOutputSymbol);
-                                aggregationColumns.add(new CubeRewriteResult.AggregatorSource(originalAggOutputSymbol, symbol));
+                                cubeScanSymbols.add(cubeScanSymbol);
+                                symbolAssignments.put(cubeScanSymbol, cubeColHandle);
+                                symbolMetadataMap.put(cubeScanSymbol, columnMetadata);
+                                rewrittenMappings.put(originalAggOutputSymbol.getName(), cubeScanSymbol);
+                                aggregationColumns.add(new CubeRewriteResult.AggregatorSource(originalAggOutputSymbol, cubeScanSymbol));
                             }
                             break;
                         case "avg":
@@ -368,11 +389,13 @@ public class AggregationRewriteWithCube
                                         .orElseThrow(() -> new PrestoException(CUBE_ERROR, "Cannot find column associated with aggregation " + avgAggregationSignature));
                                 ColumnHandle avgCubeColHandle = cubeColumnsMap.get(avgCubeColumnName);
                                 if (!symbolAssignments.containsValue(avgCubeColHandle)) {
-                                    ColumnMetadata columnMetadata = metadata.getColumnMetadata(session, cubeTableHandle, avgCubeColHandle);
-                                    symbolAssignments.put(originalAggOutputSymbol, avgCubeColHandle);
-                                    symbolMetadataMap.put(originalAggOutputSymbol, columnMetadata);
-                                    cubeScanSymbols.add(originalAggOutputSymbol);
-                                    aggregationColumns.add(new CubeRewriteResult.AggregatorSource(originalAggOutputSymbol, originalAggOutputSymbol));
+                                    ColumnMetadata columnMetadata = columnMetadataMap.get(avgCubeColHandle.getColumnName());
+                                    Symbol cubeScanSymbol = symbolAllocator.newSymbol(avgCubeColHandle.getColumnName(), columnMetadata.getType());
+                                    cubeScanSymbols.add(cubeScanSymbol);
+                                    symbolAssignments.put(cubeScanSymbol, avgCubeColHandle);
+                                    symbolMetadataMap.put(cubeScanSymbol, columnMetadata);
+                                    rewrittenMappings.put(originalAggOutputSymbol.getName(), cubeScanSymbol);
+                                    aggregationColumns.add(new CubeRewriteResult.AggregatorSource(originalAggOutputSymbol, cubeScanSymbol));
                                 }
                             }
                             else {
@@ -382,11 +405,12 @@ public class AggregationRewriteWithCube
                                 ColumnHandle sumColumnHandle = cubeColumnsMap.get(sumColumnName);
                                 Symbol sumSymbol = null;
                                 if (!symbolAssignments.containsValue(sumColumnHandle)) {
-                                    ColumnMetadata columnMetadata = metadata.getColumnMetadata(session, cubeTableHandle, sumColumnHandle);
+                                    ColumnMetadata columnMetadata = columnMetadataMap.get(sumColumnHandle.getColumnName());
                                     sumSymbol = symbolAllocator.newSymbol("sum_" + originalColumnName + "_" + originalAggOutputSymbol.getName(), columnMetadata.getType());
                                     cubeScanSymbols.add(sumSymbol);
                                     symbolAssignments.put(sumSymbol, sumColumnHandle);
                                     symbolMetadataMap.put(sumSymbol, columnMetadata);
+                                    rewrittenMappings.put(sumSymbol.getName(), sumSymbol);
                                     aggregationColumns.add(new CubeRewriteResult.AggregatorSource(sumSymbol, sumSymbol));
                                 }
                                 else {
@@ -403,11 +427,12 @@ public class AggregationRewriteWithCube
                                 ColumnHandle countColumnHandle = cubeColumnsMap.get(countColumnName);
                                 Symbol countSymbol = null;
                                 if (!symbolAssignments.containsValue(countColumnHandle)) {
-                                    ColumnMetadata columnMetadata = metadata.getColumnMetadata(session, cubeTableHandle, countColumnHandle);
+                                    ColumnMetadata columnMetadata = columnMetadataMap.get(countColumnHandle.getColumnName());
                                     countSymbol = symbolAllocator.newSymbol("count_" + originalColumnName + "_" + originalAggOutputSymbol.getName(), columnMetadata.getType());
                                     cubeScanSymbols.add(countSymbol);
                                     symbolAssignments.put(countSymbol, countColumnHandle);
                                     symbolMetadataMap.put(countSymbol, columnMetadata);
+                                    rewrittenMappings.put(countSymbol.getName(), countSymbol);
                                     aggregationColumns.add(new CubeRewriteResult.AggregatorSource(countSymbol, countSymbol));
                                 }
                                 else {
@@ -430,7 +455,12 @@ public class AggregationRewriteWithCube
                 }
             }
         }
-        TableScanNode tableScanNode = TableScanNode.newInstance(idAllocator.getNextId(), cubeTableHandle, new ArrayList<>(cubeScanSymbols), symbolAssignments, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0, false);
+
+        //Scan output order is important for partitioned cubes. Otherwise, incorrect results may be produced.
+        //Refer: https://gitee.com/openlookeng/hetu-core/issues/I4LAYC
+        List<Symbol> scanOutput = new ArrayList<>(cubeScanSymbols);
+        scanOutput.sort(Comparator.comparingInt(outSymbol -> cubeColumnsMetadata.indexOf(symbolMetadataMap.get(outSymbol))));
+        TableScanNode tableScanNode = TableScanNode.newInstance(idAllocator.getNextId(), cubeTableHandle, scanOutput, symbolAssignments, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0, false);
         return new CubeRewriteResult(tableScanNode, symbolMetadataMap, dimensionSymbols, aggregationColumns, averageAggregationColumns, computeAvgDividingSumByCount);
     }
 }
