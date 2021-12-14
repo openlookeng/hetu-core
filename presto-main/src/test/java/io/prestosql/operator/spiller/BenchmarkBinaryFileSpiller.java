@@ -27,8 +27,10 @@ import io.prestosql.spiller.Spiller;
 import io.prestosql.spiller.SpillerFactory;
 import io.prestosql.spiller.SpillerStats;
 import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Measurement;
+import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
@@ -58,9 +60,10 @@ import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
+@BenchmarkMode(Mode.Throughput)
 @State(Scope.Thread)
 @OutputTimeUnit(SECONDS)
-@Fork(3)
+@Fork(1)
 @Warmup(iterations = 5, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 @Measurement(iterations = 10, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 public class BenchmarkBinaryFileSpiller
@@ -70,22 +73,18 @@ public class BenchmarkBinaryFileSpiller
     private static final Path SPILL_PATH = Paths.get(System.getProperty("java.io.tmpdir"), "spills");
 
     @Benchmark
-    public void write(BenchmarkData data)
+    public void writeReadSpill(BenchmarkData data)
             throws ExecutionException, InterruptedException
     {
         try (Spiller spiller = data.createSpiller()) {
             spiller.spill(data.getPages().iterator()).get();
-        }
-    }
 
-    @Benchmark
-    public void read(BenchmarkData data)
-    {
-        List<Iterator<Page>> spills = data.getReadSpiller().getSpills();
-        for (Iterator<Page> spill : spills) {
-            while (spill.hasNext()) {
-                Page next = spill.next();
-                next.getPositionCount();
+            List<Iterator<Page>> spills = spiller.getSpills();
+            for (Iterator<Page> spill : spills) {
+                while (spill.hasNext()) {
+                    Page next = spill.next();
+                    next.getPositionCount();
+                }
             }
         }
     }
@@ -101,20 +100,19 @@ public class BenchmarkBinaryFileSpiller
         @Param("10")
         private int pagesCount = 10;
 
-        @Param("false")
+        @Param({"false", "true"})
         private boolean compressionEnabled;
 
-        @Param("true")
+        @Param({"false", "true"})
         private boolean encryptionEnabled;
 
-        @Param("false")
+        @Param({"false", "true"})
         private boolean directSerdeEnabled;
 
-        @Param("1")
+        @Param({"1", "25"})
         private int spillPrefetchReadPages = 1;
 
         private List<Page> pages;
-        private Spiller readSpiller;
 
         private FileSingleStreamSpillerFactory singleStreamSpillerFactory;
         private SpillerFactory spillerFactory;
@@ -135,14 +133,11 @@ public class BenchmarkBinaryFileSpiller
                     spillPrefetchReadPages);
             spillerFactory = new GenericSpillerFactory(singleStreamSpillerFactory);
             pages = createInputPages();
-            readSpiller = spillerFactory.create(TYPES, bytes -> {}, newSimpleAggregatedMemoryContext());
-            readSpiller.spill(pages.iterator()).get();
         }
 
         @TearDown
         public void tearDown()
         {
-            readSpiller.close();
             singleStreamSpillerFactory.destroy();
         }
 
@@ -176,11 +171,6 @@ public class BenchmarkBinaryFileSpiller
             return pages;
         }
 
-        public Spiller getReadSpiller()
-        {
-            return readSpiller;
-        }
-
         public Spiller createSpiller()
         {
             return spillerFactory.create(TYPES, bytes -> {}, newSimpleAggregatedMemoryContext());
@@ -192,8 +182,7 @@ public class BenchmarkBinaryFileSpiller
     {
         BenchmarkData ctx = new BenchmarkData();
         ctx.setup();
-        read(ctx);
-        write(ctx);
+        writeReadSpill(ctx);
         ctx.tearDown();
     }
 
@@ -204,7 +193,6 @@ public class BenchmarkBinaryFileSpiller
                 .verbosity(VerboseMode.NORMAL)
                 .include(".*" + BenchmarkBinaryFileSpiller.class.getSimpleName() + ".*")
                 .build();
-
         new Runner(options).run();
     }
 }
