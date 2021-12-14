@@ -251,9 +251,6 @@ public class TestMemorySelection
     {
         assertQuerySucceeds("CREATE TABLE test_indexOperations WITH (sorted_by=ARRAY['custkey'], async_processing=false) AS SELECT * FROM tpch.tiny.orders");
 
-        // get how many test keys there are
-        long testKeys = queryOperator.chars().filter(c -> c == '#').count();
-
         // get custkeys
         List<Long> custkeys = new ArrayList<>();
         custkeys.add(1000L);
