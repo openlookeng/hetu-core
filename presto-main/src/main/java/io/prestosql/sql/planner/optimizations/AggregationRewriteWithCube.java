@@ -18,6 +18,7 @@ package io.prestosql.sql.planner.optimizations;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
+import io.hetu.core.spi.cube.CubeAggregateFunction;
 import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.aggregator.AggregationSignature;
 import io.prestosql.Session;
@@ -168,15 +169,10 @@ public class AggregationRewriteWithCube
                     Optional.empty());
         }
 
-        // If there was an AVG aggregation, map it to AVG = SUM/COUNT
         if (!cubeRewriteResult.getAvgAggregationColumns().isEmpty()) {
-            if (exactGroupsMatch && cubeRewriteResult.getUseAvgAggregationColumns()) {
+            if (!cubeRewriteResult.getComputeAvgDividingSumByCount()) {
                 Map<Symbol, Expression> aggregateAssignments = new HashMap<>();
                 for (CubeRewriteResult.AggregatorSource aggregatorSource : cubeRewriteResult.getAggregationColumns()) {
-                    ColumnHandle cubeColHandle = cubeRewriteResult.getTableScanNode().getAssignments().get(aggregatorSource.getScanSymbol());
-                    ColumnMetadata cubeColumnMetadata = metadata.getColumnMetadata(session, cubeTableHandle, cubeColHandle);
-                    AggregationSignature aggregationSignature = cubeMetadata.getAggregationSignature(cubeColumnMetadata.getName())
-                            .orElseThrow(() -> new ColumnNotFoundException(new SchemaTableName(starTreeTableName.getSchemaName(), starTreeTableName.getObjectName()), cubeColHandle.getColumnName()));
                     aggregateAssignments.put(aggregatorSource.getOriginalAggSymbol(), toSymbolReference(aggregatorSource.getScanSymbol()));
                 }
                 planNode = new ProjectNode(idAllocator.getNextId(),
@@ -186,7 +182,8 @@ public class AggregationRewriteWithCube
                                 .stream()
                                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> castToRowExpression(entry.getValue())))));
             }
-            if (!exactGroupsMatch || cubeRewriteResult.getUseAvgAggregationColumns()) {
+            else {
+                // If there was an AVG aggregation, map it to AVG = SUM/COUNT
                 Set<Symbol> generatedSymbols = new HashSet<>();
                 cubeRewriteResult.getAvgAggregationColumns().forEach(source -> {
                     generatedSymbols.add(source.getCount());
@@ -275,7 +272,7 @@ public class AggregationRewriteWithCube
         Set<CubeRewriteResult.AggregatorSource> aggregationColumns = new HashSet<>();
         Set<CubeRewriteResult.AverageAggregatorSource> averageAggregationColumns = new HashSet<>();
         Map<Symbol, ColumnMetadata> symbolMetadataMap = new HashMap<>();
-        boolean useAvgAggregationColumnsSumCount = true;
+        boolean computeAvgDividingSumByCount = true;
 
         Set<Symbol> filterSymbols = new HashSet<>();
         if (filterNode != null) {
@@ -317,7 +314,7 @@ public class AggregationRewriteWithCube
                 Object mappedValue = arguments == null || arguments.isEmpty() ? null : symbolMappings.get(((SymbolReference) arguments.get(0)).getName());
                 if (mappedValue == null || (mappedValue instanceof LongLiteral && ((LongLiteral) mappedValue).getValue() == 1)) {
                     // COUNT aggregation
-                    if (StarTreeAggregationRule.COUNT.equals(aggFunction) && !aggregation.isDistinct()) {
+                    if (CubeAggregateFunction.COUNT.getName().equals(aggFunction) && !aggregation.isDistinct()) {
                         // COUNT(1)
                         AggregationSignature aggregationSignature = AggregationSignature.count();
                         String cubeColumnName = cubeMetadata.getColumn(aggregationSignature)
@@ -366,7 +363,7 @@ public class AggregationRewriteWithCube
                         case "avg":
                             AggregationSignature avgAggregationSignature = new AggregationSignature(aggFunction, originalColumnName, distinct);
                             if (exactGroupsMatch && cubeMetadata.getColumn(avgAggregationSignature).isPresent()) {
-                                useAvgAggregationColumnsSumCount = false;
+                                computeAvgDividingSumByCount = false;
                                 String avgCubeColumnName = cubeMetadata.getColumn(avgAggregationSignature)
                                         .orElseThrow(() -> new PrestoException(CUBE_ERROR, "Cannot find column associated with aggregation " + avgAggregationSignature));
                                 ColumnHandle avgCubeColHandle = cubeColumnsMap.get(avgCubeColumnName);
@@ -434,6 +431,6 @@ public class AggregationRewriteWithCube
             }
         }
         TableScanNode tableScanNode = TableScanNode.newInstance(idAllocator.getNextId(), cubeTableHandle, new ArrayList<>(cubeScanSymbols), symbolAssignments, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0, false);
-        return new CubeRewriteResult(tableScanNode, symbolMetadataMap, dimensionSymbols, aggregationColumns, averageAggregationColumns, useAvgAggregationColumnsSumCount);
+        return new CubeRewriteResult(tableScanNode, symbolMetadataMap, dimensionSymbols, aggregationColumns, averageAggregationColumns, computeAvgDividingSumByCount);
     }
 }

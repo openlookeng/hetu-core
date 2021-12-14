@@ -152,6 +152,7 @@ import io.prestosql.sql.planner.optimizations.ImplementIntersectAndExceptAsUnion
 import io.prestosql.sql.planner.optimizations.IndexJoinOptimizer;
 import io.prestosql.sql.planner.optimizations.LimitPushDown;
 import io.prestosql.sql.planner.optimizations.MetadataQueryOptimizer;
+import io.prestosql.sql.planner.optimizations.OptimizeAggregationOverJoin;
 import io.prestosql.sql.planner.optimizations.OptimizeMixedDistinctAggregations;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.planner.optimizations.PredicatePushDown;
@@ -368,6 +369,7 @@ public class PlanOptimizers
                                         new RemoveRedundantDistinctLimit(),
                                         new ImplementFilteredAggregations(),
                                         new StarTreeAggregationRule(cubeManager, metadata),
+                                        new OptimizeAggregationOverJoin(cubeManager, metadata),
                                         new SingleDistinctAggregationToGroupBy(),
                                         new MultipleDistinctAggregationToMarkDistinct(),
                                         new ImplementBernoulliSampleAsFilter(metadata),
