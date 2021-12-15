@@ -83,4 +83,9 @@ public class DefaultConnectorConfigFunctionRewriter
         Optional<String> propertyValue = this.configSupplier.getConfigValue(functionPropertyName);
         return propertyValue.map(s -> resultFunctionStringBuilder.apply(functionCallArgsPackage, s)).orElse(null);
     }
+
+    public String getConnectorName()
+    {
+        return connectorName;
+    }
 }
