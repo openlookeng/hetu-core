@@ -15,6 +15,7 @@
 package io.hetu.core.plugin.heuristicindex.index.bitmap;
 
 import com.google.common.collect.ImmutableSet;
+import io.airlift.log.Logger;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.Pair;
@@ -86,6 +87,7 @@ public class BitmapIndex
         implements Index
 {
     public static final String ID = "BITMAP";
+    private static final Logger log = Logger.get(BitmapIndex.class);
 
     // configuration properties
     /**
@@ -365,7 +367,9 @@ public class BitmapIndex
             db.close();
         }
 
-        getFile().delete();
+        if (!getFile().delete()) {
+            log.debug("Failed to delete file: " + getFile().getName());
+        }
         closed.set(true);
     }
 
