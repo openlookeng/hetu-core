@@ -83,8 +83,10 @@ public class MemoryConnectorFactory
                     .setRequiredConfigurationProperties(requiredConfig)
                     .initialize();
 
-            if (!MemoryThreadManager.isSharedThreadPoolInitilized()) {
-                MemoryThreadManager.initSharedThreadPool(injector.getInstance(MemoryConfig.class).getThreadPoolSize());
+            synchronized (MemoryThreadManager.class) {
+                if (!MemoryThreadManager.isSharedThreadPoolInitilized()) {
+                    MemoryThreadManager.initSharedThreadPool(injector.getInstance(MemoryConfig.class).getThreadPoolSize());
+                }
             }
 
             MemoryConnector memoryConnector = injector.getInstance(MemoryConnector.class);
