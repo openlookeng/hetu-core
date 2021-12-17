@@ -39,9 +39,7 @@ import javax.inject.Inject;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.ObjectOutputStream;
-import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -405,8 +403,7 @@ public class MemoryTableManager
             Files.createDirectories(tablePath);
         }
         table.setState(Table.TableState.SPILLED);
-        try (OutputStream outputStream = Files.newOutputStream(tablePath.resolve(TABLE_METADATA_SUFFIX))) {
-            ObjectOutputStream oos = new ObjectOutputStream(outputStream);
+        try (ObjectOutputStream oos = new ObjectOutputStream(Files.newOutputStream(tablePath.resolve(TABLE_METADATA_SUFFIX)))) {
             oos.writeObject(table);
         }
         catch (Exception e) {
@@ -437,8 +434,7 @@ public class MemoryTableManager
         if (!Files.exists(tablePath)) {
             throw new FileNotFoundException("No spill data found for table id " + id);
         }
-        try (InputStream inputStream = Files.newInputStream(tablePath.resolve(TABLE_METADATA_SUFFIX))) {
-            SecureObjectInputStream ois = new SecureObjectInputStream(inputStream, Table.TYPES_WHITELIST);
+        try (SecureObjectInputStream ois = new SecureObjectInputStream(Files.newInputStream(tablePath.resolve(TABLE_METADATA_SUFFIX)), Table.TYPES_WHITELIST)) {
             Table table = (Table) ois.readObject();
             table.restoreTransientObjects(pageSorter, typeManager, pagesSerde, tablePath);
             applyForMemory(table.getByteSize(), -1, () -> logNumFormat("Loaded table %s with %s bytes.", id, table.getByteSize()), () -> {});
