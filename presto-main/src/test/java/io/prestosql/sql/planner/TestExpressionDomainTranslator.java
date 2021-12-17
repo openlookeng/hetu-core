@@ -1746,6 +1746,7 @@ public class TestExpressionDomainTranslator
         Assert.assertEquals(expressionTD.getRemainingExpression(), BooleanLiteral.TRUE_LITERAL, "Still some part of expression not converted into TupleDomain");
         ExpressionDomainTranslator.ExtractionResult partTD = ExpressionDomainTranslator.fromPredicate(metadata, TEST_SESSION, partExpression, TYPES);
         Assert.assertEquals(partTD.getRemainingExpression(), BooleanLiteral.TRUE_LITERAL, "Still some part of expression not converted into TupleDomain");
+        Assert.assertEquals(contains, expressionTD.getTupleDomain().contains(partTD.getTupleDomain()));
         return transformed;
     }
 

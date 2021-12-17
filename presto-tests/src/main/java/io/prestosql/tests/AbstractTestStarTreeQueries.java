@@ -36,8 +36,10 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static io.prestosql.tests.QueryAssertions.assertEqualsIgnoreOrder;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
@@ -1013,8 +1015,8 @@ public abstract class AbstractTestStarTreeQueries
                 "SELECT sum(ctinyint) FROM test_cube_range_visitor_aggregation_comparison WHERE ctinyint = 3 GROUP BY csmallint, cbigint, ctinyint",
                 assertTableScan("test_cube_range_visitor_comparison_1"));
         assertEquals(result1.getRowCount(), 1);
-        assertFalse(result1.getMaterializedRows().get(0).getField(0).toString().equals("NULL"));
-        assertTrue(result1.getMaterializedRows().get(0).getField(0).toString().equals("3"));
+        assertNotEquals(result1.getMaterializedRows().get(0).getField(0).toString(), "NULL");
+        assertEquals(result1.getMaterializedRows().get(0).getField(0).toString(), "3");
         assertUpdate("DROP CUBE test_cube_range_visitor_comparison_1");
 
         assertQuerySucceeds(starTreeEnabledSession, "CREATE CUBE test_cube_range_visitor_comparison_2 ON test_cube_range_visitor_aggregation_comparison WITH (AGGREGATIONS = (count(cint), sum(ctinyint)), GROUP = (csmallint, cbigint, ctinyint), PARTITIONED_BY = array['cint'])");
@@ -1023,13 +1025,13 @@ public abstract class AbstractTestStarTreeQueries
                 "SELECT sum(ctinyint) FROM test_cube_range_visitor_aggregation_comparison WHERE ctinyint <> 3 GROUP BY csmallint, cbigint, ctinyint",
                 assertTableScan("test_cube_range_visitor_comparison_2"));
         assertEquals(result2.getRowCount(), 4);
-        List<String> results2 = Arrays.asList(result2.getMaterializedRows().get(0).getField(0).toString(),
+        List<String> results2 = Stream.of(result2.getMaterializedRows().get(0).getField(0).toString(),
                 result2.getMaterializedRows().get(1).getField(0).toString(),
                 result2.getMaterializedRows().get(2).getField(0).toString(),
-                result2.getMaterializedRows().get(3).getField(0).toString()).stream().sorted().collect(Collectors.toList());
+                result2.getMaterializedRows().get(3).getField(0).toString()).sorted().collect(Collectors.toList());
         assertFalse(results2.contains("NULL"));
         System.out.println(results2);
-        assertTrue(results2.equals(Arrays.asList("1", "2", "4", "5")));
+        assertEquals(Arrays.asList("1", "2", "4", "5"), results2);
         assertUpdate("DROP CUBE test_cube_range_visitor_comparison_2");
 
         assertQuerySucceeds(starTreeEnabledSession, "CREATE CUBE test_cube_range_visitor_comparison_3 ON test_cube_range_visitor_aggregation_comparison WITH (AGGREGATIONS = (count(cint), sum(csmallint)), GROUP = (csmallint, cbigint, ctinyint), PARTITIONED_BY = array['cint'])");
@@ -1038,11 +1040,11 @@ public abstract class AbstractTestStarTreeQueries
                 "SELECT sum(csmallint) FROM test_cube_range_visitor_aggregation_comparison WHERE csmallint >= 3 GROUP BY csmallint, cbigint, ctinyint",
                 assertTableScan("test_cube_range_visitor_comparison_3"));
         assertEquals(result3.getRowCount(), 3);
-        List<String> results3 = Arrays.asList(result3.getMaterializedRows().get(0).getField(0).toString(),
+        List<String> results3 = Stream.of(result3.getMaterializedRows().get(0).getField(0).toString(),
                 result3.getMaterializedRows().get(1).getField(0).toString(),
-                result3.getMaterializedRows().get(2).getField(0).toString()).stream().sorted().collect(Collectors.toList());
+                result3.getMaterializedRows().get(2).getField(0).toString()).sorted().collect(Collectors.toList());
         assertFalse(results3.contains("NULL"));
-        assertTrue(results3.equals(Arrays.asList("3", "4", "5")));
+        assertEquals(Arrays.asList("3", "4", "5"), results3);
         assertUpdate("DROP CUBE test_cube_range_visitor_comparison_3");
 
         assertQuerySucceeds(starTreeEnabledSession, "CREATE CUBE test_cube_range_visitor_comparison_4 ON test_cube_range_visitor_aggregation_comparison WITH (AGGREGATIONS = (count(cint), sum(cbigint)), GROUP = (csmallint, cbigint, ctinyint), PARTITIONED_BY = array['cint'])");
@@ -1051,23 +1053,23 @@ public abstract class AbstractTestStarTreeQueries
                 "SELECT sum(cbigint) FROM test_cube_range_visitor_aggregation_comparison WHERE cbigint <= 3 GROUP BY csmallint, cbigint, ctinyint",
                 assertTableScan("test_cube_range_visitor_comparison_4"));
         assertEquals(result4.getRowCount(), 3);
-        List<String> results4 = Arrays.asList(result4.getMaterializedRows().get(0).getField(0).toString(),
+        List<String> results4 = Stream.of(result4.getMaterializedRows().get(0).getField(0).toString(),
                 result4.getMaterializedRows().get(1).getField(0).toString(),
-                result4.getMaterializedRows().get(2).getField(0).toString()).stream().sorted().collect(Collectors.toList());
+                result4.getMaterializedRows().get(2).getField(0).toString()).sorted().collect(Collectors.toList());
         assertFalse(results4.contains("NULL"));
-        assertTrue(results4.equals(Arrays.asList("1", "2", "3")));
+        assertEquals(Arrays.asList("1", "2", "3"), results4);
         assertUpdate("DROP CUBE test_cube_range_visitor_comparison_4");
 
         assertQuerySucceeds(starTreeEnabledSession, "CREATE CUBE test_cube_range_visitor_comparison_5 ON test_cube_range_visitor_aggregation_comparison WITH (AGGREGATIONS = (count(cint), sum(csmallint)), GROUP = (csmallint, cbigint, ctinyint), PARTITIONED_BY = array['cint'])");
         assertQuerySucceeds(starTreeEnabledSession, "INSERT INTO CUBE test_cube_range_visitor_comparison_5 WHERE csmallint > 3");
         MaterializedResult result5 = computeActualAndAssertPlan(starTreeEnabledSession,
-                "SELECT sum(csmallint) FROM test_cube_range_visitor_aggregation_comparison WHERE csmallint > 3 GROUP BY csmallint, cbigint, ctinyint",
+                "SELECT sum(csmallint) FROM test_cube_range_visitor_aggregation_comparison WHERE csmallint >= 4 GROUP BY csmallint, cbigint, ctinyint",
                 assertTableScan("test_cube_range_visitor_comparison_5"));
         assertEquals(result5.getRowCount(), 2);
-        List<String> results5 = Arrays.asList(result5.getMaterializedRows().get(0).getField(0).toString(),
-                result5.getMaterializedRows().get(1).getField(0).toString()).stream().sorted().collect(Collectors.toList());
+        List<String> results5 = Stream.of(result5.getMaterializedRows().get(0).getField(0).toString(),
+                result5.getMaterializedRows().get(1).getField(0).toString()).sorted().collect(Collectors.toList());
         assertFalse(results5.contains("NULL"));
-        assertTrue(results5.equals(Arrays.asList("4", "5")));
+        assertEquals(Arrays.asList("4", "5"), results5);
         assertUpdate("DROP CUBE test_cube_range_visitor_comparison_5");
 
         assertQuerySucceeds(starTreeEnabledSession, "CREATE CUBE test_cube_range_visitor_comparison_6 ON test_cube_range_visitor_aggregation_comparison WITH (AGGREGATIONS = (count(cint), sum(cbigint)), GROUP = (csmallint, cbigint, ctinyint), PARTITIONED_BY = array['cint'])");
@@ -1076,10 +1078,10 @@ public abstract class AbstractTestStarTreeQueries
                 "SELECT sum(cbigint) FROM test_cube_range_visitor_aggregation_comparison WHERE cbigint < 3 GROUP BY csmallint, cbigint, ctinyint",
                 assertTableScan("test_cube_range_visitor_comparison_6"));
         assertEquals(result6.getRowCount(), 2);
-        List<String> results6 = Arrays.asList(result6.getMaterializedRows().get(0).getField(0).toString(),
-                result6.getMaterializedRows().get(1).getField(0).toString()).stream().sorted().collect(Collectors.toList());
+        List<String> results6 = Stream.of(result6.getMaterializedRows().get(0).getField(0).toString(),
+                result6.getMaterializedRows().get(1).getField(0).toString()).sorted().collect(Collectors.toList());
         assertFalse(results6.contains("NULL"));
-        assertTrue(results6.equals(Arrays.asList("1", "2")));
+        assertEquals(Arrays.asList("1", "2"), results6);
         assertUpdate("DROP CUBE test_cube_range_visitor_comparison_6");
 
         // Drop table
@@ -1120,9 +1122,9 @@ public abstract class AbstractTestStarTreeQueries
         assertEquals(result1.getRowCount(), 1);
         assertEquals(result2.getRowCount(), 1);
         assertEquals(result3.getRowCount(), 1);
-        assertTrue(result1.getMaterializedRows().get(0).getField(0).toString().equals("3"));
-        assertTrue(result2.getMaterializedRows().get(0).getField(0).toString().equals("3"));
-        assertTrue(result3.getMaterializedRows().get(0).getField(0).toString().equals("3"));
+        assertEquals(result1.getMaterializedRows().get(0).getField(0).toString(), "3");
+        assertEquals(result2.getMaterializedRows().get(0).getField(0).toString(), "3");
+        assertEquals(result3.getMaterializedRows().get(0).getField(0).toString(), "3");
         assertUpdate("DROP TABLE test_cube_range_visitor_between_table");
     }
 
@@ -1747,6 +1749,31 @@ public abstract class AbstractTestStarTreeQueries
     }
 
     @Test
+    public void testPartitionedCubeIncorrectResult()
+    {
+        computeActual("create table table_cube_incorrect_result(cint int, csmallint smallint,cbigint bigint,ctiny tinyint,cvarchar varchar,cchar char,cboolean boolean,cdouble double,creal real,cdate date,ctimestamp timestamp,cdecimal decimal(2,1),cstring string)");
+        computeActual("insert into table_cube_incorrect_result values (1,smallint '1',bigint '1',tinyint '1','a',char 'a',boolean '1',double '1.0',real '1.0',date '2021-03-11',timestamp '2021-03-11 15:20:00',1.0,'a'), " +
+                "(1,smallint '1',bigint '1',tinyint '1','a',char 'a',boolean '1',double '1.0',real '1.0',date '2021-03-11',timestamp '2021-03-11 15:20:00',1.0,'a'), " +
+                "(2,smallint '2',bigint '2',tinyint '2','b',char 'b',boolean '0',double '2.0',real '2.0',date '2021-03-12',timestamp '2021-03-12 15:20:00',2.0,'b'), " +
+                "(3,smallint '3',bigint '3',tinyint '3','c',char 'c',boolean '1',double '3.0',real '3.0',date '2021-03-13',timestamp '2021-03-13 15:20:00',3.0,'c'), " +
+                "(4,smallint '4',bigint '4',tinyint '4','d',char 'd',boolean '0',double '4.0',real '4.0',date '2021-03-14',timestamp '2021-03-14 15:20:00',4.0,'d'), " +
+                "(5,smallint '5',bigint '5',tinyint '5','e',char 'e',boolean '1',double '5.0',real '5.0',date '2021-03-15',timestamp '2021-03-15 15:20:00',5.0,'e'), " +
+                "(6,smallint '6',bigint '6',tinyint '6','f',char 'f',boolean '0',double '6.0',real '6.0',date '2021-03-16',timestamp '2021-03-16 15:20:00',6.0,'f'), " +
+                "(7,smallint '7',bigint '7',tinyint '7','g',char 'g',boolean '1',double '7.0',real '7.0',date '2021-03-17',timestamp '2021-03-17 15:20:00',7.0,'g'), " +
+                "(8,smallint '8',bigint '8',tinyint '8','h',char 'h',boolean '0',double '8.0',real '8.0',date '2021-03-19',timestamp '2021-03-19 15:20:00',8.0,'h'), " +
+                "(9,smallint '9',bigint '9',tinyint '9','i',char 'i',boolean '1',double '9.0',real '9.0',date '2021-03-20',timestamp '2021-03-20 15:20:00',9.0,'i'), " +
+                "(NULL,smallint '9',bigint '9',tinyint '9','j',char 'j',boolean '0',double '9.0',real '9.0',date '2021-03-21',timestamp '2021-03-21 15:20:00',9.0,'j'), " +
+                "(NULL,smallint '10',bigint '10',tinyint '10','k',char 'k',boolean '1',double '10.1',real '10.1',date '2021-03-22',timestamp '2021-03-22 14:20:00',NULL,'NULL')");
+        assertQuerySucceeds("create cube cube_partitioned_result ON table_cube_incorrect_result with (aggregations=(count(cbigint)),group=(cint,csmallint,cbigint,ctiny),partitioned_by = array['csmallint'])");
+        assertQuerySucceeds("INSERT INTO CUBE cube_partitioned_result WHERE cbigint < 3");
+        String sql = "SELECT COUNT(cbigint),cint,csmallint,cbigint,ctiny FROM table_cube_incorrect_result WHERE cbigint < 3 GROUP BY cint,csmallint,cbigint,ctiny";
+        MaterializedResult expected = computeActualAndAssertPlan(starTreeDisabledSession, sql, assertInTableScans("table_cube_incorrect_result"));
+        MaterializedResult actual = computeActualAndAssertPlan(starTreeEnabledSession, sql, assertInTableScans("cube_partitioned_result"));
+        assertEqualsIgnoreOrder(actual.getMaterializedRows(), expected.getMaterializedRows());
+        assertUpdate("DROP TABLE table_cube_incorrect_result");
+    }
+
+    @Test
     public void testWithMultipleMatchingCubes()
     {
         computeActual("CREATE TABLE orders_table_matching_cubes_test AS SELECT * FROM orders");
@@ -1806,7 +1833,7 @@ public abstract class AbstractTestStarTreeQueries
         assertQuerySucceeds("CREATE TABLE ssb_supplier(suppkey, name, address, city, nation, region, phone) AS SELECT supp.suppkey, supp.name, supp.address, substr(nat.name, 1, 3) as city, nat.name as nation, reg.name as region, supp.phone FROM supplier supp LEFT JOIN nation nat ON supp.nationkey = nat.nationkey LEFT JOIN region reg ON nat.regionkey = reg.regionkey");
         assertQuerySucceeds("CREATE TABLE ssb_customer(custkey, name, address, city, nation, region, phone, mktsegment) AS SELECT cust.custkey, cust.name, cust.address, substr(nat.name, 1, 3) as city, nat.name as nation, reg.name as region, cust.phone, cust.mktsegment FROM customer cust LEFT JOIN nation nat ON cust.nationkey = nat.nationkey LEFT JOIN region reg ON nat.regionkey = reg.regionkey");
         assertQuerySucceeds("CREATE TABLE ssb_part(partkey, name, mfgr, category, brand , color, type, size, container) AS SELECT part.partkey, part.name, part.mfgr, cast(NULL as VARCHAR), part.brand, cast(NULL AS VARCHAR), part.type, part.size, part.container FROM part part");
-        assertQuerySucceeds("CREATE TABLE ssb_lineorder(orderkey, linenumber, custkey, partkey, suppkey, orderdate, orderpriotity, shippriotity, quantity, extendedprice, ordtotalprice, discount, revenue, supplycost, tax, commitdate, shipmode) AS select line.orderkey as orderkey, line.linenumber, ord.custkey, line.partkey, line.suppkey, ord.orderdate, ord.orderpriority, ord.shippriority, line.quantity, line.extendedprice, ord.totalprice, line.discount, cast((line.extendedprice * (cast(1 as double) - line.discount)) as bigint) as revenue, partsupp.supplycost, line.tax, line.commitdate, line.shipmode FROM lineitem line, partsupp partsupp, orders ord WHERE line.orderkey = ord.orderkey AND line.partkey = partsupp.partkey AND line.suppkey = partsupp.suppkey");
+        assertQuerySucceeds("CREATE TABLE ssb_lineorder(orderkey, linenumber, custkey, partkey, suppkey, orderdate, orderpriotity, shippriority, quantity, extendedprice, ordtotalprice, discount, revenue, supplycost, tax, commitdate, shipmode) AS select line.orderkey as orderkey, line.linenumber, ord.custkey, line.partkey, line.suppkey, ord.orderdate, ord.orderpriority, ord.shippriority, line.quantity, line.extendedprice, ord.totalprice, line.discount, cast((line.extendedprice * (cast(1 as double) - line.discount)) as bigint) as revenue, partsupp.supplycost, line.tax, line.commitdate, line.shipmode FROM lineitem line, partsupp partsupp, orders ord WHERE line.orderkey = ord.orderkey AND line.partkey = partsupp.partkey AND line.suppkey = partsupp.suppkey");
 
         computeActual("CREATE CUBE lo_total_sums_cube ON ssb_lineorder WITH (AGGREGATIONS = (sum(ordtotalprice), sum(extendedprice)), GROUP = ())");
         computeActual("INSERT INTO CUBE lo_total_sums_cube");
@@ -1859,7 +1886,7 @@ public abstract class AbstractTestStarTreeQueries
         MaterializedResult actualResult = computeActualAndAssertPlan(starTreeEnabledSession, query, assertInTableScans(cubeName));
         List<MaterializedRow> actualRows = actualResult.getMaterializedRows();
         List<MaterializedRow> expectedRows = expectedResult.getMaterializedRows();
-        QueryAssertions.assertEqualsIgnoreOrder(actualRows, expectedRows, "For query: \n " + query + "\n:");
+        assertEqualsIgnoreOrder(actualRows, expectedRows, "For query: \n " + query + "\n:");
     }
 
     private Consumer<Plan> assertInTableScans(String tableName)

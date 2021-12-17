@@ -357,7 +357,13 @@ public class CubeOptimizer
             }
         }
 
-        cubeScanNode = TableScanNode.newInstance(context.getIdAllocator().getNextId(), cubeTableHandle, new ArrayList<>(cubeScanSymbols), cubeColumnHandles, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0, false);
+        //Scan output order is important for partitioned cubes. Otherwise, incorrect results may be produced.
+        //Refer: https://gitee.com/openlookeng/hetu-core/issues/I4LAYC
+        List<ColumnMetadata> cubeColumnMetadataList = cubeTableMetadata.getColumns();
+        List<Symbol> scanOutput = new ArrayList<>(cubeScanSymbols);
+        scanOutput.sort(Comparator.comparingInt(outSymbol -> cubeColumnMetadataList.indexOf(symbolMetadataMap.get(outSymbol))));
+
+        cubeScanNode = TableScanNode.newInstance(context.getIdAllocator().getNextId(), cubeTableHandle, scanOutput, cubeColumnHandles, ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0, false);
         return new CubeRewriteResult(cubeScanNode, symbolMetadataMap, dimensionSymbols, aggregationColumns, averageAggregationColumns, computeAvgDividingSumByCount);
     }
 
@@ -550,7 +556,7 @@ public class CubeOptimizer
                 aggregateAssignments.put(aggregatorSource.getOriginalAggSymbol(), toSymbolReference(aggregatorSource.getScanSymbol()));
             }
             planNode = new ProjectNode(context.getIdAllocator().getNextId(),
-                    planNode,
+                    aggNode,
                     new Assignments(aggregateAssignments
                             .entrySet()
                             .stream()
