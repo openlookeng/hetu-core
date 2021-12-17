@@ -137,34 +137,34 @@ public class TestMemorySelection
         custkeys.add(5000L);
         custkeys.add(7000L);
 
-        String predicateQuery = "SELECT count(*) FROM test_indexOperations WHERE custkey ";
+        StringBuilder predicateQuery = new StringBuilder("SELECT count(*) FROM test_indexOperations WHERE custkey ");
 
         if (queryOperator.toLowerCase(Locale.ROOT).contains("in")) {
-            predicateQuery += queryOperator + " (";
+            predicateQuery.append(queryOperator + " (");
             int custkeySize = custkeys.size();
             for (int i = 0; i < custkeySize; i++) {
-                predicateQuery += " " + custkeys.get(i);
+                predicateQuery.append(" " + custkeys.get(i));
                 if (i < custkeySize - 1) {
-                    predicateQuery += ", ";
+                    predicateQuery.append(", ");
                 }
             }
-            predicateQuery += ")";
+            predicateQuery.append(")");
         }
         else if (queryOperator.toLowerCase(Locale.ROOT).contains("between")) {
-            predicateQuery += queryOperator + " ";
+            predicateQuery.append(queryOperator + " ");
             long minkey = Math.min(custkeys.get(0), custkeys.get(1));
             long maxkey = Math.max(custkeys.get(0), custkeys.get(1));
-            predicateQuery += minkey + " AND " + maxkey;
+            predicateQuery.append(minkey + " AND " + maxkey);
         }
         else {
-            predicateQuery += queryOperator + " " + custkeys.get(0);
+            predicateQuery.append(queryOperator + " " + custkeys.get(0));
         }
 
         // get total number of rows
         long totalRows = assertQuerySucceedsGetInputRows("SELECT count(*) FROM test_indexOperations");
 
         // apply one predicate and get input rows read, this time since predicate is on sort column, rows should be reduced
-        long inputRowCountOnePredicate = assertQuerySucceedsGetInputRows(predicateQuery);
+        long inputRowCountOnePredicate = assertQuerySucceedsGetInputRows(predicateQuery.toString());
 
         // Drop table for next use
         assertQuerySucceeds("DROP TABLE test_indexOperations");
@@ -185,32 +185,32 @@ public class TestMemorySelection
             custkeys.add((long) getSingleResult("SELECT custkey FROM test_indexOperations limit 1"));
         }
 
-        String predicateQuery = "SELECT custkey FROM test_indexOperations WHERE custkey ";
+        StringBuilder predicateQuery = new StringBuilder("SELECT custkey FROM test_indexOperations WHERE custkey ");
 
         if (queryOperator.toLowerCase(Locale.ROOT).contains("in")) {
-            predicateQuery += queryOperator + " (";
+            predicateQuery.append(queryOperator + " (");
             int custkeySize = custkeys.size();
             for (int i = 0; i < custkeySize; i++) {
-                predicateQuery += " " + custkeys.get(i);
+                predicateQuery.append(" " + custkeys.get(i));
                 if (i < custkeySize - 1) {
-                    predicateQuery += ", ";
+                    predicateQuery.append(", ");
                 }
             }
-            predicateQuery += ")";
+            predicateQuery.append(")");
         }
         else if (queryOperator.toLowerCase(Locale.ROOT).contains("between")) {
-            predicateQuery += queryOperator + " ";
+            predicateQuery.append(queryOperator + " ");
             long minkey = Math.min(custkeys.get(0), custkeys.get(1));
             long maxkey = Math.max(custkeys.get(0), custkeys.get(1));
-            predicateQuery += minkey + " AND " + maxkey;
+            predicateQuery.append(minkey + " AND " + maxkey);
         }
         else {
-            predicateQuery += queryOperator + " " + custkeys.get(0);
+            predicateQuery.append(queryOperator + " " + custkeys.get(0));
         }
 
-        MaterializedResult result1 = computeActual(predicateQuery.replace("test_indexOperations", "tpch.tiny.orders"));
+        MaterializedResult result1 = computeActual(predicateQuery.toString().replace("test_indexOperations", "tpch.tiny.orders"));
 
-        MaterializedResult result2 = computeActual(predicateQuery);
+        MaterializedResult result2 = computeActual(predicateQuery.toString());
 
         // Drop table for next use
         assertQuerySucceeds("DROP TABLE test_indexOperations");
