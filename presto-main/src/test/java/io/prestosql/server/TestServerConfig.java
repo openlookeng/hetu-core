@@ -22,7 +22,9 @@ import java.util.Map;
 
 import static io.airlift.configuration.testing.ConfigAssertions.assertFullMapping;
 import static io.airlift.configuration.testing.ConfigAssertions.assertRecordedDefaults;
+import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 public class TestServerConfig
 {
@@ -35,7 +37,9 @@ public class TestServerConfig
                 .setPrestoVersion(null)
                 .setIncludeExceptionInResponse(true)
                 .setGracePeriod(new Duration(2, MINUTES))
-                .setEnhancedErrorReporting(true));
+                .setEnhancedErrorReporting(true)
+                .setHttpClientIdleTimeout(new Duration(30, SECONDS))
+                .setHttpClientRequestTimeout(new Duration(10, SECONDS)));
     }
 
     @Test
@@ -48,6 +52,8 @@ public class TestServerConfig
                 .put("http.include-exception-in-response", "false")
                 .put("shutdown.grace-period", "5m")
                 .put("sql.parser.enhanced-error-reporting", "false")
+                .put("http.client.idle-timeout", "5h")
+                .put("http.client.request-timeout", "30m")
                 .build();
 
         ServerConfig expected = new ServerConfig()
@@ -56,7 +62,9 @@ public class TestServerConfig
                 .setPrestoVersion("test")
                 .setIncludeExceptionInResponse(false)
                 .setGracePeriod(new Duration(5, MINUTES))
-                .setEnhancedErrorReporting(false);
+                .setEnhancedErrorReporting(false)
+                .setHttpClientIdleTimeout(new Duration(5, HOURS))
+                .setHttpClientRequestTimeout(new Duration(30, MINUTES));
 
         assertFullMapping(properties, expected);
     }

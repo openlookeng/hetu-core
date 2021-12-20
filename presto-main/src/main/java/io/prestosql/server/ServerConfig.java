@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 public class ServerConfig
 {
@@ -37,6 +38,8 @@ public class ServerConfig
     private boolean includeExceptionInResponse = true;
     private Duration gracePeriod = new Duration(2, MINUTES);
     private boolean enhancedErrorReporting = true;
+    private Duration httpClientIdleTimeout = new Duration(30, SECONDS);
+    private Duration httpClientRequestTimeout = new Duration(10, SECONDS);
     // Main coordinator TODO: remove this when main coordinator election is implemented
 
     private final Set<String> admins = new HashSet<>();
@@ -126,5 +129,31 @@ public class ServerConfig
     {
         this.enhancedErrorReporting = value;
         return this;
+    }
+
+    @Config("http.client.idle-timeout")
+    public ServerConfig setHttpClientIdleTimeout(Duration httpClientIdleTimeout)
+    {
+        this.httpClientIdleTimeout = httpClientIdleTimeout;
+        return this;
+    }
+
+    @MinDuration("30s")
+    public Duration getHttpClientIdleTimeout()
+    {
+        return httpClientIdleTimeout;
+    }
+
+    @Config("http.client.request-timeout")
+    public ServerConfig setHttpClientRequestTimeout(Duration httpClientRequestTimeout)
+    {
+        this.httpClientRequestTimeout = httpClientRequestTimeout;
+        return this;
+    }
+
+    @MinDuration("10s")
+    public Duration getHttpClientRequestTimeout()
+    {
+        return httpClientRequestTimeout;
     }
 }

@@ -814,3 +814,25 @@ helps with cache affinity scheduling.
 > This property defines the maximum amount of time for the system to wait until all tasks are successfully restored. If any task is not ready within this timeout, then the recovery attempt is considered a failure, and the query will try to resume from an earlier snapshot if available.
 >
 > This can also be specified on a per-query basis using the `snapshot_retry_timeout` session property.
+
+## HTTP Client Configurations
+
+### `http.client.idle-timeout`
+
+> -   **Type:** `duration`
+> -   **Default value:** `30s` (30 seconds)
+>
+> This property defines the time for which a given http client shall stay connected without any operations performed over it.
+> After the specified time elapse with no activity, then the client connection is closed and related resources are released.
+>
+> (Note: this parameter should be configured with higher time when in high load environment)
+
+### `http.client.request-timeout`
+
+> -   **Type:** `duration`
+> -   **Default value:** `10s` (10 seconds)
+>
+> This property defines the time threshold for a given http client for which response should be received.
+> After the configured time elapsed and no response received, then client connection consider that to be failure in submission of request.
+>
+> (Note: this parameter should be configured with higher time when in high load environment)

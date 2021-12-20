@@ -23,7 +23,6 @@ import com.google.inject.util.Modules;
 import io.airlift.concurrent.BoundedExecutor;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
 import io.airlift.discovery.server.EmbeddedDiscoveryModule;
-import io.airlift.units.Duration;
 import io.prestosql.catalog.CatalogModule;
 import io.prestosql.catalog.DynamicCatalogConfig;
 import io.prestosql.client.QueryResults;
@@ -191,7 +190,6 @@ import static io.prestosql.util.StatementUtils.getAllQueryTypes;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.weakref.jmx.guice.ExportBinder.newExporter;
 
 public class CoordinatorModule
@@ -200,6 +198,8 @@ public class CoordinatorModule
     @Override
     protected void setup(Binder binder)
     {
+        ServerConfig serverConfig = buildConfigObject(ServerConfig.class);
+
         httpServerBinder(binder).bindResource("/ui", "webapp").withWelcomeFile("queryeditor.html");
         httpServerBinder(binder).bindResource("/tableau", "webapp/tableau");
 
@@ -273,8 +273,8 @@ public class CoordinatorModule
         httpClientBinder(binder).bindHttpClient("memoryManager", ForMemoryManager.class)
                 .withTracing()
                 .withConfigDefaults(config -> {
-                    config.setIdleTimeout(new Duration(30, SECONDS));
-                    config.setRequestTimeout(new Duration(10, SECONDS));
+                    config.setIdleTimeout(serverConfig.getHttpClientIdleTimeout());
+                    config.setRequestTimeout(serverConfig.getHttpClientRequestTimeout());
                 });
         bindLowMemoryKiller(LowMemoryKillerPolicy.NONE, NoneLowMemoryKiller.class);
         bindLowMemoryKiller(LowMemoryKillerPolicy.TOTAL_RESERVATION, TotalReservationLowMemoryKiller.class);
@@ -322,8 +322,8 @@ public class CoordinatorModule
                 .withTracing()
                 .withFilter(GenerateTraceTokenRequestFilter.class)
                 .withConfigDefaults(config -> {
-                    config.setIdleTimeout(new Duration(30, SECONDS));
-                    config.setRequestTimeout(new Duration(10, SECONDS));
+                    config.setIdleTimeout(serverConfig.getHttpClientIdleTimeout());
+                    config.setRequestTimeout(serverConfig.getHttpClientRequestTimeout());
                     config.setMaxConnectionsPerServer(250);
                 });
 

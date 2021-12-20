@@ -27,7 +27,6 @@ import io.airlift.stats.GcMonitor;
 import io.airlift.stats.JmxGcMonitor;
 import io.airlift.stats.PauseMeter;
 import io.airlift.units.DataSize;
-import io.airlift.units.Duration;
 import io.prestosql.GroupByHashPageIndexerFactory;
 import io.prestosql.PagesIndexPageSorter;
 import io.prestosql.SystemSessionProperties;
@@ -191,7 +190,6 @@ import static io.prestosql.protocol.SmileCodecBinder.smileCodecBinder;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.weakref.jmx.guice.ExportBinder.newExporter;
 
 public class ServerMainModule
@@ -309,8 +307,8 @@ public class ServerMainModule
         httpClientBinder(binder).bindHttpClient("node-manager", ForNodeManager.class)
                 .withTracing()
                 .withConfigDefaults(config -> {
-                    config.setIdleTimeout(new Duration(30, SECONDS));
-                    config.setRequestTimeout(new Duration(10, SECONDS));
+                    config.setIdleTimeout(serverConfig.getHttpClientIdleTimeout());
+                    config.setRequestTimeout(serverConfig.getHttpClientRequestTimeout());
                 });
 
         // node scheduler
@@ -393,8 +391,8 @@ public class ServerMainModule
                 .withTracing()
                 .withFilter(GenerateTraceTokenRequestFilter.class)
                 .withConfigDefaults(config -> {
-                    config.setIdleTimeout(new Duration(30, SECONDS));
-                    config.setRequestTimeout(new Duration(10, SECONDS));
+                    config.setIdleTimeout(serverConfig.getHttpClientIdleTimeout());
+                    config.setRequestTimeout(serverConfig.getHttpClientRequestTimeout());
                     config.setMaxConnectionsPerServer(250);
                     config.setMaxContentLength(new DataSize(32, MEGABYTE));
                 });
