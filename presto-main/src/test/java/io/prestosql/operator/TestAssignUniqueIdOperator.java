@@ -75,6 +75,7 @@ public class TestAssignUniqueIdOperator
         assertEquals(SnapshotTestUtil.toSimpleSnapshotMapping(snapshot), createExpectedMapping());
         assertEquals(output.getPositionCount(), 9);
         assertEquals(output.getChannelCount(), 2);
+        operator.close();
     }
 
     private Map<String, Object> createExpectedMapping()

@@ -542,6 +542,7 @@ public class MemoryTableManager
     public long getAllTablesDiskByteUsage() throws IOException
     {
         long totalBytes = 0L;
+        validateSpillRoot();
         for (long id : tables.keySet()) {
             long diskUsageSize = Files.walk(spillRoot.resolve(String.valueOf(id)))
                     .filter(p -> p.toFile().isFile())
