@@ -716,7 +716,7 @@ public class LogicalPart
                 }
             }
 
-            BloomFilter filter = new BloomFilter(values.size(), 0.05);
+            BloomFilter filter = values.size() == 0 ? null : new BloomFilter(values.size(), 0.05);
             boolean unsupportedValue = false;
             // if the column is being sorted on, we already have min-max values by looking at the
             // first and last value of the pages, so we can save some computation by skipping this step
