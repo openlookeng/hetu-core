@@ -575,14 +575,13 @@ public class CubeOptimizer
             // Add AVG = SUM / COUNT
             for (CubeRewriteResult.AverageAggregatorSource avgAggSource : cubeRewriteResult.getAvgAggregationColumns()) {
                 Symbol sumSymbol = cubeScanToAggOutputMap.get(avgAggSource.getSum());
-                Type sumType = cubeRewriteResult.getSymbolMetadataMap().get(sumSymbol).getType();
                 Symbol countSymbol = cubeScanToAggOutputMap.get(avgAggSource.getCount());
+                Type avgResultType = typeProvider.get(avgAggSource.getOriginalAggSymbol());
                 ArithmeticBinaryExpression division = new ArithmeticBinaryExpression(
                         ArithmeticBinaryExpression.Operator.DIVIDE,
-                        toSymbolReference(sumSymbol),
-                        new Cast(toSymbolReference(countSymbol), sumType.getTypeSignature().toString()));
-                Type avgType = typeProvider.get(avgAggSource.getOriginalAggSymbol());
-                projections.put(avgAggSource.getOriginalAggSymbol(), new Cast(division, avgType.getTypeSignature().toString()));
+                        new Cast(toSymbolReference(sumSymbol), avgResultType.getTypeSignature().toString()),
+                        new Cast(toSymbolReference(countSymbol), avgResultType.getTypeSignature().toString()));
+                projections.put(avgAggSource.getOriginalAggSymbol(), division);
             }
             return new ProjectNode(context.getIdAllocator().getNextId(),
                     aggNode,

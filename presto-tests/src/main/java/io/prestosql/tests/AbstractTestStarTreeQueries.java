@@ -118,69 +118,38 @@ public abstract class AbstractTestStarTreeQueries
     @Test
     public void testAverageAggregation()
     {
-        computeActual("CREATE TABLE nation_avg_aggregations_table_1 AS SELECT * FROM nation");
-        assertUpdate(starTreeDisabledSession, "CREATE CUBE nation_aggregations_cube_2 ON nation_avg_aggregations_table_1 " +
-                "WITH (AGGREGATIONS=(avg(nationkey), count(regionkey), sum(regionkey)," +
-                " min(regionkey), max(REGIONkey))," +
-                " group=(nationKEY), format= 'orc', partitioned_by = ARRAY['nationkey'])");
-        assertUpdate(starTreeDisabledSession, "INSERT INTO CUBE nation_aggregations_cube_2", 25);
+        computeActual("CREATE TABLE orders_avg_aggs_table AS SELECT * FROM orders");
+        assertUpdate("CREATE CUBE orders_avg_aggs_cube ON orders_avg_aggs_table WITH (AGGREGATIONS = (avg(totalprice), sum(totalprice), count(*)), GROUP = (custKEY, ORDERkey), format= 'orc')");
+        assertQuerySucceeds("INSERT INTO CUBE orders_avg_aggs_cube");
 
-        assertQuery(starTreeEnabledSession,
-                "SELECT avg(nationkey) from nation_avg_aggregations_table_1 group by nationkey",
+        String[] queries = new String[] {
+                "SELECT ord.custkey, AVG(ord.totalprice) FROM %s ord GROUP BY ord.CUSTKEY",
+                "SELECT ord.custkey, ord.orderkey, AVG(ord.totalprice) FROM %s ord GROUP BY ord.custkey, ord.orderkey",
+                "SELECT ord.orderkey, AVG(ord.totalprice) FROM %s ord GROUP BY ord.orderkey",
+                "SELECT ord.orderkey, AVG(ord.totalprice), SUM(ord.totalprice) FROM %s ord GROUP BY ord.orderkey"
+        };
+
+        Stream.of(queries).forEach(query -> assertQuery(
+                starTreeEnabledSession,
+                String.format(query, "orders_avg_aggs_table"),
                 starTreeDisabledSession,
-                "SELECT avg(nationkey) from nation group by nationkey",
-                assertTableScan("nation_aggregations_cube_2"));
+                String.format(query, "orders"),
+                assertInTableScans("orders_avg_aggs_cube")));
 
-        assertQuery(starTreeEnabledSession,
-                "SELECT avg(nationkey), avg(nationkey), sum(regionkey), count(regionkey) from nation_avg_aggregations_table_1 group by nationkey",
-                starTreeDisabledSession,
-                "SELECT avg(nationkey), avg(nationkey), sum(regionkey), count(regionkey) from nation group by nationkey",
-                assertTableScan("nation_aggregations_cube_2"));
-
-        assertQuery(starTreeEnabledSession,
-                "SELECT avg(nationkey), sum(regionkey), count(regionkey) from nation_avg_aggregations_table_1 group by nationkey",
-                starTreeDisabledSession,
-                "SELECT avg(nationkey), sum(regionkey), count(regionkey) from nation group by nationkey",
-                assertTableScan("nation_aggregations_cube_2"));
-
-        assertQuery(starTreeEnabledSession,
-                "SELECT avg(nationkey), sum(regionkey), sum(regionkey), count(regionkey) from nation_avg_aggregations_table_1 group by nationkey",
-                starTreeDisabledSession,
-                "SELECT avg(nationkey), sum(regionkey), sum(regionkey), count(regionkey) from nation group by nationkey",
-                assertTableScan("nation_aggregations_cube_2"));
-
-        assertQuery(starTreeEnabledSession,
-                "SELECT count(regionkey), avg(nationkey), sum(regionkey), sum(regionkey), count(regionkey) from nation_avg_aggregations_table_1 group by nationkey",
-                starTreeDisabledSession,
-                "SELECT count(regionkey), avg(nationkey), sum(regionkey), sum(regionkey), count(regionkey) from nation group by nationkey",
-                assertTableScan("nation_aggregations_cube_2"));
-
-        assertQuery(starTreeEnabledSession,
-                "SELECT sum(regionkey), avg(nationkey), avg(nationkey),  sum(regionkey), count(regionkey), count(regionkey) from nation_avg_aggregations_table_1 group by nationkey",
-                starTreeDisabledSession,
-                "SELECT sum(regionkey), avg(nationkey), avg(nationkey),  sum(regionkey), count(regionkey), count(regionkey) from nation group by nationkey",
-                assertTableScan("nation_aggregations_cube_2"));
-
-        assertQuery(starTreeEnabledSession,
-                "SELECT sum(regionkey), avg(nationkey), avg(nationkey), count(regionkey) from nation_avg_aggregations_table_1 group by nationkey",
-                starTreeDisabledSession,
-                "SELECT sum(regionkey), avg(nationkey), avg(nationkey), count(regionkey) from nation group by nationkey",
-                assertTableScan("nation_aggregations_cube_2"));
-
-        assertQuery(starTreeEnabledSession,
-                "SELECT avg(nationkey), min(regionkey), max(regionkey), sum(regionkey) from nation_avg_aggregations_table_1 group by nationkey",
-                starTreeDisabledSession,
-                "SELECT avg(nationkey), min(regionkey), max(regionkey), sum(regionkey) from nation group by nationkey",
-                assertTableScan("nation_aggregations_cube_2"));
-
-        assertQuery(starTreeEnabledSession,
-                "SELECT avg(nationkey), min(regionkey), count(regionkey), max(regionkey), sum(regionkey) from nation_avg_aggregations_table_1 group by nationkey",
-                starTreeDisabledSession,
-                "SELECT avg(nationkey), min(regionkey), count(regionkey), max(regionkey), sum(regionkey) from nation group by nationkey",
-                assertTableScan("nation_aggregations_cube_2"));
-
-        assertUpdate("DROP CUBE nation_aggregations_cube_2");
-        assertUpdate("DROP TABLE nation_avg_aggregations_table_1");
+        assertUpdate("CREATE CUBE orders_avg_aggs_cube_2 ON orders_avg_aggs_table WITH (AGGREGATIONS = (avg(orderkey)), GROUP = (orderdate, orderpriority), format= 'orc')");
+        assertQuerySucceeds("INSERT INTO CUBE orders_avg_aggs_cube_2");
+        queries = new String[] {
+                "SELECT ord.orderdate, AVG(ord.orderkey) FROM %s ord GROUP BY ord.orderdate",
+                "SELECT ord.orderpriority, AVG(ord.orderkey) FROM %s ord GROUP BY ord.orderpriority",
+                "SELECT ord.orderdate, ord.orderpriority, AVG(ord.orderkey) FROM %s ord GROUP BY ord.orderdate, ord.orderpriority"
+        };
+        Stream.of(queries).forEach(query -> {
+            MaterializedResult actual = computeActualAndAssertPlan(starTreeEnabledSession, String.format(query, "orders_avg_aggs_table"), assertInTableScans("orders_avg_aggs_cube_2"));
+            //Using PrestoRunner instead of H2QueryRunner as the latter does not yield correct results with decimal values.
+            MaterializedResult expected = computeActualAndAssertPlan(starTreeDisabledSession, String.format(query, "orders_avg_aggs_table"), assertInTableScans("orders_avg_aggs_table"));
+            assertEqualsIgnoreOrder(actual.getMaterializedRows(), expected.getMaterializedRows());
+        });
+        assertUpdate("DROP TABLE orders_avg_aggs_table");
     }
 
     @Test
