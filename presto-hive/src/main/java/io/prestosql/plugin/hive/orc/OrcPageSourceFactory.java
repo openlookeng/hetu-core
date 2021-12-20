@@ -72,6 +72,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -612,6 +613,8 @@ public class OrcPageSourceFactory
      */
     private static List<OrcColumn> ensureColumnNameConsistency(List<OrcColumn> fileColumns, List<HiveColumnHandle> desiredColumns)
     {
+        int skipStructColumnCount = 0;
+        List<Integer> skipStructColumnCountList = new ArrayList<>();
         Map<Integer, HiveColumnHandle> desiredColumnsByNumber = desiredColumns.stream().filter(column -> !(column.getHiveColumnIndex() < 0))
                 .collect(toImmutableMap(HiveColumnHandle::getHiveColumnIndex, identity()));
 
@@ -619,17 +622,16 @@ public class OrcPageSourceFactory
         ImmutableList.Builder<OrcColumn> builder = ImmutableList.builderWithExpectedSize(columnCount);
 
         List<Integer> desiredColumnsIndex = desiredColumnsByNumber.keySet().stream().collect(Collectors.toList());
-        Map<Integer, OrcColumn> fileColumnsByNumber = fileColumns.stream()
-                .collect(toImmutableMap(orcColumn -> orcColumn.getColumnId().getId(), identity()));
-
-        int skipStructColumnCount = 0;
-        HiveColumnHandle handle = null;
-        OrcColumn column = null;
+        Map<Integer, OrcColumn> fileColumnsByNumber = new HashMap<>();
+        for (OrcColumn orcColumn : fileColumns) {
+            fileColumnsByNumber.put(orcColumn.getColumnId().getId(), orcColumn);
+            skipStructColumnCountList.add(skipStructColumnCount);
+            skipStructColumnCount += getSkipStructColumnCount(orcColumn);
+        }
 
         for (int index = 0; index < columnCount; index++) {
-            skipStructColumnCount += handle != null && column != null ? getSkipStructColumnCount(column) : 0;
-            column = fileColumnsByNumber.get(desiredColumnsIndex.get(index) + SKIP_ORC_FILE_COLUMNS + skipStructColumnCount);
-            handle = desiredColumnsByNumber.get(desiredColumnsIndex.get(index));
+            OrcColumn column = fileColumnsByNumber.get(desiredColumnsIndex.get(index) + SKIP_ORC_FILE_COLUMNS + skipStructColumnCountList.get(desiredColumnsIndex.get(index)));
+            HiveColumnHandle handle = desiredColumnsByNumber.get(desiredColumnsIndex.get(index));
             if (handle != null && !column.getColumnName().equals(handle.getName())) {
                 column = new OrcColumn(column.getPath(), column.getColumnId(), handle.getName(), column.getColumnType(), column.getOrcDataSourceId(), column.getNestedColumns());
             }
