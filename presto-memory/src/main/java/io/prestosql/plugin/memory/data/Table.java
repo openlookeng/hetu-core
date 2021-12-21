@@ -248,6 +248,7 @@ public class Table
     public void finishCreation(Runnable cleanup)
     {
         tableState = TableState.COMMITTED;
+        LOG.info("Finishing table creation. %d logicalParts to be processed", logicalParts.size());
 
         List<Future<?>> futuresList = new ArrayList<>(logicalParts.size());
         for (int i = 0; i < logicalParts.size(); i++) {
@@ -257,6 +258,7 @@ public class Table
             }
 
             int finalI = i;
+            LOG.info("Started to process Table %d :: logicalPart %d", id, finalI + 1);
             Runnable runnable = () -> {
                 LOG.info("Processing Table %d :: logicalPart %d", id, finalI + 1);
                 try {
@@ -267,6 +269,7 @@ public class Table
                     // 2. manager handles memory release
                     // only once all LPs are processed this cleanup will be called by the last LP
                     if (allProcessed()) {
+                        LOG.info("All the LogicalParts are successfully processed.");
                         cleanup.run();
                     }
                 }
