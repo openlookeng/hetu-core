@@ -159,7 +159,7 @@
         <dependency>
             <artifactId>hbase-shaded-netty</artifactId>
             <groupId>org.apache.hbase.thirdparty</groupId>
-            <version>3.3.0</version>
+            <version>4.0.0</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
