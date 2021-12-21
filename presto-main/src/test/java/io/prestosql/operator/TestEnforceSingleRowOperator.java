@@ -85,6 +85,7 @@ public class TestEnforceSingleRowOperator
         }
 
         assertTrue(caught, "Operator didn't catch input of position count 2.");
+        operator.close();
     }
 
     private Map<String, Object> createExpectedMapping()

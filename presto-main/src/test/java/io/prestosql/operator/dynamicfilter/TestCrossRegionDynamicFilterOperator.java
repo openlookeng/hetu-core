@@ -84,6 +84,7 @@ public class TestCrossRegionDynamicFilterOperator
         operator.addInput(pages.get(1));
         Page page2 = operator.getOutput();
         assertEquals(page2, pages.get(1));
+        operator.close();
     }
 
     @Test
@@ -109,6 +110,7 @@ public class TestCrossRegionDynamicFilterOperator
         Block block = page.getBlock(0).getLoadedBlock();
         String nativeValue = TypeUtils.readNativeValueForDynamicFilter(types.get(0), block, 0);
         assertEquals(nativeValue, "10001");
+        operator.close();
     }
 
     @Test
@@ -132,6 +134,7 @@ public class TestCrossRegionDynamicFilterOperator
 
         Page page = operator.getOutput();
         assertEquals(page.getPositionCount(), 0);
+        operator.close();
     }
 
     private CrossRegionDynamicFilterOperator createBloomFilterOperator(String queryId, DynamicFilterCacheManager dynamicFilterCacheManager)
