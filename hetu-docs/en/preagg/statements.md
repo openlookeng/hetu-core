@@ -117,8 +117,10 @@ INSERT OVERWRITE CUBE cube_name [WHERE condition]
 ```
 
 ### Description
-Similar to INSERT INTO CUBE statement but with this statement the existing data is overwritten. Predicates
-are optional.
+Similar to `INSERT INTO CUBE` statement but with this statement the existing data is overwritten. Predicates
+are optional.`INSERT OVERWRITE CUBE` is not supported on partitioned cubes. Cubes are essentially stored as tables and so `INSERT OVERWRITE` only 
+replaces the matching partitions and does not overwrite the entire table. So this operation is blocked on partitioned cube. 
+Drop and recreate cube if needed.
 
 ### Examples
 Insert data based on condition into the `orders_cube` Cube:

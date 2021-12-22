@@ -375,17 +375,15 @@ public abstract class AbstractTestStarTreeQueries
     @Test
     public void testInsertOverwriteCube()
     {
-        computeActual("CREATE TABLE nation_table_cube_insert_overwrite_test_1 AS SELECT * FROM nation");
-        assertUpdate("CREATE CUBE nation_insert_overwrite_cube_1 ON nation_table_cube_insert_overwrite_test_1 " +
-                "WITH (AGGREGATIONS=(count(*), COUNT(distinct nationkey), count(distinct regionkey), avg(nationkey), count(regionkey), sum(regionkey)," +
-                " min(regionkey), max(regionkey), max(nationkey), min(nationkey))," +
-                " group=(nationkey), format= 'orc', partitioned_by = ARRAY['nationkey'])");
-        assertUpdate("INSERT INTO CUBE nation_insert_overwrite_cube_1 where nationkey > 5", 19);
-        assertEquals(computeScalar("SELECT COUNT(*) FROM nation_insert_overwrite_cube_1"), 19L);
-        assertUpdate("INSERT OVERWRITE CUBE nation_insert_overwrite_cube_1 where nationkey > 5", 19);
-        assertEquals(computeScalar("SELECT COUNT(*) FROM nation_insert_overwrite_cube_1"), 19L);
-        assertUpdate("DROP CUBE nation_insert_overwrite_cube_1");
-        assertUpdate("DROP TABLE nation_table_cube_insert_overwrite_test_1");
+        computeActual("CREATE TABLE orders_table_overwrite_cube AS SELECT * FROM orders");
+        assertQuerySucceeds("CREATE CUBE orders_cube_test_overwrite ON orders_table_overwrite_cube WITH (AGGREGATIONS = (count(*), sum(totalprice), avg(totalprice)), GROUP = (custkey))");
+        assertUpdate("INSERT INTO CUBE orders_cube_test_overwrite", 1000L);
+        assertEquals(computeScalar("SELECT COUNT(*) FROM orders_cube_test_overwrite"), 1000L);
+
+        assertQuerySucceeds("CREATE CUBE orders_partitioned_cube_test_overwrite ON orders_table_overwrite_cube WITH (AGGREGATIONS = (count(*), sum(totalprice), avg(totalprice)), GROUP = (custkey, orderstatus), PARTITIONED_BY = ARRAY['orderstatus'])");
+        assertUpdate("INSERT INTO CUBE orders_partitioned_cube_test_overwrite", 2298L);
+        assertQueryFails("INSERT OVERWRITE CUBE orders_partitioned_cube_test_overwrite WHERE custkey > 200", "INSERT OVERWRITE not supported on partitioned cube. Drop and recreate cube, if needed.");
+        assertUpdate("DROP TABLE orders_table_overwrite_cube");
     }
 
     @Test

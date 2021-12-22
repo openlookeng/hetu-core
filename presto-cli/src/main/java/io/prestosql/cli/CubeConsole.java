@@ -624,9 +624,7 @@ public class CubeConsole
         else {
             //if the range is within the processing size limit then we run a single insert query only
             String queryInsert = String.format(INSERT_INTO_CUBE_STRING, cubeName, whereClause);
-            if (!console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
-                return false;
-            }
+            return console.runQuery(queryRunner, queryInsert, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
         }
         return true;
     }

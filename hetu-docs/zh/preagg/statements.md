@@ -117,8 +117,9 @@ INSERT OVERWRITE CUBE cube_name [WHERE condition]
 ```
 
 ### 描述
-类似于INSERT INTO CUBE语句，但使用此语句覆盖现有数据。
-谓词是可选的。
+类似于"INSERT INTO CUBE"语句，但使用此语句覆盖现有数据。谓词是可选的。分区的Cubes不支持`INSERT OVERWRITE CUBE`类语句。
+Cubes本质上存储为表，因此只有`INSERT OVERWRITE`替换匹配的分区并且不会覆盖整个表。所以这个操作在分区的Cube上被阻止。
+删除并重新创建多维数据集，如果 需要。
 
 ### 例子
 根据条件插入数据到`orders_cube`Cube：

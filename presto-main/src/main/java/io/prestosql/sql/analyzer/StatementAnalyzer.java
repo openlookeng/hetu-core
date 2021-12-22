@@ -538,6 +538,12 @@ class StatementAnalyzer
                 throw new SemanticException(MISSING_CUBE, insertCube, "Cube '%s' table handle does not exist", targetCube);
             }
 
+            TableMetadata cubeTableMetadata = metadata.getTableMetadata(session, targetCubeHandle.get());
+            boolean isPartitioned = cubeTableMetadata.getMetadata().getProperties().containsKey("partitioned_by");
+            if (insertCube.isOverwrite() && isPartitioned) {
+                throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "INSERT OVERWRITE not supported on partitioned cube. Drop and recreate cube, if needed.");
+            }
+
             QualifiedObjectName tableName = QualifiedObjectName.valueOf(cubeMetadata.getSourceTableName());
             TableHandle sourceTableHandle = metadata.getTableHandle(session, tableName)
                     .orElseThrow(() -> new SemanticException(MISSING_TABLE, insertCube, "Source table '%s' on which cube was built is missing", tableName.toString()));
