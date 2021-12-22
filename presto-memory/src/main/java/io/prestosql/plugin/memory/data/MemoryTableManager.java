@@ -159,6 +159,7 @@ public class MemoryTableManager
 
     public void finishUpdatingTable(long id)
     {
+        LOG.info("Finishing updating table. %d logicalParts in the table to be finished up.", tables.get(id).getLogicalPartCount());
         tables.get(id).finishCreation(() -> {
             // this should only be called once entire table has been processed
             if (tables.containsKey(id) && tables.get(id).allProcessed() && !tables.get(id).isSpilled()) {
@@ -409,6 +410,7 @@ public class MemoryTableManager
         catch (Exception e) {
             // if spilling failed mark it back to spilled
             table.setState(Table.TableState.COMMITTED);
+            LOG.debug("[Spill] Table " + id + " Failed.");
         }
         long dur = System.currentTimeMillis() - start;
         LOG.debug("[Spill] Table " + id + " has been serialized to disk. Time elapsed: " + dur + "ms");
