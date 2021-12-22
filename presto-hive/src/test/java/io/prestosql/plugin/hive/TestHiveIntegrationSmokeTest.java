@@ -6888,4 +6888,53 @@ public class TestHiveIntegrationSmokeTest
         assertUpdate("DROP TABLE testReadSchema1.testReadStruct6");
         assertUpdate("DROP SCHEMA testReadSchema1");
     }
+
+    @Test
+    public void testUpdateWithStructDataTypeColumns()
+    {
+        assertUpdate("CREATE SCHEMA testReadSchema2");
+        assertUpdate("CREATE TABLE testReadSchema2.testReadStruct7 (orderkey array(varchar), orderstatus array(row(big int)), lables map(varchar, array(int)), orderstatus1 row(big2 int))  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema2.testReadStruct7 VALUES (ARRAY ['YOUNG', 'FASION', 'STYLE'], ARRAY[row(111), row(222)], MAP(ARRAY ['type', 'grand'], ARRAY [ARRAY[1, 2], ARRAY[1,2]]), row(111))", 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema2.testReadStruct7").getRowCount(), 1);
+        assertUpdate("UPDATE testReadSchema2.testReadStruct7 set orderkey = ARRAY['UPDATE','UPDATE','UPDATE']", 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema2.testReadStruct7").getRowCount(), 1);
+        assertUpdate("DROP TABLE testReadSchema2.testReadStruct7");
+        assertUpdate("DROP SCHEMA testReadSchema2");
+    }
+
+    @Test
+    public void testReadSingleColumnStructDataTypeColumns()
+    {
+        assertUpdate("CREATE SCHEMA testReadSchema3");
+        assertUpdate("CREATE TABLE testReadSchema3.testReadStruct8 (orderkey array(varchar), orderstatus array(row(big int)), lables map(varchar, array(int)), orderstatus1 row(big2 int))  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema3.testReadStruct8 VALUES (ARRAY ['YOUNG', 'FASION', 'STYLE'], ARRAY[row(111), row(222)], MAP(ARRAY ['type', 'grand'], ARRAY [ARRAY[1, 2], ARRAY[1,2]]), row(111))", 1);
+        assertEquals(computeActual("SELECT orderkey FROM testReadSchema3.testReadStruct8").getRowCount(), 1);
+        assertEquals(computeActual("SELECT orderstatus FROM testReadSchema3.testReadStruct8").getRowCount(), 1);
+        assertEquals(computeActual("SELECT lables FROM testReadSchema3.testReadStruct8").getRowCount(), 1);
+        assertUpdate("DROP TABLE testReadSchema3.testReadStruct8");
+        assertUpdate("DROP SCHEMA testReadSchema3");
+    }
+
+    @Test
+    public void testReadFromTablesWithPrimitiveAndStructDataTypeColumns()
+    {
+        assertUpdate("CREATE SCHEMA testReadSchema4");
+        assertUpdate("CREATE TABLE testReadSchema4.testReadStruct9 (id int, orderkey array(varchar), name string, orderstatus array(row(big int)), lables map(varchar, array(int)), orderstatus1 row(big2 int), age int, salary double)  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema4.testReadStruct9 VALUES (1, ARRAY ['YOUNG', 'FASION', 'STYLE'], 'name1', ARRAY[row(111), row(222)], MAP(ARRAY ['type', 'grand'], ARRAY [ARRAY[1, 2], ARRAY[1,2]]), row(111), 30, 2000.5)", 1);
+        assertEquals(computeActual("SELECT id FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT name FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT orderkey FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT orderstatus FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT lables FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT age FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT salary FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT id, name, age, salary FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT orderkey, orderstatus, lables, orderstatus1 FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT id, orderkey, name, orderstatus FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT salary, age, lables, orderstatus FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT orderkey, name, lables, orderstatus1 FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertUpdate("DROP TABLE testReadSchema4.testReadStruct9");
+        assertUpdate("DROP SCHEMA testReadSchema4");
+    }
 }
