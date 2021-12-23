@@ -14,7 +14,7 @@
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
         <mongo-java.version>3.6.0</mongo-java.version>
-        <netty.version>4.0.32.Final</netty.version>
+        <netty.version>4.1.72.Final</netty.version>
     </properties>
 
     <dependencies>
