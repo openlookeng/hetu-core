@@ -886,29 +886,34 @@ public class LogicalPart
     @VisibleForTesting
     public boolean testFilter(BloomFilter filter, Object value)
     {
-        if (value instanceof Long) {
-            return filter.test(((Long) value).longValue());
-        }
-        else if (value instanceof Double) {
-            return filter.test((Double) value);
-        }
-        else if (value instanceof Integer) {
-            return filter.test((Integer) value);
-        }
-        else if (value instanceof Float) {
-            return filter.test((Float) value);
-        }
-        else if (value instanceof Slice) {
-            return filter.test((Slice) value);
-        }
-        else if (value instanceof byte[]) {
-            return filter.test((byte[]) value);
-        }
-        else if (value instanceof String) {
-            return filter.test(((String) value).getBytes());
+        if (filter == null) {
+            return true;
         }
         else {
-            return true;
+            if (value instanceof Long) {
+                return filter.test(((Long) value).longValue());
+            }
+            else if (value instanceof Double) {
+                return filter.test((Double) value);
+            }
+            else if (value instanceof Integer) {
+                return filter.test((Integer) value);
+            }
+            else if (value instanceof Float) {
+                return filter.test((Float) value);
+            }
+            else if (value instanceof Slice) {
+                return filter.test((Slice) value);
+            }
+            else if (value instanceof byte[]) {
+                return filter.test((byte[]) value);
+            }
+            else if (value instanceof String) {
+                return filter.test(((String) value).getBytes());
+            }
+            else {
+                return true;
+            }
         }
     }
 
