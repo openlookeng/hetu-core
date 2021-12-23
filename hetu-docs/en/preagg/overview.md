@@ -15,8 +15,8 @@ Few of the Cube properties are
  - Query latency is reduced by rewriting the logical plan to use Cube instead of the original table.
 
 ## Cube Optimizer Rule
-As part of logical plan optimization, Cube optimizer rule analyzes and optimizes the aggregation sub-tree of the logical plan with Cubes. 
-The rule looks for the aggregation sub-tree that typically looks like the following
+As part of logical plan optimization, Cube optimizer rule analyzes and optimizes the aggregation subtree of the logical plan with Cubes. 
+The rule looks for the aggregation subtree that typically looks like the following
 
 ```
 AggregationNode
@@ -27,10 +27,10 @@ AggregationNode
         |- TableScanNode
 ```
 
-The rule parses through the sub-tree and identifies the table name, aggregate functions, where clause, group by clause that is matched with Cube metadata 
+The rule parses through the subtree and identifies the table name, aggregate functions, where clause, group by clause that is matched with Cube metadata 
 to identify any Cube that can help optimize the query. In case of multiple match, recently created Cube is selected for optimization. If any match found, entire 
-aggregation sub-tree is rewritten using the Cube. This optimizer uses the TupleDomain construct to match if predicates provided in the Query can be supported by the 
-Cubes.  
+aggregation subtree is rewritten using the Cube. This optimizer uses the TupleDomain construct to match if predicates provided in the Query can be supported by the 
+Cubes.
 
 The following picture depicts the change in the logical plan after the optimization. 
 
