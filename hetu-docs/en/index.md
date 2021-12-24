@@ -65,6 +65,7 @@ headless: true
     
 - [Star Tree Cubes](#)
     - [Overview]({{< relref "./docs/preagg/overview.md" >}})
+    - [Join Support]({{< relref "./docs/preagg/join-queries.md" >}})
     - [Statements]({{< relref "./docs/preagg/statements.md" >}})
   
 - [Connectors]({{< relref "./docs/connector/_index.md" >}})
