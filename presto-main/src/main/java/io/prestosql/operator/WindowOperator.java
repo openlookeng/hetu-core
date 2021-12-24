@@ -21,6 +21,7 @@ import com.google.common.collect.PeekingIterator;
 import com.google.common.primitives.Ints;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.airlift.log.Logger;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.memory.context.LocalMemoryContext;
@@ -199,6 +200,7 @@ public class WindowOperator
         }
     }
 
+    public static final Logger LOG = Logger.get(WindowOperator.class);
     private final OperatorContext operatorContext;
     private final List<Type> outputTypes;
     private final int[] outputChannels;
@@ -907,7 +909,7 @@ public class WindowOperator
             verify(anyPage.getPositionCount() != 0, "PagesIndex.getSortedPages returned an empty page");
             currentSpillGroupRowPage = Optional.of(anyPage.getSingleValuePage(/* any */0));
             spillInProgress = Optional.of(spiller.get().spill(sortedPages));
-
+            LOG.debug("spilling to disk initiated by Window operator");
             return spillInProgress.get();
         }
 

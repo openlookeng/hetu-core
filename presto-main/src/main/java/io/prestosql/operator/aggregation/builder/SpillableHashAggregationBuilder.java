@@ -16,6 +16,7 @@ package io.prestosql.operator.aggregation.builder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.HashCollisionsCounter;
@@ -55,6 +56,7 @@ import static java.lang.Math.max;
 public class SpillableHashAggregationBuilder
         implements AggregationBuilder, Restorable
 {
+    private static final Logger LOG = Logger.get(SpillableHashAggregationBuilder.class);
     private InMemoryHashAggregationBuilder hashAggregationBuilder;
     private final SpillerFactory spillerFactory;
     private final List<AccumulatorFactory> accumulatorFactories;
@@ -263,6 +265,7 @@ public class SpillableHashAggregationBuilder
 
         // start spilling process with current content of the hashAggregationBuilder builder...
         spillInProgress = spiller.get().spill(hashAggregationBuilder.buildHashSortedResult().iterator());
+        LOG.debug("spilling to disk initiated by Hash Aggregation");
         // ... and immediately create new hashAggregationBuilder so effectively memory ownership
         // over hashAggregationBuilder is transferred from this thread to a spilling thread
         rebuildHashAggregationBuilder();

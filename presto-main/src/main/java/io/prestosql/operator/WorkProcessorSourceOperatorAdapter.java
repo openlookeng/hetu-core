@@ -424,6 +424,7 @@ public class WorkProcessorSourceOperatorAdapter
                         }
 
                         spillInProgress = reuseExchangeTableScanMappingIdState.getSpiller().get().spill(pageSpilledList.iterator());
+                        LOG.debug("spilling to disk initiated by reuse exchange");
 
                         try {
                             // blocking call to ensure spilling completes before we move forward
