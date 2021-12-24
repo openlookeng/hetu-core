@@ -16,6 +16,7 @@ package io.prestosql.operator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.airlift.log.Logger;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.snapshot.Spillable;
@@ -151,6 +152,7 @@ public class OrderByOperator
         FINISHED
     }
 
+    private static final Logger LOG = Logger.get(OrderByOperator.class);
     private final OperatorContext operatorContext;
     private final List<Integer> sortChannels;
     private final List<SortOrder> sortOrder;
@@ -353,6 +355,7 @@ public class OrderByOperator
 
         pageIndex.sort(sortChannels, sortOrder);
         spillInProgress = spiller.get().spill(pageIndex.getSortedPages());
+        LOG.debug("spilling to disk initiated by Order by operator");
         finishMemoryRevoke = () -> {
             pageIndex.clear();
             updateMemoryUsage();
