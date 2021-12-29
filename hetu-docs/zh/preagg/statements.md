@@ -70,7 +70,7 @@ cube_name ON table_name WITH (
     INSERT INTO CUBE orders_cube WHERE orderstatus = 'PENDING';
 
 `FILTER`属性可用于在构建Cube时从源表中过滤掉数据。
-在对源表应用`orderdate BETWEEN 2512450 AND 2512460`谓词后，Cube建立在数据上。过滤谓词中使用的列不得属于Cube。
+cube是基于源表应用orderdate BETWEEN 2512450 AND 2512460谓词之后的数据上构建的。过滤谓词中使用的列不得属于Cube。
 
 ### 限制
 - 可以仅使用以下聚合函数创建Cubes。

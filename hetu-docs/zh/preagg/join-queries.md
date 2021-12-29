@@ -14,7 +14,7 @@ StarTree Cube也可以帮助优化对join查询的聚合。优化器在逻辑计
   .  .  .  .  .  |- TableScanNode [Dim Table]
 ```
 
-如果确认查询于结构匹配，优化器会通过将Fact TableScanNode替换为Cube TableScanNode来重写逻辑计划。这类似于单表重写。
+如果确认查询与结构匹配，优化器会通过将Fact TableScanNode替换为Cube TableScanNode来重写逻辑计划。这类似于单表重写。
 
 ###Star架构的支持
 Join查询优化器仅支持Star架构。Star架构是一种数据仓库架构模型，其中一个事实表引用多个维度表，从图表上看，它看起来像一个星形，事实表位于中心，维度表从它向外辐射。支持各种连接。
@@ -22,7 +22,7 @@ Join查询优化器仅支持Star架构。Star架构是一种数据仓库架构�
 ![star-schema](../images/star-schema.png "star schema")
 
 ###Cube管理
-`Create Cube`仍可用于定义Cubes以优化Join查询。困难的部分是在构建多维数据集时识别GROUP构造。对于单桌查询，GROUP BY子句将只包含来自同一个表的列。但是对于连接查询，尤其是Star架构查询，GROUP BY包含来自Dimension表而不是Fact表的列。
+`Create Cube`仍可用于定义Cubes以优化Join查询。困难的部分是在构建多维数据集时识别GROUP构造。对于单表查询，GROUP BY子句将只包含来自同一个表的列。但是对于连接查询，尤其是Star架构查询，GROUP BY包含来自Dimension表而不是Fact表的列。
 让我们通过以下查询进行更多分析。
 ```sql
 SELECT SUM(lo_revenue) AS lo_revenue, d_year, p_brand
