@@ -1863,4 +1863,8 @@
             </build>
         </profile>
     </profiles>
+
+  <scm>
+    <tag>branch-1.5</tag>
+  </scm>
 </project>
