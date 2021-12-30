@@ -1,4 +1,4 @@
-##Join查询的支持
+## Join查询的支持
 StarTree Cube也可以帮助优化对join查询的聚合。优化器在逻辑计划中寻找聚合子树结构，通常如下所示。
 ```
   AggregationNode
@@ -16,12 +16,12 @@ StarTree Cube也可以帮助优化对join查询的聚合。优化器在逻辑计
 
 如果确认查询与结构匹配，优化器会通过将Fact TableScanNode替换为Cube TableScanNode来重写逻辑计划。这类似于单表重写。
 
-###Star架构的支持
+### Star架构的支持
 Join查询优化器仅支持Star架构。Star架构是一种数据仓库架构模型，其中一个事实表引用多个维度表，从图表上看，它看起来像一个星形，事实表位于中心，维度表从它向外辐射。支持各种连接。
 
 ![star-schema](../images/star-schema.png "star schema")
 
-###Cube管理
+### Cube管理
 `Create Cube`仍可用于定义Cubes以优化Join查询。困难的部分是在构建多维数据集时识别GROUP构造。对于单表查询，GROUP BY子句将只包含来自同一个表的列。但是对于连接查询，尤其是Star架构查询，GROUP BY包含来自Dimension表而不是Fact表的列。
 让我们通过以下查询进行更多分析。
 ```sql
@@ -43,7 +43,7 @@ GROUP = (lo_orderdate, lo_partkey, lo_suppkey));
 ```
 优化器解析join条件并使用这些列来识别匹配的Cubes。如果Cube大小小于事实表，则可以实现性能提升。
 
-###限制
+### 限制
 * 仅支持Star架构。
 * 不支持count distinct，因为Cube不存储实际的维度值。
 * 如果在Fact和Dimension上都定义了Cube，则不会优化查询，因为优化器无法区分两者。
@@ -55,6 +55,6 @@ GROUP = (lo_orderdate, lo_partkey, lo_suppkey));
    WHERE toYear(lo_orderdate) = 1993 AND lo_discount BETWEEN 1 AND 3 AND lo_quantity < 25;
 ```
 
-###未来
+### 未来
 * 支持Snowflake架构
 * 在多个表上构建单个Cube
