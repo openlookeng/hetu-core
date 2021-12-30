@@ -222,6 +222,6 @@ SHOW CUBES;
    但是这种实现仍然存在局限性，因为该过程涉及将多个Cube谓词合并为一个。
    只有定义在Integer、Long和Date类型上的Cube谓词才能正确合并。 对Char、String类型的支持仍需实现。
    
-##Star Tree上的性能优化
+## Star Tree上的性能优化
 1. 对同一个group by列的星型查询重写优化：如果查询语句与Cube组匹配，则会改写查询计划将聚合运算结果重定向到Cube结果，否则将添加其他聚合结果内部应用于重写语句。
 2. 平均聚合函数的star tree表扫描优化：如果查询语句与group by列的Cube匹配，则会改写查询计划将聚合运算结果重定向到Cube的预聚合列的平均值结果，否则语句将在内部重写，以选择star tree预聚合Sum和Count结果，随后计算平均值。

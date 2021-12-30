@@ -64,7 +64,7 @@ headless: true
 
 - [Star Tree多维数据集](#)
     - [概述]({{< relref "./docs/preagg/overview.md" >}})
-    - [加入支持]({{< relref "./docs/preagg/join-queries.md" >}})
+    - [Join支持]({{< relref "./docs/preagg/join-queries.md" >}})
     - [语句]({{< relref "./docs/preagg/statements.md" >}})
 
 - [连接器]({{< relref "./docs/connector/_index.md" >}})

@@ -224,7 +224,7 @@ SHOW CUBES;
    as the process involves merging multiple Cube predicates into one. Only Cube predicates defined on Integer, Long and Date types can be merged properly. Support for Char, 
    String types still need to be implemented.
    
-##Performance Optimizations on Star Tree
+## Performance Optimizations on Star Tree
 1. Star Tree Query re-write optimization for same group by columns: If the group by columns of the cube and query matches, the query is 
 re-written internally to select the pre-aggregated data. If the group by columns does not matches, the additional aggregations are 
 internally applied on the re-written query.
