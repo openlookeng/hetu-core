@@ -223,7 +223,7 @@ public class QuerySnapshotManager
         }
     }
 
-    public boolean hasPendingResume()
+    public synchronized boolean hasPendingResume()
     {
         if (retryTimer.isPresent()) {
             LOG.warn("Query %s finished after resume, but resume was not done", queryId.getId());
@@ -249,11 +249,8 @@ public class QuerySnapshotManager
             return;
         }
 
-        if (!cancelRestoreTimer()) {
-            return;
-        }
-
         if (restoreResult.getSnapshotResult() == SnapshotResult.SUCCESSFUL) {
+            cancelRestoreTimer();
             if (lastTriedId.isPresent()) {
                 // Successfully resumed from this snapshot id. Avoid resuming from it again.
                 // See HashBuilderOperator#finish(), which depends on this behavior.
