@@ -12,28 +12,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import alt from '../alt';
-import CatalogApiUtils from "../utils/CatalogApiUtils";
-import xhrform from "../utils/xhrform";
-import UserStore from "../stores/UserStore";
 
-class CatalogActions {
-    constructor() {
-    }
+package io.prestosql.catalog.showcatalog;
 
-    addCatalog(formData) {
-        return CatalogApiUtils.addCatalog(formData).then(() => {
-            return {
-                result: true,
-                message: "Success"
-            }
-        }).catch((error) => {
-            return {
-                result: false,
-                message: error.message
-            }
-        })
+import com.google.inject.Binder;
+import com.google.inject.Scopes;
+import io.airlift.configuration.AbstractConfigurationAwareModule;
+import org.glassfish.jersey.media.multipart.MultiPartFeature;
+
+import static io.airlift.jaxrs.JaxrsBinder.jaxrsBinder;
+
+public class ShowCatalogModule
+        extends AbstractConfigurationAwareModule
+{
+    @Override
+    protected void setup(Binder binder)
+    {
+        jaxrsBinder(binder).bind(ShowCatalogResource.class);
+        jaxrsBinder(binder).bind(MultiPartFeature.class);
+        binder.bind(ShowCatalogService.class).in(Scopes.SINGLETON);
     }
 }
-
-export default alt.createActions(CatalogActions);

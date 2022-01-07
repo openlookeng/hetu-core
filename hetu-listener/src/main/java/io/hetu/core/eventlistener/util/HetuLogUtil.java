@@ -41,8 +41,8 @@ public class HetuLogUtil
 
     private static String getCurrentDate(String logConversionPattern)
     {
-        if (logConversionPattern == null){
-            logConversionPattern="yyyy-MM-dd.HH";
+        if (logConversionPattern == null) {
+            logConversionPattern = "yyyy-MM-dd.HH";
         }
         SimpleDateFormat formatter = new SimpleDateFormat(logConversionPattern);
         String dateString = formatter.format(new Date());
@@ -72,7 +72,7 @@ public class HetuLogUtil
 
     private void createFile(String auditLogFile)
     {
-        if (auditLogFile == null){
+        if (auditLogFile == null) {
             return;
         }
         System.setProperty("hetu-LogOutput", auditLogFile);

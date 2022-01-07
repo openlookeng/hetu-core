@@ -51,7 +51,6 @@ public abstract class AbstractCatalogStore
     private static final Logger log = Logger.get(AbstractCatalogStore.class);
     private static final JsonCodec<List<String>> LIST_CODEC = JsonCodec.listJsonCodec(String.class);
     private static final String CATALOG_NAME_PROPERTY = "connector.name";
-
     protected final String baseDirectory;
     protected final HetuFileSystemClient fileSystemClient;
     private final int maxFileSizeInBytes;
@@ -233,6 +232,25 @@ public abstract class AbstractCatalogStore
         String connectorName = catalogProperties.remove(CATALOG_NAME_PROPERTY);
         checkState(connectorName != null, "Catalog configuration does not contain connector.name");
         return new CatalogInfo(catalogName, connectorName, null, createdTime, version, catalogProperties);
+    }
+
+    public Map<String, String> getCatalogProperties(String catalogName, int state, String baseDirectory)
+            throws IOException
+    {
+        Properties properties = new Properties();
+        CatalogFilePath catalogPath = new CatalogFilePath(baseDirectory, catalogName);
+        Path path;
+        if (state == 0) {
+            path = catalogPath.getPropertiesPath();
+        }
+        else {
+            path = catalogPath.getStaticPath();
+        }
+        try (InputStream inputStream = fileSystemClient.newInputStream(path)) {
+            properties.load(inputStream);
+        }
+        Map<String, String> catalogProperties = new HashMap<>(fromProperties(properties));
+        return catalogProperties;
     }
 
     public CatalogFileInputStream getCatalogFiles(String catalogName)
