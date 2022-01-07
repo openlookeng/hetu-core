@@ -30,12 +30,16 @@ import io.prestosql.spi.connector.SchemaNotFoundException;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.TableAlreadyExistsException;
 import io.prestosql.spi.connector.TableNotFoundException;
+import io.prestosql.spi.favorite.FavoriteEntity;
+import io.prestosql.spi.favorite.FavoriteResult;
 import io.prestosql.spi.filesystem.FileBasedLock;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.metastore.HetuMetastore;
 import io.prestosql.spi.metastore.model.CatalogEntity;
 import io.prestosql.spi.metastore.model.DatabaseEntity;
 import io.prestosql.spi.metastore.model.TableEntity;
+import io.prestosql.spi.queryhistory.QueryHistoryEntity;
+import io.prestosql.spi.queryhistory.QueryHistoryResult;
 
 import javax.inject.Inject;
 
@@ -795,5 +799,42 @@ public class HetuFsMetastore
                 throw new PrestoException(HETU_METASTORE_CODE, e);
             }
         });
+    }
+
+    @Override
+    public void insertQueryHistory(QueryHistoryEntity queryHistoryEntity, String jsonString)
+    {
+    }
+
+    @Override
+    public String getQueryDetail(String queryId)
+    {
+        return null;
+    }
+
+    @Override
+    public QueryHistoryResult getQueryHistory(int startNum, int pageSize,
+                                              String user, String startTime, String endTime,
+                                              String queryId, String query, String resourceGroup,
+                                              String resource, List<String> state, List<String> failed,
+                                              String sort, String sortOrder)
+    {
+        return null;
+    }
+
+    @Override
+    public void insertFavorite(FavoriteEntity favoriteEntity)
+    {
+    }
+
+    @Override
+    public void deleteFavorite(FavoriteEntity favoriteEntity)
+    {
+    }
+
+    @Override
+    public FavoriteResult getFavorite(int startNum, int pageSize, String user)
+    {
+        return null;
     }
 }

@@ -178,5 +178,9 @@ public class JdbcMetadataUtil
         tableDao.createTableColumnParameters();
         // hetu_tab_lock table
         tableDao.createTableLock();
+        //hetu_query_history table
+        tableDao.createTableQueryHistory();
+        //hetu_favorite table
+        tableDao.createTableFavorite();
     }
 }

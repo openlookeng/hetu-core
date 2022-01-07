@@ -26,6 +26,7 @@ import TabConstants from '../constants/TabConstants';
 
 import {Tab, TabList, TabPanel, Tabs} from 'react-tabs';
 import MySavedQueries from "./MySavedQueries";
+import MyCollection from "./MyCollection";
 
 class QueryInformation
     extends React.Component {
@@ -114,6 +115,7 @@ class QueryInformation
             <Tab>All Queries</Tab>
             <Tab>Results</Tab>
             <Tab>Data Preview</Tab>
+            <Tab>My Collection</Tab>
           </TabList>
           <TabPanel style={{height:"calc(70vh - 200px)", overflowY:'auto'}}>
             <MySavedQueries/>
@@ -130,6 +132,11 @@ class QueryInformation
           </TabPanel>
           <TabPanel style={{overflowY:'auto',height:"calc(70vh - 200px)"}}>
             <DataPreview
+                tableWidth={this.state.tableWidth}
+                tableHeight={this.state.tableHeight}/>
+          </TabPanel>
+          <TabPanel style={{overflowY:'auto',height:"calc(70vh - 200px)"}}>
+            <MyCollection
                 tableWidth={this.state.tableWidth}
                 tableHeight={this.state.tableHeight}/>
           </TabPanel>

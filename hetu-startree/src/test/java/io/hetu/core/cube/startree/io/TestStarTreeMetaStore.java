@@ -26,10 +26,14 @@ import io.hetu.core.cube.startree.tree.StarTreeMetadataBuilder;
 import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.CubeStatus;
 import io.hetu.core.spi.cube.io.CubeMetaStore;
+import io.prestosql.spi.favorite.FavoriteEntity;
+import io.prestosql.spi.favorite.FavoriteResult;
 import io.prestosql.spi.metastore.HetuMetastore;
 import io.prestosql.spi.metastore.model.CatalogEntity;
 import io.prestosql.spi.metastore.model.DatabaseEntity;
 import io.prestosql.spi.metastore.model.TableEntity;
+import io.prestosql.spi.queryhistory.QueryHistoryEntity;
+import io.prestosql.spi.queryhistory.QueryHistoryResult;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -305,5 +309,42 @@ public class TestStarTreeMetaStore
 
         @Override
         public void alterTableParameter(String catalogName, String databaseName, String tableName, String key, String value) {}
+
+        @Override
+        public void insertQueryHistory(QueryHistoryEntity queryHistoryEntity, String jsonString)
+        {
+        }
+
+        @Override
+        public String getQueryDetail(String queryId)
+        {
+            return null;
+        }
+
+        @Override
+        public QueryHistoryResult getQueryHistory(int startNum, int pageSize,
+                                                  String user, String startTime, String endTime,
+                                                  String queryId, String query, String resourceGroup,
+                                                  String resource, List<String> state, List<String> failed,
+                                                  String sort, String sortOrder)
+        {
+            return null;
+        }
+
+        @Override
+        public void insertFavorite(FavoriteEntity favoriteEntity)
+        {
+        }
+
+        @Override
+        public void deleteFavorite(FavoriteEntity favoriteEntity)
+        {
+        }
+
+        @Override
+        public FavoriteResult getFavorite(int startNum, int pageSize, String user)
+        {
+            return null;
+        }
     }
 }

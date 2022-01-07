@@ -26,12 +26,15 @@ import io.prestosql.execution.QueryManager;
 import io.prestosql.execution.QueryState;
 import io.prestosql.execution.QueryStats;
 import io.prestosql.execution.StageId;
+import io.prestosql.queryhistory.QueryHistoryService;
+import io.prestosql.queryhistory.model.Info;
 import io.prestosql.security.AccessControl;
 import io.prestosql.security.AccessControlUtil;
 import io.prestosql.server.security.SecurityRequireNonNull;
 import io.prestosql.spi.ErrorType;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.queryhistory.QueryHistoryResult;
 import io.prestosql.spi.security.GroupProvider;
 
 import javax.inject.Inject;
@@ -41,6 +44,7 @@ import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.core.Context;
@@ -57,6 +61,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Strings.nullToEmpty;
 import static io.prestosql.connector.system.KillQueryProcedure.createKillQueryException;
 import static io.prestosql.connector.system.KillQueryProcedure.createPreemptQueryException;
 import static java.util.Objects.requireNonNull;
@@ -79,6 +84,7 @@ public class QueryResource
 
     private final ServerConfig serverConfig;
     private final GroupProvider groupProvider;
+    private final QueryHistoryService queryHistoryService;
 
     public enum SortOrder
     {
@@ -92,7 +98,8 @@ public class QueryResource
                          HttpServerInfo httpServerInfo,
                          AccessControl accessControl,
                          ServerConfig serverConfig,
-                         GroupProvider groupProvider)
+                         GroupProvider groupProvider,
+                         QueryHistoryService queryHistoryService)
     {
         this.dispatchManager = requireNonNull(dispatchManager, "dispatchManager is null");
         this.queryManager = requireNonNull(queryManager, "queryManager is null");
@@ -100,6 +107,56 @@ public class QueryResource
         this.accessControl = requireNonNull(accessControl, "httpServerInfo is null");
         this.serverConfig = requireNonNull(serverConfig, "httpServerInfo is null");
         this.groupProvider = requireNonNull(groupProvider, "groupProvider is null");
+        this.queryHistoryService = requireNonNull(queryHistoryService, "queryHistoryService is null");
+    }
+
+    @GET
+    @Path("queryInfo")
+    public Response getAllQueryInfo(
+            @QueryParam("state") String stateFilter,
+            @QueryParam("failed") String failedFilter,
+            @QueryParam("sort") String sortFilter,
+            @QueryParam("sortOrder") String sortOrder,
+            @QueryParam("searchUser") String searchUser,
+            @QueryParam("searchDate") String searchDate,
+            @QueryParam("searchSql") String searchSql,
+            @QueryParam("searchQueryId") String searchQueryId,
+            @QueryParam("searchResourceGroup") String resourceGroup,
+            @QueryParam("pageNum") Integer pageNum,
+            @QueryParam("pageSize") Integer pageSize,
+            @Context HttpServletRequest servletRequest)
+    {
+        // if the user is admin, don't filter results by user.
+        if (pageNum != null && pageNum <= 0) {
+            return Response.status(Status.BAD_REQUEST).build();
+        }
+        if (pageSize != null && pageSize <= 0) {
+            return Response.status(Status.BAD_REQUEST).build();
+        }
+        searchUser = nullToEmpty(searchUser);
+        searchUser = nullToEmpty(searchUser);
+        searchDate = nullToEmpty(searchDate);
+        searchSql = nullToEmpty(searchSql);
+        searchQueryId = nullToEmpty(searchQueryId);
+        resourceGroup = nullToEmpty(resourceGroup);
+
+        String startTime = "";
+        String endTime = "";
+        if (!"".equals(searchDate)) {
+            searchDate = searchDate.replaceAll(" ", "");
+            startTime = searchDate.split("~")[0];
+            endTime = searchDate.split("~")[1];
+        }
+        Info info = new Info(searchUser, startTime, endTime, searchQueryId, searchSql, "", resourceGroup, stateFilter, failedFilter, sortFilter, sortOrder);
+        QueryHistoryResult res = queryHistoryService.Query(info, pageNum, pageSize);
+        return Response.ok(res).build();
+    }
+
+    @GET
+    @Path("/queryNums")
+    public Response getCurrentQueries()
+    {
+        return Response.ok(queryHistoryService.getCurrentQueries()).build();
     }
 
     @GET
@@ -250,6 +307,25 @@ public class QueryResource
             // redirect remote query
             return ClientBuilder.newBuilder().build().target(basicQueryInfo.getSelf()).request().get();
         }
+    }
+
+    @GET
+    @Produces("application/json")
+    @Path("history_{queryId}")
+    public Response getHistoryQueryInfo(@PathParam("queryId") QueryId queryId)
+    {
+        try {
+            requireNonNull(queryId, "queryId is null");
+        }
+        catch (Exception ex) {
+            return Response.status(Status.BAD_REQUEST).build();
+        }
+        String queryJson = queryHistoryService.getQueryDetail(queryId.toString());
+
+        if (queryJson == null || "".equals(queryJson)) {
+            return Response.status(Status.GONE).build();
+        }
+        return Response.ok(queryJson).build();
     }
 
     @DELETE
