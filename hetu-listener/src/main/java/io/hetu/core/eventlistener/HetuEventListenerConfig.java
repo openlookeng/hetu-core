@@ -42,6 +42,10 @@ public class HetuEventListenerConfig
 
     private int auditFileCount = 1;
 
+    private String auditLogFile;
+
+    private String auditLogConversionPattern;
+
     public BaseEventListener.Type getType()
     {
         return type;
@@ -238,5 +242,43 @@ public class HetuEventListenerConfig
     {
         this.auditFileLimit = auditFileLimit;
         return this;
+    }
+
+    /**
+     * set auditLogfile
+     *
+     * @param auditLogFile auditlogfile from properties file
+     * @return config object
+     */
+    @Config("hetu.auditlog.LogOutput")
+    @ConfigDescription("AuditLog event output file path")
+    public HetuEventListenerConfig setAuditLogFile(String auditLogFile)
+    {
+        this.auditLogFile = auditLogFile;
+        return this;
+    }
+
+    /**
+     * set auditLogConversionPattern
+     *
+     * @param auditLogConversionPattern auditLogConversionPattern from properties file
+     * @return config object
+     */
+    @Config("hetu.auditlog.LogConversionPattern")
+    @ConfigDescription("define the ConversionPattern of AuditLog event")
+    public HetuEventListenerConfig setAuditLogConversionPattern(String auditLogConversionPattern)
+    {
+        this.auditLogConversionPattern = auditLogConversionPattern;
+        return this;
+    }
+
+    public String getAuditLogFile()
+    {
+        return auditLogFile;
+    }
+
+    public String getAuditLogConversionPattern()
+    {
+        return auditLogConversionPattern;
     }
 }

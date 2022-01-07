@@ -17,9 +17,11 @@ package io.hetu.core.eventlistener.listeners;
 import io.airlift.log.Logger;
 import io.hetu.core.eventlistener.HetuEventListenerConfig;
 import io.hetu.core.eventlistener.util.EventUtility;
+import io.hetu.core.eventlistener.util.HetuLogUtil;
 import io.hetu.core.eventlistener.util.ListenerErrorCode;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.eventlistener.QueryCompletedEvent;
+import io.prestosql.spi.eventlistener.QueryContext;
 import io.prestosql.spi.eventlistener.QueryCreatedEvent;
 import io.prestosql.spi.eventlistener.SplitCompletedEvent;
 
@@ -65,12 +67,18 @@ class QueryEventLogger
     @Override
     protected void onQueryCreatedEvent(QueryCreatedEvent queryCreatedEvent)
     {
+        QueryContext queryContext = queryCreatedEvent.getContext();
+        org.apache.log4j.Logger log = HetuLogUtil.getLoggerByName(queryContext.getUser(), "INFO", HetuLogUtil.AuditType.Sql);
+        log.info(EventUtility.toString(queryCreatedEvent));
         logger.info(EventUtility.toString(queryCreatedEvent));
     }
 
     @Override
     protected void onQueryCompletedEvent(QueryCompletedEvent queryCompletedEvent)
     {
+        QueryContext queryContext = queryCompletedEvent.getContext();
+        org.apache.log4j.Logger log = HetuLogUtil.getLoggerByName(queryContext.getUser(), "INFO", HetuLogUtil.AuditType.Sql);
+        log.info(EventUtility.toString(queryCompletedEvent));
         logger.info(EventUtility.toString(queryCompletedEvent));
     }
 

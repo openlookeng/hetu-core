@@ -17,6 +17,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
+import io.prestosql.spi.eventlistener.AuditLogEvent;
 import io.prestosql.spi.eventlistener.EventListener;
 import io.prestosql.spi.eventlistener.EventListenerFactory;
 import io.prestosql.spi.eventlistener.QueryCompletedEvent;
@@ -105,6 +106,13 @@ public class EventListenerManager
     {
         if (configuredEventListener.get().isPresent()) {
             configuredEventListener.get().get().splitCompleted(splitCompletedEvent);
+        }
+    }
+
+    public void eventEnhanced(AuditLogEvent auditLogEvent)
+    {
+        if (configuredEventListener.get().isPresent()) {
+            configuredEventListener.get().get().auditLogged(auditLogEvent);
         }
     }
 }

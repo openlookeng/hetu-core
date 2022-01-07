@@ -1,6 +1,6 @@
 # 审计日志
 
-openLooKeng审计日志记录功能是一个自定义事件监听器，在查询创建和完成（成功或失败）时调用。审计日志包含以下信息：
+openLooKeng审计日志记录功能是一个自定义事件监听器，监听openLooKeng集群启停与集群中节点的动态添加与删除事件；监听WebUi用户登录与退出事件；监听查询事件,在查询创建和完成（成功或失败）时调用。审计日志包含以下信息：
 
 1. 事件发生时间
 2. 用户ID
@@ -23,6 +23,8 @@ openLooKeng审计日志记录功能是一个自定义事件监听器，在查询
 hetu.event.listener.type=AUDIT
 hetu.event.listener.listen.query.creation=true
 hetu.event.listener.listen.query.completion=true
+hetu.auditlog.LogOutput=/var/log/
+hetu.auditlog.LogConversionPattern=yyyy-MM-dd.HH
 ```
 
 其他审计日志记录属性包括：
@@ -43,4 +45,6 @@ hetu.event.listener.listen.query.completion=true
 hetu.event.listener.audit.file=/var/log/hetu/hetu-audit.log
 hetu.event.listener.audit.filecount=1
 hetu.event.listener.audit.limit=100000
+hetu.auditlog.LogOutput=/var/log/
+hetu.auditlog.LogConversionPattern=yyyy-MM-dd.HH
 ```
