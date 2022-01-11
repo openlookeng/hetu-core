@@ -487,5 +487,11 @@ public class TestAccessControlManager
         {
             return Optional.empty();
         }
+
+        @Override
+        public void checkCanDropPartition(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName tableName)
+        {
+            throw new UnsupportedOperationException();
+        }
     }
 }

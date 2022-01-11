@@ -36,6 +36,7 @@ import io.prestosql.sql.tree.DropCache;
 import io.prestosql.sql.tree.DropColumn;
 import io.prestosql.sql.tree.DropCube;
 import io.prestosql.sql.tree.DropIndex;
+import io.prestosql.sql.tree.DropPartition;
 import io.prestosql.sql.tree.DropRole;
 import io.prestosql.sql.tree.DropSchema;
 import io.prestosql.sql.tree.DropTable;
@@ -162,6 +163,7 @@ public final class StatementUtils
         builder.put(Prepare.class, QueryType.DATA_DEFINITION);
         builder.put(Deallocate.class, QueryType.DATA_DEFINITION);
         builder.put(SetPath.class, QueryType.DATA_DEFINITION);
+        builder.put(DropPartition.class, QueryType.DATA_DEFINITION);
 
         builder.put(VacuumTable.class, QueryType.VACUUM);
         STATEMENT_QUERY_TYPES = builder.build();

@@ -37,6 +37,7 @@ import static io.prestosql.spi.security.AccessDeniedException.denyCreateViewWith
 import static io.prestosql.spi.security.AccessDeniedException.denyDeleteTable;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropColumn;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropIndex;
+import static io.prestosql.spi.security.AccessDeniedException.denyDropPartition;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropSchema;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropTable;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropView;
@@ -491,5 +492,15 @@ public interface SystemAccessControl
     default Optional<ViewExpression> getColumnMask(Identity identity, CatalogSchemaTableName tableName, String columnName, Type type)
     {
         return Optional.empty();
+    }
+
+    /**
+     * Check if identity is allowed to drop partitions from the specified table in a catalog.
+     *
+     * @throws AccessDeniedException if not allowed
+     */
+    default void checkCanDropPartition(Identity identity, CatalogSchemaTableName table)
+    {
+        denyDropPartition(table.toString());
     }
 }

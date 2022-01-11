@@ -59,6 +59,7 @@ import io.prestosql.execution.DropCacheTask;
 import io.prestosql.execution.DropColumnTask;
 import io.prestosql.execution.DropCubeTask;
 import io.prestosql.execution.DropIndexTask;
+import io.prestosql.execution.DropPartitionTask;
 import io.prestosql.execution.DropRoleTask;
 import io.prestosql.execution.DropSchemaTask;
 import io.prestosql.execution.DropTableTask;
@@ -133,6 +134,7 @@ import io.prestosql.sql.tree.DropCache;
 import io.prestosql.sql.tree.DropColumn;
 import io.prestosql.sql.tree.DropCube;
 import io.prestosql.sql.tree.DropIndex;
+import io.prestosql.sql.tree.DropPartition;
 import io.prestosql.sql.tree.DropRole;
 import io.prestosql.sql.tree.DropSchema;
 import io.prestosql.sql.tree.DropTable;
@@ -387,6 +389,7 @@ public class CoordinatorModule
         bindDataDefinitionTask(binder, executionBinder, DropIndex.class, DropIndexTask.class);
         bindDataDefinitionTask(binder, executionBinder, DropCube.class, DropCubeTask.class);
         bindDataDefinitionTask(binder, executionBinder, CreateCube.class, CreateCubeTask.class);
+        bindDataDefinitionTask(binder, executionBinder, DropPartition.class, DropPartitionTask.class);
 
         MapBinder<String, ExecutionPolicy> executionPolicyBinder = newMapBinder(binder, String.class, ExecutionPolicy.class);
         executionPolicyBinder.addBinding("all-at-once").to(AllAtOnceExecutionPolicy.class);

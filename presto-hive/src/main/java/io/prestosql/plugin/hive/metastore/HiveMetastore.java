@@ -24,6 +24,7 @@ import io.prestosql.spi.type.Type;
 import org.apache.hadoop.hive.metastore.api.DataOperationType;
 import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
 import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
+import org.apache.hadoop.hive.metastore.utils.ObjectPair;
 
 import java.util.List;
 import java.util.Map;
@@ -195,6 +196,10 @@ public interface HiveMetastore
     boolean isImpersonationEnabled();
 
     default void refreshMetastoreCache()
+    {
+    }
+
+    default void dropPartitionByRequest(HiveIdentity identity, String databaseName, String tableName, List<ObjectPair<Integer, byte[]>> partExprs, boolean deleteData, boolean ifExists)
     {
     }
 }

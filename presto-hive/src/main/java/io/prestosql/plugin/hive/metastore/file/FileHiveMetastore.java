@@ -13,6 +13,7 @@
  */
 package io.prestosql.plugin.hive.metastore.file;
 
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -44,6 +45,7 @@ import io.prestosql.plugin.hive.metastore.PartitionWithStatistics;
 import io.prestosql.plugin.hive.metastore.PrincipalPrivileges;
 import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.plugin.hive.metastore.thrift.ThriftMetastoreUtil;
+import io.prestosql.plugin.hive.util.KryoUtils;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnNotFoundException;
 import io.prestosql.spi.connector.SchemaAlreadyExistsException;
@@ -59,10 +61,17 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.FileUtils;
+import org.apache.hadoop.hive.common.type.Date;
+import org.apache.hadoop.hive.common.type.Timestamp;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.DataOperationType;
 import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
 import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
+import org.apache.hadoop.hive.metastore.utils.ObjectPair;
+import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
+import org.apache.hadoop.hive.serde2.typeinfo.CharTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
 
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
@@ -74,6 +83,8 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -95,6 +106,14 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.prestosql.plugin.hive.HiveMetadata.TABLE_COMMENT;
 import static io.prestosql.plugin.hive.HivePartitionManager.extractPartitionValues;
+import static io.prestosql.plugin.hive.HiveType.HIVE_BOOLEAN;
+import static io.prestosql.plugin.hive.HiveType.HIVE_BYTE;
+import static io.prestosql.plugin.hive.HiveType.HIVE_DATE;
+import static io.prestosql.plugin.hive.HiveType.HIVE_DOUBLE;
+import static io.prestosql.plugin.hive.HiveType.HIVE_INT;
+import static io.prestosql.plugin.hive.HiveType.HIVE_LONG;
+import static io.prestosql.plugin.hive.HiveType.HIVE_SHORT;
+import static io.prestosql.plugin.hive.HiveType.HIVE_TIMESTAMP;
 import static io.prestosql.plugin.hive.HiveUtil.toPartitionValues;
 import static io.prestosql.plugin.hive.metastore.MetastoreUtil.makePartitionName;
 import static io.prestosql.plugin.hive.metastore.thrift.ThriftMetastoreUtil.getHiveBasicStatistics;
@@ -1014,6 +1033,99 @@ public class FileHiveMetastore
     public boolean isImpersonationEnabled()
     {
         return false;
+    }
+
+    @Override
+    public void dropPartitionByRequest(HiveIdentity identity, String databaseName, String tableName, List<ObjectPair<Integer, byte[]>> partExprs, boolean deleteData, boolean ifExists)
+    {
+        Optional<Table> tableReference = getTable(identity, databaseName, tableName);
+        if (!tableReference.isPresent()) {
+            return;
+        }
+        Table table = tableReference.get();
+        Map<String, HiveType> tablePartitionColumns = new LinkedHashMap();
+        for (Column column : table.getPartitionColumns()) {
+            tablePartitionColumns.put(column.getName(), column.getType());
+        }
+        List<String> partitionColumnsNames = tablePartitionColumns.keySet().stream().collect(Collectors.toList());
+        Optional<List<String>> existingPartitionNames = getPartitionNames(identity, databaseName, tableName);
+
+        List<ExprNodeGenericFuncDesc> exprNodeGenericFuncDescList = new ArrayList<>();
+        for (ObjectPair<Integer, byte[]> partExpr : partExprs) {
+            exprNodeGenericFuncDescList.add(KryoUtils.deserializeObjectFromKryo(partExpr.getSecond(), ExprNodeGenericFuncDesc.class));
+        }
+        for (ExprNodeGenericFuncDesc exprNodeGenericFuncDesc : exprNodeGenericFuncDescList) {
+            //removing brackets and splitting multiple partitions separated by and
+            List<String> partitions = Arrays.asList(exprNodeGenericFuncDesc.getExprString().replace("(", "").replace(")", "").split("and"));
+            List<List<String>> partitionsList = new ArrayList<>();
+            Map<String, String> partitionNamesMap = new HashMap<>();
+            List<String> partitionValues = new ArrayList<>();
+            for (String partition : partitions) {
+                // 1st -> PartitionColumnName, 2nd -> Operator, 3rd -> PartitionValue
+                partitionsList.add(Arrays.asList(partition.trim().split(" ", 3)));
+            }
+            Collections.sort(partitionsList, Comparator.comparing(partitionName -> partitionColumnsNames.indexOf(partitionName.get(0))));
+            for (List<String> partition : partitionsList) {
+                // this dropPartitionByRequest supports only equal operators on drop partitions in FileHiveMetastore
+                if (!partition.get(1).equals("=")) {
+                    return;
+                }
+                partitionNamesMap.put(partition.get(0), getPartitionValueFromString(partition.get(2), tablePartitionColumns.get(partition.get(0))));
+            }
+            for (String partitionColumnsName : partitionColumnsNames) {
+                if (partitionNamesMap.containsKey(partitionColumnsName)) {
+                    partitionValues.add(partitionNamesMap.get(partitionColumnsName));
+                }
+                else {
+                    partitionValues.add("");
+                }
+            }
+            String actualPartitionName = FileUtils.makePartName(partitionColumnsNames, partitionValues, "(.*)");
+            for (String partitionName : existingPartitionNames.get().stream().filter(partition -> partition.matches(actualPartitionName)).collect(Collectors.toList())) {
+                if (deleteData) {
+                    deleteMetadataDirectory(getPartitionMetadataDirectory(table, partitionName));
+                }
+                else {
+                    deleteSchemaFile("partition", getPartitionMetadataDirectory(table, partitionName));
+                }
+            }
+        }
+    }
+
+    // to remove extra information from partitionValue
+    private static String getPartitionValueFromString(String partitionValue, HiveType type)
+    {
+        if (type.equals(HIVE_BOOLEAN)) {
+            return new Boolean(partitionValue).toString();
+        }
+        if (type.equals(HIVE_INT)) {
+            return new Integer(partitionValue).toString();
+        }
+        if (type.equals(HIVE_LONG)) {
+            return new Long(partitionValue.replace("L", "")).toString();
+        }
+        if (type.equals(HIVE_SHORT)) {
+            return new Short(partitionValue.replace("S", "")).toString();
+        }
+        if (type.equals(HIVE_BYTE)) {
+            return new Byte(partitionValue.replace("Y", "")).toString();
+        }
+        if (type.getTypeInfo() instanceof VarcharTypeInfo) {
+            return partitionValue.substring(1, partitionValue.length() - 1);
+        }
+        if (type.equals(HIVE_DOUBLE)) {
+            return new Double(partitionValue.replace("D", "")).toString();
+        }
+        if (type.getTypeInfo() instanceof CharTypeInfo) {
+            return Strings.padEnd(partitionValue.substring(1, partitionValue.length() - 1), ((CharTypeInfo) type.getTypeInfo()).getLength(), ' ');
+        }
+        if (type.equals(HIVE_TIMESTAMP)) {
+            return Timestamp.valueOf(partitionValue.replace("TIMESTAMP", "").replaceAll("'", "")).toString();
+        }
+        if (type.equals(HIVE_DATE)) {
+            return Date.valueOf(partitionValue.replace("DATE", "").replaceAll("'", "")).toString();
+        }
+        return partitionValue;
     }
 
     @Override

@@ -38,6 +38,7 @@ import java.util.function.Function;
 import static io.prestosql.spi.security.AccessDeniedException.denyAddColumn;
 import static io.prestosql.spi.security.AccessDeniedException.denyCommentTable;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropColumn;
+import static io.prestosql.spi.security.AccessDeniedException.denyDropPartition;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropTable;
 import static io.prestosql.spi.security.AccessDeniedException.denyRenameColumn;
 import static io.prestosql.spi.security.AccessDeniedException.denyRenameTable;
@@ -53,6 +54,7 @@ public class LegacyAccessControl
     private final boolean allowAddColumn;
     private final boolean allowDropColumn;
     private final boolean allowRenameColumn;
+    private final boolean allowDropPartition;
 
     @Inject
     public LegacyAccessControl(
@@ -68,6 +70,7 @@ public class LegacyAccessControl
         allowAddColumn = securityConfig.getAllowAddColumn();
         allowDropColumn = securityConfig.getAllowDropColumn();
         allowRenameColumn = securityConfig.getAllowRenameColumn();
+        allowDropPartition = securityConfig.getAllowDropPartition();
     }
 
     @Override
@@ -306,5 +309,13 @@ public class LegacyAccessControl
     @Override
     public void checkCanShowIndex(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName indexName)
     {
+    }
+
+    @Override
+    public void checkCanDropPartition(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName tableName)
+    {
+        if (!allowDropPartition) {
+            denyDropPartition(tableName.toString());
+        }
     }
 }

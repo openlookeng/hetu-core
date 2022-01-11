@@ -40,6 +40,7 @@ import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
 import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.utils.ObjectPair;
 import org.apache.thrift.TException;
 
 import java.util.HashMap;
@@ -568,6 +569,13 @@ public class MockThriftMetastoreClient
 
     @Override
     public String getDelegationToken(String userName)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void dropPartitionByRequest(String databaseName, String tableName, List<ObjectPair<Integer, byte[]>> partExprs, boolean deleteData, boolean ifExists)
+            throws TException
     {
         throw new UnsupportedOperationException();
     }

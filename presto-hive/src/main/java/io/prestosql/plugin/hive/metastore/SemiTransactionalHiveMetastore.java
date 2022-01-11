@@ -64,6 +64,7 @@ import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.hive.common.ValidTxnWriteIdList;
 import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
 import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
+import org.apache.hadoop.hive.metastore.utils.ObjectPair;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
 
 import javax.annotation.concurrent.GuardedBy;
@@ -719,6 +720,11 @@ public class SemiTransactionalHiveMetastore
             default:
                 throw new UnsupportedOperationException("unknown table source");
         }
+    }
+
+    public synchronized void dropPartitionByRequest(HiveIdentity identity, String databaseName, String tableName, List<ObjectPair<Integer, byte[]>> partExprs, boolean ifExists)
+    {
+        delegate.dropPartitionByRequest(identity, databaseName, tableName, partExprs, true, ifExists);
     }
 
     public synchronized Map<String, Optional<Partition>> getPartitionsByNames(HiveIdentity identity, String databaseName, String tableName, List<String> partitionNames)

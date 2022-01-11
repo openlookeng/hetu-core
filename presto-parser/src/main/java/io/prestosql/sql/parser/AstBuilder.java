@@ -63,6 +63,7 @@ import io.prestosql.sql.tree.DropCache;
 import io.prestosql.sql.tree.DropColumn;
 import io.prestosql.sql.tree.DropCube;
 import io.prestosql.sql.tree.DropIndex;
+import io.prestosql.sql.tree.DropPartition;
 import io.prestosql.sql.tree.DropRole;
 import io.prestosql.sql.tree.DropSchema;
 import io.prestosql.sql.tree.DropTable;
@@ -2228,7 +2229,70 @@ class AstBuilder
                         .map(AstBuilder::unquote));
     }
 
+    @Override
+    public Node visitDropPartition(SqlBaseParser.DropPartitionContext context)
+    {
+        List<List<ComparisonExpression>> partitionsSpecMap = new ArrayList<>();
+        for (SqlBaseParser.PartitionSpecsContext partitionSpecsContext : context.partitionSpecs()) {
+            List<ComparisonExpression> comparisonExpressions = new ArrayList<>();
+            if (partitionSpecsContext instanceof SqlBaseParser.PartitionSpecsPredicatedContext) {
+                ComparisonExpression comparisonExpression = (ComparisonExpression) visitPartitionSpecsPredicated(((SqlBaseParser.PartitionSpecsPredicatedContext) partitionSpecsContext));
+                comparisonExpressions.add(comparisonExpression);
+            }
+            else if (partitionSpecsContext instanceof SqlBaseParser.PartitionSpecsBinaryContext) {
+                LogicalBinaryExpression logicalBinaryExpression = (LogicalBinaryExpression) visitPartitionSpecsBinary(((SqlBaseParser.PartitionSpecsBinaryContext) partitionSpecsContext));
+                List<Expression> predicates = extractPredicates(logicalBinaryExpression.getOperator(), logicalBinaryExpression);
+                for (Expression expression : predicates) {
+                    if (expression instanceof ComparisonExpression) {
+                        ComparisonExpression comparisonExpression = (ComparisonExpression) expression;
+                        comparisonExpressions.add(comparisonExpression);
+                    }
+                }
+            }
+            partitionsSpecMap.add(comparisonExpressions);
+        }
+
+        return new DropPartition(
+                getLocation(context),
+                getQualifiedName(context.qualifiedName()),
+                context.EXISTS() != null,
+                partitionsSpecMap);
+    }
+
     // ***************** helpers *****************
+
+    @Override
+    public Node visitPartitionSpecsBinary(SqlBaseParser.PartitionSpecsBinaryContext context)
+    {
+        LogicalBinaryExpression.Operator operator = LogicalBinaryExpression.Operator.AND;
+        return new LogicalBinaryExpression(
+                operator,
+                (Expression) visit(context.left),
+                (Expression) visit(context.right));
+    }
+
+    @Override
+    public Node visitPartitionSpecsPredicated(SqlBaseParser.PartitionSpecsPredicatedContext context)
+    {
+        if (context.predicate() != null) {
+            return visit(context.predicate());
+        }
+
+        return visit(context.valueExpression);
+    }
+
+    public static List<Expression> extractPredicates(LogicalBinaryExpression.Operator operator, Expression expression)
+    {
+        if (expression instanceof LogicalBinaryExpression && ((LogicalBinaryExpression) expression).getOperator() == operator) {
+            LogicalBinaryExpression logicalBinaryExpression = (LogicalBinaryExpression) expression;
+            return ImmutableList.<Expression>builder()
+                    .addAll(extractPredicates(operator, logicalBinaryExpression.getLeft()))
+                    .addAll(extractPredicates(operator, logicalBinaryExpression.getRight()))
+                    .build();
+        }
+
+        return ImmutableList.of(expression);
+    }
 
     @Override
     protected Node defaultResult()

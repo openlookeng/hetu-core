@@ -24,6 +24,7 @@ public class LegacySecurityConfig
     private boolean allowRenameTable;
     private boolean allowCommentTable;
     private boolean allowRenameColumn;
+    private boolean allowDropPartition;
 
     public boolean getAllowAddColumn()
     {
@@ -100,6 +101,19 @@ public class LegacySecurityConfig
     public LegacySecurityConfig setAllowRenameColumn(boolean allowRenameColumn)
     {
         this.allowRenameColumn = allowRenameColumn;
+        return this;
+    }
+
+    public boolean getAllowDropPartition()
+    {
+        return this.allowDropPartition;
+    }
+
+    @Config("hive.allow-drop-partition")
+    @ConfigDescription("Allow Hive connector to drop partitions")
+    public LegacySecurityConfig setAllowDropPartition(boolean allowDropPartition)
+    {
+        this.allowDropPartition = allowDropPartition;
         return this;
     }
 }

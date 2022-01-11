@@ -294,4 +294,10 @@ public abstract class ForwardingConnectorAccessControl
     {
         return delegate().getColumnMask(transactionHandle, identity, tableName, columnName, type);
     }
+
+    @Override
+    public void checkCanDropPartition(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName tableName)
+    {
+        delegate().checkCanDropPartition(transactionHandle, identity, tableName);
+    }
 }

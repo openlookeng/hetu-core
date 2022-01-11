@@ -573,4 +573,6 @@ public interface Metadata
     PartialAndFinalAggregationType validateAndGetSortAggregationType(Session session, TableHandle tableHandle, List<String> keyNames);
 
     void refreshMetadataCache(Session session, Optional<String> catalogName);
+
+    void dropPartition(Session session, TableHandle tableHandle, List<Map<String, String>> partitions, boolean ifExists, List<Map<String, String>> operatorMap);
 }

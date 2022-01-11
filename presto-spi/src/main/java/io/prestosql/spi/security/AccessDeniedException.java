@@ -478,4 +478,14 @@ public class AccessDeniedException
     {
         throw new AccessDeniedException(format("Cannot access node information", formatExtraInfo(extraInfo)));
     }
+
+    public static void denyDropPartition(String tableName)
+    {
+        denyDropPartition(tableName, null);
+    }
+
+    public static void denyDropPartition(String tableName, String extraInfo)
+    {
+        throw new AccessDeniedException(format("Cannot drop partition from table %s%s", tableName, formatExtraInfo(extraInfo)));
+    }
 }

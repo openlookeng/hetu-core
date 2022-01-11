@@ -29,6 +29,8 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatisticsDesc;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.CommitTxnRequest;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.DropPartitionsExpr;
+import org.apache.hadoop.hive.metastore.api.DropPartitionsRequest;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.GetRoleGrantsForPrincipalRequest;
 import org.apache.hadoop.hive.metastore.api.GetRoleGrantsForPrincipalResponse;
@@ -48,6 +50,7 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PartitionsStatsRequest;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
+import org.apache.hadoop.hive.metastore.api.RequestPartsSpec;
 import org.apache.hadoop.hive.metastore.api.Role;
 import org.apache.hadoop.hive.metastore.api.RolePrincipalGrant;
 import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
@@ -57,6 +60,7 @@ import org.apache.hadoop.hive.metastore.api.TableStatsRequest;
 import org.apache.hadoop.hive.metastore.api.TableValidWriteIds;
 import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore;
 import org.apache.hadoop.hive.metastore.txn.TxnUtils;
+import org.apache.hadoop.hive.metastore.utils.ObjectPair;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.transport.TTransport;
@@ -75,6 +79,7 @@ public class ThriftHiveMetastoreClient
     private static final Logger log = Logger.get(ThriftHiveMetastoreClient.class);
 
     private static final LoggingInvocationHandler.ParameterNamesProvider PARAMETER_NAMES_PROVIDER = new LoggingInvocationHandler.AirliftParameterNamesProvider(ThriftHiveMetastore.Iface.class, ThriftHiveMetastore.Client.class);
+    private static final String CATALOG = "hive";
 
     private final TTransport transport;
     private final ThriftHiveMetastore.Iface client;
@@ -274,6 +279,25 @@ public class ThriftHiveMetastoreClient
             throws TException
     {
         return client.drop_partition(databaseName, tableName, partitionValues, deleteData);
+    }
+
+    @Override
+    public void dropPartitionByRequest(String databaseName, String tableName, List<ObjectPair<Integer, byte[]>> partExprs, boolean deleteData, boolean ifExists)
+            throws TException
+    {
+        List<DropPartitionsExpr> expressions = new ArrayList<>(partExprs.size());
+        for (ObjectPair<Integer, byte[]> partExpr : partExprs) {
+            DropPartitionsExpr dpe = new DropPartitionsExpr();
+            dpe.setExpr(partExpr.getSecond());
+            dpe.setPartArchiveLevel(partExpr.getFirst());
+            expressions.add(dpe);
+        }
+        DropPartitionsRequest dropPartitionsRequest = new DropPartitionsRequest(databaseName, tableName, RequestPartsSpec.exprs(expressions));
+        dropPartitionsRequest.setCatName(CATALOG);
+        dropPartitionsRequest.setDeleteData(deleteData);
+        dropPartitionsRequest.setNeedResult(true);
+        dropPartitionsRequest.setIfExists(ifExists);
+        client.drop_partitions_req(dropPartitionsRequest).getPartitions();
     }
 
     @Override

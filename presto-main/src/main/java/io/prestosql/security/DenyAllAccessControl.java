@@ -43,6 +43,7 @@ import static io.prestosql.spi.security.AccessDeniedException.denyCreateViewWith
 import static io.prestosql.spi.security.AccessDeniedException.denyDeleteTable;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropColumn;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropIndex;
+import static io.prestosql.spi.security.AccessDeniedException.denyDropPartition;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropRole;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropSchema;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropTable;
@@ -329,5 +330,11 @@ public class DenyAllAccessControl
     public void checkCanShowRoleGrants(TransactionId transactionId, Identity identity, String catalogName)
     {
         denyShowRoleGrants(catalogName);
+    }
+
+    @Override
+    public void checkCanDropPartition(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
+    {
+        denyDropPartition(tableName.toString());
     }
 }
