@@ -38,7 +38,7 @@ import static java.util.Objects.requireNonNull;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
-class QueryAssertions
+public class QueryAssertions
         implements Closeable
 {
     private final QueryRunner runner;

@@ -95,6 +95,37 @@ Returns the value of `x` associated with the maximum value of `y` over all input
 
 
 
+**listagg(x, seperator)**
+
+Returns the concatenated input values, separated by the `separator` string.
+
+Synopsis:
+
+```
+LISTAGG( expression [, separator] [ON OVERFLOW overflow_behaviour])
+    WITHIN GROUP (ORDER BY sort_item, [...])
+```
+
+If `separator` is not specified, the empty string will be used as `separator`.
+
+In its simplest form the function looks like:
+
+```
+SELECT listagg(value, ',') WITHIN GROUP (ORDER BY value) csv_value
+    FROM (VALUES 'a', 'c', 'b') t(value);
+```
+
+and results in:
+
+```
+    csv_value
+    -----------
+    'a,b,c'
+```
+The current implementation of `LISTAGG` function does not support window frames.
+
+
+
 **max\_by(x, y, n)** -\> array\<\[same as x\]\>
 
 Returns `n` values of `x` associated with the `n` largest of all input values of `y` in descending order of `y`.

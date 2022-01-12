@@ -185,7 +185,7 @@ public abstract class AbstractGroupCollectionAggregationState<T>
         return sumPositions.get(blockId) + position;
     }
 
-    protected abstract void accept(T consumer, PageBuilder pageBuilder, int currentPosition);
+    protected abstract boolean accept(T consumer, PageBuilder pageBuilder, int currentPosition);
 
     @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)

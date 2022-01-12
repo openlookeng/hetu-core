@@ -358,6 +358,16 @@ sampleType
     | SYSTEM
     ;
 
+listAggOverflowBehavior
+    : ERROR
+    | TRUNCATE string? listaggCountIndication
+    ;
+
+listaggCountIndication
+    : WITH COUNT
+    | WITHOUT COUNT
+    ;
+
 aliasedRelation
     : relationPrimary (AS? identifier columnAliases?)?
     ;
@@ -419,6 +429,9 @@ primaryExpression
     | POSITION '(' valueExpression IN valueExpression ')'                                 #position
     | '(' expression (',' expression)+ ')'                                                #rowConstructor
     | ROW '(' expression (',' expression)* ')'                                            #rowConstructor
+    | name=LISTAGG '(' setQuantifier? expression (',' string)?
+        (ON OVERFLOW listAggOverflowBehavior)? ')'
+        (WITHIN GROUP '(' ORDER BY sortItem (',' sortItem)* ')')                          #listagg
     | qualifiedName '(' ASTERISK ')' filter? over?                                        #functionCall
     | qualifiedName '(' (setQuantifier? expression (',' expression)*)?
         (ORDER BY sortItem (',' sortItem)*)? ')' filter? (nullTreatment? over)?           #functionCall
@@ -624,9 +637,9 @@ nonReserved
     // IMPORTANT: this rule must only contain tokens. Nested rules are not supported. See SqlParser.exitNonReserved
     : ADD | ADMIN | ALL | ANALYZE | ANY | ARRAY | ASC | AT
     | BERNOULLI
-    | CALL | CALLED | CASCADE | CATALOGS | COLUMN | COLUMNS | COMMENT | COMMIT | COMMITTED | CURRENT
+    | CALL | CALLED | CASCADE | CATALOGS | COLUMN | COLUMNS | COMMENT | COMMIT | COMMITTED | COUNT | CURRENT
     | DATA | DATABASE | DATABASES | DATE | DAY | DEFINER | DESC | DISTRIBUTED
-    | EXCLUDING | EXPLAIN | EXTERNAL
+    | ERROR | EXCLUDING | EXPLAIN | EXTERNAL
     | FETCH | FILTER | FIRST | FOLLOWING | FORMAT | FUNCTION | FUNCTIONS
     | GRANT | GRANTED | GRANTS | GRAPHVIZ
     | HOUR
@@ -635,15 +648,15 @@ nonReserved
     | LAST | LATERAL | LEVEL | LIMIT | LOGICAL
     | MAP | MINUTE | MONTH
     | NAME | NEXT | NFC | NFD | NFKC | NFKD | NO | NONE | NULLIF | NULLS
-    | OFFSET | ONLY | OPTION | ORDINALITY | OUTPUT | OVER
+    | OFFSET | ONLY | OPTION | ORDINALITY | OUTPUT | OVER | OVERFLOW
     | PARTITION | PARTITIONS | PATH | POSITION | PRECEDING | PRIVILEGES | PROPERTIES
     | RANGE | READ | RENAME | REPEATABLE | REPLACE | RESET | RESTRICT | RETURN | RETURNS | REVOKE | ROLE | ROLES | ROLLBACK | ROW | ROWS
     | SCHEMA | SCHEMAS | SECOND | SECURITY | SERIALIZABLE | SESSION | SET | SETS
     | SHOW | SOME | START | STATS | SUBSTRING | SYSTEM
-    | TABLES | TABLESAMPLE | TEXT | TIES | TIME | TIMESTAMP | TO | TRANSACTION | TRY_CAST | TYPE
+    | TABLES | TABLESAMPLE | TEXT | TIES | TIME | TIMESTAMP | TO | TRANSACTION | TRUNCATE | TRY_CAST | TYPE
     | UNBOUNDED | UNCOMMITTED | USE | USER
     | VALIDATE | VERBOSE | VIEW | VIEWS
-    | WORK | WRITE
+    | WITHIN | WITHOUT | WORK | WRITE
     | YEAR
     | ZONE
     | INDEX
@@ -678,6 +691,7 @@ COMMENT: 'COMMENT';
 COMMIT: 'COMMIT';
 COMMITTED: 'COMMITTED';
 CONSTRAINT: 'CONSTRAINT';
+COUNT: 'COUNT';
 CREATE: 'CREATE';
 CROSS: 'CROSS';
 CUBE: 'CUBE';
@@ -706,6 +720,7 @@ DISTRIBUTED: 'DISTRIBUTED';
 DROP: 'DROP';
 ELSE: 'ELSE';
 END: 'END';
+ERROR: 'ERROR';
 ESCAPE: 'ESCAPE';
 EXCEPT: 'EXCEPT';
 EXCLUDING: 'EXCLUDING';
@@ -756,6 +771,7 @@ LEFT: 'LEFT';
 LEVEL: 'LEVEL';
 LIKE: 'LIKE';
 LIMIT: 'LIMIT';
+LISTAGG: 'LISTAGG';
 LOCALTIME: 'LOCALTIME';
 LOCALTIMESTAMP: 'LOCALTIMESTAMP';
 LOGICAL: 'LOGICAL';
@@ -787,6 +803,7 @@ ORDINALITY: 'ORDINALITY';
 OUTER: 'OUTER';
 OUTPUT: 'OUTPUT';
 OVER: 'OVER';
+OVERFLOW: 'OVERFLOW';
 OVERWRITE: 'OVERWRITE';
 PARTITION: 'PARTITION';
 PARTITIONS: 'PARTITIONS';
@@ -840,6 +857,7 @@ TIMESTAMP: 'TIMESTAMP';
 TO: 'TO';
 TRANSACTION: 'TRANSACTION';
 TRUE: 'TRUE';
+TRUNCATE: 'TRUNCATE';
 TRY_CAST: 'TRY_CAST';
 TYPE: 'TYPE';
 UESCAPE: 'UESCAPE';
@@ -859,6 +877,8 @@ VIEWS: 'VIEWS';
 WHEN: 'WHEN';
 WHERE: 'WHERE';
 WITH: 'WITH';
+WITHIN: 'WITHIN';
+WITHOUT: 'WITHOUT';
 WORK: 'WORK';
 WRITE: 'WRITE';
 YEAR: 'YEAR';
