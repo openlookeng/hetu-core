@@ -23,6 +23,9 @@ import RunActions from "../queryeditor/actions/RunActions";
 import TableStore from "../queryeditor/stores/TableStore";
 import AuditLogActions from "../queryeditor/actions/AuditLogActions";
 import MultiSelect from 'react-simple-multi-select';
+import Select from "rc-select";
+import Pagination from "rc-pagination";
+import localeInfo from "../node_modules/rc-pagination/es/locale/en_US";
 
 export class AuditLog extends React.Component {
     constructor(props) {
@@ -115,7 +118,8 @@ export class AuditLog extends React.Component {
             AuditLogActions.getAuditLog(searchStringUser, searchStringBeginTime,
                 searchStringEndTime, searchStringLogLevel, searchStringType).then((data) => {
                 this.setState({
-                    auditlog: data
+                    auditlog: data,
+                    total: data.length
                 })
                 this.resetTimer();
             })
@@ -276,9 +280,10 @@ export class AuditLog extends React.Component {
         _.defer(this.refreshData);
     }
 
-    renderAuditLog(obj) {
+    renderAuditLog(obj, currentPage, pageSize) {
         let arr = [];
-        for (let i = 0; i < obj.length; i++) {
+        let showIndex = (currentPage-1)*pageSize;
+        for (let i = showIndex; i < showIndex + pageSize; i++) {
             arr.push(
                 <div className="auditlog-row">
                     {obj[i]}
@@ -321,6 +326,7 @@ export class AuditLog extends React.Component {
     }
 
     render() {
+        const {currentPage, total, pageSize } = this.state;
         const { auditlog } = this.state;
         const {searchStringUser,searchStringBeginTime,searchStringEndTime,searchStringLogLevel,searchStringType} = this.state;
         let downloadParam = {
@@ -374,7 +380,7 @@ export class AuditLog extends React.Component {
                                     </select>
                                     <select id="audittype" className="selectpicker" data-style="select" onChange={this.handleSearchStringChange} value={this.state.searchStringType} name="AuditType" >
                                         <option value="Sql">Sql</option>
-                                        <option value="Webui">WebUI</option>
+                                        <option value="WebUi">WebUI</option>
                                         <option value="Cluster">Cluster</option>
                                     </select>
                                     <a href={"../v1/audit/download?"+downloadString} target="_blank" className="btn"> Download <i className="icon fa fa-download"/> </a>
@@ -386,11 +392,24 @@ export class AuditLog extends React.Component {
                                         <div className="col-xs-12"><h4>{"No Audit Log"}</h4></div>
                                     </div>
                                     :
-                                    this.renderAuditLog(auditlog)
+                                    this.renderAuditLog(auditlog,currentPage,pageSize)
                                 }
                             </div>
                         </div>
-
+                        <Pagination
+                            defaultCurrent={1}
+                            current={currentPage}
+                            total={total}
+                            defaultPageSize={20}
+                            pageSize={pageSize}
+                            onChange={this.onPageChange}
+                            showTotal={total => `Total ${total} `}
+                            style={{ marginTop: 10 }}
+                            locale={localeInfo}
+                            showSizeChanger
+                            onShowSizeChange={this.onPageSizeChange}
+                            selectComponentClass={Select}
+                        />
                     </div>
                 </div>
                 <div className='flex flex-row flex-initial statusFooter'>

@@ -99,6 +99,8 @@ class AuditEventLogger
                 " queryId=" + queryCompletedEvent.getMetadata().getQueryId() +
                 " operation= " + queryCompletedEvent.getClass().getSimpleName() +
                 " WrittenRows= " + queryCompletedEvent.getStatistics().getWrittenRows() +
+                " TotalRows= " + queryCompletedEvent.getStatistics().getTotalRows() +
+                " OutputRows= " + queryCompletedEvent.getStatistics().getOutputRows() +
                 " stmt={" + queryCompletedEvent.getMetadata().getQuery() +
                 "} status=" + queryCompletedEvent.getMetadata().getQueryState() +
                 " " + queryCompletedEvent.getClass().getCanonicalName());
