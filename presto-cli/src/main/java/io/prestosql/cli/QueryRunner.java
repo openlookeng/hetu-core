@@ -47,6 +47,7 @@ public class QueryRunner
     private final OkHttpClient httpClient;
     private final Consumer<OkHttpClient.Builder> sslSetup;
     private CubeConsole cubeConsole;
+    private ReloadCubeConsole reloadCubeConsole;
 
     public QueryRunner(
             ClientSession session,
@@ -124,6 +125,11 @@ public class QueryRunner
     public void setCubeConsole(CubeConsole cubeConsole)
     {
         this.cubeConsole = cubeConsole;
+    }
+
+    public void setReloadCubeConsole(ReloadCubeConsole reloadCubeConsole)
+    {
+        this.reloadCubeConsole = reloadCubeConsole;
     }
 
     public CubeConsole getCubeConsole()

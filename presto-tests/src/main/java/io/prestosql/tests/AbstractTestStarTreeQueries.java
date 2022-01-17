@@ -340,6 +340,50 @@ public abstract class AbstractTestStarTreeQueries
     }
 
     @Test
+    public void testShowCreateCube()
+    {
+        computeActual("CREATE TABLE nation_show_create_cube_table_1 AS SELECT * FROM nation");
+        assertUpdate(starTreeDisabledSession, "CREATE CUBE nation_show_create_cube_1 ON nation_show_create_cube_table_1 " +
+                "WITH (AGGREGATIONS=(count(*), count(distinct regionkey), avg(nationkey), max(regionkey))," +
+                " group=(regionkey))");
+        MaterializedResult originalResult = computeActual("SHOW CREATE CUBE nation_show_create_cube_1");
+        String newQuery = originalResult.getMaterializedRows().get(0).getFields().get(0).toString();
+        assertUpdate("DROP CUBE nation_show_create_cube_1");
+        assertUpdate(starTreeDisabledSession, newQuery);
+        MaterializedResult reWrittenResult = computeActual("SHOW CREATE CUBE nation_show_create_cube_1");
+        String reWrittenQuery = reWrittenResult.getMaterializedRows().get(0).getFields().get(0).toString();
+        assertTrue(newQuery.equals(reWrittenQuery));
+        assertUpdate("DROP CUBE nation_show_create_cube_1");
+
+        assertUpdate(starTreeDisabledSession, "CREATE CUBE nation_show_create_cube_2 ON nation_show_create_cube_table_1 " +
+                "WITH (AGGREGATIONS=(count(*), COUNT(distinct nationkey), count(distinct regionkey), avg(nationkey), count(regionkey), sum(regionkey)," +
+                " min(regionkey), max(regionkey), max(nationkey), min(nationkey))," +
+                " group=(nationkey), format= 'orc', partitioned_by = ARRAY['nationkey'])");
+        originalResult = computeActual("SHOW CREATE CUBE nation_show_create_cube_2");
+        newQuery = originalResult.getMaterializedRows().get(0).getFields().get(0).toString();
+        assertUpdate("DROP CUBE nation_show_create_cube_2");
+        assertUpdate(starTreeDisabledSession, newQuery);
+        reWrittenResult = computeActual("SHOW CREATE CUBE nation_show_create_cube_2");
+        reWrittenQuery = reWrittenResult.getMaterializedRows().get(0).getFields().get(0).toString();
+        assertTrue(newQuery.equals(reWrittenQuery));
+        assertUpdate("DROP CUBE nation_show_create_cube_2");
+
+        assertUpdate(starTreeDisabledSession, "CREATE CUBE nation_show_create_cube_3 ON nation_show_create_cube_table_1 " +
+                "WITH (AGGREGATIONS=(count(*), count(distinct regionkey), avg(nationkey), max(regionkey))," +
+                " group=(regionkey), format= 'orc', partitioned_by = ARRAY['regionkey', 'nationkey']," +
+                " FILTER = (nationkey >= 5 and name = 'PERU'))");
+        originalResult = computeActual("SHOW CREATE CUBE nation_show_create_cube_3");
+        newQuery = originalResult.getMaterializedRows().get(0).getFields().get(0).toString();
+        assertUpdate("DROP CUBE nation_show_create_cube_3");
+        assertUpdate(starTreeDisabledSession, newQuery);
+        reWrittenResult = computeActual("SHOW CREATE CUBE nation_show_create_cube_3");
+        reWrittenQuery = reWrittenResult.getMaterializedRows().get(0).getFields().get(0).toString();
+        assertTrue(newQuery.equals(reWrittenQuery));
+        assertUpdate("DROP CUBE nation_show_create_cube_3");
+        assertUpdate("DROP TABLE nation_show_create_cube_table_1");
+    }
+
+    @Test
     public void testInsertIntoCube()
     {
         computeActual("CREATE TABLE nation_table_cube_insert_test_1 AS SELECT * FROM nation");

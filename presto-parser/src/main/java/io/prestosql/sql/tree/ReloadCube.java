@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2021. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -11,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.sql.tree;
 
 import com.google.common.collect.ImmutableList;
@@ -20,52 +22,44 @@ import java.util.Objects;
 import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
-import static java.util.Objects.requireNonNull;
 
-public class ShowCreate
+public class ReloadCube
         extends Statement
 {
-    public enum Type
+    private final QualifiedName cubeName;
+    private final boolean exists;
+
+    public ReloadCube(QualifiedName cubeName, boolean exists)
     {
-        TABLE,
-        VIEW,
-        CUBE,
+        this(Optional.empty(), cubeName, exists);
     }
 
-    private final Type type;
-    private final QualifiedName name;
-
-    public ShowCreate(Type type, QualifiedName name)
+    public ReloadCube(NodeLocation location, QualifiedName cubeName, boolean exists)
     {
-        this(Optional.empty(), type, name);
+        this(Optional.of(location), cubeName, exists);
     }
 
-    public ShowCreate(NodeLocation location, Type type, QualifiedName name)
-    {
-        this(Optional.of(location), type, name);
-    }
-
-    private ShowCreate(Optional<NodeLocation> location, Type type, QualifiedName name)
+    private ReloadCube(Optional<NodeLocation> location, QualifiedName cubeName, boolean exists)
     {
         super(location);
-        this.type = requireNonNull(type, "type is null");
-        this.name = requireNonNull(name, "name is null");
+        this.cubeName = cubeName;
+        this.exists = exists;
     }
 
-    public QualifiedName getName()
+    public QualifiedName getCubeName()
     {
-        return name;
+        return cubeName;
     }
 
-    public Type getType()
+    public boolean isExists()
     {
-        return type;
+        return exists;
     }
 
     @Override
     public <R, C> R accept(AstVisitor<R, C> visitor, C context)
     {
-        return visitor.visitShowCreate(this, context);
+        return visitor.visitReloadCube(this, context);
     }
 
     @Override
@@ -77,7 +71,7 @@ public class ShowCreate
     @Override
     public int hashCode()
     {
-        return Objects.hash(type, name);
+        return Objects.hash(cubeName, exists);
     }
 
     @Override
@@ -89,16 +83,17 @@ public class ShowCreate
         if ((obj == null) || (getClass() != obj.getClass())) {
             return false;
         }
-        ShowCreate o = (ShowCreate) obj;
-        return Objects.equals(name, o.name) && Objects.equals(type, o.type);
+        ReloadCube o = (ReloadCube) obj;
+        return Objects.equals(cubeName, o.cubeName)
+                && (exists == o.exists);
     }
 
     @Override
     public String toString()
     {
         return toStringHelper(this)
-                .add("type", type)
-                .add("name", name)
+                .add("cubeName", cubeName)
+                .add("exists", exists)
                 .toString();
     }
 }

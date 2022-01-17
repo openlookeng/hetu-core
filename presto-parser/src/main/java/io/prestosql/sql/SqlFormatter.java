@@ -832,6 +832,10 @@ public final class SqlFormatter
                 builder.append("SHOW CREATE VIEW ")
                         .append(formatName(node.getName()));
             }
+            else if (node.getType() == ShowCreate.Type.CUBE) {
+                builder.append("SHOW CREATE CUBE ")
+                        .append(formatName(node.getName()));
+            }
 
             return null;
         }
