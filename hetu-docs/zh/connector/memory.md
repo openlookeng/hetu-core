@@ -173,8 +173,8 @@ totaldiskbyteusage | totalmemorybyteusage
 
 | Index ID     | 是否可用于`sorted_by`或`index_columns`   | 支持的运算符                           |
 |--------------|-----------------------------------------|---------------------------------------|
-| Bloom        | 两者都可                                 | `=` `IN`                             |                   
-| MinMax       | 仅`sorted_by`                           | `=` `>` `>=` `<` `<=` `IN` `BETWEEN` |
+| Bloom        | 仅`index_columns`                                 | `=` `IN`                             |                   
+| MinMax       | 两者都可                           | `=` `>` `>=` `<` `<=` `IN` `BETWEEN` |
 | Sparse       | 仅`sorted_by`                           | `=` `>` `>=` `<` `<=` `IN` `BETWEEN` |
 
 使用统计信息
