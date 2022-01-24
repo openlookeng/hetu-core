@@ -50,9 +50,10 @@ public final class SqlServerQueryRunner
         return createSqlServerQueryRunner(testingSqlServer, ImmutableMap.of(), ImmutableList.copyOf(tables));
     }
 
-    public static QueryRunner createSqlServerQueryRunner(TestingSqlServer testingSqlServer, Map<String, String> connectorProperties, Iterable<TpchTable<?>> tables)
+    public static QueryRunner createSqlServerQueryRunner(TestingSqlServer testingSqlServer, Map<String, String> inputConnectorProperties, Iterable<TpchTable<?>> tables)
             throws Exception
     {
+        Map<String, String> connectorProperties = inputConnectorProperties;
         DistributedQueryRunner queryRunner = DistributedQueryRunner.builder(createSession())
                 .build();
         try {

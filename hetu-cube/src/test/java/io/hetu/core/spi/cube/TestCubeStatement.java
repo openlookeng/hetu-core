@@ -34,8 +34,8 @@ public class TestCubeStatement
                 .select("name", "address", "nationkey")
                 .aggregate(AggregationSignature.count())
                 .from("tpch.tiny.customer")
-                .groupBy("address")
-                .groupBy("name", "nationkey")
+                .groupByAddString("address")
+                .groupByAddStringList("name", "nationkey")
                 .build();
 
         assertEquals(statement.getFrom(), "tpch.tiny.customer", "incorrect from table");

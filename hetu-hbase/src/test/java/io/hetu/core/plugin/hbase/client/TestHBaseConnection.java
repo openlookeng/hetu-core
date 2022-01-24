@@ -14,6 +14,7 @@
  */
 package io.hetu.core.plugin.hbase.client;
 
+import io.airlift.log.Logger;
 import io.hetu.core.plugin.hbase.utils.TestSliceUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -70,6 +71,8 @@ public class TestHBaseConnection
      */
     public static Table htable;
 
+    private static final Logger LOG = Logger.get(TestHBaseConnection.class);
+
     static {
         Configuration conf = HBaseConfiguration.create();
         conf.set("hbase.client.retries.number", "1");
@@ -108,7 +111,7 @@ public class TestHBaseConnection
             Mockito.when(admin.listNamespaceDescriptors()).thenReturn(listNamespaceDescriptors());
         }
         catch (IOException e) {
-            e.printStackTrace();
+            LOG.info("Error message: " + e.getStackTrace());
         }
 
         htable = Mockito.mock(Table.class);
@@ -120,7 +123,7 @@ public class TestHBaseConnection
             }).when(htable).put(Mockito.anyListOf(Put.class));
         }
         catch (IOException e) {
-            e.printStackTrace();
+            LOG.info("Error message: " + e.getStackTrace());
         }
     }
 

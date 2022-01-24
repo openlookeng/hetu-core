@@ -82,8 +82,7 @@ public class HeuristicIndexUtils
 
     private static String parsePartitionValue(String rightVal)
     {
-        // quoted value
-        // e.g. 'value'
+        // quoted value, e.g. 'value'
         if (rightVal.matches("^'.*'$")) {
             return rightVal.substring(1, rightVal.length() - 1);
         }
@@ -98,8 +97,7 @@ public class HeuristicIndexUtils
 
     private static String parsePartitionName(String leftVal)
     {
-        // quoted
-        // e.g. "a"
+        // quoted, e.g. "a"
         if (leftVal.startsWith("\"")) {
             return leftVal.substring(1, leftVal.length() - 1).trim();
         }

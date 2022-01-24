@@ -121,9 +121,9 @@ public class AbstractTestOrderByQueries
 
         queryTemplate("SELECT count(*) %output% FROM (SELECT substr(name,1,1) letter FROM nation) x GROUP BY %groupBy% ORDER BY %orderBy%")
                 .replaceAll(
-                        parameter("output").of("", ", letter", ", letter AS y"),
-                        parameter("groupBy").of("x.letter", "letter"),
-                        parameter("orderBy").of("x.letter", "letter"))
+                        parameter("output").ofStringList("", ", letter", ", letter AS y"),
+                        parameter("groupBy").ofStringList("x.letter", "letter"),
+                        parameter("orderBy").ofStringList("x.letter", "letter"))
                 .forEach(this::assertQueryOrdered);
     }
 

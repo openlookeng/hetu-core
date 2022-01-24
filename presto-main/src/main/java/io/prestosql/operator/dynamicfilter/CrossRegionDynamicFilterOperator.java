@@ -255,8 +255,8 @@ public class CrossRegionDynamicFilterOperator
         @Override
         public Operator createOperator(DriverContext driverContext)
         {
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, CrossRegionDynamicFilterOperator.class.getSimpleName());
-            return new CrossRegionDynamicFilterOperator(operatorContext, queryId, symbols, typeProvider, dynamicFilterCacheManager, columns, outputNodeSybmols);
+            OperatorContext context = driverContext.addOperatorContext(operatorId, planNodeId, CrossRegionDynamicFilterOperator.class.getSimpleName());
+            return new CrossRegionDynamicFilterOperator(context, queryId, symbols, typeProvider, dynamicFilterCacheManager, columns, outputNodeSybmols);
         }
 
         @Override

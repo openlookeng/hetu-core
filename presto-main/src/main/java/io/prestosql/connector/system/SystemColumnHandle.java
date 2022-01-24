@@ -37,6 +37,7 @@ public class SystemColumnHandle
     }
 
     @JsonProperty
+    @Override
     public String getColumnName()
     {
         return columnName;

@@ -111,11 +111,11 @@ public class JoinGraph
 
     public JoinGraph withFilter(RowExpression expression)
     {
-        ImmutableList.Builder<RowExpression> filters = ImmutableList.builder();
-        filters.addAll(this.filters);
-        filters.add(expression);
+        ImmutableList.Builder<RowExpression> rowExpressionBuilder = ImmutableList.builder();
+        rowExpressionBuilder.addAll(this.filters);
+        rowExpressionBuilder.add(expression);
 
-        return new JoinGraph(nodes, edges, rootId, filters.build(), assignments);
+        return new JoinGraph(nodes, edges, rootId, rowExpressionBuilder.build(), assignments);
     }
 
     public List<RowExpression> getFilters()
@@ -187,12 +187,12 @@ public class JoinGraph
             checkState(!edges.containsKey(node.getId()), "Node [%s] appeared in two JoinGraphs", node);
         }
 
-        List<PlanNode> nodes = ImmutableList.<PlanNode>builder()
+        List<PlanNode> planNodes = ImmutableList.<PlanNode>builder()
                 .addAll(this.nodes)
                 .addAll(other.nodes)
                 .build();
 
-        ImmutableMultimap.Builder<PlanNodeId, Edge> edges = ImmutableMultimap.<PlanNodeId, Edge>builder()
+        ImmutableMultimap.Builder<PlanNodeId, Edge> edgeBuilder = ImmutableMultimap.<PlanNodeId, Edge>builder()
                 .putAll(this.edges)
                 .putAll(other.edges);
 
@@ -209,11 +209,11 @@ public class JoinGraph
 
             PlanNode left = context.getSymbolSource(leftSymbol);
             PlanNode right = context.getSymbolSource(rightSymbol);
-            edges.put(left.getId(), new Edge(right, leftSymbol, rightSymbol));
-            edges.put(right.getId(), new Edge(left, rightSymbol, leftSymbol));
+            edgeBuilder.put(left.getId(), new Edge(right, leftSymbol, rightSymbol));
+            edgeBuilder.put(right.getId(), new Edge(left, rightSymbol, leftSymbol));
         }
 
-        return new JoinGraph(nodes, edges.build(), newRoot, joinedFilters, Optional.empty());
+        return new JoinGraph(planNodes, edgeBuilder.build(), newRoot, joinedFilters, Optional.empty());
     }
 
     private static class Builder

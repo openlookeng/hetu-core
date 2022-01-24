@@ -38,6 +38,7 @@ public class TpchColumnHandle
     }
 
     @JsonProperty
+    @Override
     public String getColumnName()
     {
         return columnName;

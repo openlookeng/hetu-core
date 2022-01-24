@@ -128,7 +128,7 @@ public final class Signature
     public static OperatorType unmangleOperator(String mangledName)
     {
         checkArgument(mangledName.startsWith(OPERATOR_PREFIX), "not a mangled operator name: %s", mangledName);
-        return OperatorType.valueOf(mangledName.substring(OPERATOR_PREFIX.length()).toUpperCase());
+        return OperatorType.valueOf(mangledName.substring(OPERATOR_PREFIX.length()).toUpperCase(Locale.ROOT));
     }
 
     public static boolean isMangleOperator(String mangledName)

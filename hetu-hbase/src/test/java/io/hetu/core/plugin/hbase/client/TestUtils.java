@@ -14,6 +14,7 @@
  */
 package io.hetu.core.plugin.hbase.client;
 
+import io.airlift.log.Logger;
 import io.hetu.core.plugin.hbase.connector.HBaseColumnHandle;
 import io.hetu.core.plugin.hbase.connector.HBaseTableHandle;
 import io.hetu.core.plugin.hbase.metadata.HBaseTable;
@@ -47,6 +48,8 @@ import static io.prestosql.spi.type.VarcharType.VARCHAR;
  */
 public class TestUtils
 {
+    private static final Logger LOG = Logger.get(TestUtils.class);
+
     private TestUtils() {}
 
     /**
@@ -266,7 +269,7 @@ public class TestUtils
             }
         }
         catch (NullPointerException | JSONException e) {
-            e.printStackTrace();
+            LOG.info("Error message: " + e.getStackTrace());
         }
         return hTableMetaMemory;
     }
@@ -289,7 +292,7 @@ public class TestUtils
             }
         }
         catch (ClassNotFoundException | IllegalArgumentException | IllegalAccessException e) {
-            e.printStackTrace();
+            LOG.info("Error message: " + e.getStackTrace());
         }
 
         Type typeNull = null;

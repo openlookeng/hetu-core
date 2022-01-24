@@ -16,6 +16,7 @@ package io.hetu.core.plugin.vdm;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.airlift.log.Logger;
 import io.airlift.testing.mysql.TestingMySqlServer;
 import io.airlift.tpch.TpchTable;
 import io.hetu.core.metastore.HetuMetastorePlugin;
@@ -38,6 +39,8 @@ import static io.prestosql.testing.TestingSession.testSessionBuilder;
 public final class VdmQueryRunner
 {
     protected static final SqlParserOptions DEFAULT_SQL_PARSER_OPTIONS = new SqlParserOptions();
+
+    private static final Logger LOG = Logger.get(VdmQueryRunner.class);
 
     private VdmQueryRunner()
     {
@@ -81,7 +84,7 @@ public final class VdmQueryRunner
                     file2.createNewFile();
                 }
                 catch (IOException e) {
-                    e.printStackTrace();
+                    LOG.info("Error message: " + e.getStackTrace());
                 }
             }
             try (BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(hetumetastoreConfig))) {

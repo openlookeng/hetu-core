@@ -70,6 +70,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -462,7 +463,7 @@ public class ParquetTester
             return new SqlDecimal((BigInteger) fieldFromCursor, decimalType.getPrecision(), decimalType.getScale());
         }
         if (isVarcharType(type)) {
-            return new String(((Slice) fieldFromCursor).getBytes());
+            return new String(((Slice) fieldFromCursor).getBytes(), StandardCharsets.UTF_8);
         }
         if (VARBINARY.equals(type)) {
             return new SqlVarbinary(((Slice) fieldFromCursor).getBytes());

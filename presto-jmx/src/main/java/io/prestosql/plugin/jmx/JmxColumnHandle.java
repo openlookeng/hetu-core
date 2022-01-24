@@ -40,6 +40,7 @@ public class JmxColumnHandle
     }
 
     @JsonProperty
+    @Override
     public String getColumnName()
     {
         return columnName;

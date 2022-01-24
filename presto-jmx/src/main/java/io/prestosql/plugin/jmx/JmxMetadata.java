@@ -310,6 +310,8 @@ public class JmxMetadata
             case "double":
             case "java.lang.Double":
                 return DOUBLE;
+            default:
+                break;
         }
         return createUnboundedVarcharType();
     }

@@ -228,6 +228,8 @@ public class ThriftTpchService
                 return 0.01;
             case "sf1":
                 return 1.0;
+            default:
+                break;
         }
         throw new IllegalArgumentException("Schema is not setup: " + schemaName);
     }

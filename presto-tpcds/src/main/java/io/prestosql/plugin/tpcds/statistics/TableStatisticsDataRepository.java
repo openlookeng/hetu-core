@@ -34,10 +34,11 @@ public class TableStatisticsDataRepository
             .registerModule(new Jdk8Module());
 
     public void save(
-            String schemaName,
+            String inputSchemaName,
             Table table,
             TableStatisticsData statisticsData)
     {
+        String schemaName = inputSchemaName;
         schemaName = normalizeSchemaName(schemaName);
         String filename = table.getName();
         Path path = Paths.get("presto-tpcds", "src", "main", "resources", "tpcds", "statistics", schemaName, filename + ".json");
@@ -67,8 +68,9 @@ public class TableStatisticsDataRepository
         }
     }
 
-    public Optional<TableStatisticsData> load(String schemaName, Table table)
+    public Optional<TableStatisticsData> load(String schemaNameInput, Table table)
     {
+        String schemaName = schemaNameInput;
         schemaName = normalizeSchemaName(schemaName);
         String filename = table.getName();
         String resourcePath = "/tpcds/statistics/" + schemaName + "/" + filename + ".json";

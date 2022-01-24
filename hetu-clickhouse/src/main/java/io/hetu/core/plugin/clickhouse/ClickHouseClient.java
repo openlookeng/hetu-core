@@ -345,8 +345,9 @@ public class ClickHouseClient
     }
 
     @Override
-    public void renameColumn(JdbcIdentity identity, JdbcTableHandle handle, JdbcColumnHandle jdbcColumn, String newColumnName)
+    public void renameColumn(JdbcIdentity identity, JdbcTableHandle handle, JdbcColumnHandle jdbcColumn, String inputNewColumnName)
     {
+        String newColumnName = inputNewColumnName;
         try (Connection connection = connectionFactory.openConnection(identity)) {
             if (connection.getMetaData().storesUpperCaseIdentifiers()) {
                 newColumnName = newColumnName.toUpperCase(ENGLISH);

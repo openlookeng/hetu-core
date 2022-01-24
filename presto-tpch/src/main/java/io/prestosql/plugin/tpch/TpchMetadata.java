@@ -135,11 +135,11 @@ public class TpchMetadata
 
     public TpchMetadata(ColumnNaming columnNaming, boolean predicatePushdownEnabled, boolean partitioningEnabled)
     {
-        ImmutableSet.Builder<String> tableNames = ImmutableSet.builder();
+        ImmutableSet.Builder<String> tableNamesBuilder = ImmutableSet.builder();
         for (TpchTable<?> tpchTable : TpchTable.getTables()) {
-            tableNames.add(tpchTable.getTableName());
+            tableNamesBuilder.add(tpchTable.getTableName());
         }
-        this.tableNames = tableNames.build();
+        this.tableNames = tableNamesBuilder.build();
         this.columnNaming = columnNaming;
         this.predicatePushdownEnabled = predicatePushdownEnabled;
         this.partitioningEnabled = partitioningEnabled;
@@ -463,6 +463,7 @@ public class TpchMetadata
                 localProperties);
     }
 
+    @Override
     public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle table, Constraint constraint)
     {
         TpchTableHandle handle = (TpchTableHandle) table;

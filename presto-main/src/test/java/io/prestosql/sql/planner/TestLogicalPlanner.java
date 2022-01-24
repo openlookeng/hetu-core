@@ -466,7 +466,7 @@ public class TestLogicalPlanner
     @Test
     public void testSubqueryPruning()
     {
-        List<QueryTemplate.Parameter> subqueries = QueryTemplate.parameter("subquery").of(
+        List<QueryTemplate.Parameter> subqueries = QueryTemplate.parameter("subquery").ofStringList(
                 "orderkey IN (SELECT orderkey FROM lineitem WHERE orderkey % 2 = 0)",
                 "EXISTS(SELECT orderkey FROM lineitem WHERE orderkey % 2 = 0)",
                 "0 = (SELECT orderkey FROM lineitem WHERE orderkey % 2 = 0)");

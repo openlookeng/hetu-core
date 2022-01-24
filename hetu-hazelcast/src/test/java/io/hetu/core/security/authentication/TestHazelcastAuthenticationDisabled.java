@@ -68,12 +68,12 @@ public class TestHazelcastAuthenticationDisabled
         String value2 = "bbb";
 
         Config config = new Config();
-        HazelcastInstance hazelcastInstance1 = Hazelcast.newHazelcastInstance(config);
-        Map<Integer, String> clusterMap1 = hazelcastInstance1.getMap("MyMap");
+        HazelcastInstance newHazelcastInstance1 = Hazelcast.newHazelcastInstance(config);
+        Map<Integer, String> clusterMap1 = newHazelcastInstance1.getMap("MyMap");
         clusterMap1.put(1, value1);
 
-        HazelcastInstance hazelcastInstance2 = Hazelcast.newHazelcastInstance(config);
-        Map<Integer, String> clusterMap2 = hazelcastInstance2.getMap("MyMap");
+        HazelcastInstance newHazelcastInstance2 = Hazelcast.newHazelcastInstance(config);
+        Map<Integer, String> clusterMap2 = newHazelcastInstance2.getMap("MyMap");
         clusterMap2.put(2, value2);
 
         assertEquals(clusterMap1.get(2), value2);

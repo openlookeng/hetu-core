@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
@@ -228,7 +229,7 @@ public class FileBasedSeedStoreOnYarn
             throws IOException
     {
         StringBuilder content = new StringBuilder(0);
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(fs.newInputStream(file)))) {
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(fs.newInputStream(file), StandardCharsets.UTF_8))) {
             br.lines().forEach(content::append);
         }
         return content.toString();

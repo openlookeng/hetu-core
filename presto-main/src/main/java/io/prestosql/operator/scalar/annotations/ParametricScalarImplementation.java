@@ -333,13 +333,13 @@ public class ParametricScalarImplementation
             this.dependencies = ImmutableList.copyOf(requireNonNull(dependencies, "dependencies is null"));
             this.constructorDependencies = ImmutableList.copyOf(requireNonNull(constructorDependencies, "constructorDependencies is null"));
 
-            int numberOfBlockPositionArguments = 0;
+            int cnt = 0;
             for (ArgumentProperty argumentProperty : argumentProperties) {
                 if (argumentProperty.getArgumentType() == VALUE_TYPE && argumentProperty.getNullConvention().equals(BLOCK_AND_POSITION)) {
-                    numberOfBlockPositionArguments++;
+                    cnt++;
                 }
             }
-            this.numberOfBlockPositionArguments = numberOfBlockPositionArguments;
+            this.numberOfBlockPositionArguments = cnt;
         }
 
         public boolean isNullable()
@@ -481,9 +481,9 @@ public class ParametricScalarImplementation
                     .map(TypeParameter::value)
                     .collect(toImmutableSet());
 
-            SqlType returnType = method.getAnnotation(SqlType.class);
-            checkArgument(returnType != null, "Method [%s] is missing @SqlType annotation", method);
-            this.returnType = parseTypeSignature(returnType.value(), literalParameters);
+            SqlType returnType1 = method.getAnnotation(SqlType.class);
+            checkArgument(returnType1 != null, "Method [%s] is missing @SqlType annotation", method);
+            this.returnType = parseTypeSignature(returnType1.value(), literalParameters);
 
             Class<?> actualReturnType = method.getReturnType();
             this.returnNativeContainerType = Primitives.unwrap(actualReturnType);
@@ -505,7 +505,7 @@ public class ParametricScalarImplementation
                         "Expected type parameter to only contain A-Z and 0-9 (starting with A-Z), but got %s on method [%s]", typeParameter.value(), method);
             }
 
-            inferSpecialization(method, actualReturnType, returnType.value());
+            inferSpecialization(method, actualReturnType, returnType1.value());
             parseArguments(method);
 
             this.constructorMethodHandle = getConstructor(method, constructor);
@@ -672,29 +672,29 @@ public class ParametricScalarImplementation
 
         private MethodHandle getMethodHandle(Method method)
         {
-            MethodHandle methodHandle = methodHandle(FUNCTION_IMPLEMENTATION_ERROR, method);
+            MethodHandle handle = methodHandle(FUNCTION_IMPLEMENTATION_ERROR, method);
             if (!isStatic(method.getModifiers())) {
                 // Change type of "this" argument to Object to make sure callers won't have classloader issues
-                methodHandle = methodHandle.asType(methodHandle.type().changeParameterType(0, Object.class));
+                handle = handle.asType(handle.type().changeParameterType(0, Object.class));
                 // Re-arrange the parameters, so that the "this" parameter is after the meta parameters
-                int[] permutedIndices = new int[methodHandle.type().parameterCount()];
+                int[] permutedIndices = new int[handle.type().parameterCount()];
                 permutedIndices[0] = dependencies.size();
-                MethodType newType = methodHandle.type().changeParameterType(dependencies.size(), methodHandle.type().parameterType(0));
+                MethodType newType = handle.type().changeParameterType(dependencies.size(), handle.type().parameterType(0));
                 for (int i = 0; i < dependencies.size(); i++) {
                     permutedIndices[i + 1] = i;
-                    newType = newType.changeParameterType(i, methodHandle.type().parameterType(i + 1));
+                    newType = newType.changeParameterType(i, handle.type().parameterType(i + 1));
                 }
                 for (int i = dependencies.size() + 1; i < permutedIndices.length; i++) {
                     permutedIndices[i] = i;
                 }
-                methodHandle = permuteArguments(methodHandle, newType, permutedIndices);
+                handle = permuteArguments(handle, newType, permutedIndices);
             }
-            return methodHandle;
+            return handle;
         }
 
         public ParametricScalarImplementation get()
         {
-            Signature signature = new Signature(
+            Signature newSignature = new Signature(
                     header.getName(),
                     SCALAR,
                     createTypeVariableConstraints(typeParameters, dependencies),
@@ -704,7 +704,7 @@ public class ParametricScalarImplementation
                     false);
 
             return new ParametricScalarImplementation(
-                    signature,
+                    newSignature,
                     argumentNativeContainerTypes,
                     specializedTypeParameters,
                     choices,

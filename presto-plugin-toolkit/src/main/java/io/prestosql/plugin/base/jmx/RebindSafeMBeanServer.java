@@ -75,6 +75,7 @@ public class RebindSafeMBeanServer
                 return mbeanServer.registerMBean(object, name);
             }
             catch (InstanceAlreadyExistsException ignored) {
+                // could be ignored
             }
 
             try {

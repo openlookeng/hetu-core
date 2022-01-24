@@ -80,6 +80,7 @@ public class TestAutoCloseableCloser
             closer.close();
         }
         catch (Throwable ignored) {
+            // could be ignored
         }
         for (TestAutoCloseable closeable : closeables) {
             assertTrue(closeable.isClosed());

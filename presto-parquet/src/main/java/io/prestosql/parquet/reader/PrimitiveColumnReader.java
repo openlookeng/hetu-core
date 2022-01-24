@@ -300,20 +300,20 @@ public abstract class PrimitiveColumnReader
 
     private ValuesReader initDataReader(ParquetEncoding dataEncoding, int valueCount, ByteBufferInputStream in)
     {
-        ValuesReader valuesReader;
+        ValuesReader localValuesReader;
         if (dataEncoding.usesDictionary()) {
             if (dictionary == null) {
                 throw new ParquetDecodingException("Dictionary is missing for Page");
             }
-            valuesReader = dataEncoding.getDictionaryBasedValuesReader(columnDescriptor, VALUES, dictionary);
+            localValuesReader = dataEncoding.getDictionaryBasedValuesReader(columnDescriptor, VALUES, dictionary);
         }
         else {
-            valuesReader = dataEncoding.getValuesReader(columnDescriptor, VALUES);
+            localValuesReader = dataEncoding.getValuesReader(columnDescriptor, VALUES);
         }
 
         try {
-            valuesReader.initFromPage(valueCount, in);
-            return valuesReader;
+            localValuesReader.initFromPage(valueCount, in);
+            return localValuesReader;
         }
         catch (IOException e) {
             throw new ParquetDecodingException("Error reading parquet page in column " + columnDescriptor, e);

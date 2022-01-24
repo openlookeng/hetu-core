@@ -2107,7 +2107,7 @@ public class HiveAstBuilder
         String fieldString = context.identifier().getText();
         Extract.Field field;
         try {
-            field = Extract.Field.valueOf(fieldString.toUpperCase());
+            field = Extract.Field.valueOf(fieldString.toUpperCase(Locale.ROOT));
         }
         catch (IllegalArgumentException e) {
             throw parseError("Invalid EXTRACT field: " + fieldString, context);

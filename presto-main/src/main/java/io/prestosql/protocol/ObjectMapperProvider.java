@@ -76,6 +76,7 @@ public class ObjectMapperProvider
             modules.add(new JodaModule());
         }
         catch (ClassNotFoundException ignored) {
+            // could be ignored
         }
     }
 

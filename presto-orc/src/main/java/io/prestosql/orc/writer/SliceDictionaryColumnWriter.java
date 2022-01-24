@@ -207,8 +207,9 @@ public class SliceDictionaryColumnWriter
         return OptionalInt.of(toIntExact(directColumnWriter.getBufferedBytes()));
     }
 
-    private boolean writeDictionaryRowGroup(Block dictionary, int valueCount, IntBigArray dictionaryIndexes, int maxDirectBytes)
+    private boolean writeDictionaryRowGroup(Block dictionary, int count, IntBigArray dictionaryIndexes, int maxDirectBytes)
     {
+        int valueCount = count;
         int[][] segments = dictionaryIndexes.getSegments();
         for (int i = 0; valueCount > 0 && i < segments.length; i++) {
             int[] segment = segments[i];

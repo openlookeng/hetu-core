@@ -16,6 +16,7 @@ package io.hetu.core.metastore;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import io.airlift.log.Logger;
 import io.prestosql.spi.metastore.HetuCache;
 
 import java.time.Duration;
@@ -25,6 +26,7 @@ import java.util.concurrent.ExecutionException;
 public class HetuLocalCache<K, V>
         implements HetuCache<K, V>
 {
+    private static final Logger LOG = Logger.get(HetuLocalCache.class);
     private final Cache<K, V> localCache;
 
     public HetuLocalCache(HetuMetastoreCacheConfig hetuMetastoreCacheConfig)
@@ -53,7 +55,7 @@ public class HetuLocalCache<K, V>
             return localCache.get(key, loader);
         }
         catch (ExecutionException e) {
-            e.printStackTrace();
+            LOG.info("Error message: " + e.getStackTrace());
         }
         return null;
     }

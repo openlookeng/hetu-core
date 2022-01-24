@@ -108,8 +108,8 @@ public class TestSemiTransactionalHiveMetastore
         Map<String, Function<PartitionStatistics, PartitionStatistics>> partNamesUpdateMap = new HashMap<>();
         List<PartitionStatistics> statistics = ImmutableList.of(STATISTICS_1, STATISTICS_1);
         for (int index = 0; index < partitions.size(); index++) {
-            PartitionStatistics stats = statistics.get(index);
-            partNamesUpdateMap.put(partitions.get(index), actualStatistics -> stats);
+            PartitionStatistics partitionStatistics = statistics.get(index);
+            partNamesUpdateMap.put(partitions.get(index), actualStatistics -> partitionStatistics);
         }
         thriftHiveMetastore.updatePartitionsStatistics(IDENTITY, MockThriftMetastoreClient.TEST_DATABASE, MockThriftMetastoreClient.TEST_TABLE_UP_NAME, partNamesUpdateMap);
     }

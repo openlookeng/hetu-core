@@ -256,6 +256,8 @@ public abstract class BasePostgreSqlClient
             case "timestamptz":
                 // PostgreSQL's "timestamp with time zone" is reported as Types.TIMESTAMP rather than Types.TIMESTAMP_WITH_TIMEZONE
                 return Optional.of(timestampWithTimeZoneColumnMapping());
+            default:
+                break;
         }
         if (typeHandle.getJdbcType() == Types.VARCHAR && !jdbcTypeName.equals("varchar")) {
             // This can be e.g. an ENUM
@@ -401,7 +403,7 @@ public abstract class BasePostgreSqlClient
             byte[] in = slice.getBytes();
             SliceOutput dynamicSliceOutput = new DynamicSliceOutput(in.length);
             SORTED_MAPPER.writeValue((OutputStream) dynamicSliceOutput, SORTED_MAPPER.readValue(parser, Object.class));
-            // nextToken() returns null if the input is parsed correctly,
+            // the function nextToken() returns null if the input is parsed correctly,
             // but will throw an exception if there are trailing characters.
             parser.nextToken();
             return dynamicSliceOutput.slice();

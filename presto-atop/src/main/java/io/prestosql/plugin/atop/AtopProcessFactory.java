@@ -26,6 +26,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -113,7 +114,7 @@ public class AtopProcessFactory
         private AtopProcess(Process process, Duration readTimeout, ExecutorService executor)
         {
             this.process = requireNonNull(process, "process is null");
-            underlyingReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            underlyingReader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
             TimeLimiter limiter = SimpleTimeLimiter.create(executor);
             this.reader = limiter.newProxy(underlyingReader::readLine, LineReader.class, readTimeout.toMillis(), MILLISECONDS);
             try {

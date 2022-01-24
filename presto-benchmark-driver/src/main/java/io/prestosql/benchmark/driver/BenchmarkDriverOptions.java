@@ -110,12 +110,12 @@ public class BenchmarkDriverOptions
 
     private static URI parseServer(String server)
     {
-        server = server.toLowerCase(ENGLISH);
-        if (server.startsWith("http://") || server.startsWith("https://")) {
-            return URI.create(server);
+        String localServer = server.toLowerCase(ENGLISH);
+        if (localServer.startsWith("http://") || localServer.startsWith("https://")) {
+            return URI.create(localServer);
         }
 
-        HostAndPort host = HostAndPort.fromString(server);
+        HostAndPort host = HostAndPort.fromString(localServer);
         try {
             return new URI("http", null, host.getHost(), host.getPortOrDefault(80), null, null, null);
         }

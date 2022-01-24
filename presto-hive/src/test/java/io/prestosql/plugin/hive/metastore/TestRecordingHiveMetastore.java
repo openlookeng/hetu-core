@@ -108,7 +108,7 @@ public class TestRecordingHiveMetastore
             throws IOException
     {
         HiveConfig recordingHiveConfig = new HiveConfig()
-                .setRecordingPath(File.createTempFile("recording_test", "json").getAbsolutePath())
+                .setRecordingPath(File.createTempFile("recording_test", "json").getCanonicalPath())
                 .setRecordingDuration(new Duration(10, TimeUnit.MINUTES));
 
         RecordingHiveMetastore recordingHiveMetastore = new RecordingHiveMetastore(new TestingHiveMetastore(), recordingHiveConfig);

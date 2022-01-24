@@ -347,9 +347,9 @@ public class BTreeIndex
             IOUtils.copy(new SnappyInputStream(in), out);
         }
         setupDB();
-        Properties properties = getProperties();
-        if (properties.getProperty(PartitionIndexWriter.SYMBOL_TABLE_KEY_NAME) != null) {
-            this.symbolTable = SerializationUtils.deserializeMap(properties.getProperty(PartitionIndexWriter.SYMBOL_TABLE_KEY_NAME), s -> s, s -> s);
+        Properties localProperties = getProperties();
+        if (localProperties.getProperty(PartitionIndexWriter.SYMBOL_TABLE_KEY_NAME) != null) {
+            this.symbolTable = SerializationUtils.deserializeMap(localProperties.getProperty(PartitionIndexWriter.SYMBOL_TABLE_KEY_NAME), s -> s, s -> s);
         }
         return this;
     }

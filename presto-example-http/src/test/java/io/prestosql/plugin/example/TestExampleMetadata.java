@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Resources;
+import io.airlift.log.Logger;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
@@ -40,6 +41,7 @@ import static org.testng.Assert.fail;
 @Test(singleThreaded = true)
 public class TestExampleMetadata
 {
+    private static final Logger LOG = Logger.get(TestExampleMetadata.class);
     private static final ExampleTableHandle NUMBERS_TABLE_HANDLE = new ExampleTableHandle("example", "numbers");
     private ExampleMetadata metadata;
 
@@ -82,12 +84,14 @@ public class TestExampleMetadata
             fail("Expected getColumnHandle of unknown table to throw a TableNotFoundException");
         }
         catch (TableNotFoundException expected) {
+            LOG.info("Error message: " + expected.getMessage());
         }
         try {
             metadata.getColumnHandles(SESSION, new ExampleTableHandle("example", "unknown"));
             fail("Expected getColumnHandle of unknown table to throw a TableNotFoundException");
         }
         catch (TableNotFoundException expected) {
+            LOG.info("Error message: " + expected.getMessage());
         }
     }
 

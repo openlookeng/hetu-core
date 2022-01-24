@@ -129,7 +129,7 @@ public final class BuiltInScalarFunctionImplementation
             }
 
             List<Class<?>> parameterList = methodHandle.type().parameterList();
-            boolean hasProperties = false;
+            boolean tmpHasProperties = false;
             if (parameterList.contains(ConnectorSession.class)) {
                 checkArgument(parameterList.stream().filter(ConnectorSession.class::equals).count() == 1, "function implementation should have exactly one ConnectorSession parameter");
                 if (!instanceFactory.isPresent()) {
@@ -138,9 +138,9 @@ public final class BuiltInScalarFunctionImplementation
                 else {
                     checkArgument(parameterList.get(1) == ConnectorSession.class, "ConnectorSession must be the second argument when instanceFactory is present");
                 }
-                hasProperties = true;
+                tmpHasProperties = true;
             }
-            this.hasProperties = hasProperties;
+            this.hasProperties = tmpHasProperties;
         }
 
         public boolean isNullable()

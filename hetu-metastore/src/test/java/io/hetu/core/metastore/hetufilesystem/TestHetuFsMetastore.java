@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Resources;
 import com.google.inject.Injector;
 import io.airlift.bootstrap.Bootstrap;
+import io.airlift.log.Logger;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
 import io.prestosql.plugin.base.jmx.MBeanServerModule;
@@ -67,6 +68,7 @@ import static org.testng.Assert.fail;
 
 public class TestHetuFsMetastore
 {
+    private static final Logger LOG = Logger.get(TestHetuFsMetastore.class);
     private HetuMetastore metastore;
     private HetuFileSystemClient client;
     private CatalogEntity defaultCatalog;
@@ -144,7 +146,7 @@ public class TestHetuFsMetastore
             client.deleteRecursively(Paths.get(path));
         }
         catch (IOException e) {
-            e.printStackTrace();
+            LOG.info("Error message: " + e.getStackTrace());
         }
     }
 

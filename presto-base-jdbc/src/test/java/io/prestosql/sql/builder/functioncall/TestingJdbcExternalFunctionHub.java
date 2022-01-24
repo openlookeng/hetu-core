@@ -27,6 +27,7 @@ public class TestingJdbcExternalFunctionHub
 {
     private CatalogSchemaName catalogSchemaName = new CatalogSchemaName("jdbc", "foo");
 
+    @Override
     public Set<ExternalFunctionInfo> getExternalFunctions()
     {
         return ImmutableSet.<ExternalFunctionInfo>builder().add(EXTERNAL_FUNCTION_INFO).build();

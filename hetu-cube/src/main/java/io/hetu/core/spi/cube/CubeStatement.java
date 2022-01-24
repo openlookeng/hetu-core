@@ -140,13 +140,13 @@ public class CubeStatement
             return this;
         }
 
-        public Builder groupBy(String column)
+        public Builder groupByAddString(String column)
         {
             this.groupBy.add(column);
             return this;
         }
 
-        public Builder groupBy(String... columns)
+        public Builder groupByAddStringList(String... columns)
         {
             this.groupBy.addAll(Arrays.asList(columns));
             return this;

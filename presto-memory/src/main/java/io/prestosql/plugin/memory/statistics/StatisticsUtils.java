@@ -170,7 +170,7 @@ public class StatisticsUtils
     {
         ColumnStatisticsData.Builder columnStatBuilder = ColumnStatisticsData.builder();
 
-        // MIN_VALUE, MAX_VALUE
+        // MIN VALUE, MAX VALUE
         // We ask the engine to compute either both or neither
         verify(stats.containsKey(MIN_VALUE) == stats.containsKey(MAX_VALUE));
         if (stats.containsKey(MIN_VALUE)) {

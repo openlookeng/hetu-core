@@ -364,11 +364,11 @@ public abstract class InMemoryAggregationBuilder
     {
         InMemoryAggregationBuilderState myState = new InMemoryAggregationBuilderState();
         myState.groupBy = groupBy.capture(serdeProvider);
-        List<Object> aggregators = new ArrayList<>();
+        List<Object> aggregatorsList = new ArrayList<>();
         for (Aggregator aggregator : this.aggregators) {
-            aggregators.add(aggregator.capture(serdeProvider));
+            aggregatorsList.add(aggregator.capture(serdeProvider));
         }
-        myState.aggregators = aggregators;
+        myState.aggregators = aggregatorsList;
         myState.full = full;
         return myState;
     }

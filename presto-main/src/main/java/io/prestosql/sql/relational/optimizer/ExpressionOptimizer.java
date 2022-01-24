@@ -89,8 +89,9 @@ public class ExpressionOptimizer
         }
 
         @Override
-        public RowExpression visitCall(CallExpression call, Void context)
+        public RowExpression visitCall(CallExpression inputCall, Void context)
         {
+            CallExpression call = inputCall;
             if (functionResolution.isCastFunction(call.getFunctionHandle())) {
                 call = rewriteCast(call);
             }

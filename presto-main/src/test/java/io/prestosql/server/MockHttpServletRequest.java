@@ -86,8 +86,8 @@ public class MockHttpServletRequest
     @Override
     public String getHeader(String name)
     {
-        Enumeration<String> headers = getHeaders(name);
-        return headers.hasMoreElements() ? headers.nextElement() : null;
+        Enumeration<String> localHeaders = getHeaders(name);
+        return localHeaders.hasMoreElements() ? localHeaders.nextElement() : null;
     }
 
     @Override

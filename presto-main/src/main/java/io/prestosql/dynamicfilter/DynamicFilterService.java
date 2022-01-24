@@ -429,9 +429,9 @@ public class DynamicFilterService
                         builder.add(df);
                     }
                 }
-                Set<DynamicFilter> dynamicFilters = builder.build();
-                if (!dynamicFilters.isEmpty()) {
-                    supplier.add(dynamicFilters);
+                Set<DynamicFilter> dynamicFiltersSet = builder.build();
+                if (!dynamicFiltersSet.isEmpty()) {
+                    supplier.add(dynamicFiltersSet);
                 }
             }
             return supplier;

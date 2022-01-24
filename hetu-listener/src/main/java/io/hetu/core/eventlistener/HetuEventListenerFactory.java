@@ -24,6 +24,7 @@ import java.util.Map;
 public class HetuEventListenerFactory
         implements EventListenerFactory
 {
+    @Override
     public String getName()
     {
         return "hetu-listener";
@@ -35,6 +36,7 @@ public class HetuEventListenerFactory
      * @param properties properties
      * @return event listener
      */
+    @Override
     public EventListener create(Map<String, String> properties)
     {
         ConfigurationFactory configurationFactory = new ConfigurationFactory(properties);

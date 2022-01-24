@@ -413,7 +413,6 @@ public class QueryMonitor
             long waiting = queryStats.getResourceWaitingTime().toMillis();
 
             List<StageInfo> stages = StageInfo.getAllStages(queryInfo.getOutputStage());
-            // long lastSchedulingCompletion = 0;
             long firstTaskStartTime = queryEndTime.getMillis();
             long firstStageFirstTaskStartTime = queryEndTime.getMillis();
             long lastTaskStartTime = queryStartTime.getMillis() + planning;

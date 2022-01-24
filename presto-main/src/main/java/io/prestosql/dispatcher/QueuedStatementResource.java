@@ -354,13 +354,13 @@ public class QueuedStatementResource
 
         public QueryResults getQueryResults(long token, UriInfo uriInfo, String xForwardedProto)
         {
-            long lastToken = this.lastToken.get();
+            long tmpLastToken = this.lastToken.get();
             // token should be the last token or the next token
-            if (token != lastToken && token != lastToken + 1) {
+            if (token != tmpLastToken && token != tmpLastToken + 1) {
                 throw new WebApplicationException(Response.Status.GONE);
             }
             // advance (or stay at) the token
-            this.lastToken.compareAndSet(lastToken, token);
+            this.lastToken.compareAndSet(tmpLastToken, token);
 
             synchronized (this) {
                 // if query submission has not finished, return simple empty result

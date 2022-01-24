@@ -679,7 +679,7 @@ public class HBaseConnection
         List<byte[]> splitKeys = new ArrayList<>();
         allRanges.forEach(range -> {
             for (char index = range.getStart(); index <= range.getEnd(); index += 1) {
-                splitKeys.add(String.valueOf(index).getBytes());
+                splitKeys.add(String.valueOf(index).getBytes(UTF_8));
             }
         });
 

@@ -66,11 +66,11 @@ public class TpcdsMetadata
 
     public TpcdsMetadata()
     {
-        ImmutableSet.Builder<String> tableNames = ImmutableSet.builder();
+        ImmutableSet.Builder<String> tableNamesBuilder = ImmutableSet.builder();
         for (Table tpcdsTable : Table.getBaseTables()) {
-            tableNames.add(tpcdsTable.getName().toLowerCase(ENGLISH));
+            tableNamesBuilder.add(tpcdsTable.getName().toLowerCase(ENGLISH));
         }
-        this.tableNames = tableNames.build();
+        this.tableNames = tableNamesBuilder.build();
     }
 
     @Override

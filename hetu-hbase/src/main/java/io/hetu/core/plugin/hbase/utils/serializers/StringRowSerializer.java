@@ -67,6 +67,7 @@ public class StringRowSerializer
      *
      * @param columnHandleList columnHandleList
      */
+    @Override
     public void setColumnHandleList(List<HBaseColumnHandle> columnHandleList)
     {
         this.columnHandles = columnHandleList;
@@ -108,6 +109,7 @@ public class StringRowSerializer
      * @param result Entry to deserialize
      * @param defaultValue defaultValue
      */
+    @Override
     public void deserialize(Result result, String defaultValue)
     {
         if (!columnValues.containsKey(rowIdName)) {
@@ -134,7 +136,7 @@ public class StringRowSerializer
                     }
                     catch (CharacterCodingException e) {
                         LOG.error("bytes decode to string error, cause by %s", e.getMessage());
-                        e.printStackTrace();
+                        LOG.error("Error message: " + e.getStackTrace());
                     }
                 }
                 columnValues.put(familyQualifierColumnMap.get(family).get(qualifer), value);
@@ -205,6 +207,7 @@ public class StringRowSerializer
      * @param <T> Type
      * @return read from HBase, set into output
      */
+    @Override
     public <T> T getBytesObject(Type type, String columnName)
     {
         String fieldValue = getFieldValue(columnName);

@@ -53,8 +53,9 @@ public final class ParquetTypeUtils
         return (new ColumnIOFactory()).getColumnIO(requestedSchema, fileSchema, true);
     }
 
-    public static GroupColumnIO getMapKeyValueColumn(GroupColumnIO groupColumnIO)
+    public static GroupColumnIO getMapKeyValueColumn(GroupColumnIO inputGroupColumnIO)
     {
+        GroupColumnIO groupColumnIO = inputGroupColumnIO;
         while (groupColumnIO.getChildrenCount() == 1) {
             groupColumnIO = (GroupColumnIO) groupColumnIO.getChild(0);
         }
@@ -68,8 +69,9 @@ public final class ParquetTypeUtils
      * 4. Otherwise, the repeated field's type is the element type with the repeated field's repetition.
      * https://github.com/apache/parquet-format/blob/master/LogicalTypes.md#lists
      */
-    public static ColumnIO getArrayElementColumn(ColumnIO columnIO)
+    public static ColumnIO getArrayElementColumn(ColumnIO inputColumnIO)
     {
+        ColumnIO columnIO = inputColumnIO;
         while (columnIO instanceof GroupColumnIO && !columnIO.getType().isRepetition(REPEATED)) {
             columnIO = ((GroupColumnIO) columnIO).getChild(0);
         }

@@ -143,16 +143,16 @@ public class ComputedStatistics
     public static ComputedStatistics restoreComputedStatistics(Object state, BlockEncodingSerdeProvider serdeProvider)
     {
         ComputedStatisticsState myState = (ComputedStatisticsState) state;
-        List<Block> groupingValues = Arrays.stream(myState.groupingValues).map(array -> restoreBlock(array, serdeProvider)).collect(Collectors.toList());
-        Map<TableStatisticType, Block> tableStatistics = new HashMap<>();
+        List<Block> groupingValuesList = Arrays.stream(myState.groupingValues).map(array -> restoreBlock(array, serdeProvider)).collect(Collectors.toList());
+        Map<TableStatisticType, Block> tableStatisticTypeMap = new HashMap<>();
         for (Map.Entry<TableStatisticType, byte[]> entry : myState.tableStatistics.entrySet()) {
-            tableStatistics.put(entry.getKey(), restoreBlock(entry.getValue(), serdeProvider));
+            tableStatisticTypeMap.put(entry.getKey(), restoreBlock(entry.getValue(), serdeProvider));
         }
-        Map<ColumnStatisticMetadata, Block> columnStatistics = new HashMap<>();
+        Map<ColumnStatisticMetadata, Block> columnStatisticMetadataMap = new HashMap<>();
         for (Map.Entry<ColumnStatisticMetadata, byte[]> entry : myState.columnStatistics.entrySet()) {
-            columnStatistics.put(entry.getKey(), restoreBlock(entry.getValue(), serdeProvider));
+            columnStatisticMetadataMap.put(entry.getKey(), restoreBlock(entry.getValue(), serdeProvider));
         }
-        return new ComputedStatistics(myState.groupingColumns, groupingValues, tableStatistics, columnStatistics);
+        return new ComputedStatistics(myState.groupingColumns, groupingValuesList, tableStatisticTypeMap, columnStatisticMetadataMap);
     }
 
     private static byte[] serializeBlock(Block block, BlockEncodingSerdeProvider serdeProvider)

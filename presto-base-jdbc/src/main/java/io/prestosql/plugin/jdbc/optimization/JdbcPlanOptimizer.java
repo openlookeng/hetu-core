@@ -175,7 +175,7 @@ public class JdbcPlanOptimizer
             List<RowExpression> pushable = new ArrayList<>();
             List<RowExpression> nonPushable = new ArrayList<>();
 
-            for (RowExpression conjunct : logicalRowExpressions.extractConjuncts(node.getPredicate())) {
+            for (RowExpression conjunct : LogicalRowExpressions.extractConjuncts(node.getPredicate())) {
                 try {
                     JdbcConverterContext jdbcConverterContext = new JdbcConverterContext();
                     conjunct.accept(queryGenerator.get().getConverter(), jdbcConverterContext);

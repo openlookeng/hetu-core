@@ -17,6 +17,7 @@ import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Range;
+import io.airlift.log.Logger;
 import org.testng.annotations.Test;
 
 import static io.prestosql.orc.metadata.statistics.AbstractStatisticsBuilderTest.StatisticsType.DATE;
@@ -28,6 +29,8 @@ import static org.testng.Assert.fail;
 public class TestDateStatisticsBuilder
         extends AbstractStatisticsBuilderTest<DateStatisticsBuilder, Integer>
 {
+    private static final Logger LOG = Logger.get(TestDateStatisticsBuilder.class);
+
     public TestDateStatisticsBuilder()
     {
         super(DATE, DateStatisticsBuilder::new, DateStatisticsBuilder::addValue);
@@ -62,6 +65,7 @@ public class TestDateStatisticsBuilder
             fail("Expected ArithmeticException");
         }
         catch (ArithmeticException expected) {
+            LOG.info("Error message: " + expected.getMessage());
         }
 
         try {
@@ -69,6 +73,7 @@ public class TestDateStatisticsBuilder
             fail("Expected ArithmeticException");
         }
         catch (ArithmeticException expected) {
+            LOG.info("Error message: " + expected.getMessage());
         }
     }
 

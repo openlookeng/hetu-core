@@ -82,7 +82,6 @@ public class TestSplitFiltering
         PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_DELAY, new Duration(5000, TimeUnit.MILLISECONDS));
         PropertyService.setProperty(HetuConstant.FILTER_CACHE_LOADING_THREADS, 2L);
 
-        //ComparisonExpression expr = new ComparisonExpression(ComparisonExpression.Operator.EQUAL, new SymbolReference("a"), new StringLiteral("test_value"));
         RowExpression expression = PlanBuilder.comparison(OperatorType.EQUAL, new VariableReferenceExpression("a", VarcharType.VARCHAR), new ConstantExpression(utf8Slice("test_value"), VarcharType.VARCHAR));
 
         SqlStageExecution stage = TestUtil.getTestStage(expression);
