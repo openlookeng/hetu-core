@@ -66,12 +66,12 @@ public class InMemoryNodeManager
     {
         remoteNodes.putAll(catalogName, nodes);
 
-        List<Consumer<AllNodes>> listeners;
+        List<Consumer<AllNodes>> nodeListeners;
         synchronized (this) {
-            listeners = ImmutableList.copyOf(this.listeners);
+            nodeListeners = ImmutableList.copyOf(this.listeners);
         }
         AllNodes allNodes = getAllNodes();
-        listeners.forEach(listener -> listener.accept(allNodes));
+        nodeListeners.forEach(listener -> listener.accept(allNodes));
     }
 
     @Override

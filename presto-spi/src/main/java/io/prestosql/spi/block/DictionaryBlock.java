@@ -213,17 +213,17 @@ public class DictionaryBlock<T>
 
     private void calculateCompactSize()
     {
-        int uniqueIds = 0;
+        int positionUniqueIds = 0;
         boolean[] used = new boolean[dictionary.getPositionCount()];
         for (int i = 0; i < positionCount; i++) {
             int position = getId(i);
             if (!used[position]) {
-                uniqueIds++;
+                positionUniqueIds++;
                 used[position] = true;
             }
         }
         this.sizeInBytes = dictionary.getPositionsSizeInBytes(used) + (Integer.BYTES * (long) positionCount);
-        this.uniqueIds = uniqueIds;
+        this.uniqueIds = positionUniqueIds;
     }
 
     @Override
@@ -235,7 +235,7 @@ public class DictionaryBlock<T>
 
         // Calculation of logical size can be performed as part of calculateCompactSize() with minor modifications.
         // Keeping this calculation separate as this is a little more expensive and may not be called as often.
-        long sizeInBytes = 0;
+        long blockSizeInBytes = 0;
         long[] seenSizes = new long[dictionary.getPositionCount()];
         Arrays.fill(seenSizes, -1L);
         for (int i = 0; i < getPositionCount(); i++) {
@@ -243,11 +243,11 @@ public class DictionaryBlock<T>
             if (seenSizes[position] < 0) {
                 seenSizes[position] = dictionary.getRegionSizeInBytes(position, 1);
             }
-            sizeInBytes += seenSizes[position];
+            blockSizeInBytes += seenSizes[position];
         }
 
-        logicalSizeInBytes = sizeInBytes;
-        return sizeInBytes;
+        logicalSizeInBytes = blockSizeInBytes;
+        return blockSizeInBytes;
     }
 
     @Override

@@ -153,7 +153,7 @@ public final class HiveQueryRunner
                         file2.createNewFile();
                     }
                     catch (IOException e) {
-                        e.printStackTrace();
+                        log.info(e.getMessage());
                     }
                 }
 
@@ -343,8 +343,8 @@ public final class HiveQueryRunner
 
         DistributedQueryRunner queryRunner = createQueryRunner(TpchTable.getTables(), ImmutableMap.of("http-server.http.port", "8080"), baseDataDir);
         Thread.sleep(10);
-        Logger log = Logger.get(DistributedQueryRunner.class);
-        log.info("======== SERVER STARTED ========");
-        log.info("\n====\n%s\n====", queryRunner.getCoordinator().getBaseUrl());
+        Logger logger = Logger.get(DistributedQueryRunner.class);
+        logger.info("======== SERVER STARTED ========");
+        logger.info("\n====\n%s\n====", queryRunner.getCoordinator().getBaseUrl());
     }
 }

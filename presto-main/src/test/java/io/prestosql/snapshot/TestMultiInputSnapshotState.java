@@ -263,11 +263,11 @@ public class TestMultiInputSnapshotState
     public void testUndeterminedSources()
             throws Exception
     {
-        TestingRestorableUndeterminedInputs restorable = new TestingRestorableUndeterminedInputs();
-        MultiInputSnapshotState state = new MultiInputSnapshotState(restorable, snapshotManager, serde, TestMultiInputSnapshotState::createSnapshotStateId);
+        TestingRestorableUndeterminedInputs restorableUndeterminedInputs = new TestingRestorableUndeterminedInputs();
+        MultiInputSnapshotState inputSnapshotState = new MultiInputSnapshotState(restorableUndeterminedInputs, snapshotManager, serde, TestMultiInputSnapshotState::createSnapshotStateId);
 
-        processPage(state, source1, marker1);
-        processPage(state, source2, marker1);
+        processPage(inputSnapshotState, source1, marker1);
+        processPage(inputSnapshotState, source2, marker1);
         verify(snapshotManager, never()).storeState(anyObject(), anyObject());
     }
 
@@ -428,11 +428,11 @@ public class TestMultiInputSnapshotState
                 .addDriverContext();
         OperatorContext operatorContext = driverContext.addOperatorContext(1, new PlanNodeId("planNodeId"), "test");
 
-        MultiInputSnapshotState state = MultiInputSnapshotState.forOperator(mock(MultiInputRestorable.class), operatorContext);
-        processPage(state, source1, regularPage);
+        MultiInputSnapshotState inputSnapshotState = MultiInputSnapshotState.forOperator(mock(MultiInputRestorable.class), operatorContext);
+        processPage(inputSnapshotState, source1, regularPage);
 
-        state = MultiInputSnapshotState.forTaskComponent(mock(MultiInputRestorable.class), taskContext, TestMultiInputSnapshotState::createSnapshotStateId);
-        processPage(state, source1, regularPage);
+        inputSnapshotState = MultiInputSnapshotState.forTaskComponent(mock(MultiInputRestorable.class), taskContext, TestMultiInputSnapshotState::createSnapshotStateId);
+        processPage(inputSnapshotState, source1, regularPage);
     }
 
     @Test

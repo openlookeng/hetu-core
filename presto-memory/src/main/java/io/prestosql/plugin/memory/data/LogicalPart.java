@@ -59,6 +59,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Set;
@@ -673,7 +674,7 @@ public class LogicalPart
                 Object value = getNativeValue(types.get(sortChannels.get(0)), page.getBlock(sortChannels.get(0)), 0);
                 if (value != null) {
                     if (!(value instanceof Comparable)) {
-                        throw new RuntimeException(String.format("Unable to create sparse index for channel %d, type is not Comparable.", sortChannels.get(0)));
+                        throw new RuntimeException(String.format(Locale.ENGLISH, "Unable to create sparse index for channel %d, type is not Comparable.", sortChannels.get(0)));
                     }
                     sparseIdx.computeIfAbsent((Comparable) value, e -> new SparseValue(new ArrayList<>())).getPageIndices().add(i);
                 }
@@ -1055,8 +1056,7 @@ public class LogicalPart
 
         public SparseValue(List<Integer> pageIndices)
         {
-            this.pageIndices = pageIndices;
-            this.last = null;
+            this(pageIndices, null);
         }
 
         public SparseValue(List<Integer> pageIndices, Comparable last)

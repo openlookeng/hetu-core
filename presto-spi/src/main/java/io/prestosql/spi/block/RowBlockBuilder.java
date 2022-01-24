@@ -71,11 +71,11 @@ public class RowBlockBuilder<T>
     private static BlockBuilder[] createFieldBlockBuilders(List<Type> fieldTypes, BlockBuilderStatus blockBuilderStatus, int expectedEntries)
     {
         // Stream API should not be used since constructor can be called in performance sensitive sections
-        BlockBuilder[] fieldBlockBuilders = new BlockBuilder[fieldTypes.size()];
+        BlockBuilder[] finalFieldBlockBuilders = new BlockBuilder[fieldTypes.size()];
         for (int i = 0; i < fieldTypes.size(); i++) {
-            fieldBlockBuilders[i] = fieldTypes.get(i).createBlockBuilder(blockBuilderStatus, expectedEntries);
+            finalFieldBlockBuilders[i] = fieldTypes.get(i).createBlockBuilder(blockBuilderStatus, expectedEntries);
         }
-        return fieldBlockBuilders;
+        return finalFieldBlockBuilders;
     }
 
     @Override

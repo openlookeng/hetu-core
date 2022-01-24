@@ -92,12 +92,12 @@ public class PartitionedOutputBuffer
                 requireNonNull(systemMemoryContextSupplier, "systemMemoryContextSupplier is null"),
                 requireNonNull(notificationExecutor, "notificationExecutor is null"));
 
-        ImmutableList.Builder<ClientBuffer> partitions = ImmutableList.builder();
+        ImmutableList.Builder<ClientBuffer> partitionsBuffer = ImmutableList.builder();
         for (OutputBufferId bufferId : outputBuffers.getBuffers().keySet()) {
             ClientBuffer partition = new ClientBuffer(bufferId);
-            partitions.add(partition);
+            partitionsBuffer.add(partition);
         }
-        this.partitions = partitions.build();
+        this.partitions = partitionsBuffer.build();
 
         state.compareAndSet(OPEN, NO_MORE_BUFFERS);
         state.compareAndSet(NO_MORE_PAGES, FLUSHING);
@@ -136,7 +136,7 @@ public class PartitionedOutputBuffer
         //
 
         // always get the state first before any other stats
-        BufferState state = this.state.get();
+        BufferState bufferState = this.state.get();
 
         int totalBufferedPages = 0;
         ImmutableList.Builder<BufferInfo> infos = ImmutableList.builder();
@@ -150,9 +150,9 @@ public class PartitionedOutputBuffer
 
         return new OutputBufferInfo(
                 "PARTITIONED",
-                state,
-                state.canAddBuffers(),
-                state.canAddPages(),
+                bufferState,
+                bufferState.canAddBuffers(),
+                bufferState.canAddPages(),
                 memoryManager.getBufferedBytes(),
                 totalBufferedPages,
                 totalRowsAdded.get(),

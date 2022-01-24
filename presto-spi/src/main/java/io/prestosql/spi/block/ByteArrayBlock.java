@@ -196,9 +196,10 @@ public class ByteArrayBlock
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
 
-        positionOffset += arrayOffset;
-        boolean[] newValueIsNull = valueIsNull == null ? null : compactArray(valueIsNull, positionOffset, length);
-        byte[] newValues = compactArray(values, positionOffset, length);
+        int finalPositionOffset = positionOffset;
+        finalPositionOffset += arrayOffset;
+        boolean[] newValueIsNull = valueIsNull == null ? null : compactArray(valueIsNull, finalPositionOffset, length);
+        byte[] newValues = compactArray(values, finalPositionOffset, length);
 
         if (newValueIsNull == valueIsNull && newValues == values) {
             return this;

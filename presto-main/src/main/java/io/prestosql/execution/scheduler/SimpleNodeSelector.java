@@ -140,10 +140,10 @@ public class SimpleNodeSelector
     public SplitPlacementResult computeAssignments(Set<Split> splits, List<RemoteTask> existingTasks, Optional<SqlStageExecution> stage)
     {
         Multimap<InternalNode, Split> assignment = HashMultimap.create();
-        NodeMap nodeMap = this.nodeMap.get().get();
-        NodeAssignmentStats assignmentStats = new NodeAssignmentStats(nodeTaskMap, nodeMap, existingTasks);
+        NodeMap nodeMapSlice = this.nodeMap.get().get();
+        NodeAssignmentStats assignmentStats = new NodeAssignmentStats(nodeTaskMap, nodeMapSlice, existingTasks);
 
-        ResettableRandomizedIterator<InternalNode> randomCandidates = randomizedNodes(nodeMap, ImmutableSet.of());
+        ResettableRandomizedIterator<InternalNode> randomCandidates = randomizedNodes(nodeMapSlice, ImmutableSet.of());
         Set<InternalNode> blockedExactNodes = new HashSet<>();
         boolean splitWaitingForAnyNode = false;
         // splitsToBeRedistributed becomes true only when splits go through locality-based assignment
@@ -182,7 +182,7 @@ public class SimpleNodeSelector
             if (optimizedLocalScheduling) { //should not hit for consumer case
                 for (Split split : splits) {
                     if (split.isRemotelyAccessible() && !split.getAddresses().isEmpty()) {
-                        List<InternalNode> candidateNodes = selectExactNodes(nodeMap, split.getAddresses(), includeCoordinator);
+                        List<InternalNode> candidateNodes = selectExactNodes(nodeMapSlice, split.getAddresses(), includeCoordinator);
 
                         Optional<InternalNode> chosenNode = candidateNodes.stream()
                                 .filter(ownerNode -> assignmentStats.getTotalSplitCount(ownerNode) < maxSplitsPerNode)
@@ -206,13 +206,13 @@ public class SimpleNodeSelector
 
                 List<InternalNode> candidateNodes;
                 if (!split.isRemotelyAccessible()) {
-                    candidateNodes = selectExactNodes(nodeMap, split.getAddresses(), includeCoordinator);
+                    candidateNodes = selectExactNodes(nodeMapSlice, split.getAddresses(), includeCoordinator);
                 }
                 else {
                     candidateNodes = selectNodes(minCandidates, randomCandidates);
                 }
                 if (candidateNodes.isEmpty()) {
-                    log.debug("No nodes available to schedule %s. Available nodes %s", split, nodeMap.getNodesByHost().keys());
+                    log.debug("No nodes available to schedule %s. Available nodes %s", split, nodeMapSlice.getNodesByHost().keys());
                     throw new PrestoException(NO_NODES_AVAILABLE, "No nodes available to run query");
                 }
 
@@ -262,7 +262,7 @@ public class SimpleNodeSelector
 
         if (!stage.isPresent() || stage.get().getStateMachine().getConsumerScanNode() == null) {
             if (splitsToBeRedistributed) { //skip for consumer
-                equateDistribution(assignment, assignmentStats, nodeMap);
+                equateDistribution(assignment, assignmentStats, nodeMapSlice);
             }
         }
 

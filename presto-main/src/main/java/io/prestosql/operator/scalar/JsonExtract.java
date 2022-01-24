@@ -354,6 +354,7 @@ public final class JsonExtract
             index = Integer.parseInt(fieldName);
         }
         catch (NumberFormatException ignored) {
+            // the exception could be ignored
         }
         return index;
     }

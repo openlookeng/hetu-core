@@ -80,16 +80,16 @@ class ClientBuffer
         //
 
         @SuppressWarnings("FieldAccessNotGuarded")
-        boolean destroyed = this.destroyed.get();
+        boolean bufferDestroyed = this.destroyed.get();
 
         @SuppressWarnings("FieldAccessNotGuarded")
         long sequenceId = this.currentSequenceId.get();
 
         // if destroyed the buffered page count must be zero regardless of observation ordering in this lock free code
-        int bufferedPages = destroyed ? 0 : Math.max(toIntExact(pagesAdded.get() - sequenceId), 0);
+        int bufferedPages = bufferDestroyed ? 0 : Math.max(toIntExact(pagesAdded.get() - sequenceId), 0);
 
         PageBufferInfo pageBufferInfo = new PageBufferInfo(bufferId.getId(), bufferedPages, bufferedBytes.get(), rowsAdded.get(), pagesAdded.get());
-        return new BufferInfo(bufferId, destroyed, bufferedPages, sequenceId, pageBufferInfo);
+        return new BufferInfo(bufferId, bufferDestroyed, bufferedPages, sequenceId, pageBufferInfo);
     }
 
     public boolean isDestroyed()
@@ -98,14 +98,14 @@ class ClientBuffer
         // NOTE: this code must be lock free so state machine updates do not hang
         //
         @SuppressWarnings("FieldAccessNotGuarded")
-        boolean destroyed = this.destroyed.get();
-        return destroyed;
+        boolean bufferDestroyed = this.destroyed.get();
+        return bufferDestroyed;
     }
 
     public void destroy()
     {
         List<SerializedPageReference> removedPages;
-        PendingRead pendingRead;
+        PendingRead finalPendingRead;
         synchronized (this) {
             removedPages = ImmutableList.copyOf(pages);
             pages.clear();
@@ -115,20 +115,20 @@ class ClientBuffer
             noMorePages = true;
             destroyed.set(true);
 
-            pendingRead = this.pendingRead;
+            finalPendingRead = this.pendingRead;
             this.pendingRead = null;
         }
 
         removedPages.forEach(SerializedPageReference::dereferencePage);
 
-        if (pendingRead != null) {
-            pendingRead.completeResultFutureWithEmpty();
+        if (finalPendingRead != null) {
+            finalPendingRead.completeResultFutureWithEmpty();
         }
     }
 
     public void enqueuePages(Collection<SerializedPageReference> pages)
     {
-        PendingRead pendingRead;
+        PendingRead finalPendingRead;
         synchronized (this) {
             // ignore pages after no more pages is set
             // this can happen with limit queries
@@ -138,13 +138,13 @@ class ClientBuffer
 
             addPages(pages);
 
-            pendingRead = this.pendingRead;
+            finalPendingRead = this.pendingRead;
             this.pendingRead = null;
         }
 
         // we just added a page, so process the pending read
-        if (pendingRead != null) {
-            processRead(pendingRead);
+        if (finalPendingRead != null) {
+            processRead(finalPendingRead);
         }
     }
 
@@ -203,7 +203,7 @@ class ClientBuffer
 
     public void setNoMorePages()
     {
-        PendingRead pendingRead;
+        PendingRead finalPendingRead;
         synchronized (this) {
             // ignore duplicate calls
             if (noMorePages) {
@@ -212,13 +212,13 @@ class ClientBuffer
 
             noMorePages = true;
 
-            pendingRead = this.pendingRead;
+            finalPendingRead = this.pendingRead;
             this.pendingRead = null;
         }
 
         // there will be no more pages, so process the pending read
-        if (pendingRead != null) {
-            processRead(pendingRead);
+        if (finalPendingRead != null) {
+            processRead(finalPendingRead);
         }
     }
 
@@ -410,12 +410,12 @@ class ClientBuffer
         long sequenceId = currentSequenceId.get();
 
         @SuppressWarnings("FieldAccessNotGuarded")
-        boolean destroyed = this.destroyed.get();
+        boolean bufferDestroyed = this.destroyed.get();
 
         return toStringHelper(this)
                 .add("bufferId", bufferId)
                 .add("sequenceId", sequenceId)
-                .add("destroyed", destroyed)
+                .add("destroyed", bufferDestroyed)
                 .toString();
     }
 

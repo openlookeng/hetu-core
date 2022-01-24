@@ -48,6 +48,7 @@ import org.openjdk.jmh.runner.options.VerboseMode;
 import org.openjdk.jmh.runner.options.WarmupMode;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
@@ -139,9 +140,9 @@ public class BenchmarkJsonToMapCast
                     String key = "key" + i;
                     String value = generateRandomJsonValue(valueType);
                     jsonSlice.appendByte('"');
-                    jsonSlice.appendBytes(key.getBytes());
-                    jsonSlice.appendBytes("\":".getBytes());
-                    jsonSlice.appendBytes(value.getBytes());
+                    jsonSlice.appendBytes(key.getBytes(StandardCharsets.UTF_8));
+                    jsonSlice.appendBytes("\":".getBytes(StandardCharsets.UTF_8));
+                    jsonSlice.appendBytes(value.getBytes(StandardCharsets.UTF_8));
                 }
                 jsonSlice.appendByte('}');
 

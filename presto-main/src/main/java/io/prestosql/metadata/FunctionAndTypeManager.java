@@ -306,6 +306,7 @@ public class FunctionAndTypeManager
         }
     }
 
+    @Override
     public void createFunction(SqlInvokedFunction function, boolean replace)
     {
         Optional<FunctionNamespaceManager<?>> functionNamespaceManager = getServingFunctionNamespaceManager(function.getSignature().getName().getCatalogSchemaName());

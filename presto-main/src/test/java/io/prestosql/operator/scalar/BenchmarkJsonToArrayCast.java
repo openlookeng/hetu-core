@@ -47,6 +47,7 @@ import org.openjdk.jmh.runner.options.VerboseMode;
 import org.openjdk.jmh.runner.options.WarmupMode;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
@@ -136,7 +137,7 @@ public class BenchmarkJsonToArrayCast
                         jsonSlice.appendByte(',');
                     }
                     String value = generateRandomJsonValue(elementType);
-                    jsonSlice.appendBytes(value.getBytes());
+                    jsonSlice.appendBytes(value.getBytes(StandardCharsets.UTF_8));
                 }
                 jsonSlice.appendByte(']');
 

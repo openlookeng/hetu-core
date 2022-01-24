@@ -525,7 +525,7 @@ public class ReorderJoins
         @Override
         public int hashCode()
         {
-            return Objects.hash(sources, ImmutableSet.copyOf(logicalRowExpressions.extractConjuncts(filter)), outputSymbols);
+            return Objects.hash(sources, ImmutableSet.copyOf(LogicalRowExpressions.extractConjuncts(filter)), outputSymbols);
         }
 
         @Override
@@ -537,7 +537,7 @@ public class ReorderJoins
 
             MultiJoinNode other = (MultiJoinNode) obj;
             return this.sources.equals(other.sources)
-                    && ImmutableSet.copyOf(logicalRowExpressions.extractConjuncts(this.filter)).equals(ImmutableSet.copyOf(logicalRowExpressions.extractConjuncts(other.filter)))
+                    && ImmutableSet.copyOf(LogicalRowExpressions.extractConjuncts(this.filter)).equals(ImmutableSet.copyOf(LogicalRowExpressions.extractConjuncts(other.filter)))
                     && this.outputSymbols.equals(other.outputSymbols);
         }
 

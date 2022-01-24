@@ -153,15 +153,15 @@ public class EliminateCrossJoins
         requireNonNull(expectedOutputSymbols, "expectedOutputSymbols is null");
         requireNonNull(idAllocator, "idAllocator is null");
         requireNonNull(graph, "graph is null");
-        joinOrder = ImmutableList.copyOf(requireNonNull(joinOrder, "joinOrder is null"));
-        checkArgument(joinOrder.size() >= 2);
+        ImmutableList<Integer> finalJoinOrder = ImmutableList.copyOf(requireNonNull(joinOrder, "joinOrder is null"));
+        checkArgument(finalJoinOrder.size() >= 2);
 
-        PlanNode result = graph.getNode(joinOrder.get(0));
+        PlanNode result = graph.getNode(finalJoinOrder.get(0));
         Set<PlanNodeId> alreadyJoinedNodes = new HashSet<>();
         alreadyJoinedNodes.add(result.getId());
 
-        for (int i = 1; i < joinOrder.size(); i++) {
-            PlanNode rightNode = graph.getNode(joinOrder.get(i));
+        for (int i = 1; i < finalJoinOrder.size(); i++) {
+            PlanNode rightNode = graph.getNode(finalJoinOrder.get(i));
             alreadyJoinedNodes.add(rightNode.getId());
 
             ImmutableList.Builder<JoinNode.EquiJoinClause> criteria = ImmutableList.builder();

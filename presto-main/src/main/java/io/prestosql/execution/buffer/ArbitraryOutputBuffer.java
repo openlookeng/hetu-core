@@ -147,16 +147,16 @@ public class ArbitraryOutputBuffer
         //
 
         // always get the state first before any other stats
-        BufferState state = this.state.get();
+        BufferState bufferState = this.state.get();
 
         // buffers it a concurrent collection so it is safe to access out side of guard
         // in this case we only want a snapshot of the current buffers
         @SuppressWarnings("FieldAccessNotGuarded")
-        Collection<ClientBuffer> buffers = this.buffers.values();
+        Collection<ClientBuffer> clientBuffers = this.buffers.values();
 
         int totalBufferedPages = masterBuffer.getBufferedPages();
         ImmutableList.Builder<BufferInfo> infos = ImmutableList.builder();
-        for (ClientBuffer buffer : buffers) {
+        for (ClientBuffer buffer : clientBuffers) {
             BufferInfo bufferInfo = buffer.getInfo();
             infos.add(bufferInfo);
 
@@ -166,9 +166,9 @@ public class ArbitraryOutputBuffer
 
         return new OutputBufferInfo(
                 "ARBITRARY",
-                state,
-                state.canAddBuffers(),
-                state.canAddPages(),
+                bufferState,
+                bufferState.canAddBuffers(),
+                bufferState.canAddPages(),
                 memoryManager.getBufferedBytes(),
                 totalBufferedPages,
                 totalRowsAdded.get(),
@@ -185,8 +185,8 @@ public class ArbitraryOutputBuffer
         synchronized (this) {
             // ignore buffers added after query finishes, which can happen when a query is canceled
             // also ignore old versions, which is normal
-            BufferState state = this.state.get();
-            if (state.isTerminal() || outputBuffers.getVersion() >= newOutputBuffers.getVersion()) {
+            BufferState bufferState = this.state.get();
+            if (bufferState.isTerminal() || outputBuffers.getVersion() >= newOutputBuffers.getVersion()) {
                 return;
             }
 
@@ -241,13 +241,13 @@ public class ArbitraryOutputBuffer
         // but still arrives at the buffer *before* the marker. These pages are potentially used twice, if we resume from this marker.
         synchronized (this) {
             // All marker related processing is handled by this utility method
-            pages = snapshotState.processSerializedPages(pages, origin);
+            List<SerializedPage> finalPages = snapshotState.processSerializedPages(pages, origin);
             Collection<ClientBuffer> targetClients = null;
-            if (pages.size() == 1 && pages.get(0).isMarkerPage()) {
+            if (finalPages.size() == 1 && finalPages.get(0).isMarkerPage()) {
                 // Broadcast marker to all clients
                 targetClients = safeGetBuffersSnapshot();
             }
-            doEnqueue(pages, targetClients);
+            doEnqueue(finalPages, targetClients);
         }
     }
 
@@ -392,15 +392,15 @@ public class ArbitraryOutputBuffer
         // NOTE: buffers are allowed to be created in the FINISHED state because destroy() can move to the finished state
         // without a clean "no-more-buffers" message from the scheduler.  This happens with limit queries and is ok because
         // the buffer will be immediately destroyed.
-        BufferState state = this.state.get();
-        checkState(state.canAddBuffers() || !outputBuffers.isNoMoreBufferIds(), "No more buffers already set");
+        BufferState bufferState = this.state.get();
+        checkState(bufferState.canAddBuffers() || !outputBuffers.isNoMoreBufferIds(), "No more buffers already set");
 
         // NOTE: buffers are allowed to be created before they are explicitly declared by setOutputBuffers
         // When no-more-buffers is set, we verify that all created buffers have been declared
         buffer = new ClientBuffer(id);
 
         // do not setup the new buffer if we are already failed
-        if (state != FAILED) {
+        if (bufferState != FAILED) {
             // add pending markers
             if (!markersForNewBuffers.isEmpty()) {
                 markersForNewBuffers.forEach(SerializedPageReference::addReference);
@@ -408,7 +408,7 @@ public class ArbitraryOutputBuffer
             }
 
             // buffer may have finished immediately before calling this method
-            if (state == FINISHED) {
+            if (bufferState == FINISHED) {
                 buffer.destroy();
             }
         }
@@ -451,8 +451,8 @@ public class ArbitraryOutputBuffer
         // This buffer type assigns each page to a single, arbitrary reader,
         // so we don't need to wait for no-more-buffers to finish the buffer.
         // Any readers added after finish will simply receive no data.
-        BufferState state = this.state.get();
-        if ((state == FLUSHING) || ((state == NO_MORE_PAGES) && masterBuffer.isEmpty())) {
+        BufferState bufferState = this.state.get();
+        if ((bufferState == FLUSHING) || ((bufferState == NO_MORE_PAGES) && masterBuffer.isEmpty())) {
             if (safeGetBuffersSnapshot().stream().allMatch(ClientBuffer::isDestroyed)) {
                 destroy();
             }

@@ -165,8 +165,7 @@ public class PhasedExecutionSchedule
             }
         }
 
-        List<Set<PlanFragmentId>> schedulePhases = ImmutableList.copyOf(new TopologicalOrderIterator<>(componentGraph));
-        return schedulePhases;
+        return ImmutableList.copyOf(new TopologicalOrderIterator<>(componentGraph));
     }
 
     private static class Visitor

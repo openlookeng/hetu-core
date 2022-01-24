@@ -279,21 +279,6 @@ public class MemoryTableManager
         }
 
         // TODO: disabling limit and sample pushdown for now
-//        boolean done = false;
-//        long totalRows = 0;
-//        for (int i = partNumber; i < pages.size() && !done; i += totalParts) {
-//            if (sampleRatio.isPresent() && ThreadLocalRandom.current().nextDouble() >= sampleRatio.getAsDouble()) {
-//                continue;
-//            }
-//
-//            Page page = pages.get(i);
-//            totalRows += page.getPositionCount();
-//            if (limit.isPresent() && totalRows > limit.getAsLong()) {
-//                page = page.getRegion(0, (int) (page.getPositionCount() - (totalRows - limit.getAsLong())));
-//                done = true;
-//            }
-//            partitionedPages.add(getColumns(page, columnIndexes));
-//        }
         return projectedPages.build();
     }
 

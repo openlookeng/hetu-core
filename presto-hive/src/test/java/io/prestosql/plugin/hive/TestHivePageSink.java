@@ -137,7 +137,14 @@ public class TestHivePageSink
 
     private static String makeFileName(File tempDir, HiveConfig config)
     {
-        return tempDir.getAbsolutePath() + "/" + config.getHiveStorageFormat().name() + "." + config.getHiveCompressionCodec().name();
+        try {
+            return tempDir.getCanonicalPath() + "/" + config.getHiveStorageFormat().name() + "." + config.getHiveCompressionCodec().name();
+        }
+        catch (IOException e) {
+            System.out.println("error when make fileName");
+            // could be ignored
+        }
+        return null;
     }
 
     private static long writeTestFile(HiveConfig config, HiveMetastore metastore, String outputPath)
@@ -226,27 +233,33 @@ public class TestHivePageSink
         splitProperties.setProperty(SERIALIZATION_LIB, config.getHiveStorageFormat().getSerDe());
         splitProperties.setProperty("columns", Joiner.on(',').join(getColumnHandles().stream().map(HiveColumnHandle::getName).collect(toList())));
         splitProperties.setProperty("columns.types", Joiner.on(',').join(getColumnHandles().stream().map(HiveColumnHandle::getHiveType).map(hiveType -> hiveType.getHiveTypeName().toString()).collect(toList())));
-        HiveSplitWrapper split = HiveSplitWrapper.wrap(new HiveSplit(
-                SCHEMA_NAME,
-                TABLE_NAME,
-                "",
-                "file:///" + outputFile.getAbsolutePath(),
-                0,
-                outputFile.length(),
-                outputFile.length(),
-                0,
-                splitProperties,
-                ImmutableList.of(),
-                ImmutableList.of(),
-                OptionalInt.empty(),
-                false,
-                ImmutableMap.of(),
-                Optional.empty(),
-                false,
-                Optional.empty(),
-                Optional.empty(),
-                false,
-                ImmutableMap.of()));
+        HiveSplitWrapper split = null;
+        try {
+            split = HiveSplitWrapper.wrap(new HiveSplit(
+                    SCHEMA_NAME,
+                    TABLE_NAME,
+                    "",
+                    "file:///" + outputFile.getCanonicalPath(),
+                    0,
+                    outputFile.length(),
+                    outputFile.length(),
+                    0,
+                    splitProperties,
+                    ImmutableList.of(),
+                    ImmutableList.of(),
+                    OptionalInt.empty(),
+                    false,
+                    ImmutableMap.of(),
+                    Optional.empty(),
+                    false,
+                    Optional.empty(),
+                    Optional.empty(),
+                    false,
+                    ImmutableMap.of()));
+        }
+        catch (IOException e) {
+            System.out.println(e.getMessage());
+        }
         ConnectorTableHandle table = new HiveTableHandle(SCHEMA_NAME, TABLE_NAME, ImmutableMap.of(), ImmutableList.of(), Optional.empty());
         HivePageSourceProvider provider = new HivePageSourceProvider(config, HiveTestUtils.createTestHdfsEnvironment(config), HiveTestUtils.getDefaultHiveRecordCursorProvider(config), HiveTestUtils.getDefaultHiveDataStreamFactories(config), HiveTestUtils.TYPE_MANAGER, HiveTestUtils.getNoOpIndexCache(), getDefaultHiveSelectiveFactories(config));
         return provider.createPageSource(transaction, getSession(config), split, table, ImmutableList.copyOf(getColumnHandles()));
@@ -402,8 +415,8 @@ public class TestHivePageSink
             throws IOException
     {
         HivePageSink hivePageSink = prepareHivePageSink();
-        Page page1 = new Page(new IntArrayBlock(1, Optional.empty(), new int[]{0}));
-        Page page2 = new Page(new IntArrayBlock(1, Optional.empty(), new int[]{1}));
+        Page page1 = new Page(new IntArrayBlock(1, Optional.empty(), new int[] {0}));
+        Page page2 = new Page(new IntArrayBlock(1, Optional.empty(), new int[] {1}));
         hivePageSink.appendPage(page1);
         Object state = hivePageSink.capture(null);
         hivePageSink.appendPage(page2);
@@ -419,8 +432,8 @@ public class TestHivePageSink
     {
         HivePageSink hivePageSink = prepareHivePageSink();
 
-        Page page1 = new Page(new IntArrayBlock(1, Optional.empty(), new int[]{0}));
-        Page page2 = new Page(new IntArrayBlock(1, Optional.empty(), new int[]{1}));
+        Page page1 = new Page(new IntArrayBlock(1, Optional.empty(), new int[] {0}));
+        Page page2 = new Page(new IntArrayBlock(1, Optional.empty(), new int[] {1}));
         hivePageSink.appendPage(page1);
         Object state = hivePageSink.capture(null);
         hivePageSink.appendPage(page2);

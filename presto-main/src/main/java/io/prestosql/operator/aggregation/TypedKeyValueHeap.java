@@ -123,10 +123,10 @@ public class TypedKeyValueHeap
 
     public static TypedKeyValueHeap deserialize(Block block, Type keyType, Type valueType, BlockComparator blockComparator)
     {
-        int capacity = toIntExact(BIGINT.getLong(block, 0));
+        int blockCapacity = toIntExact(BIGINT.getLong(block, 0));
         Block keysBlock = new ArrayType(keyType).getObject(block, 1);
         Block valuesBlock = new ArrayType(valueType).getObject(block, 2);
-        TypedKeyValueHeap heap = new TypedKeyValueHeap(blockComparator, keyType, valueType, capacity);
+        TypedKeyValueHeap heap = new TypedKeyValueHeap(blockComparator, keyType, valueType, blockCapacity);
         heap.addAll(keysBlock, valuesBlock);
         return heap;
     }

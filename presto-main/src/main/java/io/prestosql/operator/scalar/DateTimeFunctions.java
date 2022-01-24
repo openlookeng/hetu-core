@@ -464,8 +464,9 @@ public final class DateTimeFunctions
                 return QUARTER_OF_YEAR.getField(chronology);
             case "year":
                 return chronology.year();
+            default:
+                throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "'" + unitString + "' is not a valid DATE field");
         }
-        throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "'" + unitString + "' is not a valid DATE field");
     }
 
     private static DateTimeField getTimeField(ISOChronology chronology, Slice unit)
@@ -480,8 +481,9 @@ public final class DateTimeFunctions
                 return chronology.minuteOfHour();
             case "hour":
                 return chronology.hourOfDay();
+            default:
+                throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "'" + unitString + "' is not a valid Time field");
         }
-        throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "'" + unitString + "' is not a valid Time field");
     }
 
     private static DateTimeField getTimestampField(ISOChronology chronology, Slice unit)
@@ -506,8 +508,9 @@ public final class DateTimeFunctions
                 return QUARTER_OF_YEAR.getField(chronology);
             case "year":
                 return chronology.year();
+            default:
+                throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "'" + unitString + "' is not a valid Timestamp field");
         }
-        throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "'" + unitString + "' is not a valid Timestamp field");
     }
 
     @Description("parses the specified date/time by the given format")
@@ -574,6 +577,8 @@ public final class DateTimeFunctions
                     // '' (two apostrophes) in a pattern denote single apostrophe and here we interpret this as "start quote" + "end quote".
                     // This has no impact on method's result value.
                     quoted = true;
+                    break;
+                default:
                     break;
             }
         }

@@ -1654,14 +1654,14 @@ public final class MetadataManager
 
         private synchronized void finish()
         {
-            List<CatalogMetadata> catalogs;
+            List<CatalogMetadata> catalogMetadataList;
             synchronized (this) {
                 checkState(!finished, "Query is already finished");
                 finished = true;
-                catalogs = new ArrayList<>(this.catalogs.values());
+                catalogMetadataList = new ArrayList<>(this.catalogs.values());
             }
 
-            for (CatalogMetadata catalogMetadata : catalogs) {
+            for (CatalogMetadata catalogMetadata : catalogMetadataList) {
                 ConnectorSession connectorSession = session.toConnectorSession(catalogMetadata.getCatalogName());
                 catalogMetadata.getMetadata().cleanupQuery(connectorSession);
             }

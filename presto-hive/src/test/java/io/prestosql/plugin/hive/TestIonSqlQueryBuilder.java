@@ -79,8 +79,8 @@ public class TestIonSqlQueryBuilder
     @Test
     public void testDecimalColumns()
     {
-        TypeManager typeManager = this.typeManager;
-        IonSqlQueryBuilder queryBuilder = new IonSqlQueryBuilder(typeManager);
+        TypeManager manager = this.typeManager;
+        IonSqlQueryBuilder queryBuilder = new IonSqlQueryBuilder(manager);
         List<HiveColumnHandle> columns = ImmutableList.of(
                 new HiveColumnHandle("quantity", HiveType.valueOf("decimal(20,0)"), parseTypeSignature(DECIMAL), 0, REGULAR, Optional.empty()),
                 new HiveColumnHandle("extendedprice", HiveType.valueOf("decimal(20,2)"), parseTypeSignature(DECIMAL), 1, REGULAR, Optional.empty()),
@@ -89,7 +89,7 @@ public class TestIonSqlQueryBuilder
         TupleDomain<HiveColumnHandle> tupleDomain = withColumnDomains(
                 ImmutableMap.of(
                         columns.get(0), Domain.create(ofRanges(Range.lessThan(DecimalType.createDecimalType(20, 0), HiveTestUtils.longDecimal("50"))), false),
-                        columns.get(1), Domain.create(ofRanges(Range.equal(HiveType.valueOf("decimal(20,2)").getType(typeManager), HiveTestUtils.longDecimal("0.05"))), false),
+                        columns.get(1), Domain.create(ofRanges(Range.equal(HiveType.valueOf("decimal(20,2)").getType(manager), HiveTestUtils.longDecimal("0.05"))), false),
                         columns.get(2), Domain.create(ofRanges(Range.range(decimalType, HiveTestUtils.shortDecimal("0.0"), true, HiveTestUtils.shortDecimal("0.02"), true)), false)));
         assertEquals("SELECT s._1, s._2, s._3 FROM S3Object s WHERE ((case s._1 when '' then null else CAST(s._1 AS DECIMAL(20,0)) end < 50)) AND " +
                         "(case s._2 when '' then null else CAST(s._2 AS DECIMAL(20,2)) end = 0.05) AND ((case s._3 when '' then null else CAST(s._3 AS DECIMAL(10,2)) " +

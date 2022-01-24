@@ -23,6 +23,7 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.testing.MaterializedResult;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static io.airlift.slice.Slices.wrappedBuffer;
@@ -79,7 +80,7 @@ public class TestPageSplitterUtil
         int maxPageSizeInBytes = 1;
         List<Type> types = ImmutableList.of(VARCHAR);
 
-        Slice expectedValue = wrappedBuffer("test".getBytes());
+        Slice expectedValue = wrappedBuffer("test".getBytes(StandardCharsets.UTF_8));
         BlockBuilder blockBuilder = VARCHAR.createBlockBuilder(null, 1, expectedValue.length());
         blockBuilder.writeBytes(expectedValue, 0, expectedValue.length()).closeEntry();
         Block rleBlock = new RunLengthEncodedBlock(blockBuilder.build(), positionCount);

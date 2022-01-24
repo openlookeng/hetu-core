@@ -175,14 +175,15 @@ public class NumericHistogram
 
         PriorityQueue<Entry> queue = initializeQueue(values, weights, count);
 
-        while (count > targetCount) {
+        int totalCount = count;
+        while (totalCount > targetCount) {
             Entry current = queue.poll();
             if (!current.isValid()) {
                 // ignore entries that have already been replaced
                 continue;
             }
 
-            count--;
+            totalCount--;
 
             Entry right = current.getRight();
 

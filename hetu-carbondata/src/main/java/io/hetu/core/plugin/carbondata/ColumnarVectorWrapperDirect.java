@@ -143,14 +143,15 @@ class ColumnarVectorWrapperDirect
     @Override
     public void putDecimals(int rowId, int count, BigDecimal value, int precision)
     {
+        int inputRowId = rowId;
         for (int i = 0; i < count; i++) {
-            if (nullBitSet.get(rowId)) {
-                columnVector.putNull(rowId);
+            if (nullBitSet.get(inputRowId)) {
+                columnVector.putNull(inputRowId);
             }
             else {
-                columnVector.putDecimal(rowId, value, precision);
+                columnVector.putDecimal(inputRowId, value, precision);
             }
-            rowId++;
+            inputRowId++;
         }
     }
 
@@ -185,8 +186,9 @@ class ColumnarVectorWrapperDirect
     @Override
     public void putByteArray(int rowId, int count, byte[] value)
     {
+        int inputRowId = rowId;
         for (int i = 0; i < count; i++) {
-            columnVector.putByteArray(rowId++, value);
+            columnVector.putByteArray(inputRowId++, value);
         }
     }
 
@@ -303,84 +305,90 @@ class ColumnarVectorWrapperDirect
     @Override
     public void putFloats(int rowId, int count, float[] src, int srcIndex)
     {
+        int inputRowId = rowId;
         for (int i = 0; i < count; i++) {
-            if (nullBitSet.get(rowId)) {
-                columnVector.putNull(rowId);
+            if (nullBitSet.get(inputRowId)) {
+                columnVector.putNull(inputRowId);
             }
             else {
-                columnVector.putFloat(rowId, src[i]);
+                columnVector.putFloat(inputRowId, src[i]);
             }
-            rowId++;
+            inputRowId++;
         }
     }
 
     @Override
     public void putShorts(int rowId, int count, short[] src, int srcIndex)
     {
+        int inputRowId = rowId;
         for (int i = 0; i < count; i++) {
-            if (nullBitSet.get(rowId)) {
-                columnVector.putNull(rowId);
+            if (nullBitSet.get(inputRowId)) {
+                columnVector.putNull(inputRowId);
             }
             else {
-                columnVector.putShort(rowId, src[i]);
+                columnVector.putShort(inputRowId, src[i]);
             }
-            rowId++;
+            inputRowId++;
         }
     }
 
     @Override
     public void putInts(int rowId, int count, int[] src, int srcIndex)
     {
+        int inputRowId = rowId;
         for (int i = 0; i < count; i++) {
-            if (nullBitSet.get(rowId)) {
-                columnVector.putNull(rowId);
+            if (nullBitSet.get(inputRowId)) {
+                columnVector.putNull(inputRowId);
             }
             else {
-                columnVector.putInt(rowId, src[i]);
+                columnVector.putInt(inputRowId, src[i]);
             }
-            rowId++;
+            inputRowId++;
         }
     }
 
     @Override
     public void putLongs(int rowId, int count, long[] src, int srcIndex)
     {
+        int inputRowId = rowId;
         for (int i = 0; i < count; i++) {
-            if (nullBitSet.get(rowId)) {
-                columnVector.putNull(rowId);
+            if (nullBitSet.get(inputRowId)) {
+                columnVector.putNull(inputRowId);
             }
             else {
-                columnVector.putLong(rowId, src[i]);
+                columnVector.putLong(inputRowId, src[i]);
             }
-            rowId++;
+            inputRowId++;
         }
     }
 
     @Override
     public void putDoubles(int rowId, int count, double[] src, int srcIndex)
     {
+        int inputRowId = rowId;
         for (int i = 0; i < count; i++) {
-            if (nullBitSet.get(rowId)) {
-                columnVector.putNull(rowId);
+            if (nullBitSet.get(inputRowId)) {
+                columnVector.putNull(inputRowId);
             }
             else {
-                columnVector.putDouble(rowId, src[i]);
+                columnVector.putDouble(inputRowId, src[i]);
             }
-            rowId++;
+            inputRowId++;
         }
     }
 
     @Override
     public void putBytes(int rowId, int count, byte[] src, int srcIndex)
     {
+        int inputRowId = rowId;
         for (int i = 0; i < count; i++) {
-            if (nullBitSet.get(rowId)) {
-                columnVector.putNull(rowId);
+            if (nullBitSet.get(inputRowId)) {
+                columnVector.putNull(inputRowId);
             }
             else {
-                columnVector.putByte(rowId, src[i]);
+                columnVector.putByte(inputRowId, src[i]);
             }
-            rowId++;
+            inputRowId++;
         }
     }
 

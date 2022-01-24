@@ -219,6 +219,7 @@ public class HandleResolver
                 }
             }
             catch (UnsupportedOperationException ignored) {
+                // could be ignored
             }
         }
         throw new IllegalArgumentException("No connector for handle: " + handle);
@@ -234,6 +235,7 @@ public class HandleResolver
                 }
             }
             catch (UnsupportedOperationException ignored) {
+                // could be ignored
             }
         }
         throw new IllegalArgumentException("No connector for handle: " + handle);

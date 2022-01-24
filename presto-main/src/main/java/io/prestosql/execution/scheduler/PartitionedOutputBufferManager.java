@@ -43,12 +43,12 @@ public class PartitionedOutputBufferManager
             partitions.put(new OutputBufferId(partition), partition);
         }
 
-        OutputBuffers outputBuffers = createInitialEmptyOutputBuffers(requireNonNull(partitioningHandle, "partitioningHandle is null"))
+        OutputBuffers buffers = createInitialEmptyOutputBuffers(requireNonNull(partitioningHandle, "partitioningHandle is null"))
                 .withBuffers(partitions.build())
                 .withNoMoreBufferIds();
-        outputBufferTarget.accept(outputBuffers);
+        outputBufferTarget.accept(buffers);
 
-        this.outputBuffers = outputBuffers.getBuffers();
+        this.outputBuffers = buffers.getBuffers();
     }
 
     @Override

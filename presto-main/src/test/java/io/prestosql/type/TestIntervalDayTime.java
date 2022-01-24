@@ -88,9 +88,9 @@ public class TestIntervalDayTime
     {
         assertFunction(projection, expectedType, expectedValue);
 
-        projection = projection.replace("INTERVAL '", "INTERVAL '-");
-        expectedValue = new SqlIntervalDayTime(-expectedValue.getMillis());
-        assertFunction(projection, expectedType, expectedValue);
+        String actualProjection = projection.replace("INTERVAL '", "INTERVAL '-");
+        SqlIntervalDayTime expectedProjection = new SqlIntervalDayTime(-expectedValue.getMillis());
+        assertFunction(actualProjection, expectedType, expectedProjection);
     }
 
     @Test

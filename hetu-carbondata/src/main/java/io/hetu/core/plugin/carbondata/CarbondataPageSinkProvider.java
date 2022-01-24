@@ -163,6 +163,7 @@ public class CarbondataPageSinkProvider
                 ImmutableMap.of(), handle.getAdditionalConf(), false);
     }
 
+    @Override
     public ConnectorPageSink createPageSink(ConnectorTransactionHandle transaction, ConnectorSession session, ConnectorOutputTableHandle tableHandle)
     {
         CarbondataOutputTableHandle handle = (CarbondataOutputTableHandle) tableHandle;

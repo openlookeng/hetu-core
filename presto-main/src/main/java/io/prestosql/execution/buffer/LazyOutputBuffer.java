@@ -127,13 +127,13 @@ public class LazyOutputBuffer
             //
             // NOTE: this code must be lock free to not hanging state machine updates
             //
-            BufferState state = this.state.get();
+            BufferState bufferState = this.state.get();
 
             return new OutputBufferInfo(
                     "UNINITIALIZED",
-                    state,
-                    state.canAddBuffers(),
-                    state.canAddPages(),
+                    bufferState,
+                    bufferState.canAddBuffers(),
+                    bufferState.canAddPages(),
                     0,
                     0,
                     0,
@@ -146,8 +146,8 @@ public class LazyOutputBuffer
     @Override
     public void setOutputBuffers(OutputBuffers newOutputBuffers)
     {
-        Set<OutputBufferId> abortedBuffers = ImmutableSet.of();
-        List<PendingRead> pendingReads = ImmutableList.of();
+        Set<OutputBufferId> abortedBuffersIds = ImmutableSet.of();
+        List<PendingRead> bufferPendingReads = ImmutableList.of();
         OutputBuffer outputBuffer;
         synchronized (this) {
             if (delegate == null) {
@@ -168,9 +168,9 @@ public class LazyOutputBuffer
                 }
 
                 // process pending aborts and reads outside of synchronized lock
-                abortedBuffers = ImmutableSet.copyOf(this.abortedBuffers);
+                abortedBuffersIds = ImmutableSet.copyOf(this.abortedBuffers);
                 this.abortedBuffers.clear();
-                pendingReads = ImmutableList.copyOf(this.pendingReads);
+                bufferPendingReads = ImmutableList.copyOf(this.pendingReads);
                 this.pendingReads.clear();
             }
             outputBuffer = delegate;
@@ -179,8 +179,8 @@ public class LazyOutputBuffer
         outputBuffer.setOutputBuffers(newOutputBuffers);
 
         // process pending aborts and reads outside of synchronized lock
-        abortedBuffers.forEach(outputBuffer::abort);
-        for (PendingRead pendingRead : pendingReads) {
+        abortedBuffersIds.forEach(outputBuffer::abort);
+        for (PendingRead pendingRead : bufferPendingReads) {
             pendingRead.process(outputBuffer);
         }
     }
@@ -279,7 +279,7 @@ public class LazyOutputBuffer
     public void destroy()
     {
         OutputBuffer outputBuffer;
-        List<PendingRead> pendingReads = ImmutableList.of();
+        List<PendingRead> bufferPendingReads = ImmutableList.of();
         synchronized (this) {
             if (delegate == null) {
                 // ignore destroy if the buffer already in a terminal state.
@@ -287,7 +287,7 @@ public class LazyOutputBuffer
                     return;
                 }
 
-                pendingReads = ImmutableList.copyOf(this.pendingReads);
+                bufferPendingReads = ImmutableList.copyOf(this.pendingReads);
                 this.pendingReads.clear();
             }
             outputBuffer = delegate;
@@ -295,7 +295,7 @@ public class LazyOutputBuffer
 
         // if there is no output buffer, free the pending reads
         if (outputBuffer == null) {
-            for (PendingRead pendingRead : pendingReads) {
+            for (PendingRead pendingRead : bufferPendingReads) {
                 pendingRead.getFutureResult().set(emptyResults(0, true));
             }
             return;

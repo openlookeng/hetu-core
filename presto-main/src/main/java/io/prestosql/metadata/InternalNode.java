@@ -45,8 +45,8 @@ public class InternalNode
             @JsonProperty("nodeVersion") NodeVersion nodeVersion,
             @JsonProperty("coordinator") boolean coordinator)
     {
-        nodeIdentifier = emptyToNull(nullToEmpty(nodeIdentifier).trim());
-        this.nodeIdentifier = requireNonNull(nodeIdentifier, "nodeIdentifier is null or empty");
+        String trimNodeIdentifier = emptyToNull(nullToEmpty(nodeIdentifier).trim());
+        this.nodeIdentifier = requireNonNull(trimNodeIdentifier, "nodeIdentifier is null or empty");
         this.internalUri = requireNonNull(internalUri, "internalUri is null");
         this.nodeVersion = requireNonNull(nodeVersion, "nodeVersion is null");
         this.coordinator = coordinator;
@@ -61,8 +61,8 @@ public class InternalNode
             @JsonProperty("coordinator") boolean coordinator,
             @JsonProperty("worker") boolean worker)
     {
-        nodeIdentifier = emptyToNull(nullToEmpty(nodeIdentifier).trim());
-        this.nodeIdentifier = requireNonNull(nodeIdentifier, "nodeIdentifier is null or empty");
+        String trimNodeIdentifier = emptyToNull(nullToEmpty(nodeIdentifier).trim());
+        this.nodeIdentifier = requireNonNull(trimNodeIdentifier, "nodeIdentifier is null or empty");
         this.internalUri = requireNonNull(internalUri, "internalUri is null");
         this.nodeVersion = requireNonNull(nodeVersion, "nodeVersion is null");
         this.coordinator = coordinator;

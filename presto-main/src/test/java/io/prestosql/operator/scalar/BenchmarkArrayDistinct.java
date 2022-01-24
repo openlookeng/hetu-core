@@ -115,8 +115,6 @@ public class BenchmarkArrayDistinct
             for (int i = 0; i < TYPES.size(); i++) {
                 Type elementType = TYPES.get(i);
                 ArrayType arrayType = new ArrayType(elementType);
-//                Signature signature = new Signature(QualifiedObjectName.valueOfDefaultFunction(name), FunctionKind.SCALAR, arrayType.getTypeSignature(), arrayType.getTypeSignature());
-//                projectionsBuilder.add(new CallExpression(signature.getName().toString(), new BuiltInFunctionHandle(signature), arrayType, ImmutableList.of(field(i, arrayType)), Optional.empty()));
                 FunctionHandle functionHandle = functionAndTypeManager.lookupFunction(name, fromTypes(arrayType));
                 projectionsBuilder.add(new CallExpression(name, functionHandle, arrayType, ImmutableList.of(field(i, arrayType))));
                 blocks[i] = createChannel(POSITIONS, ARRAY_SIZE, arrayType);

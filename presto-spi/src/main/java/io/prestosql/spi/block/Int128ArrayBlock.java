@@ -206,9 +206,9 @@ public class Int128ArrayBlock
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
 
-        positionOffset += this.positionOffset;
-        boolean[] newValueIsNull = valueIsNull == null ? null : compactArray(valueIsNull, positionOffset, length);
-        long[] newValues = compactArray(values, positionOffset * 2, length * 2);
+        int finalPositionOffset = positionOffset + this.positionOffset;
+        boolean[] newValueIsNull = valueIsNull == null ? null : compactArray(valueIsNull, finalPositionOffset, length);
+        long[] newValues = compactArray(values, finalPositionOffset * 2, length * 2);
 
         if (newValueIsNull == valueIsNull && newValues == values) {
             return this;

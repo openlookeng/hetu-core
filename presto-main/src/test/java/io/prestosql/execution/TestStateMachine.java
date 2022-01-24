@@ -54,6 +54,7 @@ public class TestStateMachine
             fail("expected a NullPointerException");
         }
         catch (NullPointerException ignored) {
+            // the exception could be ignored
         }
 
         StateMachine<State> stateMachine = new StateMachine<>("test", executor, State.BREAKFAST);
@@ -64,6 +65,7 @@ public class TestStateMachine
                 fail("expected a NullPointerException");
             }
             catch (NullPointerException expected) {
+                // the exception could be ignored
             }
         });
 
@@ -73,6 +75,7 @@ public class TestStateMachine
                 fail("expected a NullPointerException");
             }
             catch (NullPointerException expected) {
+                // the exception could be ignored
             }
         });
 
@@ -82,6 +85,7 @@ public class TestStateMachine
                 fail("expected a NullPointerException");
             }
             catch (NullPointerException expected) {
+                // the exception could be ignored
             }
         });
 
@@ -91,6 +95,7 @@ public class TestStateMachine
                 fail("expected a NullPointerException");
             }
             catch (NullPointerException expected) {
+                // the exception could be ignored
             }
         });
 
@@ -100,6 +105,7 @@ public class TestStateMachine
                 fail("expected a NullPointerException");
             }
             catch (NullPointerException expected) {
+                // the exception could be ignored
             }
         });
     }
@@ -127,6 +133,7 @@ public class TestStateMachine
                 fail("expected IllegalStateException");
             }
             catch (IllegalStateException expected) {
+                // the exception could be ignored
             }
         });
         assertNoStateChange(stateMachine, () -> stateMachine.set(State.DINNER));
@@ -163,6 +170,7 @@ public class TestStateMachine
                 fail("expected IllegalStateException");
             }
             catch (IllegalStateException expected) {
+                // the exception could be ignored
             }
         });
         assertNoStateChange(stateMachine, () -> stateMachine.compareAndSet(State.DINNER, State.DINNER));
@@ -214,6 +222,7 @@ public class TestStateMachine
                 fail("expected IllegalStateException");
             }
             catch (IllegalStateException expected) {
+                // the exception could be ignored
             }
         });
         assertNoStateChange(stateMachine, () -> stateMachine.setIf(State.LUNCH, currentState -> false));

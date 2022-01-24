@@ -79,16 +79,16 @@ public class LocalMergeSourceOperator
         {
             checkState(!closed, "Factory is already closed");
 
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, LocalMergeSourceOperator.class.getSimpleName());
+            OperatorContext context = driverContext.addOperatorContext(operatorId, planNodeId, LocalMergeSourceOperator.class.getSimpleName());
 
-            LocalExchange localExchange = localExchangeFactory.getLocalExchange(driverContext.getLifespan(), driverContext.getPipelineContext().getTaskContext(), planNodeId.toString(), operatorContext.isSnapshotEnabled());
+            LocalExchange localExchange = localExchangeFactory.getLocalExchange(driverContext.getLifespan(), driverContext.getPipelineContext().getTaskContext(), planNodeId.toString(), context.isSnapshotEnabled());
 
             PageWithPositionComparator comparator = orderingCompiler.compilePageWithPositionComparator(types, sortChannels, orderings);
-            List<LocalExchangeSource> sources = IntStream.range(0, localExchange.getBufferCount())
+            List<LocalExchangeSource> localExchangeSources = IntStream.range(0, localExchange.getBufferCount())
                     .boxed()
                     .map(index -> localExchange.getNextSource())
                     .collect(toImmutableList());
-            return new LocalMergeSourceOperator(operatorContext, sources, types, comparator, localExchange.getSnapshotState(), planNodeId.toString());
+            return new LocalMergeSourceOperator(context, localExchangeSources, types, comparator, localExchange.getSnapshotState(), planNodeId.toString());
         }
 
         @Override
