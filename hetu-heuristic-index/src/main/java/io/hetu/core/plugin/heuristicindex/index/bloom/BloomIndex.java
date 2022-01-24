@@ -32,6 +32,7 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -86,7 +87,7 @@ public class BloomIndex
     public synchronized boolean addValues(List<Pair<String, List<Object>>> values)
     {
         // Currently expecting only one column
-        List<Object> columnIdxValue = values.get(0).getSecond();
+        HashSet<Object> columnIdxValue = new HashSet<>(values.get(0).getSecond());
         for (Object value : columnIdxValue) {
             if (value != null) {
                 getFilterFromMemory().add(value.toString().getBytes());
