@@ -305,7 +305,6 @@ public class TestUnscaledDecimal128Arithmetic
         // normalization scale signed overflow
         assertDivideAllSigns(new int[] {1, 1, 1, 0x7FFFFFFF}, new int[] {0xFFFFFFFF, 1, 0, 0});
 
-        // u2 = v1
         assertDivideAllSigns(new int[] {0, 0x8FFFFFFF, 0x8FFFFFFF, 0}, new int[] {0xFFFFFFFF, 0x8FFFFFFF, 0, 0});
 
         // qhat is greater than q by 1

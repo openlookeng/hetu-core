@@ -255,6 +255,8 @@ public class Console
                         System.out.println();
                         System.out.println(getHelpText());
                         continue;
+                    default:
+                        break;
                 }
                 // execute any complete statements
                 StatementSplitter splitter = new StatementSplitter(line, STATEMENT_DELIMITERS);

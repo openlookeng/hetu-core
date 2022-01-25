@@ -279,7 +279,7 @@ public class TestFileBasedSystemAccessControl
         copy(new File(getResourcePath("catalog.json")), configFile);
 
         accessControlManager.setSystemAccessControl(FileBasedSystemAccessControl.NAME, ImmutableMap.of(
-                SECURITY_CONFIG_FILE, configFile.getAbsolutePath(),
+                SECURITY_CONFIG_FILE, configFile.getCanonicalPath(),
                 SECURITY_REFRESH_PERIOD, "1ms"));
 
         transaction(transactionManager, accessControlManager)

@@ -42,6 +42,7 @@ public class TestTpchDistributedQueries
     }
 
     @Test
+    @Override
     public void testIOExplain()
     {
         String query = "SELECT * FROM orders";
@@ -119,6 +120,7 @@ public class TestTpchDistributedQueries
         assertTrue(sampleSizeFound, "Table sample returned unexpected number of rows");
     }
 
+    @Override
     public void testShowTables()
     {
         assertQuerySucceeds(createSession("sf1"), "SHOW TABLES");

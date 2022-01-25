@@ -150,12 +150,12 @@ public class Pager
     public static Pager create(List<String> command)
     {
         try {
-            Process process = new ProcessBuilder()
+            Process start = new ProcessBuilder()
                     .command(command)
                     .redirectOutput(ProcessBuilder.Redirect.INHERIT)
                     .redirectError(ProcessBuilder.Redirect.INHERIT)
                     .start();
-            return new Pager(process.getOutputStream(), process);
+            return new Pager(start.getOutputStream(), start);
         }
         catch (IOException e) {
             System.err.println("ERROR: failed to open pager: " + e.getMessage());

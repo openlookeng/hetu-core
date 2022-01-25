@@ -55,25 +55,26 @@ public class ListEncoding
     public void decodeValueInto(int depth, BlockBuilder builder, Slice slice, int offset, int length)
             throws RcFileCorruptionException
     {
+        int newOffset = offset;
         byte separator = getSeparator(depth);
-        int end = offset + length;
+        int end = newOffset + length;
 
         BlockBuilder arrayBlockBuilder = builder.beginBlockEntry();
         if (length > 0) {
-            int elementOffset = offset;
-            while (offset < end) {
-                byte currentByte = slice.getByte(offset);
+            int elementOffset = newOffset;
+            while (newOffset < end) {
+                byte currentByte = slice.getByte(newOffset);
                 if (currentByte == separator) {
-                    decodeElementValueInto(depth, arrayBlockBuilder, slice, elementOffset, offset - elementOffset);
-                    elementOffset = offset + 1;
+                    decodeElementValueInto(depth, arrayBlockBuilder, slice, elementOffset, newOffset - elementOffset);
+                    elementOffset = newOffset + 1;
                 }
-                else if (isEscapeByte(currentByte) && offset + 1 < length) {
+                else if (isEscapeByte(currentByte) && newOffset + 1 < length) {
                     // ignore the char after escape_char
-                    offset++;
+                    newOffset++;
                 }
-                offset++;
+                newOffset++;
             }
-            decodeElementValueInto(depth, arrayBlockBuilder, slice, elementOffset, offset - elementOffset);
+            decodeElementValueInto(depth, arrayBlockBuilder, slice, elementOffset, newOffset - elementOffset);
         }
         builder.closeEntry();
     }

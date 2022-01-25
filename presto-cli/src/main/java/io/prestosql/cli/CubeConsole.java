@@ -257,14 +257,14 @@ public class CubeConsole
         if (!processCubeInitialQuery(queryRunner, rowCountsDistinctValuesQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
             return false;
         }
-        List<List<?>> rowBufferIterationItems = getListRowBufferIterationItems();
+        List<List<?>> bufferIterationItems = getListRowBufferIterationItems();
 
-        if (rowBufferIterationItems != null && rowBufferIterationItems.size() != EMPTY_ROW_BUFFER_ITERATION_ITEMS) {
+        if (bufferIterationItems != null && bufferIterationItems.size() != EMPTY_ROW_BUFFER_ITERATION_ITEMS) {
             //this loop process the multiple insert query statements
-            int end = rowBufferIterationItems.size() - 1;
+            int end = bufferIterationItems.size() - 1;
 
             for (int i = 0; i <= end; i++) {
-                List<?> rowBufferItems = rowBufferIterationItems.get(i);
+                List<?> rowBufferItems = bufferIterationItems.get(i);
                 Expression finalPredicate;
                 Expression userBoundaryPredicate = null;
                 String queryInsert;
@@ -381,13 +381,13 @@ public class CubeConsole
         if (!processCubeInitialQuery(queryRunner, rowCountsDistinctValuesQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
             return false;
         }
-        List<List<?>> rowBufferIterationItems = getListRowBufferIterationItems();
+        List<List<?>> bufferIterationItems = getListRowBufferIterationItems();
 
-        if (rowBufferIterationItems != null) {
+        if (bufferIterationItems != null) {
             //this loop process the multiple insert query statements
-            int end = rowBufferIterationItems.size() - 1;
+            int end = bufferIterationItems.size() - 1;
             for (int i = 0; i <= end; i++) {
-                List<?> rowBufferItems = rowBufferIterationItems.get(i);
+                List<?> rowBufferItems = bufferIterationItems.get(i);
                 Expression finalPredicate;
                 String queryInsert;
                 String minItem = rowBufferItems.get(INDEX_AT_MIN_POSITION).toString();
@@ -694,10 +694,10 @@ public class CubeConsole
                     if (!processCubeInitialQuery(queryRunner, columnDataTypeQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
                         return false;
                     }
-                    String resultInitCubeQuery;
-                    resultInitCubeQuery = getResultInitCubeQuery();
-                    if (resultInitCubeQuery != null) {
-                        cubeColumnDataType = resultInitCubeQuery;
+                    String resInitCubeQuery;
+                    resInitCubeQuery = getResultInitCubeQuery();
+                    if (resInitCubeQuery != null) {
+                        cubeColumnDataType = resInitCubeQuery;
                     }
 
                     if (cubeColumnDataType.contains(DATATYPE_DECIMAL)) {
@@ -726,9 +726,9 @@ public class CubeConsole
                                 return false;
                             }
                             Long valueCountDistinctQuery = INITIAL_QUERY_RESULT_VALUE;
-                            resultInitCubeQuery = getResultInitCubeQuery();
-                            if (resultInitCubeQuery != null) {
-                                valueCountDistinctQuery = Long.parseLong(resultInitCubeQuery);
+                            resInitCubeQuery = getResultInitCubeQuery();
+                            if (resInitCubeQuery != null) {
+                                valueCountDistinctQuery = Long.parseLong(resInitCubeQuery);
                             }
                             if (valueCountDistinctQuery < MAX_BUFFERED_ROWS && valueCountDistinctQuery * rowBufferTempMultiplier < Integer.MAX_VALUE) {
                                 supportedExpression = true;
@@ -780,10 +780,10 @@ public class CubeConsole
                     if (!processCubeInitialQuery(queryRunner, columnDataTypeQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
                         return false;
                     }
-                    String resultInitCubeQuery;
-                    resultInitCubeQuery = getResultInitCubeQuery();
-                    if (resultInitCubeQuery != null) {
-                        cubeColumnDataType = resultInitCubeQuery.toLowerCase(Locale.ENGLISH);
+                    String resInitCubeQuery;
+                    resInitCubeQuery = getResultInitCubeQuery();
+                    if (resInitCubeQuery != null) {
+                        cubeColumnDataType = resInitCubeQuery.toLowerCase(Locale.ENGLISH);
                     }
 
                     if (cubeColumnDataType.contains(DATATYPE_DECIMAL)) {
@@ -809,9 +809,9 @@ public class CubeConsole
                             return false;
                         }
                         Long valueCountDistinctQuery = INITIAL_QUERY_RESULT_VALUE;
-                        resultInitCubeQuery = getResultInitCubeQuery();
-                        if (resultInitCubeQuery != null) {
-                            valueCountDistinctQuery = Long.parseLong(resultInitCubeQuery);
+                        resInitCubeQuery = getResultInitCubeQuery();
+                        if (resInitCubeQuery != null) {
+                            valueCountDistinctQuery = Long.parseLong(resInitCubeQuery);
                         }
                         if (valueCountDistinctQuery < MAX_BUFFERED_ROWS) {
                             supportedExpression = true;

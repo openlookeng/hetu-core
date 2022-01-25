@@ -218,9 +218,9 @@ public class PluginManager
     private void loadPlugin(URLClassLoader pluginClassLoader, boolean onlyInstallFunctionsPlugin)
     {
         ServiceLoader<Plugin> serviceLoader = ServiceLoader.load(Plugin.class, pluginClassLoader);
-        List<Plugin> plugins = ImmutableList.copyOf(serviceLoader);
-        checkState(!plugins.isEmpty(), "No service providers of type %s", Plugin.class.getName());
-        for (Plugin plugin : plugins) {
+        List<Plugin> pluginSet = ImmutableList.copyOf(serviceLoader);
+        checkState(!pluginSet.isEmpty(), "No service providers of type %s", Plugin.class.getName());
+        for (Plugin plugin : pluginSet) {
             String name = plugin.getClass().getName();
             log.info("Installing %s", name);
             if (onlyInstallFunctionsPlugin) {
@@ -366,9 +366,9 @@ public class PluginManager
         URLClassLoader classLoader = createClassLoader(artifacts, pomFile.getPath());
 
         Artifact artifact = artifacts.get(0);
-        Set<String> plugins = discoverPlugins(artifact, classLoader);
-        if (!plugins.isEmpty()) {
-            writePluginServices(plugins, artifact.getFile());
+        Set<String> pluginSet = discoverPlugins(artifact, classLoader);
+        if (!pluginSet.isEmpty()) {
+            writePluginServices(pluginSet, artifact.getFile());
         }
 
         return classLoader;

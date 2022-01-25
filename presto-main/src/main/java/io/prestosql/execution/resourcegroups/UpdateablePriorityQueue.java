@@ -18,15 +18,21 @@ interface UpdateablePriorityQueue<E>
 {
     boolean addOrUpdate(E element, long priority);
 
+    @Override
     boolean contains(E element);
 
+    @Override
     boolean remove(E element);
 
+    @Override
     E poll();
 
+    @Override
     E peek();
 
+    @Override
     int size();
 
+    @Override
     boolean isEmpty();
 }

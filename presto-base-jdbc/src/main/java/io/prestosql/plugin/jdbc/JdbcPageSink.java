@@ -156,11 +156,11 @@ public class JdbcPageSink
     public CompletableFuture<Collection<Slice>> finish()
     {
         // commit and close
-        try (Connection connection = this.connection;
-                PreparedStatement statement = this.statement) {
+        try (Connection conn = this.connection;
+                PreparedStatement inputPreparedStatement = this.statement) {
             if (batchSize > 0) {
-                statement.executeBatch();
-                connection.commit();
+                inputPreparedStatement.executeBatch();
+                conn.commit();
             }
         }
         catch (SQLNonTransientException e) {
@@ -178,11 +178,11 @@ public class JdbcPageSink
     public void abort()
     {
         // rollback and close
-        try (Connection connection = this.connection;
-                PreparedStatement statement = this.statement) {
+        try (Connection conn = this.connection;
+                PreparedStatement stat = this.statement) {
             // skip rollback if implicitly closed due to an error
-            if (!connection.isClosed()) {
-                connection.rollback();
+            if (!conn.isClosed()) {
+                conn.rollback();
             }
         }
         catch (SQLException e) {

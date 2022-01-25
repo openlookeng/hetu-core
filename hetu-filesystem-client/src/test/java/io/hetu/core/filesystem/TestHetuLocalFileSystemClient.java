@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.FileAlreadyExistsException;
@@ -202,10 +203,10 @@ public class TestHetuLocalFileSystemClient
             assertTrue(testFile.delete());
         }
         OutputStream os = fs.newOutputStream(testFile.toPath());
-        os.write(content.getBytes());
+        os.write(content.getBytes(StandardCharsets.UTF_8));
         os.close();
         InputStream is = fs.newInputStream(testFile.toPath());
-        BufferedReader br = new BufferedReader(new InputStreamReader(is));
+        BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
         assertEquals(br.readLine(), content);
     }
 
@@ -229,10 +230,10 @@ public class TestHetuLocalFileSystemClient
     {
         Path path = tFolder.getRoot().toPath().resolve("testfileDup");
         OutputStream os = fs.newOutputStream(path);
-        os.write("foo".getBytes());
+        os.write("foo".getBytes(StandardCharsets.UTF_8));
         os.close();
         OutputStream os2 = fs.newOutputStream(path, CREATE_NEW);
-        os2.write("bar".getBytes());
+        os2.write("bar".getBytes(StandardCharsets.UTF_8));
         os2.close();
     }
 

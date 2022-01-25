@@ -471,6 +471,7 @@ public class Validator
 
     private QueryResult executeQuery(String url, String username, String password, Query query, String sql, Duration timeout, Map<String, String> sessionProperties)
     {
+        String newSql = sql;
         ExecutorService executor = newSingleThreadExecutor();
         TimeLimiter limiter = SimpleTimeLimiter.create(executor);
 
@@ -485,14 +486,14 @@ public class Validator
                 Stopwatch stopwatch = Stopwatch.createStarted();
                 Statement limitedStatement = limiter.newProxy(statement, Statement.class, timeout.toMillis(), MILLISECONDS);
                 if (explainOnly) {
-                    sql = "EXPLAIN " + sql;
+                    newSql = "EXPLAIN " + newSql;
                 }
 
                 long start = System.nanoTime();
                 PrestoStatement prestoStatement = limitedStatement.unwrap(PrestoStatement.class);
                 ProgressMonitor progressMonitor = new ProgressMonitor();
                 prestoStatement.setProgressMonitor(progressMonitor);
-                boolean isSelectQuery = limitedStatement.execute(sql);
+                boolean isSelectQuery = limitedStatement.execute(newSql);
 
                 List<List<Object>> results;
                 if (isSelectQuery) {
@@ -549,6 +550,7 @@ public class Validator
         }
         catch (SQLClientInfoException ignored) {
             // Do nothing
+            log.warn(ignored.getMessage());
         }
     }
 

@@ -80,11 +80,11 @@ public class QueryStateInfo
 
     public static QueryStateInfo createQueryStateInfo(BasicQueryInfo queryInfo, Optional<ResourceGroupId> group)
     {
-        Optional<QueryProgressStats> progress = Optional.empty();
+        Optional<QueryProgressStats> queryProgressStats = Optional.empty();
         if (!queryInfo.getState().isDone() && queryInfo.getState() != QUEUED) {
-            progress = Optional.of(createQueryProgressStats(queryInfo.getQueryStats()));
+            queryProgressStats = Optional.of(createQueryProgressStats(queryInfo.getQueryStats()));
         }
-        return createQueryStateInfo(queryInfo, group, Optional.empty(), progress);
+        return createQueryStateInfo(queryInfo, group, Optional.empty(), queryProgressStats);
     }
 
     private static QueryStateInfo createQueryStateInfo(

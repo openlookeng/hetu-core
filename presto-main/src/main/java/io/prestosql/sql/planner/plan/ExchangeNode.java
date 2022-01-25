@@ -86,30 +86,30 @@ public class ExchangeNode
             @JsonProperty("aggregationType") AggregationNode.AggregationType aggregationType)
     {
         super(id);
-
+        List<PlanNode> sourceList = sources;
         // CTEScanNode adds one exchange node on top of it,
         // so if upper node going to have another ExchangeNode then we should omit previous one.
         // In order to find this, we check if child node is already exchange node and it has only one source
         // and that source CTE node.
-        if (sources.size() == 1) {
-            PlanNode child = sources.get(0);
+        if (sourceList.size() == 1) {
+            PlanNode child = sourceList.get(0);
             if (scope == REMOTE && child instanceof ExchangeNode && child.getSources().size() == 1 && child.getSources().get(0) instanceof CTEScanNode) {
-                sources = ImmutableList.of(child.getSources().get(0));
+                sourceList = ImmutableList.of(child.getSources().get(0));
             }
         }
 
         requireNonNull(type, "type is null");
         requireNonNull(scope, "scope is null");
-        requireNonNull(sources, "sources is null");
+        requireNonNull(sourceList, "sources is null");
         requireNonNull(partitioningScheme, "partitioningScheme is null");
         requireNonNull(inputs, "inputs is null");
         requireNonNull(orderingScheme, "orderingScheme is null");
 
         checkArgument(!inputs.isEmpty(), "inputs is empty");
         checkArgument(inputs.stream().allMatch(inputSymbols -> inputSymbols.size() == partitioningScheme.getOutputLayout().size()), "Input symbols do not match output symbols");
-        checkArgument(inputs.size() == sources.size(), "Must have same number of input lists as sources");
+        checkArgument(inputs.size() == sourceList.size(), "Must have same number of input lists as sources");
         for (int i = 0; i < inputs.size(); i++) {
-            checkArgument(ImmutableSet.copyOf(sources.get(i).getOutputSymbols()).containsAll(inputs.get(i)), "Source does not supply all required input symbols");
+            checkArgument(ImmutableSet.copyOf(sourceList.get(i).getOutputSymbols()).containsAll(inputs.get(i)), "Source does not supply all required input symbols");
         }
 
         checkArgument(scope != LOCAL || partitioningScheme.getPartitioning().getArguments().stream().allMatch(ArgumentBinding::isVariable),
@@ -124,7 +124,7 @@ public class ExchangeNode
             checkArgument(partitioningScheme.getOutputLayout().containsAll(ordering.getOrderBy()), "Partitioning scheme does not supply all required ordering symbols");
         });
         this.type = type;
-        this.sources = sources;
+        this.sources = sourceList;
         this.scope = scope;
         this.partitioningScheme = partitioningScheme;
         this.inputs = listOfListsCopy(inputs);
@@ -164,16 +164,17 @@ public class ExchangeNode
 
     public static ExchangeNode partitionedExchange(PlanNodeId id, Scope scope, PlanNode child, PartitioningScheme partitioningScheme, AggregationNode.AggregationType aggregationType)
     {
+        PlanNode childNode = child;
         if (partitioningScheme.getPartitioning().getHandle().isSingleNode()) {
-            return gatheringExchange(id, scope, child);
+            return gatheringExchange(id, scope, childNode);
         }
 
         // CTEScanNode adds one exchange node on top of it,
         // so if upper node going to have another ExchangeNode then we should omit previous one.
         // In order to find this, we check if child node is already exchange node and it has only one source
         // and that source CTE node.
-        if (scope == REMOTE && child instanceof ExchangeNode && child.getSources().size() == 1 && child.getSources().get(0) instanceof CTEScanNode) {
-            child = child.getSources().get(0);
+        if (scope == REMOTE && childNode instanceof ExchangeNode && childNode.getSources().size() == 1 && childNode.getSources().get(0) instanceof CTEScanNode) {
+            childNode = childNode.getSources().get(0);
         }
 
         return new ExchangeNode(
@@ -181,7 +182,7 @@ public class ExchangeNode
                 ExchangeNode.Type.REPARTITION,
                 scope,
                 partitioningScheme,
-                ImmutableList.of(child),
+                ImmutableList.of(childNode),
                 ImmutableList.of(partitioningScheme.getOutputLayout()).asList(),
                 Optional.empty(),
                 aggregationType);
@@ -191,17 +192,18 @@ public class ExchangeNode
     {
         // CTEScanNode adds one exchange node on top of it,
         // so if upper node going to have another ExchangeNode then we should omit previous one.
-        if (scope == REMOTE && child instanceof ExchangeNode && child.getSources().size() == 1 && child.getSources().get(0) instanceof CTEScanNode) {
-            child = child.getSources().get(0);
+        PlanNode childNode = child;
+        if (scope == REMOTE && childNode instanceof ExchangeNode && childNode.getSources().size() == 1 && childNode.getSources().get(0) instanceof CTEScanNode) {
+            childNode = childNode.getSources().get(0);
         }
 
         return new ExchangeNode(
                 id,
                 ExchangeNode.Type.REPLICATE,
                 scope,
-                new PartitioningScheme(Partitioning.create(FIXED_BROADCAST_DISTRIBUTION, ImmutableList.of()), child.getOutputSymbols()),
-                ImmutableList.of(child),
-                ImmutableList.of(child.getOutputSymbols()),
+                new PartitioningScheme(Partitioning.create(FIXED_BROADCAST_DISTRIBUTION, ImmutableList.of()), childNode.getOutputSymbols()),
+                ImmutableList.of(childNode),
+                ImmutableList.of(childNode.getOutputSymbols()),
                 Optional.empty(),
                 AggregationNode.AggregationType.HASH);
     }
@@ -210,17 +212,18 @@ public class ExchangeNode
     {
         // CTEScanNode adds one exchange node on top of it,
         // so if upper node going to have another ExchangeNode then we should omit previous one.
-        if (scope == REMOTE && child instanceof ExchangeNode && child.getSources().size() == 1 && child.getSources().get(0) instanceof CTEScanNode) {
-            child = child.getSources().get(0);
+        PlanNode childNode = child;
+        if (scope == REMOTE && childNode instanceof ExchangeNode && childNode.getSources().size() == 1 && childNode.getSources().get(0) instanceof CTEScanNode) {
+            childNode = childNode.getSources().get(0);
         }
 
         return new ExchangeNode(
                 id,
                 ExchangeNode.Type.GATHER,
                 scope,
-                new PartitioningScheme(Partitioning.create(SINGLE_DISTRIBUTION, ImmutableList.of()), child.getOutputSymbols()),
-                ImmutableList.of(child),
-                ImmutableList.of(child.getOutputSymbols()),
+                new PartitioningScheme(Partitioning.create(SINGLE_DISTRIBUTION, ImmutableList.of()), childNode.getOutputSymbols()),
+                ImmutableList.of(childNode),
+                ImmutableList.of(childNode.getOutputSymbols()),
                 Optional.empty(),
                 AggregationNode.AggregationType.HASH);
     }
@@ -238,8 +241,9 @@ public class ExchangeNode
     {
         // CTEScanNode adds one exchange node on top of it,
         // so if upper node going to have another ExchangeNode then we should omit previous one.
-        if (scope == REMOTE && child instanceof ExchangeNode && child.getSources().size() == 1 && child.getSources().get(0) instanceof CTEScanNode) {
-            child = child.getSources().get(0);
+        PlanNode childNode = child;
+        if (scope == REMOTE && childNode instanceof ExchangeNode && childNode.getSources().size() == 1 && childNode.getSources().get(0) instanceof CTEScanNode) {
+            childNode = childNode.getSources().get(0);
         }
 
         PartitioningHandle partitioningHandle = scope == LOCAL ? FIXED_PASSTHROUGH_DISTRIBUTION : SINGLE_DISTRIBUTION;
@@ -247,9 +251,9 @@ public class ExchangeNode
                 id,
                 Type.GATHER,
                 scope,
-                new PartitioningScheme(Partitioning.create(partitioningHandle, ImmutableList.of()), child.getOutputSymbols()),
-                ImmutableList.of(child),
-                ImmutableList.of(child.getOutputSymbols()),
+                new PartitioningScheme(Partitioning.create(partitioningHandle, ImmutableList.of()), childNode.getOutputSymbols()),
+                ImmutableList.of(childNode),
+                ImmutableList.of(childNode.getOutputSymbols()),
                 Optional.of(orderingScheme),
                 AggregationNode.AggregationType.HASH);
     }

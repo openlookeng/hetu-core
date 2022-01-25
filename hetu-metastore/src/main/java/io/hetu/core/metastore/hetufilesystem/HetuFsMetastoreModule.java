@@ -44,8 +44,7 @@ public class HetuFsMetastoreModule
 
     public HetuFsMetastoreModule(HetuFileSystemClient client, String type)
     {
-        this.client = client;
-        this.type = type;
+        this(client, null, type);
     }
 
     @Override

@@ -73,14 +73,14 @@ public class VacuumTableNode
         this.statisticsAggregationDescriptor = requireNonNull(statisticsAggregationDescriptor, "statisticsAggregationDescriptor is null");
         checkArgument(statisticsAggregation.isPresent() == statisticsAggregationDescriptor.isPresent(), "statisticsAggregation and statisticsAggregationDescriptor must be either present or absent");
 
-        ImmutableList.Builder<Symbol> outputs = ImmutableList.<Symbol>builder()
+        ImmutableList.Builder<Symbol> outputsBuilder = ImmutableList.<Symbol>builder()
                 .add(rowCountSymbol)
                 .add(fragmentSymbol);
         statisticsAggregation.ifPresent(aggregation -> {
-            outputs.addAll(aggregation.getGroupingSymbols());
-            outputs.addAll(aggregation.getAggregations().keySet());
+            outputsBuilder.addAll(aggregation.getGroupingSymbols());
+            outputsBuilder.addAll(aggregation.getAggregations().keySet());
         });
-        this.outputs = outputs.build();
+        this.outputs = outputsBuilder.build();
     }
 
     @JsonProperty("table")

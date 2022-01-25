@@ -328,7 +328,7 @@ public class TestQuantileDigestAggregationFunction
         }
 
         // Test all the quantiles (values_at_quantiles)
-        assertPercentilesWithinError(type, binary, error, rows, percentiles);
+        assertPercentilesWithinErrorWithArray(type, binary, error, rows, percentiles);
     }
 
     private void assertPercentileWithinError(String type, SqlVarbinary binary, double error, List<? extends Number> rows, double percentile)
@@ -347,7 +347,7 @@ public class TestQuantileDigestAggregationFunction
                 true);
     }
 
-    private void assertPercentilesWithinError(String type, SqlVarbinary binary, double error, List<? extends Number> rows, double[] percentiles)
+    private void assertPercentilesWithinErrorWithArray(String type, SqlVarbinary binary, double error, List<? extends Number> rows, double[] percentiles)
     {
         List<Double> boxedPercentiles = Arrays.stream(percentiles).sorted().boxed().collect(toImmutableList());
         List<Number> lowerBounds = boxedPercentiles.stream().map(percentile -> getLowerBound(error, rows, percentile)).collect(toImmutableList());

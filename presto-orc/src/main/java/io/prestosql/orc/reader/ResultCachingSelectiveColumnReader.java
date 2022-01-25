@@ -135,14 +135,7 @@ public class ResultCachingSelectiveColumnReader<T>
         this.readSize = 0;
         this.cachedBlock = null;
 
-        /* Todo(Nitin) Check if stripe level caching would make sense or reckon be too big a block?
-        cacheKey.setOrcDataSourceId(orcDataSourceId);
-        cacheKey.setStripeOffset(stripeOffset);
-        cacheKey.setRowGroupOffset(-1);
-        cacheKey.setColumnId(column.getColumnId());
-        cacheKey.setPredicate(predicate);
-
-        cachedBlock = cacheAccumulated(stripeInformation);*/
+        /* Todo(Nitin) Check if stripe level caching would make sense or reckon be too big a block?*/
 
         delegate.startStripe(fileTimeZone, dictionaryStreamSources, encoding);
     }

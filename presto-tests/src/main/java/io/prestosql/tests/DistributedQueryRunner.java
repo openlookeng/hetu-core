@@ -114,7 +114,7 @@ public class DistributedQueryRunner
     }
 
     public DistributedQueryRunner(
-            Session defaultSession,
+            Session sessionDefault,
             int nodeCount,
             Map<String, String> extraProperties,
             Map<String, String> coordinatorProperties,
@@ -123,7 +123,8 @@ public class DistributedQueryRunner
             Optional<Path> baseDataDir)
             throws Exception
     {
-        requireNonNull(defaultSession, "defaultSession is null");
+        Session newSessionDefault = sessionDefault;
+        requireNonNull(newSessionDefault, "defaultSession is null");
 
         try {
             long start = System.nanoTime();
@@ -131,20 +132,20 @@ public class DistributedQueryRunner
             closer.register(() -> closeUnchecked(discoveryServer));
             log.info("Created TestingDiscoveryServer in %s", nanosSince(start).convertToMostSuccinctTimeUnit());
 
-            ImmutableList.Builder<TestingPrestoServer> servers = ImmutableList.builder();
+            ImmutableList.Builder<TestingPrestoServer> serverBuilder = ImmutableList.builder();
 
             Map<String, String> extraCoordinatorProperties = new HashMap<>();
             extraCoordinatorProperties.putAll(extraProperties);
             extraCoordinatorProperties.putAll(coordinatorProperties);
             coordinator = closer.register(createTestingPrestoServer(discoveryServer.getBaseUrl(), true, extraCoordinatorProperties, parserOptions, environment, baseDataDir));
-            servers.add(coordinator);
+            serverBuilder.add(coordinator);
 
             for (int i = 1; i < nodeCount; i++) {
                 TestingPrestoServer worker = closer.register(createTestingPrestoServer(discoveryServer.getBaseUrl(), false, extraProperties, parserOptions, environment, baseDataDir));
-                servers.add(worker);
+                serverBuilder.add(worker);
             }
 
-            this.servers = servers.build();
+            this.servers = serverBuilder.build();
         }
         catch (Exception e) {
             try {
@@ -156,8 +157,8 @@ public class DistributedQueryRunner
         }
 
         // copy session using property manager in coordinator
-        defaultSession = defaultSession.toSessionRepresentation().toSession(coordinator.getMetadata().getSessionPropertyManager(), defaultSession.getIdentity().getExtraCredentials());
-        this.prestoClient = closer.register(new TestingPrestoClient(coordinator, defaultSession));
+        newSessionDefault = newSessionDefault.toSessionRepresentation().toSession(coordinator.getMetadata().getSessionPropertyManager(), newSessionDefault.getIdentity().getExtraCredentials());
+        this.prestoClient = closer.register(new TestingPrestoClient(coordinator, newSessionDefault));
 
         long start = System.nanoTime();
         while (!allNodesGloballyVisible()) {

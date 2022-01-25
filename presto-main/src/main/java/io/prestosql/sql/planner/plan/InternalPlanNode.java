@@ -27,6 +27,7 @@ public abstract class InternalPlanNode
         super(planNodeId);
     }
 
+    @Override
     public final <R, C> R accept(PlanVisitor<R, C> visitor, C context)
     {
         checkArgument(visitor instanceof InternalPlanVisitor, "PlanVisitor is only for connector to use; InternalPlanNode should never use it");

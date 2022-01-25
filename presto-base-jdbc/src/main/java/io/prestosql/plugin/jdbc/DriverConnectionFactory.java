@@ -58,31 +58,31 @@ public class DriverConnectionFactory
 
     public static Properties basicConnectionProperties(BaseJdbcConfig config)
     {
-        Properties connectionProperties = new Properties();
+        Properties properties = new Properties();
         if (config.getConnectionUser() != null) {
-            connectionProperties.setProperty("user", config.getConnectionUser());
+            properties.setProperty("user", config.getConnectionUser());
         }
         if (config.getConnectionPassword() != null) {
-            connectionProperties.setProperty("password", config.getConnectionPassword());
+            properties.setProperty("password", config.getConnectionPassword());
         }
 
         try {
-            connectionProperties.setProperty("useConnectionPool", "" + config.isUseConnectionPool());
-            connectionProperties.setProperty("maxIdle", "" + config.getMaxIdle());
-            connectionProperties.setProperty("minIdle", "" + config.getMinIdle());
-            connectionProperties.setProperty("maxTotal", "" + config.getMaxTotal());
-            connectionProperties.setProperty("lifo", "" + config.isLifo());
-            connectionProperties.setProperty("fairness", "" + config.isFairness());
-            connectionProperties.setProperty("maxWaitMillis", "" + config.getMaxWaitMillis());
-            connectionProperties.setProperty("softMinEvictableIdleTimeMillis", "" + config.getSoftMinEvictableIdleTimeMillis());
-            connectionProperties.setProperty("numTestsPerEvictionRun", "" + config.getNumTestsPerEvictionRun());
-            connectionProperties.setProperty("testOnCreate", "" + config.isTestOnCreate());
-            connectionProperties.setProperty("testOnBorrow", "" + config.isTestOnBorrow());
-            connectionProperties.setProperty("testOnReturn", "" + config.isTestOnReturn());
-            connectionProperties.setProperty("testWhileIdle", "" + config.isTestWhileIdle());
-            connectionProperties.setProperty("timeBetweenEvictionRunsMillis", "" + config.getTimeBetweenEvictionRunsMillis());
-            connectionProperties.setProperty("blockWhenExhausted", "" + config.isBlockWhenExhausted());
-            connectionProperties.setProperty("jmxEnabled", "" + config.isJmxEnabled());
+            properties.setProperty("useConnectionPool", "" + config.isUseConnectionPool());
+            properties.setProperty("maxIdle", "" + config.getMaxIdle());
+            properties.setProperty("minIdle", "" + config.getMinIdle());
+            properties.setProperty("maxTotal", "" + config.getMaxTotal());
+            properties.setProperty("lifo", "" + config.isLifo());
+            properties.setProperty("fairness", "" + config.isFairness());
+            properties.setProperty("maxWaitMillis", "" + config.getMaxWaitMillis());
+            properties.setProperty("softMinEvictableIdleTimeMillis", "" + config.getSoftMinEvictableIdleTimeMillis());
+            properties.setProperty("numTestsPerEvictionRun", "" + config.getNumTestsPerEvictionRun());
+            properties.setProperty("testOnCreate", "" + config.isTestOnCreate());
+            properties.setProperty("testOnBorrow", "" + config.isTestOnBorrow());
+            properties.setProperty("testOnReturn", "" + config.isTestOnReturn());
+            properties.setProperty("testWhileIdle", "" + config.isTestWhileIdle());
+            properties.setProperty("timeBetweenEvictionRunsMillis", "" + config.getTimeBetweenEvictionRunsMillis());
+            properties.setProperty("blockWhenExhausted", "" + config.isBlockWhenExhausted());
+            properties.setProperty("jmxEnabled", "" + config.isJmxEnabled());
         }
         catch (Exception e) {
             // ignore exception
@@ -90,7 +90,7 @@ public class DriverConnectionFactory
                 LOG.debug("basicConnectionProperties : set pool config failed... cause by", e);
             }
         }
-        return connectionProperties;
+        return properties;
     }
 
     public DriverConnectionFactory(Driver driver, String connectionUrl, Optional<String> userCredentialName, Optional<String> passwordCredentialName, Properties connectionProperties)
@@ -115,24 +115,24 @@ public class DriverConnectionFactory
 
     public static GenericObjectPoolConfig createGenericObjectPoolConfig(Properties connectionProperties)
     {
-        GenericObjectPoolConfig genericObjectPoolConfig = new GenericObjectPoolConfig();
+        GenericObjectPoolConfig config = new GenericObjectPoolConfig();
         try {
-            genericObjectPoolConfig.setMaxIdle(Integer.parseInt(connectionProperties.getProperty("maxIdle")));
-            genericObjectPoolConfig.setMaxTotal(Integer.parseInt(connectionProperties.getProperty("maxTotal")));
-            genericObjectPoolConfig.setMinIdle(Integer.parseInt(connectionProperties.getProperty("minIdle")));
-            genericObjectPoolConfig.setLifo(Boolean.parseBoolean(connectionProperties.getProperty("lifo")));
-            genericObjectPoolConfig.setFairness(Boolean.parseBoolean(connectionProperties.getProperty("fairness")));
-            genericObjectPoolConfig.setMaxWaitMillis(Long.parseLong(connectionProperties.getProperty("maxWaitMillis")));
-            genericObjectPoolConfig.setSoftMinEvictableIdleTimeMillis(Long.parseLong(connectionProperties.getProperty("softMinEvictableIdleTimeMillis")));
-            genericObjectPoolConfig.setSoftMinEvictableIdleTimeMillis(Long.parseLong(connectionProperties.getProperty("softMinEvictableIdleTimeMillis")));
-            genericObjectPoolConfig.setNumTestsPerEvictionRun(Integer.parseInt(connectionProperties.getProperty("numTestsPerEvictionRun")));
-            genericObjectPoolConfig.setTestOnCreate(Boolean.parseBoolean(connectionProperties.getProperty("testOnCreate")));
-            genericObjectPoolConfig.setTestOnBorrow(Boolean.parseBoolean(connectionProperties.getProperty("testOnBorrow")));
-            genericObjectPoolConfig.setTestOnReturn(Boolean.parseBoolean(connectionProperties.getProperty("testOnReturn")));
-            genericObjectPoolConfig.setTestWhileIdle(Boolean.parseBoolean(connectionProperties.getProperty("testWhileIdle")));
-            genericObjectPoolConfig.setTimeBetweenEvictionRunsMillis(Long.parseLong(connectionProperties.getProperty("timeBetweenEvictionRunsMillis")));
-            genericObjectPoolConfig.setBlockWhenExhausted(Boolean.parseBoolean(connectionProperties.getProperty("blockWhenExhausted")));
-            genericObjectPoolConfig.setJmxEnabled(Boolean.parseBoolean(connectionProperties.getProperty("jmxEnabled")));
+            config.setMaxIdle(Integer.parseInt(connectionProperties.getProperty("maxIdle")));
+            config.setMaxTotal(Integer.parseInt(connectionProperties.getProperty("maxTotal")));
+            config.setMinIdle(Integer.parseInt(connectionProperties.getProperty("minIdle")));
+            config.setLifo(Boolean.parseBoolean(connectionProperties.getProperty("lifo")));
+            config.setFairness(Boolean.parseBoolean(connectionProperties.getProperty("fairness")));
+            config.setMaxWaitMillis(Long.parseLong(connectionProperties.getProperty("maxWaitMillis")));
+            config.setSoftMinEvictableIdleTimeMillis(Long.parseLong(connectionProperties.getProperty("softMinEvictableIdleTimeMillis")));
+            config.setSoftMinEvictableIdleTimeMillis(Long.parseLong(connectionProperties.getProperty("softMinEvictableIdleTimeMillis")));
+            config.setNumTestsPerEvictionRun(Integer.parseInt(connectionProperties.getProperty("numTestsPerEvictionRun")));
+            config.setTestOnCreate(Boolean.parseBoolean(connectionProperties.getProperty("testOnCreate")));
+            config.setTestOnBorrow(Boolean.parseBoolean(connectionProperties.getProperty("testOnBorrow")));
+            config.setTestOnReturn(Boolean.parseBoolean(connectionProperties.getProperty("testOnReturn")));
+            config.setTestWhileIdle(Boolean.parseBoolean(connectionProperties.getProperty("testWhileIdle")));
+            config.setTimeBetweenEvictionRunsMillis(Long.parseLong(connectionProperties.getProperty("timeBetweenEvictionRunsMillis")));
+            config.setBlockWhenExhausted(Boolean.parseBoolean(connectionProperties.getProperty("blockWhenExhausted")));
+            config.setJmxEnabled(Boolean.parseBoolean(connectionProperties.getProperty("jmxEnabled")));
             if (LOG.isDebugEnabled()) {
                 LOG.debug("createGenericObjectPoolConfig: success... ");
             }
@@ -142,7 +142,7 @@ public class DriverConnectionFactory
                 LOG.debug("createGenericObjectPoolConfig: failed... cause by ", e);
             }
         }
-        return genericObjectPoolConfig;
+        return config;
     }
 
     @Override

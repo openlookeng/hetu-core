@@ -95,16 +95,16 @@ public class TestDiscoveryNodeManager
         try {
             AllNodes allNodes = manager.getAllNodes();
 
-            Set<InternalNode> activeNodes = allNodes.getActiveNodes();
-            assertEqualsIgnoreOrder(activeNodes, this.activeNodes);
+            Set<InternalNode> activeNodeSet = allNodes.getActiveNodes();
+            assertEqualsIgnoreOrder(activeNodeSet, this.activeNodes);
 
-            for (InternalNode actual : activeNodes) {
+            for (InternalNode actual : activeNodeSet) {
                 for (InternalNode expected : this.activeNodes) {
                     assertNotSame(actual, expected);
                 }
             }
 
-            assertEqualsIgnoreOrder(activeNodes, manager.getNodes(ACTIVE));
+            assertEqualsIgnoreOrder(activeNodeSet, manager.getNodes(ACTIVE));
 
             Set<InternalNode> inactiveNodes = allNodes.getInactiveNodes();
             assertEqualsIgnoreOrder(inactiveNodes, this.inactiveNodes);
@@ -125,11 +125,11 @@ public class TestDiscoveryNodeManager
     @Test
     public void testGetCurrentNode()
     {
-        NodeInfo nodeInfo = new NodeInfo(new NodeConfig()
+        NodeInfo info = new NodeInfo(new NodeConfig()
                 .setEnvironment("test")
                 .setNodeId(currentNode.getNodeIdentifier()));
 
-        DiscoveryNodeManager manager = new DiscoveryNodeManager(selector, nodeInfo, new NoOpFailureDetector(), expectedVersion, testHttpClient, internalCommunicationConfig, new MockMetadata());
+        DiscoveryNodeManager manager = new DiscoveryNodeManager(selector, info, new NoOpFailureDetector(), expectedVersion, testHttpClient, internalCommunicationConfig, new MockMetadata());
         try {
             assertEquals(manager.getCurrentNode(), currentNode);
         }
@@ -194,9 +194,9 @@ public class TestDiscoveryNodeManager
 
         private synchronized void announceNodes(Set<InternalNode> activeNodes, Set<InternalNode> inactiveNodes)
         {
-            ImmutableList.Builder<ServiceDescriptor> descriptors = ImmutableList.builder();
+            ImmutableList.Builder<ServiceDescriptor> serviceDescriptorBuilder = ImmutableList.builder();
             for (InternalNode node : Iterables.concat(activeNodes, inactiveNodes)) {
-                descriptors.add(serviceDescriptor("presto")
+                serviceDescriptorBuilder.add(serviceDescriptor("presto")
                         .setNodeId(node.getNodeIdentifier())
                         .addProperty("http", node.getInternalUri().toString())
                         .addProperty("node_version", node.getNodeVersion().toString())
@@ -204,7 +204,7 @@ public class TestDiscoveryNodeManager
                         .build());
             }
 
-            this.descriptors = descriptors.build();
+            this.descriptors = serviceDescriptorBuilder.build();
         }
 
         @Override

@@ -61,17 +61,17 @@ public final class JsonResponse<T>
         this.headers = requireNonNull(headers, "headers is null");
         this.responseBody = requireNonNull(responseBody, "responseBody is null");
 
-        T value = null;
-        IllegalArgumentException exception = null;
+        T val = null;
+        IllegalArgumentException exp = null;
         try {
-            value = jsonCodec.fromJson(responseBody);
+            val = jsonCodec.fromJson(responseBody);
         }
         catch (IllegalArgumentException e) {
-            exception = new IllegalArgumentException(format("Unable to create %s from JSON response:\n[%s]", jsonCodec.getType(), responseBody), e);
+            exp = new IllegalArgumentException(format("Unable to create %s from JSON response:\n[%s]", jsonCodec.getType(), responseBody), e);
         }
-        this.hasValue = (exception == null);
-        this.value = value;
-        this.exception = exception;
+        this.hasValue = (exp == null);
+        this.value = val;
+        this.exception = exp;
     }
 
     public int getStatusCode()
@@ -133,14 +133,14 @@ public final class JsonResponse<T>
             if ((response.code() == 307) || (response.code() == 308)) {
                 String location = response.header(LOCATION);
                 if (location != null) {
-                    request = request.newBuilder().url(location).build();
-                    return execute(codec, client, request);
+                    Request req = request.newBuilder().url(location).build();
+                    return execute(codec, client, req);
                 }
             }
 
-            ResponseBody responseBody = requireNonNull(response.body());
-            String body = responseBody.string();
-            if (isJson(responseBody.contentType())) {
+            ResponseBody resBody = requireNonNull(response.body());
+            String body = resBody.string();
+            if (isJson(resBody.contentType())) {
                 return new JsonResponse<>(response.code(), response.message(), response.headers(), body, codec);
             }
             return new JsonResponse<>(response.code(), response.message(), response.headers(), body);
