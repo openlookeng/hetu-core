@@ -108,7 +108,7 @@ public class HivePageSource
 
         prefilledValues = new Object[size];
         types = new Type[size];
-        ImmutableList.Builder<Optional<Function<Block, Block>>> coercers = ImmutableList.builder();
+        ImmutableList.Builder<Optional<Function<Block, Block>>> localCoercers = ImmutableList.builder();
 
         for (int columnIndex = 0; columnIndex < size; columnIndex++) {
             ColumnMapping columnMapping = columnMappings.get(columnIndex);
@@ -119,10 +119,10 @@ public class HivePageSource
             types[columnIndex] = type;
 
             if (columnMapping.getCoercionFrom().isPresent()) {
-                coercers.add(Optional.of(HiveCoercer.createCoercer(typeManager, columnMapping.getCoercionFrom().get(), columnMapping.getHiveColumnHandle().getHiveType())));
+                localCoercers.add(Optional.of(HiveCoercer.createCoercer(typeManager, columnMapping.getCoercionFrom().get(), columnMapping.getHiveColumnHandle().getHiveType())));
             }
             else {
-                coercers.add(Optional.empty());
+                localCoercers.add(Optional.empty());
             }
 
             if (columnMapping.getKind() == PREFILLED) {
@@ -134,7 +134,7 @@ public class HivePageSource
                 }
             }
         }
-        this.coercers = coercers.build();
+        this.coercers = localCoercers.build();
         this.isSelectiveRead = delegate instanceof OrcSelectivePageSource;
     }
 

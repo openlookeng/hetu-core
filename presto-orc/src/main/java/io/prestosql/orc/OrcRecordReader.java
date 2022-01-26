@@ -261,6 +261,7 @@ public class OrcRecordReader
         return block;
     }
 
+    @Override
     public Map<String, Slice> getUserMetadata()
     {
         return ImmutableMap.copyOf(Maps.transformValues(userMetadata, Slices::copyOf));

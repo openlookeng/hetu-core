@@ -854,19 +854,19 @@ public class BackgroundHiveSplitLoader
                 return Optional.empty();
             }
 
-            int tableBucketCount = bucketHandle.get().getTableBucketCount();
-            int readBucketCount = bucketHandle.get().getReadBucketCount();
+            int localTableBucketCount = bucketHandle.get().getTableBucketCount();
+            int localReadBucketCount = bucketHandle.get().getReadBucketCount();
 
-            if (tableBucketCount != readBucketCount && bucketFilter.isPresent()) {
+            if (localTableBucketCount != localReadBucketCount && bucketFilter.isPresent()) {
                 // TODO: remove when supported
                 throw new PrestoException(NOT_SUPPORTED, "Filter on \"$bucket\" is not supported when the table has partitions with different bucket counts");
             }
 
-            List<HiveColumnHandle> bucketColumns = bucketHandle.get().getColumns();
+            List<HiveColumnHandle> localBucketColumns = bucketHandle.get().getColumns();
             IntPredicate predicate = bucketFilter
                     .<IntPredicate>map(filter -> filter.getBucketsToKeep()::contains)
                     .orElse(bucket -> true);
-            return Optional.of(new BucketSplitInfo(bucketColumns, tableBucketCount, readBucketCount, predicate));
+            return Optional.of(new BucketSplitInfo(localBucketColumns, localTableBucketCount, localReadBucketCount, predicate));
         }
 
         private BucketSplitInfo(List<HiveColumnHandle> bucketColumns, int tableBucketCount, int readBucketCount, IntPredicate bucketFilter)

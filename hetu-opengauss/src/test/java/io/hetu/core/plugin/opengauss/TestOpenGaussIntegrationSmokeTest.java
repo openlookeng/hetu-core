@@ -40,24 +40,28 @@ public class TestOpenGaussIntegrationSmokeTest
     }
 
     @Test
+    @Override
     public void testMaterializedView()
     {
         // not supported
     }
 
     @Test
+    @Override
     public void testTableWithNoSupportedColumns()
     {
         // not supported
     }
 
     @Test
+    @Override
     public void testInsertWithFailureDoesntLeaveBehindOrphanedTable()
     {
         // not supported
     }
 
     @Test
+    @Override
     public void testInsertIntoNotNullColumn()
     {
         @Language("SQL") String createTableSql = format("" +

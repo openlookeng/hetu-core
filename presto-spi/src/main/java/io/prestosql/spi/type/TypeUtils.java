@@ -19,6 +19,8 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 
+import java.nio.charset.Charset;
+
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 
 public final class TypeUtils
@@ -75,7 +77,7 @@ public final class TypeUtils
         }
         else if (javaType == Slice.class && (type instanceof VarcharType || type instanceof CharType)) {
             Slice slice = type.getSlice(block, position);
-            value = new String(slice.getBytes());
+            value = new String(slice.getBytes(), Charset.defaultCharset());
         }
         return value;
     }

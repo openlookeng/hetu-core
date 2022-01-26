@@ -287,8 +287,9 @@ public class HiveTableProperties
         return Optional.of(csvValue.charAt(0));
     }
 
-    private static SortingColumn sortingColumnFromString(String name)
+    private static SortingColumn sortingColumnFromString(String inputName)
     {
+        String name = inputName;
         SortingColumn.Order order = SortingColumn.Order.ASCENDING;
         String lower = name.toUpperCase(ENGLISH);
         if (lower.endsWith(" ASC")) {

@@ -133,6 +133,7 @@ public class HivePageSinkProvider
         return createPageSink(handle, false, HiveACIDWriteType.UPDATE, session, ImmutableMap.of());
     }
 
+    @Override
     public ConnectorPageSink createPageSink(ConnectorTransactionHandle transaction, ConnectorSession session, ConnectorDeleteAsInsertTableHandle tableHandle)
     {
         HiveDeleteAsInsertTableHandle handle = (HiveDeleteAsInsertTableHandle) tableHandle;

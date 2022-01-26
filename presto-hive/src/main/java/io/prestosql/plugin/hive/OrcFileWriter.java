@@ -14,6 +14,7 @@
 package io.prestosql.plugin.hive;
 
 import com.google.common.collect.ImmutableList;
+import io.airlift.log.Logger;
 import io.prestosql.orc.OrcDataSink;
 import io.prestosql.orc.OrcDataSource;
 import io.prestosql.orc.OrcWriteValidation.OrcWriteValidationMode;
@@ -63,6 +64,8 @@ import static java.util.Objects.requireNonNull;
 public class OrcFileWriter
         implements HiveFileWriter
 {
+    private static final Logger log = Logger.get(OrcFileWriter.class);
+
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(OrcFileWriter.class).instanceSize();
     private static final ThreadMXBean THREAD_MX_BEAN = ManagementFactory.getThreadMXBean();
     private static final String ACID_KEY_INDEX_NAME = "hive.acid.key.index";
@@ -130,20 +133,20 @@ public class OrcFileWriter
 
         this.fileInputColumnIndexes = requireNonNull(fileInputColumnIndexes, "outputColumnInputIndexes is null");
 
-        ImmutableList.Builder<Block> nullBlocks = ImmutableList.builder();
+        ImmutableList.Builder<Block> localNullBlocks = ImmutableList.builder();
         for (Type fileColumnType : fileColumnTypes) {
             BlockBuilder blockBuilder = fileColumnType.createBlockBuilder(null, 1, 0);
             blockBuilder.appendNull();
-            nullBlocks.add(blockBuilder.build());
+            localNullBlocks.add(blockBuilder.build());
         }
-        this.nullBlocks = nullBlocks.build();
-        ImmutableList.Builder<Block> dataNullBlocks = ImmutableList.builder();
+        this.nullBlocks = localNullBlocks.build();
+        ImmutableList.Builder<Block> localDataNullBlocks = ImmutableList.builder();
         for (Type fileColumnType : dataFileColumnTypes) {
             BlockBuilder blockBuilder = fileColumnType.createBlockBuilder(null, 1, 0);
             blockBuilder.appendNull();
-            dataNullBlocks.add(blockBuilder.build());
+            localDataNullBlocks.add(blockBuilder.build());
         }
-        this.dataNullBlocks = dataNullBlocks.build();
+        this.dataNullBlocks = localDataNullBlocks.build();
         this.validationInputFactory = validationInputFactory;
         this.acidOptions = acidOptions;
         this.lastKey = new OrcAcidRowId(-1, -1, -1);
@@ -399,7 +402,7 @@ public class OrcFileWriter
                 rollbackAction.call();
             }
             catch (Exception ignored) {
-                // ignore
+                log.warn("RollbackAction error after roc commit error");
             }
             throw new PrestoException(HIVE_WRITER_CLOSE_ERROR, "Error committing write to Hive", e);
         }

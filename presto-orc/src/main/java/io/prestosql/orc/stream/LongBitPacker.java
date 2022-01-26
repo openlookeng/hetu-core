@@ -165,6 +165,9 @@ public final class LongBitPacker
                 //noinspection fallthrough
             case 1:
                 buffer[outputIndex] = (0b1000_0000 & value) >>> 7;
+                break;
+            default:
+                break; // do nothing
         }
     }
 
@@ -210,6 +213,9 @@ public final class LongBitPacker
                 //noinspection fallthrough
             case 1:
                 buffer[outputIndex] = (0b1100_0000 & value) >>> 6;
+                break;
+            default:
+                break;
         }
     }
 

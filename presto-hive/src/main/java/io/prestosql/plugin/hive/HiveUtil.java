@@ -398,6 +398,7 @@ public final class HiveUtil
                 break;
             }
             catch (NoSuchMethodException ignored) {
+                log.warn("GetDeclaredMethod error(FileSystem = %s, path = %s)", FileSystem.class.getName(), Path.class.getName());
             }
         }
 
@@ -478,8 +479,9 @@ public final class HiveUtil
         }
     }
 
-    private static void initializeDeserializer(Configuration configuration, Deserializer deserializer, Properties schema)
+    private static void initializeDeserializer(Configuration inputConfiguration, Deserializer deserializer, Properties schema)
     {
+        Configuration configuration = inputConfiguration;
         try {
             configuration = ConfigurationUtils.copy(configuration); // Some SerDes (e.g. Avro) modify passed configuration
             deserializer.initialize(configuration, schema);
@@ -673,8 +675,9 @@ public final class HiveUtil
         return VIEW_PREFIX + data + VIEW_SUFFIX;
     }
 
-    public static ConnectorViewDefinition decodeViewData(String data)
+    public static ConnectorViewDefinition decodeViewData(String intputData)
     {
+        String data = intputData;
         checkCondition(data.startsWith(VIEW_PREFIX), HiveErrorCode.HIVE_INVALID_VIEW_DATA, "View data missing prefix: %s", data);
         checkCondition(data.endsWith(VIEW_SUFFIX), HiveErrorCode.HIVE_INVALID_VIEW_DATA, "View data missing suffix: %s", data);
         data = data.substring(VIEW_PREFIX.length());
@@ -828,8 +831,9 @@ public final class HiveUtil
         return Decimals.encodeUnscaledValue(decimalPartitionKey(value, type, name).unscaledValue());
     }
 
-    private static BigDecimal decimalPartitionKey(String value, DecimalType type, String name)
+    private static BigDecimal decimalPartitionKey(String inputValue, DecimalType type, String name)
     {
+        String value = inputValue;
         try {
             if (value.endsWith(BIG_DECIMAL_POSTFIX)) {
                 value = value.substring(0, value.length() - BIG_DECIMAL_POSTFIX.length());

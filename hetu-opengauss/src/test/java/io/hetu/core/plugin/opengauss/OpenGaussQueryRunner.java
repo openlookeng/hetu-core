@@ -44,10 +44,11 @@ public final class OpenGaussQueryRunner
         return createOpenGaussQueryRunner(server, ImmutableMap.of(), ImmutableList.copyOf(tables));
     }
 
-    public static QueryRunner createOpenGaussQueryRunner(TestOpenGaussServer server, Map<String, String> connectorProperties, Iterable<TpchTable<?>> tables)
+    public static QueryRunner createOpenGaussQueryRunner(TestOpenGaussServer server, Map<String, String> inputConnectorProperties, Iterable<TpchTable<?>> tables)
             throws Exception
     {
         DistributedQueryRunner queryRunner = null;
+        Map<String, String> connectorProperties = inputConnectorProperties;
         try {
             queryRunner = new DistributedQueryRunner(createSession(), 3);
 

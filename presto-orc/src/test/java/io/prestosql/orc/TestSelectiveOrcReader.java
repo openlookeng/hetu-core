@@ -32,6 +32,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -191,12 +192,14 @@ public class TestSelectiveOrcReader
 
     private static TupleDomainFilter stringBetween(boolean nullAllowed, String upper, String lower)
     {
-        return TupleDomainFilter.BytesRange.of(lower.getBytes(), false, upper.getBytes(), false, nullAllowed);
+        return TupleDomainFilter.BytesRange.of(lower.getBytes(StandardCharsets.UTF_8), false,
+                upper.getBytes(StandardCharsets.UTF_8), false, nullAllowed);
     }
 
     private static TupleDomainFilter stringEquals(boolean nullAllowed, String value)
     {
-        return TupleDomainFilter.BytesRange.of(value.getBytes(), false, value.getBytes(), false, nullAllowed);
+        return TupleDomainFilter.BytesRange.of(value.getBytes(StandardCharsets.UTF_8), false, value.getBytes(StandardCharsets.UTF_8),
+                false, nullAllowed);
     }
 
     private static String toCharValue(Object value, int minLength)

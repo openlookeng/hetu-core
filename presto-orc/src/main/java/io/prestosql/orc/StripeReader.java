@@ -292,7 +292,7 @@ public class StripeReader
         return true;
     }
 
-    private Map<StreamId, OrcChunkLoader> readDiskRanges(long stripeOffset, Map<StreamId, DiskRange> diskRanges, AggregatedMemoryContext systemMemoryUsage)
+    private Map<StreamId, OrcChunkLoader> readDiskRanges(long stripeOffset, Map<StreamId, DiskRange> inputDiskRanges, AggregatedMemoryContext systemMemoryUsage)
             throws IOException
     {
         //
@@ -300,6 +300,7 @@ public class StripeReader
         //
 
         // transform ranges to have an absolute offset in file
+        Map<StreamId, DiskRange> diskRanges = inputDiskRanges;
         ImmutableMap.Builder<StreamId, DiskRange> diskRangesBuilder = ImmutableMap.builder();
         for (Entry<StreamId, DiskRange> entry : diskRanges.entrySet()) {
             DiskRange diskRange = entry.getValue();

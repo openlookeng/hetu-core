@@ -284,6 +284,8 @@ public class TestOrcReaderCache
                                 assertEquals(VARCHAR.getSlice(block, i).toStringUtf8(), "val" + (position + i));
                             }
                             break;
+                        default:
+                            // do nothing
                     }
                 }
                 position += page.getPositionCount();

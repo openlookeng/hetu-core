@@ -224,13 +224,13 @@ public class HivePageSink
 
         if (acidWriteType == HiveACIDWriteType.DELETE) {
             //Null blocks will be used in case of delete
-            ImmutableList.Builder<Block> nullBlocks = ImmutableList.builder();
+            ImmutableList.Builder<Block> localNullBlocks = ImmutableList.builder();
             for (Type dataColumnType : dataColumnTypes.build()) {
                 BlockBuilder blockBuilder = dataColumnType.createBlockBuilder(null, 1, 0);
                 blockBuilder.appendNull();
-                nullBlocks.add(blockBuilder.build());
+                localNullBlocks.add(blockBuilder.build());
             }
-            this.nullBlocks = nullBlocks.build();
+            this.nullBlocks = localNullBlocks.build();
         }
         else {
             this.nullBlocks = ImmutableList.of();
@@ -433,7 +433,7 @@ public class HivePageSink
                 allBucketList.add(split.getBucketNumber().orElse(0));
             });
 
-            List<ColumnHandle> inputColumns = new ArrayList<>(HivePageSink.this.inputColumns);
+            List<ColumnHandle> localInputColumns = new ArrayList<>(HivePageSink.this.inputColumns);
             if (isInsertOnlyTable() || acidWriteType == HiveACIDWriteType.VACUUM_UNIFY) {
                 //Insert only tables Just need to merge contents together. No processing required.
                 //During vacuum unify, all buckets will be merged to one.
@@ -447,19 +447,19 @@ public class HivePageSink
                 }
                 else if (acidWriteType == HiveACIDWriteType.VACUUM_UNIFY) {
                     HiveColumnHandle rowIdHandle = HiveColumnHandle.updateRowIdHandle();
-                    inputColumns.add(rowIdHandle);
+                    localInputColumns.add(rowIdHandle);
                 }
 
                 pageSources = multiSplits.stream()
                         .map(split -> pageSourceProvider.createPageSource(
-                                transactionHandle, session, split, connectorTableHandle, inputColumns))
+                                transactionHandle, session, split, connectorTableHandle, localInputColumns))
                         .collect(toList());
                 List<Iterator<Page>> pageSourceIterators = HiveUtil.getPageSourceIterators(pageSources);
                 sortedPagesForVacuum = Iterators.concat(pageSourceIterators.iterator());
             }
             else {
                 HiveColumnHandle rowIdHandle = HiveColumnHandle.updateRowIdHandle();
-                inputColumns.add(rowIdHandle);
+                localInputColumns.add(rowIdHandle);
 
                 List<HiveSplitWrapper> multiSplits = hiveSplits.stream()
                         .map(HiveSplitWrapper::wrap)
@@ -467,13 +467,13 @@ public class HivePageSink
 
                 pageSources = multiSplits.stream()
                         .map(split -> pageSourceProvider.createPageSource(
-                                transactionHandle, session, split, connectorTableHandle, inputColumns))
+                                transactionHandle, session, split, connectorTableHandle, localInputColumns))
                         .collect(toList());
-                List<Type> columnTypes = inputColumns.stream()
+                List<Type> columnTypes = localInputColumns.stream()
                         .map(c -> ((HiveColumnHandle) c).getHiveType().getType(typeManager))
                         .collect(toList());
                 //Last index for rowIdHandle
-                List<Integer> sortFields = ImmutableList.of(inputColumns.size() - 1);
+                List<Integer> sortFields = ImmutableList.of(localInputColumns.size() - 1);
                 sortedPagesForVacuum = HiveUtil.getMergeSortedPages(pageSources, columnTypes, sortFields,
                         ImmutableList.of(SortOrder.ASC_NULLS_FIRST));
             }
@@ -552,15 +552,15 @@ public class HivePageSink
         private Map<String, Options> initVacuumOptions(List<HiveSplit> hiveSplits)
         {
             return hdfsEnvironment.doAs(session.getUser(), () -> {
-                Map<String, Options> vacuumOptionsMap = new HashMap<>();
+                Map<String, Options> localVacuumOptionsMap = new HashMap<>();
                 //Findout the minWriteId and maxWriteId for current compaction.
                 HiveVacuumTableHandle vacuumTableHandle = (HiveVacuumTableHandle) writableTableHandle;
                 for (HiveSplit split : hiveSplits) {
                     String partition = split.getPartitionName();
-                    Options options = vacuumOptionsMap.get(partition);
+                    Options options = localVacuumOptionsMap.get(partition);
                     if (options == null) {
                         options = new Options(writerFactory.getConf()).maximumWriteId(-1).minimumWriteId(Long.MAX_VALUE);
-                        vacuumOptionsMap.put(partition, options);
+                        localVacuumOptionsMap.put(partition, options);
                     }
                     if (vacuumTableHandle.isFullVacuum()) {
                         //Major compaction, need to write the base
@@ -626,7 +626,7 @@ public class HivePageSink
                         options.maximumWriteId(suitableRange.getMax());
                     }
                 }
-                return vacuumOptionsMap;
+                return localVacuumOptionsMap;
             });
         }
 
@@ -705,8 +705,9 @@ public class HivePageSink
         return NOT_BLOCKED;
     }
 
-    private void doAppend(Page page)
+    private void doAppend(Page inputPage)
     {
+        Page page = inputPage;
         while (page.getPositionCount() > MAX_PAGE_POSITIONS) {
             Page chunk = page.getRegion(0, MAX_PAGE_POSITIONS);
             page = page.getRegion(MAX_PAGE_POSITIONS, page.getPositionCount() - MAX_PAGE_POSITIONS);
@@ -967,8 +968,9 @@ public class HivePageSink
             this.pageIndexer = pageIndexerFactory.createPageIndexer(partitionColumnTypes);
         }
 
-        public int[] partitionPage(Page partitionColumns, Block bucketBlock, Block operationIdBlock)
+        public int[] partitionPage(Page inputPartitionColumns, Block bucketBlock, Block operationIdBlock)
         {
+            Page partitionColumns = inputPartitionColumns;
             if (bucketBlock != null) {
                 Block[] blocks = new Block[partitionColumns.getChannelCount() + 1];
                 for (int i = 0; i < partitionColumns.getChannelCount(); i++) {

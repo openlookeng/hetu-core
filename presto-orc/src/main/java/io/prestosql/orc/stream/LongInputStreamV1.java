@@ -96,9 +96,10 @@ public class LongInputStreamV1
     }
 
     @Override
-    public void next(long[] values, int items)
+    public void next(long[] values, int inputItems)
             throws IOException
     {
+        int items = inputItems;
         int offset = 0;
         while (items > 0) {
             if (used == numLiterals) {
@@ -123,9 +124,10 @@ public class LongInputStreamV1
     }
 
     @Override
-    public void next(int[] values, int items)
+    public void next(int[] values, int inputItems)
             throws IOException
     {
+        int items = inputItems;
         int offset = 0;
         while (items > 0) {
             if (used == numLiterals) {
@@ -162,9 +164,10 @@ public class LongInputStreamV1
     }
 
     @Override
-    public void next(short[] values, int items)
+    public void next(short[] values, int inputItems)
             throws IOException
     {
+        int items = inputItems;
         int offset = 0;
         while (items > 0) {
             if (used == numLiterals) {
@@ -226,9 +229,10 @@ public class LongInputStreamV1
     }
 
     @Override
-    public void skip(long items)
+    public void skip(long inputItems)
             throws IOException
     {
+        long items = inputItems;
         while (items > 0) {
             if (used == numLiterals) {
                 readValues();

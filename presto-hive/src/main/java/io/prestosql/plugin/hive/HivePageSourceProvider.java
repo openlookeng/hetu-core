@@ -668,20 +668,20 @@ public class HivePageSourceProvider
             Set<Integer> regularColumnIndices = new HashSet<>();
             ImmutableList.Builder<ColumnMapping> columnMappings = ImmutableList.builder();
             for (HiveColumnHandle column : columns) {
-                Optional<HiveType> coercionFrom = Optional.ofNullable(columnCoercions.get(column.getHiveColumnIndex()));
+                Optional<HiveType> localCoercionFrom = Optional.ofNullable(columnCoercions.get(column.getHiveColumnIndex()));
                 if (column.getColumnType() == REGULAR) {
                     if (missingColumns.contains(column.getColumnName())) {
                         columnMappings.add(new ColumnMapping(ColumnMappingKind.PREFILLED, column, Optional.empty(),
-                                OptionalInt.empty(), coercionFrom));
+                                OptionalInt.empty(), localCoercionFrom));
                         continue;
                     }
                     checkArgument(regularColumnIndices.add(column.getHiveColumnIndex()), "duplicate hiveColumnIndex in columns list");
 
-                    columnMappings.add(regular(column, regularIndex, coercionFrom));
+                    columnMappings.add(regular(column, regularIndex, localCoercionFrom));
                     regularIndex++;
                 }
                 else if (HiveColumnHandle.isUpdateColumnHandle(column)) {
-                    columnMappings.add(transaction(column, regularIndex, coercionFrom));
+                    columnMappings.add(transaction(column, regularIndex, localCoercionFrom));
                     regularIndex++;
                 }
                 else {
@@ -689,7 +689,7 @@ public class HivePageSourceProvider
                             column,
                             HiveUtil.getPrefilledColumnValue(column, partitionKeysByName.get(column.getName()), path,
                                     bucketNumber),
-                            coercionFrom));
+                            localCoercionFrom));
                 }
             }
             for (HiveColumnHandle column : requiredInterimColumns) {
@@ -753,8 +753,9 @@ public class HivePageSourceProvider
         return partitionValue;
     }
 
-    protected static Domain modifyDomain(Domain domain, Optional<RowExpression> filter)
+    protected static Domain modifyDomain(Domain inputDomain, Optional<RowExpression> filter)
     {
+        Domain domain = inputDomain;
         Range range = domain.getValues().getRanges().getSpan();
         if (filter.isPresent() && filter.get() instanceof CallExpression) {
             CallExpression call = (CallExpression) filter.get();

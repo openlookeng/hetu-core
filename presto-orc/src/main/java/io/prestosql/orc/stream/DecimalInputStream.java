@@ -58,9 +58,9 @@ public class DecimalInputStream
         // buffer, so last checkpoint is no longer valid)
         if (block.length() > 0 && decodeCompressedBlockOffset(newCheckpoint) == decodeCompressedBlockOffset(lastCheckpoint)) {
             // and decompressed position is within our block, reposition in the block directly
-            int blockOffset = decodeDecompressedOffset(newCheckpoint) - decodeDecompressedOffset(lastCheckpoint);
-            if (blockOffset >= 0 && blockOffset < block.length()) {
-                this.blockOffset = blockOffset;
+            int localBlockOffset = decodeDecompressedOffset(newCheckpoint) - decodeDecompressedOffset(lastCheckpoint);
+            if (localBlockOffset >= 0 && localBlockOffset < block.length()) {
+                this.blockOffset = localBlockOffset;
                 // do not change last checkpoint because we have not moved positions
                 return;
             }
@@ -160,9 +160,10 @@ public class DecimalInputStream
         }
     }
 
-    private int decodeLongDecimalTail(long[] result, int count, int batchSize)
+    private int decodeLongDecimalTail(long[] result, int inputCount, int batchSize)
             throws IOException
     {
+        int count = inputCount;
         boolean negative = false;
         long low = 0;
         long middle = 0;
@@ -313,9 +314,10 @@ public class DecimalInputStream
         }
     }
 
-    private int decodeShortDecimalTail(long[] result, int count, int batchSize)
+    private int decodeShortDecimalTail(long[] result, int inputCount, int batchSize)
             throws IOException
     {
+        int count = inputCount;
         long low = 0;
         long high = 0;
 

@@ -276,9 +276,10 @@ public class OrcOutputBuffer
     }
 
     @Override
-    public void writeBytes(InputStream in, int length)
+    public void writeBytes(InputStream in, int inputLength)
             throws IOException
     {
+        int length = inputLength;
         while (length > 0) {
             int batch = ensureBatchSize(length);
             slice.setBytes(bufferPosition, in, batch);
@@ -288,8 +289,9 @@ public class OrcOutputBuffer
     }
 
     @Override
-    public void writeZero(int length)
+    public void writeZero(int inputLength)
     {
+        int length = inputLength;
         checkArgument(length >= 0, "length must be 0 or greater than 0.");
 
         while (length > 0) {
@@ -459,8 +461,10 @@ public class OrcOutputBuffer
         }
     }
 
-    private void writeDirectlyToOutputStream(byte[] bytes, int bytesOffset, int length)
+    private void writeDirectlyToOutputStream(byte[] bytes, int inputBytesOffset, int inputLength)
     {
+        int bytesOffset = inputBytesOffset;
+        int length = inputLength;
         if (compressor == null) {
             compressedOutputStream.writeBytes(bytes, bytesOffset, length);
             return;

@@ -292,9 +292,10 @@ public class OrcWriteValidation
             OrcDataSourceId orcDataSourceId,
             long stripeOffset,
             int rowGroupIndex,
-            ColumnMetadata<ColumnStatistics> actual)
+            ColumnMetadata<ColumnStatistics> inputActual)
             throws OrcCorruptionException
     {
+        ColumnMetadata<ColumnStatistics> actual = inputActual;
         List<RowGroupStatistics> rowGroups = rowGroupStatistics.get(stripeOffset);
         if (rowGroups == null) {
             throw new OrcCorruptionException(orcDataSourceId, "Unexpected stripe at offset %s", stripeOffset);
@@ -466,11 +467,11 @@ public class OrcWriteValidation
         {
             this.types = ImmutableList.copyOf(requireNonNull(types, "types is null"));
 
-            ImmutableList.Builder<XxHash64> columnHashes = ImmutableList.builder();
+            ImmutableList.Builder<XxHash64> localColumnHashes = ImmutableList.builder();
             for (Type ignored : types) {
-                columnHashes.add(new XxHash64());
+                localColumnHashes.add(new XxHash64());
             }
-            this.columnHashes = columnHashes.build();
+            this.columnHashes = localColumnHashes.build();
         }
 
         public static WriteChecksumBuilder createWriteChecksumBuilder(ColumnMetadata<OrcType> orcTypes, List<Type> readTypes)
@@ -906,12 +907,12 @@ public class OrcWriteValidation
 
         public void addRowGroupStatistics(Map<OrcColumnId, ColumnStatistics> columnStatistics)
         {
-            RowGroupStatistics rowGroupStatistics = new RowGroupStatistics(validationMode, columnStatistics);
-            currentRowGroupStatistics.add(rowGroupStatistics);
+            RowGroupStatistics localRrowGroupStatistics = new RowGroupStatistics(validationMode, columnStatistics);
+            currentRowGroupStatistics.add(localRrowGroupStatistics);
 
             retainedSize += RowGroupStatistics.INSTANCE_SIZE;
             if (validationMode != HASHED) {
-                for (ColumnStatistics statistics : rowGroupStatistics.getColumnStatistics().values()) {
+                for (ColumnStatistics statistics : localRrowGroupStatistics.getColumnStatistics().values()) {
                     retainedSize += Integer.BYTES + statistics.getRetainedSizeInBytes();
                 }
             }
