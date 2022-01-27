@@ -298,19 +298,19 @@ public class GroupedTypedHistogram
 
         for (int i = 0; i < nextNodePointer; i++) {
             // find the old one
-            int bucketId = getBucketIdForNode(i, newMask);
+            int tmpBucketId = getBucketIdForNode(i, newMask);
             int probeCount = 1;
 
-            int originalBucket = bucketId;
+            int originalBucket = tmpBucketId;
             // find new one
-            while (newBuckets.get(bucketId) != -1) {
+            while (newBuckets.get(tmpBucketId) != -1) {
                 int probe = nextProbe(probeCount);
-                bucketId = nextBucketId(originalBucket, newMask, probe);
+                tmpBucketId = nextBucketId(originalBucket, newMask, probe);
                 probeCount++;
             }
 
             // record the mapping
-            newBuckets.set(bucketId, i);
+            newBuckets.set(tmpBucketId, i);
         }
         buckets = newBuckets;
         bucketCount = newBucketCount;
@@ -344,9 +344,9 @@ public class GroupedTypedHistogram
     private int getBucketIdForNode(int nodePointer, int mask)
     {
         long valueAndGroupHash = valueAndGroupHashes.get(nodePointer); // without mask
-        int bucketId = (int) (valueAndGroupHash & mask);
+        int tmpBucketId = (int) (valueAndGroupHash & mask);
 
-        return bucketId;
+        return tmpBucketId;
     }
 
     //short-lived abstraction that is basically a position into parallel arrays that we can treat as one data structure
@@ -477,25 +477,25 @@ public class GroupedTypedHistogram
             long valueHash = murmurHash3(TypeUtils.hashPosition(type, block, position));
             long groupIdHash = murmurHash3(groupId);
             long valueAndGroupHash = combineGroupAndValueHash(groupIdHash, valueHash);
-            int bucketId = (int) (valueAndGroupHash & mask);
+            int tmpBucketId = (int) (valueAndGroupHash & mask);
             int nodePointer;
             int probeCount = 1;
-            int originalBucketId = bucketId;
+            int originalBucketId = tmpBucketId;
             // look for an empty slot or a slot containing this group x key
             while (true) {
-                nodePointer = buckets.get(bucketId);
+                nodePointer = buckets.get(tmpBucketId);
 
                 if (nodePointer == EMPTY_BUCKET) {
-                    return new BucketDataNode(bucketId, new ValueNode(nextNodePointer), valueHash, valueAndGroupHash, nextNodePointer, true);
+                    return new BucketDataNode(tmpBucketId, new ValueNode(nextNodePointer), valueHash, valueAndGroupHash, nextNodePointer, true);
                 }
                 else if (groupAndValueMatches(groupId, block, position, nodePointer, valuePositions.get(nodePointer))) {
                     // value match
-                    return new BucketDataNode(bucketId, new ValueNode(nodePointer), valueHash, valueAndGroupHash, nodePointer, false);
+                    return new BucketDataNode(tmpBucketId, new ValueNode(nodePointer), valueHash, valueAndGroupHash, nodePointer, false);
                 }
                 else {
                     // keep looking
                     int probe = nextProbe(probeCount);
-                    bucketId = nextBucketId(originalBucketId, mask, probe);
+                    tmpBucketId = nextBucketId(originalBucketId, mask, probe);
                     probeCount++;
                 }
             }

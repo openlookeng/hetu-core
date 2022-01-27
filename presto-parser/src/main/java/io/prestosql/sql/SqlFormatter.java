@@ -289,10 +289,10 @@ public final class SqlFormatter
         {
             append(indent, "EXECUTE ");
             builder.append(node.getName());
-            List<Expression> parameters = node.getParameters();
-            if (!parameters.isEmpty()) {
+            List<Expression> parameters1 = node.getParameters();
+            if (!parameters1.isEmpty()) {
                 builder.append(" USING ");
-                Joiner.on(", ").appendTo(builder, parameters);
+                Joiner.on(", ").appendTo(builder, parameters1);
             }
             return null;
         }
@@ -1105,15 +1105,15 @@ public final class SqlFormatter
                         }
                         if (element instanceof LikeClause) {
                             LikeClause likeClause = (LikeClause) element;
-                            StringBuilder builder = new StringBuilder(elementIndent);
-                            builder.append("LIKE ")
+                            StringBuilder builder1 = new StringBuilder(elementIndent);
+                            builder1.append("LIKE ")
                                     .append(formatName(likeClause.getTableName()));
                             if (likeClause.getPropertiesOption().isPresent()) {
-                                builder.append(" ")
+                                builder1.append(" ")
                                         .append(likeClause.getPropertiesOption().get().name())
                                         .append(" PROPERTIES");
                             }
-                            return builder.toString();
+                            return builder1.toString();
                         }
                         throw new UnsupportedOperationException("unknown table element: " + element);
                     })

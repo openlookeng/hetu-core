@@ -574,7 +574,7 @@ public class Query
             queryHtmlUri = new URI("http://localhost");
         }
         catch (URISyntaxException e) {
-            // do nothing
+            log.error("get uri error: %s", e.getMessage());
         }
 
         // Remove as many pages as possible from the exchange until just greater than DESIRED_RESULT_BYTES
@@ -671,7 +671,7 @@ public class Query
                 nextResultsUri = new URI(Long.toString(nextToken.getAsLong()));
             }
             catch (URISyntaxException e) {
-                e.printStackTrace();
+                log.error("get uri error: %s", e.getMessage());
             }
         }
 

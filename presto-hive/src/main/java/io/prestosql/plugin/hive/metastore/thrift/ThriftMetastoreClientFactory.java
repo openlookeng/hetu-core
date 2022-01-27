@@ -81,6 +81,7 @@ public class ThriftMetastoreClientFactory
         }
     }
 
+    @Override
     public ThriftMetastoreClient create(HostAndPort address)
             throws TTransportException
     {

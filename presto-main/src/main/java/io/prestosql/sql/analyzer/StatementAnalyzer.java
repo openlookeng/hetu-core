@@ -798,7 +798,6 @@ class StatementAnalyzer
             Scope queryScope = process(new Table(node.getSourceTableName()), scope);
             ImmutableList.Builder<Field> outputFields = ImmutableList.builder();
             for (FunctionCall aggFunction : aggFunctions) {
-                //count(1) or count(col)
                 String argument = aggFunction.getArguments().isEmpty() || aggFunction.getArguments().get(0) instanceof LongLiteral ? null : ((Identifier) aggFunction.getArguments().get(0)).getValue();
                 String aggFunctionName = aggFunction.getName().toString().toLowerCase(ENGLISH);
                 if (!cubeSupportedFunctions.contains(aggFunctionName)) {

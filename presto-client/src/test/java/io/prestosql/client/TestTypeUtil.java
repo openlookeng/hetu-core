@@ -102,14 +102,6 @@ public class TestTypeUtil
     @Test
     public void testParametricType()
     {
-        /*
-        *   .put(CHAR.getName(), CHAR)
-            .put(VARCHAR.getName(), VARCHAR)
-            .put(ARRAY.getName(), ARRAY)
-            .put(MAP.getName(), MAP)
-            .put(ROW.getName(), ROW)
-        * */
-
         Type type = parseType(typeManager, "decimal(10,2)");
         assertTrue(type instanceof DecimalType);
 

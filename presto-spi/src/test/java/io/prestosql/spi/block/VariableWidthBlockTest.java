@@ -18,6 +18,7 @@ import io.airlift.slice.Slices;
 import io.prestosql.spi.util.BloomFilter;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.Random;
@@ -74,9 +75,9 @@ public class VariableWidthBlockTest
             offsets[i + 1] = offset;
             String value = "value" + rnd.nextLong();
             buffer.append(value);
-            offset += value.getBytes().length;
+            offset += value.getBytes(StandardCharsets.UTF_8).length;
         }
-        Slice slice = Slices.wrappedBuffer(buffer.toString().getBytes());
+        Slice slice = Slices.wrappedBuffer(buffer.toString().getBytes(StandardCharsets.UTF_8));
 
         return new VariableWidthBlock(count, slice, offsets, Optional.empty());
     }

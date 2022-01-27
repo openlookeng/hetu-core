@@ -107,10 +107,10 @@ public class FileBasedLock
         }
         Path lockFileDir = Paths.get(lockDir);
         long timeout = (timeoutRead == null) ? DEFAULT_LOCK_FILE_TIMEOUT : Long.parseLong(timeoutRead);
-        long retryInterval = (retryIntervalRead == null) ? DEFAULT_RETRY_INTERVAL : Long.parseLong(retryIntervalRead);
-        long refreshRate = (refreshRateRead == null) ? DEFAULT_REFRESH_RATE : Long.parseLong(refreshRateRead);
+        long retryInterval1 = (retryIntervalRead == null) ? DEFAULT_RETRY_INTERVAL : Long.parseLong(retryIntervalRead);
+        long refreshRate1 = (refreshRateRead == null) ? DEFAULT_REFRESH_RATE : Long.parseLong(refreshRateRead);
 
-        return new FileBasedLock(fs, lockFileDir, timeout, retryInterval, refreshRate);
+        return new FileBasedLock(fs, lockFileDir, timeout, retryInterval1, refreshRate1);
     }
 
     /**
@@ -318,7 +318,7 @@ public class FileBasedLock
             LOG.debug("Exception thrown during lock.release(): %s", e.getMessage());
         }
         catch (InterruptedException e) {
-            e.printStackTrace();
+            LOG.error("Load pdbo table error : ", e.getMessage());
         }
     }
 
@@ -454,7 +454,7 @@ public class FileBasedLock
             throws IOException
     {
         try (OutputStream os = (overwrite) ? fs.newOutputStream(file) : fs.newOutputStream(file, CREATE_NEW)) {
-            os.write(content.getBytes());
+            os.write(content.getBytes(StandardCharsets.UTF_8));
         }
     }
 

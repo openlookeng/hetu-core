@@ -241,7 +241,6 @@ public class TestDataSourceTableSplitManager
         }
     }
 
-    // splitCount <= 0
     @Test
     public void testGetTableSplits07()
     {

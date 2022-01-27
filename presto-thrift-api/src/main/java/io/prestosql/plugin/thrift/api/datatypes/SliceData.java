@@ -127,37 +127,37 @@ final class SliceData
         if (positions == 0) {
             return create.apply(null, null, null);
         }
-        boolean[] nulls = null;
-        int[] sizes = null;
-        byte[] bytes = null;
+        boolean[] nulls1 = null;
+        int[] sizes1 = null;
+        byte[] bytes1 = null;
         int bytesIndex = 0;
         for (int position = 0; position < positions; position++) {
             if (block.isNull(position)) {
-                if (nulls == null) {
-                    nulls = new boolean[positions];
+                if (nulls1 == null) {
+                    nulls1 = new boolean[positions];
                 }
-                nulls[position] = true;
+                nulls1[position] = true;
             }
             else {
                 Slice value = type.getSlice(block, position);
-                if (sizes == null) {
-                    sizes = new int[positions];
+                if (sizes1 == null) {
+                    sizes1 = new int[positions];
                     int totalBytes = totalSliceBytes(block);
                     if (totalBytes > 0) {
-                        bytes = new byte[totalBytes];
+                        bytes1 = new byte[totalBytes];
                     }
                 }
                 int length = value.length();
-                sizes[position] = length;
+                sizes1[position] = length;
                 if (length > 0) {
-                    checkState(bytes != null);
-                    value.getBytes(0, bytes, bytesIndex, length);
+                    checkState(bytes1 != null);
+                    value.getBytes(0, bytes1, bytesIndex, length);
                     bytesIndex += length;
                 }
             }
         }
-        checkState(bytes == null || bytesIndex == bytes.length);
-        return create.apply(nulls, sizes, bytes);
+        checkState(bytes1 == null || bytesIndex == bytes1.length);
+        return create.apply(nulls1, sizes1, bytes1);
     }
 
     private static int totalSliceBytes(Block block)

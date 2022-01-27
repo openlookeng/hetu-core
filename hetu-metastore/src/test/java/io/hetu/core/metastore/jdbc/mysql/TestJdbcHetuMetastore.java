@@ -505,7 +505,7 @@ public class TestJdbcHetuMetastore
                 .put("desc", "vschema")
                 .build();
 
-        DatabaseEntity database = DatabaseEntity.builder()
+        DatabaseEntity tmpDatabase = DatabaseEntity.builder()
                 .setCatalogName(defaultCatalog.getName())
                 .setDatabaseName("database100")
                 .setOwner("root9")
@@ -519,7 +519,7 @@ public class TestJdbcHetuMetastore
         for (int i = 0; i < 5; i++) {
             threads[i] = new Thread(() -> {
                 try {
-                    metastore.createDatabaseIfNotExist(database);
+                    metastore.createDatabaseIfNotExist(tmpDatabase);
                 }
                 catch (PrestoException e) {
                     testResult = false;
@@ -533,7 +533,7 @@ public class TestJdbcHetuMetastore
         }
 
         assertTrue(testResult);
-        metastore.dropDatabase(database.getCatalogName(), database.getName());
+        metastore.dropDatabase(tmpDatabase.getCatalogName(), tmpDatabase.getName());
     }
 
     /**
@@ -717,7 +717,7 @@ public class TestJdbcHetuMetastore
                 .put("desc", "vschema")
                 .build();
 
-        DatabaseEntity database = DatabaseEntity.builder()
+        DatabaseEntity tmpDatabase = DatabaseEntity.builder()
                 .setCatalogName(defaultCatalog.getName())
                 .setDatabaseName("database200")
                 .setOwner("root9")
@@ -725,7 +725,7 @@ public class TestJdbcHetuMetastore
                 .setCreateTime(System.currentTimeMillis())
                 .setParameters(properties)
                 .build();
-        metastore.createDatabase(database);
+        metastore.createDatabase(tmpDatabase);
 
         DatabaseEntity newDatabase = DatabaseEntity.builder()
                 .setCatalogName(defaultCatalog.getName())
@@ -741,7 +741,7 @@ public class TestJdbcHetuMetastore
         for (int i = 0; i < 5; i++) {
             threads[i] = new Thread(() -> {
                 try {
-                    metastore.alterDatabase(database.getCatalogName(), database.getName(), newDatabase);
+                    metastore.alterDatabase(tmpDatabase.getCatalogName(), tmpDatabase.getName(), newDatabase);
                 }
                 catch (PrestoException e) {
                     testResult = false;
@@ -755,7 +755,7 @@ public class TestJdbcHetuMetastore
         }
 
         assertTrue(testResult);
-        metastore.dropDatabase(database.getCatalogName(), database.getName());
+        metastore.dropDatabase(tmpDatabase.getCatalogName(), tmpDatabase.getName());
     }
 
     /**

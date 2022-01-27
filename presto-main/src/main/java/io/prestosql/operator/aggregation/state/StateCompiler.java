@@ -445,21 +445,6 @@ public class StateCompiler
         constructor.getBody()
                 .ret();
 
-        /**
-         public Object capture(BlockEncodingSerdeProvider serdeProvider)
-         {
-         List<Object> stateValues = new ArrayList<>();
-         BlockEncodingSerde captureBlockEncodingSerde = serdeProvider.getBlockEncodingSerde();
-         Object obj;
-
-         obj = SnapshotUtils.captureHelper(xxxValue, serdeProvider);
-         stateValues.add(obj);
-         .
-         .
-         .
-         }
-         **/
-
         Parameter captureSerdeProvider = arg("serdeProvider", BlockEncodingSerdeProvider.class);
         MethodDefinition capture = definition.declareMethod(a(PUBLIC), "capture", type(Object.class), captureSerdeProvider);
         Variable myState = capture.getScope().declareVariable(List.class, "myState");
@@ -475,19 +460,6 @@ public class StateCompiler
 
         capture.getBody().append(myState.ret());
 
-        /**
-         public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
-         {
-         BlockEncodingSerde restoreBlockEncodingSerde = serdeProvider.getBlockEncodingSerde();
-         List<Object> restoreState = (List) state;
-         Object value;
-
-         Then it's setting value to be equal to elements in restoreState list.
-         If the field we're restoring is a block, restore the block from byte[], and set the field to the new block using the field's setter.
-         If the field is a slice, call Slices.wrappedBuffer(byte[]) to restore slice, assign it to field by using field's setter.
-         If the field is anything else, use the field's setter.
-         }
-         **/
         Parameter state = arg("state", Object.class);
         Parameter restoreSerdeProvider = arg("serdeProvider", BlockEncodingSerdeProvider.class);
         MethodDefinition restore = definition.declareMethod(a(PUBLIC), "restore", type(void.class), state, restoreSerdeProvider);
@@ -571,12 +543,6 @@ public class StateCompiler
         // return size
         body.append(size.ret());
 
-        /**
-         public Object capture(BlockEncodingSerdeProvider serdeProvider)
-         {
-            call xxxBigArray's individual capture method and add returned Object to myState list.
-         }
-         **/
         //Generate capture
         Parameter captureSerdeProvider = arg("serdeProvider", BlockEncodingSerdeProvider.class);
         MethodDefinition capture = definition.declareMethod(a(PUBLIC), "capture", type(Object.class), captureSerdeProvider);
@@ -588,12 +554,6 @@ public class StateCompiler
         capture.getBody().append(myState.invoke("add", boolean.class, capture.getThis().invoke("getGroupId", long.class).cast(Object.class)));
         capture.getBody().append(myState.ret());
 
-        /**
-         public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
-         {
-            cast state class to list, loop through list and call restore on individual xxxBigArray using list content as state.
-         }
-         **/
         //Generate restore
         Parameter state = arg("state", Object.class);
         Parameter restoreSerdeProvider = arg("serdeProvider", BlockEncodingSerdeProvider.class);
@@ -807,25 +767,23 @@ public class StateCompiler
         private final Object initialValue;
         private final Optional<Type> sqlType;
 
-        private StateField(String name, Class<?> type, Object initialValue, String getterName, Optional<Type> sqlType)
+        private StateField(String name, Class<?> type, Object initialValue, String getterName, Optional<Type> tmpSqlType)
         {
             this.name = requireNonNull(name, "name is null");
             checkArgument(!name.isEmpty(), "name is empty");
             this.type = requireNonNull(type, "type is null");
             this.getterName = requireNonNull(getterName, "getterName is null");
             this.initialValue = initialValue;
-            checkArgument(sqlType != null, "sqlType is null");
-            if (sqlType.isPresent()) {
+            checkArgument(tmpSqlType != null, "sqlType is null");
+            boolean isPresent = tmpSqlType.isPresent();
+            if (isPresent) {
                 checkArgument(
-                        (sqlType.get().getJavaType() == type) ||
-                                ((type == byte.class) && TINYINT.equals(sqlType.get())) ||
-                                ((type == int.class) && INTEGER.equals(sqlType.get())),
-                        "Stack type (%s) and provided sql type (%s) are incompatible", type.getName(), sqlType.get().getDisplayName());
+                        (tmpSqlType.get().getJavaType() == type) ||
+                                ((type == byte.class) && TINYINT.equals(tmpSqlType.get())) ||
+                                ((type == int.class) && INTEGER.equals(tmpSqlType.get())),
+                        "Stack type (%s) and provided sql type (%s) are incompatible", type.getName(), tmpSqlType.get().getDisplayName());
             }
-            else {
-                sqlType = sqlTypeFromStackType(type);
-            }
-            this.sqlType = sqlType;
+            this.sqlType = isPresent ? tmpSqlType : sqlTypeFromStackType(type);
         }
 
         private static Optional<Type> sqlTypeFromStackType(Class<?> stackType)
@@ -883,8 +841,8 @@ public class StateCompiler
 
         boolean isPrimitiveType()
         {
-            Class<?> type = getType();
-            return (type == long.class || type == double.class || type == boolean.class || type == byte.class || type == int.class);
+            Class<?> tmpType = getType();
+            return (tmpType == long.class || tmpType == double.class || tmpType == boolean.class || tmpType == byte.class || tmpType == int.class);
         }
 
         public BytecodeExpression initialValueExpression()

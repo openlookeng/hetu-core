@@ -498,11 +498,9 @@ public class ExpressionAnalyzer
         @Override
         protected Type visitComparisonExpression(ComparisonExpression node, StackableAstVisitorContext<Context> context)
         {
-            if (SystemSessionProperties.isImplicitConversionEnabled(session)) {
-                node = implicitConversionRewriteForComparison(node, context);
-            }
-            OperatorType operatorType = OperatorType.valueOf(node.getOperator().name());
-            return getOperator(context, node, operatorType, node.getLeft(), node.getRight());
+            ComparisonExpression tmpNode = SystemSessionProperties.isImplicitConversionEnabled(session) ? implicitConversionRewriteForComparison(node, context) : node;
+            OperatorType operatorType = OperatorType.valueOf(tmpNode.getOperator().name());
+            return getOperator(context, tmpNode, operatorType, tmpNode.getLeft(), tmpNode.getRight());
         }
 
         private ComparisonExpression implicitConversionRewriteForComparison(ComparisonExpression node, StackableAstVisitorContext<Context> context)
@@ -673,10 +671,8 @@ public class ExpressionAnalyzer
         @Override
         protected Type visitArithmeticBinary(ArithmeticBinaryExpression node, StackableAstVisitorContext<Context> context)
         {
-            if (SystemSessionProperties.isImplicitConversionEnabled(session)) {
-                node = implicitConversionRewriteForArithmetic(node, context);
-            }
-            return getOperator(context, node, OperatorType.valueOf(node.getOperator().name()), node.getLeft(), node.getRight());
+            ArithmeticBinaryExpression tmpNode = SystemSessionProperties.isImplicitConversionEnabled(session) ? implicitConversionRewriteForArithmetic(node, context) : node;
+            return getOperator(context, tmpNode, OperatorType.valueOf(tmpNode.getOperator().name()), tmpNode.getLeft(), tmpNode.getRight());
         }
 
         private ArithmeticBinaryExpression implicitConversionRewriteForArithmetic(ArithmeticBinaryExpression node, StackableAstVisitorContext<Context> context)
@@ -919,83 +915,81 @@ public class ExpressionAnalyzer
         @Override
         protected Type visitFunctionCall(FunctionCall node, StackableAstVisitorContext<Context> context)
         {
-            if (SystemSessionProperties.isImplicitConversionEnabled(session)) {
-                node = implicitConversionRewriteForConcat(node, context);
-            }
+            FunctionCall tmpNode = SystemSessionProperties.isImplicitConversionEnabled(session) ? implicitConversionRewriteForConcat(node, context) : node;
 
             if (node.getWindow().isPresent()) {
-                for (Expression expression : node.getWindow().get().getPartitionBy()) {
+                for (Expression expression : tmpNode.getWindow().get().getPartitionBy()) {
                     process(expression, context);
                     Type type = getExpressionType(expression);
                     if (!type.isComparable()) {
-                        throw new SemanticException(TYPE_MISMATCH, node, "%s is not comparable, and therefore cannot be used in window function PARTITION BY", type);
+                        throw new SemanticException(TYPE_MISMATCH, tmpNode, "%s is not comparable, and therefore cannot be used in window function PARTITION BY", type);
                     }
                 }
 
-                for (SortItem sortItem : getSortItemsFromOrderBy(node.getWindow().get().getOrderBy())) {
+                for (SortItem sortItem : getSortItemsFromOrderBy(tmpNode.getWindow().get().getOrderBy())) {
                     process(sortItem.getSortKey(), context);
                     Type type = getExpressionType(sortItem.getSortKey());
                     if (!type.isOrderable()) {
-                        throw new SemanticException(TYPE_MISMATCH, node, "%s is not orderable, and therefore cannot be used in window function ORDER BY", type);
+                        throw new SemanticException(TYPE_MISMATCH, tmpNode, "%s is not orderable, and therefore cannot be used in window function ORDER BY", type);
                     }
                 }
 
-                if (node.getWindow().get().getFrame().isPresent()) {
-                    WindowFrame frame = node.getWindow().get().getFrame().get();
+                if (tmpNode.getWindow().get().getFrame().isPresent()) {
+                    WindowFrame frame = tmpNode.getWindow().get().getFrame().get();
 
                     if (frame.getStart().getValue().isPresent()) {
                         Type type = process(frame.getStart().getValue().get(), context);
                         if (!type.equals(INTEGER) && !type.equals(BIGINT)) {
-                            throw new SemanticException(TYPE_MISMATCH, node, "Window frame start value type must be INTEGER or BIGINT(actual %s)", type);
+                            throw new SemanticException(TYPE_MISMATCH, tmpNode, "Window frame start value type must be INTEGER or BIGINT(actual %s)", type);
                         }
                     }
 
                     if (frame.getEnd().isPresent() && frame.getEnd().get().getValue().isPresent()) {
                         Type type = process(frame.getEnd().get().getValue().get(), context);
                         if (!type.equals(INTEGER) && !type.equals(BIGINT)) {
-                            throw new SemanticException(TYPE_MISMATCH, node, "Window frame end value type must be INTEGER or BIGINT (actual %s)", type);
+                            throw new SemanticException(TYPE_MISMATCH, tmpNode, "Window frame end value type must be INTEGER or BIGINT (actual %s)", type);
                         }
                     }
                 }
 
-                windowFunctions.add(NodeRef.of(node));
+                windowFunctions.add(NodeRef.of(tmpNode));
             }
 
-            if (node.getFilter().isPresent()) {
-                Expression expression = node.getFilter().get();
+            if (tmpNode.getFilter().isPresent()) {
+                Expression expression = tmpNode.getFilter().get();
                 process(expression, context);
             }
 
-            List<TypeSignatureProvider> argumentTypes = getCallArgumentTypes(node.getArguments(), context);
-            FunctionHandle function = resolveFunction(session.getTransactionId(), node, argumentTypes, metadata.getFunctionAndTypeManager());
+            List<TypeSignatureProvider> argumentTypes = getCallArgumentTypes(tmpNode.getArguments(), context);
+            FunctionHandle function = resolveFunction(session.getTransactionId(), tmpNode, argumentTypes, metadata.getFunctionAndTypeManager());
             FunctionMetadata functionMetadata = functionAndTypeManager.getFunctionMetadata(function);
 
             if (functionMetadata.getName().getObjectName().equalsIgnoreCase(ARRAY_CONSTRUCTOR)) {
                 // After optimization, array constructor is rewritten to a function call.
                 // For historic reasons array constructor is allowed to have 254 arguments
-                if (node.getArguments().size() > 254) {
-                    throw new SemanticException(TOO_MANY_ARGUMENTS, node, "Too many arguments for array constructor", functionMetadata.getName().getObjectName());
+                if (tmpNode.getArguments().size() > 254) {
+                    throw new SemanticException(TOO_MANY_ARGUMENTS, tmpNode, "Too many arguments for array constructor", functionMetadata.getName().getObjectName());
                 }
             }
-            else if (node.getArguments().size() > 127) {
-                throw new SemanticException(TOO_MANY_ARGUMENTS, node, "Too many arguments for function call %s()", functionMetadata.getName().getObjectName());
+            else if (tmpNode.getArguments().size() > 127) {
+                throw new SemanticException(TOO_MANY_ARGUMENTS, tmpNode, "Too many arguments for function call %s()", functionMetadata.getName().getObjectName());
             }
 
-            if (node.getOrderBy().isPresent()) {
-                for (SortItem sortItem : node.getOrderBy().get().getSortItems()) {
+            if (tmpNode.getOrderBy().isPresent()) {
+                for (SortItem sortItem : tmpNode.getOrderBy().get().getSortItems()) {
                     Type sortKeyType = process(sortItem.getSortKey(), context);
                     if (!sortKeyType.isOrderable()) {
-                        throw new SemanticException(TYPE_MISMATCH, node, "ORDER BY can only be applied to orderable types (actual: %s)", sortKeyType.getDisplayName());
+                        throw new SemanticException(TYPE_MISMATCH, tmpNode, "ORDER BY can only be applied to orderable types (actual: %s)", sortKeyType.getDisplayName());
                     }
                 }
             }
 
-            for (int i = 0; i < node.getArguments().size(); i++) {
-                Expression expression = node.getArguments().get(i);
+            for (int i = 0; i < tmpNode.getArguments().size(); i++) {
+                Expression expression = tmpNode.getArguments().get(i);
                 Type expectedType = functionAndTypeManager.getType(functionMetadata.getArgumentTypes().get(i));
                 requireNonNull(expectedType, format("Type %s not found", functionMetadata.getArgumentTypes().get(i)));
-                if (node.isDistinct() && !expectedType.isComparable()) {
-                    throw new SemanticException(TYPE_MISMATCH, node, "DISTINCT can only be applied to comparable types (actual: %s)", expectedType);
+                if (tmpNode.isDistinct() && !expectedType.isComparable()) {
+                    throw new SemanticException(TYPE_MISMATCH, tmpNode, "DISTINCT can only be applied to comparable types (actual: %s)", expectedType);
                 }
                 if (argumentTypes.get(i).hasDependency()) {
                     FunctionType expectedFunctionType = (FunctionType) expectedType;
@@ -1006,10 +1000,10 @@ public class ExpressionAnalyzer
                     coerceType(expression, actualType, expectedType, format("Function %s argument %d", function, i));
                 }
             }
-            resolvedFunctions.put(NodeRef.of(node), function);
+            resolvedFunctions.put(NodeRef.of(tmpNode), function);
 
             Type type = typeManager.getType(functionMetadata.getReturnType());
-            return setExpressionType(node, type);
+            return setExpressionType(tmpNode, type);
         }
 
         private FunctionCall implicitConversionRewriteForConcat(FunctionCall node, StackableAstVisitorContext<Context> context)
@@ -1746,21 +1740,21 @@ public class ExpressionAnalyzer
         ExpressionAnalyzer analyzer = create(analysis, session, metadata, sqlParser, accessControl, TypeProvider.empty(), warningCollector);
         analyzer.analyze(expression, scope);
 
-        Map<NodeRef<Expression>, Type> expressionTypes = analyzer.getExpressionTypes();
-        Map<NodeRef<Expression>, Type> expressionCoercions = analyzer.getExpressionCoercions();
-        Set<NodeRef<Expression>> typeOnlyCoercions = analyzer.getTypeOnlyCoercions();
-        Map<NodeRef<FunctionCall>, FunctionHandle> resolvedFunctions = analyzer.getResolvedFunctions();
+        Map<NodeRef<Expression>, Type> tmpExpressionTypes = analyzer.getExpressionTypes();
+        Map<NodeRef<Expression>, Type> tmpExpressionCoercions = analyzer.getExpressionCoercions();
+        Set<NodeRef<Expression>> tmpTypeOnlyCoercions = analyzer.getTypeOnlyCoercions();
+        Map<NodeRef<FunctionCall>, FunctionHandle> tmpResolvedFunctions = analyzer.getResolvedFunctions();
 
-        analysis.addTypes(expressionTypes);
-        analysis.addCoercions(expressionCoercions, typeOnlyCoercions);
-        analysis.addFunctionHandles(resolvedFunctions);
+        analysis.addTypes(tmpExpressionTypes);
+        analysis.addCoercions(tmpExpressionCoercions, tmpTypeOnlyCoercions);
+        analysis.addFunctionHandles(tmpResolvedFunctions);
         analysis.addColumnReferences(analyzer.getColumnReferences());
         analysis.addLambdaArgumentReferences(analyzer.getLambdaArgumentReferences());
         analysis.addTableColumnReferences(accessControl, session.getIdentity(), analyzer.getTableColumnReferences());
 
         return new ExpressionAnalysis(
-                expressionTypes,
-                expressionCoercions,
+                tmpExpressionTypes,
+                tmpExpressionCoercions,
                 analyzer.getSubqueryInPredicates(),
                 analyzer.getScalarSubqueries(),
                 analyzer.getExistsSubqueries(),

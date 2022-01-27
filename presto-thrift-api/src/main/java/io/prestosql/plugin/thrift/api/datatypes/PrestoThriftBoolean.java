@@ -123,23 +123,23 @@ public final class PrestoThriftBoolean
         if (positions == 0) {
             return booleanData(new PrestoThriftBoolean(null, null));
         }
-        boolean[] nulls = null;
-        boolean[] booleans = null;
+        boolean[] nulls1 = null;
+        boolean[] booleans1 = null;
         for (int position = 0; position < positions; position++) {
             if (block.isNull(position)) {
-                if (nulls == null) {
-                    nulls = new boolean[positions];
+                if (nulls1 == null) {
+                    nulls1 = new boolean[positions];
                 }
-                nulls[position] = true;
+                nulls1[position] = true;
             }
             else {
-                if (booleans == null) {
-                    booleans = new boolean[positions];
+                if (booleans1 == null) {
+                    booleans1 = new boolean[positions];
                 }
-                booleans[position] = BOOLEAN.getBoolean(block, position);
+                booleans1[position] = BOOLEAN.getBoolean(block, position);
             }
         }
-        return booleanData(new PrestoThriftBoolean(nulls, booleans));
+        return booleanData(new PrestoThriftBoolean(nulls1, booleans1));
     }
 
     private static boolean sameSizeIfPresent(boolean[] nulls, boolean[] booleans)

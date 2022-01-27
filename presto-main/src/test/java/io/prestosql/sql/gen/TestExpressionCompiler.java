@@ -108,7 +108,7 @@ public class TestExpressionCompiler
 {
     private static final Boolean[] booleanValues = {true, false, null};
     private static final Integer[] smallInts = {9, 10, 11, -9, -10, -11, null};
-    private static final Integer[] extremeInts = {101510, /*Long.MIN_VALUE,*/ Integer.MAX_VALUE};
+    private static final Integer[] extremeInts = {101510, Integer.MAX_VALUE};
     private static final Integer[] intLefts = ObjectArrays.concat(smallInts, extremeInts, Integer.class);
     private static final Integer[] intRights = {3, -3, 101510823, null};
     private static final Integer[] intMiddle = {9, -3, 88, null};
@@ -1906,11 +1906,12 @@ public class TestExpressionCompiler
 
     private void assertExecute(List<String> expressions, Type expectedType, Object expected)
     {
-        if (expected instanceof Slice) {
-            expected = ((Slice) expected).toStringUtf8();
+        Object tmpExpected = expected;
+        if (tmpExpected instanceof Slice) {
+            tmpExpected = ((Slice) tmpExpected).toStringUtf8();
         }
         for (String expression : expressions) {
-            assertExecute(expression, expectedType, expected);
+            assertExecute(expression, expectedType, tmpExpected);
         }
     }
 

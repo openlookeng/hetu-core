@@ -219,12 +219,12 @@ public class SingleTypedHistogram
     private static int calculateMaxFill(int hashSize)
     {
         checkArgument(hashSize > 0, "hashSize must be greater than 0");
-        int maxFill = (int) Math.ceil(hashSize * FILL_RATIO);
-        if (maxFill == hashSize) {
-            maxFill--;
+        int tmpMaxFill = (int) Math.ceil(hashSize * FILL_RATIO);
+        if (tmpMaxFill == hashSize) {
+            tmpMaxFill--;
         }
-        checkArgument(hashSize > maxFill, "hashSize must be larger than maxFill");
-        return maxFill;
+        checkArgument(hashSize > tmpMaxFill, "hashSize must be larger than maxFill");
+        return tmpMaxFill;
     }
 
     @Override

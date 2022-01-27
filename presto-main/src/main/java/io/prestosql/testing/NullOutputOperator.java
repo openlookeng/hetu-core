@@ -63,8 +63,8 @@ public class NullOutputOperator
         @Override
         public Operator createOperator(DriverContext driverContext)
         {
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, NullOutputOperator.class.getSimpleName());
-            return new NullOutputOperator(operatorContext);
+            OperatorContext oprContext = driverContext.addOperatorContext(operatorId, planNodeId, NullOutputOperator.class.getSimpleName());
+            return new NullOutputOperator(oprContext);
         }
 
         @Override

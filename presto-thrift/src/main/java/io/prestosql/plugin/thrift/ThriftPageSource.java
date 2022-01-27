@@ -67,15 +67,15 @@ public class ThriftPageSource
     {
         // init columns
         requireNonNull(columns, "columns is null");
-        ImmutableList.Builder<String> columnNames = new ImmutableList.Builder<>();
-        ImmutableList.Builder<Type> columnTypes = new ImmutableList.Builder<>();
+        ImmutableList.Builder<String> columnNames1 = new ImmutableList.Builder<>();
+        ImmutableList.Builder<Type> columnTypes1 = new ImmutableList.Builder<>();
         for (ColumnHandle columnHandle : columns) {
             ThriftColumnHandle thriftColumnHandle = (ThriftColumnHandle) columnHandle;
-            columnNames.add(thriftColumnHandle.getColumnName());
-            columnTypes.add(thriftColumnHandle.getColumnType());
+            columnNames1.add(thriftColumnHandle.getColumnName());
+            columnTypes1.add(thriftColumnHandle.getColumnType());
         }
-        this.columnNames = columnNames.build();
-        this.columnTypes = columnTypes.build();
+        this.columnNames = columnNames1.build();
+        this.columnTypes = columnTypes1.build();
         this.stats = requireNonNull(stats, "stats is null");
 
         // this parameter is read from config, so it should be checked by config validation

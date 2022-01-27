@@ -54,11 +54,11 @@ public class StatsCalculatorTester
 
     private static LocalQueryRunner createQueryRunner(Session session)
     {
-        LocalQueryRunner queryRunner = new LocalQueryRunner(session);
-        queryRunner.createCatalog(session.getCatalog().get(),
+        LocalQueryRunner tmpQueryRunner = new LocalQueryRunner(session);
+        tmpQueryRunner.createCatalog(session.getCatalog().get(),
                 new TpchConnectorFactory(1),
                 ImmutableMap.of());
-        return queryRunner;
+        return tmpQueryRunner;
     }
 
     public StatsCalculatorAssertion assertStatsFor(Function<PlanBuilder, PlanNode> planProvider)

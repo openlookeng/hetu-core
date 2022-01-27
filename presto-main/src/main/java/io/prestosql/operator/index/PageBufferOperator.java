@@ -49,8 +49,8 @@ public class PageBufferOperator
         @Override
         public Operator createOperator(DriverContext driverContext)
         {
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, PageBufferOperator.class.getSimpleName());
-            return new PageBufferOperator(operatorContext, pageBuffer);
+            OperatorContext tmpOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, PageBufferOperator.class.getSimpleName());
+            return new PageBufferOperator(tmpOperatorContext, pageBuffer);
         }
 
         @Override

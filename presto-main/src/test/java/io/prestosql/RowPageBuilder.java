@@ -45,11 +45,11 @@ public class RowPageBuilder
     RowPageBuilder(Iterable<Type> types)
     {
         this.types = ImmutableList.copyOf(requireNonNull(types, "types is null"));
-        ImmutableList.Builder<BlockBuilder> builders = ImmutableList.builder();
+        ImmutableList.Builder<BlockBuilder> tmpBuilders = ImmutableList.builder();
         for (Type type : types) {
-            builders.add(type.createBlockBuilder(null, 1));
+            tmpBuilders.add(type.createBlockBuilder(null, 1));
         }
-        this.builders = builders.build();
+        this.builders = tmpBuilders.build();
         checkArgument(!this.builders.isEmpty(), "At least one value info is required");
     }
 

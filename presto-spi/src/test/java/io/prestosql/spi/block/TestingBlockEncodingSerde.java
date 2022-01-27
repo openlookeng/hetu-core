@@ -76,8 +76,9 @@ public final class TestingBlockEncodingSerde
 
             // see if a replacement block should be written instead
             Optional<Block> replacementBlock = blockEncoding.replacementBlockForWrite(block);
+            Block tmpBlock = block;
             if (replacementBlock.isPresent()) {
-                block = replacementBlock.get();
+                tmpBlock = replacementBlock.get();
                 continue;
             }
 
@@ -85,7 +86,7 @@ public final class TestingBlockEncodingSerde
             writeLengthPrefixedString(output, encodingName);
 
             // write the block to the output
-            blockEncoding.writeBlock(this, output, block);
+            blockEncoding.writeBlock(this, output, tmpBlock);
 
             break;
         }

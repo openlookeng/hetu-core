@@ -70,6 +70,7 @@ public class DataSourceTableSplitManager
                                                 config.getTableSplitStepCalcCalcThreads(), splitConfigs);
             Thread stepCalcThread = new Thread(stepCalcManager);
             stepCalcThread.setName("step calc thread");
+            stepCalcThread.setUncaughtExceptionHandler((tr, ex) -> System.out.println(tr.getName() + " : " + ex.getMessage()));
             stepCalcThread.setDaemon(true);
             stepCalcThread.start();
             stepCalcManager.start();

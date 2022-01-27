@@ -163,11 +163,12 @@ public class ExecutingStatementResource
             @Suspended AsyncResponse asyncResponse)
     {
         Query query = getQuery(queryId, slug);
-        if (isNullOrEmpty(proto)) {
-            proto = uriInfo.getRequestUri().getScheme();
+        String tmpProto = proto;
+        if (isNullOrEmpty(tmpProto)) {
+            tmpProto = uriInfo.getRequestUri().getScheme();
         }
 
-        asyncQueryResults(query, token, maxWait, targetResultSize, uriInfo, proto, asyncResponse);
+        asyncQueryResults(query, token, maxWait, targetResultSize, uriInfo, tmpProto, asyncResponse);
     }
 
     protected Query getQuery(QueryId queryId, String slug)
@@ -219,13 +220,8 @@ public class ExecutingStatementResource
             AsyncResponse asyncResponse)
     {
         Duration wait = WAIT_ORDERING.min(MAX_WAIT_TIME, maxWait);
-        if (targetResultSize == null) {
-            targetResultSize = DEFAULT_TARGET_RESULT_SIZE;
-        }
-        else {
-            targetResultSize = Ordering.natural().min(targetResultSize, MAX_TARGET_RESULT_SIZE);
-        }
-        ListenableFuture<QueryResults> queryResultsFuture = query.waitForResults(token, uriInfo, scheme, wait, targetResultSize);
+        DataSize tmpTargetResultSize = targetResultSize == null ? DEFAULT_TARGET_RESULT_SIZE : Ordering.natural().min(targetResultSize, MAX_TARGET_RESULT_SIZE);
+        ListenableFuture<QueryResults> queryResultsFuture = query.waitForResults(token, uriInfo, scheme, wait, tmpTargetResultSize);
 
         ListenableFuture<Response> response = Futures.transform(queryResultsFuture, queryResults -> toResponse(query, queryResults), directExecutor());
 

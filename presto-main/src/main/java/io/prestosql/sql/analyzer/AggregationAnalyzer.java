@@ -542,15 +542,15 @@ class AggregationAnalyzer
         @Override
         protected Boolean visitIfExpression(IfExpression node, Void context)
         {
-            ImmutableList.Builder<Expression> expressions = ImmutableList.<Expression>builder()
+            ImmutableList.Builder<Expression> expressionList = ImmutableList.<Expression>builder()
                     .add(node.getCondition())
                     .add(node.getTrueValue());
 
             if (node.getFalseValue().isPresent()) {
-                expressions.add(node.getFalseValue().get());
+                expressionList.add(node.getFalseValue().get());
             }
 
-            return expressions.build().stream().allMatch(expression -> process(expression, context));
+            return expressionList.build().stream().allMatch(expression -> process(expression, context));
         }
 
         @Override

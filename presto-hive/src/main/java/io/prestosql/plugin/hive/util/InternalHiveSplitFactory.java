@@ -105,7 +105,7 @@ public class InternalHiveSplitFactory
 
     private Optional<InternalHiveSplit> createInternalHiveSplit(LocatedFileStatus status, OptionalInt bucketNumber, boolean splittable, Optional<DeleteDeltaLocations> deleteDeltaLocations, Optional<Long> startRowOffsetOfFile)
     {
-        splittable = splittable && isSplittable(inputFormat, fileSystem, status.getPath());
+        boolean tmpSplittable = splittable && isSplittable(inputFormat, fileSystem, status.getPath());
         return createInternalHiveSplit(
                 status.getPath(),
                 status.getBlockLocations(),
@@ -114,7 +114,7 @@ public class InternalHiveSplitFactory
                 status.getLen(),
                 status.getModificationTime(),
                 bucketNumber,
-                splittable,
+                tmpSplittable,
                 deleteDeltaLocations,
                 startRowOffsetOfFile,
                 ImmutableMap.of());
@@ -157,19 +157,20 @@ public class InternalHiveSplitFactory
             return Optional.empty();
         }
 
-        boolean forceLocalScheduling = this.forceLocalScheduling;
+        boolean tmpForceLocalScheduling = this.forceLocalScheduling;
 
         // For empty files, some filesystem (e.g. LocalFileSystem) produce one empty block
         // while others (e.g. hdfs.DistributedFileSystem) produces no block.
         // Synthesize an empty block if one does not already exist.
-        if (fileSize == 0 && blockLocations.length == 0) {
-            blockLocations = new BlockLocation[] {new BlockLocation()};
+        BlockLocation[] tmpBlockLocations = blockLocations;
+        if (fileSize == 0 && tmpBlockLocations.length == 0) {
+            tmpBlockLocations = new BlockLocation[] {new BlockLocation()};
             // Turn off force local scheduling because hosts list doesn't exist.
-            forceLocalScheduling = false;
+            tmpForceLocalScheduling = false;
         }
 
         ImmutableList.Builder<InternalHiveSplit.InternalHiveBlock> blockBuilder = ImmutableList.builder();
-        for (BlockLocation blockLocation : blockLocations) {
+        for (BlockLocation blockLocation : tmpBlockLocations) {
             // clamp the block range
             long blockStart = Math.max(start, blockLocation.getOffset());
             long blockEnd = Math.min(start + length, blockLocation.getOffset() + blockLocation.getLength());
@@ -203,7 +204,7 @@ public class InternalHiveSplitFactory
                 blocks,
                 bucketNumber,
                 splittable,
-                forceLocalScheduling && allBlocksHaveAddress(blocks),
+                tmpForceLocalScheduling && allBlocksHaveAddress(blocks),
                 columnCoercions,
                 bucketConversion,
                 s3SelectPushdownEnabled && S3SelectPushdown.isCompressionCodecSupported(inputFormat, path),

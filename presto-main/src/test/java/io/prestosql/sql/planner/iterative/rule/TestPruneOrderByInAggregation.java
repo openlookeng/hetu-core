@@ -71,8 +71,8 @@ public class TestPruneOrderByInAggregation
         List<Symbol> sourceSymbols = ImmutableList.of(input, key, keyHash, mask);
         return planBuilder.aggregation(aggregationBuilder -> aggregationBuilder
                 .singleGroupingSet(key)
-                .addAggregation(avg, planBuilder.expression("avg(input order by input)"), ImmutableList.of(BIGINT), mask)
-                .addAggregation(arrayAgg, planBuilder.expression("array_agg(input order by input)"), ImmutableList.of(BIGINT), mask)
+                .addAggregation(avg, PlanBuilder.expression("avg(input order by input)"), ImmutableList.of(BIGINT), mask)
+                .addAggregation(arrayAgg, PlanBuilder.expression("array_agg(input order by input)"), ImmutableList.of(BIGINT), mask)
                 .hashSymbol(keyHash)
                 .source(planBuilder.values(sourceSymbols, ImmutableList.of())));
     }

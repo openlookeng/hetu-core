@@ -15,7 +15,6 @@ package io.prestosql.cost;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import io.prestosql.spi.plan.PlanNode;
 
 import java.util.Objects;
 import java.util.stream.Stream;

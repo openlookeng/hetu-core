@@ -121,19 +121,20 @@ public class Memo
                 old.getOutputSymbols(),
                 node.getOutputSymbols());
 
-        if (node instanceof GroupReference) {
-            node = getNode(((GroupReference) node).getGroupId());
+        PlanNode tmpNode = node;
+        if (tmpNode instanceof GroupReference) {
+            tmpNode = getNode(((GroupReference) tmpNode).getGroupId());
         }
         else {
-            node = insertChildrenAndRewrite(node);
+            tmpNode = insertChildrenAndRewrite(tmpNode);
         }
 
-        incrementReferenceCounts(node, group);
-        getGroup(group).membership = node;
+        incrementReferenceCounts(tmpNode, group);
+        getGroup(group).membership = tmpNode;
         decrementReferenceCounts(old, group);
         evictStatisticsAndCost(group);
 
-        return node;
+        return tmpNode;
     }
 
     private void evictStatisticsAndCost(int group)

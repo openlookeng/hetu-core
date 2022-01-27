@@ -200,13 +200,6 @@ public class TestJoinNodeFlattener
                 ImmutableList.of(equiJoinClause(a1, b1)),
                 ImmutableList.of(a1, b1, b2, c1, c2),
                 Optional.of(abcFilter));
-        /*
-        MultiJoinNode expected = new MultiJoinNode(
-                new LinkedHashSet<>(ImmutableList.of(valuesA, valuesB, valuesC)),
-                and(new ComparisonExpression(EQUAL, toSymbolReference(b1), toSymbolReference(c1)), new ComparisonExpression(EQUAL, toSymbolReference(a1), toSymbolReference(b1)), bcFilter, abcFilter),
-                ImmutableList.of(a1, b1, b2, c1, c2));
-        assertEquals(toMultiJoinNode(joinNode, noLookup(), DEFAULT_JOIN_LIMIT), expected);
-         */
     }
 
     @Test

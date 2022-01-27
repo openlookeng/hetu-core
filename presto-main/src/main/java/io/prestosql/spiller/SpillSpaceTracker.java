@@ -15,7 +15,6 @@ package io.prestosql.spiller;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
-import io.prestosql.ExceededSpillLimitException;
 import org.weakref.jmx.Managed;
 
 import javax.annotation.concurrent.GuardedBy;

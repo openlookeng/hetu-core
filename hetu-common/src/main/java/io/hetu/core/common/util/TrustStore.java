@@ -13,6 +13,7 @@
  */
 package io.hetu.core.common.util;
 
+import io.airlift.log.Logger;
 import io.airlift.security.pem.PemReader;
 
 import javax.security.auth.x500.X500Principal;
@@ -29,6 +30,8 @@ import java.util.Optional;
 
 public class TrustStore
 {
+    private static final Logger LOGGER = Logger.get(TrustStore.class);
+
     private TrustStore() {}
 
     public static KeyStore loadTrustStore(File trustStorePath, Optional<String> trustStorePassword)
@@ -48,6 +51,7 @@ public class TrustStore
             }
         }
         catch (IOException | GeneralSecurityException ignored) {
+            LOGGER.error("loadTrustStore error : %s", ignored.getMessage());
         }
 
         try (InputStream in = new FileInputStream(trustStorePath)) {

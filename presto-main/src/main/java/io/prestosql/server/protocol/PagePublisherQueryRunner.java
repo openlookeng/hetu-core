@@ -66,7 +66,7 @@ import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 
 public class PagePublisherQueryRunner
 {
-    private static final Logger log = Logger.get(PagePublisherQueryRunner.class);
+    private static final Logger LOGGER = Logger.get(PagePublisherQueryRunner.class);
 
     private static final DataCenterQueryResults RUNNING_RESULTS = new DataCenterQueryResults("", URI.create(""), null, URI.create(""), null, null,
             new StatementStats("RUNNING", false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null), null,
@@ -372,7 +372,7 @@ public class PagePublisherQueryRunner
                     Thread.sleep(1);
                 }
                 catch (InterruptedException ignore) {
-                    // ignore this exception and continue to wait
+                    LOGGER.error("InterruptedException : %s", ignore.getMessage());
                 }
             }
 
@@ -426,7 +426,7 @@ public class PagePublisherQueryRunner
                             queryManager.recordHeartbeat(queryId);
                         }
                         catch (InterruptedException e) {
-                            log.debug(e, "Queue was full, retrying...");
+                            LOGGER.debug(e, "Queue was full, retrying...");
                         }
                     }
                 }

@@ -135,9 +135,9 @@ public class CostCalculatorUsingExchanges
                         .add(node.getRowNumberSymbol())
                         .build();
             }
-            PlanNodeStatsEstimate stats = getStats(node);
-            double cpuCost = stats.getOutputSizeInBytes(symbols, types);
-            double memoryCost = node.getPartitionBy().isEmpty() ? 0 : stats.getOutputSizeInBytes(node.getSource().getOutputSymbols(), types);
+            PlanNodeStatsEstimate tmpStats = getStats(node);
+            double cpuCost = tmpStats.getOutputSizeInBytes(symbols, types);
+            double memoryCost = node.getPartitionBy().isEmpty() ? 0 : tmpStats.getOutputSizeInBytes(node.getSource().getOutputSymbols(), types);
             LocalCostEstimate localCost = LocalCostEstimate.of(cpuCost, memoryCost, 0);
             return costForStreaming(node, localCost);
         }
@@ -402,10 +402,10 @@ public class CostCalculatorUsingExchanges
         private PlanCostEstimate costForLookupJoin(PlanNode node, LocalCostEstimate localCost)
         {
             verify(node.getSources().size() == 2, "Unexpected number of sources for %s: %s", node, node.getSources());
-            List<PlanCostEstimate> sourcesCosts = getSourcesEstimations(node).collect(toImmutableList());
-            verify(sourcesCosts.size() == 2);
-            PlanCostEstimate probeCost = sourcesCosts.get(0);
-            PlanCostEstimate buildCost = sourcesCosts.get(1);
+            List<PlanCostEstimate> tmpSourcesCosts = getSourcesEstimations(node).collect(toImmutableList());
+            verify(tmpSourcesCosts.size() == 2);
+            PlanCostEstimate probeCost = tmpSourcesCosts.get(0);
+            PlanCostEstimate buildCost = tmpSourcesCosts.get(1);
 
             return new PlanCostEstimate(
                     probeCost.getCpuCost() + buildCost.getCpuCost() + localCost.getCpuCost(),
