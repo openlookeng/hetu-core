@@ -13,9 +13,16 @@
  */
 package io.prestosql.spi.block;
 
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.StandardErrorCode;
+
+import java.io.InputStream;
+import java.io.OutputStream;
 
 import static io.prestosql.spi.block.ArrayBlock.createArrayBlockInternal;
 import static io.prestosql.spi.block.EncoderUtil.decodeNullBits;
@@ -64,5 +71,56 @@ public class ArrayBlockEncoding
         sliceInput.readBytes(Slices.wrappedIntArray(offsets));
         boolean[] valueIsNull = decodeNullBits(sliceInput, positionCount).orElseGet(() -> new boolean[positionCount]);
         return createArrayBlockInternal(0, positionCount, valueIsNull, offsets, values);
+    }
+
+    @Override
+    public Block readBlock(BlockEncodingSerde blockEncodingSerde, InputStream inputStream)
+    {
+        if (!(inputStream instanceof Input)) {
+            throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Wrong inputStream for SingleMap ReadBlock");
+        }
+
+        Input input = (Input) inputStream;
+        Block values = blockEncodingSerde.readBlock(input);
+        int positionCount = input.readInt();
+        int[] offsets = input.readInts(positionCount);
+
+        boolean[] valueIsNull = null;
+        if (input.readBoolean()) {
+            valueIsNull = input.readBooleans(positionCount);
+        }
+
+        return createArrayBlockInternal(0, positionCount, valueIsNull, offsets, values);
+    }
+
+    @Override
+    public void writeBlock(BlockEncodingSerde blockEncodingSerde, OutputStream outputStream, Block block)
+    {
+        if (!(outputStream instanceof Output)) {
+            throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Wrong outputStream for SingleMap WriteBlock");
+        }
+
+        Output output = (Output) outputStream;
+        AbstractArrayBlock arrayBlock = (AbstractArrayBlock) block;
+
+        int positionCount = arrayBlock.getPositionCount();
+
+        int offsetBase = arrayBlock.getOffsetBase();
+        int[] offsets = arrayBlock.getOffsets();
+
+        int valuesStartOffset = offsets[offsetBase];
+        int valuesEndOffset = offsets[offsetBase + positionCount];
+        Block values = arrayBlock.getRawElementBlock().getRegion(valuesStartOffset, valuesEndOffset - valuesStartOffset);
+        blockEncodingSerde.writeBlock(output, values);
+
+        output.writeInt(positionCount);
+        for (int position = 0; position < positionCount + 1; position++) {
+            output.writeInt(offsets[offsetBase + position] - valuesStartOffset);
+        }
+
+        output.writeBoolean(block.mayHaveNull());
+        if (block.mayHaveNull()) {
+            output.writeBooleans(arrayBlock.getValueIsNull(), offsetBase, positionCount);
+        }
     }
 }

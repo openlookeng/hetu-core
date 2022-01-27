@@ -13,14 +13,23 @@
  */
 package io.prestosql.spi.block;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.Serializer;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.StandardErrorCode;
 
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.prestosql.spi.StandardErrorCode.TYPE_NOT_FOUND;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 // This class is exactly the same as BlockEncodingManager. They are in SPI and don't have access to InternalBlockEncodingSerde.
@@ -28,6 +37,7 @@ public final class TestingBlockEncodingSerde
         implements BlockEncodingSerde
 {
     private final ConcurrentMap<String, BlockEncoding> blockEncodings = new ConcurrentHashMap<>();
+    private final Kryo kryo = new Kryo();
 
     public TestingBlockEncodingSerde()
     {
@@ -90,6 +100,74 @@ public final class TestingBlockEncodingSerde
 
             break;
         }
+    }
+
+    @Override
+    public Block readBlock(InputStream inputStream)
+    {
+        if (!(inputStream instanceof Input)) {
+            throw new PrestoException(StandardErrorCode.GENERIC_INTERNAL_ERROR,
+                    "This interface should not be called in this flow");
+        }
+
+        Input input = (Input) inputStream;
+        String encodingName;
+        // read the encoding name
+        encodingName = readLengthPrefixedString((Input) input);
+
+        // look up the encoding factory
+        BlockEncoding blockEncoding = blockEncodings.get(encodingName);
+        Serializer<?> serializer = getSerializerFromBlockEncoding(blockEncoding);
+        if (serializer == null) {
+            throw new PrestoException(TYPE_NOT_FOUND, "BlockEncoding Type not implemented: " + blockEncoding);
+        }
+        return (Block) serializer.read(kryo, input, null);
+    }
+
+    @Override
+    public void writeBlock(OutputStream outputStream, Block block)
+    {
+        if (!(outputStream instanceof Output)) {
+            throw new PrestoException(StandardErrorCode.GENERIC_INTERNAL_ERROR,
+                    "This interface should not be called in this flow");
+        }
+
+        Output output = (Output) outputStream;
+
+        String encodingName = block.getEncodingName();
+        BlockEncoding blockEncoding = blockEncodings.get(encodingName);
+        Serializer<Block<?>> serializer = getSerializerFromBlockEncoding(blockEncoding);
+        if (serializer == null) {
+            throw new PrestoException(TYPE_NOT_FOUND, "BlockEncoding Type not implemented: " + blockEncoding);
+        }
+
+        // write the name to the output
+        writeLengthPrefixedString(output, encodingName);
+
+        // write the block to the output
+        serializer.write(kryo, output, block);
+    }
+
+    private Serializer<Block<?>> getSerializerFromBlockEncoding(BlockEncoding blockEncoding)
+    {
+        if (blockEncoding instanceof AbstractBlockEncoding) {
+            return (Serializer<Block<?>>) blockEncoding;
+        }
+        return null;
+    }
+
+    private static String readLengthPrefixedString(Input input)
+    {
+        int length = input.readInt();
+        byte[] bytes = input.readBytes(length);
+        return new String(bytes, UTF_8);
+    }
+
+    private static void writeLengthPrefixedString(Output output, String value)
+    {
+        byte[] bytes = value.getBytes(UTF_8);
+        output.writeInt(bytes.length);
+        output.writeBytes(bytes);
     }
 
     private static String readLengthPrefixedString(SliceInput input)

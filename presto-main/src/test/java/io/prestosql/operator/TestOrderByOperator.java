@@ -266,7 +266,7 @@ public class TestOrderByOperator
         Map<String, Object> expectedMapping = new HashMap<>();
         expectedMapping.put("operatorContext", 0);
         expectedMapping.put("revocableMemoryContext", 0L);
-        expectedMapping.put("localUserMemoryContext", 8828L);
+        expectedMapping.put("localUserMemoryContext", 8844L);
         return expectedMapping;
     }
 

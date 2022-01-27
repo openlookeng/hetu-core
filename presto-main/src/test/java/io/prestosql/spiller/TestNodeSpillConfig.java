@@ -36,7 +36,8 @@ public class TestNodeSpillConfig
                 .setSpillCompressionEnabled(false)
                 .setSpillEncryptionEnabled(false)
                 .setSpillDirectSerdeEnabled(false)
-                .setSpillPrefetchReadPages(1));
+                .setSpillPrefetchReadPages(1)
+                .setSpillUseKryoSerialization(false));
     }
 
     @Test
@@ -49,6 +50,7 @@ public class TestNodeSpillConfig
                 .put("experimental.spill-encryption-enabled", "true")
                 .put("experimental.spill-direct-serde-enabled", "true")
                 .put("experimental.spill-prefetch-read-pages", "25")
+                .put("experimental.spill-use-kryo-serialization", "true")
                 .build();
 
         NodeSpillConfig expected = new NodeSpillConfig()
@@ -57,7 +59,8 @@ public class TestNodeSpillConfig
                 .setSpillCompressionEnabled(true)
                 .setSpillEncryptionEnabled(true)
                 .setSpillDirectSerdeEnabled(true)
-                .setSpillPrefetchReadPages(25);
+                .setSpillPrefetchReadPages(25)
+                .setSpillUseKryoSerialization(true);
 
         assertFullMapping(properties, expected);
     }

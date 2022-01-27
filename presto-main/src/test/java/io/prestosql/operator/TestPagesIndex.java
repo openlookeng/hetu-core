@@ -80,8 +80,8 @@ public class TestPagesIndex
         expectedMapping.put("valueAddresses", valueAddresses);
         expectedMapping.put("nextBlockToCompact", 0);
         expectedMapping.put("positionCount", 7);
-        expectedMapping.put("pagesMemorySize", 3852L);
-        expectedMapping.put("estimatedSize", 12396L);
+        expectedMapping.put("pagesMemorySize", 3860L);
+        expectedMapping.put("estimatedSize", 12404L);
         return expectedMapping;
     }
 

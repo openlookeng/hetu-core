@@ -75,7 +75,7 @@ final class InternalBlockEncodingSerde
         }
     }
 
-    private static String readLengthPrefixedString(SliceInput input)
+    protected static String readLengthPrefixedString(SliceInput input)
     {
         int length = input.readInt();
         byte[] bytes = new byte[length];

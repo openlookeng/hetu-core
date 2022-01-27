@@ -13,8 +13,15 @@
  */
 package io.prestosql.spi.block;
 
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.StandardErrorCode;
+
+import java.io.InputStream;
+import java.io.OutputStream;
 
 public class RunLengthBlockEncoding
         implements BlockEncoding
@@ -49,5 +56,50 @@ public class RunLengthBlockEncoding
         Block value = blockEncodingSerde.readBlock(sliceInput);
 
         return new RunLengthEncodedBlock(value, positionCount);
+    }
+
+    /**
+     * Read a block from the specified input.  The returned
+     * block should begin at the specified position.
+     *
+     * @param blockEncodingSerde
+     * @param inputStream
+     */
+    @Override
+    public Block readBlock(BlockEncodingSerde blockEncodingSerde, InputStream inputStream)
+    {
+        if (!(inputStream instanceof Input)) {
+            throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Wrong inputStream for RLE ReadBlock");
+        }
+
+        Input input = (Input) inputStream;
+        int positionCount = input.readInt();
+
+        Block value = blockEncodingSerde.readBlock(input);
+        return new RunLengthEncodedBlock(value, positionCount);
+    }
+
+    /**
+     * Write the specified block to the specified output
+     *
+     * @param blockEncodingSerde
+     * @param outputStream
+     * @param block
+     */
+    @Override
+    public void writeBlock(BlockEncodingSerde blockEncodingSerde, OutputStream outputStream, Block block)
+    {
+        if (!(outputStream instanceof Output)) {
+            throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Wrong outputStream for RLE WriteBlock");
+        }
+
+        RunLengthEncodedBlock rleBlock = (RunLengthEncodedBlock) block;
+        Output output = (Output) outputStream;
+
+        // write the run length
+        output.writeInt(rleBlock.getPositionCount());
+
+        // write the value
+        blockEncodingSerde.writeBlock(output, rleBlock.getValue());
     }
 }

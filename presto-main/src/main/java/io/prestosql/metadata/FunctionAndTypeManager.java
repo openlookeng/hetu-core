@@ -13,6 +13,7 @@
  */
 package io.prestosql.metadata;
 
+import com.esotericsoftware.kryo.Kryo;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -126,13 +127,15 @@ public class FunctionAndTypeManager
     private final LoadingCache<FunctionResolutionCacheKey, FunctionHandle> functionCache;
     private final CacheStatsMBean cacheStatsMBean;
     private final ConcurrentMap<String, BlockEncoding> blockEncodings = new ConcurrentHashMap<>();
+    private final Kryo kryo;
 
     @Inject
     public FunctionAndTypeManager(
             TransactionManager transactionManager,
             FeaturesConfig featuresConfig,
             HandleResolver handleResolver,
-            Set<Type> types)
+            Set<Type> types,
+            Kryo kryo)
     {
         this.transactionManager = requireNonNull(transactionManager, "transactionManager is null");
         this.builtInFunctionNamespaceManager = new BuiltInFunctionNamespaceManager(featuresConfig, this);
@@ -148,6 +151,7 @@ public class FunctionAndTypeManager
                 .build(CacheLoader.from(key -> resolveBuiltInFunction(key.functionName, fromTypeSignatures(key.parameterTypes))));
         this.cacheStatsMBean = new CacheStatsMBean(functionCache);
         this.functionResolver = new FunctionResolver(this);
+        this.kryo = requireNonNull(kryo, "Kryo Object cannot be null");
 
         // add the built-in BlockEncodings
         addBlockEncoding(new VariableWidthBlockEncoding());
@@ -168,7 +172,7 @@ public class FunctionAndTypeManager
 
     public static FunctionAndTypeManager createTestFunctionAndTypeManager()
     {
-        return new FunctionAndTypeManager(createTestTransactionManager(), new FeaturesConfig(), new HandleResolver(), ImmutableSet.of());
+        return new FunctionAndTypeManager(createTestTransactionManager(), new FeaturesConfig(), new HandleResolver(), ImmutableSet.of(), new Kryo());
     }
 
     public BlockEncoding getBlockEncoding(String encodingName)
@@ -181,6 +185,11 @@ public class FunctionAndTypeManager
     public BlockEncodingSerde getBlockEncodingSerde()
     {
         return new InternalBlockEncodingSerde(this);
+    }
+
+    public BlockEncodingSerde getBlockKryoEncodingSerde()
+    {
+        return new KryoBlockEncodingSerde(this, kryo);
     }
 
     public void addBlockEncoding(BlockEncoding blockEncoding)

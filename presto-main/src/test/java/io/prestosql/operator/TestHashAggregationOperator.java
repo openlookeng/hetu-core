@@ -317,7 +317,7 @@ public class TestHashAggregationOperator
         //TODO-cp-I2DSGQ: change expectedMapping after implementation of operatorContext capture
         expectedMapping.put("operatorContext", 0);
         expectedMapping.put("aggregationBuilder", aggregationBuilderMapping);
-        expectedMapping.put("memoryContext", 10355419L);
+        expectedMapping.put("memoryContext", 10675419L);
         expectedMapping.put("inputProcessed", true);
         expectedMapping.put("finishing", false);
         expectedMapping.put("finished", false);
@@ -405,7 +405,7 @@ public class TestHashAggregationOperator
         aggregation3Array0.put("capacity", 40960);
         aggregation3Array0.put("segments", 40);
         aggregation3Array1.put("array", blockObjectBigArrayState);
-        aggregation3Array1.put("sizeOfBlocks", 2504108L);
+        aggregation3Array1.put("sizeOfBlocks", 2824108L);
         blockObjectBigArrayState.put("array", 1);
         blockObjectBigArrayState.put("capacity", 40960);
         aggregation3StateList.add(39999L);

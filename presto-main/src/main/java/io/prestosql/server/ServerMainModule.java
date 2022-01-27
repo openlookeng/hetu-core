@@ -13,6 +13,7 @@
  */
 package io.prestosql.server;
 
+import com.esotericsoftware.kryo.Kryo;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Binder;
 import com.google.inject.Key;
@@ -438,6 +439,8 @@ public class ServerMainModule
         binder.bind(TypeAnalyzer.class).in(Scopes.SINGLETON);
         jsonBinder(binder).addDeserializerBinding(Type.class).to(TypeDeserializer.class);
         newSetBinder(binder, Type.class);
+
+        binder.bind(Kryo.class).in(Scopes.SINGLETON);
 
         // split manager
         binder.bind(SplitManager.class).in(Scopes.SINGLETON);

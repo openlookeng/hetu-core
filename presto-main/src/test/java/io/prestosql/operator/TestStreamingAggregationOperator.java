@@ -178,7 +178,7 @@ public class TestStreamingAggregationOperator
         Map<String, Object> expectedMapping = new HashMap<>();
         expectedMapping.put("operatorContext", 0);
         expectedMapping.put("systemMemoryContext", 0L);
-        expectedMapping.put("userMemoryContext", 2236L);
+        expectedMapping.put("userMemoryContext", 2244L);
         expectedMapping.put("finishing", false);
         return expectedMapping;
     }

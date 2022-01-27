@@ -13,6 +13,8 @@
  */
 package io.prestosql.spiller;
 
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.AbstractIterator;
@@ -89,6 +91,7 @@ public class FileSingleStreamSpiller
     private long spilledPagesInMemorySize;
     private ListenableFuture<?> spillInProgress = Futures.immediateFuture(null);
     private boolean useDirectSerde;
+    private boolean useKryo;
     private boolean compressionEnabled;
     private Optional<SpillCipher> spillCipher;
     private byte[] cipherIV;
@@ -107,7 +110,8 @@ public class FileSingleStreamSpiller
             Optional<SpillCipher> spillCipher,
             boolean compressionEnabled,
             boolean useDirectSerde,
-            int spillPrefetchReadPages)
+            int spillPrefetchReadPages,
+            boolean useKryo)
     {
         this.serde = requireNonNull(serde, "serde is null");
         this.executor = requireNonNull(executor, "executor is null");
@@ -136,6 +140,7 @@ public class FileSingleStreamSpiller
         }
         this.spillPrefetchReadPages = spillPrefetchReadPages;
         this.useDirectSerde = useDirectSerde;
+        this.useKryo = useKryo;
         this.compressionEnabled = compressionEnabled;
         this.spillCipher = spillCipher;
     }
@@ -206,8 +211,13 @@ public class FileSingleStreamSpiller
             System.arraycopy(tmpCipherIV, 0, this.cipherIV, 0, tmpCipherIV.length);
             tmpOutputStream = new CipherOutputStream(tmpOutputStream, cipher);
         }
+
         if (compressionEnabled) {
             tmpOutputStream = new SnappyFramedOutputStream(tmpOutputStream);
+        }
+
+        if (useKryo) {
+            return new Output(tmpOutputStream, bufferSize);
         }
         return new OutputStreamSliceOutput(tmpOutputStream, bufferSize);
     }
@@ -240,14 +250,23 @@ public class FileSingleStreamSpiller
         if (spillCipher.isPresent()) {
             tmpInputStream = new CipherInputStream(tmpInputStream, spillCipher.get().getDecryptionCipher(cipherIV));
         }
+
         if (compressionEnabled) {
             tmpInputStream = new SnappyFramedInputStream(tmpInputStream);
+        }
+
+        if (useKryo) {
+            return new Input(tmpInputStream, bufferSize);
         }
         return new InputStreamSliceInput(tmpInputStream, bufferSize);
     }
 
     private Predicate<InputStream> getStreamEndOfData()
     {
+        if (useKryo) {
+            return (input) -> ((Input) input).end();
+        }
+
         return (input) -> !((InputStreamSliceInput) input).isReadable();
     }
 
@@ -348,6 +367,7 @@ public class FileSingleStreamSpiller
         state.targetFile = this.targetFile.getFilePath().toAbsolutePath().toString();
         state.compressionEnabled = this.compressionEnabled;
         state.useDirectSerde = this.useDirectSerde;
+        state.useKryo = this.useKryo;
         return state;
     }
 
@@ -371,6 +391,7 @@ public class FileSingleStreamSpiller
             }
             this.compressionEnabled = myState.compressionEnabled;
             this.useDirectSerde = myState.useDirectSerde;
+            this.useKryo = myState.useKryo;
         }
         catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -386,5 +407,6 @@ public class FileSingleStreamSpiller
         private String targetFile;
         private boolean compressionEnabled;
         private boolean useDirectSerde;
+        private boolean useKryo;
     }
 }

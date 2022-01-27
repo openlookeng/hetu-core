@@ -13,14 +13,22 @@
  */
 package io.prestosql.spi.block;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.StandardErrorCode;
+
+import java.io.InputStream;
+import java.io.OutputStream;
 
 import static io.prestosql.spi.block.EncoderUtil.decodeNullBits;
 import static io.prestosql.spi.block.EncoderUtil.encodeNullsAsBits;
 
 public class Int128ArrayBlockEncoding
-        implements BlockEncoding
+        extends AbstractBlockEncoding<Int128ArrayBlock>
 {
     public static final String NAME = "INT128_ARRAY";
 
@@ -62,5 +70,65 @@ public class Int128ArrayBlockEncoding
         }
 
         return new Int128ArrayBlock(0, positionCount, valueIsNull, values);
+    }
+
+    @Override
+    public void write(Kryo kryo, Output output, Int128ArrayBlock block)
+    {
+        int positionCount = block.getPositionCount();
+        output.writeInt(positionCount);
+        output.writeBoolean(block.mayHaveNull());
+
+        if (block.mayHaveNull()) {
+            output.writeBooleans(block.valueIsNull, 0, positionCount);
+        }
+
+        output.writeLongs(block.values, block.positionOffset, positionCount * 2);
+    }
+
+    @Override
+    public Int128ArrayBlock read(Kryo kryo, Input input, Class<? extends Int128ArrayBlock> aClass)
+    {
+        int positionCount = input.readInt();
+        boolean[] valuesIsNull = null;
+        if (input.readBoolean()) {
+            valuesIsNull = input.readBooleans(positionCount);
+        }
+        long[] values = input.readLongs(positionCount * 2);
+        return new Int128ArrayBlock(0, positionCount, valuesIsNull, values);
+    }
+
+    /**
+     * Read a block from the specified input.  The returned
+     * block should begin at the specified position.
+     *
+     * @param blockEncodingSerde
+     * @param input
+     */
+    @Override
+    public Block readBlock(BlockEncodingSerde blockEncodingSerde, InputStream input)
+    {
+        if (!(blockEncodingSerde.getContext() instanceof Kryo) || !(input instanceof Input)) {
+            throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Generic readblock not supported for Int128");
+        }
+
+        return this.read((Kryo) blockEncodingSerde.getContext(), (Input) input, Int128ArrayBlock.class);
+    }
+
+    /**
+     * Write the specified block to the specified output
+     *
+     * @param blockEncodingSerde
+     * @param output
+     * @param block
+     */
+    @Override
+    public void writeBlock(BlockEncodingSerde blockEncodingSerde, OutputStream output, Block block)
+    {
+        if (!(blockEncodingSerde.getContext() instanceof Kryo) || !(output instanceof Output)) {
+            throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Generic write not supported for Int128");
+        }
+
+        this.write((Kryo) blockEncodingSerde.getContext(), (Output) output, (Int128ArrayBlock) block);
     }
 }
