@@ -212,13 +212,14 @@ public class PagesRTreeIndex
         long joinAddress = addresses.getLong(joinPosition);
         int blockIndex = decodeSliceIndex(joinAddress);
         int blockPosition = decodePosition(joinAddress);
+        int channelOffset = outputChannelOffset;
 
         for (int outputIndex : outputChannels) {
             Type type = types.get(outputIndex);
             List<Block> channel = channels.get(outputIndex);
             Block block = channel.get(blockIndex);
-            type.appendTo(block, blockPosition, pageBuilder.getBlockBuilder(outputChannelOffset));
-            outputChannelOffset++;
+            type.appendTo(block, blockPosition, pageBuilder.getBlockBuilder(channelOffset));
+            channelOffset++;
         }
     }
 }

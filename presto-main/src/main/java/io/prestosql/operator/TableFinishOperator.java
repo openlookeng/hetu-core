@@ -87,9 +87,9 @@ public class TableFinishOperator
         {
             checkState(!closed, "Factory is already closed");
             OperatorContext context = driverContext.addOperatorContext(operatorId, planNodeId, TableFinishOperator.class.getSimpleName());
-            Operator statisticsAggregationOperator = statisticsAggregationOperatorFactory.createOperator(driverContext);
-            boolean statisticsCpuTimerEnabled = !(statisticsAggregationOperator instanceof DevNullOperator) && isStatisticsCpuTimerEnabled(session);
-            return new TableFinishOperator(context, tableFinisher, statisticsAggregationOperator, descriptor, statisticsCpuTimerEnabled);
+            Operator aggregationOperator = statisticsAggregationOperatorFactory.createOperator(driverContext);
+            boolean cpuTimerEnabled = !(aggregationOperator instanceof DevNullOperator) && isStatisticsCpuTimerEnabled(session);
+            return new TableFinishOperator(context, tableFinisher, aggregationOperator, descriptor, cpuTimerEnabled);
         }
 
         @Override

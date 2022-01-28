@@ -188,12 +188,12 @@ public class PartitionedOutputOperator
         @Override
         public Operator createOperator(DriverContext driverContext)
         {
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, PartitionedOutputOperator.class.getSimpleName());
-            String id = operatorContext.getUniqueId();
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, PartitionedOutputOperator.class.getSimpleName());
+            String id = addOperatorContext.getUniqueId();
             outputBuffer.addInputChannel(id);
             return new PartitionedOutputOperator(
                     id,
-                    operatorContext,
+                    addOperatorContext,
                     sourceTypes,
                     pagePreprocessor,
                     partitionFunction,
@@ -324,12 +324,13 @@ public class PartitionedOutputOperator
             return;
         }
 
-        if (page instanceof MarkerPage) {
+        Page inputPage = page;
+        if (inputPage instanceof MarkerPage) {
             // Send out all pending pages, then broadcast the marker. This must be done BEFORE snapshotState.processPage(),
             // otherwise what's in PageBuilders are captured, and their content will be sent AGAIN after resume.
             partitionFunction.flush(true);
 
-            snapshotState.processPage(page);
+            snapshotState.processPage(inputPage);
             MarkerPage marker = snapshotState.nextMarker();
 
             if (isStage0) {
@@ -349,11 +350,11 @@ public class PartitionedOutputOperator
             }
         }
         else {
-            page = pagePreprocessor.apply(page);
-            partitionFunction.partitionPage(page);
+            inputPage = pagePreprocessor.apply(inputPage);
+            partitionFunction.partitionPage(inputPage);
         }
 
-        operatorContext.recordOutput(page.getSizeInBytes(), page.getPositionCount());
+        operatorContext.recordOutput(inputPage.getSizeInBytes(), inputPage.getPositionCount());
 
         // We use getSizeInBytes() here instead of getRetainedSizeInBytes() for an approximation of
         // the amount of memory used by the pageBuilders, because calculating the retained

@@ -83,13 +83,14 @@ public class ApplyConnectorOptimization
     }
 
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode inputPlan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
-        requireNonNull(plan, "plan is null");
+        requireNonNull(inputPlan, "inputPlan is null");
         requireNonNull(session, "session is null");
         requireNonNull(types, "types is null");
         requireNonNull(idAllocator, "idAllocator is null");
 
+        PlanNode plan = inputPlan;
         Map<CatalogName, Set<ConnectorPlanOptimizer>> connectorOptimizers = connectorOptimizersSupplier.get();
 
         if (connectorOptimizers.isEmpty()) {

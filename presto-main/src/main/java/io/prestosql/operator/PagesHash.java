@@ -230,12 +230,13 @@ public final class PagesHash
         // values returned by {@link Object#hashCode()}.
         //
 
-        rawHash ^= rawHash >>> 33;
-        rawHash *= 0xff51afd7ed558ccdL;
-        rawHash ^= rawHash >>> 33;
-        rawHash *= 0xc4ceb9fe1a85ec53L;
-        rawHash ^= rawHash >>> 33;
+        long rawHashNew = rawHash;
+        rawHashNew ^= rawHashNew >>> 33;
+        rawHashNew *= 0xff51afd7ed558ccdL;
+        rawHashNew ^= rawHashNew >>> 33;
+        rawHashNew *= 0xc4ceb9fe1a85ec53L;
+        rawHashNew ^= rawHashNew >>> 33;
 
-        return (int) (rawHash & mask);
+        return (int) (rawHashNew & mask);
     }
 }

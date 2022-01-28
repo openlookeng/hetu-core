@@ -182,8 +182,8 @@ public class CubeFinishOperator
         //Merge new data predicate with existing predicate string
         CubeRangeCanonicalizer canonicalizer = new CubeRangeCanonicalizer(metadata, session, types);
         newPredicate = canonicalizer.mergePredicates(newPredicate);
-        newPredicateString = newPredicate.equals(BooleanLiteral.TRUE_LITERAL) ? null : ExpressionFormatter.formatExpression(newPredicate, Optional.empty());
-        return newPredicateString == null && sourceTablePredicate == null ? null : new CubeFilter(sourceTablePredicate, newPredicateString);
+        String formatExpression = newPredicate.equals(BooleanLiteral.TRUE_LITERAL) ? null : ExpressionFormatter.formatExpression(newPredicate, Optional.empty());
+        return formatExpression == null && sourceTablePredicate == null ? null : new CubeFilter(sourceTablePredicate, formatExpression);
     }
 
     @Override

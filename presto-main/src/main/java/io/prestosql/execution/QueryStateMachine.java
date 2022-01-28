@@ -228,7 +228,7 @@ public class QueryStateMachine
     static QueryStateMachine beginWithTicker(
             String query,
             Optional<String> preparedQuery,
-            Session session,
+            Session inputSession,
             URI self,
             ResourceGroupId resourceGroup,
             ResourceGroupManager resourceGroupManager,
@@ -240,17 +240,18 @@ public class QueryStateMachine
             Metadata metadata,
             WarningCollector warningCollector)
     {
+        Session localSession = inputSession;
         // If there is not an existing transaction, begin an auto commit transaction
-        if (!session.getTransactionId().isPresent() && !transactionControl) {
+        if (!localSession.getTransactionId().isPresent() && !transactionControl) {
             // TODO: make autocommit isolation level a session parameter
             TransactionId transactionId = transactionManager.beginTransaction(true);
-            session = session.beginTransactionId(transactionId, transactionManager, accessControl);
+            localSession = localSession.beginTransactionId(transactionId, transactionManager, accessControl);
         }
 
         QueryStateMachine queryStateMachine = new QueryStateMachine(
                 query,
                 preparedQuery,
-                session,
+                localSession,
                 self,
                 resourceGroup,
                 resourceGroupManager,
@@ -353,9 +354,9 @@ public class QueryStateMachine
 
         ErrorCode errorCode = null;
         if (state == FAILED) {
-            ExecutionFailureInfo failureCause = this.failureCause.get();
-            if (failureCause != null) {
-                errorCode = failureCause.getErrorCode();
+            ExecutionFailureInfo localFailureCause = this.failureCause.get();
+            if (localFailureCause != null) {
+                errorCode = localFailureCause.getErrorCode();
             }
         }
 
@@ -412,12 +413,12 @@ public class QueryStateMachine
         // never be visible.
         QueryState state = queryState.get();
 
-        ExecutionFailureInfo failureCause = null;
+        ExecutionFailureInfo localFailureCause = null;
         ErrorCode errorCode = null;
         if (state == FAILED) {
-            failureCause = this.failureCause.get();
-            if (failureCause != null) {
-                errorCode = failureCause.getErrorCode();
+            localFailureCause = this.failureCause.get();
+            if (localFailureCause != null) {
+                errorCode = localFailureCause.getErrorCode();
             }
         }
 
@@ -447,7 +448,7 @@ public class QueryStateMachine
                 clearTransactionId.get(),
                 updateType.get(),
                 rootStage,
-                failureCause,
+                localFailureCause,
                 errorCode,
                 warningCollector.getWarnings(),
                 inputs.get(),
@@ -1240,16 +1241,16 @@ public class QueryStateMachine
             checkArgument(columnNames.size() == columnTypes.size(), "columnNames and columnTypes must be the same size");
 
             Optional<QueryOutputInfo> queryOutputInfo;
-            List<Consumer<QueryOutputInfo>> outputInfoListeners;
+            List<Consumer<QueryOutputInfo>> localOutputInfoListeners;
             synchronized (this) {
                 checkState(this.columnNames == null && this.columnTypes == null, "output fields already set");
                 this.columnNames = ImmutableList.copyOf(columnNames);
                 this.columnTypes = ImmutableList.copyOf(columnTypes);
 
                 queryOutputInfo = getQueryOutputInfo();
-                outputInfoListeners = ImmutableList.copyOf(this.outputInfoListeners);
+                localOutputInfoListeners = ImmutableList.copyOf(this.outputInfoListeners);
             }
-            queryOutputInfo.ifPresent(info -> fireStateChanged(info, outputInfoListeners));
+            queryOutputInfo.ifPresent(info -> fireStateChanged(info, localOutputInfoListeners));
         }
 
         private void resetForResume()
@@ -1264,7 +1265,7 @@ public class QueryStateMachine
             requireNonNull(newExchangeLocations, "newExchangeLocations is null");
 
             Optional<QueryOutputInfo> queryOutputInfo;
-            List<Consumer<QueryOutputInfo>> outputInfoListeners;
+            List<Consumer<QueryOutputInfo>> localOutputInfoListeners;
             synchronized (this) {
                 if (this.noMoreExchangeLocations) {
                     checkArgument(this.exchangeLocations.containsAll(newExchangeLocations), "New locations added after no more locations set");
@@ -1274,9 +1275,9 @@ public class QueryStateMachine
                 this.exchangeLocations.addAll(newExchangeLocations);
                 this.noMoreExchangeLocations = noMoreExchangeLocations;
                 queryOutputInfo = getQueryOutputInfo();
-                outputInfoListeners = ImmutableList.copyOf(this.outputInfoListeners);
+                localOutputInfoListeners = ImmutableList.copyOf(this.outputInfoListeners);
             }
-            queryOutputInfo.ifPresent(info -> fireStateChanged(info, outputInfoListeners));
+            queryOutputInfo.ifPresent(info -> fireStateChanged(info, localOutputInfoListeners));
         }
 
         private synchronized Optional<QueryOutputInfo> getQueryOutputInfo()

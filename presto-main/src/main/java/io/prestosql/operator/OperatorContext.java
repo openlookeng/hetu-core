@@ -39,6 +39,7 @@ import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
@@ -517,8 +518,8 @@ public class OperatorContext
 
     public OperatorStats getOperatorStats()
     {
-        Supplier<OperatorInfo> infoSupplier = this.infoSupplier.get();
-        OperatorInfo info = Optional.ofNullable(infoSupplier).map(Supplier::get).orElse(null);
+        Supplier<OperatorInfo> operatorInfoSupplier = this.infoSupplier.get();
+        OperatorInfo info = Optional.ofNullable(operatorInfoSupplier).map(Supplier::get).orElse(null);
 
         long inputPositionsCount = inputPositions.getTotalCount();
 
@@ -576,8 +577,8 @@ public class OperatorContext
 
     public List<OperatorStats> getNestedOperatorStats()
     {
-        Supplier<List<OperatorStats>> nestedOperatorStatsSupplier = this.nestedOperatorStatsSupplier.get();
-        return Optional.ofNullable(nestedOperatorStatsSupplier)
+        Supplier<List<OperatorStats>> operatorStatsSupplier = this.nestedOperatorStatsSupplier.get();
+        return Optional.ofNullable(operatorStatsSupplier)
                 .map(Supplier::get)
                 .orElseGet(() -> ImmutableList.of(getOperatorStats()));
     }
@@ -818,7 +819,8 @@ public class OperatorContext
     public String getUniqueId()
     {
         TaskId taskId = driverContext.getTaskId();
-        return String.format("%s_%02d_%d_%d_%02d_%02d",
+        return String.format(Locale.ENGLISH,
+                "%s_%02d_%d_%d_%02d_%02d",
                 taskId.getQueryId().getId(),
                 taskId.getStageId().getId(),
                 taskId.getId(),

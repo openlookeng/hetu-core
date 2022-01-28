@@ -556,12 +556,12 @@ public class PredicatePushDown
         }
 
         @Override
-        public PlanNode visitJoin(JoinNode node, RewriteContext<RowExpression> context)
+        public PlanNode visitJoin(JoinNode inputNode, RewriteContext<RowExpression> context)
         {
             RowExpression inheritedPredicate = context.get();
 
             // See if we can rewrite outer joins in terms of a plain inner join
-            node = tryNormalizeToOuterToInnerJoin(node, inheritedPredicate);
+            JoinNode node = tryNormalizeToOuterToInnerJoin(inputNode, inheritedPredicate);
 
             RowExpression leftEffectivePredicate = effectivePredicateExtractor.extract(node.getLeft(), session);
             RowExpression rightEffectivePredicate = effectivePredicateExtractor.extract(node.getRight(), session);
@@ -869,9 +869,10 @@ public class PredicatePushDown
         }
 
         @Override
-        public PlanNode visitSpatialJoin(SpatialJoinNode node, RewriteContext<RowExpression> context)
+        public PlanNode visitSpatialJoin(SpatialJoinNode inputNode, RewriteContext<RowExpression> context)
         {
             RowExpression inheritedPredicate = context.get();
+            SpatialJoinNode node = inputNode;
 
             List<VariableReferenceExpression> nodeLeftOutput = toVariableReferences(node.getLeft().getOutputSymbols(), planSymbolAllocator.getTypes());
             List<VariableReferenceExpression> nodeRightOutput = toVariableReferences(node.getRight().getOutputSymbols(), planSymbolAllocator.getTypes());
@@ -978,22 +979,24 @@ public class PredicatePushDown
             return toVariableReference(symbol, planSymbolAllocator.getTypes());
         }
 
-        private OuterJoinPushDownResult processLimitedOuterJoin(RowExpression inheritedPredicate, RowExpression outerEffectivePredicate, RowExpression innerEffectivePredicate, RowExpression joinPredicate, Collection<VariableReferenceExpression> outerVariables)
+        private OuterJoinPushDownResult processLimitedOuterJoin(RowExpression inputInheritedPredicate, RowExpression inputOuterEffectivePredicate, RowExpression inputInnerEffectivePredicate, RowExpression inputJoinPredicate, Collection<VariableReferenceExpression> outerVariables)
         {
-            checkArgument(Iterables.all(VariablesExtractor.extractUnique(outerEffectivePredicate), in(outerVariables)), "outerEffectivePredicate must only contain variables from outerVariables");
-            checkArgument(Iterables.all(VariablesExtractor.extractUnique(innerEffectivePredicate), not(in(outerVariables))), "innerEffectivePredicate must not contain variables from outerVariables");
+            checkArgument(Iterables.all(VariablesExtractor.extractUnique(inputOuterEffectivePredicate), in(outerVariables)), "inputOuterEffectivePredicate must only contain variables from outerVariables");
+            checkArgument(Iterables.all(VariablesExtractor.extractUnique(inputInnerEffectivePredicate), not(in(outerVariables))), "inputInnerEffectivePredicate must not contain variables from outerVariables");
 
             ImmutableList.Builder<RowExpression> outerPushdownConjuncts = ImmutableList.builder();
             ImmutableList.Builder<RowExpression> innerPushdownConjuncts = ImmutableList.builder();
             ImmutableList.Builder<RowExpression> postJoinConjuncts = ImmutableList.builder();
             ImmutableList.Builder<RowExpression> joinConjuncts = ImmutableList.builder();
+            RowExpression inheritedPredicate = inputInheritedPredicate;
 
             // Strip out non-deterministic conjuncts
             postJoinConjuncts.addAll(filter(extractConjuncts(inheritedPredicate), not(determinismEvaluator::isDeterministic)));
             inheritedPredicate = logicalRowExpressions.filterDeterministicConjuncts(inheritedPredicate);
 
-            outerEffectivePredicate = logicalRowExpressions.filterDeterministicConjuncts(outerEffectivePredicate);
-            innerEffectivePredicate = logicalRowExpressions.filterDeterministicConjuncts(innerEffectivePredicate);
+            RowExpression outerEffectivePredicate = logicalRowExpressions.filterDeterministicConjuncts(inputOuterEffectivePredicate);
+            RowExpression innerEffectivePredicate = logicalRowExpressions.filterDeterministicConjuncts(inputInnerEffectivePredicate);
+            RowExpression joinPredicate = inputJoinPredicate;
             joinConjuncts.addAll(filter(extractConjuncts(joinPredicate), not(determinismEvaluator::isDeterministic)));
             joinPredicate = logicalRowExpressions.filterDeterministicConjuncts(joinPredicate);
 
@@ -1099,14 +1102,18 @@ public class PredicatePushDown
             }
         }
 
-        private InnerJoinPushDownResult processInnerJoin(PlanNode node, RowExpression inheritedPredicate, RowExpression leftEffectivePredicate, RowExpression rightEffectivePredicate, RowExpression joinPredicate, Collection<VariableReferenceExpression> leftVariables)
+        private InnerJoinPushDownResult processInnerJoin(PlanNode node, RowExpression inputInheritedPredicate, RowExpression inputLeftEffectivePredicate, RowExpression inputRightEffectivePredicate, RowExpression inputJoinPredicate, Collection<VariableReferenceExpression> leftVariables)
         {
+            RowExpression leftEffectivePredicate = inputLeftEffectivePredicate;
+            RowExpression rightEffectivePredicate = inputRightEffectivePredicate;
             checkArgument(Iterables.all(VariablesExtractor.extractUnique(leftEffectivePredicate), in(leftVariables)), "leftEffectivePredicate must only contain variables from leftVariables");
             checkArgument(Iterables.all(VariablesExtractor.extractUnique(rightEffectivePredicate), not(in(leftVariables))), "rightEffectivePredicate must not contain variables from leftVariables");
 
             ImmutableList.Builder<RowExpression> leftPushDownConjuncts = ImmutableList.builder();
             ImmutableList.Builder<RowExpression> rightPushDownConjuncts = ImmutableList.builder();
             ImmutableList.Builder<RowExpression> joinConjuncts = ImmutableList.builder();
+            RowExpression inheritedPredicate = inputInheritedPredicate;
+            RowExpression joinPredicate = inputJoinPredicate;
 
             // Strip out non-deterministic conjuncts
             joinConjuncts.addAll(filter(extractConjuncts(inheritedPredicate), not(determinismEvaluator::isDeterministic)));
@@ -1348,9 +1355,9 @@ public class PredicatePushDown
         }
 
         //Evaluates an expression's response to binding the specified input symbols to NULL
-        private RowExpression nullInputEvaluator(final Collection<VariableReferenceExpression> nullSymbols, RowExpression expression)
+        private RowExpression nullInputEvaluator(final Collection<VariableReferenceExpression> nullSymbols, RowExpression inputExpression)
         {
-            expression = RowExpressionNodeInliner.replaceExpression(expression, nullSymbols.stream()
+            RowExpression expression = RowExpressionNodeInliner.replaceExpression(inputExpression, nullSymbols.stream()
                     .collect(Collectors.toMap(identity(), variable -> constantNull(variable.getType()))));
             return new RowExpressionOptimizer(metadata).optimize(expression, RowExpressionInterpreter.Level.OPTIMIZED, session.toConnectorSession());
         }

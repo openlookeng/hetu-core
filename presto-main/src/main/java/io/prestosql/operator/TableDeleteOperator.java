@@ -215,9 +215,9 @@ public class TableDeleteOperator
             Constraint constraint = new Constraint(tupleDomain);
 
             //Apply the constraint on the table handle
-            Optional<TableHandle> tableHandle = metadata.applyDelete(session, this.tableHandle, constraint);
-            if (tableHandle.isPresent()) {
-                tableHandleForDelete = tableHandle.get();
+            Optional<TableHandle> tableHandleDelete = metadata.applyDelete(session, this.tableHandle, constraint);
+            if (tableHandleDelete.isPresent()) {
+                tableHandleForDelete = tableHandleDelete.get();
             }
         }
         OptionalLong rowsDeletedCount = metadata.executeDelete(session, tableHandleForDelete);

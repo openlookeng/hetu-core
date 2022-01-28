@@ -67,8 +67,8 @@ public class ExplainAnalyzeOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, ExplainAnalyzeOperator.class.getSimpleName());
-            return new ExplainAnalyzeOperator(operatorContext, queryPerformanceFetcher, metadata, verbose);
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, ExplainAnalyzeOperator.class.getSimpleName());
+            return new ExplainAnalyzeOperator(addOperatorContext, queryPerformanceFetcher, metadata, verbose);
         }
 
         @Override
@@ -213,15 +213,16 @@ public class ExplainAnalyzeOperator
 
     private static void getSubStages(StageId stageId, StageInfo rootStage, ImmutableList.Builder<StageInfo> collector, boolean add)
     {
+        boolean status = add;
         if (rootStage.getStageId().equals(stageId)) {
-            add = true;
+            status = true;
         }
         List<StageInfo> subStages = rootStage.getSubStages();
         for (StageInfo subStage : subStages) {
-            getSubStages(stageId, subStage, collector, add);
+            getSubStages(stageId, subStage, collector, status);
         }
 
-        if (add && !rootStage.getStageId().equals(stageId)) {
+        if (status && !rootStage.getStageId().equals(stageId)) {
             collector.add(rootStage);
         }
     }

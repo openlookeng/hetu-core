@@ -188,13 +188,13 @@ public class SplitKey
             throw new IOException("Cannot create SplitKey instance from serialized value");
         }
         try {
-            String catalog = null;
-            String schema = null;
-            String table = null;
-            String path = null;
-            long start = -1;
-            long end = -1;
-            long lastModifiedTime = 0;
+            String localCatalog = null;
+            String localSchema = null;
+            String localTable = null;
+            String localPath = null;
+            long localStart = -1;
+            long localEnd = -1;
+            long localLastModifiedTime = 0;
             splitKeyString = splitKeyString.replace("SplitKey{", "").replace("}", "");
             String[] variableAndValues = splitKeyString.split(",");
             for (String variableAndValue : variableAndValues) {
@@ -203,29 +203,31 @@ public class SplitKey
                 String value = tokens[1].replace("'", "").trim();
                 switch (variable) {
                     case "catalog":
-                        catalog = value;
+                        localCatalog = value;
                         break;
                     case "schema":
-                        schema = value;
+                        localSchema = value;
                         break;
                     case "table":
-                        table = value;
+                        localTable = value;
                         break;
                     case "start":
-                        start = Long.parseLong(value);
+                        localStart = Long.parseLong(value);
                         break;
                     case "end":
-                        end = Long.parseLong(value);
+                        localEnd = Long.parseLong(value);
                         break;
                     case "lastModifiedTime":
-                        lastModifiedTime = Long.parseLong(value);
+                        localLastModifiedTime = Long.parseLong(value);
                         break;
                     case "path":
-                        path = value;
+                        localPath = value;
+                        break;
+                    default:
                         break;
                 }
             }
-            return new SplitKey(catalog, schema, table, path, start, end, lastModifiedTime);
+            return new SplitKey(localCatalog, localSchema, localTable, localPath, localStart, localEnd, localLastModifiedTime);
         }
         catch (Exception ex) {
             log.error(ex, "Unable to create SplitKey from serialized value %s", key);

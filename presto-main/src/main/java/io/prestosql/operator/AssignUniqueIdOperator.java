@@ -59,11 +59,11 @@ public class AssignUniqueIdOperator
         {
             checkState(!closed, "Factory is already closed");
 
-            OperatorContext operatorContext = driverContext.addOperatorContext(
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(
                     operatorId,
                     planNodeId,
                     AssignUniqueIdOperator.class.getSimpleName());
-            return new AssignUniqueIdOperator(operatorContext, valuePool);
+            return new AssignUniqueIdOperator(addOperatorContext, valuePool);
         }
 
         @Override

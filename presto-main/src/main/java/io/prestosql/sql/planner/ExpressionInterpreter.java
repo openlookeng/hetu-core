@@ -535,12 +535,12 @@ public class ExpressionInterpreter
             ImmutableList.Builder<Expression> operandsBuilder = ImmutableList.builder();
             Set<Expression> visitedExpression = new HashSet<>();
             for (Object value : values) {
-                Expression expression = toExpression(value, type);
-                if (!isDeterministic(expression) || visitedExpression.add(expression)) {
-                    operandsBuilder.add(expression);
+                Expression localExpression = toExpression(value, type);
+                if (!isDeterministic(localExpression) || visitedExpression.add(localExpression)) {
+                    operandsBuilder.add(localExpression);
                 }
                 // TODO: Replace this logic with an anlyzer which specifies whether it evaluates to null
-                if (expression instanceof Literal && !(expression instanceof NullLiteral)) {
+                if (localExpression instanceof Literal && !(localExpression instanceof NullLiteral)) {
                     break;
                 }
             }

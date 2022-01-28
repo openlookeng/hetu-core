@@ -200,8 +200,8 @@ public final class OuterLookupSource
                 this.visitedPositions = (boolean[]) restoredJoinPositions;
             }
             else {
-                try (LookupSource lookupSource = lookupSourceSupplier.get()) {
-                    this.visitedPositions = new boolean[toIntExact(lookupSource.getJoinPositionCount())];
+                try (LookupSource source = lookupSourceSupplier.get()) {
+                    this.visitedPositions = new boolean[toIntExact(source.getJoinPositionCount())];
                 }
             }
         }

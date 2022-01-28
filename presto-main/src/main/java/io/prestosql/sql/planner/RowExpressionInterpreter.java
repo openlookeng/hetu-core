@@ -512,11 +512,11 @@ public class RowExpressionInterpreter
                     ImmutableList.Builder<RowExpression> operandsBuilder = ImmutableList.builder();
                     Set<RowExpression> visitedExpression = new HashSet<>();
                     for (Object value : values) {
-                        RowExpression expression = LiteralEncoder.toRowExpression(value, type);
-                        if (!determinismEvaluator.isDeterministic(expression) || visitedExpression.add(expression)) {
-                            operandsBuilder.add(expression);
+                        RowExpression localExpression = LiteralEncoder.toRowExpression(value, type);
+                        if (!determinismEvaluator.isDeterministic(localExpression) || visitedExpression.add(localExpression)) {
+                            operandsBuilder.add(localExpression);
                         }
-                        if (expression instanceof ConstantExpression && !(((ConstantExpression) expression).getValue() == null)) {
+                        if (localExpression instanceof ConstantExpression && !(((ConstantExpression) localExpression).getValue() == null)) {
                             break;
                         }
                     }

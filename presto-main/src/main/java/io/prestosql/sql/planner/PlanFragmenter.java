@@ -429,18 +429,19 @@ public class PlanFragmenter
 
         private Integer checkForCTENode(PlanNode node, PlanNodeId nodeId)
         {
-            while (node instanceof ProjectNode) {
-                node = ((ProjectNode) node).getSource();
+            PlanNode planNode = node;
+            while (planNode instanceof ProjectNode) {
+                planNode = ((ProjectNode) planNode).getSource();
             }
 
-            if (node instanceof CTEScanNode) {
-                int commonCTERefNum = ((CTEScanNode) node).getCommonCTERefNum();
+            if (planNode instanceof CTEScanNode) {
+                int commonCTERefNum = ((CTEScanNode) planNode).getCommonCTERefNum();
                 if (cteToParentsMap.containsKey(commonCTERefNum)) {
                     cteToParentsMap.get(commonCTERefNum).forEach(x -> x.updateConsumerPlan(nodeId));
-                    ((CTEScanNode) node).updateConsumerPlans(cteToParentsMap.get(commonCTERefNum).get(0).getConsumerPlans());
+                    ((CTEScanNode) planNode).updateConsumerPlans(cteToParentsMap.get(commonCTERefNum).get(0).getConsumerPlans());
                 }
                 else {
-                    ((CTEScanNode) node).updateConsumerPlan(nodeId);
+                    ((CTEScanNode) planNode).updateConsumerPlan(nodeId);
                 }
 
                 return commonCTERefNum;
@@ -451,12 +452,13 @@ public class PlanFragmenter
 
         private CTEScanNode getCTENode(PlanNode node)
         {
-            while (node instanceof ProjectNode) {
-                node = ((ProjectNode) node).getSource();
+            PlanNode planNode = node;
+            while (planNode instanceof ProjectNode) {
+                planNode = ((ProjectNode) planNode).getSource();
             }
 
-            if (node instanceof CTEScanNode) {
-                return (CTEScanNode) node;
+            if (planNode instanceof CTEScanNode) {
+                return (CTEScanNode) planNode;
             }
 
             // Should never come here.

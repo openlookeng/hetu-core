@@ -283,8 +283,9 @@ public class PagesIndex
 
     public int buildPage(int position, int[] outputChannels, PageBuilder pageBuilder)
     {
-        while (!pageBuilder.isFull() && position < positionCount) {
-            long pageAddress = valueAddresses.getLong(position);
+        int positionValue = position;
+        while (!pageBuilder.isFull() && positionValue < positionCount) {
+            long pageAddress = valueAddresses.getLong(positionValue);
             int blockIndex = decodeSliceIndex(pageAddress);
             int blockPosition = decodePosition(pageAddress);
 
@@ -297,10 +298,10 @@ public class PagesIndex
                 type.appendTo(block, blockPosition, pageBuilder.getBlockBuilder(i));
             }
 
-            position++;
+            positionValue++;
         }
 
-        return position;
+        return positionValue;
     }
 
     public void appendTo(int channel, int position, BlockBuilder output)
@@ -469,8 +470,8 @@ public class PagesIndex
             Map<Integer, Rectangle> partitions)
     {
         // TODO probably shouldn't copy to reduce memory and for memory accounting's sake
-        List<List<Block>> channels = ImmutableList.copyOf(this.channels);
-        return new PagesSpatialIndexSupplier(session, valueAddresses, types, outputChannels, channels, geometryChannel, radiusChannel, partitionChannel, spatialRelationshipTest, filterFunctionFactory, partitions);
+        List<List<Block>> channelLists = ImmutableList.copyOf(this.channels);
+        return new PagesSpatialIndexSupplier(session, valueAddresses, types, outputChannels, channelLists, geometryChannel, radiusChannel, partitionChannel, spatialRelationshipTest, filterFunctionFactory, partitions);
     }
 
     public LookupSourceSupplier createLookupSourceSupplier(
@@ -482,9 +483,9 @@ public class PagesIndex
             List<JoinFilterFunctionFactory> searchFunctionFactories,
             Optional<List<Integer>> outputChannels)
     {
-        List<List<Block>> channels = ImmutableList.copyOf(this.channels);
+        List<List<Block>> channelLists = ImmutableList.copyOf(this.channels);
         if (!joinChannels.isEmpty()) {
-            // todo compiled implementation of lookup join does not support when we are joining with empty join channels.
+            // todo compiled implementation of lookup join does not support when we are joining with empty join channelLists.
             // This code path will trigger only for OUTER joins. To fix that we need to add support for
             //        OUTER joins into NestedLoopsJoin and remove "type == INNER" condition in LocalExecutionPlanner.visitJoin()
 
@@ -493,7 +494,7 @@ public class PagesIndex
                 return lookupSourceFactory.createLookupSourceSupplier(
                         session,
                         valueAddresses,
-                        channels,
+                        channelLists,
                         hashChannel,
                         filterFunctionFactory,
                         sortChannel,
@@ -508,7 +509,7 @@ public class PagesIndex
         PagesHashStrategy hashStrategy = new SimplePagesHashStrategy(
                 types,
                 outputChannels.orElse(rangeList(types.size())),
-                channels,
+                channelLists,
                 joinChannels,
                 hashChannel,
                 sortChannel,
@@ -518,7 +519,7 @@ public class PagesIndex
                 session,
                 hashStrategy,
                 valueAddresses,
-                channels,
+                channelLists,
                 filterFunctionFactory,
                 sortChannel,
                 searchFunctionFactories);

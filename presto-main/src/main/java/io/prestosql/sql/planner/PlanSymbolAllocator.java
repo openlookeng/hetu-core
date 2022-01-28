@@ -57,6 +57,7 @@ public class PlanSymbolAllocator
         return newSymbol(symbolHint.getName(), symbols.get(symbolHint));
     }
 
+    @Override
     public Symbol newSymbol(String nameHint, Type type)
     {
         return newSymbol(nameHint, type, null);
@@ -67,26 +68,27 @@ public class PlanSymbolAllocator
         return newSymbol("$hashValue", BigintType.BIGINT);
     }
 
+    @Override
     public Symbol newSymbol(String nameHint, Type type, String suffix)
     {
         requireNonNull(nameHint, "name is null");
         requireNonNull(type, "type is null");
 
         // TODO: workaround for the fact that QualifiedName lowercases parts
-        nameHint = nameHint.toLowerCase(ENGLISH);
+        String nameHintLower = nameHint.toLowerCase(ENGLISH);
 
         // don't strip the tail if the only _ is the first character
-        int index = nameHint.lastIndexOf("_");
+        int index = nameHintLower.lastIndexOf("_");
         if (index > 0) {
-            String tail = nameHint.substring(index + 1);
+            String tail = nameHintLower.substring(index + 1);
 
             // only strip if tail is numeric or _ is the last character
-            if (Ints.tryParse(tail) != null || index == nameHint.length() - 1) {
-                nameHint = nameHint.substring(0, index);
+            if (Ints.tryParse(tail) != null || index == nameHintLower.length() - 1) {
+                nameHintLower = nameHintLower.substring(0, index);
             }
         }
 
-        String unique = nameHint;
+        String unique = nameHintLower;
 
         if (suffix != null) {
             unique = unique + "$" + suffix;

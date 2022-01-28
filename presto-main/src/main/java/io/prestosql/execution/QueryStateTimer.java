@@ -223,9 +223,9 @@ class QueryStateTimer
 
     public Duration getQueuedTime()
     {
-        Duration queuedTime = this.queuedTime.get();
-        if (queuedTime != null) {
-            return queuedTime;
+        Duration localQueuedTime = this.queuedTime.get();
+        if (localQueuedTime != null) {
+            return localQueuedTime;
         }
 
         // if queue time is not set, the query is still queued

@@ -49,8 +49,8 @@ public class LimitOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, LimitOperator.class.getSimpleName());
-            return new LimitOperator(operatorContext, limit);
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, LimitOperator.class.getSimpleName());
+            return new LimitOperator(addOperatorContext, limit);
         }
 
         @Override

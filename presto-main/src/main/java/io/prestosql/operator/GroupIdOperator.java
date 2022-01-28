@@ -68,37 +68,37 @@ public class GroupIdOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, GroupIdOperator.class.getSimpleName());
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, GroupIdOperator.class.getSimpleName());
 
             // create an int array for fast lookup of input columns for every grouping set
-            int[][] groupingSetInputs = new int[groupingSetMappings.size()][outputTypes.size() - 1];
+            int[][] groupingSets = new int[groupingSetMappings.size()][outputTypes.size() - 1];
             for (int i = 0; i < groupingSetMappings.size(); i++) {
                 // -1 means the output column is null
-                Arrays.fill(groupingSetInputs[i], -1);
+                Arrays.fill(groupingSets[i], -1);
 
                 // anything else is an input column to copy
                 for (int outputChannel : groupingSetMappings.get(i).keySet()) {
-                    groupingSetInputs[i][outputChannel] = groupingSetMappings.get(i).get(outputChannel);
+                    groupingSets[i][outputChannel] = groupingSetMappings.get(i).get(outputChannel);
                 }
             }
 
             // it's easier to create null blocks for every output column even though we only null out some grouping column outputs
-            Block[] nullBlocks = new Block[outputTypes.size()];
+            Block[] outputNullBlocks = new Block[outputTypes.size()];
             for (int i = 0; i < outputTypes.size(); i++) {
-                nullBlocks[i] = outputTypes.get(i).createBlockBuilder(null, 1)
+                outputNullBlocks[i] = outputTypes.get(i).createBlockBuilder(null, 1)
                         .appendNull()
                         .build();
             }
 
             // create groupid blocks for every group
-            Block[] groupIdBlocks = new Block[groupingSetMappings.size()];
+            Block[] groupSetBlocks = new Block[groupingSetMappings.size()];
             for (int i = 0; i < groupingSetMappings.size(); i++) {
                 BlockBuilder builder = BIGINT.createBlockBuilder(null, 1);
                 BIGINT.writeLong(builder, i);
-                groupIdBlocks[i] = builder.build();
+                groupSetBlocks[i] = builder.build();
             }
 
-            return new GroupIdOperator(operatorContext, outputTypes, groupingSetInputs, nullBlocks, groupIdBlocks);
+            return new GroupIdOperator(addOperatorContext, outputTypes, groupingSets, outputNullBlocks, groupSetBlocks);
         }
 
         @Override

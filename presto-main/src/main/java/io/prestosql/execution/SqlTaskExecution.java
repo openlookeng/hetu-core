@@ -216,30 +216,30 @@ public class SqlTaskExecution
         try (SetThreadName ignored = new SetThreadName("Task-%s", taskId)) {
             // index driver factories
             Set<PlanNodeId> partitionedSources = ImmutableSet.copyOf(localExecutionPlan.getPartitionedSourceOrder());
-            ImmutableMap.Builder<PlanNodeId, DriverSplitRunnerFactory> driverRunnerFactoriesWithSplitLifeCycle = ImmutableMap.builder();
-            ImmutableList.Builder<DriverSplitRunnerFactory> driverRunnerFactoriesWithTaskLifeCycle = ImmutableList.builder();
-            ImmutableList.Builder<DriverSplitRunnerFactory> driverRunnerFactoriesWithDriverGroupLifeCycle = ImmutableList.builder();
+            ImmutableMap.Builder<PlanNodeId, DriverSplitRunnerFactory> localDriverRunnerFactoriesWithSplitLifeCycle = ImmutableMap.builder();
+            ImmutableList.Builder<DriverSplitRunnerFactory> localDriverRunnerFactoriesWithTaskLifeCycle = ImmutableList.builder();
+            ImmutableList.Builder<DriverSplitRunnerFactory> localDriverRunnerFactoriesWithDriverGroupLifeCycle = ImmutableList.builder();
             for (DriverFactory driverFactory : localExecutionPlan.getDriverFactories()) {
                 Optional<PlanNodeId> sourceId = driverFactory.getSourceId();
                 if (sourceId.isPresent() && partitionedSources.contains(sourceId.get())) {
-                    driverRunnerFactoriesWithSplitLifeCycle.put(sourceId.get(), new DriverSplitRunnerFactory(driverFactory, true));
+                    localDriverRunnerFactoriesWithSplitLifeCycle.put(sourceId.get(), new DriverSplitRunnerFactory(driverFactory, true));
                 }
                 else {
                     switch (driverFactory.getPipelineExecutionStrategy()) {
                         case GROUPED_EXECUTION:
-                            driverRunnerFactoriesWithDriverGroupLifeCycle.add(new DriverSplitRunnerFactory(driverFactory, false));
+                            localDriverRunnerFactoriesWithDriverGroupLifeCycle.add(new DriverSplitRunnerFactory(driverFactory, false));
                             break;
                         case UNGROUPED_EXECUTION:
-                            driverRunnerFactoriesWithTaskLifeCycle.add(new DriverSplitRunnerFactory(driverFactory, false));
+                            localDriverRunnerFactoriesWithTaskLifeCycle.add(new DriverSplitRunnerFactory(driverFactory, false));
                             break;
                         default:
                             throw new UnsupportedOperationException();
                     }
                 }
             }
-            this.driverRunnerFactoriesWithSplitLifeCycle = driverRunnerFactoriesWithSplitLifeCycle.build();
-            this.driverRunnerFactoriesWithDriverGroupLifeCycle = driverRunnerFactoriesWithDriverGroupLifeCycle.build();
-            this.driverRunnerFactoriesWithTaskLifeCycle = driverRunnerFactoriesWithTaskLifeCycle.build();
+            this.driverRunnerFactoriesWithSplitLifeCycle = localDriverRunnerFactoriesWithSplitLifeCycle.build();
+            this.driverRunnerFactoriesWithDriverGroupLifeCycle = localDriverRunnerFactoriesWithDriverGroupLifeCycle.build();
+            this.driverRunnerFactoriesWithTaskLifeCycle = localDriverRunnerFactoriesWithTaskLifeCycle.build();
 
             this.pendingSplitsByPlanNode = this.driverRunnerFactoriesWithSplitLifeCycle.keySet().stream()
                     .collect(toImmutableMap(identity(), ignore -> new PendingSplitsForPlanNode()));
@@ -282,7 +282,7 @@ public class SqlTaskExecution
             LocalExecutionPlan localExecutionPlan,
             TaskExecutor taskExecutor)
     {
-        TaskHandle taskHandle = taskExecutor.addTask(
+        TaskHandle localTaskHandle = taskExecutor.addTask(
                 taskStateMachine.getTaskId(),
                 outputBuffer::getUtilization,
                 getInitialSplitsPerNode(taskContext.getSession()),
@@ -290,13 +290,13 @@ public class SqlTaskExecution
                 getMaxDriversPerTask(taskContext.getSession()));
         taskStateMachine.addStateChangeListener(state -> {
             if (state.isDone()) {
-                taskExecutor.removeTask(taskHandle);
+                taskExecutor.removeTask(localTaskHandle);
                 for (DriverFactory factory : localExecutionPlan.getDriverFactories()) {
                     factory.noMoreDrivers();
                 }
             }
         });
-        return taskHandle;
+        return localTaskHandle;
     }
 
     public TaskId getTaskId()
@@ -346,9 +346,10 @@ public class SqlTaskExecution
         }
     }
 
-    private synchronized Map<PlanNodeId, TaskSource> updateSources(List<TaskSource> sources)
+    private synchronized Map<PlanNodeId, TaskSource> updateSources(List<TaskSource> inputSources)
     {
         Map<PlanNodeId, TaskSource> updatedUnpartitionedSources = new HashMap<>();
+        List<TaskSource> sources = inputSources;
 
         // first remove any split that was already acknowledged
         long currentMaxAcknowledgedSplit = this.maxAcknowledgedSplit;
@@ -1244,7 +1245,7 @@ public class SqlTaskExecution
         @Override
         public ListenableFuture<?> processFor(Duration duration)
         {
-            Driver driver;
+            Driver localDriver;
             synchronized (this) {
                 // if close() was called before we get here, there's not point in even creating the driver
                 if (closed) {
@@ -1255,10 +1256,10 @@ public class SqlTaskExecution
                     this.driver = driverSplitRunnerFactory.createDriver(driverContext, partitionedSplit);
                 }
 
-                driver = this.driver;
+                localDriver = this.driver;
             }
 
-            return driver.processFor(duration);
+            return localDriver.processFor(duration);
         }
 
         @Override
@@ -1270,14 +1271,14 @@ public class SqlTaskExecution
         @Override
         public void close()
         {
-            Driver driver;
+            Driver localDriver;
             synchronized (this) {
                 closed = true;
-                driver = this.driver;
+                localDriver = this.driver;
             }
 
-            if (driver != null) {
-                driver.close();
+            if (localDriver != null) {
+                localDriver.close();
             }
         }
     }
@@ -1339,30 +1340,30 @@ public class SqlTaskExecution
         public Status(TaskContext taskContext, Map<Integer, PipelineExecutionStrategy> pipelineToExecutionStrategy)
         {
             this.taskContext = requireNonNull(taskContext, "taskContext is null");
-            int pipelineWithTaskLifeCycleCount = 0;
-            int pipelineWithDriverGroupLifeCycleCount = 0;
-            ImmutableMap.Builder<Integer, Map<Lifespan, PerPipelineAndLifespanStatus>> perPipelineAndLifespan = ImmutableMap.builder();
-            ImmutableMap.Builder<Integer, PerPipelineStatus> perPipeline = ImmutableMap.builder();
+            int localPipelineWithTaskLifeCycleCount = 0;
+            int localPipelineWithDriverGroupLifeCycleCount = 0;
+            ImmutableMap.Builder<Integer, Map<Lifespan, PerPipelineAndLifespanStatus>> localPerPipelineAndLifespan = ImmutableMap.builder();
+            ImmutableMap.Builder<Integer, PerPipelineStatus> localPerPipeline = ImmutableMap.builder();
             for (Entry<Integer, PipelineExecutionStrategy> entry : pipelineToExecutionStrategy.entrySet()) {
                 int pipelineId = entry.getKey();
                 PipelineExecutionStrategy executionStrategy = entry.getValue();
-                perPipelineAndLifespan.put(pipelineId, new HashMap<>());
-                perPipeline.put(pipelineId, new PerPipelineStatus(executionStrategy));
+                localPerPipelineAndLifespan.put(pipelineId, new HashMap<>());
+                localPerPipeline.put(pipelineId, new PerPipelineStatus(executionStrategy));
                 switch (executionStrategy) {
                     case UNGROUPED_EXECUTION:
-                        pipelineWithTaskLifeCycleCount++;
+                        localPipelineWithTaskLifeCycleCount++;
                         break;
                     case GROUPED_EXECUTION:
-                        pipelineWithDriverGroupLifeCycleCount++;
+                        localPipelineWithDriverGroupLifeCycleCount++;
                         break;
                     default:
                         throw new IllegalArgumentException(format("Unknown ExecutionStrategy (%s) for pipeline %s.", executionStrategy, pipelineId));
                 }
             }
-            this.pipelineWithTaskLifeCycleCount = pipelineWithTaskLifeCycleCount;
-            this.pipelineWithDriverGroupLifeCycleCount = pipelineWithDriverGroupLifeCycleCount;
-            this.perPipelineAndLifespan = perPipelineAndLifespan.build();
-            this.perPipeline = perPipeline.build();
+            this.pipelineWithTaskLifeCycleCount = localPipelineWithTaskLifeCycleCount;
+            this.pipelineWithDriverGroupLifeCycleCount = localPipelineWithDriverGroupLifeCycleCount;
+            this.perPipelineAndLifespan = localPerPipelineAndLifespan.build();
+            this.perPipeline = localPerPipeline.build();
         }
 
         public synchronized void setNoMoreLifespans()

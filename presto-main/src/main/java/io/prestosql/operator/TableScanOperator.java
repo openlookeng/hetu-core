@@ -169,16 +169,11 @@ public class TableScanOperator
             this.consumerTableScanNodeCount = consumerTableScanNodeCount;
         }
 
+        // todo: find set strategy usage
         public ReuseExchangeOperator.STRATEGY getStrategy()
         {
             return strategy;
         }
-
-//        public void setStrategy(ReuseExchangeOperator.STRATEGY strategy)
-//        {
-//            //todo: find usage
-//            this.strategy = strategy;
-//        }
 
         @Override
         public int getOperatorId()
@@ -202,13 +197,13 @@ public class TableScanOperator
         public SourceOperator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, sourceId, getOperatorType());
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, sourceId, getOperatorType());
             if (table.getConnectorHandle().isSuitableForPushdown()) {
-                return new WorkProcessorSourceOperatorAdapter(operatorContext, this, REUSE_STRATEGY_DEFAULT, new UUID(0, 0), spillEnabled, types, spillerFactory, spillerThreshold, consumerTableScanNodeCount);
+                return new WorkProcessorSourceOperatorAdapter(addOperatorContext, this, REUSE_STRATEGY_DEFAULT, new UUID(0, 0), spillEnabled, types, spillerFactory, spillerThreshold, consumerTableScanNodeCount);
             }
 
             return new TableScanOperator(
-                    operatorContext,
+                    addOperatorContext,
                     sourceId,
                     pageSourceProvider,
                     table,
@@ -755,10 +750,11 @@ public class TableScanOperator
     {
         BloomFilterUtils.updateBloomFilter(queryIdOptional, isDcTable, stateStoreProviderOptional, tableScanNodeOptional, dynamicFilterCacheManagerOptional, bloomFiltersBackup, bloomFilters);
 
+        Page inputPage = page;
         if (!bloomFilters.isEmpty()) {
-            page = BloomFilterUtils.filter(page, bloomFilters);
+            inputPage = BloomFilterUtils.filter(inputPage, bloomFilters);
         }
-        return page;
+        return inputPage;
     }
 
     private void cleanupInErrorCase()

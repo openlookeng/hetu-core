@@ -74,8 +74,8 @@ public class StreamingAggregationOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, StreamingAggregationOperator.class.getSimpleName());
-            return new StreamingAggregationOperator(operatorContext, sourceTypes, groupByTypes, groupByChannels, step, accumulatorFactories, joinCompiler);
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, StreamingAggregationOperator.class.getSimpleName());
+            return new StreamingAggregationOperator(addOperatorContext, sourceTypes, groupByTypes, groupByChannels, step, accumulatorFactories, joinCompiler);
         }
 
         @Override

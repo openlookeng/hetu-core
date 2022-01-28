@@ -257,7 +257,7 @@ public class SqlQueryExecution
             stateMachine.setUpdateType(analysis.getUpdateType());
 
             // when the query finishes cache the final query info, and clear the reference to the output stage
-            AtomicReference<SqlQueryScheduler> queryScheduler = this.queryScheduler;
+            AtomicReference<SqlQueryScheduler> localQueryScheduler = this.queryScheduler;
             stateMachine.addStateChangeListener(state -> {
                 //Set the AsyncRunning flag if query is capable of running async
                 if (analysis.isAsyncQuery() && state == QueryState.RUNNING) {
@@ -272,7 +272,7 @@ public class SqlQueryExecution
                 if (SystemSessionProperties.isSnapshotEnabled(stateMachine.getSession())) {
                     snapshotManager.doneQuery(state);
                 }
-                SqlQueryScheduler scheduler = queryScheduler.get();
+                SqlQueryScheduler scheduler = localQueryScheduler.get();
                 if (scheduler != null) {
                     scheduler.abort();
                 }
@@ -1140,8 +1140,8 @@ public class SqlQueryExecution
                 WarningCollector warningCollector)
         {
             String executionPolicyName = SystemSessionProperties.getExecutionPolicy(stateMachine.getSession());
-            ExecutionPolicy executionPolicy = executionPolicies.get(executionPolicyName);
-            checkArgument(executionPolicy != null, "No execution policy %s", executionPolicy);
+            ExecutionPolicy localExecutionPolicy = executionPolicies.get(executionPolicyName);
+            checkArgument(localExecutionPolicy != null, "No execution policy %s", localExecutionPolicy);
 
             return new CachedSqlQueryExecution(
                     preparedQuery,
@@ -1164,7 +1164,7 @@ public class SqlQueryExecution
                     failureDetector,
                     nodeTaskMap,
                     queryExplainer,
-                    executionPolicy,
+                    localExecutionPolicy,
                     schedulerStats,
                     statsCalculator,
                     costCalculator,

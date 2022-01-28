@@ -257,8 +257,9 @@ public class WindowFilterPushDown
             return OptionalInt.empty();
         }
 
-        private static RowNumberNode mergeLimit(RowNumberNode node, int newRowCountPerPartition)
+        private static RowNumberNode mergeLimit(RowNumberNode node, int inputNewRowCountPerPartition)
         {
+            int newRowCountPerPartition = inputNewRowCountPerPartition;
             if (node.getMaxRowCountPerPartition().isPresent()) {
                 newRowCountPerPartition = Math.min(node.getMaxRowCountPerPartition().get(), newRowCountPerPartition);
             }

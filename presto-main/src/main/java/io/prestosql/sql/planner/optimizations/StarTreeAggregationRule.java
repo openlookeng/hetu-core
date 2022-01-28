@@ -411,8 +411,10 @@ public class StarTreeAggregationRule
         return new ImmutablePair<>(cubePredicate1, cubePredicate2);
     }
 
-    private boolean arePredicatesEqual(Expression left, Expression right, Metadata metadata, Session session, TypeProvider types)
+    private boolean arePredicatesEqual(Expression inputLeft, Expression inputRight, Metadata metadata, Session session, TypeProvider types)
     {
+        Expression left = inputLeft;
+        Expression right = inputRight;
         if (left == null && right == null) {
             return true;
         }

@@ -39,6 +39,7 @@ import org.openjdk.jol.info.ClassLayout;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -801,7 +802,7 @@ public class GroupedTopNBuilder
                     }
                 }
             }
-            return null;
+            return Collections.emptyList();
         }
 
         @Override

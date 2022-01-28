@@ -281,7 +281,7 @@ public class RowExpressionPredicateExtractor
                 for (int row = 0; row < node.getRows().size(); row++) {
                     RowExpression value = node.getRows().get(row).get(column);
 
-                    if (!logicalRowExpressions.isDeterministic(new RowExpressionDeterminismEvaluator(metadata), value)) {
+                    if (!LogicalRowExpressions.isDeterministic(new RowExpressionDeterminismEvaluator(metadata), value)) {
                         nonDeterministic = true;
                         break;
                     }

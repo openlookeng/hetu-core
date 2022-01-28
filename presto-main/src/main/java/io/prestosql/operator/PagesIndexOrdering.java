@@ -155,8 +155,10 @@ public class PagesIndexOrdering
      */
     private static void vectorSwap(PagesIndex pagesIndex, int from, int l, int s)
     {
-        for (int i = 0; i < s; i++, from++, l++) {
-            pagesIndex.swap(from, l);
+        int start = from;
+        int target = l;
+        for (int i = 0; i < s; i++, start++, target++) {
+            pagesIndex.swap(start, target);
         }
     }
 }

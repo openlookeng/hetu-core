@@ -73,14 +73,14 @@ public final class PartitionedConsumption<T>
         requireNonNull(loader, "loader is null");
         requireNonNull(disposer, "disposer is null");
 
-        ImmutableList.Builder<Partition<T>> partitions = ImmutableList.builder();
+        ImmutableList.Builder<Partition<T>> partitionList = ImmutableList.builder();
         ListenableFuture<?> partitionActivator = activator;
         for (Integer partitionNumber : partitionNumbers) {
             Partition<T> partition = new Partition<>(consumersCount, partitionNumber, loader, partitionActivator, disposer);
-            partitions.add(partition);
+            partitionList.add(partition);
             partitionActivator = partition.released;
         }
-        return partitions.build();
+        return partitionList.build();
     }
 
     public int getConsumersCount()
@@ -90,7 +90,7 @@ public final class PartitionedConsumption<T>
 
     public Iterator<Partition<T>> beginConsumption()
     {
-        Queue<Partition<T>> partitions = new ArrayDeque<>(requireNonNull(this.partitions, "partitions is already null"));
+        Queue<Partition<T>> partitionQueue = new ArrayDeque<>(requireNonNull(this.partitions, "partitionQueue is already null"));
         if (consumed.incrementAndGet() >= consumersCount) {
             // Unreference futures to allow GC
             this.partitions = null;
@@ -100,7 +100,7 @@ public final class PartitionedConsumption<T>
             @Override
             protected Partition<T> computeNext()
             {
-                Partition<T> next = partitions.poll();
+                Partition<T> next = partitionQueue.poll();
                 if (next != null) {
                     return next;
                 }
