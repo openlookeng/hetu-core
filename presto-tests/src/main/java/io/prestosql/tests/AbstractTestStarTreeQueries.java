@@ -968,11 +968,12 @@ public abstract class AbstractTestStarTreeQueries
     {
         // Table creation
         assertQuerySucceeds(starTreeEnabledSession, "CREATE TABLE test_cube_range_visitor_aggregation_comparison(cint int, csmallint smallint, cbigint bigint, ctinyint tinyint)");
-        assertQuerySucceeds(starTreeEnabledSession, "INSERT INTO test_cube_range_visitor_aggregation_comparison VALUES(1,smallint '1',bigint '1',tinyint '1')");
-        assertQuerySucceeds(starTreeEnabledSession, "INSERT INTO test_cube_range_visitor_aggregation_comparison VALUES(2,smallint '2',bigint '2',tinyint '2')");
-        assertQuerySucceeds(starTreeEnabledSession, "INSERT INTO test_cube_range_visitor_aggregation_comparison VALUES(3,smallint '3',bigint '3',tinyint '3')");
-        assertQuerySucceeds(starTreeEnabledSession, "INSERT INTO test_cube_range_visitor_aggregation_comparison VALUES(4,smallint '4',bigint '4',tinyint '4')");
-        assertQuerySucceeds(starTreeEnabledSession, "INSERT INTO test_cube_range_visitor_aggregation_comparison VALUES(5,smallint '5',bigint '5',tinyint '5')");
+        assertQuerySucceeds(starTreeEnabledSession, "INSERT INTO test_cube_range_visitor_aggregation_comparison VALUES " +
+                "(1, smallint '1',bigint '1',tinyint '1')," +
+                "(2, smallint '2',bigint '2',tinyint '2')," +
+                "(3, smallint '3',bigint '3',tinyint '3')," +
+                "(4, smallint '4',bigint '4',tinyint '4')," +
+                "(5, smallint '5',bigint '5',tinyint '5')");
 
         // To ensure that tests do not disturb one another, since some queries use same types, the following are tested individually:
         // Comparison tests with cube creation, query, assert and drop
@@ -1093,6 +1094,39 @@ public abstract class AbstractTestStarTreeQueries
         assertEquals(result2.getMaterializedRows().get(0).getField(0).toString(), "3");
         assertEquals(result3.getMaterializedRows().get(0).getField(0).toString(), "3");
         assertUpdate("DROP TABLE test_cube_range_visitor_between_table");
+    }
+
+    @Test
+    public void testAggregationWithVarcharPredicateRange()
+    {
+        computeActual("CREATE TABLE web_usage_varchar_test(dt varchar(10), browser varchar(100), impressions integer)");
+        computeActual("INSERT INTO web_usage_varchar_test VALUES " +
+                "('20220101', 'CHROME', 10), ('20220101', 'FIREFOX', 5), ('20220101', 'SAFARI', 8), " +
+                "('20220102', 'CHROME', 15), ('20220102', 'FIREFOX', 12), ('20220102', 'SAFARI', 9)," +
+                "('20220103', 'CHROME', 6), ('20220103', 'FIREFOX', 4), ('20220103', 'SAFARI', 2)");
+        computeActual("CREATE CUBE web_usage_varchar_cube_test ON web_usage_varchar_test WITH (AGGREGATIONS = (sum(impressions), count(*)), GROUP = (dt))");
+        computeActual("INSERT INTO CUBE web_usage_varchar_cube_test WHERE dt = '20220101'");
+        MaterializedResult tableResults = computeActualAndAssertPlan(
+                starTreeDisabledSession,
+                "SELECT dt, sum(impressions), count(*) FROM web_usage_varchar_test WHERE dt = '20220101' GROUP BY dt",
+                assertTableScan("web_usage_varchar_test"));
+        MaterializedResult cubeResults = computeActualAndAssertPlan(
+                starTreeEnabledSession,
+                "SELECT dt, sum(impressions), count(*) FROM web_usage_varchar_test WHERE dt = '20220101' GROUP BY dt",
+                assertTableScan("web_usage_varchar_cube_test"));
+        assertEqualsIgnoreOrder(tableResults.getMaterializedRows(), cubeResults.getMaterializedRows());
+        computeActual("INSERT INTO CUBE web_usage_varchar_cube_test WHERE dt between '20220102' and '20220103'");
+        tableResults = computeActualAndAssertPlan(
+                starTreeDisabledSession,
+                "SELECT dt, sum(impressions), count(*) FROM web_usage_varchar_test WHERE dt between '20220101' AND '20220103' GROUP BY dt",
+                assertTableScan("web_usage_varchar_test"));
+        cubeResults = computeActualAndAssertPlan(
+                starTreeEnabledSession,
+                "SELECT dt, sum(impressions), count(*) FROM web_usage_varchar_test WHERE dt between '20220101' AND '20220103' GROUP BY dt",
+                assertTableScan("web_usage_varchar_cube_test"));
+        assertEqualsIgnoreOrder(tableResults.getMaterializedRows(), cubeResults.getMaterializedRows());
+        assertQueryFails("INSERT INTO CUBE web_usage_varchar_cube_test WHERE dt = '20220103'", "Cannot allow insert. Cube already contains data for the given predicate.*");
+        assertUpdate("DROP TABLE web_usage_varchar_test");
     }
 
     @Test(enabled = false, description = "Need to fix decimal comparison error")

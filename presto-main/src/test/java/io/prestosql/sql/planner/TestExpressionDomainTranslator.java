@@ -1368,44 +1368,84 @@ public class TestExpressionDomainTranslator
     {
         mergeAndAssert(true,
                 ExpressionUtils.or(
-                        between(C_VARCHAR, stringLiteral("App01"), stringLiteral("App05")),
-                        equal(C_VARCHAR, stringLiteral("App06")),
-                        equal(C_VARCHAR, stringLiteral("App07")),
-                        and(greaterThan(C_VARCHAR, stringLiteral("App07")), lessThanOrEqual(C_VARCHAR, stringLiteral("App09"))),
-                        between(C_VARCHAR, stringLiteral("App10"), stringLiteral("App15")),
-                        between(C_VARCHAR, stringLiteral("App25"), stringLiteral("App35"))),
-                between(C_VARCHAR, stringLiteral("App02"), stringLiteral("App04")));
-
-        mergeAndAssert(false,
-                ExpressionUtils.or(
-                        between(C_VARCHAR, stringLiteral("App01"), stringLiteral("App05")),
-                        equal(C_VARCHAR, stringLiteral("App06")),
-                        equal(C_VARCHAR, stringLiteral("App07")),
-                        and(greaterThan(C_VARCHAR, stringLiteral("App07")), lessThanOrEqual(C_VARCHAR, stringLiteral("App09"))),
-                        between(C_VARCHAR, stringLiteral("App10"), stringLiteral("App15")),
-                        between(C_VARCHAR, stringLiteral("App25"), stringLiteral("App35"))),
-                between(C_VARCHAR, stringLiteral("App02"), stringLiteral("App12")));
-
-        mergeAndAssert(false,
-                ExpressionUtils.or(
-                        between(C_VARCHAR, stringLiteral("App01"), stringLiteral("App05")),
-                        equal(C_VARCHAR, stringLiteral("App06")),
-                        equal(C_VARCHAR, stringLiteral("App07")),
-                        and(greaterThan(C_VARCHAR, stringLiteral("App07")), lessThanOrEqual(C_VARCHAR, stringLiteral("App09"))),
-                        between(C_VARCHAR, stringLiteral("App10"), stringLiteral("App15")),
-                        between(C_VARCHAR, stringLiteral("App25"), stringLiteral("App35"))),
-                and(greaterThan(C_VARCHAR, stringLiteral("App02")), lessThan(C_VARCHAR, stringLiteral("App12"))));
+                        between(C_VARCHAR, stringLiteral("App01", VARCHAR), stringLiteral("App05", VARCHAR)),
+                        equal(C_VARCHAR, stringLiteral("App06", VARCHAR)),
+                        equal(C_VARCHAR, stringLiteral("App07", VARCHAR)),
+                        and(greaterThan(C_VARCHAR, stringLiteral("App07", VARCHAR)), lessThanOrEqual(C_VARCHAR, stringLiteral("App09", VARCHAR))),
+                        between(C_VARCHAR, stringLiteral("App10", VARCHAR), stringLiteral("App15", VARCHAR)),
+                        between(C_VARCHAR, stringLiteral("App25", VARCHAR), stringLiteral("App35", VARCHAR))),
+                between(C_VARCHAR, stringLiteral("App02", VARCHAR), stringLiteral("App04", VARCHAR)));
 
         mergeAndAssert(true,
                 ExpressionUtils.or(
-                        between(C_VARCHAR, stringLiteral("App01"), stringLiteral("App05")),
-                        equal(C_VARCHAR, stringLiteral("App06")),
-                        equal(C_VARCHAR, stringLiteral("App07")),
+                        between(C_VARCHAR, stringLiteral("App01", VARCHAR), stringLiteral("App05", VARCHAR)),
+                        equal(C_VARCHAR, stringLiteral("App06", VARCHAR)),
+                        equal(C_VARCHAR, stringLiteral("App07", VARCHAR)),
+                        and(greaterThan(C_VARCHAR, stringLiteral("App07", VARCHAR)), lessThanOrEqual(C_VARCHAR, stringLiteral("App09", VARCHAR))),
+                        between(C_VARCHAR, stringLiteral("App10", VARCHAR), stringLiteral("App15", VARCHAR)),
+                        between(C_VARCHAR, stringLiteral("App25", VARCHAR), stringLiteral("App35", VARCHAR))),
+                between(C_VARCHAR, stringLiteral("App02", VARCHAR), stringLiteral("App12", VARCHAR)));
+
+        mergeAndAssert(true,
+                ExpressionUtils.or(
+                        between(C_VARCHAR, stringLiteral("App01", VARCHAR), stringLiteral("App05", VARCHAR)),
+                        equal(C_VARCHAR, stringLiteral("App06", VARCHAR)),
+                        equal(C_VARCHAR, stringLiteral("App07", VARCHAR)),
+                        and(greaterThan(C_VARCHAR, stringLiteral("App07", VARCHAR)), lessThanOrEqual(C_VARCHAR, stringLiteral("App09", VARCHAR))),
+                        between(C_VARCHAR, stringLiteral("App10", VARCHAR), stringLiteral("App15", VARCHAR)),
+                        between(C_VARCHAR, stringLiteral("App25", VARCHAR), stringLiteral("App35", VARCHAR))),
+                and(greaterThan(C_VARCHAR, stringLiteral("App02", VARCHAR)), lessThan(C_VARCHAR, stringLiteral("App12", VARCHAR))));
+
+        mergeAndAssert(true,
+                ExpressionUtils.or(
+                        between(C_VARCHAR, stringLiteral("App01", VARCHAR), stringLiteral("App05", VARCHAR)),
+                        equal(C_VARCHAR, stringLiteral("App06", VARCHAR)),
+                        equal(C_VARCHAR, stringLiteral("App07", VARCHAR)),
                         equal(C_VARCHAR, nullLiteral()),
-                        and(greaterThan(C_VARCHAR, stringLiteral("App07")), lessThanOrEqual(C_VARCHAR, stringLiteral("App09"))),
-                        between(C_VARCHAR, stringLiteral("App10"), stringLiteral("App15")),
-                        between(C_VARCHAR, stringLiteral("App25"), stringLiteral("App35"))),
-                between(C_VARCHAR, stringLiteral("App02"), stringLiteral("App04")));
+                        and(greaterThan(C_VARCHAR, stringLiteral("App07", VARCHAR)), lessThanOrEqual(C_VARCHAR, stringLiteral("App09", VARCHAR))),
+                        between(C_VARCHAR, stringLiteral("App10", VARCHAR), stringLiteral("App15", VARCHAR)),
+                        between(C_VARCHAR, stringLiteral("App25", VARCHAR), stringLiteral("App35", VARCHAR))),
+                between(C_VARCHAR, stringLiteral("App02", VARCHAR), stringLiteral("App04", VARCHAR)));
+
+        mergeAndAssert(true,
+                ExpressionUtils.or(
+                        between(C_VARCHAR, stringLiteral("App01", VARCHAR), stringLiteral("App05", VARCHAR)),
+                        equal(C_VARCHAR, stringLiteral("App06", VARCHAR)),
+                        equal(C_VARCHAR, stringLiteral("App07", VARCHAR)),
+                        and(greaterThan(C_VARCHAR, stringLiteral("App07", VARCHAR)), lessThanOrEqual(C_VARCHAR, stringLiteral("App09", VARCHAR))),
+                        between(C_VARCHAR, stringLiteral("App10", VARCHAR), stringLiteral("App15", VARCHAR)),
+                        between(C_VARCHAR, stringLiteral("App25", VARCHAR), stringLiteral("App35", VARCHAR))),
+                between(C_VARCHAR, stringLiteral("App25", VARCHAR), stringLiteral("App35", VARCHAR)));
+
+        mergeAndAssert(true,
+                ExpressionUtils.or(
+                        between(C_VARCHAR, stringLiteral("20200101", VARCHAR), stringLiteral("20200105", VARCHAR)),
+                        equal(C_VARCHAR, stringLiteral("20200106", VARCHAR)),
+                        equal(C_VARCHAR, stringLiteral("20200107", VARCHAR)),
+                        and(greaterThan(C_VARCHAR, stringLiteral("20200107", VARCHAR)), lessThanOrEqual(C_VARCHAR, stringLiteral("20200109", VARCHAR))),
+                        between(C_VARCHAR, stringLiteral("20200110", VARCHAR), stringLiteral("20200115", VARCHAR)),
+                        between(C_VARCHAR, stringLiteral("20200125", VARCHAR), stringLiteral("20200129", VARCHAR))),
+                between(C_VARCHAR, stringLiteral("20200102", VARCHAR), stringLiteral("20200112", VARCHAR)));
+
+        mergeAndAssert(false,
+                ExpressionUtils.or(
+                        between(C_VARCHAR, stringLiteral("App01", VARCHAR), stringLiteral("App05", VARCHAR)),
+                        equal(C_VARCHAR, stringLiteral("App06", VARCHAR)),
+                        equal(C_VARCHAR, stringLiteral("App07", VARCHAR)),
+                        and(greaterThan(C_VARCHAR, stringLiteral("App07", VARCHAR)), lessThanOrEqual(C_VARCHAR, stringLiteral("App09", VARCHAR))),
+                        between(C_VARCHAR, stringLiteral("App10", VARCHAR), stringLiteral("App15", VARCHAR)),
+                        between(C_VARCHAR, stringLiteral("App25", VARCHAR), stringLiteral("App35", VARCHAR))),
+                between(C_VARCHAR, stringLiteral("App09", VARCHAR), stringLiteral("App17", VARCHAR)));
+
+        mergeAndAssert(false,
+                ExpressionUtils.or(
+                        between(C_VARCHAR, stringLiteral("Test01App", VARCHAR), stringLiteral("Test05App", VARCHAR)),
+                        equal(C_VARCHAR, stringLiteral("Test06App", VARCHAR)),
+                        equal(C_VARCHAR, stringLiteral("Test07App", VARCHAR)),
+                        and(greaterThan(C_VARCHAR, stringLiteral("Test07App", VARCHAR)), lessThanOrEqual(C_VARCHAR, stringLiteral("Test09App", VARCHAR))),
+                        between(C_VARCHAR, stringLiteral("Test10App", VARCHAR), stringLiteral("Test15App", VARCHAR)),
+                        between(C_VARCHAR, stringLiteral("Test25App", VARCHAR), stringLiteral("Test35App", VARCHAR))),
+                between(C_VARCHAR, stringLiteral("Test09App", VARCHAR), stringLiteral("Test12App", VARCHAR)));
     }
 
     private void testDateType()

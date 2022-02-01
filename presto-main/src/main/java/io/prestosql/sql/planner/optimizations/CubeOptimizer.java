@@ -656,7 +656,7 @@ public class CubeOptimizer
                 dimensions.add(sourceTableColumn.getColumnName());
                 groupBy.add(sourceTableColumn.getColumnName());
                 matchingMetadataList.removeIf(metadata -> {
-                    //Retain Cube metadata only if the one of the join column is part of Cube
+                    //Retain Cube metadata, only if one of the join column is part of Cube
                     return !metadata.getDimensions().contains(sourceTableColumn.getColumnName());
                 });
             });
