@@ -36,6 +36,8 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.spiller.SpillCipher;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 
 import javax.annotation.concurrent.NotThreadSafe;
 import javax.crypto.Cipher;
@@ -51,10 +53,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
@@ -77,6 +76,7 @@ public class FileSingleStreamSpiller
     static final int BUFFER_SIZE = 4 * 1024;
 
     private FileHolder targetFile;
+    private HdfsFileHolder hdfsTargetFile;
     private final Closer closer = Closer.create();
     private final PagesSerde serde;
     private final SpillerStats spillerStats;
@@ -96,6 +96,10 @@ public class FileSingleStreamSpiller
     // Snapshot: capture page sizes that are used to update localSpillContext and spillerStats during resume
     private List<Long> pageSizeList = new LinkedList<>();
     private final int spillPrefetchReadPages;
+    private Configuration conff;
+    private FileSystem hdfsFS;
+    private org.apache.hadoop.fs.Path hdfsPath;
+    private boolean hdfsSpillPath;
 
     public FileSingleStreamSpiller(
             PagesSerde serde,
@@ -107,13 +111,14 @@ public class FileSingleStreamSpiller
             Optional<SpillCipher> spillCipher,
             boolean compressionEnabled,
             boolean useDirectSerde,
-            int spillPrefetchReadPages)
+            int spillPrefetchReadPages, boolean hdfsSpillPath)
     {
         this.serde = requireNonNull(serde, "serde is null");
         this.executor = requireNonNull(executor, "executor is null");
         this.spillerStats = requireNonNull(spillerStats, "spillerStats is null");
         this.localSpillContext = spillContext.newLocalSpillContext();
         this.memoryContext = requireNonNull(memoryContext, "memoryContext is null");
+        this.hdfsSpillPath = hdfsSpillPath;
         if (requireNonNull(spillCipher, "spillCipher is null").isPresent()) {
             closer.register(spillCipher.get()::close);
         }
@@ -129,7 +134,20 @@ public class FileSingleStreamSpiller
         // middle of execution when close() is called (note that this applies to both readPages() and writePages() methods).
         this.memoryContext.setBytes(BUFFER_SIZE);
         try {
-            this.targetFile = closer.register(new FileHolder(Files.createTempFile(spillPath, SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX)));
+            if (hdfsSpillPath) {
+
+                this.conff = new Configuration();
+                conff.set("fs.defaultFS", "hdfs://localhost:9000");
+                this.hdfsFS = FileSystem.get(conff);
+
+                Random random = new Random();
+                String num = String.valueOf(random.nextLong());
+                this.hdfsPath = new org.apache.hadoop.fs.Path(spillPath + SPILL_FILE_PREFIX + num + SPILL_FILE_SUFFIX);
+
+                this.hdfsTargetFile = closer.register(new HdfsFileHolder(hdfsPath,hdfsFS));
+            } else {
+                this.targetFile = closer.register(new FileHolder(Files.createTempFile(spillPath, SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX)));
+            }
         }
         catch (IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to create spill file", e);
@@ -176,7 +194,7 @@ public class FileSingleStreamSpiller
     private void writePages(Iterator<Page> pageIterator)
     {
         checkState(writable, "Spilling no longer allowed. The spiller has been made non-writable on first read for subsequent reads to be consistent");
-        try (SliceOutput output = new OutputStreamSliceOutput(targetFile.newOutputStream(APPEND), BUFFER_SIZE)) {
+        try (SliceOutput output = getOutputStreamBasedOnSpillLocation()) {
             Stopwatch timer = Stopwatch.createStarted();
             while (pageIterator.hasNext()) {
                 Page page = pageIterator.next();
@@ -214,7 +232,7 @@ public class FileSingleStreamSpiller
     private void writePagesDirect(Iterator<Page> pageIterator)
     {
         checkState(writable, "Spilling no longer allowed. The spiller has been made non-writable on first read for subsequent reads to be consistent");
-        try (OutputStream output = getStreamForWriting(targetFile.newOutputStream(APPEND), BUFFER_SIZE)) {
+        try (OutputStream output = getStreamForWriting(getOutputStreamBasedOnSpillLocation(), BUFFER_SIZE)) {
             Stopwatch timer = Stopwatch.createStarted();
             while (pageIterator.hasNext()) {
                 Page page = pageIterator.next();
@@ -253,9 +271,14 @@ public class FileSingleStreamSpiller
     {
         checkState(writable, "Repeated reads are disallowed to prevent potential resource leaks");
         writable = false;
-
+        InputStream input;
         try {
-            InputStream input = closer.register(targetFile.newInputStream());
+            if (this.hdfsSpillPath) {
+                input = closer.register(hdfsTargetFile.newInputStream());
+            }
+            else {
+                input = closer.register(targetFile.newInputStream());
+            }
             Iterator<Page> pages;
 
             if (useDirectSerde) {
@@ -384,5 +407,16 @@ public class FileSingleStreamSpiller
         private String targetFile;
         private boolean compressionEnabled;
         private boolean useDirectSerde;
+    }
+
+    private SliceOutput getOutputStreamBasedOnSpillLocation()
+            throws IOException
+    {
+        if (this.hdfsSpillPath) {
+            return new OutputStreamSliceOutput(hdfsTargetFile.newOutputStream(), BUFFER_SIZE);
+        }
+        else {
+            return new OutputStreamSliceOutput(targetFile.newOutputStream(APPEND), BUFFER_SIZE);
+        }
     }
 }

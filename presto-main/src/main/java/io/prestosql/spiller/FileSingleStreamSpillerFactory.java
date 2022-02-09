@@ -20,6 +20,7 @@ import com.google.inject.Inject;
 import io.airlift.log.Logger;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.SpillContext;
@@ -28,6 +29,8 @@ import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.spiller.SpillCipher;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.analyzer.FeaturesConfig;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -71,6 +74,9 @@ public class FileSingleStreamSpillerFactory
     private final boolean spillCompressionEnabled;
     private int roundRobinIndex;
     private int spillPrefetchReadPages;
+    private Configuration conf;
+    private boolean hdfsSpillPath = false;
+    private FileSystemClientManager fileSystemClientManager;
 
     @Inject
     public FileSingleStreamSpillerFactory(Metadata metadata, SpillerStats spillerStats, FeaturesConfig featuresConfig, NodeSpillConfig nodeSpillConfig)
@@ -106,18 +112,35 @@ public class FileSingleStreamSpillerFactory
         this.spillerStats = requireNonNull(spillerStats, "spillerStats can not be null");
         requireNonNull(spillPaths, "spillPaths is null");
         this.spillPaths = ImmutableList.copyOf(spillPaths);
+
+        // TODO (Subhra) hdfs.doAs() to get the configurations -> refer surya to get configurations
+        this.conf = new Configuration();
+        conf.set("fs.defaultFS", "hdfs://localhost:9000");
+
         spillPaths.forEach(path -> {
-            try {
-                createDirectories(path);
+            if (isHdfsPath(path)) {
+                this.hdfsSpillPath = true;
+                try {
+                    createDirectoriesInHDFS(path);
+                }
+                catch (IOException exception) {
+                    throw new IllegalArgumentException(
+                            format("could not create spill path %s in hdfs; adjust experimental.spiller-spill-path config property or filesystem permissions", path), exception);
+                }
+            } else {
+                try {
+                    createDirectories(path);
+                }
+                catch (IOException e) {
+                    throw new IllegalArgumentException(
+                            format("could not create spill path %s; adjust experimental.spiller-spill-path config property or filesystem permissions", path), e);
+                }
+                if (!path.toFile().canWrite()) {
+                    throw new IllegalArgumentException(
+                            format("spill path %s is not writable; adjust experimental.spiller-spill-path config property or filesystem permissions", path));
+                }
             }
-            catch (IOException e) {
-                throw new IllegalArgumentException(
-                        format("could not create spill path %s; adjust experimental.spiller-spill-path config property or filesystem permissions", path), e);
-            }
-            if (!path.toFile().canWrite()) {
-                throw new IllegalArgumentException(
-                        format("spill path %s is not writable; adjust experimental.spiller-spill-path config property or filesystem permissions", path));
-            }
+
         });
         this.maxUsedSpaceThreshold = maxUsedSpaceThreshold;
         this.spillEncryptionEnabled = spillEncryptionEnabled;
@@ -165,7 +188,7 @@ public class FileSingleStreamSpillerFactory
             spillCipher = Optional.of(new AesSpillCipher());
         }
         PagesSerde serde = serdeFactory.createPagesSerdeForSpill(spillCipher, spillDirectSerdeEnabled);
-        return new FileSingleStreamSpiller(serde, executor, getNextSpillPath(), spillerStats, spillContext, memoryContext, spillCipher, spillCompressionEnabled, spillDirectSerdeEnabled, spillPrefetchReadPages);
+        return new FileSingleStreamSpiller(serde, executor, getNextSpillPath(), spillerStats, spillContext, memoryContext, spillCipher, spillCompressionEnabled, spillDirectSerdeEnabled, spillPrefetchReadPages,hdfsSpillPath);
     }
 
     private synchronized Path getNextSpillPath()
@@ -194,5 +217,19 @@ public class FileSingleStreamSpillerFactory
         catch (IOException e) {
             throw new PrestoException(OUT_OF_SPILL_SPACE, "Cannot determine free space for spill", e);
         }
+    }
+
+    private void createDirectoriesInHDFS(Path path) throws IOException
+    {
+        FileSystem fileSystem = FileSystem.get(conf);
+        org.apache.hadoop.fs.Path pth = new org.apache.hadoop.fs.Path(path.toString());
+        fileSystem.mkdirs(pth);
+    }
+
+    private boolean isHdfsPath(Path path)
+    {
+        // TODO (Subhra)  api call to determine hdfs path or not
+        path.startsWith("hdfs");
+        return true;
     }
 }
