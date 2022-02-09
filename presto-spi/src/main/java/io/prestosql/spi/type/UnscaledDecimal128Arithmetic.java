@@ -770,8 +770,9 @@ public final class UnscaledDecimal128Arithmetic
         return XxHash64.hash(rawLow) ^ XxHash64.hash(unpackUnsignedLong(rawHigh));
     }
 
-    public static String toUnscaledString(Slice decimal)
+    public static String toUnscaledString(Slice inputDecimal)
     {
+        Slice decimal = inputDecimal;
         if (isZero(decimal)) {
             return "0";
         }
@@ -845,8 +846,10 @@ public final class UnscaledDecimal128Arithmetic
     /**
      * Scale down the value for 5**fiveScale (result := decimal / 5**fiveScale).
      */
-    private static void scaleDownFive(Slice decimal, int fiveScale, Slice result)
+    private static void scaleDownFive(Slice inputDecimal, int inputFiveScale, Slice result)
     {
+        Slice decimal = inputDecimal;
+        int fiveScale = inputFiveScale;
         while (true) {
             int powerFive = Math.min(fiveScale, MAX_POWER_OF_FIVE_INT);
             fiveScale -= powerFive;
@@ -864,8 +867,9 @@ public final class UnscaledDecimal128Arithmetic
     /**
      * Scale up the value for 5**fiveScale (decimal := decimal * 5**fiveScale).
      */
-    private static void scaleUpFiveDestructive(Slice decimal, int fiveScale)
+    private static void scaleUpFiveDestructive(Slice decimal, int inputFiveScale)
     {
+        int fiveScale = inputFiveScale;
         while (fiveScale > 0) {
             int powerFive = Math.min(fiveScale, MAX_POWER_OF_FIVE_INT);
             fiveScale -= powerFive;
@@ -878,8 +882,10 @@ public final class UnscaledDecimal128Arithmetic
      * Scale down the value for 10**tenScale (this := this / 5**tenScale). This
      * method rounds-up, eg 44/10=4, 44/10=5.
      */
-    private static void scaleDownTenRoundUp(Slice decimal, int tenScale, Slice result)
+    private static void scaleDownTenRoundUp(Slice inputDecimal, int inputTenScale, Slice result)
     {
+        Slice decimal = inputDecimal;
+        int tenScale = inputTenScale;
         boolean round;
         do {
             int powerTen = Math.min(tenScale, MAX_POWER_OF_TEN_INT);
@@ -896,8 +902,10 @@ public final class UnscaledDecimal128Arithmetic
         }
     }
 
-    private static void scaleDownTenTruncate(Slice decimal, int tenScale, Slice result)
+    private static void scaleDownTenTruncate(Slice inputDecimal, int inputTenScale, Slice result)
     {
+        Slice decimal = inputDecimal;
+        int tenScale = inputTenScale;
         do {
             int powerTen = Math.min(tenScale, MAX_POWER_OF_TEN_INT);
             tenScale -= powerTen;

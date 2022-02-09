@@ -88,8 +88,9 @@ class HiveVacuumSplitSource
         return AcidUtils.isDeleteDelta(bucketFile.getParent());
     }
 
-    private List<HiveSplit> getHiveSplitsFor(int bucketNumber, String partition, boolean isDeleteDelta)
+    private List<HiveSplit> getHiveSplitsFor(int bucketNumber, String inputPartition, boolean isDeleteDelta)
     {
+        String partition = inputPartition;
         if (partition == null) {
             partition = "default";
         }
@@ -166,13 +167,13 @@ class HiveVacuumSplitSource
          * If partition handle is passed splits will be chosen only for that bucket, else will be choosen from available buckets.
          */
         int bucketToChoose = (partitionHandle instanceof HivePartitionHandle) ? ((HivePartitionHandle) partitionHandle).getBucket() : -1;
-        Iterator<Entry<String, Map<Integer, Map<Boolean, List<HiveSplit>>>>> partitions = splitsMap.entrySet().iterator();
-        while (partitions.hasNext()) {
-            Entry<String, Map<Integer, Map<Boolean, List<HiveSplit>>>> currentPartitionEntry = partitions.next();
+        Iterator<Entry<String, Map<Integer, Map<Boolean, List<HiveSplit>>>>> localPartitions = splitsMap.entrySet().iterator();
+        while (localPartitions.hasNext()) {
+            Entry<String, Map<Integer, Map<Boolean, List<HiveSplit>>>> currentPartitionEntry = localPartitions.next();
             String currentPartition = currentPartitionEntry.getKey();
             if (vacuumTableHandle.isUnifyVacuum() && currentPartition.contains(HivePartitionKey.HIVE_DEFAULT_DYNAMIC_PARTITION)) {
                 //skip the dynamic partition for now.
-                partitions.remove();
+                localPartitions.remove();
                 continue;
             }
             Map<Integer, Map<Boolean, List<HiveSplit>>> buckets = currentPartitionEntry.getValue();
@@ -191,7 +192,7 @@ class HiveVacuumSplitSource
             }
             if (deltaTypeToSplits == null) {
                 if (buckets.size() == 0) {
-                    partitions.remove();
+                    localPartitions.remove();
                 }
                 continue;
             }
@@ -206,7 +207,7 @@ class HiveVacuumSplitSource
             if (!splitsIterator.hasNext()) {
                 buckets.remove(bucketNumber);
                 if (buckets.size() == 0) {
-                    partitions.remove();
+                    localPartitions.remove();
                 }
             }
             if (bucketedSplits == null || bucketedSplits.isEmpty()) {

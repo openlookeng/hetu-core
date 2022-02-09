@@ -15,12 +15,10 @@
 
 package io.hetu.core.plugin.carbondata.integrationtest;
 
-import com.esotericsoftware.minlog.Log;
 import com.google.gson.Gson;
 import io.hetu.core.plugin.carbondata.server.HetuTestServer;
 import io.prestosql.hive.$internal.au.com.bytecode.opencsv.CSVReader;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.StandardErrorCode;
 import org.apache.carbondata.common.logging.LogServiceFactory;
 import org.apache.carbondata.core.constants.CarbonCommonConstants;
 import org.apache.carbondata.core.datastore.filesystem.CarbonFile;
@@ -53,7 +51,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.text.DateFormat;
@@ -67,10 +64,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
-import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -1429,7 +1424,7 @@ public class TestCarbonAllDataType
             assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtabledrop", false), false);
 
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error(e.getMessage());
         }
     }
 
@@ -1474,7 +1469,7 @@ public class TestCarbonAllDataType
                     i++;
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                logger.error(e.getMessage());
             }
 
             // Step 3: convert format level TableInfo to code level TableInfo
@@ -1555,7 +1550,7 @@ public class TestCarbonAllDataType
                     try {
                         date = inputFormat.parse(data);
                     } catch (ParseException e) {
-                        e.printStackTrace();
+                        logger.error(e.getMessage());
                     }
                     String dateString = outuptformat.format(date);
                     dateString = "date '" + dateString + "'";
@@ -1569,7 +1564,7 @@ public class TestCarbonAllDataType
                     try {
                         date = inputFormat.parse(data);
                     } catch (ParseException e) {
-                        e.printStackTrace();
+                        logger.error(e.getMessage());
                     }
                     String dateString = outuptformat.format(date);
                     dateString = "date '" + dateString + "'";
@@ -1578,7 +1573,7 @@ public class TestCarbonAllDataType
                 return   "date '" + data + "'";
             }
             case "varchar":
-            {//'china'
+            {
                 return "'" + data + "'";
             }
             case "timestamp":
@@ -1592,7 +1587,7 @@ public class TestCarbonAllDataType
                     try {
                         date = inputFormattime.parse(data);
                     } catch (ParseException e) {
-                        e.printStackTrace();
+                        logger.error(e.getMessage());
                     }
                     dateString = outuptformattime.format(date);
                 }
@@ -1603,7 +1598,7 @@ public class TestCarbonAllDataType
                     try {
                         date = inputFormattime.parse(data);
                     } catch (ParseException e) {
-                        e.printStackTrace();
+                        logger.error(e.getMessage());
                     }
                     dateString = outuptformattime.format(date);
                 }
@@ -1614,7 +1609,7 @@ public class TestCarbonAllDataType
                     try {
                         date = inputFormattime.parse(data);
                     } catch (ParseException e) {
-                        e.printStackTrace();
+                        logger.error(e.getMessage());
                     }
                     dateString = outuptformattime.format(date);
                 }
@@ -1625,7 +1620,7 @@ public class TestCarbonAllDataType
                     try {
                         date = inputFormattime.parse(data);
                     } catch (ParseException e) {
-                        e.printStackTrace();
+                        logger.error(e.getMessage());
                     }
                     dateString = outuptformattime.format(date);
                 }
@@ -1637,9 +1632,10 @@ public class TestCarbonAllDataType
                 return dateString;
             }
             case "smallint":  {
-                // smallint '12'
                 return "smallint '" + data + "'";
             }
+            default:
+                break;
         }
         return data;
     }
@@ -1697,7 +1693,7 @@ public class TestCarbonAllDataType
             hetuServer.execute(inserData);
         }
         catch(Exception e) {
-            e.printStackTrace();
+            logger.error(e.getMessage());
         }
     }
 
@@ -1736,7 +1732,7 @@ public class TestCarbonAllDataType
 
         }
         catch (IOException | InterruptedException e) {
-            e.printStackTrace();
+            logger.error(e.getMessage());
         }
     }
 
@@ -1785,14 +1781,15 @@ public class TestCarbonAllDataType
     */
     private boolean checkStatusFileForDeleteMarked(String tableName, int updateNumber, int segmentNumber) throws SQLException
     {
+        BufferedReader reader = null;
         try {
             File dir = new File(storePath + "/carbon.store/testdb/" + tableName + "/Metadata");
             File[] tableUpdateStatusFiles = dir.listFiles((d, name) -> name.startsWith("tableupdatestatus"));
             Arrays.sort(tableUpdateStatusFiles);
             Gson gson = new Gson();
-            BufferedReader reader = new BufferedReader(new FileReader(tableUpdateStatusFiles[updateNumber]));
+            reader = new BufferedReader(new FileReader(tableUpdateStatusFiles[updateNumber]));
             SegmentUpdateDetails[] segmentUpdateDetails = gson.fromJson(reader, SegmentUpdateDetails[].class);
-            File tableStatusFile = new File(dir.getAbsolutePath() + "/tablestatus");
+            File tableStatusFile = new File(dir.getCanonicalPath() + "/tablestatus");
             reader = new BufferedReader(new FileReader(tableStatusFile));
             LoadMetadataDetails loadMetadataDetails = gson.fromJson(reader, LoadMetadataDetails[].class)[segmentNumber];
             if ((segmentUpdateDetails[0].getSegmentStatus() != null && segmentUpdateDetails[0].getSegmentStatus().toString().equals("Marked for Delete")) &&
@@ -1802,6 +1799,16 @@ public class TestCarbonAllDataType
         } catch (IOException e) {
             hetuServer.execute("drop table if exists testdb." + tableName);
             Assert.fail("Failed to read status files");
+        }
+        finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                }
+                catch (IOException e) {
+                    logger.error(e.getMessage());
+                }
+            }
         }
         return false;
     }
@@ -1822,7 +1829,7 @@ public class TestCarbonAllDataType
                     "/carbon.store/testdb/mytesttable/Fact/Part0/Segment_0.1", false), true);
         } catch (IOException e) {
             hetuServer.execute("DROP TABLE if exists testdb.mytesttable");
-            e.printStackTrace();
+            logger.error(e.getMessage());
         }
 
         hetuServer.execute("DROP TABLE if exists testdb.mytesttable");
@@ -1846,7 +1853,7 @@ public class TestCarbonAllDataType
         }
         catch (IOException e) {
             hetuServer.execute("DROP TABLE if exists testdb.mytesttable2");
-            e.printStackTrace();
+            logger.error(e.getMessage());
         }
 
         hetuServer.execute("DROP TABLE if exists testdb.mytesttable2");
@@ -1879,7 +1886,7 @@ public class TestCarbonAllDataType
         }
         catch (IOException | InterruptedException e) {
             hetuServer.execute("DROP TABLE if exists testdb.myectable");
-            e.printStackTrace();
+            logger.error(e.getMessage());
         }
 
         hetuServer.execute("DROP TABLE if exists testdb.myectable");
@@ -1904,7 +1911,7 @@ public class TestCarbonAllDataType
                 FileFactory.mkdirs( storePath + "/carbon.store/mytestDb");
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error(e.getMessage());
         }
 
         String location = "'" + "file:///" + storePath + "/carbon.store/mytestDb" + "')" ;

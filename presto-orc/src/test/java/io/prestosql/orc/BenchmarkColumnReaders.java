@@ -343,11 +343,11 @@ public class BenchmarkColumnReaders
             orcFile = new File(temporaryDirectory, randomUUID().toString());
             writeOrcColumnPresto(orcFile, NONE, type, createValues(), new OrcWriterStats());
 
-            OrcDataSource dataSource = new FileOrcDataSource(orcFile, new DataSize(1, MEGABYTE),
+            OrcDataSource localDataSource = new FileOrcDataSource(orcFile, new DataSize(1, MEGABYTE),
                     new DataSize(8, MEGABYTE), new DataSize(8, MEGABYTE), true, orcFile.lastModified());
-            DiskRange diskRange = new DiskRange(0, toIntExact(dataSource.getSize()));
-            dataSource = new CachingOrcDataSource(dataSource, desiredOffset -> diskRange);
-            this.dataSource = dataSource;
+            DiskRange diskRange = new DiskRange(0, toIntExact(localDataSource.getSize()));
+            localDataSource = new CachingOrcDataSource(localDataSource, desiredOffset -> diskRange);
+            this.dataSource = localDataSource;
         }
 
         @TearDown

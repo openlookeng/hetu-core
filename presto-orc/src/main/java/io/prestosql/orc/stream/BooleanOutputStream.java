@@ -68,8 +68,9 @@ public class BooleanOutputStream
         }
     }
 
-    public void writeBooleans(int count, boolean value)
+    public void writeBooleans(int inputCount, boolean value)
     {
+        int count = inputCount;
         checkArgument(count >= 0, "count is negative");
         if (count == 0) {
             return;

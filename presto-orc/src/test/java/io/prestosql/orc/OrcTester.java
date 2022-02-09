@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.airlift.units.DataSize;
@@ -86,6 +87,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -163,6 +165,7 @@ import static org.testng.FileAssert.fail;
 
 public class OrcTester
 {
+    private static final Logger log = Logger.get(OrcTester.class);
     public static final DataSize MAX_BLOCK_SIZE = new DataSize(1, MEGABYTE);
     public static final DateTimeZone HIVE_STORAGE_TIME_ZONE = DateTimeZone.forID("America/Bahia_Banderas");
 
@@ -620,7 +623,7 @@ public class OrcTester
                 }
                 else if (type instanceof CharType) {
                     String charString = String.valueOf(value);
-                    return filter.testBytes(charString.getBytes(), 0, charString.length());
+                    return filter.testBytes(charString.getBytes(StandardCharsets.UTF_8), 0, charString.length());
                 }
                 else if (type == VARBINARY) {
                     byte[] binary = ((SqlVarbinary) value).getBytes();
@@ -749,6 +752,7 @@ public class OrcTester
                         iterator.remove();
                     }
                     catch (AssertionError ignored) {
+                        log.debug(ignored.getMessage());
                     }
                 }
             }
@@ -985,8 +989,9 @@ public class OrcTester
         assertFalse(iterator.hasNext());
     }
 
-    private static Object decodeRecordReaderValue(Type type, Object actualValue)
+    private static Object decodeRecordReaderValue(Type type, Object inputActualValue)
     {
+        Object actualValue = inputActualValue;
         if (actualValue instanceof BooleanWritable) {
             actualValue = ((BooleanWritable) actualValue).get();
         }

@@ -179,7 +179,7 @@ public class HiveMetadataFactory
     @Override
     public HiveMetadata get()
     {
-        SemiTransactionalHiveMetastore metastore = new SemiTransactionalHiveMetastore(
+        SemiTransactionalHiveMetastore localMetastore = new SemiTransactionalHiveMetastore(
                 hdfsEnvironment,
                 CachingHiveMetastore.memoizeMetastore(this.metastore, perTransactionCacheMaximumSize), // per-transaction cache
                 renameExecution,
@@ -193,7 +193,7 @@ public class HiveMetadataFactory
                 hmsWriteBatchSize);
 
         return new HiveMetadata(
-                metastore,
+                localMetastore,
                 hdfsEnvironment,
                 partitionManager,
                 writesToNonManagedTablesEnabled,
@@ -204,8 +204,8 @@ public class HiveMetadataFactory
                 partitionUpdateCodec,
                 typeTranslator,
                 prestoVersion,
-                new MetastoreHiveStatisticsProvider(metastore, statsCache, samplePartitionCache),
-                accessControlMetadataFactory.create(metastore),
+                new MetastoreHiveStatisticsProvider(localMetastore, statsCache, samplePartitionCache),
+                accessControlMetadataFactory.create(localMetastore),
                 autoVacuumEnabled,
                 vacuumDeltaNumThreshold,
                 vacuumDeltaPercentThreshold,

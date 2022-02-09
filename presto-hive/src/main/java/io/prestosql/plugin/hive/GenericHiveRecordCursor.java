@@ -13,6 +13,7 @@
  */
 package io.prestosql.plugin.hive;
 
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.prestosql.hadoop.TextLineLengthLimitExceededException;
@@ -80,6 +81,8 @@ import static java.util.Objects.requireNonNull;
 class GenericHiveRecordCursor<K, V extends Writable>
         implements RecordCursor
 {
+    private static final Logger log = Logger.get(GenericHiveRecordCursor.class);
+
     private final Path path;
     private final RecordReader<K, V> recordReader;
     private final K key;
@@ -184,6 +187,7 @@ class GenericHiveRecordCursor<K, V extends Writable>
             completedBytes = min(totalBytes, max(completedBytes, newCompletedBytes));
         }
         catch (IOException ignored) {
+            log.warn("updateCompletedBytes error");
         }
     }
 
@@ -362,17 +366,17 @@ class GenericHiveRecordCursor<K, V extends Writable>
             }
 
             // create a slice view over the hive value and trim to character limits
-            Slice value = Slices.wrappedBuffer(hiveValue.getBytes(), 0, hiveValue.getLength());
+            Slice localValue = Slices.wrappedBuffer(hiveValue.getBytes(), 0, hiveValue.getLength());
             Type type = types[column];
             if (isVarcharType(type)) {
-                value = truncateToLength(value, type);
+                localValue = truncateToLength(localValue, type);
             }
             if (isCharType(type)) {
-                value = truncateToLengthAndTrimSpaces(value, type);
+                localValue = truncateToLengthAndTrimSpaces(localValue, type);
             }
 
             // store a copy of the bytes, since the hive reader can reuse the underlying buffer
-            slices[column] = Slices.copyOf(value);
+            slices[column] = Slices.copyOf(localValue);
             nulls[column] = false;
         }
     }

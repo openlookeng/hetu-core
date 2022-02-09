@@ -130,7 +130,7 @@ public class TestCarbondataAutoCleanup
             assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup1/Fact/Part0/Segment_3", false), false);
         }
         catch (IOException exception) {
-
+            logger.debug(exception.getMessage());
         }
 
         CarbondataMetadata.enableTracingCleanupTask(false);
@@ -159,7 +159,7 @@ public class TestCarbondataAutoCleanup
             assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup2/Fact/Part0/Segment_2", false), false);
             assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup2/Fact/Part0/Segment_3", false), false);
         } catch (IOException exception) {
-
+            logger.debug(exception.getMessage());
         }
 
         CarbondataMetadata.enableTracingCleanupTask(false);
@@ -189,7 +189,7 @@ public class TestCarbondataAutoCleanup
             assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup3/Fact/Part0/Segment_2", false), false);
             assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup3/Fact/Part0/Segment_3", false), false);
         } catch (IOException exception) {
-
+            logger.debug(exception.getMessage());
         }
 
         CarbondataMetadata.enableTracingCleanupTask(false);
@@ -221,7 +221,7 @@ public class TestCarbondataAutoCleanup
                 assertEquals(FileFactory.isFileExist(storePath + "/carbon.store/testdb/testtableautocleanupwithpushdown/Fact/Part0/Segment_2", false), false);
                 assertEquals(FileFactory.isFileExist(storePath + "/carbon.store/testdb/testtableautocleanupwithpushdown/Fact/Part0/Segment_3", false), false);
             } catch (IOException exception) {
-
+                logger.debug(exception.getMessage());
             }
         }
         finally {
@@ -254,7 +254,7 @@ public class TestCarbondataAutoCleanup
             assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup4/Fact/Part0/Segment_2", false), false);
             assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup4/Fact/Part0/Segment_3", false), false);
         } catch (IOException exception) {
-
+            logger.debug(exception.getMessage());
         }
 
         CarbondataMetadata.enableTracingCleanupTask(false);
@@ -285,7 +285,7 @@ public class TestCarbondataAutoCleanup
             assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup5/Fact/Part0/Segment_3", false), false);
         }
         catch (IOException exception) {
-
+            logger.debug(exception.getMessage());
         }
 
         CarbondataMetadata.enableTracingCleanupTask(false);
@@ -314,7 +314,7 @@ public class TestCarbondataAutoCleanup
             assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup6/Fact/Part0/Segment_2", false), false);
             assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup6/Fact/Part0/Segment_3", false), false);
         } catch (IOException exception) {
-
+            logger.debug(exception.getMessage());
         }
 
         CarbondataMetadata.enableTracingCleanupTask(false);
@@ -344,7 +344,7 @@ public class TestCarbondataAutoCleanup
             assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup7/Fact/Part0/Segment_2", false), false);
             assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup7/Fact/Part0/Segment_3", false), false);
         } catch (IOException exception) {
-
+            logger.debug(exception.getMessage());
         }
 
         CarbondataMetadata.enableTracingCleanupTask(false);
@@ -374,7 +374,7 @@ public class TestCarbondataAutoCleanup
             assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup8/Fact/Part0/Segment_2", false), false);
             assertEquals(FileFactory.isFileExist(storePath  + "/carbon.store/testdb/testtableautocleanup8/Fact/Part0/Segment_3", false), false);
         } catch (IOException exception) {
-
+            logger.debug(exception.getMessage());
         }
 
         CarbondataMetadata.enableTracingCleanupTask(false);
@@ -403,7 +403,7 @@ public class TestCarbondataAutoCleanup
                 content = content.replaceFirst(modificationOrdeletionTimesStamp, replace);
                 Files.write(path, content.getBytes(charset));
             } catch (IOException e) {
-                e.printStackTrace();
+                logger.error(e.getMessage());
             }
         }
     }

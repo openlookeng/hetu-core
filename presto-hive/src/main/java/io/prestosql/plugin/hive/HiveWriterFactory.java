@@ -97,6 +97,7 @@ import static io.prestosql.plugin.hive.util.ConfigurationUtils.toJobConf;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static java.lang.Math.min;
 import static java.lang.String.format;
+import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 import static java.util.UUID.randomUUID;
 import static java.util.function.Function.identity;
@@ -240,22 +241,22 @@ public class HiveWriterFactory
         this.acidWriteType = acidWriteType;
         // divide input columns into partition and data columns
         requireNonNull(inputColumns, "inputColumns is null");
-        ImmutableList.Builder<String> partitionColumnNames = ImmutableList.builder();
-        ImmutableList.Builder<Type> partitionColumnTypes = ImmutableList.builder();
-        ImmutableList.Builder<DataColumn> dataColumns = ImmutableList.builder();
+        ImmutableList.Builder<String> localPartitionColumnNames = ImmutableList.builder();
+        ImmutableList.Builder<Type> localPartitionColumnTypes = ImmutableList.builder();
+        ImmutableList.Builder<DataColumn> localDataColumns = ImmutableList.builder();
         for (HiveColumnHandle column : inputColumns) {
             HiveType hiveType = column.getHiveType();
             if (column.isPartitionKey()) {
-                partitionColumnNames.add(column.getName());
-                partitionColumnTypes.add(typeManager.getType(column.getTypeSignature()));
+                localPartitionColumnNames.add(column.getName());
+                localPartitionColumnTypes.add(typeManager.getType(column.getTypeSignature()));
             }
             else {
-                dataColumns.add(new DataColumn(column.getName(), hiveType));
+                localDataColumns.add(new DataColumn(column.getName(), hiveType));
             }
         }
-        this.partitionColumnNames = partitionColumnNames.build();
-        this.partitionColumnTypes = partitionColumnTypes.build();
-        this.dataColumns = dataColumns.build();
+        this.partitionColumnNames = localPartitionColumnNames.build();
+        this.partitionColumnTypes = localPartitionColumnTypes.build();
+        this.dataColumns = localDataColumns.build();
 
         Path writePath;
         if (isCreateTable) {
@@ -265,11 +266,11 @@ public class HiveWriterFactory
             writePath = writeInfo.getWritePath();
         }
         else {
-            Optional<Table> table = pageSinkMetadataProvider.getTable();
-            if (!table.isPresent()) {
+            Optional<Table> localTable = pageSinkMetadataProvider.getTable();
+            if (!localTable.isPresent()) {
                 throw new PrestoException(HIVE_INVALID_METADATA, format("Table %s.%s was dropped during insert", schemaName, tableName));
             }
-            this.table = table.get();
+            this.table = localTable.get();
             writePath = locationService.getQueryWriteInfo(locationHandle).getWritePath();
         }
 
@@ -289,12 +290,12 @@ public class HiveWriterFactory
                 .collect(toImmutableMap(PropertyMetadata::getName,
                         entry -> session.getProperty(entry.getName(), entry.getJavaType()).toString()));
 
-        Configuration conf = hdfsEnvironment.getConfiguration(new HdfsContext(session, schemaName, tableName), writePath);
-        this.conf = toJobConf(conf);
+        Configuration localConf = hdfsEnvironment.getConfiguration(new HdfsContext(session, schemaName, tableName), writePath);
+        this.conf = toJobConf(localConf);
 
         // make sure the FileSystem is created with the correct Configuration object
         try {
-            hdfsEnvironment.getFileSystem(session.getUser(), writePath, conf);
+            hdfsEnvironment.getFileSystem(session.getUser(), writePath, localConf);
         }
         catch (IOException e) {
             throw new PrestoException(HIVE_FILESYSTEM_ERROR, "Failed getting FileSystem: " + writePath, e);
@@ -358,7 +359,7 @@ public class HiveWriterFactory
         else {
             // Snapshot: don't use UUID. File name needs to be deterministic.
             if (isSnapshotEnabled) {
-                fileName = String.format("%s_%d_%d_%d", queryId, session.getTaskId().getAsInt(), session.getPipelineId().getAsInt(), session.getDriverId().getAsInt());
+                fileName = String.format(ENGLISH, "%s_%d_%d_%d", queryId, session.getTaskId().getAsInt(), session.getPipelineId().getAsInt(), session.getDriverId().getAsInt());
             }
             else {
                 fileName = queryId + "_" + randomUUID();

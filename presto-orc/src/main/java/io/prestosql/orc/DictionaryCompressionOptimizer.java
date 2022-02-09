@@ -107,7 +107,7 @@ public class DictionaryCompressionOptimizer
         convertLowCompressionStreams(bufferedBytes);
     }
 
-    public void optimize(int bufferedBytes, int stripeRowCount)
+    public void optimize(int inputBufferedBytes, int stripeRowCount)
     {
         // recompute the dictionary memory usage
         dictionaryMemoryBytes = allWriters.stream()
@@ -125,6 +125,7 @@ public class DictionaryCompressionOptimizer
         }
 
         // before any further checks, convert all low compression streams
+        int bufferedBytes = inputBufferedBytes;
         bufferedBytes = convertLowCompressionStreams(bufferedBytes);
 
         if (dictionaryMemoryBytes <= dictionaryMemoryMaxBytesLow || bufferedBytes >= stripeMaxBytes) {
@@ -177,8 +178,10 @@ public class DictionaryCompressionOptimizer
         }
     }
 
-    private int convertLowCompressionStreams(int bufferedBytes)
+    private int convertLowCompressionStreams(int inputBufferedBytes)
     {
+        int bufferedBytes = inputBufferedBytes;
+
         // convert all low compression column to direct
         for (DictionaryColumnManager dictionaryWriter : ImmutableList.copyOf(directConversionCandidates)) {
             if (dictionaryWriter.getCompressionRatio() < DICTIONARY_MIN_COMPRESSION_RATIO) {
