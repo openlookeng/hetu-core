@@ -68,7 +68,12 @@ public class TestBinaryFileSpiller
         Metadata metadata = createTestMetadataManager();
         spillerStats = new SpillerStats();
         FeaturesConfig featuresConfig = new FeaturesConfig();
-        featuresConfig.setSpillerSpillPaths(spillPath.getAbsolutePath());
+        try {
+            featuresConfig.setSpillerSpillPaths(spillPath.getCanonicalPath());
+        }
+        catch (IOException e) {
+            System.out.println(e.getStackTrace());
+        }
         featuresConfig.setSpillMaxUsedSpaceThreshold(1.0);
         NodeSpillConfig nodeSpillConfig = new NodeSpillConfig();
         singleStreamSpillerFactory = new FileSingleStreamSpillerFactory(metadata, spillerStats, featuresConfig, nodeSpillConfig);

@@ -84,18 +84,18 @@ public enum AtopTable
 
     private static List<AtopColumn> baseColumnsAnd(AtopColumn... additionalColumns)
     {
-        ImmutableList.Builder<AtopColumn> columns = ImmutableList.builder();
-        columns.add(HOST_IP);
+        ImmutableList.Builder<AtopColumn> atopColumnBuilder = ImmutableList.builder();
+        atopColumnBuilder.add(HOST_IP);
         // 0th field is the label (i.e. table name)
         // 1st field is the name of the host, but isn't fully qualified
-        columns.add(START_TIME);
+        atopColumnBuilder.add(START_TIME);
         // 2nd field is the end timestamp as unix time
-        columns.add(END_TIME);
+        atopColumnBuilder.add(END_TIME);
         // 3rd field is the date, but we already have the epoch
         // 4th field is the time, but we already have the epoch
         // 5th field is the duration, and will be combined with 2 to compute start_time
-        columns.addAll(Arrays.asList(additionalColumns));
-        return columns.build();
+        atopColumnBuilder.addAll(Arrays.asList(additionalColumns));
+        return atopColumnBuilder.build();
     }
 
     public String getName()

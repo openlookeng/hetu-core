@@ -13,6 +13,7 @@
  */
 package io.prestosql.sql.tree;
 
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -33,7 +34,7 @@ public class RoutineCharacteristics
 
         public Language(String language)
         {
-            this.language = requireNonNull(language.toUpperCase());
+            this.language = requireNonNull(language.toUpperCase(Locale.ROOT));
         }
 
         public String getLanguage()

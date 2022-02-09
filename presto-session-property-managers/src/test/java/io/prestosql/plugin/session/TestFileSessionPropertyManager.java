@@ -37,6 +37,8 @@ import static org.testng.Assert.assertEquals;
 
 public class TestFileSessionPropertyManager
 {
+    private static final Pattern PIPELINE = Pattern.compile("global.pipeline.user_.*");
+    private static final Pattern INTERACTIVE = Pattern.compile("global.interactive.user_.*");
     private static final SessionConfigurationContext CONTEXT = new SessionConfigurationContext(
             "user",
             Optional.of("source"),
@@ -54,7 +56,7 @@ public class TestFileSessionPropertyManager
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
-                Optional.of(Pattern.compile("global.pipeline.user_.*")),
+                Optional.of(PIPELINE),
                 properties);
 
         assertProperties(properties, spec);
@@ -107,7 +109,7 @@ public class TestFileSessionPropertyManager
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
-                Optional.of(Pattern.compile("global.interactive.user_.*")),
+                Optional.of(INTERACTIVE),
                 ImmutableMap.of("PROPERTY", "VALUE"));
 
         assertProperties(ImmutableMap.of(), spec);

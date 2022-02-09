@@ -173,6 +173,7 @@ public class TestGenericPartitioningSpiller
         }
         catch (UncheckedIOException ignored) {
             // expected
+            // could be ignored
         }
     }
 

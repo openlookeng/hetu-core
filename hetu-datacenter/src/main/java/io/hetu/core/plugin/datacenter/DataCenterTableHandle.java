@@ -56,11 +56,11 @@ public final class DataCenterTableHandle
      */
     public DataCenterTableHandle(String catalogName, String schemaName, String tableName, OptionalLong limit)
     {
-        this.catalogName = catalogName;
-        this.schemaName = requireNonNull(schemaName, "schemaName is null");
-        this.tableName = requireNonNull(tableName, "tableName is null");
-        this.limit = requireNonNull(limit, "limit is null");
-        this.pushDownSql = "";
+        this(catalogName,
+                requireNonNull(schemaName, "schemaName is null"),
+                requireNonNull(tableName, "tableName is null"),
+                requireNonNull(limit, "limit is null"),
+                "");
     }
 
     /**
@@ -125,6 +125,7 @@ public final class DataCenterTableHandle
         return new SchemaTableName(schemaName, tableName);
     }
 
+    @Override
     public String getSchemaPrefixedTableName()
     {
         return catalogName + SPLIT_DOT + schemaName + SPLIT_DOT + tableName;

@@ -408,14 +408,14 @@ public class CachedSqlQueryExecution
             connectorTransactionHandleMap = new HashMap<>();
 
             // A map of String fully qualified names to TableHandles for ease of access
-            Map<String, TableHandle> tables = new HashMap<>();
+            Map<String, TableHandle> tableHandleHashMap = new HashMap<>();
             for (TableHandle handle : analysis.getTables()) {
-                tables.put(handle.getFullyQualifiedName(), handle);
+                tableHandleHashMap.put(handle.getFullyQualifiedName(), handle);
                 analysis.getCubes(handle).forEach(cubeHandle -> {
-                    tables.putIfAbsent(cubeHandle.getFullyQualifiedName(), cubeHandle);
+                    tableHandleHashMap.putIfAbsent(cubeHandle.getFullyQualifiedName(), cubeHandle);
                 });
             }
-            this.tables = tables;
+            this.tables = tableHandleHashMap;
             this.reuseTableScanNewMappingIdMap = new HashMap();
         }
 

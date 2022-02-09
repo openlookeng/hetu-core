@@ -19,6 +19,7 @@ import org.testng.annotations.Test;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Random;
 
 import static org.testng.Assert.assertFalse;
@@ -91,7 +92,7 @@ public class TestBloomFilter
     {
         BloomFilter bloomFilter = new BloomFilter(COUNT, 0.1);
         for (String value : values) {
-            bloomFilter.add(value.getBytes());
+            bloomFilter.add(value.getBytes(StandardCharsets.UTF_8));
         }
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -104,7 +105,7 @@ public class TestBloomFilter
         System.out.println("Deserialization 1M values took: " + (System.nanoTime() - deserializationStart) / 1000000 + " ms");
 
         for (String value : values) {
-            assertTrue(deserializedBloomFilter.test(value.getBytes()), "Value should exist in deserialized BloomFilter");
+            assertTrue(deserializedBloomFilter.test(value.getBytes(StandardCharsets.UTF_8)), "Value should exist in deserialized BloomFilter");
         }
 
         BloomFilter bloomFilter1 = new BloomFilter(COUNT, 0.01);

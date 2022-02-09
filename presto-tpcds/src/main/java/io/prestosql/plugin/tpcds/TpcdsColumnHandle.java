@@ -38,6 +38,7 @@ public class TpcdsColumnHandle
     }
 
     @JsonProperty
+    @Override
     public String getColumnName()
     {
         return columnName;

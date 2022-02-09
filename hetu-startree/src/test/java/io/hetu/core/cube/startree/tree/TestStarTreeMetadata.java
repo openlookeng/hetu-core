@@ -154,7 +154,7 @@ public class TestStarTreeMetadata
                 .select("returnflag", "linestatus")
                 .aggregate(avg("quantity", false))
                 .from("tpch.tiny.lineitem")
-                .groupBy("returnflag", "linestatus")
+                .groupByAddStringList("returnflag", "linestatus")
                 .build();
         assertTrue(metadata.matches(statement), "failed to match a valid cube statement");
     }
@@ -178,7 +178,7 @@ public class TestStarTreeMetadata
                 .select("returnflag", "linestatus")
                 .aggregate(sum("quantity", false))
                 .from("tpch.tiny.lineitem2")
-                .groupBy("returnflag", "linestatus")
+                .groupByAddStringList("returnflag", "linestatus")
                 .build();
         assertTrue(metadataWithoutAvg.matches(statement), "failed to match a valid cube statement");
     }
@@ -190,7 +190,7 @@ public class TestStarTreeMetadata
                 .select("returnflag", "linestatus")
                 .aggregate(avg("unknown", false))
                 .from("tpch.tiny.lineitem")
-                .groupBy("returnflag", "linestatus")
+                .groupByAddStringList("returnflag", "linestatus")
                 .build();
         assertFalse(metadata.matches(statement), "failed to detect an invalid cube statement");
     }
@@ -225,7 +225,7 @@ public class TestStarTreeMetadata
                 .aggregate(avg("quantity", false))
                 .aggregate(avg("discount", false))
                 .from("tpch.tiny.lineitem3")
-                .groupBy("returnflag", "linestatus")
+                .groupByAddStringList("returnflag", "linestatus")
                 .build();
         assertTrue(metadataWithAvg.matches(statement), "failed to match a valid cube statement");
     }
@@ -237,7 +237,7 @@ public class TestStarTreeMetadata
                 .select("returnflag", "linestatus")
                 .aggregate(avg("quantity", false))
                 .from("tpch.tiny.lineitem4")
-                .groupBy("returnflag", "linestatus")
+                .groupByAddStringList("returnflag", "linestatus")
                 .build();
         assertFalse(metadataWithAvgWithoutSumCount.matches(statement), "failed to match a valid cube statement");
     }

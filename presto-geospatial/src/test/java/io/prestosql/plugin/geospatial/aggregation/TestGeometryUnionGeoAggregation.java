@@ -360,7 +360,6 @@ public class TestGeometryUnionGeoAggregation
     {
         List<String> wktList = Arrays.stream(wkts).map(wkt -> format("ST_GeometryFromText('%s')", wkt)).collect(toList());
         String wktArray = format("ARRAY[%s]", COMMA_JOINER.join(wktList));
-        // ST_Union(ARRAY[ST_GeometryFromText('...'), ...])
         assertFunction(format("geometry_union(%s)", wktArray), GEOMETRY, expectedWkt);
 
         reverse(wktList);

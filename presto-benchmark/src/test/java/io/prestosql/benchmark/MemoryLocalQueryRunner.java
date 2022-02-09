@@ -123,16 +123,16 @@ public class MemoryLocalQueryRunner
 
     private static LocalQueryRunner createMemoryLocalQueryRunner(Session session)
     {
-        LocalQueryRunner localQueryRunner = LocalQueryRunner.queryRunnerWithInitialTransaction(session);
+        LocalQueryRunner queryRunnerWithInitialTransaction = LocalQueryRunner.queryRunnerWithInitialTransaction(session);
 
         // add tpch
-        localQueryRunner.createCatalog("tpch", new TpchConnectorFactory(1), ImmutableMap.of());
-        localQueryRunner.createCatalog(
+        queryRunnerWithInitialTransaction.createCatalog("tpch", new TpchConnectorFactory(1), ImmutableMap.of());
+        queryRunnerWithInitialTransaction.createCatalog(
                 "memory",
                 new MemoryConnectorFactory(),
                 ImmutableMap.of("memory.max-data-per-node", "4GB"));
 
-        return localQueryRunner;
+        return queryRunnerWithInitialTransaction;
     }
 
     public void dropTable(String tableName)

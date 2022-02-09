@@ -286,6 +286,7 @@ public class TestTaskExecutor
                 catch (IllegalStateException e) {
                     // under high concurrency sometimes the deregister call can occur after completion
                     // this is not a real problem
+                    // could be ignored
                 }
                 taskExecutor.removeTask(taskHandles[0]);
                 taskExecutor.removeTask(taskHandles[1]);

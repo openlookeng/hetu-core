@@ -143,7 +143,7 @@ public class BenchmarkBinaryFileSpiller
 
         private List<Page> createInputPages()
         {
-            ImmutableList.Builder<Page> pages = ImmutableList.builder();
+            ImmutableList.Builder<Page> builder = ImmutableList.builder();
 
             PageBuilder pageBuilder = new PageBuilder(TYPES);
             LineItemGenerator lineItemGenerator = new LineItemGenerator(1, 1, 1);
@@ -159,11 +159,11 @@ public class BenchmarkBinaryFileSpiller
                     VARCHAR.writeString(pageBuilder.getBlockBuilder(3), lineItem.getReturnFlag());
                     DOUBLE.writeDouble(pageBuilder.getBlockBuilder(4), lineItem.getExtendedPrice());
                 }
-                pages.add(pageBuilder.build());
+                builder.add(pageBuilder.build());
                 pageBuilder.reset();
             }
 
-            return pages.build();
+            return builder.build();
         }
 
         public List<Page> getPages()

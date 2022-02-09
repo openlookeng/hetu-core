@@ -86,7 +86,7 @@ public class EmbeddedKafka
                 .put("auto.create.topics.enable", "false")
                 .put("zookeeper.connection.timeout.ms", "1000000")
                 .put("port", "0")
-                .put("log.dirs", kafkaDataDir.getAbsolutePath())
+                .put("log.dirs", kafkaDataDir.getCanonicalPath())
                 .put("zookeeper.connect", zookeeper.getConnectString())
                 .putAll(Maps.fromProperties(overrideProperties))
                 .build();

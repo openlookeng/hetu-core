@@ -108,18 +108,18 @@ public class FullSmileResponseHandler<T>
             this.smileBytes = requireNonNull(smileBytes, "smileBytes is null");
             this.responseBytes = smileBytes;
 
-            T value = null;
-            IllegalArgumentException exception = null;
+            T val = null;
+            IllegalArgumentException illegalArgumentException = null;
             try {
-                value = smileCodec.fromSmile(smileBytes);
+                val = smileCodec.fromSmile(smileBytes);
             }
             catch (IllegalArgumentException e) {
-                exception = new IllegalArgumentException("Unable to create " + smileCodec.getType() + " from SMILE response", e);
+                illegalArgumentException = new IllegalArgumentException("Unable to create " + smileCodec.getType() + " from SMILE response", e);
             }
 
-            this.hasValue = (exception == null);
-            this.value = value;
-            this.exception = exception;
+            this.hasValue = (illegalArgumentException == null);
+            this.value = val;
+            this.exception = illegalArgumentException;
         }
 
         @Override

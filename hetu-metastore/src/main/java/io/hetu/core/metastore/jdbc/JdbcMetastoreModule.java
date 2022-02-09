@@ -45,7 +45,7 @@ public class JdbcMetastoreModule
 
     public JdbcMetastoreModule(String type)
     {
-        this.type = type;
+        this(null, type);
     }
 
     @Override

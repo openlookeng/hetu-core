@@ -390,8 +390,8 @@ public class TestHBaseConnector
     public void testhBaseConnectorIdGetConnectorId()
     {
         HBaseConnectorId hBCnnId = new HBaseConnectorId();
-        hBCnnId.setConnectorId("hbase");
-        assertEquals("hbase", hBCnnId.getConnectorId());
+        HBaseConnectorId.setConnectorId("hbase");
+        assertEquals("hbase", HBaseConnectorId.getConnectorId());
     }
 
     /**
@@ -401,7 +401,7 @@ public class TestHBaseConnector
     public void testHBaseConnectorIdEquals()
     {
         HBaseConnectorId hBCnnId = new HBaseConnectorId();
-        hBCnnId.setConnectorId("hbase");
+        HBaseConnectorId.setConnectorId("hbase");
         assertEquals(true, hBCnnId.equals(hBCnnId));
         assertEquals(false, hBCnnId.equals(null));
     }

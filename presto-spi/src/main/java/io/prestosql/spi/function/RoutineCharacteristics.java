@@ -17,6 +17,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
 
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -38,7 +39,7 @@ public class RoutineCharacteristics
         @JsonCreator
         public Language(String language)
         {
-            this.language = requireNonNull(language.toUpperCase());
+            this.language = requireNonNull(language.toUpperCase(Locale.ROOT));
         }
 
         @JsonValue

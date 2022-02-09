@@ -31,6 +31,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 
 public class JmxConnectorConfig
 {
+    private static final Pattern PATTERN = Pattern.compile("(?<!\\\\),");
     private Set<String> dumpTables = ImmutableSet.of();
     private Duration dumpPeriod = new Duration(10, SECONDS);
     private int maxEntries = 24 * 60 * 60;
@@ -44,7 +45,7 @@ public class JmxConnectorConfig
     @Config("jmx.dump-tables")
     public JmxConnectorConfig setDumpTables(String tableNames)
     {
-        this.dumpTables = Splitter.on(Pattern.compile("(?<!\\\\),")) // match "," not preceded by "\"
+        this.dumpTables = Splitter.on(PATTERN) // match "," not preceded by "\"
                 .omitEmptyStrings()
                 .splitToList(tableNames)
                 .stream()

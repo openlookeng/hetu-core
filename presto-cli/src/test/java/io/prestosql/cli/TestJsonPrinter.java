@@ -18,6 +18,7 @@ import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static io.prestosql.cli.TestAlignedTablePrinter.row;
@@ -72,7 +73,7 @@ public class TestJsonPrinter
         List<String> fieldNames = ImmutableList.of("first", "last", "quantity");
         OutputPrinter printer = new JsonPrinter(fieldNames, writer);
 
-        printer.printRows(rows(row("hello".getBytes(), null, 123)), true);
+        printer.printRows(rows(row("hello".getBytes(StandardCharsets.UTF_8), null, 123)), true);
         printer.finish();
 
         String expected = "{\"first\":\"68 65 6c 6c 6f\",\"last\":null,\"quantity\":123}\n";

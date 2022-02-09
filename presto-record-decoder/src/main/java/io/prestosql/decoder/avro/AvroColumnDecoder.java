@@ -272,8 +272,9 @@ public class AvroColumnDecoder
         }
     }
 
-    private static Block serializeMap(BlockBuilder blockBuilder, Object value, Type type, String columnName)
+    private static Block serializeMap(BlockBuilder inputBlockBuilder, Object value, Type type, String columnName)
     {
+        BlockBuilder blockBuilder = inputBlockBuilder;
         if (value == null) {
             requireNonNull(blockBuilder, "parent blockBuilder is null").appendNull();
             return blockBuilder.build();

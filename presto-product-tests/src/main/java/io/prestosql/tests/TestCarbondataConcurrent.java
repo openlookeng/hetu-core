@@ -25,6 +25,7 @@ public class TestCarbondataConcurrent
 
     public TestCarbondataConcurrent(String tableName, CreateTableTests.CarbonTaskOperation taskOperation)
     {
+        super.setName("TestCarbondataConcurrent");
         this.tableName = tableName;
         this.taskOperation = taskOperation;
     }

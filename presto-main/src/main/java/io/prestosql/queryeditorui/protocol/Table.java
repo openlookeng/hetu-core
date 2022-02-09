@@ -91,13 +91,13 @@ public class Table
 
     public static Table fromInput(Input input)
     {
-        List<String> columns = new ArrayList<>(input.getColumns().size());
+        List<String> columnsList = new ArrayList<>(input.getColumns().size());
 
         for (Column c : input.getColumns()) {
-            columns.add(c.getName());
+            columnsList.add(c.getName());
         }
 
-        return new Table(input.getCatalogName().getCatalogName(), input.getSchema(), input.getTable(), columns);
+        return new Table(input.getCatalogName().getCatalogName(), input.getSchema(), input.getTable(), columnsList);
     }
 
     @JsonProperty

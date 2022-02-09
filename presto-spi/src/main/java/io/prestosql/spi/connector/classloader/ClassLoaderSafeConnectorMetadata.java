@@ -739,6 +739,7 @@ public class ClassLoaderSafeConnectorMetadata
         }
     }
 
+    @Override
     public Optional<ProjectionApplicationResult<ConnectorTableHandle>> applyProjection(ConnectorSession session, ConnectorTableHandle handle, List<ConnectorExpression> projections, Map<String, ColumnHandle> assignments)
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
@@ -746,6 +747,7 @@ public class ClassLoaderSafeConnectorMetadata
         }
     }
 
+    @Override
     public Optional<ConnectorTableHandle> applySample(ConnectorSession session, ConnectorTableHandle handle, SampleType sampleType, double sampleRatio)
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
@@ -779,6 +781,7 @@ public class ClassLoaderSafeConnectorMetadata
     /**
      * Hetu can only create index for supported connectors.
      */
+    @Override
     public boolean isHeuristicIndexSupported()
     {
         return delegate.isHeuristicIndexSupported();

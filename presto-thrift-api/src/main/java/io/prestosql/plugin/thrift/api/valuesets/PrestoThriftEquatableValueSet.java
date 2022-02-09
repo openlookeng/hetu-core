@@ -94,9 +94,9 @@ public final class PrestoThriftEquatableValueSet
     public static PrestoThriftEquatableValueSet fromEquatableValueSet(EquatableValueSet valueSet)
     {
         Type type = valueSet.getType();
-        Set<ValueEntry> values = valueSet.getEntries();
-        List<PrestoThriftBlock> thriftValues = new ArrayList<>(values.size());
-        for (ValueEntry value : values) {
+        Set<ValueEntry> valueEntrySet = valueSet.getEntries();
+        List<PrestoThriftBlock> thriftValues = new ArrayList<>(valueEntrySet.size());
+        for (ValueEntry value : valueEntrySet) {
             checkState(type.equals(value.getType()), "ValueEntrySet has elements of different types: %s vs %s", type, value.getType());
             thriftValues.add(fromBlock(value.getBlock(), type));
         }

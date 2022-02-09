@@ -258,8 +258,9 @@ public class MySqlClient
     }
 
     @Override
-    public void renameColumn(JdbcIdentity identity, JdbcTableHandle handle, JdbcColumnHandle jdbcColumn, String newColumnName)
+    public void renameColumn(JdbcIdentity identity, JdbcTableHandle handle, JdbcColumnHandle jdbcColumn, String inputNewColumnName)
     {
+        String newColumnName = inputNewColumnName;
         try (Connection connection = connectionFactory.openConnection(identity)) {
             DatabaseMetaData metadata = connection.getMetaData();
             if (metadata.storesUpperCaseIdentifiers()) {
@@ -392,7 +393,7 @@ public class MySqlClient
             byte[] in = slice.getBytes();
             SliceOutput dynamicSliceOutput = new DynamicSliceOutput(in.length);
             SORTED_MAPPER.writeValue((OutputStream) dynamicSliceOutput, SORTED_MAPPER.readValue(parser, Object.class));
-            // nextToken() returns null if the input is parsed correctly,
+            // the function nextToken() returns null if the input is parsed correctly,
             // but will throw an exception if there are trailing characters.
             parser.nextToken();
             return dynamicSliceOutput.slice();

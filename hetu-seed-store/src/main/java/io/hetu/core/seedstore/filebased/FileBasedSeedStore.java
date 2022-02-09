@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
@@ -54,7 +55,7 @@ public class FileBasedSeedStore
     private Map<String, String> config;
     // seed dir
     private String name;
-    // seedFilePath = <seedDir>/<name>/seeds.txt
+
     private Path seedDir;
     private Path seedFilePath;
 
@@ -181,7 +182,7 @@ public class FileBasedSeedStore
 
         StringBuilder content = new StringBuilder(0);
         if (fs.exists(seedFilePath)) {
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(fs.newInputStream(seedFilePath)))) {
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(fs.newInputStream(seedFilePath), StandardCharsets.UTF_8))) {
                 br.lines().forEach(content::append);
             }
         }
@@ -204,7 +205,7 @@ public class FileBasedSeedStore
             throws IOException
     {
         try (OutputStream os = (overwrite) ? fs.newOutputStream(file) : fs.newOutputStream(file, CREATE_NEW)) {
-            os.write(content.getBytes());
+            os.write(content.getBytes(StandardCharsets.UTF_8));
         }
     }
 }

@@ -55,7 +55,7 @@ public class FunctionMetadata
         this.methodByName = new HashMap<>();
     }
 
-    // Return [funcName, className]
+    // Return funcName and className
     public static String[] parseFunctionClassName(String metadata)
     {
         Matcher matcher = FUNCTION_METADATA_PATTERN.matcher(metadata);

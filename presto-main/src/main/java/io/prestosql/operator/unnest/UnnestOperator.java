@@ -74,8 +74,8 @@ public class UnnestOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, UnnestOperator.class.getSimpleName());
-            return new UnnestOperator(operatorContext, replicateChannels, replicateTypes, unnestChannels, unnestTypes, withOrdinality);
+            OperatorContext localOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, UnnestOperator.class.getSimpleName());
+            return new UnnestOperator(localOperatorContext, replicateChannels, replicateTypes, unnestChannels, unnestTypes, withOrdinality);
         }
 
         @Override

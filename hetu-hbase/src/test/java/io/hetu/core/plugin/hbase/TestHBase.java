@@ -342,9 +342,9 @@ public class TestHBase
     {
         HBaseConnectorId h1 = new HBaseConnectorId();
         HBaseConnectorId h2 = new HBaseConnectorId();
-        h1.setConnectorId("hbase");
-        h2.setConnectorId("hbase");
-        assertEquals(true, h1.getConnectorId().equals(h2.getConnectorId()));
+        HBaseConnectorId.setConnectorId("hbase");
+        HBaseConnectorId.setConnectorId("hbase");
+        assertEquals(true, HBaseConnectorId.getConnectorId().equals(HBaseConnectorId.getConnectorId()));
         assertEquals(h1.hashCode(), h2.hashCode());
         assertEquals(h1.toString(), h2.toString());
     }

@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 import java.util.zip.GZIPOutputStream;
@@ -60,10 +61,10 @@ public class CsvOutputBuilder
         this.countingOutputStream = new CountingOutputStream(new FileOutputStream(this.outputFile));
         OutputStreamWriter writer;
         if (compressedOutput) {
-            writer = new OutputStreamWriter(new GZIPOutputStream(this.countingOutputStream));
+            writer = new OutputStreamWriter(new GZIPOutputStream(this.countingOutputStream), StandardCharsets.UTF_8);
         }
         else {
-            writer = new OutputStreamWriter(this.countingOutputStream);
+            writer = new OutputStreamWriter(this.countingOutputStream, StandardCharsets.UTF_8);
         }
         this.csvWriter = new CSVWriter(writer);
     }
@@ -137,7 +138,7 @@ public class CsvOutputBuilder
             csvWriter.close();
         }
         catch (IOException e) {
-            e.printStackTrace();
+            LOG.debug("Error message: " + e.getStackTrace());
         }
 
         return outputFile;

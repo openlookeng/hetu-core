@@ -55,6 +55,7 @@ public final class DataCenterColumnHandle
     }
 
     @JsonProperty
+    @Override
     public String getColumnName()
     {
         return columnName;

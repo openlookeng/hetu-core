@@ -1484,6 +1484,8 @@ public class TestExpressionInterpreter
                     return 12345L;
                 case "bound_decimal_long":
                     return Decimals.encodeUnscaledValue(new BigInteger("12345678901234567890123"));
+                default:
+                    break;
             }
 
             return toSymbolReference(symbol);

@@ -30,8 +30,9 @@ public final class JsonUtils
 {
     private JsonUtils() {}
 
-    public static <T> T parseJson(Path path, Class<T> javaType)
+    public static <T> T parseJson(Path inputPath, Class<T> javaType)
     {
+        Path path = inputPath;
         if (!path.isAbsolute()) {
             path = path.toAbsolutePath();
         }

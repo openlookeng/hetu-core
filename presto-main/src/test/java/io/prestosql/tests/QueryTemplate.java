@@ -158,7 +158,7 @@ public class QueryTemplate
             return new Parameter(key, value);
         }
 
-        public List<Parameter> of(String... values)
+        public List<Parameter> ofStringList(String... values)
         {
             return Arrays.stream(values)
                     .map(this::of)

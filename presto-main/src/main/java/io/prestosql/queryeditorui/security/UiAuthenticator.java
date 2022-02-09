@@ -110,13 +110,15 @@ public class UiAuthenticator
             builder.uri(new URI(null, null, null, path, null));
         }
         catch (URISyntaxException ignored) {
+            // could be ignored
         }
 
         return builder.build();
     }
 
-    public static Response.ResponseBuilder redirectFromSuccessfulLoginResponse(String redirectPath)
+    public static Response.ResponseBuilder redirectFromSuccessfulLoginResponse(String inputRedirectPath)
     {
+        String redirectPath = inputRedirectPath;
         URI redirectLocation = UI_LOCATION_URI;
 
         redirectPath = emptyToNull(redirectPath);
@@ -125,6 +127,7 @@ public class UiAuthenticator
                 redirectLocation = new URI(redirectPath);
             }
             catch (URISyntaxException ignored) {
+                // could be ignored
             }
         }
 

@@ -44,6 +44,7 @@ public class MysqlExternalFunctionHub
         return jdbcConfig.getConnectorRegistryFunctionNamespace();
     }
 
+    @Override
     public Set<ExternalFunctionInfo> getExternalFunctions()
     {
         return ImmutableSet.<ExternalFunctionInfo>builder()

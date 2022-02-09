@@ -14,6 +14,7 @@
 package io.prestosql.memory;
 
 import com.google.common.collect.ImmutableMap;
+import io.airlift.log.Logger;
 import io.prestosql.Session;
 import io.prestosql.plugin.tpch.TpchPlugin;
 import io.prestosql.server.BasicQueryInfo;
@@ -55,6 +56,7 @@ import static org.testng.Assert.fail;
 @Test(singleThreaded = true)
 public class TestMemoryManager
 {
+    private static final Logger LOG = Logger.get(TestMemoryManager.class);
     private static final Session SESSION = testSessionBuilder()
             .setCatalog("tpch")
             // Use sf1000 to make sure this takes at least one second, so that the memory manager will fail the query
@@ -98,6 +100,7 @@ public class TestMemoryManager
             }
             catch (RuntimeException e) {
                 // expected
+                LOG.info("Error message: " + e.getMessage());
             }
             Session session = testSessionBuilder()
                     .setCatalog("tpch")
@@ -214,8 +217,10 @@ public class TestMemoryManager
     public void testNoLeak()
             throws Exception
     {
-        testNoLeak("SELECT clerk FROM orders"); // TableScan operator
-        testNoLeak("SELECT COUNT(*), clerk FROM orders WHERE orderstatus='O' GROUP BY clerk"); // ScanFilterProjectOperator, AggregationOperator
+        // TableScan operator
+        testNoLeak("SELECT clerk FROM orders");
+        // ScanFilterProjectOperator and AggregationOperator
+        testNoLeak("SELECT COUNT(*), clerk FROM orders WHERE orderstatus='O' GROUP BY clerk");
     }
 
     private void testNoLeak(@Language("SQL") String query)

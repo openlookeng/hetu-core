@@ -155,11 +155,11 @@ public class SqlInvokedFunction
 
     public SqlFunctionHandle getRequiredFunctionHandle()
     {
-        Optional<? extends SqlFunctionHandle> functionHandle = getFunctionHandle();
-        if (!functionHandle.isPresent()) {
+        Optional<? extends SqlFunctionHandle> sqlFunctionHandle = getFunctionHandle();
+        if (!sqlFunctionHandle.isPresent()) {
             throw new IllegalStateException("missing functionHandle");
         }
-        return functionHandle.get();
+        return sqlFunctionHandle.get();
     }
 
     public String getRequiredVersion()

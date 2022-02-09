@@ -37,9 +37,9 @@ public class ResourceGroupIdTemplate
     @JsonCreator
     public ResourceGroupIdTemplate(String fullId)
     {
-        List<String> segments = Splitter.on(".").splitToList(requireNonNull(fullId, "fullId is null"));
-        checkArgument(!segments.isEmpty(), "Resource group id is empty");
-        this.segments = segments.stream()
+        List<String> segmentsList = Splitter.on(".").splitToList(requireNonNull(fullId, "fullId is null"));
+        checkArgument(!segmentsList.isEmpty(), "Resource group id is empty");
+        this.segments = segmentsList.stream()
                 .map(ResourceGroupNameTemplate::new)
                 .collect(Collectors.toList());
     }

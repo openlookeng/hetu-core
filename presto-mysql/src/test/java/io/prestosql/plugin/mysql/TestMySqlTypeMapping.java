@@ -297,7 +297,8 @@ public class TestMySqlTypeMapping
         try {
             assertQuery(
                     "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'tpch' AND TABLE_NAME = 'test_unsupported_data_type'",
-                    "VALUES 'supported_column'"); // no 'unsupported_column'
+                    "VALUES 'supported_column'");
+            // no unsupported_column
         }
         finally {
             jdbcSqlExecutor.execute("DROP TABLE tpch.test_unsupported_data_type");

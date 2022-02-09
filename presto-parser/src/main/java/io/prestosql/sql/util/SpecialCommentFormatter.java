@@ -43,11 +43,12 @@ public class SpecialCommentFormatter
         return sql.substring(sql.indexOf("@") + 1, sql.lastIndexOf("#"));
     }
 
-    private static void insertIntoTableColumnMap(String comment)
+    private static void insertIntoTableColumnMap(String inputComment)
     {
         if (!queryMap.isEmpty()) {
             queryMap.clear();
         }
+        String comment = inputComment;
         comment = comment.replaceAll("\\s", "");
         String[] tableAndColumns = comment.split("=");
         String[] columns = tableAndColumns[1].split(",");

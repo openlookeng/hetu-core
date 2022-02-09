@@ -21,6 +21,8 @@ import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.VariableWidthBlockBuilder;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.nio.charset.StandardCharsets;
+
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Verify.verify;
 import static io.prestosql.spi.block.PageBuilderStatus.DEFAULT_MAX_PAGE_SIZE_IN_BYTES;
@@ -192,7 +194,7 @@ public class DictionaryBuilder
     {
         byte[] escapedBytes;
         try {
-            escapedBytes = unescapeJava(new String(text)).getBytes();
+            escapedBytes = unescapeJava(new String(text, StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8);
         }
         catch (IllegalArgumentException e) {
             return text.length;
@@ -217,11 +219,11 @@ public class DictionaryBuilder
 
     private static int calculateMaxFill(int hashSize)
     {
-        int maxFill = (int) Math.ceil(hashSize * FILL_RATIO);
-        if (maxFill == hashSize) {
-            maxFill--;
+        int ceil = (int) Math.ceil(hashSize * FILL_RATIO);
+        if (ceil == hashSize) {
+            ceil--;
         }
-        return maxFill;
+        return ceil;
     }
 
     private long getMaskedHash(long rawHash)

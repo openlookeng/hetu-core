@@ -413,10 +413,10 @@ public class TestPostgreSqlTypeMapping
 
     protected DataTypeTest arrayDateTest(Function<DataType<LocalDate>, DataType<List<LocalDate>>> arrayTypeFactory)
     {
-        ZoneId jvmZone = ZoneId.systemDefault();
-        checkState(jvmZone.getId().equals("America/Bahia_Banderas"), "This test assumes certain JVM time zone");
+        ZoneId localJvmZone = ZoneId.systemDefault();
+        checkState(localJvmZone.getId().equals("America/Bahia_Banderas"), "This test assumes certain JVM time zone");
         LocalDate dateOfLocalTimeChangeForwardAtMidnightInJvmZone = LocalDate.of(1970, 1, 1);
-        checkIsGap(jvmZone, dateOfLocalTimeChangeForwardAtMidnightInJvmZone.atStartOfDay());
+        checkIsGap(localJvmZone, dateOfLocalTimeChangeForwardAtMidnightInJvmZone.atStartOfDay());
 
         ZoneId someZone = ZoneId.of("Europe/Vilnius");
         LocalDate dateOfLocalTimeChangeForwardAtMidnightInSomeZone = LocalDate.of(1983, 4, 1);
@@ -486,10 +486,10 @@ public class TestPostgreSqlTypeMapping
     {
         // Note: there is identical test for MySQL
 
-        ZoneId jvmZone = ZoneId.systemDefault();
-        checkState(jvmZone.getId().equals("America/Bahia_Banderas"), "This test assumes certain JVM time zone");
+        ZoneId localJvmZone = ZoneId.systemDefault();
+        checkState(localJvmZone.getId().equals("America/Bahia_Banderas"), "This test assumes certain JVM time zone");
         LocalDate dateOfLocalTimeChangeForwardAtMidnightInJvmZone = LocalDate.of(1970, 1, 1);
-        checkIsGap(jvmZone, dateOfLocalTimeChangeForwardAtMidnightInJvmZone.atStartOfDay());
+        checkIsGap(localJvmZone, dateOfLocalTimeChangeForwardAtMidnightInJvmZone.atStartOfDay());
 
         ZoneId someZone = ZoneId.of("Europe/Vilnius");
         LocalDate dateOfLocalTimeChangeForwardAtMidnightInSomeZone = LocalDate.of(1983, 4, 1);
@@ -507,7 +507,7 @@ public class TestPostgreSqlTypeMapping
                 .addRoundTrip(dateDataType(), dateOfLocalTimeChangeForwardAtMidnightInSomeZone)
                 .addRoundTrip(dateDataType(), dateOfLocalTimeChangeBackwardAtMidnightInSomeZone);
 
-        for (String timeZoneId : ImmutableList.of(UTC_KEY.getId(), jvmZone.getId(), someZone.getId())) {
+        for (String timeZoneId : ImmutableList.of(UTC_KEY.getId(), localJvmZone.getId(), someZone.getId())) {
             Session session = Session.builder(getQueryRunner().getDefaultSession())
                     .setTimeZoneKey(TimeZoneKey.getTimeZoneKey(timeZoneId))
                     .build();
@@ -683,7 +683,8 @@ public class TestPostgreSqlTypeMapping
         try {
             assertQuery(
                     "SELECT column_name FROM information_schema.columns WHERE table_schema = 'tpch' AND table_name = 'test_unsupported_data_type'",
-                    "VALUES 'key'"); // no 'unsupported_column'
+                    "VALUES 'key'");
+            // no unsupported_column
         }
         finally {
             jdbcSqlExecutor.execute("DROP TABLE tpch.test_unsupported_data_type");

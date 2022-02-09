@@ -180,6 +180,7 @@ public class LdapAuthenticator
             context.close();
         }
         catch (NamingException ignored) {
+            // could be ignored
         }
     }
 

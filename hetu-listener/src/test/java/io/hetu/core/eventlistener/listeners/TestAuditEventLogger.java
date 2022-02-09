@@ -16,6 +16,7 @@ package io.hetu.core.eventlistener.listeners;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.Key;
+import io.airlift.log.Logger;
 import io.hetu.core.eventlistener.HetuEventListenerPlugin;
 import io.prestosql.Session;
 import io.prestosql.plugin.tpch.TpchPlugin;
@@ -37,6 +38,7 @@ import static org.testng.Assert.assertTrue;
 @Test(singleThreaded = true)
 public class TestAuditEventLogger
 {
+    private static final Logger LOG = Logger.get(TestAuditEventLogger.class);
     private static final Path path = Paths.get("/tmp/hetu_audit_test.log");
 
     private final DistributedQueryRunner queryRunner;
@@ -91,7 +93,7 @@ public class TestAuditEventLogger
         }
         catch (RuntimeException ex) {
             // Query should fail but the listener should log the query
-            ex.printStackTrace();
+            LOG.info("Error message: " + ex.getStackTrace());
             assertLog("UserName", "UserIp", "queryId", "operation", "stmt={select * from tpch.tiny.fake_customer}", "status");
         }
     }

@@ -64,15 +64,15 @@ public class MergingHashAggregationBuilder
             int overwriteIntermediateChannelOffset,
             JoinCompiler joinCompiler)
     {
-        ImmutableList.Builder<Integer> groupByPartialChannels = ImmutableList.builder();
+        ImmutableList.Builder<Integer> groupByPartialChannelsBuilder = ImmutableList.builder();
         for (int i = 0; i < groupByTypes.size(); i++) {
-            groupByPartialChannels.add(i);
+            groupByPartialChannelsBuilder.add(i);
         }
 
         this.accumulatorFactories = accumulatorFactories;
         this.step = AggregationNode.Step.partialInput(step);
         this.expectedGroups = expectedGroups;
-        this.groupByPartialChannels = groupByPartialChannels.build();
+        this.groupByPartialChannels = groupByPartialChannelsBuilder.build();
         this.hashChannel = hashChannel.isPresent() ? Optional.of(groupByTypes.size()) : hashChannel;
         this.operatorContext = operatorContext;
         this.sortedPages = sortedPages;

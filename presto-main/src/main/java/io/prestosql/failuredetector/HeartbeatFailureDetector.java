@@ -276,6 +276,7 @@ public class HeartbeatFailureDetector
                 return new URI(url);
             }
             catch (URISyntaxException ignored) {
+                // could be ignored
             }
         }
         return null;
@@ -510,11 +511,11 @@ public class HeartbeatFailureDetector
         @JsonProperty
         public FailureInfo getLastFailureInfo()
         {
-            Exception lastFailureException = getLastFailureException();
-            if (lastFailureException == null) {
+            Exception exception = getLastFailureException();
+            if (exception == null) {
                 return null;
             }
-            return Failures.toFailure(lastFailureException).toFailureInfo();
+            return Failures.toFailure(exception).toFailureInfo();
         }
 
         @JsonProperty

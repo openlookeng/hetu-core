@@ -47,7 +47,7 @@ public class SqlResultHandleUtils
     {
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         try (InputStream is = classLoader.getResourceAsStream(HTML_TMPLATE_FILE_NAME);
-                InputStreamReader isr = new InputStreamReader(is);
+                InputStreamReader isr = new InputStreamReader(is, UTF_8);
                 BufferedReader reader = new BufferedReader(isr);
                 OutputStream out = new FileOutputStream(outputFile + ".html");
                 BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out, UTF_8), BUFFER_SIZE)) {

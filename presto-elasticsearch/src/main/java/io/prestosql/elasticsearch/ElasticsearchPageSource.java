@@ -309,7 +309,7 @@ public class ElasticsearchPageSource
         else if (type instanceof RowType) {
             RowType rowType = (RowType) type;
 
-            List<Decoder> decoders = rowType.getFields().stream()
+            List<Decoder> decoderList = rowType.getFields().stream()
                     .map(field -> createDecoder(appendPath(path, field.getName().get()), field.getType()))
                     .collect(toImmutableList());
 
@@ -318,7 +318,7 @@ public class ElasticsearchPageSource
                     .map(Optional::get)
                     .collect(toImmutableList());
 
-            return new RowDecoder(path, fieldNames, decoders);
+            return new RowDecoder(path, fieldNames, decoderList);
         }
         if (type instanceof ArrayType) {
             Type elementType = ((ArrayType) type).getElementType();

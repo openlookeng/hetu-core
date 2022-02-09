@@ -97,7 +97,7 @@ public class CubeStatementGenerator
         for (Symbol symbol : aggregationNode.getGroupingKeys()) {
             Object column = symbolMappings.get(symbol.getName());
             if (column instanceof ColumnHandle) {
-                builder.groupBy(((ColumnHandle) column).getColumnName());
+                builder.groupByAddString(((ColumnHandle) column).getColumnName());
             }
             else {
                 // Don't know how to handle it

@@ -35,6 +35,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -274,7 +275,7 @@ public class LocalFileRecordCursor
         private static Optional<Domain> getDomain(OptionalInt timestampOrdinalPosition, TupleDomain<LocalFileColumnHandle> predicate)
         {
             Optional<Map<LocalFileColumnHandle, Domain>> domains = predicate.getDomains();
-            Domain domain = null;
+            Domain localDomain = null;
             if (domains.isPresent() && timestampOrdinalPosition.isPresent()) {
                 Map<LocalFileColumnHandle, Domain> domainMap = domains.get();
                 Set<Domain> timestampDomain = domainMap.entrySet().stream()
@@ -283,10 +284,10 @@ public class LocalFileRecordCursor
                         .collect(toSet());
 
                 if (!timestampDomain.isEmpty()) {
-                    domain = Iterables.getOnlyElement(timestampDomain);
+                    localDomain = Iterables.getOnlyElement(timestampDomain);
                 }
             }
-            return Optional.ofNullable(domain);
+            return Optional.ofNullable(localDomain);
         }
 
         private BufferedReader createNextReader()
@@ -299,7 +300,7 @@ public class LocalFileRecordCursor
             FileInputStream fileInputStream = new FileInputStream(file);
 
             InputStream in = isGZipped(file) ? new GZIPInputStream(fileInputStream) : fileInputStream;
-            return new BufferedReader(new InputStreamReader(in));
+            return new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
         }
 
         public static boolean isGZipped(File file)
@@ -316,21 +317,21 @@ public class LocalFileRecordCursor
         public List<String> readFields()
                 throws IOException
         {
-            List<String> fields = null;
+            List<String> fieldsList = null;
             boolean newReader = false;
             if (maxRowFromFile <= 0) {
                 throw new PrestoException(LOCAL_FILE_READ_ERROR, "Local file too large for presto.");
             }
-            while (fields == null) {
+            while (fieldsList == null) {
                 if (reader == null) {
                     return null;
                 }
                 String line = reader.readLine();
                 if (line != null) {
-                    fields = LINE_SPLITTER.splitToList(line);
-                    if (!newReader || meetsPredicate(fields)) {
+                    fieldsList = LINE_SPLITTER.splitToList(line);
+                    if (!newReader || meetsPredicate(fieldsList)) {
                         maxRowFromFile--;
-                        return fields;
+                        return fieldsList;
                     }
                 }
                 reader.close();
@@ -338,7 +339,7 @@ public class LocalFileRecordCursor
                 newReader = true;
             }
             maxRowFromFile--;
-            return fields;
+            return fieldsList;
         }
 
         private boolean meetsPredicate(List<String> fields)

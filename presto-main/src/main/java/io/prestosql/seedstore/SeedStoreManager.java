@@ -40,6 +40,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -437,7 +438,7 @@ public class SeedStoreManager
         while (retryTimes <= SEED_RETRY_TIMES && (seeds == null || seeds.size() == 0));
 
         if (seeds == null || seeds.size() == 0) {
-            throw new PrestoException(SEED_STORE_FAILURE, String.format("add seed=%s to seed store failed after retry:%d",
+            throw new PrestoException(SEED_STORE_FAILURE, String.format(Locale.ROOT, "add seed=%s to seed store failed after retry:%d",
                     seed.getLocation(), SEED_RETRY_TIMES));
         }
 

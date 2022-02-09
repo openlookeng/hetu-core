@@ -288,8 +288,6 @@ public class TestPrestoS3FileSystem
     {
         java.nio.file.Path stagingParent = createTempDirectory("test");
         java.nio.file.Path staging = Paths.get(stagingParent.toString(), "staging");
-        // stagingParent = /tmp/testXXX
-        // staging = /tmp/testXXX/staging
 
         try (PrestoS3FileSystem fs = new PrestoS3FileSystem()) {
             MockAmazonS3 s3 = new MockAmazonS3();
@@ -311,7 +309,6 @@ public class TestPrestoS3FileSystem
             throws Exception
     {
         java.nio.file.Path staging = createTempFile("staging", null);
-        // staging = /tmp/stagingXXX.tmp
 
         try (PrestoS3FileSystem fs = new PrestoS3FileSystem()) {
             MockAmazonS3 s3 = new MockAmazonS3();
@@ -332,8 +329,6 @@ public class TestPrestoS3FileSystem
     {
         java.nio.file.Path staging = createTempDirectory("staging");
         java.nio.file.Path link = Paths.get(staging + ".symlink");
-        // staging = /tmp/stagingXXX
-        // link = /tmp/stagingXXX.symlink -> /tmp/stagingXXX
 
         try {
             try {

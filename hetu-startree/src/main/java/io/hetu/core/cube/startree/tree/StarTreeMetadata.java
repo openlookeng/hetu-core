@@ -115,6 +115,7 @@ public class StarTreeMetadata
     }
 
     @JsonProperty
+    @Override
     public CubeFilter getCubeFilter()
     {
         return cubeFilter;
