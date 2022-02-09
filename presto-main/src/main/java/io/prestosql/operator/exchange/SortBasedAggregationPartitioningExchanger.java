@@ -179,8 +179,9 @@ public class SortBasedAggregationPartitioningExchanger
         return memoryManager.getNotFullFuture();
     }
 
-    int roundOffToPowerOfTwo(int n)
+    int roundOffToPowerOfTwo(int value)
     {
+        int n = value;
         if ((n & (n - 1)) == 0) {
             return n;
         }

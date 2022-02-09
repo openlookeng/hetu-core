@@ -131,23 +131,23 @@ public class BroadcastOutputBuffer
         //
 
         // always get the state first before any other stats
-        BufferState state = this.state.get();
+        BufferState bufferState = this.state.get();
 
         // buffer it a concurrent collection so it is safe to access out side of guard
         // in this case we only want a snapshot of the current buffers
         @SuppressWarnings("FieldAccessNotGuarded")
-        Collection<ClientBuffer> buffers = this.buffers.values();
+        Collection<ClientBuffer> clientBuffers = this.buffers.values();
 
         return new OutputBufferInfo(
                 "BROADCAST",
-                state,
-                state.canAddBuffers(),
-                state.canAddPages(),
+                bufferState,
+                bufferState.canAddBuffers(),
+                bufferState.canAddPages(),
                 memoryManager.getBufferedBytes(),
                 totalBufferedPages.get(),
                 totalRowsAdded.get(),
                 totalPagesAdded.get(),
-                buffers.stream()
+                clientBuffers.stream()
                         .map(ClientBuffer::getInfo)
                         .collect(toImmutableList()));
     }
@@ -161,8 +161,8 @@ public class BroadcastOutputBuffer
         synchronized (this) {
             // ignore buffers added after query finishes, which can happen when a query is canceled
             // also ignore old versions, which is normal
-            BufferState state = this.state.get();
-            if (state.isTerminal() || outputBuffers.getVersion() >= newOutputBuffers.getVersion()) {
+            BufferState bufferState = this.state.get();
+            if (bufferState.isTerminal() || outputBuffers.getVersion() >= newOutputBuffers.getVersion()) {
                 return;
             }
 
@@ -174,7 +174,7 @@ public class BroadcastOutputBuffer
             for (Entry<OutputBufferId, Integer> entry : outputBuffers.getBuffers().entrySet()) {
                 if (!buffers.containsKey(entry.getKey())) {
                     ClientBuffer buffer = getBuffer(entry.getKey());
-                    if (!state.canAddPages()) {
+                    if (!bufferState.canAddPages()) {
                         buffer.setNoMorePages();
                     }
                 }
@@ -222,8 +222,8 @@ public class BroadcastOutputBuffer
         // but still arrives at the buffer *before* the marker. These pages are potentially used twice, if we resume from this marker.
         synchronized (this) {
             // All marker related processing is handled by this utility method
-            pages = snapshotState.processSerializedPages(pages, origin);
-            doEnqueue(pages);
+            List<SerializedPage> finalPages = snapshotState.processSerializedPages(pages, origin);
+            doEnqueue(finalPages);
         }
     }
 
@@ -248,7 +248,7 @@ public class BroadcastOutputBuffer
                 .collect(toImmutableList());
 
         // if we can still add buffers, remember the pages for the future buffers
-        Collection<ClientBuffer> buffers;
+        Collection<ClientBuffer> clientBuffers;
         synchronized (this) {
             if (state.get().canAddBuffers()) {
                 serializedPageReferences.forEach(SerializedPageReference::addReference);
@@ -256,11 +256,11 @@ public class BroadcastOutputBuffer
             }
 
             // make a copy while holding the lock to avoid race with initialPagesForNewBuffers.addAll above
-            buffers = safeGetBuffersSnapshot();
+            clientBuffers = safeGetBuffersSnapshot();
         }
 
         // add pages to all existing buffers (each buffer will increment the reference count)
-        buffers.forEach(partition -> partition.enqueuePages(serializedPageReferences));
+        clientBuffers.forEach(partition -> partition.enqueuePages(serializedPageReferences));
 
         // drop the initial reference
         serializedPageReferences.forEach(SerializedPageReference::dereferencePage);
@@ -365,26 +365,26 @@ public class BroadcastOutputBuffer
         // NOTE: buffers are allowed to be created in the FINISHED state because destroy() can move to the finished state
         // without a clean "no-more-buffers" message from the scheduler.  This happens with limit queries and is ok because
         // the buffer will be immediately destroyed.
-        BufferState state = this.state.get();
-        checkState(state.canAddBuffers() || !outputBuffers.isNoMoreBufferIds(), "No more buffers already set");
+        BufferState bufferState = this.state.get();
+        checkState(bufferState.canAddBuffers() || !outputBuffers.isNoMoreBufferIds(), "No more buffers already set");
 
         // NOTE: buffers are allowed to be created before they are explicitly declared by setOutputBuffers
         // When no-more-buffers is set, we verify that all created buffers have been declared
         buffer = new ClientBuffer(id);
 
         // do not setup the new buffer if we are already failed
-        if (state != FAILED) {
+        if (bufferState != FAILED) {
             // add initial pages
             buffer.enqueuePages(initialPagesForNewBuffers);
 
             // update state
-            if (!state.canAddPages()) {
+            if (!bufferState.canAddPages()) {
                 // BE CAREFUL: set no more pages only if not FAILED, because this allows clients to FINISH
                 buffer.setNoMorePages();
             }
 
             // buffer may have finished immediately before calling this method
-            if (state == FINISHED) {
+            if (bufferState == FINISHED) {
                 buffer.destroy();
             }
         }

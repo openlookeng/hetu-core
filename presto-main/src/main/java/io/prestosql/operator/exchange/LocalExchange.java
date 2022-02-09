@@ -137,12 +137,12 @@ public class LocalExchange
         openSinkFactories.addAll(allSinkFactories);
         noMoreSinkFactories();
 
-        ImmutableList.Builder<LocalExchangeSource> sources = ImmutableList.builder();
+        ImmutableList.Builder<LocalExchangeSource> localExchangeSourceBuilder = ImmutableList.builder();
         for (int i = 0; i < bufferCount; i++) {
             // Snapshot state is given to all local-sources, so they can process markers when they are received.
-            sources.add(new LocalExchangeSource(source -> checkAllSourcesFinished(), snapshotState));
+            localExchangeSourceBuilder.add(new LocalExchangeSource(source -> checkAllSourcesFinished(), snapshotState));
         }
-        this.sources = sources.build();
+        this.sources = localExchangeSourceBuilder.build();
 
         List<BiConsumer<PageReference, String>> buffers = this.sources.stream()
                 .map(buffer -> (BiConsumer<PageReference, String>) buffer::addPage)
@@ -468,31 +468,31 @@ public class LocalExchange
 
     private static int computeBufferCount(PartitioningHandle partitioning, int defaultConcurrency, List<Integer> partitionChannels)
     {
-        int bufferCount;
+        int computeBufferCount;
         if (partitioning.equals(SINGLE_DISTRIBUTION)) {
-            bufferCount = 1;
+            computeBufferCount = 1;
             checkArgument(partitionChannels.isEmpty(), "Gather exchange must not have partition channels");
         }
         else if (partitioning.equals(FIXED_BROADCAST_DISTRIBUTION)) {
-            bufferCount = defaultConcurrency;
+            computeBufferCount = defaultConcurrency;
             checkArgument(partitionChannels.isEmpty(), "Broadcast exchange must not have partition channels");
         }
         else if (partitioning.equals(FIXED_ARBITRARY_DISTRIBUTION)) {
-            bufferCount = defaultConcurrency;
+            computeBufferCount = defaultConcurrency;
             checkArgument(partitionChannels.isEmpty(), "Arbitrary exchange must not have partition channels");
         }
         else if (partitioning.equals(FIXED_HASH_DISTRIBUTION)) {
-            bufferCount = defaultConcurrency;
+            computeBufferCount = defaultConcurrency;
             checkArgument(!partitionChannels.isEmpty(), "Partitioned exchange must have partition channels");
         }
         else if (partitioning.equals(FIXED_PASSTHROUGH_DISTRIBUTION)) {
-            bufferCount = defaultConcurrency;
+            computeBufferCount = defaultConcurrency;
             checkArgument(partitionChannels.isEmpty(), "Passthrough exchange must not have partition channels");
         }
         else {
             throw new IllegalArgumentException("Unsupported local exchange partitioning " + partitioning);
         }
-        return bufferCount;
+        return computeBufferCount;
     }
 
     public static class LocalExchangeSinkFactoryId

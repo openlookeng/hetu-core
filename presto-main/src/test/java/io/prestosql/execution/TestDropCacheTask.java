@@ -167,10 +167,10 @@ public class TestDropCacheTask
     public void testDropCacheNotExistsFalse()
     {
         DropCache statement = new DropCache(QualifiedName.of("test_nonexistent_table"), false);
-        QueryStateMachine stateMachine = createQueryStateMachine("START TRANSACTION", testSession, transactionManager);
+        QueryStateMachine queryStateMachine = createQueryStateMachine("START TRANSACTION", testSession, transactionManager);
 
         try {
-            getFutureValue(new DropCacheTask().execute(statement, createTestTransactionManager(), metadata, new AllowAllAccessControl(), stateMachine, Collections.emptyList(), new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager())));
+            getFutureValue(new DropCacheTask().execute(statement, createTestTransactionManager(), metadata, new AllowAllAccessControl(), queryStateMachine, Collections.emptyList(), new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager())));
             fail("expected exception");
         }
         catch (RuntimeException e) {
@@ -194,9 +194,9 @@ public class TestDropCacheTask
                 .setCatalog(CATALOG_NAME)
                 .setSchema(schema)
                 .build();
-        QueryStateMachine stateMachine = createQueryStateMachine("START TRANSACTION", session, transactionManager);
+        QueryStateMachine queryStateMachine = createQueryStateMachine("START TRANSACTION", session, transactionManager);
 
-        getFutureValue(new DropCacheTask().execute(statement, createTestTransactionManager(), metadata, new AllowAllAccessControl(), stateMachine, Collections.emptyList(), new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager())));
+        getFutureValue(new DropCacheTask().execute(statement, createTestTransactionManager(), metadata, new AllowAllAccessControl(), queryStateMachine, Collections.emptyList(), new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager())));
         assertFalse(SplitCacheMap.getInstance().cacheExists(fullName));
     }
 

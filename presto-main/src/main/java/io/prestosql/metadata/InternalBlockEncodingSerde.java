@@ -50,17 +50,18 @@ final class InternalBlockEncodingSerde
     @Override
     public void writeBlock(SliceOutput output, Block block)
     {
+        Block blockToWrite = block;
         while (true) {
             // get the encoding name
-            String encodingName = block.getEncodingName();
+            String encodingName = blockToWrite.getEncodingName();
 
             // look up the BlockEncoding
             BlockEncoding blockEncoding = functionAndTypeManager.getBlockEncoding(encodingName);
 
             // see if a replacement block should be written instead
-            Optional<Block> replacementBlock = blockEncoding.replacementBlockForWrite(block);
+            Optional<Block> replacementBlock = blockEncoding.replacementBlockForWrite(blockToWrite);
             if (replacementBlock.isPresent()) {
-                block = replacementBlock.get();
+                blockToWrite = replacementBlock.get();
                 continue;
             }
 
@@ -68,7 +69,7 @@ final class InternalBlockEncodingSerde
             writeLengthPrefixedString(output, encodingName);
 
             // write the block to the output
-            blockEncoding.writeBlock(this, output, block);
+            blockEncoding.writeBlock(this, output, blockToWrite);
 
             break;
         }

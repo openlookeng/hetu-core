@@ -241,7 +241,6 @@ public abstract class AbstractTestHiveFileFormats
                     WRITE_DECIMAL_PRECISION_18.toString(), EXPECTED_DECIMAL_PRECISION_18, true))
             .add(new TestColumn("p_decimal_precision_38", DECIMAL_INSPECTOR_PRECISION_38,
                     WRITE_DECIMAL_PRECISION_38.toString() + "BD", EXPECTED_DECIMAL_PRECISION_38, true))
-//            .add(new TestColumn("p_binary", javaByteArrayObjectInspector, "test2", Slices.utf8Slice("test2"), true))
             .add(new TestColumn("p_null_string", javaStringObjectInspector, HIVE_DEFAULT_DYNAMIC_PARTITION, null, true))
             .add(new TestColumn("p_null_varchar", javaHiveVarcharObjectInspector, HIVE_DEFAULT_DYNAMIC_PARTITION, null,
                     true))
@@ -271,7 +270,6 @@ public abstract class AbstractTestHiveFileFormats
             .add(new TestColumn("p_null_decimal_precision_38", DECIMAL_INSPECTOR_PRECISION_38,
                     HIVE_DEFAULT_DYNAMIC_PARTITION, null, true))
 
-//            .add(new TestColumn("p_null_binary", javaByteArrayObjectInspector, HIVE_DEFAULT_DYNAMIC_PARTITION, null, true))
             .add(new TestColumn("t_null_string", javaStringObjectInspector, null, null))
             .add(new TestColumn("t_null_varchar", javaHiveVarcharObjectInspector, null, null))
             .add(new TestColumn("t_null_char", CHAR_INSPECTOR_LENGTH_10, null, null))
@@ -568,11 +566,12 @@ public abstract class AbstractTestHiveFileFormats
             String filePath,
             HiveStorageFormat storageFormat,
             HiveCompressionCodec compressionCodec,
-            List<TestColumn> testColumns,
+            List<TestColumn> columns,
             ConnectorSession session,
             int numRows,
             HiveFileWriterFactory fileWriterFactory)
     {
+        List<TestColumn> testColumns = columns;
         // filter out partition keys, which are not written to the file
         testColumns = ImmutableList.copyOf(filter(testColumns, not(TestColumn::isPartitionKey)));
 
@@ -625,13 +624,14 @@ public abstract class AbstractTestHiveFileFormats
             String filePath,
             HiveStorageFormat storageFormat,
             HiveCompressionCodec compressionCodec,
-            List<TestColumn> testColumns,
+            List<TestColumn> columns,
             int numRows)
             throws Exception
     {
         HiveOutputFormat<?, ?> outputFormat = newInstance(storageFormat.getOutputFormat(), HiveOutputFormat.class);
         Serializer serializer = newInstance(storageFormat.getSerDe(), Serializer.class);
 
+        List<TestColumn> testColumns = columns;
         // filter out partition keys, which are not written to the file
         testColumns = ImmutableList.copyOf(filter(testColumns, not(TestColumn::isPartitionKey)));
 

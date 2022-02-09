@@ -133,6 +133,7 @@ public class CarbondataWriterFactory
     {
     }
 
+    @Override
     protected void setAdditionalSchemaProperties(Properties schema)
     {
         schema.setProperty(META_TABLE_LOCATION, locationService.getTableWriteInfo(locationHandle, false).getTargetPath().toString());

@@ -720,7 +720,7 @@ public class HintedReorderJoins
             @Override
             public int hashCode()
             {
-                return Objects.hash(sources, ImmutableSet.copyOf(logicalRowExpressions.extractConjuncts(filter)), outputSymbols);
+                return Objects.hash(sources, ImmutableSet.copyOf(LogicalRowExpressions.extractConjuncts(filter)), outputSymbols);
             }
 
             @Override
@@ -732,7 +732,7 @@ public class HintedReorderJoins
 
                 MultiJoinNode other = (MultiJoinNode) obj;
                 return this.sources.equals(other.sources)
-                        && ImmutableSet.copyOf(logicalRowExpressions.extractConjuncts(this.filter)).equals(ImmutableSet.copyOf(logicalRowExpressions.extractConjuncts(other.filter)))
+                        && ImmutableSet.copyOf(LogicalRowExpressions.extractConjuncts(this.filter)).equals(ImmutableSet.copyOf(LogicalRowExpressions.extractConjuncts(other.filter)))
                         && this.outputSymbols.equals(other.outputSymbols);
             }
 
@@ -896,8 +896,8 @@ public class HintedReorderJoins
             @Override
             public Void visitPlan(PlanNode node, StringBuilder context)
             {
-                node = lookup.resolve(node);
-                for (PlanNode source : node.getSources()) {
+                PlanNode finalNode = lookup.resolve(node);
+                for (PlanNode source : finalNode.getSources()) {
                     lookup.resolve(source).accept(this, context);
                 }
                 return null;

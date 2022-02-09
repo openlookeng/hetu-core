@@ -46,10 +46,10 @@ public class BlockListBlock<T>
         this.positionCount = positionCount;
         this.positionMap = new int[blockCount + 1];
 
-        long retainedSizeInBytes = INSTANCE_SIZE + sizeOf(blocks);
+        long finalRetainedSizeInBytes = INSTANCE_SIZE + sizeOf(blocks);
         int positionIdx = 0;
         this.positionMap[0] = 0;
-        boolean hasNulls = false;
+        boolean finalHasNulls = false;
 
         String blockEncodingName = blocks[0].getEncodingName();
         for (int i = 0; i < blockCount; i++) {
@@ -58,20 +58,20 @@ public class BlockListBlock<T>
                 throw new IllegalArgumentException("All blocks should be of same type");
             }
 
-            retainedSizeInBytes += block.getRetainedSizeInBytes();
+            finalRetainedSizeInBytes += block.getRetainedSizeInBytes();
             positionIdx += block.getPositionCount();
             this.positionMap[i + 1] = positionIdx;
 
-            hasNulls = hasNulls || block.mayHaveNull();
+            finalHasNulls = finalHasNulls || block.mayHaveNull();
         }
 
-        this.hasNulls = hasNulls;
+        this.hasNulls = finalHasNulls;
 
         if (positionIdx != positionCount) {
             throw new IllegalArgumentException("positionCount not matching the positions in the block");
         }
 
-        this.retainedSizeInBytes = retainedSizeInBytes;
+        this.retainedSizeInBytes = finalRetainedSizeInBytes;
     }
 
     private int lookupBlockForPosition(int position)
@@ -196,25 +196,26 @@ public class BlockListBlock<T>
             throw new IllegalArgumentException("Not Supported");
         }
 
+        int finalLength = length;
         int blockIdx = lookupBlockForPosition(positionOffset);
         Block[] newBlocks = new Block[blockCount];
         int newBlockCount = 0;
         int newPositionCount = 0;
         Block block;
 
-        for (int i = blockIdx; i < blockCount && length > 0; i++) {
+        for (int i = blockIdx; i < blockCount && finalLength > 0; i++) {
             block = blocks[i];
 
             /* if region is within the block return the block else wrap the candidate blocks */
-            if (block.getPositionCount() > (positionOffset - positionMap[blockIdx]) + length) {
-                newBlocks[newBlockCount++] = block.getRegion(positionOffset - positionMap[blockIdx], length);
-                newPositionCount += length;
-                length -= length;
+            if (block.getPositionCount() > (positionOffset - positionMap[blockIdx]) + finalLength) {
+                newBlocks[newBlockCount++] = block.getRegion(positionOffset - positionMap[blockIdx], finalLength);
+                newPositionCount += finalLength;
+                finalLength -= finalLength;
             }
             else {
                 newBlocks[newBlockCount++] = block;
                 newPositionCount += block.getPositionCount();
-                length -= block.getPositionCount();
+                finalLength -= block.getPositionCount();
             }
         }
 

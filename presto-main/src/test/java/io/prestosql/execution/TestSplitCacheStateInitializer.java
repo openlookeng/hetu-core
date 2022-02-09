@@ -110,11 +110,11 @@ public class TestSplitCacheStateInitializer
     public void setup()
     {
         Metadata metadata = MetadataManager.createTestMetadataManager();
-        BlockEncodingSerde blockEncodingSerde = metadata.getFunctionAndTypeManager().getBlockEncodingSerde();
+        BlockEncodingSerde encodingSerde = metadata.getFunctionAndTypeManager().getBlockEncodingSerde();
         objectMapper = new ObjectMapperProvider().get().registerModule(new SimpleModule()
                 .addDeserializer(Type.class, new TypeDeserializer(metadata))
-                .addSerializer(Block.class, new BlockJsonSerde.Serializer(blockEncodingSerde))
-                .addDeserializer(Block.class, new BlockJsonSerde.Deserializer(blockEncodingSerde))
+                .addSerializer(Block.class, new BlockJsonSerde.Serializer(encodingSerde))
+                .addDeserializer(Block.class, new BlockJsonSerde.Deserializer(encodingSerde))
                 .addKeyDeserializer(SplitKey.class, new SplitKey.KeyDeserializer()));
     }
 

@@ -82,6 +82,7 @@ public class DynamicSplitPlacementPolicy
                 Thread.sleep(computeAssignmentSleepMilliSeconds);
             }
             catch (InterruptedException e) {
+                // could be ignored
             }
         }
 

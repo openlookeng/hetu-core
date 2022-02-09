@@ -305,7 +305,7 @@ public class AggregationImplementation
 
         private AggregationImplementation get()
         {
-            Signature signature = new Signature(
+            Signature signatureInstance = new Signature(
                     QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, header.getName()),
                     FunctionKind.AGGREGATE,
                     typeVariableConstraints,
@@ -314,7 +314,7 @@ public class AggregationImplementation
                     inputTypes,
                     false);
 
-            return new AggregationImplementation(signature,
+            return new AggregationImplementation(signatureInstance,
                     aggregationDefinition,
                     stateClass,
                     inputHandle,

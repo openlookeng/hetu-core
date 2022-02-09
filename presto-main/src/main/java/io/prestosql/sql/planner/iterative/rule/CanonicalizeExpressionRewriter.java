@@ -89,27 +89,29 @@ public class CanonicalizeExpressionRewriter
         @Override
         public Expression rewriteComparisonExpression(ComparisonExpression node, Void context, ExpressionTreeRewriter<Void> treeRewriter)
         {
+            ComparisonExpression finalNode = node;
             // if we have a comparison of the form <constant> <op> <expr>, normalize it to
             // <expr> <op-flipped> <constant>
             if (isConstant(node.getLeft()) && !isConstant(node.getRight())) {
-                node = new ComparisonExpression(node.getOperator().flip(), node.getRight(), node.getLeft());
+                finalNode = new ComparisonExpression(node.getOperator().flip(), node.getRight(), node.getLeft());
             }
 
-            return treeRewriter.defaultRewrite(node, context);
+            return treeRewriter.defaultRewrite(finalNode, context);
         }
 
         @Override
         public Expression rewriteArithmeticBinary(ArithmeticBinaryExpression node, Void context, ExpressionTreeRewriter<Void> treeRewriter)
         {
+            ArithmeticBinaryExpression finalNode = node;
             if (node.getOperator() == MULTIPLY || node.getOperator() == ADD) {
                 // if we have a operation of the form <constant> [+|*] <expr>, normalize it to
                 // <expr> [+|*] <constant>
                 if (isConstant(node.getLeft()) && !isConstant(node.getRight())) {
-                    node = new ArithmeticBinaryExpression(node.getOperator(), node.getRight(), node.getLeft());
+                    finalNode = new ArithmeticBinaryExpression(node.getOperator(), node.getRight(), node.getLeft());
                 }
             }
 
-            return treeRewriter.defaultRewrite(node, context);
+            return treeRewriter.defaultRewrite(finalNode, context);
         }
 
         @Override

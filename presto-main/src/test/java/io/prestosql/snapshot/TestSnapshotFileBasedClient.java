@@ -47,10 +47,5 @@ public class TestSnapshotFileBasedClient
         client.storeSnapshotResult(queryId, map);
         LinkedHashMap<Long, SnapshotResult> resultMap = (LinkedHashMap<Long, SnapshotResult>) client.loadSnapshotResult(queryId);
         Assert.assertEquals(map, resultMap);
-
-        // Test delete
-        //client.deleteAll(queryId);
-        //resultMap = (LinkedHashMap<Long, SnapshotResult>) client.loadSnapshotResult(queryId);
-        //Assert.assertEquals(resultMap.size(), 0);
     }
 }

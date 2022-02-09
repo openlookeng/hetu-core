@@ -130,15 +130,15 @@ public class VariableWidthBlock
     @Override
     public long getPositionsSizeInBytes(boolean[] positions)
     {
-        long sizeInBytes = 0;
+        long finalSizeInBytes = 0;
         int usedPositionCount = 0;
         for (int i = 0; i < positions.length; ++i) {
             if (positions[i]) {
                 usedPositionCount++;
-                sizeInBytes += offsets[arrayOffset + i + 1] - offsets[arrayOffset + i];
+                finalSizeInBytes += offsets[arrayOffset + i + 1] - offsets[arrayOffset + i];
             }
         }
-        return sizeInBytes + (Integer.BYTES + Byte.BYTES) * (long) usedPositionCount;
+        return finalSizeInBytes + (Integer.BYTES + Byte.BYTES) * (long) usedPositionCount;
     }
 
     @Override
@@ -205,11 +205,11 @@ public class VariableWidthBlock
     public Block copyRegion(int positionOffset, int length)
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
-        positionOffset += arrayOffset;
+        int finalPositionOffset = positionOffset + arrayOffset;
 
-        int[] newOffsets = compactOffsets(offsets, positionOffset, length);
-        Slice newSlice = compactSlice(slice, offsets[positionOffset], newOffsets[length]);
-        boolean[] newValueIsNull = valueIsNull == null ? null : compactArray(valueIsNull, positionOffset, length);
+        int[] newOffsets = compactOffsets(offsets, finalPositionOffset, length);
+        Slice newSlice = compactSlice(slice, offsets[finalPositionOffset], newOffsets[length]);
+        boolean[] newValueIsNull = valueIsNull == null ? null : compactArray(valueIsNull, finalPositionOffset, length);
 
         if (newOffsets == offsets && newSlice == slice && newValueIsNull == valueIsNull) {
             return this;

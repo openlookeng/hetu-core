@@ -149,11 +149,11 @@ public class TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate
 
     private PlanNode getChildFilterNode(Context context, PlanNode node)
     {
-        node = context.getLookup().resolve(node);
-        if (node instanceof ProjectNode) {
-            return getChildFilterNode(context, ((ProjectNode) node).getSource());
+        PlanNode finalNode = context.getLookup().resolve(node);
+        if (finalNode instanceof ProjectNode) {
+            return getChildFilterNode(context, ((ProjectNode) finalNode).getSource());
         }
-        return node;
+        return finalNode;
     }
 
     private Optional<ProjectNode> transformProjectNode(Context context, ProjectNode projectNode)

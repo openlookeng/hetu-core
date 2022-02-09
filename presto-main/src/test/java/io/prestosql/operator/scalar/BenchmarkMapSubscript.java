@@ -182,9 +182,9 @@ public class BenchmarkMapSubscript
         private static Block createMapBlock(MapType mapType, int positionCount, Block keyBlock, Block valueBlock)
         {
             int[] offsets = new int[positionCount + 1];
-            int mapSize = keyBlock.getPositionCount() / positionCount;
+            int blockMapSize = keyBlock.getPositionCount() / positionCount;
             for (int i = 0; i < offsets.length; i++) {
-                offsets[i] = mapSize * i;
+                offsets[i] = blockMapSize * i;
             }
             return mapType.createBlockFromKeyValue(Optional.empty(), offsets, keyBlock, valueBlock);
         }

@@ -214,8 +214,8 @@ public class PushDeleteAsInsertIntoConnector
                 Assignments.Builder builder = Assignments.builder();
                 builder.putAll(assignments.filter(rewritten.getOutputSymbols()));
                 //Project out symbols which are part of predicate
-                List<Symbol> nonTableSymbols = this.nonTableSymbols.stream().filter(rewritten.getOutputSymbols()::contains).collect(Collectors.toList());
-                for (Symbol symbol : nonTableSymbols) {
+                List<Symbol> finalNonTableSymbols = this.nonTableSymbols.stream().filter(rewritten.getOutputSymbols()::contains).collect(Collectors.toList());
+                for (Symbol symbol : finalNonTableSymbols) {
                     builder.put(symbol, castToRowExpression(toSymbolReference(symbol)));
                 }
                 assignments = builder.build();

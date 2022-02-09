@@ -67,15 +67,15 @@ public class LocalExchangeSinkOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, LocalExchangeSinkOperator.class.getSimpleName());
+            OperatorContext context = driverContext.addOperatorContext(operatorId, planNodeId, LocalExchangeSinkOperator.class.getSimpleName());
 
             LocalExchangeSinkFactory localExchangeSinkFactory = localExchangeFactory.getLocalExchange(driverContext.getLifespan(),
                     driverContext.getPipelineContext().getTaskContext(),
                     planNodeId.toString(),
-                    operatorContext.isSnapshotEnabled()).getSinkFactory(sinkFactoryId);
+                    context.isSnapshotEnabled()).getSinkFactory(sinkFactoryId);
 
-            String sinkId = operatorContext.getUniqueId();
-            return new LocalExchangeSinkOperator(sinkId, operatorContext, localExchangeSinkFactory.createSink(sinkId), pagePreprocessor);
+            String sinkId = context.getUniqueId();
+            return new LocalExchangeSinkOperator(sinkId, context, localExchangeSinkFactory.createSink(sinkId), pagePreprocessor);
         }
 
         @Override
@@ -161,17 +161,18 @@ public class LocalExchangeSinkOperator
     {
         requireNonNull(page, "page is null");
 
+        Page inputPage = page;
         if (snapshotState != null) {
-            if (snapshotState.processPage(page)) {
-                page = snapshotState.nextMarker();
+            if (snapshotState.processPage(inputPage)) {
+                inputPage = snapshotState.nextMarker();
             }
         }
 
-        if (!(page instanceof MarkerPage)) {
-            page = pagePreprocessor.apply(page);
+        if (!(inputPage instanceof MarkerPage)) {
+            inputPage = pagePreprocessor.apply(inputPage);
         }
-        sink.addPage(page, id);
-        operatorContext.recordOutput(page.getSizeInBytes(), page.getPositionCount());
+        sink.addPage(inputPage, id);
+        operatorContext.recordOutput(inputPage.getSizeInBytes(), inputPage.getPositionCount());
     }
 
     @Override

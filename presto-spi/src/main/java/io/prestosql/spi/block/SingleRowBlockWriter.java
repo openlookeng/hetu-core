@@ -40,11 +40,11 @@ public class SingleRowBlockWriter<T>
     {
         super(rowIndex);
         this.fieldBlockBuilders = fieldBlockBuilders;
-        long initialBlockBuilderSize = 0;
+        long finalInitialBlockBuilderSize = 0;
         for (BlockBuilder fieldBlockBuilder : fieldBlockBuilders) {
-            initialBlockBuilderSize += fieldBlockBuilder.getSizeInBytes();
+            finalInitialBlockBuilderSize += fieldBlockBuilder.getSizeInBytes();
         }
-        this.initialBlockBuilderSize = initialBlockBuilderSize;
+        this.initialBlockBuilderSize = finalInitialBlockBuilderSize;
     }
 
     /**

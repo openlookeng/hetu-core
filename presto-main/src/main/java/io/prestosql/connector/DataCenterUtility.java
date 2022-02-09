@@ -127,8 +127,9 @@ public class DataCenterUtility
      * @param metadata session
      * @param catalogName catalog name
      */
-    public static boolean isDCCatalog(Metadata metadata, String catalogName)
+    public static boolean isDCCatalog(Metadata metadata, String name)
     {
+        String catalogName = name;
         if (catalogName != null && catalogName.contains(".")) {
             catalogName = catalogName.substring(0, catalogName.indexOf("."));
         }

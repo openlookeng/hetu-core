@@ -215,9 +215,9 @@ public class PlanPrinter
                 .distinct()
                 .collect(toImmutableMap(Map.Entry::getKey, Map.Entry::getValue)));
 
-        TableInfoSupplier tableInfoSupplier = new TableInfoSupplier(metadata, session);
-        ValuePrinter valuePrinter = new ValuePrinter(metadata, session);
-        return new PlanPrinter(root, typeProvider, Optional.empty(), tableInfoSupplier, valuePrinter, StatsAndCosts.empty(), Optional.empty(), metadata).toJson();
+        TableInfoSupplier supplier = new TableInfoSupplier(metadata, session);
+        ValuePrinter printer = new ValuePrinter(metadata, session);
+        return new PlanPrinter(root, typeProvider, Optional.empty(), supplier, printer, StatsAndCosts.empty(), Optional.empty(), metadata).toJson();
     }
 
     public static String textLogicalPlan(
@@ -229,9 +229,9 @@ public class PlanPrinter
             int level,
             boolean verbose)
     {
-        TableInfoSupplier tableInfoSupplier = new TableInfoSupplier(metadata, session);
-        ValuePrinter valuePrinter = new ValuePrinter(metadata, session);
-        return new PlanPrinter(plan, types, Optional.empty(), tableInfoSupplier, valuePrinter, estimatedStatsAndCosts, Optional.empty(), metadata).toText(verbose, level);
+        TableInfoSupplier supplier = new TableInfoSupplier(metadata, session);
+        ValuePrinter printer = new ValuePrinter(metadata, session);
+        return new PlanPrinter(plan, types, Optional.empty(), supplier, printer, estimatedStatsAndCosts, Optional.empty(), metadata).toText(verbose, level);
     }
 
     public static String textDistributedPlan(StageInfo outputStageInfo, Metadata metadata, Session session, boolean verbose)
@@ -274,11 +274,11 @@ public class PlanPrinter
 
     public static String textDistributedPlan(SubPlan plan, Metadata metadata, Session session, boolean verbose)
     {
-        TableInfoSupplier tableInfoSupplier = new TableInfoSupplier(metadata, session);
-        ValuePrinter valuePrinter = new ValuePrinter(metadata, session);
+        TableInfoSupplier supplier = new TableInfoSupplier(metadata, session);
+        ValuePrinter printer = new ValuePrinter(metadata, session);
         StringBuilder builder = new StringBuilder();
         for (PlanFragment fragment : plan.getAllFragments()) {
-            builder.append(formatFragment(tableInfoSupplier, valuePrinter, fragment, Optional.empty(), Optional.empty(), verbose, plan.getAllFragments(), metadata));
+            builder.append(formatFragment(supplier, printer, fragment, Optional.empty(), Optional.empty(), verbose, plan.getAllFragments(), metadata));
         }
 
         return builder.toString();

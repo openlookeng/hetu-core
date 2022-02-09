@@ -49,16 +49,16 @@ public class SnapshotStateId
     {
         String[] components = str.split(SLASH);
         // the 4 first components are queryId, snapshotId, stageId, and taskId, according to generateHierarchy
-        TaskId newTaskId = new TaskId(components[0], Integer.parseInt(components[2]), Integer.parseInt(components[3]));
-        long snapshotId1 = Long.parseLong(components[1]);
+        TaskId taskIdGen = new TaskId(components[0], Integer.parseInt(components[2]), Integer.parseInt(components[3]));
+        long snapshotIdGen = Long.parseLong(components[1]);
         List<String> parts = Arrays.asList(components);
-        return new SnapshotStateId(snapshotId1, newTaskId, parts);
+        return new SnapshotStateId(snapshotIdGen, taskIdGen, parts);
     }
 
     public static SnapshotStateId forTaskComponent(long snapshotId, TaskContext taskContext, String component)
     {
-        TaskId localTaskId = taskContext.getTaskId();
-        return new SnapshotStateId(snapshotId, localTaskId, component);
+        TaskId taskIdGen = taskContext.getTaskId();
+        return new SnapshotStateId(snapshotId, taskIdGen, component);
     }
 
     public static SnapshotStateId forTaskComponent(long snapshotId, TaskId taskId, String component)
@@ -69,10 +69,10 @@ public class SnapshotStateId
     public static SnapshotStateId forOperator(long snapshotId, OperatorContext operatorContext)
     {
         DriverContext driverContext = operatorContext.getDriverContext();
-        TaskId localTaskId = driverContext.getTaskId();
+        TaskId taskIdGen = driverContext.getTaskId();
         int pipelineId = driverContext.getPipelineContext().getPipelineId();
         int driverId = driverContext.getDriverId();
-        return new SnapshotStateId(snapshotId, localTaskId, pipelineId, driverId, operatorContext.getOperatorId());
+        return new SnapshotStateId(snapshotId, taskIdGen, pipelineId, driverId, operatorContext.getOperatorId());
     }
 
     public static SnapshotStateId forOperator(long snapshotId, TaskId taskId, int pipelineId, int driverId, int operatorId)

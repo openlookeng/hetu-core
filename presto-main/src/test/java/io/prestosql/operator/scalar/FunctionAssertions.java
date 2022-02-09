@@ -257,12 +257,13 @@ public final class FunctionAssertions
 
     public void assertFunction(String projection, Type expectedType, Object expected)
     {
-        if (expected instanceof Slice) {
-            expected = ((Slice) expected).toStringUtf8();
+        Object expectedProjection = expected;
+        if (expectedProjection instanceof Slice) {
+            expectedProjection = ((Slice) expectedProjection).toStringUtf8();
         }
 
         Object actual = selectSingleValue(projection, expectedType, compiler);
-        assertEquals(actual, expected);
+        assertEquals(actual, expectedProjection);
     }
 
     public void assertFunctionString(String projection, Type expectedType, String expected)

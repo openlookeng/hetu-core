@@ -294,11 +294,11 @@ public class TestStringFunctions
 
     private void testStrPosAndPosition(String string, String substring, Long expected)
     {
-        string = (string == null) ? "NULL" : ("'" + string + "'");
+        String newString = (string == null) ? "NULL" : ("'" + string + "'");
         substring = (substring == null) ? "NULL" : ("'" + substring + "'");
 
-        assertFunction(format("STRPOS(%s, %s)", string, substring), BIGINT, expected);
-        assertFunction(format("POSITION(%s in %s)", substring, string), BIGINT, expected);
+        assertFunction(format("STRPOS(%s, %s)", newString, substring), BIGINT, expected);
+        assertFunction(format("POSITION(%s in %s)", substring, newString), BIGINT, expected);
     }
 
     @Test

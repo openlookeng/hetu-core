@@ -122,9 +122,9 @@ public class SplitCacheAwareNodeSelector
     public SplitPlacementResult computeAssignments(Set<Split> splits, List<RemoteTask> existingTasks, Optional<SqlStageExecution> stage)
     {
         Multimap<InternalNode, Split> assignment = HashMultimap.create();
-        NodeMap nodeMap = this.nodeMap.get().get();
+        NodeMap nodeMapSlice = this.nodeMap.get().get();
         Map<CatalogName, Map<String, InternalNode>> activeNodesByCatalog = new HashMap<>();
-        NodeAssignmentStats assignmentStats = new NodeAssignmentStats(nodeTaskMap, nodeMap, existingTasks);
+        NodeAssignmentStats assignmentStats = new NodeAssignmentStats(nodeTaskMap, nodeMapSlice, existingTasks);
 
         Set<Split> uncacheableSplits = new HashSet<>();
         Set<Split> newCacheableSplits = new HashSet<>();

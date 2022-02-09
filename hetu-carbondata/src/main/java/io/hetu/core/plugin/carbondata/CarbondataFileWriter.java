@@ -226,25 +226,25 @@ public class CarbondataFileWriter
 
     private FileSinkOperator.RecordWriter getHiveWriter(String segmentId, long taskNo) throws Exception
     {
-        Path outPutPath = this.outPutPath;
-        Properties properties = this.properties;
-        JobConf configuration = this.configuration;
-        boolean compress = HiveConf.getBoolVar(configuration, COMPRESSRESULT);
+        Path finalOutPutPath = this.outPutPath;
+        Properties finalProperties = this.properties;
+        JobConf finalConfiguration = this.configuration;
+        boolean compress = HiveConf.getBoolVar(finalConfiguration, COMPRESSRESULT);
 
-        CarbonLoadModel carbonLoadModel = HiveCarbonUtil.getCarbonLoadModel(properties, configuration);
+        CarbonLoadModel carbonLoadModel = HiveCarbonUtil.getCarbonLoadModel(finalProperties, finalConfiguration);
         carbonLoadModel.setSegmentId(segmentId);
         carbonLoadModel.setTaskNo(String.valueOf(taskNo));
         carbonLoadModel.setFactTimeStamp(Long.parseLong(txnTimeStamp));
         carbonLoadModel.setBadRecordsAction(TableOptionConstant.BAD_RECORDS_ACTION.getName() + ",force");
 
-        CarbonTableOutputFormat.setLoadModel(configuration, carbonLoadModel);
+        CarbonTableOutputFormat.setLoadModel(finalConfiguration, carbonLoadModel);
         this.configuration.set(CarbondataConstants.TaskId, getTaskAttemptId(String.valueOf(taskNo)));
 
         Object writer =
                 Class.forName(MapredCarbonOutputFormat.class.getName()).getConstructor().newInstance();
         return ((MapredCarbonOutputFormat<?>) writer)
-                .getHiveRecordWriter(configuration, outPutPath, Text.class, compress,
-                        properties, Reporter.NULL);
+                .getHiveRecordWriter(finalConfiguration, finalOutPutPath, Text.class, compress,
+                        finalProperties, Reporter.NULL);
     }
 
     @Override
@@ -285,7 +285,7 @@ public class CarbondataFileWriter
 
     public void appendRow(Page dataPage, int position)
     {
-        FileSinkOperator.RecordWriter recordWriter = null;
+        FileSinkOperator.RecordWriter finalRecordWriter = null;
         if (HiveACIDWriteType.isUpdateOrDelete(acidWriteType)) {
             try {
                 DeleteDeltaBlockDetails deleteDeltaBlockDetails = null;
@@ -334,7 +334,7 @@ public class CarbondataFileWriter
                     return;
                 }
 
-                recordWriter = segmentRecordWriterMap.computeIfAbsent(segmentId, v ->
+                finalRecordWriter = segmentRecordWriterMap.computeIfAbsent(segmentId, v ->
                 {
                     try {
                         return getHiveWriter(segmentId, CarbonUpdateUtil.getLatestTaskIdForSegment(new Segment(segmentId), tablePath) + 1);
@@ -351,7 +351,7 @@ public class CarbondataFileWriter
             }
         }
         else {
-            recordWriter = this.recordWriter;
+            finalRecordWriter = this.recordWriter;
         }
 
         for (int field = 0; field < fieldCount; field++) {
@@ -365,8 +365,8 @@ public class CarbondataFileWriter
         }
 
         try {
-            if (recordWriter != null) {
-                recordWriter.write(serDe.serialize(row, tableInspector));
+            if (finalRecordWriter != null) {
+                finalRecordWriter.write(serDe.serialize(row, tableInspector));
             }
         }
         catch (SerDeException | IOException e) {

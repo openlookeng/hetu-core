@@ -93,7 +93,7 @@ public class FixedSourcePartitionedScheduler
 
         BucketedSplitPlacementPolicy splitPlacementPolicy = new BucketedSplitPlacementPolicy(nodeSelector, nodes, bucketNodeMap, stage::getAllTasks);
 
-        ArrayList<SourceScheduler> sourceSchedulers = new ArrayList<>();
+        ArrayList<SourceScheduler> sourceSchedulerArrayList = new ArrayList<>();
         checkArgument(
                 partitionHandles.equals(ImmutableList.of(NOT_PARTITIONED)) != stageExecutionDescriptor.isStageGroupedExecution(),
                 "PartitionHandles should be [NOT_PARTITIONED] if and only if all scan nodes use ungrouped execution strategy");
@@ -107,7 +107,7 @@ public class FixedSourcePartitionedScheduler
         }
 
         boolean firstPlanNode = true;
-        Optional<LifespanScheduler> groupedLifespanScheduler = Optional.empty();
+        Optional<LifespanScheduler> groupedLifespanSchedulerOptional = Optional.empty();
         for (PlanNodeId planNodeId : schedulingOrder) {
             SplitSource splitSource = splitSources.get(planNodeId);
             boolean groupedExecutionForScanNode = stageExecutionDescriptor.isScanGroupedExecution(planNodeId);
@@ -125,7 +125,7 @@ public class FixedSourcePartitionedScheduler
             if (stageExecutionDescriptor.isStageGroupedExecution() && !groupedExecutionForScanNode) {
                 sourceScheduler = new AsGroupedSourceScheduler(sourceScheduler);
             }
-            sourceSchedulers.add(sourceScheduler);
+            sourceSchedulerArrayList.add(sourceScheduler);
 
             if (firstPlanNode) {
                 firstPlanNode = false;
@@ -151,12 +151,12 @@ public class FixedSourcePartitionedScheduler
                     lifespanScheduler.scheduleInitial(sourceScheduler);
                     // Schedule new lifespans for finished ones
                     stage.addCompletedDriverGroupsChangedListener(lifespanScheduler::onLifespanFinished);
-                    groupedLifespanScheduler = Optional.of(lifespanScheduler);
+                    groupedLifespanSchedulerOptional = Optional.of(lifespanScheduler);
                 }
             }
         }
-        this.groupedLifespanScheduler = groupedLifespanScheduler;
-        this.sourceSchedulers = sourceSchedulers;
+        this.groupedLifespanScheduler = groupedLifespanSchedulerOptional;
+        this.sourceSchedulers = sourceSchedulerArrayList;
     }
 
     private ConnectorPartitionHandle partitionHandleFor(Lifespan lifespan)

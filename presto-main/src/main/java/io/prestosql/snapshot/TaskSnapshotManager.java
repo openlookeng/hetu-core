@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -132,23 +133,24 @@ public class TaskSnapshotManager
     private Optional<Object> loadWithBacktrack(SnapshotStateId snapshotStateId)
             throws Exception
     {
-        TaskId taskId = snapshotStateId.getTaskId();
-        long snapshotId = snapshotStateId.getSnapshotId();
+        SnapshotStateId newSnapshotStateId = snapshotStateId;
+        TaskId snapshotStateIdTaskId = newSnapshotStateId.getTaskId();
+        long snapshotId = newSnapshotStateId.getSnapshotId();
 
         // Operators may have finished when a snapshot is taken, then in the snapshot the operator won't have a corresponding state,
         // but they still needs to be restored to rebuild their internal states.
         // Need to check previous snapshots for their stored states.
         Optional<Object> state;
-        loadMapIfNecessary(snapshotId, taskId);
-        state = Optional.ofNullable(loadCache.get(snapshotId).get(snapshotStateId.toString()));
+        loadMapIfNecessary(snapshotId, snapshotStateIdTaskId);
+        state = Optional.ofNullable(loadCache.get(snapshotId).get(newSnapshotStateId.toString()));
         Map<Long, SnapshotResult> snapshotToSnapshotResultMap = null;
         while (!state.isPresent()) {
             // Snapshot is complete but no entry for this id, then the component must have finished
             // before the snapshot was taken. Look at previous complete snapshots for last saved state.
             if (snapshotToSnapshotResultMap == null) {
-                snapshotToSnapshotResultMap = snapshotUtils.loadSnapshotResult(snapshotStateId.getTaskId().getQueryId().getId());
+                snapshotToSnapshotResultMap = snapshotUtils.loadSnapshotResult(newSnapshotStateId.getTaskId().getQueryId().getId());
             }
-            OptionalLong prevSnapshotId = getPreviousSnapshotIdIfComplete(snapshotToSnapshotResultMap, snapshotStateId.getSnapshotId());
+            OptionalLong prevSnapshotId = getPreviousSnapshotIdIfComplete(snapshotToSnapshotResultMap, newSnapshotStateId.getSnapshotId());
             if (!prevSnapshotId.isPresent()) {
                 return state;
             }
@@ -160,9 +162,9 @@ public class TaskSnapshotManager
                 return Optional.of(NO_STATE);
             }
             snapshotId = prevSnapshotId.getAsLong();
-            snapshotStateId = snapshotStateId.withSnapshotId(snapshotId);
-            loadMapIfNecessary(snapshotId, taskId);
-            state = Optional.ofNullable(loadCache.get(snapshotId).get(snapshotStateId.toString()));
+            newSnapshotStateId = newSnapshotStateId.withSnapshotId(snapshotId);
+            loadMapIfNecessary(snapshotId, snapshotStateIdTaskId);
+            state = Optional.ofNullable(loadCache.get(snapshotId).get(newSnapshotStateId.toString()));
         }
         return state;
     }
@@ -219,13 +221,13 @@ public class TaskSnapshotManager
             List<Map.Entry<Long, SnapshotResult>> entryList = new ArrayList<>(snapshotToSnapshotResultMap.entrySet());
             for (int i = entryList.size() - 1; i >= 0; i--) {
                 long sId = entryList.get(i).getKey();
-                SnapshotResult restoreResult = entryList.get(i).getValue();
+                SnapshotResult snapshotRestoreResult = entryList.get(i).getValue();
                 if (sId < snapshotId) {
-                    if (restoreResult == SnapshotResult.SUCCESSFUL) {
+                    if (snapshotRestoreResult == SnapshotResult.SUCCESSFUL) {
                         return OptionalLong.of(sId);
                     }
                     // Skip over NA entries
-                    else if (restoreResult != SnapshotResult.NA) {
+                    else if (snapshotRestoreResult != SnapshotResult.NA) {
                         return OptionalLong.empty();
                     }
                 }
@@ -295,7 +297,7 @@ public class TaskSnapshotManager
 
     private void updateCapture(SnapshotStateId componentId, SnapshotComponentCounter.ComponentState componentState)
     {
-        TaskId taskId = componentId.getTaskId();
+        TaskId componentIdTaskId = componentId.getTaskId();
         checkState(totalComponents > 0);
         final long snapshotId = componentId.getSnapshotId();
         // update capturedSnapshotComponentCounterMap
@@ -311,7 +313,7 @@ public class TaskSnapshotManager
                     if (snapshotResult == SnapshotResult.SUCCESSFUL) {
                         // All components for the task have captured their states successfully.
                         // Save the consolidated state.
-                        SnapshotStateId newId = createConsolidatedId(snapshotId, taskId);
+                        SnapshotStateId newId = createConsolidatedId(snapshotId, componentIdTaskId);
                         try {
                             Map<String, Object> map = storeCache.remove(snapshotId);
                             if (map == null) {
@@ -327,15 +329,15 @@ public class TaskSnapshotManager
                     }
                     if (snapshotUtils.isCoordinator()) {
                         // Results on coordinator won't be reported through remote task. Send to the query side.
-                        QuerySnapshotManager querySnapshotManager = snapshotUtils.getQuerySnapshotManager(taskId.getQueryId());
+                        QuerySnapshotManager querySnapshotManager = snapshotUtils.getQuerySnapshotManager(componentIdTaskId.getQueryId());
                         if (querySnapshotManager != null) {
                             if (snapshotResult == SnapshotResult.SUCCESSFUL) {
-                                querySnapshotManager.addConsolidatedFileToList(createConsolidatedId(snapshotId, taskId).toString());
+                                querySnapshotManager.addConsolidatedFileToList(createConsolidatedId(snapshotId, componentIdTaskId).toString());
                             }
-                            querySnapshotManager.updateQueryCapture(taskId, snapshotId, snapshotResult);
+                            querySnapshotManager.updateQueryCapture(componentIdTaskId, snapshotId, snapshotResult);
                         }
                     }
-                    LOG.debug("Finished capturing snapshot %d for task %s. Result is %s.", snapshotId, taskId, snapshotResult);
+                    LOG.debug("Finished capturing snapshot %d for task %s. Result is %s.", snapshotId, componentIdTaskId, snapshotResult);
                 }
             }
         }
@@ -343,7 +345,7 @@ public class TaskSnapshotManager
 
     private void updateRestore(SnapshotStateId componentId, SnapshotComponentCounter.ComponentState componentState)
     {
-        TaskId taskId = componentId.getTaskId();
+        TaskId componentIdTaskId = componentId.getTaskId();
         checkState(totalComponents > 0);
         long snapshotId = componentId.getSnapshotId();
         // update restoredSnapshotComponentCounterMap
@@ -356,15 +358,15 @@ public class TaskSnapshotManager
                 if (restoreResult.setSnapshotResult(snapshotId, snapshotResult) && snapshotResult.isDone()) {
                     if (snapshotUtils.isCoordinator()) {
                         // Results on coordinator won't be reported through remote task. Send to the query side.
-                        QuerySnapshotManager querySnapshotManager = snapshotUtils.getQuerySnapshotManager(taskId.getQueryId());
+                        QuerySnapshotManager querySnapshotManager = snapshotUtils.getQuerySnapshotManager(componentIdTaskId.getQueryId());
                         if (querySnapshotManager != null) {
-                            querySnapshotManager.updateQueryRestore(taskId, Optional.of(restoreResult));
+                            querySnapshotManager.updateQueryRestore(componentIdTaskId, Optional.of(restoreResult));
                         }
                     }
                     // All components for the task have restored their states successfully.
                     // The loadCache won't be used again.
                     loadCache.clear();
-                    LOG.debug("Finished restoring snapshot %d for task %s. Result is %s.", snapshotId, taskId.toString(), snapshotResult);
+                    LOG.debug("Finished restoring snapshot %d for task %s. Result is %s.", snapshotId, componentIdTaskId.toString(), snapshotResult);
                 }
             }
         }
@@ -397,6 +399,6 @@ public class TaskSnapshotManager
     @Override
     public String toString()
     {
-        return String.format("%s, with total component %d", taskId, totalComponents);
+        return String.format(Locale.ENGLISH, "%s, with total component %d", taskId, totalComponents);
     }
 }

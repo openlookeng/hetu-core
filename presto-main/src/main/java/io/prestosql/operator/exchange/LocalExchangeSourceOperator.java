@@ -60,14 +60,14 @@ public class LocalExchangeSourceOperator
 
             LocalExchange inMemoryExchange = localExchangeFactory.getLocalExchange(driverContext.getLifespan(), driverContext.getPipelineContext().getTaskContext());
 
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, LocalExchangeSourceOperator.class.getSimpleName());
-            LocalExchangeSource source = inMemoryExchange.getNextSource();
+            OperatorContext context = driverContext.addOperatorContext(operatorId, planNodeId, LocalExchangeSourceOperator.class.getSimpleName());
+            LocalExchangeSource localExchangeSource = inMemoryExchange.getNextSource();
             // Snapshot: make driver ID and source/partition index the same, to ensure consistency before and after resuming.
             // HashBuilderOperator also uses the same mechanism to ensure consistency.
-            if (operatorContext.isSnapshotEnabled()) {
-                source = inMemoryExchange.getSource(driverContext.getDriverId());
+            if (context.isSnapshotEnabled()) {
+                localExchangeSource = inMemoryExchange.getSource(driverContext.getDriverId());
             }
-            return new LocalExchangeSourceOperator(operatorContext, source, totalInputChannels);
+            return new LocalExchangeSourceOperator(context, localExchangeSource, totalInputChannels);
         }
 
         @Override

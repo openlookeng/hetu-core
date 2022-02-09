@@ -37,17 +37,17 @@ class WindowOperatorStats
     {
         checkArgument(info.getWindowInfos().size() > 0, "WindowInfo cannot have empty list of DriverWindowInfos");
 
-        int activeDrivers = 0;
-        int totalDrivers = 0;
+        int windowActiveDrivers = 0;
+        int windowTotalDrivers = 0;
 
-        double partitionRowsSumSquaredDiffs = 0.0;
-        double positionsInIndexesSumSquaredDiffs = 0.0;
-        double sizeOfIndexesSumSquaredDiffs = 0.0;
-        double indexCountPerDriverSumSquaredDiffs = 0.0;
-        double rowCountPerDriverSumSquaredDiffs = 0.0;
-        long totalRowCount = 0;
-        long totalIndexesCount = 0;
-        long totalPartitionsCount = 0;
+        double windowPartitionRowsSumSquaredDiffs = 0.0;
+        double windowPositionsInIndexesSumSquaredDiffs = 0.0;
+        double windowSizeOfIndexesSumSquaredDiffs = 0.0;
+        double windowIndexCountPerDriverSumSquaredDiffs = 0.0;
+        double windowRowCountPerDriverSumSquaredDiffs = 0.0;
+        long windowTotalRowCount = 0;
+        long windowTotalIndexesCount = 0;
+        long windowTotalPartitionsCount = 0;
 
         double averageNumberOfIndexes = info.getWindowInfos().stream()
                 .filter(WindowOperatorStats::isMeaningful)
@@ -63,35 +63,35 @@ class WindowOperatorStats
 
         for (DriverWindowInfo driverWindowInfo : info.getWindowInfos()) {
             long driverTotalRowsCount = driverWindowInfo.getTotalRowsCount();
-            totalDrivers++;
+            windowTotalDrivers++;
             if (driverTotalRowsCount > 0) {
                 long numberOfIndexes = driverWindowInfo.getNumberOfIndexes();
 
-                partitionRowsSumSquaredDiffs += driverWindowInfo.getSumSquaredDifferencesSizeInPartition();
-                totalPartitionsCount += driverWindowInfo.getTotalPartitionsCount();
+                windowPartitionRowsSumSquaredDiffs += driverWindowInfo.getSumSquaredDifferencesSizeInPartition();
+                windowTotalPartitionsCount += driverWindowInfo.getTotalPartitionsCount();
 
-                totalRowCount += driverWindowInfo.getTotalRowsCount();
+                windowTotalRowCount += driverWindowInfo.getTotalRowsCount();
 
-                positionsInIndexesSumSquaredDiffs += driverWindowInfo.getSumSquaredDifferencesPositionsOfIndex();
-                sizeOfIndexesSumSquaredDiffs += driverWindowInfo.getSumSquaredDifferencesSizeOfIndex();
-                totalIndexesCount += numberOfIndexes;
+                windowPositionsInIndexesSumSquaredDiffs += driverWindowInfo.getSumSquaredDifferencesPositionsOfIndex();
+                windowSizeOfIndexesSumSquaredDiffs += driverWindowInfo.getSumSquaredDifferencesSizeOfIndex();
+                windowTotalIndexesCount += numberOfIndexes;
 
-                indexCountPerDriverSumSquaredDiffs += (Math.pow(numberOfIndexes - averageNumberOfIndexes, 2));
-                rowCountPerDriverSumSquaredDiffs += (Math.pow(driverTotalRowsCount - averageNumberOfRows, 2));
-                activeDrivers++;
+                windowIndexCountPerDriverSumSquaredDiffs += (Math.pow(numberOfIndexes - averageNumberOfIndexes, 2));
+                windowRowCountPerDriverSumSquaredDiffs += (Math.pow(driverTotalRowsCount - averageNumberOfRows, 2));
+                windowActiveDrivers++;
             }
         }
 
-        return new WindowOperatorStats(partitionRowsSumSquaredDiffs,
-                positionsInIndexesSumSquaredDiffs,
-                sizeOfIndexesSumSquaredDiffs,
-                indexCountPerDriverSumSquaredDiffs,
-                rowCountPerDriverSumSquaredDiffs,
-                totalRowCount,
-                totalIndexesCount,
-                totalPartitionsCount,
-                activeDrivers,
-                totalDrivers);
+        return new WindowOperatorStats(windowPartitionRowsSumSquaredDiffs,
+                windowPositionsInIndexesSumSquaredDiffs,
+                windowSizeOfIndexesSumSquaredDiffs,
+                windowIndexCountPerDriverSumSquaredDiffs,
+                windowRowCountPerDriverSumSquaredDiffs,
+                windowTotalRowCount,
+                windowTotalIndexesCount,
+                windowTotalPartitionsCount,
+                windowActiveDrivers,
+                windowTotalDrivers);
     }
 
     private static boolean isMeaningful(DriverWindowInfo windowInfo)

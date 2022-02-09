@@ -49,9 +49,9 @@ public class ResettableRandomizedIterator<T>
             throw new NoSuchElementException();
         }
 
-        int position = ThreadLocalRandom.current().nextInt(this.position, list.size());
+        int elementPosition = ThreadLocalRandom.current().nextInt(this.position, list.size());
 
-        T result = list.set(position, list.get(this.position));
+        T result = list.set(elementPosition, list.get(this.position));
         list.set(this.position, result);
         this.position++;
 

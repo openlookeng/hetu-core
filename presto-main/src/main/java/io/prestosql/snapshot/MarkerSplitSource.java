@@ -231,10 +231,11 @@ public class MarkerSplitSource
 
     private ListenableFuture<SplitBatch> prepareNextBatch(ConnectorPartitionHandle partitionHandle, Lifespan lifespan, int maxSize)
     {
+        int localMaxSize = maxSize;
         int remaining = splitBuffer.size() - bufferPosition;
-        if (remaining >= maxSize || sourceExhausted) {
+        if (remaining >= localMaxSize || sourceExhausted) {
             // Request can be served entirely by the buffer
-            int including = Math.min(remaining, maxSize);
+            int including = Math.min(remaining, localMaxSize);
             List<Split> splits = splitBuffer.subList(bufferPosition, bufferPosition + including);
             bufferPosition += including;
             boolean lastBatch = sourceExhausted && including == remaining;
@@ -245,13 +246,13 @@ public class MarkerSplitSource
         if (remaining > 0) {
             existing = new ArrayList<>(splitBuffer.subList(bufferPosition, bufferPosition + remaining));
             bufferPosition += remaining;
-            maxSize -= remaining;
+            localMaxSize -= remaining;
         }
         // Lambda below requires this to be effectively final, so can't use "existing" directly
         final List<Split> existingSplits = existing;
 
         // Retrieve additional splits from source, and combine with remaining splits in the buffer, if any
-        ListenableFuture<SplitBatch> result = source.getNextBatch(partitionHandle, lifespan, maxSize);
+        ListenableFuture<SplitBatch> result = source.getNextBatch(partitionHandle, lifespan, localMaxSize);
         return Futures.transform(result, batch ->
         {
             if (batch != null) {
@@ -278,7 +279,7 @@ public class MarkerSplitSource
 
     private SplitBatch recordSnapshot(Lifespan lifespan, boolean resuming, long snapshotId, boolean lastBatch)
     {
-        lastBatch = updateUnionsources(snapshotId, lastBatch);
+        boolean localLastBatch = updateUnionsources(snapshotId, lastBatch);
 
         if (!resuming) {
             if (!firstSnapshot.isPresent()) {
@@ -291,8 +292,8 @@ public class MarkerSplitSource
 
         MarkerSplit split = resuming ? MarkerSplit.resumeSplit(getCatalogName(), snapshotId) : MarkerSplit.snapshotSplit(getCatalogName(), snapshotId);
         Split marker = new Split(getCatalogName(), split, lifespan);
-        SplitBatch batch = new SplitBatch(Collections.singletonList(marker), lastBatch);
-        if (lastBatch) {
+        SplitBatch batch = new SplitBatch(Collections.singletonList(marker), localLastBatch);
+        if (localLastBatch) {
             sentFinalMarker = true;
             deactivate();
         }
@@ -301,7 +302,8 @@ public class MarkerSplitSource
 
     private boolean updateUnionsources(long snapshotId, boolean lastBatch)
     {
-        if (lastBatch && !unionSources.isEmpty()) {
+        boolean localLastBatch = lastBatch;
+        if (localLastBatch && !unionSources.isEmpty()) {
             if (remainingUnionSources.contains(this)) {
                 OptionalLong lastMarker = remainingUnionSources.size() == 1 ? OptionalLong.of(snapshotId) : OptionalLong.empty();
                 for (MarkerSplitSource source : unionSources) {
@@ -309,10 +311,10 @@ public class MarkerSplitSource
                 }
             }
             if (!remainingUnionSources.isEmpty()) {
-                lastBatch = false;
+                localLastBatch = false;
             }
         }
-        return lastBatch;
+        return localLastBatch;
     }
 
     public void resumeSnapshot(long snapshotId)
