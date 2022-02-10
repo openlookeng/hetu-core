@@ -377,11 +377,12 @@ public class TestStatementBuilder
 
     private static String fixTpchQuery(String s)
     {
-        s = s.replaceFirst("(?m);$", "");
-        s = s.replaceAll("(?m)^:[xo]$", "");
-        s = s.replaceAll("(?m)^:n -1$", "");
-        s = s.replaceAll("(?m)^:n ([0-9]+)$", "LIMIT $1");
-        s = s.replace("day (3)", "day"); // for query 1
-        return s;
+        String tmpString = s;
+        tmpString = tmpString.replaceFirst("(?m);$", "");
+        tmpString = tmpString.replaceAll("(?m)^:[xo]$", "");
+        tmpString = tmpString.replaceAll("(?m)^:n -1$", "");
+        tmpString = tmpString.replaceAll("(?m)^:n ([0-9]+)$", "LIMIT $1");
+        tmpString = tmpString.replace("day (3)", "day"); // for query 1
+        return tmpString;
     }
 }

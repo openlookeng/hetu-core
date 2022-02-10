@@ -100,30 +100,35 @@ public final class DecoderTestColumnHandle
     }
 
     @JsonProperty
+    @Override
     public String getName()
     {
         return name;
     }
 
     @JsonProperty
+    @Override
     public Type getType()
     {
         return type;
     }
 
     @JsonProperty
+    @Override
     public String getMapping()
     {
         return mapping;
     }
 
     @JsonProperty
+    @Override
     public String getDataFormat()
     {
         return dataFormat;
     }
 
     @JsonProperty
+    @Override
     public String getFormatHint()
     {
         return formatHint;
@@ -136,6 +141,7 @@ public final class DecoderTestColumnHandle
     }
 
     @JsonProperty
+    @Override
     public boolean isInternal()
     {
         return internal;

@@ -99,8 +99,8 @@ public class MarkerPage
     public static MarkerPage deserialize(byte[] bytes)
     {
         ByteBuffer buffer = ByteBuffer.wrap(bytes);
-        long snapshotId = buffer.getLong();
-        boolean isResuming = buffer.get() != 0;
-        return new MarkerPage(snapshotId, isResuming);
+        long snapshotId1 = buffer.getLong();
+        boolean isResuming1 = buffer.get() != 0;
+        return new MarkerPage(snapshotId1, isResuming1);
     }
 }

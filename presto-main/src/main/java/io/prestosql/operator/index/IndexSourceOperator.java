@@ -74,9 +74,9 @@ public class IndexSourceOperator
         public SourceOperator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, sourceId, IndexSourceOperator.class.getSimpleName());
+            OperatorContext tmpOperatorContext = driverContext.addOperatorContext(operatorId, sourceId, IndexSourceOperator.class.getSimpleName());
             return new IndexSourceOperator(
-                    operatorContext,
+                    tmpOperatorContext,
                     sourceId,
                     index,
                     probeKeyNormalizer);

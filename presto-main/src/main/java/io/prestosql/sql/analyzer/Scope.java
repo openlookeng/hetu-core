@@ -172,9 +172,10 @@ public class Scope
 
     private static boolean isColumnReference(QualifiedName name, RelationType relation)
     {
-        while (name.getPrefix().isPresent()) {
-            name = name.getPrefix().get();
-            if (!relation.resolveFields(name).isEmpty()) {
+        QualifiedName tmpName = name;
+        while (tmpName.getPrefix().isPresent()) {
+            tmpName = tmpName.getPrefix().get();
+            if (!relation.resolveFields(tmpName).isEmpty()) {
                 return true;
             }
         }

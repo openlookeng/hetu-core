@@ -16,6 +16,7 @@ package io.prestosql.plugin.jdbc;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.log.Logger;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
@@ -44,6 +45,7 @@ import static org.testng.Assert.fail;
 @Test(singleThreaded = true)
 public class TestJdbcMetadata
 {
+    private static final Logger LOGGER = Logger.get(TestJdbcMetadata.class);
     private TestingDatabase database;
     private JdbcMetadata metadata;
     private JdbcTableHandle tableHandle;
@@ -73,8 +75,8 @@ public class TestJdbcMetadata
     @Test
     public void testGetTableHandle()
     {
-        JdbcTableHandle tableHandle = metadata.getTableHandle(SESSION, new SchemaTableName("example", "numbers"));
-        assertEquals(metadata.getTableHandle(SESSION, new SchemaTableName("example", "numbers")), tableHandle);
+        JdbcTableHandle tmpTableHandle = metadata.getTableHandle(SESSION, new SchemaTableName("example", "numbers"));
+        assertEquals(metadata.getTableHandle(SESSION, new SchemaTableName("example", "numbers")), tmpTableHandle);
         assertNull(metadata.getTableHandle(SESSION, new SchemaTableName("example", "unknown")));
         assertNull(metadata.getTableHandle(SESSION, new SchemaTableName("unknown", "numbers")));
         assertNull(metadata.getTableHandle(SESSION, new SchemaTableName("unknown", "unknown")));
@@ -101,6 +103,7 @@ public class TestJdbcMetadata
             fail("Expected getColumnHandle of unknown table to throw a TableNotFoundException");
         }
         catch (TableNotFoundException ignored) {
+            LOGGER.error("unknownTableColumnHandle error : %s", ignored.getMessage());
         }
     }
 
@@ -136,6 +139,7 @@ public class TestJdbcMetadata
             fail("Expected getTableMetadata of unknown table to throw a TableNotFoundException");
         }
         catch (TableNotFoundException ignored) {
+            LOGGER.error("TableNotFoundException error : %s", ignored.getMessage());
         }
     }
 

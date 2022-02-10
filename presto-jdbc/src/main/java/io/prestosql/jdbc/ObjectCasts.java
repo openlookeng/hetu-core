@@ -55,8 +55,9 @@ final class ObjectCasts
                     case "1":
                     case "true":
                         return true;
+                    default:
+                        throw new IllegalArgumentException("Invalid boolean value: " + x);
                 }
-                throw new IllegalArgumentException("Invalid boolean value: " + x);
             }
         }
         catch (RuntimeException e) {

@@ -296,13 +296,14 @@ public class TestSnapshotCompleteness
 
     private Class<?> findStateClass(Class<?> clazz, String className)
     {
-        while (clazz != null) {
-            for (Class<?> inner : clazz.getDeclaredClasses()) {
+        Class<?> tmpClazz = clazz;
+        while (tmpClazz != null) {
+            for (Class<?> inner : tmpClazz.getDeclaredClasses()) {
                 if (inner.getSimpleName().equals(className)) {
                     return inner;
                 }
             }
-            clazz = clazz.getName().contains("$") ? clazz.getEnclosingClass() : clazz.getDeclaringClass();
+            tmpClazz = tmpClazz.getName().contains("$") ? tmpClazz.getEnclosingClass() : tmpClazz.getDeclaringClass();
         }
         return null;
     }

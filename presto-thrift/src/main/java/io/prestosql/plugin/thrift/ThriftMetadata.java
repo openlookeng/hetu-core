@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.drift.TException;
 import io.airlift.drift.client.DriftClient;
+import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.prestosql.plugin.thrift.annotations.ForMetadataRefresh;
 import io.prestosql.plugin.thrift.api.PrestoThriftNullableSchemaName;
@@ -66,6 +67,7 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 public class ThriftMetadata
         implements ConnectorMetadata
 {
+    private static final Logger LOGGER = Logger.get(ThriftMetadata.class);
     private static final Duration EXPIRE_AFTER_WRITE = new Duration(10, MINUTES);
     private static final Duration REFRESH_AFTER_WRITE = new Duration(2, MINUTES);
 
@@ -177,6 +179,7 @@ public class ThriftMetadata
                 columns.put(tableName, getRequiredTableMetadata(tableName).getColumns());
             }
             catch (TableNotFoundException e) {
+                LOGGER.error("get table error : %s", e.getMessage());
                 // when list the column information of the table, ignore the exception.
             }
         }

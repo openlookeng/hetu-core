@@ -120,7 +120,7 @@ import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.HIVE_
 public class ThriftHiveMetastore
         implements ThriftMetastore
 {
-    private static final Logger log = Logger.get(ThriftHiveMetastore.class);
+    private static final Logger LOGGER = Logger.get(ThriftHiveMetastore.class);
 
     private final ThriftMetastoreStats stats = new ThriftMetastoreStats();
     private final MetastoreLocator clientProvider;
@@ -1271,7 +1271,6 @@ public class ThriftHiveMetastore
         }
 
         // check if statistics for the columnsWithMissingStatistics are actually stored in the metastore
-        // when trying to remove any missing statistics the metastore throws NoSuchObjectException
         String partitionName = partitionWithStatistics.getPartitionName();
         List<ColumnStatisticsObj> statisticsToBeRemoved = getMetastorePartitionColumnStatistics(
                 identity,
@@ -1620,7 +1619,7 @@ public class ThriftHiveMetastore
                     throw new PrestoException(HiveErrorCode.HIVE_TABLE_LOCK_NOT_ACQUIRED, format("Timed out waiting for lock %d in hive transaction %s for query %s", lockId, transactionId, queryId));
                 }
 
-                log.debug("Waiting for lock %d in hive transaction %s for query %s", lockId, transactionId, queryId);
+                LOGGER.debug("Waiting for lock %d in hive transaction %s for query %s", lockId, transactionId, queryId);
 
                 response = retry()
                         .stopOn(NoSuchTxnException.class, NoSuchLockException.class, TxnAbortedException.class, MetaException.class)
@@ -1753,7 +1752,7 @@ public class ThriftHiveMetastore
                     });
         }
         catch (ConfigValSecurityException e) {
-            log.debug(e, "Could not fetch value for config '%s' from Hive", name);
+            LOGGER.debug(e, "Could not fetch value for config '%s' from Hive", name);
             return Optional.empty();
         }
         catch (TException e) {
@@ -1859,6 +1858,7 @@ public class ThriftHiveMetastore
                 throw t;
             }
             catch (IOException e) {
+                LOGGER.error("setMetastoreUserOrClose error : %s", e.getMessage());
                 // impossible; will be suppressed
             }
         }

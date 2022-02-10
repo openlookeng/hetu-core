@@ -354,7 +354,7 @@ public final class HttpRemoteTask
             return;
         }
 
-        boolean needsUpdate = false;
+        boolean tmpNeedsUpdate = false;
         for (Entry<PlanNodeId, Collection<Split>> entry : splitsBySource.asMap().entrySet()) {
             PlanNodeId sourceId = entry.getKey();
             Collection<Split> splits = entry.getValue();
@@ -370,11 +370,11 @@ public final class HttpRemoteTask
                 pendingSourceSplitCount += added;
                 partitionedSplitCountTracker.setPartitionedSplitCount(getPartitionedSplitCount());
             }
-            needsUpdate = true;
+            tmpNeedsUpdate = true;
         }
         updateSplitQueueSpace();
 
-        if (needsUpdate) {
+        if (tmpNeedsUpdate) {
             this.needsUpdate.set(true);
             scheduleUpdate();
         }
@@ -568,7 +568,6 @@ public final class HttpRemoteTask
         Request request = setContentTypeHeaders(isBinaryEncoding, preparePost())
                 .setUri(uriBuilder.build())
                 .setBodyGenerator(StaticBodyGenerator.createStaticBodyGenerator(taskUpdateRequestJson))
-                // .setBodyGenerator(createBodyGenerator(updateRequest))
                 .build();
         ResponseHandler responseHandler;
         if (isBinaryEncoding) {
@@ -604,12 +603,12 @@ public final class HttpRemoteTask
     {
         Set<ScheduledSplit> splits = ImmutableSet.copyOf(pendingSplits.get(planNodeId));
         boolean pendingNoMoreSplits = Boolean.TRUE.equals(this.noMoreSplits.get(planNodeId));
-        boolean noMoreSplits = this.noMoreSplits.containsKey(planNodeId);
+        boolean tmpNoMoreSplits = this.noMoreSplits.containsKey(planNodeId);
         Set<Lifespan> noMoreSplitsForLifespan = pendingNoMoreSplitsForLifespan.get(planNodeId);
 
         TaskSource element = null;
         if (!splits.isEmpty() || !noMoreSplitsForLifespan.isEmpty() || pendingNoMoreSplits) {
-            element = new TaskSource(planNodeId, splits, noMoreSplitsForLifespan, noMoreSplits);
+            element = new TaskSource(planNodeId, splits, noMoreSplitsForLifespan, tmpNoMoreSplits);
         }
         return element;
     }
@@ -879,13 +878,13 @@ public final class HttpRemoteTask
         {
             try (SetThreadName ignored = new SetThreadName("UpdateResponseHandler-%s", taskId)) {
                 try {
-                    long currentRequestStartNanos;
+                    long tmpCurrentRequestStartNanos;
                     synchronized (HttpRemoteTask.this) {
                         currentRequest = null;
                         sendPlan.set(value.isNeedsPlan());
-                        currentRequestStartNanos = HttpRemoteTask.this.currentRequestStartNanos;
+                        tmpCurrentRequestStartNanos = HttpRemoteTask.this.currentRequestStartNanos;
                     }
-                    updateStats(currentRequestStartNanos);
+                    updateStats(tmpCurrentRequestStartNanos);
                     processTaskUpdate(value, sources);
                     updateErrorTracker.requestSucceeded();
                 }
@@ -900,12 +899,12 @@ public final class HttpRemoteTask
         {
             try (SetThreadName ignored = new SetThreadName("UpdateResponseHandler-%s", taskId)) {
                 try {
-                    long currentRequestStartNanos;
+                    long tmpCurrentRequestStartNanos;
                     synchronized (HttpRemoteTask.this) {
                         currentRequest = null;
-                        currentRequestStartNanos = HttpRemoteTask.this.currentRequestStartNanos;
+                        tmpCurrentRequestStartNanos = HttpRemoteTask.this.currentRequestStartNanos;
                     }
-                    updateStats(currentRequestStartNanos);
+                    updateStats(tmpCurrentRequestStartNanos);
 
                     // on failure assume we need to update again
                     needsUpdate.set(true);

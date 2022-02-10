@@ -112,7 +112,6 @@ public class PageConsumer
             throw new WebApplicationException(Response.Status.GONE);
         }
 
-        // token > lastToken + 1
         throw new WebApplicationException(Response.Status.NOT_FOUND);
     }
 

@@ -43,7 +43,7 @@ import static java.util.concurrent.Executors.newCachedThreadPool;
 public class StepCalcManager
         implements Runnable
 {
-    private static final Logger log = Logger.get(StepCalcManager.class);
+    private static final Logger LOGGER = Logger.get(StepCalcManager.class);
     private final ExecutorService executor;
     private final ThreadPoolExecutorMBean executorMBean;
     private PriorityBlockingQueue<TableSplitConfig> adjustTableQueue;
@@ -93,7 +93,7 @@ public class StepCalcManager
                 lastUpdateTime = System.currentTimeMillis();
             }
             catch (Exception e) {
-                log.error("Load pdbo table error : ", e.getMessage());
+                LOGGER.error("Load pdbo table error : %s", e.getMessage());
                 lastUpdateTime = System.currentTimeMillis();
             }
         }
@@ -127,8 +127,8 @@ public class StepCalcManager
 
         List<SplitStatLog> copyLogList = new ArrayList<>();
         for (SplitStatLog statLog : list) {
-            SplitStatLog log = new SplitStatLog();
-            log.setCatalogName(statLog.getCatalogName())
+            SplitStatLog tmpLog = new SplitStatLog();
+            tmpLog.setCatalogName(statLog.getCatalogName())
                     .setSchemaName(statLog.getSchemaName())
                     .setTableName(statLog.getTableName())
                     .setSplitField(statLog.getSplitField())
@@ -138,7 +138,7 @@ public class StepCalcManager
                     .setEndIndex(statLog.getEndIndex())
                     .setTimeStamp(statLog.getTimeStamp())
                     .setRecordFlag(statLog.getRecordFlag());
-            copyLogList.add(log);
+            copyLogList.add(tmpLog);
         }
 
         return copyLogList;
@@ -207,10 +207,10 @@ public class StepCalcManager
             executor.execute(runner);
         }
         catch (RejectedExecutionException ignored) {
+            LOGGER.error("execute thread error : %s", ignored.getMessage());
         }
     }
 
-    // TableSplitConfig.catalogName/schemaName/tableName
     public List<SplitStatLog> getAdjustSplitList(String catalogName, String schemaName, String tableName)
     {
         String key = generateTableFullName(catalogName, schemaName, tableName);
@@ -268,27 +268,27 @@ public class StepCalcManager
         SplitStatLog firstLog = tableLogs.get(0);
 
         if (firstLog.getSplitCount() == null) {
-            log.debug("scan node is null, split run log invalid. table=" + table.getTableName());
+            LOGGER.debug("scan node is null, split run log invalid. table=" + table.getTableName());
             return false;
         }
 
         if (firstLog.getSplitCount() != totalSplitNum) {
             // scanNodes + upper limit + lower limit
             if ((firstLog.getSplitCount() + 2) != totalSplitNum) {
-                log.debug("split run log invalid. logCount=" + totalSplitNum +
+                LOGGER.debug("split run log invalid. logCount=" + totalSplitNum +
                         ",expect=" + firstLog.getSplitCount() + ", table=" + table.getTableName());
                 return false;
             }
         }
 
         if (!table.getSplitField().equals(firstLog.getSplitField())) {
-            log.debug("split run log invalid. config field=" + table.getSplitField() +
+            LOGGER.debug("split run log invalid. config field=" + table.getSplitField() +
                     ",field in log=" + firstLog.getSplitField() + ", table=" + table.getTableName());
             return false;
         }
 
         if (!table.getSplitCount().equals(firstLog.getSplitCount())) {
-            log.debug("split run log invalid. config scanNode=" + table.getSplitCount() +
+            LOGGER.debug("split run log invalid. config scanNode=" + table.getSplitCount() +
                     ",log splitCount=" + firstLog.getSplitCount() + ", table=" + table.getTableName());
             return false;
         }
@@ -302,13 +302,13 @@ public class StepCalcManager
         for (SplitStatLog statLog : tableLogs) {
             // split range of logs must be continuous
             if (rangeEnd != statLog.getBeginIndex()) {
-                log.debug("split run log invalid for range not continous. last end=" + rangeEnd +
+                LOGGER.debug("split run log invalid for range not continous. last end=" + rangeEnd +
                         ",range begin=" + statLog.getBeginIndex() + ", table=" + table.getTableName());
                 return false;
             }
 
             if (statLog.getBeginIndex() >= statLog.getEndIndex()) {
-                log.debug("split run log invalid for range invalid. range begin=" + statLog.getBeginIndex() +
+                LOGGER.debug("split run log invalid for range invalid. range begin=" + statLog.getBeginIndex() +
                         ",range end=" + statLog.getEndIndex() + ", table=" + table.getTableName());
                 return false;
             }
@@ -380,7 +380,7 @@ public class StepCalcManager
         }
 
         if (result.size() != logCount) {
-            log.debug("adjust step failed, origin logsize=" + logCount + ",result logsize=" + result.size() + ",average rows=" + averageRows);
+            LOGGER.debug("adjust step failed, origin logsize=" + logCount + ",result logsize=" + result.size() + ",average rows=" + averageRows);
             return false;
         }
 

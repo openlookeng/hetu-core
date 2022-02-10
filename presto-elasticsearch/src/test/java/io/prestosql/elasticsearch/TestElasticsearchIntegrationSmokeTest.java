@@ -75,6 +75,7 @@ public class TestElasticsearchIntegrationSmokeTest
     }
 
     @Test
+    @Override
     public void testSelectAll()
     {
         // List columns explicitly, as there's no defined order in Elasticsearch
@@ -82,6 +83,7 @@ public class TestElasticsearchIntegrationSmokeTest
     }
 
     @Test
+    @Override
     public void testRangePredicate()
     {
         // List columns explicitly, as there's no defined order in Elasticsearch
@@ -92,6 +94,7 @@ public class TestElasticsearchIntegrationSmokeTest
     }
 
     @Test
+    @Override
     public void testMultipleRangesPredicate()
     {
         assertQuery("" +

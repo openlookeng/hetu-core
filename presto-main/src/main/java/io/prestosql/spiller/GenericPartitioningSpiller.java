@@ -86,13 +86,13 @@ public class GenericPartitioningSpiller
         this.memoryContext = memoryContext;
         int partitionCount = partitionFunction.getPartitionCount();
 
-        ImmutableList.Builder<PageBuilder> pageBuilders = ImmutableList.builder();
+        ImmutableList.Builder<PageBuilder> tmpPageBuilders = ImmutableList.builder();
         spillers = new ArrayList<>(partitionCount);
         for (int partition = 0; partition < partitionCount; partition++) {
-            pageBuilders.add(new PageBuilder(types));
+            tmpPageBuilders.add(new PageBuilder(types));
             spillers.add(Optional.empty());
         }
-        this.pageBuilders = pageBuilders.build();
+        this.pageBuilders = tmpPageBuilders.build();
     }
 
     @Override

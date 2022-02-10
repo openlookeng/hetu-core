@@ -549,21 +549,21 @@ public class TestHindex
 
         String tableName = getNewTableName();
         createTable1(tableName);
-        testerQuery = "SELECT * FROM " + tableName + " WHERE " + testerQuery;
+        String tmpTesterQuery = "SELECT * FROM " + tableName + " WHERE " + testerQuery;
         String indexName = getNewIndexName();
 
         assertQuerySucceeds("CREATE INDEX " + indexName + " USING " +
                 indexType + " ON " + tableName + " (id)");
 
-        MaterializedResult resultLoadingIndex = computeActual(testerQuery);
+        MaterializedResult resultLoadingIndex = computeActual(tmpTesterQuery);
 
         // Wait before continuing
         Thread.sleep(INDEX_LOAD_WAIT_TIME);
 
-        MaterializedResult resultIndexLoaded = computeActual(testerQuery);
+        MaterializedResult resultIndexLoaded = computeActual(tmpTesterQuery);
 
         assertTrue(verifyEqualResults(resultLoadingIndex, resultIndexLoaded),
-                "The results should be equal for " + testerQuery + " " + indexType);
+                "The results should be equal for " + tmpTesterQuery + " " + indexType);
     }
 
     @Test

@@ -91,16 +91,16 @@ public class CachingCostProvider
     private PlanCostEstimate getGroupCost(GroupReference groupReference)
     {
         int group = groupReference.getGroupId();
-        Memo memo = this.memo.orElseThrow(() -> new IllegalStateException("CachingCostProvider without memo cannot handle GroupReferences"));
+        Memo tmpMemo = this.memo.orElseThrow(() -> new IllegalStateException("CachingCostProvider without memo cannot handle GroupReferences"));
 
-        Optional<PlanCostEstimate> knownCost = memo.getCost(group);
+        Optional<PlanCostEstimate> knownCost = tmpMemo.getCost(group);
         if (knownCost.isPresent()) {
             return knownCost.get();
         }
 
-        PlanCostEstimate cost = calculateCost(memo.getNode(group));
-        verify(!memo.getCost(group).isPresent(), "Group cost already set");
-        memo.storeCost(group, cost);
+        PlanCostEstimate cost = calculateCost(tmpMemo.getNode(group));
+        verify(!tmpMemo.getCost(group).isPresent(), "Group cost already set");
+        tmpMemo.storeCost(group, cost);
         return cost;
     }
 

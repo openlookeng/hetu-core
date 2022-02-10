@@ -72,6 +72,7 @@ public class CTEScanNode
     }
 
     @JsonProperty
+    @Override
     public List<Symbol> getOutputSymbols()
     {
         return outputSymbols;

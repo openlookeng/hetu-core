@@ -16,6 +16,7 @@ package io.prestosql.plugin.jdbc;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CachedConnectorMetadata;
@@ -54,6 +55,7 @@ import static org.testng.Assert.fail;
 @Test(singleThreaded = true)
 public class TestCachingJdbcMetadata
 {
+    private static final Logger LOGGER = Logger.get(TestCachingJdbcMetadata.class);
     private TestingDatabase database;
     private CachedConnectorMetadata metadata;
     private JdbcMetadataConfig config;
@@ -225,6 +227,7 @@ public class TestCachingJdbcMetadata
             fail("Expected getTableMetadata of unknown table to throw a TableNotFoundException");
         }
         catch (TableNotFoundException ignored) {
+            LOGGER.error("unknownTableMetadata error : %s", ignored.getMessage());
         }
     }
 
@@ -302,6 +305,7 @@ public class TestCachingJdbcMetadata
             fail("Expected getColumnHandle of unknown table to throw a TableNotFoundException");
         }
         catch (TableNotFoundException ignored) {
+            LOGGER.error("unknownTableColumnHandle error : %s", ignored.getMessage());
         }
     }
 

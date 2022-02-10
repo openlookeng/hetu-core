@@ -1016,13 +1016,13 @@ public class TestEffectivePredicateExtractor
     {
         // Normalize the predicate by identity so that the EqualityInference will produce stable rewrites in this test
         // and thereby produce comparable Sets of conjuncts from this method.
-        predicate = expressionNormalizer.normalize(predicate);
+        Expression tmpPredicate = expressionNormalizer.normalize(predicate);
 
         // Equality inference rewrites and equality generation will always be stable across multiple runs in the same JVM
-        EqualityInference inference = EqualityInference.createEqualityInference(predicate);
+        EqualityInference inference = EqualityInference.createEqualityInference(tmpPredicate);
 
         Set<Expression> rewrittenSet = new HashSet<>();
-        for (Expression expression : EqualityInference.nonInferrableConjuncts(predicate)) {
+        for (Expression expression : EqualityInference.nonInferrableConjuncts(tmpPredicate)) {
             Expression rewritten = inference.rewriteExpression(expression, Predicates.alwaysTrue());
             Preconditions.checkState(rewritten != null, "Rewrite with full symbol scope should always be possible");
             rewrittenSet.add(rewritten);

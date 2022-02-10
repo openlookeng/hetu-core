@@ -77,7 +77,7 @@ public class StringClassifierAdapter
         BasicSliceInput input = slice.getInput();
         int classifierLength = input.readInt();
 
-        Model classifier = ModelUtils.deserialize(input.readSlice(classifierLength));
+        Model classifier1 = ModelUtils.deserialize(input.readSlice(classifierLength));
         int numEnumerations = input.readInt();
 
         ImmutableMap.Builder<Integer, String> builder = ImmutableMap.builder();
@@ -89,7 +89,7 @@ public class StringClassifierAdapter
             builder.put(key, value);
         }
 
-        return new StringClassifierAdapter((Classifier<Integer>) classifier, builder.build());
+        return new StringClassifierAdapter((Classifier<Integer>) classifier1, builder.build());
     }
 
     @Override

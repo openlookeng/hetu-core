@@ -143,8 +143,8 @@ class ContinuousTaskStatusFetcher
     private synchronized void scheduleNextRequest()
     {
         // stopped or done?
-        TaskStatus taskStatus = getTaskStatus();
-        if (!running || taskStatus.getState().isDone()) {
+        TaskStatus tmpTaskStatus = getTaskStatus();
+        if (!running || tmpTaskStatus.getState().isDone()) {
             return;
         }
 
@@ -163,9 +163,9 @@ class ContinuousTaskStatusFetcher
         }
 
         Request request = addInstanceIdHeader(setContentTypeHeaders(isBinaryEncoding, prepareGet()))
-                .setUri(uriBuilderFrom(taskStatus.getSelf()).appendPath("status").build())
+                .setUri(uriBuilderFrom(tmpTaskStatus.getSelf()).appendPath("status").build())
                 .setHeader(CONTENT_TYPE, JSON_UTF_8.toString())
-                .setHeader(PRESTO_CURRENT_STATE, taskStatus.getState().toString())
+                .setHeader(PRESTO_CURRENT_STATE, tmpTaskStatus.getState().toString())
                 .setHeader(PRESTO_MAX_WAIT, refreshMaxWait.toString())
                 .build();
 
@@ -223,8 +223,8 @@ class ContinuousTaskStatusFetcher
             updateStats(currentRequestStartNanos.get());
             try {
                 // if task not already done, record error
-                TaskStatus taskStatus = getTaskStatus();
-                if (!taskStatus.getState().isDone()) {
+                TaskStatus tmpTaskStatus = getTaskStatus();
+                if (!tmpTaskStatus.getState().isDone()) {
                     errorTracker.requestFailed(cause);
                 }
             }

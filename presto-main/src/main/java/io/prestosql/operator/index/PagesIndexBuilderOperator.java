@@ -54,8 +54,8 @@ public class PagesIndexBuilderOperator
         {
             checkState(!closed, "Factory is already closed");
 
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, PagesIndexBuilderOperator.class.getSimpleName());
-            return new PagesIndexBuilderOperator(operatorContext, indexSnapshotBuilder);
+            OperatorContext tmpOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, PagesIndexBuilderOperator.class.getSimpleName());
+            return new PagesIndexBuilderOperator(tmpOperatorContext, indexSnapshotBuilder);
         }
 
         @Override

@@ -614,14 +614,14 @@ public class PrestoStatement
     protected final PrestoConnection connection()
             throws SQLException
     {
-        PrestoConnection connection = this.connection.get();
-        if (connection == null) {
+        PrestoConnection conn = this.connection.get();
+        if (conn == null) {
             throw new SQLException("Statement is closed");
         }
-        if (connection.isClosed()) {
+        if (conn.isClosed()) {
             throw new SQLException("Connection is closed");
         }
-        return connection;
+        return conn;
     }
 
     private void closeResultSet()

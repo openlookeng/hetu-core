@@ -23,6 +23,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 
 import static io.prestosql.plugin.ml.type.RegressorType.REGRESSOR;
 import static java.util.Objects.requireNonNull;
@@ -50,7 +51,7 @@ public class SvmRegressor
     {
         // TODO do something with the hyperparameters
         try {
-            svm_model model = svm.svm_load_model(new BufferedReader(new InputStreamReader(new ByteArrayInputStream(modelData))));
+            svm_model model = svm.svm_load_model(new BufferedReader(new InputStreamReader(new ByteArrayInputStream(modelData), StandardCharsets.UTF_8)));
             return new SvmRegressor(model);
         }
         catch (IOException e) {

@@ -230,16 +230,11 @@ public class SslInboundHandler
         if (logger.isFineEnabled()) {
             logger.fine(format("begin to enlargeApplicationBuffer, channel=%s, buffer=[%s, %s, %s]", channel, buffer.position(), buffer.limit(), buffer.capacity()));
         }
-        if (appBufferSize > buffer.capacity()) {
-            buffer = newByteBuffer(appBufferSize, config.getOption(DIRECT_BUF));
-        }
-        else {
-            buffer = ByteBuffer.allocate(buffer.capacity() * 2);
-        }
+        ByteBuffer tmpBuffer = appBufferSize > buffer.capacity() ? newByteBuffer(appBufferSize, config.getOption(DIRECT_BUF)) : ByteBuffer.allocate(buffer.capacity() * 2);
         if (logger.isFineEnabled()) {
-            logger.fine(format("end to enlargeApplicationBuffer, channel=%s, buffer=[%s, %s, %s]", channel, buffer.position(), buffer.limit(), buffer.capacity()));
+            logger.fine(format("end to enlargeApplicationBuffer, channel=%s, buffer=[%s, %s, %s]", channel, tmpBuffer.position(), tmpBuffer.limit(), tmpBuffer.capacity()));
         }
-        return buffer;
+        return tmpBuffer;
     }
 
     private ByteBuffer enlargePacketBuffer(ByteBuffer buffer)
@@ -249,32 +244,28 @@ public class SslInboundHandler
         if (logger.isFineEnabled()) {
             logger.fine(format("begin to enlargePacketBuffer, channel=%s, buffer=[%s, %s, %s]", channel, buffer.position(), buffer.limit(), buffer.capacity()));
         }
-        if (appBufferSize > buffer.capacity()) {
-            buffer = newByteBuffer(appBufferSize, config.getOption(DIRECT_BUF));
-        }
-        else {
-            buffer = ByteBuffer.allocate(buffer.capacity() * 2);
-        }
+        ByteBuffer tmpBuffer = appBufferSize > buffer.capacity() ? newByteBuffer(appBufferSize, config.getOption(DIRECT_BUF)) : ByteBuffer.allocate(buffer.capacity() * 2);
         if (logger.isFineEnabled()) {
-            logger.fine(format("end to enlargePacketBuffer, channel=%s, buffer=[%s, %s, %s]", channel, buffer.position(), buffer.limit(), buffer.capacity()));
+            logger.fine(format("end to enlargePacketBuffer, channel=%s, buffer=[%s, %s, %s]", channel, tmpBuffer.position(), tmpBuffer.limit(), tmpBuffer.capacity()));
         }
-        return buffer;
+        return tmpBuffer;
     }
 
     private ByteBuffer adapterByteBufferIfNotEnough(ByteBuffer buffer, int otherBufferLimit)
     {
         ChannelOptions config = channel.options();
+        ByteBuffer tmpBuffer = buffer;
         if (buffer.capacity() < otherBufferLimit) {
             if (logger.isFineEnabled()) {
-                logger.fine(format("adapterByteBufferIfNotEnough, begin to enlarge, channel=%s, buffer=[%s, %s, %s]", channel, buffer.position(), buffer.limit(), buffer.capacity()));
+                logger.fine(format("adapterByteBufferIfNotEnough, begin to enlarge, channel=%s, buffer=[%s, %s, %s]", channel, tmpBuffer.position(), tmpBuffer.limit(), tmpBuffer.capacity()));
             }
-            buffer = newByteBuffer(otherBufferLimit, config.getOption(DIRECT_BUF));
+            tmpBuffer = newByteBuffer(otherBufferLimit, config.getOption(DIRECT_BUF));
             updateInboundPipeline();
             if (logger.isFineEnabled()) {
-                logger.fine(format("adapterByteBufferIfNotEnough, end to enlarge, channel=%s, buffer=[%s, %s, %s]", channel, buffer.position(), buffer.limit(), buffer.capacity()));
+                logger.fine(format("adapterByteBufferIfNotEnough, end to enlarge, channel=%s, buffer=[%s, %s, %s]", channel, tmpBuffer.position(), tmpBuffer.limit(), tmpBuffer.capacity()));
             }
         }
 
-        return buffer;
+        return tmpBuffer;
     }
 }

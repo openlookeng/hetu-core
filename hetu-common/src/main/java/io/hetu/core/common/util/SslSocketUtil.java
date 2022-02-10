@@ -47,16 +47,6 @@ public class SslSocketUtil
         if (!tlsEnabled) {
             return Optional.empty();
         }
-
-        // https://docs.oracle.com/javase/8/docs/technotes/guides/security/jsse/JSSERefGuide.html#CustomizingStores
-        // as per link above, the default SSLContext will be constructed using the default KeyManager and
-        // default TrustManager. Those can be configured using the following system properties:
-        // javax.net.ssl.keyStore
-        // javax.net.ssl.keyStorePassword
-        // javax.net.ssl.keyStoreType
-        // javax.net.ssl.trustStore
-        // javax.net.ssl.trustStorePassword
-        // see link above for more details
         return Optional.of(SSLContext.getDefault());
     }
 

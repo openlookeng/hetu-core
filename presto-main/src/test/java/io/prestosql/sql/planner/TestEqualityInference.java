@@ -281,9 +281,9 @@ public class TestEqualityInference
     public void testSubExpressionRewrites()
     {
         EqualityInference.Builder builder = new EqualityInference.Builder();
-        builder.addEquality(nameReference("a1"), add("b", "c")); // a1 = b + c
-        builder.addEquality(nameReference("a2"), multiply(nameReference("b"), add("b", "c"))); // a2 = b * (b + c)
-        builder.addEquality(nameReference("a3"), multiply(nameReference("a1"), add("b", "c"))); // a3 = a1 * (b + c)
+        builder.addEquality(nameReference("a1"), add("b", "c"));
+        builder.addEquality(nameReference("a2"), multiply(nameReference("b"), add("b", "c")));
+        builder.addEquality(nameReference("a3"), multiply(nameReference("a1"), add("b", "c")));
         EqualityInference inference = builder.build();
 
         // Expression (b + c) should get entirely rewritten as a1
@@ -323,8 +323,8 @@ public class TestEqualityInference
     public void testEqualityGeneration()
     {
         EqualityInference.Builder builder = new EqualityInference.Builder();
-        builder.addEquality(nameReference("a1"), add("b", "c")); // a1 = b + c
-        builder.addEquality(nameReference("e1"), add("b", "d")); // e1 = b + d
+        builder.addEquality(nameReference("a1"), add("b", "c"));
+        builder.addEquality(nameReference("e1"), add("b", "d"));
         addEquality("c", "d", builder);
         EqualityInference inference = builder.build();
 

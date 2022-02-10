@@ -65,10 +65,10 @@ public class TestingConnectorContext
 
     public TestingConnectorContext()
     {
-        Metadata metadata = createTestMetadataManager();
-        pageIndexerFactory = new GroupByHashPageIndexerFactory(new JoinCompiler(metadata));
-        rowExpressionService = new ConnectorRowExpressionService(new RowExpressionDomainTranslator(metadata), new RowExpressionDeterminismEvaluator(metadata));
-        typeManager = new InternalTypeManager(metadata.getFunctionAndTypeManager());
+        Metadata tmpMetadata = createTestMetadataManager();
+        pageIndexerFactory = new GroupByHashPageIndexerFactory(new JoinCompiler(tmpMetadata));
+        rowExpressionService = new ConnectorRowExpressionService(new RowExpressionDomainTranslator(tmpMetadata), new RowExpressionDeterminismEvaluator(tmpMetadata));
+        typeManager = new InternalTypeManager(tmpMetadata.getFunctionAndTypeManager());
         FunctionAndTypeManager functionAndTypeManager = FunctionAndTypeManager.createTestFunctionAndTypeManager();
         functionMetadataManager = functionAndTypeManager;
         this.standardFunctionResolution = new FunctionResolution(functionAndTypeManager);

@@ -102,6 +102,8 @@ public class TestTablePartitioningSelect
             assertThat(query("SELECT * FROM " + tableNameInDatabase)).containsOnly(row(42, 2), row(null, 1));
         }
         catch (QueryExecutionException expectedDueToInvalidPartitionData) {
+            System.out.println("query fail");
+            expectedDueToInvalidPartitionData.printStackTrace();
         }
     }
 }

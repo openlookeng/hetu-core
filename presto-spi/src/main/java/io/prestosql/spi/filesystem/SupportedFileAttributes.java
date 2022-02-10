@@ -16,7 +16,6 @@ package io.prestosql.spi.filesystem;
 
 import com.google.common.collect.ImmutableSet;
 
-import java.nio.file.Path;
 import java.util.Set;
 
 /**

@@ -22,7 +22,6 @@ import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.UnionNode;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.rule.DetermineJoinDistributionType;
-import io.prestosql.sql.planner.iterative.rule.ReorderJoins;
 import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;

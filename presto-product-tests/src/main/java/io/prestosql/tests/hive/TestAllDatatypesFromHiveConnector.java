@@ -28,6 +28,7 @@ import io.prestosql.tempto.query.QueryResult;
 import org.testng.annotations.Test;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -150,7 +151,7 @@ public class TestAllDatatypesFromHiveConnector
                         "ala ma kot",
                         "ala ma    ",
                         true,
-                        "kot binarny".getBytes()));
+                        "kot binarny".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Requires(OrcRequirements.class)
@@ -181,7 +182,7 @@ public class TestAllDatatypesFromHiveConnector
                         "ala ma kot",
                         "ala ma    ",
                         true,
-                        "kot binarny".getBytes()));
+                        "kot binarny".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Requires(RcfileRequirements.class)
@@ -212,7 +213,7 @@ public class TestAllDatatypesFromHiveConnector
                         "ala ma kot",
                         "ala ma    ",
                         true,
-                        "kot binarny".getBytes()));
+                        "kot binarny".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Requires(AvroRequirements.class)
@@ -401,7 +402,7 @@ public class TestAllDatatypesFromHiveConnector
                         "ala ma kot",
                         "ala ma    ",
                         true,
-                        "kot binarny".getBytes()));
+                        "kot binarny".getBytes(StandardCharsets.UTF_8)));
     }
 
     private static TableInstance<?> mutableTableInstanceOf(TableDefinition tableDefinition)

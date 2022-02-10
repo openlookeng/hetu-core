@@ -118,7 +118,6 @@ public class TestJdbcRecordSetProvider
         getCursor(table, ImmutableList.of(textColumn, valueColumn), TupleDomain.withColumnDomains(
                 ImmutableMap.of(textColumn, Domain.union(ImmutableList.of(Domain.singleValue(VARCHAR, utf8Slice("foo")), Domain.singleValue(VARCHAR, utf8Slice("bar")))))));
 
-        // inequality (string)
         getCursor(table, ImmutableList.of(textColumn, valueColumn), TupleDomain.withColumnDomains(
                 ImmutableMap.of(textColumn, Domain.create(ValueSet.ofRanges(Range.greaterThan(VARCHAR, utf8Slice("foo"))), false))));
 
@@ -180,7 +179,7 @@ public class TestJdbcRecordSetProvider
 
     private RecordCursor getCursor(JdbcTableHandle jdbcTableHandle, List<JdbcColumnHandle> columns, TupleDomain<ColumnHandle> domain)
     {
-        jdbcTableHandle = new JdbcTableHandle(
+        JdbcTableHandle tmpJdbcTableHandle = new JdbcTableHandle(
                 jdbcTableHandle.getSchemaTableName(),
                 jdbcTableHandle.getCatalogName(),
                 jdbcTableHandle.getSchemaName(),
@@ -188,12 +187,12 @@ public class TestJdbcRecordSetProvider
                 domain,
                 OptionalLong.empty());
 
-        ConnectorSplitSource splits = jdbcClient.getSplits(IDENTITY, jdbcTableHandle);
-        JdbcSplit split = (JdbcSplit) getOnlyElement(getFutureValue(splits.getNextBatch(NOT_PARTITIONED, 1000)).getSplits());
+        ConnectorSplitSource splits = jdbcClient.getSplits(IDENTITY, tmpJdbcTableHandle);
+        JdbcSplit tmpSplit = (JdbcSplit) getOnlyElement(getFutureValue(splits.getNextBatch(NOT_PARTITIONED, 1000)).getSplits());
 
         ConnectorTransactionHandle transaction = new JdbcTransactionHandle();
         JdbcRecordSetProvider recordSetProvider = new JdbcRecordSetProvider(jdbcClient);
-        RecordSet recordSet = recordSetProvider.getRecordSet(transaction, SESSION, split, jdbcTableHandle, columns);
+        RecordSet recordSet = recordSetProvider.getRecordSet(transaction, SESSION, tmpSplit, tmpJdbcTableHandle, columns);
 
         return recordSet.cursor();
     }

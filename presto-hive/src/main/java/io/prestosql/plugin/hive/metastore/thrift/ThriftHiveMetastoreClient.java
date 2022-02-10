@@ -83,12 +83,12 @@ public class ThriftHiveMetastoreClient
     public ThriftHiveMetastoreClient(TTransport transport, String hostname)
     {
         this.transport = requireNonNull(transport, "transport is null");
-        ThriftHiveMetastore.Client client = new ThriftHiveMetastore.Client(new TBinaryProtocol(transport));
+        ThriftHiveMetastore.Client tmpClient = new ThriftHiveMetastore.Client(new TBinaryProtocol(transport));
         if (log.isDebugEnabled()) {
-            this.client = newProxy(ThriftHiveMetastore.Iface.class, new LoggingInvocationHandler(client, PARAMETER_NAMES_PROVIDER, log::debug));
+            this.client = newProxy(ThriftHiveMetastore.Iface.class, new LoggingInvocationHandler(tmpClient, PARAMETER_NAMES_PROVIDER, log::debug));
         }
         else {
-            this.client = client;
+            this.client = tmpClient;
         }
         this.hostname = requireNonNull(hostname, "hostname is null");
     }

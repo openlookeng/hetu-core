@@ -258,11 +258,12 @@ public class TestMemorySelection
         custkeys.add(7000L);
         custkeys.add(9000L);
 
+        String tmpQueryOperator = queryOperator;
         for (Long key : custkeys) {
-            queryOperator = queryOperator.replaceFirst("#", String.valueOf(key));
+            tmpQueryOperator = tmpQueryOperator.replaceFirst("#", String.valueOf(key));
         }
 
-        String predicateQuery = "SELECT count(distinct custkey) FROM test_indexOperations WHERE " + queryOperator;
+        String predicateQuery = "SELECT count(distinct custkey) FROM test_indexOperations WHERE " + tmpQueryOperator;
 
         // get total number rows
         long totalRows = assertQuerySucceedsGetInputRows("SELECT count(*) FROM test_indexOperations");
@@ -287,11 +288,12 @@ public class TestMemorySelection
 
         // get custkeys
         List<Object> results = getResults("SELECT * from (SELECT custkey FROM test_indexOperations LIMIT " + testKeys + ") ORDER BY custkey ASC");
+        String tmpQueryOperator = queryOperator;
         for (Object key : results) {
-            queryOperator = queryOperator.replaceFirst("#", String.valueOf((long) key));
+            tmpQueryOperator = tmpQueryOperator.replaceFirst("#", String.valueOf((long) key));
         }
 
-        String predicateQuery = "SELECT count(distinct custkey) FROM test_indexOperations WHERE " + queryOperator;
+        String predicateQuery = "SELECT count(distinct custkey) FROM test_indexOperations WHERE " + tmpQueryOperator;
 
         MaterializedResult result1 = computeActual(predicateQuery.replace("test_indexOperations", "tpch.tiny.orders"));
 
