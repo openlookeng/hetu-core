@@ -114,7 +114,7 @@ public class TypeSignature
         }
 
         String baseName = null;
-        List<TypeSignatureParameter> parameters = new ArrayList<>();
+        List<TypeSignatureParameter> localParameters = new ArrayList<>();
         int parameterStart = -1;
         int bracketCount = 0;
 
@@ -138,17 +138,17 @@ public class TypeSignature
                 checkArgument(bracketCount >= 0, "Bad type signature: '%s'", signature);
                 if (bracketCount == 0) {
                     checkArgument(parameterStart >= 0, "Bad type signature: '%s'", signature);
-                    parameters.add(parseTypeSignatureParameter(signature, parameterStart, i, literalCalculationParameters));
+                    localParameters.add(parseTypeSignatureParameter(signature, parameterStart, i, literalCalculationParameters));
                     parameterStart = i + 1;
                     if (i == signature.length() - 1) {
-                        return new TypeSignature(baseName, parameters);
+                        return new TypeSignature(baseName, localParameters);
                     }
                 }
             }
             else if (c == ',') {
                 if (bracketCount == 1) {
                     checkArgument(parameterStart >= 0, "Bad type signature: '%s'", signature);
-                    parameters.add(parseTypeSignatureParameter(signature, parameterStart, i, literalCalculationParameters));
+                    localParameters.add(parseTypeSignatureParameter(signature, parameterStart, i, literalCalculationParameters));
                     parameterStart = i + 1;
                 }
             }

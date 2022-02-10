@@ -196,8 +196,9 @@ public final class Decimals
         return toString(unscaledValue.toString(), scale);
     }
 
-    private static String toString(String unscaledValueString, int scale)
+    private static String toString(String inputString, int scale)
     {
+        String unscaledValueString = inputString;
         StringBuilder resultBuilder = new StringBuilder();
         // add sign
         if (unscaledValueString.startsWith("-")) {
@@ -274,8 +275,9 @@ public final class Decimals
         decimalType.writeSlice(blockBuilder, encodeScaledValue(value));
     }
 
-    public static BigDecimal rescale(BigDecimal value, DecimalType type)
+    public static BigDecimal rescale(BigDecimal inputValue, DecimalType type)
     {
+        BigDecimal value = inputValue;
         value = value.setScale(type.getScale(), UNNECESSARY);
 
         if (value.precision() > type.getPrecision()) {
