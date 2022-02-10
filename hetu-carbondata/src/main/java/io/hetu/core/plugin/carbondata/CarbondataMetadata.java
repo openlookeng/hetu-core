@@ -935,11 +935,11 @@ public class CarbondataMetadata
     @Override
     public void createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, boolean ignoreExisting)
     {
-        SchemaTableName schemaTableName = tableMetadata.getTable();
-        String schemaName = schemaTableName.getSchemaName();
-        String tableName = schemaTableName.getTableName();
+        SchemaTableName localSchemaTableName = tableMetadata.getTable();
+        String localSchemaName = localSchemaTableName.getSchemaName();
+        String tableName = localSchemaTableName.getTableName();
         this.user = session.getUser();
-        this.schemaName = schemaName;
+        this.schemaName = localSchemaName;
         currentState = State.CREATE_TABLE;
         List<String> partitionedBy = new ArrayList<String>();
         List<SortingColumn> sortBy = new ArrayList<SortingColumn>();
@@ -947,7 +947,7 @@ public class CarbondataMetadata
         Map<String, String> tableProperties = new HashMap<String, String>();
         getParametersForCreateTable(session, tableMetadata, partitionedBy, sortBy, columnHandles, tableProperties);
 
-        metastore.getDatabase(schemaName).orElseThrow(() -> new SchemaNotFoundException(schemaName));
+        metastore.getDatabase(localSchemaName).orElseThrow(() -> new SchemaNotFoundException(localSchemaName));
 
         BaseStorageFormat hiveStorageFormat = CarbondataTableProperties.getCarbondataStorageFormat(tableMetadata.getProperties());
         // it will get final path to create carbon table
@@ -955,10 +955,10 @@ public class CarbondataMetadata
         Path targetPath = locationService.getQueryWriteInfo(locationHandle).getTargetPath();
 
         AbsoluteTableIdentifier finalAbsoluteTableIdentifier = AbsoluteTableIdentifier.from(targetPath.toString(),
-                new CarbonTableIdentifier(schemaName, tableName, UUID.randomUUID().toString()));
+                new CarbonTableIdentifier(localSchemaName, tableName, UUID.randomUUID().toString()));
         hdfsEnvironment.doAs(session.getUser(), () -> {
             initialConfiguration = ConfigurationUtils.toJobConf(this.hdfsEnvironment.getConfiguration(
-                        new HdfsEnvironment.HdfsContext(session, schemaName, tableName),
+                        new HdfsEnvironment.HdfsContext(session, localSchemaName, tableName),
                         new Path(locationHandle.getJsonSerializableTargetPath())));
 
             CarbondataMetadataUtils.createMetaDataFolderSchemaFile(hdfsEnvironment, session, columnHandles, finalAbsoluteTableIdentifier, partitionedBy,
@@ -967,9 +967,9 @@ public class CarbondataMetadata
             this.tableStorageLocation = Optional.of(targetPath.toString());
             try {
                 Map<String, String> serdeParameters = initSerDeProperties(tableName);
-                Table table = buildTableObject(
+                Table localTable = buildTableObject(
                         session.getQueryId(),
-                        schemaName,
+                        localSchemaName,
                         tableName,
                         session.getUser(),
                         columnHandles,
@@ -981,11 +981,11 @@ public class CarbondataMetadata
                         true, // carbon table is set as external table
                         prestoVersion,
                         serdeParameters);
-                PrincipalPrivileges principalPrivileges = MetastoreUtil.buildInitialPrivilegeSet(table.getOwner());
-                HiveBasicStatistics basicStatistics = table.getPartitionColumns().isEmpty() ? HiveBasicStatistics.createZeroStatistics() : HiveBasicStatistics.createEmptyStatistics();
+                PrincipalPrivileges principalPrivileges = MetastoreUtil.buildInitialPrivilegeSet(localTable.getOwner());
+                HiveBasicStatistics basicStatistics = localTable.getPartitionColumns().isEmpty() ? HiveBasicStatistics.createZeroStatistics() : HiveBasicStatistics.createEmptyStatistics();
                 metastore.createTable(
                         session,
-                        table,
+                        localTable,
                         principalPrivileges,
                         Optional.empty(),
                         ignoreExisting,
@@ -1463,11 +1463,10 @@ public class CarbondataMetadata
                 Properties hiveschema = MetastoreUtil.getHiveSchema(table);
                 Configuration configuration = jobContext.getConfiguration();
                 configuration.set(SET_OVERWRITE, "false");
-                CarbonLoadModel carbonLoadModel =
-                        HiveCarbonUtil.getCarbonLoadModel(hiveschema, configuration);
-                LoadMetadataDetails loadMetadataDetails = carbonLoadModel.getCurrentLoadMetadataDetail();
-                carbonLoadModel.setSegmentId(loadMetadataDetails.getLoadName());
-                CarbonLoaderUtil.recordNewLoadMetadata(loadMetadataDetails, carbonLoadModel, false, true);
+                CarbonLoadModel loadModel = HiveCarbonUtil.getCarbonLoadModel(hiveschema, configuration);
+                LoadMetadataDetails loadMetadataDetails = loadModel.getCurrentLoadMetadataDetail();
+                loadModel.setSegmentId(loadMetadataDetails.getLoadName());
+                CarbonLoaderUtil.recordNewLoadMetadata(loadMetadataDetails, loadModel, false, true);
             }
             catch (IOException e) {
                 LOG.error("Error occurred while committing the insert job.", e);

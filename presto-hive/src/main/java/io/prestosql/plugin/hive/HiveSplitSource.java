@@ -166,7 +166,7 @@ class HiveSplitSource
             HiveConfig hiveConfig,
             HiveStorageFormat hiveStorageFormat)
     {
-        AtomicReference<State> stateReference = new AtomicReference<>(State.initial());
+        AtomicReference<State> localStateReference = new AtomicReference<>(State.initial());
         return new HiveSplitSource(
                 session,
                 databaseName,
@@ -205,7 +205,7 @@ class HiveSplitSource
                 maxInitialSplits,
                 maxOutstandingSplitsSize,
                 splitLoader,
-                stateReference,
+                localStateReference,
                 highMemorySplitSourceCounter,
                 dynamicFilterSupplier,
                 userDefinedCachePredicates,

@@ -259,9 +259,9 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         this.stripes = localStripes.build();
         this.stripeFilePositions = localStripeFilePositions.build();
 
-        OrcDataSource orcDataSource = inputOrcDataSource;
-        orcDataSource = wrapWithCacheIfTinyStripes(orcDataSource, this.stripes, maxMergeDistance, tinyStripeThreshold);
-        this.orcDataSource = orcDataSource;
+        OrcDataSource localOrcDataSource = inputOrcDataSource;
+        localOrcDataSource = wrapWithCacheIfTinyStripes(localOrcDataSource, this.stripes, maxMergeDistance, tinyStripeThreshold);
+        this.orcDataSource = localOrcDataSource;
         this.splitLength = splitLength;
 
         this.fileRowCount = stripeInfos.stream()
@@ -279,7 +279,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         // their constructors is confusing.
         AggregatedMemoryContext streamReadersSystemMemoryContext = this.systemMemoryUsage.newAggregatedMemoryContext();
         stripeReader = new StripeReader(
-                orcDataSource,
+                localOrcDataSource,
                 legacyFileTimeZone.toTimeZone().toZoneId(),
                 decompressor,
                 orcTypes,

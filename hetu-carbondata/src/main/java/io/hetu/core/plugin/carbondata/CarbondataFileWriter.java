@@ -127,10 +127,11 @@ public class CarbondataFileWriter
     private boolean isInitDone;
     private boolean isCommitDone;
 
-    public CarbondataFileWriter(Path outPutPath, List<String> inputColumnNames, Properties properties,
+    public CarbondataFileWriter(Path paramOutPutPath, List<String> inputColumnNames, Properties properties,
                                 JobConf configuration, TypeManager typeManager, Optional<AcidOutputFormat.Options> acidOptions,
                                 Optional<HiveACIDWriteType> acidWriteType, OptionalInt taskId) throws SerDeException
     {
+        Path outPutPath = paramOutPutPath;
         this.outPutPath = requireNonNull(outPutPath, "path is null");
         // in table creation this can be null
         if (null != properties.getProperty("location")) {

@@ -168,13 +168,13 @@ public final class OrcWriter
         // create column writers
         OrcType localRootType = orcTypes.get(ROOT_COLUMN);
         checkArgument(localRootType.getFieldCount() == types.size());
-        ImmutableList.Builder<ColumnWriter> columnWriters = ImmutableList.builder();
+        ImmutableList.Builder<ColumnWriter> localColumnWriters = ImmutableList.builder();
         ImmutableSet.Builder<SliceDictionaryColumnWriter> sliceColumnWriters = ImmutableSet.builder();
         for (int fieldId = 0; fieldId < types.size(); fieldId++) {
             OrcColumnId fieldColumnIndex = localRootType.getFieldTypeIndex(fieldId);
             Type fieldType = types.get(fieldId);
             ColumnWriter columnWriter = createColumnWriter(fieldColumnIndex, orcTypes, fieldType, compression, maxCompressionBufferSize, options.getMaxStringStatisticsLimit());
-            columnWriters.add(columnWriter);
+            localColumnWriters.add(columnWriter);
 
             if (columnWriter instanceof SliceDictionaryColumnWriter) {
                 sliceColumnWriters.add((SliceDictionaryColumnWriter) columnWriter);
@@ -187,7 +187,7 @@ public final class OrcWriter
                 }
             }
         }
-        this.columnWriters = columnWriters.build();
+        this.columnWriters = localColumnWriters.build();
         this.dictionaryCompressionOptimizer = new DictionaryCompressionOptimizer(
                 sliceColumnWriters.build(),
                 stripeMinBytes,
