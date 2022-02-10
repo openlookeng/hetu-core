@@ -687,8 +687,10 @@ public class TestHashJoinOperator
         return result;
     }
 
-    private static MaterializedResult getProperColumns(Operator joinOperator, List<Type> types, RowPagesBuilder probePages, List<Page> actualPages)
+    private static MaterializedResult getProperColumns(Operator joinOperator, List<Type> inputTypes, RowPagesBuilder probePages, List<Page> pages)
     {
+        List<Type> types = inputTypes;
+        List<Page> actualPages = pages;
         if (probePages.getHashChannel().isPresent()) {
             List<Integer> hashChannels = ImmutableList.of(probePages.getHashChannel().get());
             actualPages = dropChannel(actualPages, hashChannels);

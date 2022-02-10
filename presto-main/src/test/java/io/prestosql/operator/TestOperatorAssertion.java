@@ -99,9 +99,9 @@ public class TestOperatorAssertion
         public void finish()
         {
             if (this.isBlocked == NOT_BLOCKED) {
-                SettableFuture<?> isBlocked = SettableFuture.create();
-                this.isBlocked = isBlocked;
-                executor.schedule(() -> isBlocked.set(null), unblockAfter.toMillis(), TimeUnit.MILLISECONDS);
+                SettableFuture<?> isBlockedFuture = SettableFuture.create();
+                this.isBlocked = isBlockedFuture;
+                executor.schedule(() -> isBlockedFuture.set(null), unblockAfter.toMillis(), TimeUnit.MILLISECONDS);
             }
         }
 

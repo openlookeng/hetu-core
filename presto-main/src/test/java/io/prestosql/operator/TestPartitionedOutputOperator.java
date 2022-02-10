@@ -88,7 +88,6 @@ public class TestPartitionedOutputOperator
         ArgumentCaptor<Object> stateArgument = ArgumentCaptor.forClass(Object.class);
         verify(snapshotUtils, times(1)).storeState(anyObject(), stateArgument.capture());
         Object snapshot = stateArgument.getValue();
-//        assertEquals(SnapshotTestUtil.toFullSnapshotMapping(snapshot), createExpectedMappingBeforeFinish());
 
         when(snapshotUtils.loadState(anyObject())).thenReturn(Optional.of(snapshot));
         operator.addInput(input.get(1));

@@ -330,6 +330,7 @@ public class TestHttpPageBufferClient
             requestComplete.await(10, TimeUnit.SECONDS);
         }
         catch (BrokenBarrierException ignored) {
+            // the exception could be ignored
         }
         try {
             afterRequest.await(10, TimeUnit.SECONDS);
