@@ -1034,4 +1034,9 @@ public interface ConnectorMetadata
     {
         throw new UnsupportedOperationException("This connector does not support refreshing metadata cache");
     }
+
+    default void dropPartition(ConnectorSession toConnectorSession, ConnectorTableHandle connectorHandle, List<Map<String, String>> partitions, boolean ifExists, List<Map<String, String>> operatorMap)
+    {
+        throw new UnsupportedOperationException("This connector does not support drop partition");
+    }
 }

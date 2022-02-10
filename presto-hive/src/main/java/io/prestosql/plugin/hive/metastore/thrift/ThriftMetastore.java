@@ -33,6 +33,7 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
 import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.utils.ObjectPair;
 
 import java.util.List;
 import java.util.Map;
@@ -182,6 +183,11 @@ public interface ThriftMetastore
 
     default Set<HivePrivilegeInfo> listSchemaPrivileges(String databaseName, String tableName,
             HivePrincipal principal)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void dropPartitionByRequest(HiveIdentity identity, String databaseName, String tableName, List<ObjectPair<Integer, byte[]>> partExprs, boolean deleteData, boolean ifExists)
     {
         throw new UnsupportedOperationException();
     }

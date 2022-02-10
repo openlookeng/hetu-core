@@ -29,7 +29,7 @@ import static io.prestosql.spi.type.Decimals.decodeUnscaledValue;
 import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.UNSCALED_DECIMAL_128_SLICE_LENGTH;
 import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.compare;
 
-final class LongDecimalType
+public final class LongDecimalType
         extends DecimalType
 {
     LongDecimalType(int precision, int scale)

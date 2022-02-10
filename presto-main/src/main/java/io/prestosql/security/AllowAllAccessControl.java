@@ -249,4 +249,9 @@ public class AllowAllAccessControl
     public void checkCanShowRoleGrants(TransactionId transactionId, Identity identity, String catalogName)
     {
     }
+
+    @Override
+    public void checkCanDropPartition(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
+    {
+    }
 }

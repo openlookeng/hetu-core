@@ -709,4 +709,10 @@ public abstract class AbstractMockMetadata
     {
         throw new UnsupportedOperationException();
     }
+
+    @Override
+    public void dropPartition(Session session, TableHandle tableHandle, List<Map<String, String>> partitions, boolean ifExists, List<Map<String, String>> operatorMap)
+    {
+        throw new UnsupportedOperationException();
+    }
 }

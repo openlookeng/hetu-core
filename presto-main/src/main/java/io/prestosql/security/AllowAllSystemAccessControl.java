@@ -284,4 +284,9 @@ public class AllowAllSystemAccessControl
     {
         return Optional.empty();
     }
+
+    @Override
+    public void checkCanDropPartition(Identity identity, CatalogSchemaTableName table)
+    {
+    }
 }

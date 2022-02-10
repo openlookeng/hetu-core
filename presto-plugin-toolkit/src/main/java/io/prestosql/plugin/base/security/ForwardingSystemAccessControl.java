@@ -313,4 +313,10 @@ public abstract class ForwardingSystemAccessControl
     {
         delegate().checkCanShowIndex(identity, index);
     }
+
+    @Override
+    public void checkCanDropPartition(Identity identity, CatalogSchemaTableName table)
+    {
+        delegate().checkCanDropPartition(identity, table);
+    }
 }

@@ -153,6 +153,9 @@ statement
     | REFRESH META CACHE (FOR (cluster=identifier '.')? catalog=identifier)?                   #refreshMetadataCache
     | SHOW VIEWS ((FROM | IN) qualifiedName)?
         (LIKE? pattern=string (ESCAPE escape=string)?)?                #showViews
+    | ALTER TABLE qualifiedName DROP (IF EXISTS)?
+        PARTITION '('partitionSpecs')'
+        (',' PARTITION '('partitionSpecs')')*                              #dropPartition
     ;
 
 assignmentList
@@ -364,6 +367,11 @@ aliasedRelation
 
 columnAliases
     : '(' identifier (',' identifier)* ')'
+    ;
+
+partitionSpecs
+    : valueExpression predicate[$valueExpression.ctx]?       #partitionSpecsPredicated
+    | left=partitionSpecs ',' right=partitionSpecs           #partitionSpecsBinary
     ;
 
 relationPrimary

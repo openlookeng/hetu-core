@@ -28,6 +28,7 @@ import org.apache.hadoop.hive.metastore.api.RolePrincipalGrant;
 import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
 import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.utils.ObjectPair;
 import org.apache.thrift.TException;
 
 import java.io.Closeable;
@@ -185,5 +186,8 @@ public interface ThriftMetastoreClient
             throws TException;
 
     ShowLocksResponse showLocks(ShowLocksRequest rqst)
+            throws TException;
+
+    void dropPartitionByRequest(String databaseName, String tableName, List<ObjectPair<Integer, byte[]>> partExprs, boolean deleteData, boolean ifExists)
             throws TException;
 }

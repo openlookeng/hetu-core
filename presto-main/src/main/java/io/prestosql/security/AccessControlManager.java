@@ -485,6 +485,22 @@ public class AccessControlManager
     }
 
     @Override
+    public void checkCanDropPartition(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
+    {
+        requireNonNull(identity, "identity is null");
+        requireNonNull(tableName, "tableName is null");
+
+        authenticationCheck(() -> checkCanAccessCatalog(identity, tableName.getCatalogName()));
+
+        authorizationCheck(() -> systemAccessControl.get().checkCanDropPartition(identity, toCatalogSchemaTableName(tableName)));
+
+        CatalogAccessControlEntry entry = getConnectorAccessControl(transactionId, tableName.getCatalogName());
+        if (entry != null) {
+            authorizationCheck(() -> entry.getAccessControl().checkCanDropPartition(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(tableName.getCatalogName()), toSchemaTableName(tableName)));
+        }
+    }
+
+    @Override
     public void checkCanRenameColumn(TransactionId transactionId, Identity identity, QualifiedObjectName tableName)
     {
         requireNonNull(identity, "identity is null");

@@ -44,6 +44,7 @@ import io.prestosql.spi.type.Type;
 import org.apache.hadoop.hive.metastore.api.DataOperationType;
 import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
 import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
+import org.apache.hadoop.hive.metastore.utils.ObjectPair;
 import org.weakref.jmx.Managed;
 
 import javax.annotation.concurrent.ThreadSafe;
@@ -1001,6 +1002,18 @@ public class CachingHiveMetastore
         identity = updateIdentity(identity);
         try {
             delegate.dropPartition(identity, databaseName, tableName, parts, deleteData);
+        }
+        finally {
+            invalidatePartitionCache(databaseName, tableName);
+        }
+    }
+
+    @Override
+    public void dropPartitionByRequest(HiveIdentity identity, String databaseName, String tableName, List<ObjectPair<Integer, byte[]>> partExprs, boolean deleteData, boolean ifExists)
+    {
+        identity = updateIdentity(identity);
+        try {
+            delegate.dropPartitionByRequest(identity, databaseName, tableName, partExprs, deleteData, ifExists);
         }
         finally {
             invalidatePartitionCache(databaseName, tableName);

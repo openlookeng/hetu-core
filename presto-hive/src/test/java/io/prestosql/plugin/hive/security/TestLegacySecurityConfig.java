@@ -33,7 +33,8 @@ public class TestLegacySecurityConfig
                 .setAllowDropTable(false)
                 .setAllowRenameTable(false)
                 .setAllowCommentTable(false)
-                .setAllowRenameColumn(false));
+                .setAllowRenameColumn(false)
+                .setAllowDropPartition(false));
     }
 
     @Test
@@ -46,6 +47,7 @@ public class TestLegacySecurityConfig
                 .put("hive.allow-rename-table", "true")
                 .put("hive.allow-comment-table", "true")
                 .put("hive.allow-rename-column", "true")
+                .put("hive.allow-drop-partition", "true")
                 .build();
 
         LegacySecurityConfig expected = new LegacySecurityConfig()
@@ -54,7 +56,8 @@ public class TestLegacySecurityConfig
                 .setAllowDropTable(true)
                 .setAllowRenameTable(true)
                 .setAllowCommentTable(true)
-                .setAllowRenameColumn(true);
+                .setAllowRenameColumn(true)
+                .setAllowDropPartition(true);
 
         assertFullMapping(properties, expected);
     }

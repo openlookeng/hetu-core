@@ -46,6 +46,9 @@ import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.plugin.hive.security.AccessControlMetadata;
 import io.prestosql.plugin.hive.statistics.HiveStatisticsProvider;
 import io.prestosql.plugin.hive.util.ConfigurationUtils;
+import io.prestosql.plugin.hive.util.HivePartitionUtils;
+import io.prestosql.plugin.hive.util.KryoUtils;
+import io.prestosql.plugin.hive.util.OperatorUtils;
 import io.prestosql.plugin.hive.util.Statistics;
 import io.prestosql.spi.PartialAndFinalAggregationType;
 import io.prestosql.spi.PrestoException;
@@ -100,10 +103,17 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.hadoop.hive.metastore.utils.ObjectPair;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
+import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPAnd;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.OpenCSVSerde;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.mapred.JobConf;
 
 import java.io.File;
@@ -171,6 +181,7 @@ import static io.prestosql.plugin.hive.HiveWriterFactory.removeSnapshotFileName;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_USER_ERROR;
 import static io.prestosql.spi.StandardErrorCode.INVALID_ANALYZE_PROPERTY;
+import static io.prestosql.spi.StandardErrorCode.INVALID_PROCEDURE_ARGUMENT;
 import static io.prestosql.spi.StandardErrorCode.INVALID_SCHEMA_PROPERTY;
 import static io.prestosql.spi.StandardErrorCode.INVALID_TABLE_PROPERTY;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -194,6 +205,7 @@ import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
 import static org.apache.hadoop.hive.serde.serdeConstants.FIELD_DELIM;
 import static org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category.PRIMITIVE;
+import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.booleanTypeInfo;
 
 public class HiveMetadata
         implements TransactionalMetadata
@@ -3241,5 +3253,46 @@ public class HiveMetadata
     public void refreshMetadataCache()
     {
         metastore.refreshMetastoreCache();
+    }
+
+    @Override
+    public void dropPartition(ConnectorSession session, ConnectorTableHandle tableHandle, List<Map<String, String>> partitions, boolean ifExists, List<Map<String, String>> operatorMap)
+    {
+        HiveTableHandle hiveTableHandle = (HiveTableHandle) tableHandle;
+        List<HiveColumnHandle> partitionColumns = hiveTableHandle.getPartitionColumns();
+
+        if (partitionColumns.size() == 0 && partitions.size() != 0) {
+            throw new PrestoException(NOT_SUPPORTED, String.format("%s is not a partitioned table", hiveTableHandle.getSchemaPrefixedTableName()));
+        }
+
+        List<String> actualPartitionColumnNames = partitionColumns.stream().map(HiveColumnHandle::getColumnName).collect(toList());
+        List<Type> actualPartitionColumnTypes = partitionColumns.stream().map(HiveColumnHandle::getTypeSignature).map(typeManager::getType).collect(toList());
+        List<HiveType> actualPartitionColumnHiveTypes = partitionColumns.stream().map(HiveColumnHandle::getHiveType).collect(toList());
+        List<ObjectPair<Integer, byte[]>> partExprs = new ArrayList<>();
+        for (int index = 0; index < partitions.size(); index++) {
+            List<String> partitionColumnNames = new ArrayList<>();
+            ExprNodeGenericFuncDesc exprNodeGenericFuncDesc = null;
+            ExprNodeGenericFuncDesc expr;
+            if (partitions.get(index).keySet().stream().filter(partition -> actualPartitionColumnNames.contains(partition)).count() != partitions.get(index).size()) {
+                throw new PrestoException(INVALID_PROCEDURE_ARGUMENT, "partition columns passed are not among actual partition columns");
+            }
+            for (int partitionColumnIndex = 0; partitionColumnIndex < actualPartitionColumnNames.size(); partitionColumnIndex++) {
+                String partitionColumnName = actualPartitionColumnNames.get(partitionColumnIndex);
+                if (partitions.get(index).containsKey(partitionColumnName) && operatorMap.get(index).containsKey(partitionColumnName)) {
+                    Type type = actualPartitionColumnTypes.get(partitionColumnIndex);
+                    Object partitionValue = HivePartitionUtils.getPartitionValue(partitions.get(index).get(partitionColumnName), type);
+                    partitionColumnNames.add(partitionColumnName);
+                    TypeInfo typeInfo = actualPartitionColumnHiveTypes.get(partitionColumnIndex).getTypeInfo();
+                    ExprNodeColumnDesc exprNodeColumnDesc = new ExprNodeColumnDesc(typeInfo, partitionColumnName, null, true);
+                    ExprNodeConstantDesc exprNodeConstantDesc = new ExprNodeConstantDesc(typeInfo, partitionValue);
+                    List<ExprNodeDesc> children = new ArrayList(ImmutableList.of(exprNodeColumnDesc, exprNodeConstantDesc));
+                    expr = new ExprNodeGenericFuncDesc(booleanTypeInfo, OperatorUtils.getGenericUDFUsingOperator(operatorMap.get(index).get(partitionColumnName)), children);
+                    exprNodeGenericFuncDesc = exprNodeGenericFuncDesc == null ? expr : new ExprNodeGenericFuncDesc(booleanTypeInfo, new GenericUDFOPAnd(), new ArrayList<>(ImmutableList.of(exprNodeGenericFuncDesc, expr)));
+                }
+            }
+            partExprs.add(new ObjectPair<>(partitions.get(0).size(), KryoUtils.serializeUsingKryo(exprNodeGenericFuncDesc)));
+        }
+        // ifExists is true by default in hive
+        metastore.dropPartitionByRequest(new HiveIdentity(session), hiveTableHandle.getSchemaName(), hiveTableHandle.getTableName(), partExprs, ifExists || true);
     }
 }

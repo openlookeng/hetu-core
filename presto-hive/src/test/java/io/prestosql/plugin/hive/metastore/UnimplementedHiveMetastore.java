@@ -19,6 +19,7 @@ import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.spi.security.RoleGrant;
 import io.prestosql.spi.statistics.ColumnStatisticType;
 import io.prestosql.spi.type.Type;
+import org.apache.hadoop.hive.metastore.utils.ObjectPair;
 
 import java.util.List;
 import java.util.Map;
@@ -157,6 +158,12 @@ class UnimplementedHiveMetastore
 
     @Override
     public void dropColumn(HiveIdentity identity, String databaseName, String tableName, String columnName)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void dropPartitionByRequest(HiveIdentity identity, String databaseName, String tableName, List<ObjectPair<Integer, byte[]>> partExprs, boolean deleteData, boolean ifExists)
     {
         throw new UnsupportedOperationException();
     }

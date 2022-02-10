@@ -9,7 +9,7 @@ You can enable authorization checks for the [hive](./hive.md) by setting the `hi
 
 | Property Value           | Description                                                  |
 | :----------------------- | :----------------------------------------------------------- |
-| `legacy` (default value) | Few authorization checks are enforced, thus allowing most operations. The config properties `hive.allow-drop-table`, `hive.allow-rename-table`, `hive.allow-add-column`, `hive.allow-drop-column` and `hive.allow-rename-column` are used. |
+| `legacy` (default value) | Few authorization checks are enforced, thus allowing most operations. The config properties `hive.allow-drop-table`, `hive.allow-rename-table`, `hive.allow-add-column`, `hive.allow-drop-column`, `hive.allow-rename-column` and `hive.allow-drop-partition` are used. |
 | `read-only`              | Operations that read data or metadata, such as `SELECT`, are permitted, but none of the operations that write data or metadata, such as `CREATE`, `INSERT` or `DELETE`, are allowed. |
 | `file`                   | Authorization checks are enforced using a config file specified by the Hive configuration property `security.config-file`. See [File Based Authorization](./hive-security.md#file-based-authorization) for details. |
 | `sql-standard`           | Users are permitted to perform the operations as long as they have the required privileges as per the SQL standard. In this mode, openLooKeng enforces the authorization checks for queries based on the privileges defined in Hive metastore. To alter these privileges, use the [GRANT](../sql/grant.md) and [REVOKE](../sql/revoke.md) commands. See [SQL Standard Based Authorization](./hive-security.md#sql-standard-based-authorization) for details. |

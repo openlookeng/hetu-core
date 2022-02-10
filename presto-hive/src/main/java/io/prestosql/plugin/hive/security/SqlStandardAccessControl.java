@@ -61,6 +61,7 @@ import static io.prestosql.spi.security.AccessDeniedException.denyCreateView;
 import static io.prestosql.spi.security.AccessDeniedException.denyCreateViewWithSelect;
 import static io.prestosql.spi.security.AccessDeniedException.denyDeleteTable;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropColumn;
+import static io.prestosql.spi.security.AccessDeniedException.denyDropPartition;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropRole;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropSchema;
 import static io.prestosql.spi.security.AccessDeniedException.denyDropTable;
@@ -211,6 +212,14 @@ public class SqlStandardAccessControl
     {
         if (!isTableOwner(transaction, identity, tableName)) {
             denyDropColumn(tableName.toString());
+        }
+    }
+
+    @Override
+    public void checkCanDropPartition(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName tableName)
+    {
+        if (!isTableOwner(transactionHandle, identity, tableName)) {
+            denyDropPartition(tableName.toString());
         }
     }
 

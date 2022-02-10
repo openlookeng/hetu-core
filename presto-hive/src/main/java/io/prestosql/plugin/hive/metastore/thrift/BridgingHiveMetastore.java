@@ -39,6 +39,7 @@ import org.apache.hadoop.hive.metastore.api.DataOperationType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
 import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
+import org.apache.hadoop.hive.metastore.utils.ObjectPair;
 
 import javax.inject.Inject;
 
@@ -482,5 +483,11 @@ public class BridgingHiveMetastore
     public boolean isImpersonationEnabled()
     {
         return delegate.isImpersonationEnabled();
+    }
+
+    @Override
+    public void dropPartitionByRequest(HiveIdentity identity, String databaseName, String tableName, List<ObjectPair<Integer, byte[]>> partExprs, boolean deleteData, boolean ifExists)
+    {
+        delegate.dropPartitionByRequest(identity, databaseName, tableName, partExprs, deleteData, ifExists);
     }
 }

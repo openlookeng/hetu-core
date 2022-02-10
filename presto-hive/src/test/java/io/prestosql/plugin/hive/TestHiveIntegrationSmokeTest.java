@@ -6937,4 +6937,61 @@ public class TestHiveIntegrationSmokeTest
         assertUpdate("DROP TABLE testReadSchema4.testReadStruct9");
         assertUpdate("DROP SCHEMA testReadSchema4");
     }
+
+    @Test
+    public void testAlterTableDropPartition()
+    {
+        assertUpdate("CREATE SCHEMA dropPartition0");
+        assertUpdate("CREATE TABLE dropPartition0.test_drop_partition_table(rownum int, ii varbinary, aa tinyint, bb smallint, cc int, dd bigint, ee boolean, ff real, gg double, hh varchar(10), kk decimal, ll decimal(10, 8), nn char(5), oo timestamp, pp date)" +
+                " WITH (partitioned_by=ARRAY['aa','bb','cc','dd','ee','ff','gg','hh', 'kk', 'll', 'nn', 'oo', 'pp'])");
+        assertUpdate("INSERT INTO dropPartition0.test_drop_partition_table VALUES (2,varbinary'abcd',tinyint'22', smallint'33', 88, 99999, boolean'0', 3.3, 2.02,'hello', 56, 32.3, 'work', timestamp'2019-09-19 15:00:00', date'2019-10-30')", 1);
+        assertEquals(computeActual("SELECT * FROM dropPartition0.test_drop_partition_table").getRowCount(), 1);
+        assertUpdate("ALTER TABLE dropPartition0.test_drop_partition_table DROP PARTITION (aa=22,bb=33,cc=88,dd=99999,ee=false,ff=3.3,gg=2.02,hh='hello',kk=56,ll=32.3,nn='work', oo=timestamp'2019-09-19 15:00:00', pp=date'2019-10-30')");
+        assertEquals(computeActual("SELECT * FROM dropPartition0.test_drop_partition_table").getRowCount(), 0);
+        assertUpdate("DROP TABLE dropPartition0.test_drop_partition_table");
+        assertUpdate("DROP SCHEMA dropPartition0");
+    }
+
+    @Test
+    public void testAlterTableDropPartitionWithSubsetOfPartitions()
+    {
+        assertUpdate("CREATE SCHEMA dropPartition1");
+        assertUpdate("CREATE TABLE dropPartition1.test_drop_partition_table1(rownum int, ii varbinary, aa tinyint, bb smallint, cc int, dd bigint, ee boolean, ff real, gg double, hh varchar(10), kk decimal, ll decimal(10, 8), nn char(5), oo timestamp, pp date)" +
+                " WITH (partitioned_by=ARRAY['aa','bb','cc','dd','ee','ff','gg','hh', 'kk', 'll', 'nn', 'oo', 'pp'])");
+        assertUpdate("INSERT INTO dropPartition1.test_drop_partition_table1 VALUES (2,varbinary'abcd',tinyint'22', smallint'33', 88, 99999, boolean'0', 3.3, 2.02, 'hello', 56, 32.3, 'work', timestamp'2019-09-19 15:00:00', date'2019-10-30')", 1);
+        assertEquals(computeActual("SELECT * FROM dropPartition1.test_drop_partition_table1").getRowCount(), 1);
+        assertUpdate("ALTER TABLE dropPartition1.test_drop_partition_table1 DROP PARTITION (oo=timestamp'2019-09-19 15:00:00')");
+        assertEquals(computeActual("SELECT * FROM dropPartition1.test_drop_partition_table1").getRowCount(), 0);
+        assertUpdate("DROP TABLE dropPartition1.test_drop_partition_table1");
+        assertUpdate("DROP SCHEMA dropPartition1");
+    }
+
+    @Test
+    public void testAlterTableDropPartitionWithMultiPartitions()
+    {
+        assertUpdate("CREATE SCHEMA dropPartition2");
+        assertUpdate("CREATE TABLE dropPartition2.test_drop_partition_table2(rownum int, ii varbinary, cc int, dd bigint)" +
+                " WITH (partitioned_by=ARRAY['cc','dd'])");
+        assertUpdate("INSERT INTO dropPartition2.test_drop_partition_table2 VALUES (2,varbinary'abcd', 88, 88888)", 1);
+        assertUpdate("INSERT INTO dropPartition2.test_drop_partition_table2 VALUES (2,varbinary'abcd', 99, 99999)", 1);
+        assertEquals(computeActual("SELECT * FROM dropPartition2.test_drop_partition_table2").getRowCount(), 2);
+        assertUpdate("ALTER TABLE dropPartition2.test_drop_partition_table2 DROP PARTITION (cc=88,dd=88888), PARTITION (cc=99,dd=99999)");
+        assertEquals(computeActual("SELECT * FROM dropPartition2.test_drop_partition_table2").getRowCount(), 0);
+        assertUpdate("DROP TABLE dropPartition2.test_drop_partition_table2");
+        assertUpdate("DROP SCHEMA dropPartition2");
+    }
+
+    @Test(expectedExceptions = RuntimeException.class)
+    public void testAlterTableDropPartitionPassingNonPartitionColumns()
+    {
+        assertUpdate("CREATE SCHEMA dropPartition3");
+        assertUpdate("CREATE TABLE dropPartition3.test_drop_partition_table3(rownum int, ii varbinary, aa tinyint, bb smallint, cc int, dd bigint, ee boolean, ff real, gg double, hh varchar(10), kk decimal, ll decimal(10, 8), nn char(5))" +
+                " WITH (partitioned_by=ARRAY['aa','bb','cc','dd','ee','ff','gg','hh', 'kk', 'll', 'nn'])");
+        assertUpdate("INSERT INTO dropPartition3.test_drop_partition_table3 VALUES (2,varbinary'abcd',tinyint'22', smallint'33', 88, 99999, boolean'0', 3.3, 2.02,'hello', 56, 32.3, 'work')", 1);
+        assertEquals(computeActual("SELECT * FROM dropPartition3.test_drop_partition_table3").getRowCount(), 1);
+        assertUpdate("ALTER TABLE dropPartition3.test_drop_partition_table3 DROP PARTITION (rownum=22,bb=33,cc=88,dd=99999)");
+        assertEquals(computeActual("SELECT * FROM dropPartition3.test_drop_partition_table3").getRowCount(), 0);
+        assertUpdate("DROP TABLE dropPartition3.test_drop_partition_table3");
+        assertUpdate("DROP SCHEMA dropPartition3");
+    }
 }

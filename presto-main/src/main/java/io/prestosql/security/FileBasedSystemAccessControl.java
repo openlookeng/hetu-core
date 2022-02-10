@@ -438,6 +438,11 @@ public class FileBasedSystemAccessControl
         }
     }
 
+    @Override
+    public void checkCanDropPartition(Identity identity, CatalogSchemaTableName table)
+    {
+    }
+
     private boolean canAccessNodeInfo(Identity identity)
     {
         for (NodeInformationRule rule : nodeInfoRules) {

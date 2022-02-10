@@ -1576,6 +1576,14 @@ public final class MetadataManager
         }
     }
 
+    @Override
+    public void dropPartition(Session session, TableHandle tableHandle, List<Map<String, String>> partitions, boolean ifExists, List<Map<String, String>> operatorMap)
+    {
+        CatalogName catalogName = tableHandle.getCatalogName();
+        ConnectorMetadata metadata = getMetadataForWrite(session, catalogName);
+        metadata.dropPartition(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle(), partitions, ifExists, operatorMap);
+    }
+
     //
     // Helpers
     //

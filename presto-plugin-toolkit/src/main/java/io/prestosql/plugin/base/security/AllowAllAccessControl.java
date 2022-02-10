@@ -240,4 +240,9 @@ public class AllowAllAccessControl
     {
         return Optional.empty();
     }
+
+    @Override
+    public void checkCanDropPartition(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName tableName)
+    {
+    }
 }

@@ -389,4 +389,11 @@ public interface AccessControl
     {
         return ImmutableList.of();
     }
+
+    /**
+     * Check if identity is allowed to drop partitions from the specified table.
+     *
+     * @throws io.prestosql.spi.security.AccessDeniedException if not allowed
+     */
+    void checkCanDropPartition(TransactionId transactionId, Identity identity, QualifiedObjectName tableName);
 }

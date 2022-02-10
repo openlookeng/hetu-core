@@ -73,6 +73,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TxnAbortedException;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.hive.metastore.api.UnknownTableException;
+import org.apache.hadoop.hive.metastore.utils.ObjectPair;
 import org.apache.thrift.TException;
 import org.weakref.jmx.Flatten;
 import org.weakref.jmx.Managed;
@@ -1166,6 +1167,31 @@ public class ThriftHiveMetastore
         }
         catch (NoSuchObjectException e) {
             throw new PartitionNotFoundException(new SchemaTableName(databaseName, tableName), parts);
+        }
+        catch (TException e) {
+            throw new PrestoException(HiveErrorCode.HIVE_METASTORE_ERROR, e);
+        }
+        catch (Exception e) {
+            throw propagate(e);
+        }
+    }
+
+    @Override
+    public void dropPartitionByRequest(HiveIdentity identity, String databaseName, String tableName, List<ObjectPair<Integer, byte[]>> partExprs, boolean deleteData, boolean ifExists)
+    {
+        try {
+            retry()
+                    .stopOn(NoSuchObjectException.class, MetaException.class)
+                    .stopOnIllegalExceptions()
+                    .run("dropPartitionByName", stats.getDropPartition().wrap(() -> {
+                        try (ThriftMetastoreClient client = createMetastoreClient(identity)) {
+                            client.dropPartitionByRequest(databaseName, tableName, partExprs, deleteData, ifExists);
+                        }
+                        return null;
+                    }));
+        }
+        catch (NoSuchObjectException e) {
+            return;
         }
         catch (TException e) {
             throw new PrestoException(HiveErrorCode.HIVE_METASTORE_ERROR, e);

@@ -855,4 +855,12 @@ public class ClassLoaderSafeConnectorMetadata
             delegate.refreshMetadataCache();
         }
     }
+
+    @Override
+    public void dropPartition(ConnectorSession session, ConnectorTableHandle connectorHandle, List<Map<String, String>> partitions, boolean ifExists, List<Map<String, String>> operatorMap)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            delegate.dropPartition(session, connectorHandle, partitions, ifExists, operatorMap);
+        }
+    }
 }
