@@ -52,8 +52,8 @@ public class NestedLoopBuildOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, NestedLoopBuildOperator.class.getSimpleName());
-            return new NestedLoopBuildOperator(operatorContext, nestedLoopJoinBridgeManager.getJoinBridge(driverContext.getLifespan()));
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, NestedLoopBuildOperator.class.getSimpleName());
+            return new NestedLoopBuildOperator(addOperatorContext, nestedLoopJoinBridgeManager.getJoinBridge(driverContext.getLifespan()));
         }
 
         @Override

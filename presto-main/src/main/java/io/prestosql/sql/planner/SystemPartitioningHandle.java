@@ -135,9 +135,10 @@ public final class SystemPartitioningHandle
         return partitioning.toString();
     }
 
-    public NodePartitionMap getNodePartitionMap(Session session, NodeScheduler nodeScheduler, boolean isSnapshotEnabled, Integer nodeCount)
+    public NodePartitionMap getNodePartitionMap(Session session, NodeScheduler nodeScheduler, boolean isSnapshotEnabled, Integer inputNodeCount)
     {
         NodeSelector nodeSelector = nodeScheduler.createNodeSelector(null, false, null);
+        Integer nodeCount = inputNodeCount;
         List<InternalNode> nodes;
         if (partitioning == SystemPartitioning.COORDINATOR_ONLY) {
             nodes = ImmutableList.of(nodeSelector.selectCurrentNode());

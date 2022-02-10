@@ -139,16 +139,16 @@ public class VacuumTableOperator
             checkState(!closed, "Factory is already closed");
             OperatorContext context = driverContext.addOperatorContext(operatorId, planNodeId, getOperatorType());
             Operator statisticsAggregationOperator = statisticsAggregationOperatorFactory.createOperator(driverContext);
-            boolean statisticsCpuTimerEnabled = !(statisticsAggregationOperator instanceof DevNullOperator) && isStatisticsCpuTimerEnabled(session);
-            ConnectorPageSourceProvider connectorPageSourceProvider = this.pageSourceProvider.getPageSourceProvider(table.getCatalogName());
+            boolean cpuTimerEnabled = !(statisticsAggregationOperator instanceof DevNullOperator) && isStatisticsCpuTimerEnabled(session);
+            ConnectorPageSourceProvider localPageSourceProvider = this.pageSourceProvider.getPageSourceProvider(table.getCatalogName());
             return new VacuumTableOperator(
                     context,
                     planNodeId,
                     createPageSink(driverContext),
-                    connectorPageSourceProvider,
+                    localPageSourceProvider,
                     table,
                     statisticsAggregationOperator,
-                    statisticsCpuTimerEnabled,
+                    cpuTimerEnabled,
                     types);
         }
 
@@ -332,7 +332,6 @@ public class VacuumTableOperator
     public Page pollMarker()
     {
         //TODO-cp-I38S9D: used for SQL statement that is not covered by the scope
-//        return snapshotState.nextMarker();
         return null;
     }
 

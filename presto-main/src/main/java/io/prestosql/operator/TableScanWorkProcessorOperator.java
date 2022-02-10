@@ -384,13 +384,15 @@ public class TableScanWorkProcessorOperator
 
         private Page filter(Page page)
         {
+            Page inputPage = page;
+
             if (bloomFilters.isEmpty()) {
                 BloomFilterUtils.updateBloomFilter(queryIdOptional, isDcTable, stateStoreProviderOptional, tableScanNodeOptional, dynamicFilterCacheManagerOptional, bloomFiltersBackup, bloomFilters);
             }
             if (!bloomFilters.isEmpty()) {
-                page = BloomFilterUtils.filter(page, bloomFilters);
+                inputPage = BloomFilterUtils.filter(inputPage, bloomFilters);
             }
-            return page;
+            return inputPage;
         }
     }
 }

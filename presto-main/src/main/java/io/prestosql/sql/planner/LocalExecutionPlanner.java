@@ -733,11 +733,12 @@ public class LocalExecutionPlanner
                 }
             }
 
+            List<OperatorFactory> factories = operatorFactories;
             if (SystemSessionProperties.isWorkProcessorPipelines(taskContext.getSession())) {
-                operatorFactories = WorkProcessorPipelineSourceOperator.convertOperators(getNextOperatorId(), operatorFactories);
+                factories = WorkProcessorPipelineSourceOperator.convertOperators(getNextOperatorId(), factories);
             }
 
-            DriverFactory driverFactory = new DriverFactory(getNextPipelineId(), inputDriver, outputDriver, operatorFactories, driverInstances, pipelineExecutionStrategy);
+            DriverFactory driverFactory = new DriverFactory(getNextPipelineId(), inputDriver, outputDriver, factories, driverInstances, pipelineExecutionStrategy);
             driverFactories.add(driverFactory);
             return driverFactory;
         }
@@ -1466,7 +1467,7 @@ public class LocalExecutionPlanner
                 LocalExecutionPlanContext context,
                 PlanNodeId planNodeId,
                 PlanNode sourceNode,
-                Optional<RowExpression> filterExpression,
+                Optional<RowExpression> inputFilterExpression,
                 Assignments assignments,
                 List<Symbol> outputSymbols)
         {
@@ -1479,6 +1480,7 @@ public class LocalExecutionPlanner
             ReuseExchangeOperator.STRATEGY strategy = REUSE_STRATEGY_DEFAULT;
             UUID reuseTableScanMappingId = new UUID(0, 0);
             Integer consumerTableScanNodeCount = 0;
+            Optional<RowExpression> filterExpression = inputFilterExpression;
             if (sourceNode instanceof TableScanNode) {
                 TableScanNode tableScanNode = (TableScanNode) sourceNode;
                 table = tableScanNode.getTable();
@@ -1637,8 +1639,9 @@ public class LocalExecutionPlanner
             return null;
         }
 
-        private RowExpression bindChannels(RowExpression expression, Map<Symbol, Integer> sourceLayout, TypeProvider types)
+        private RowExpression bindChannels(RowExpression inputExpression, Map<Symbol, Integer> sourceLayout, TypeProvider types)
         {
+            RowExpression expression = inputExpression;
             Type type = expression.getType();
             Object value = new RowExpressionInterpreter(expression, metadata, session.toConnectorSession(), OPTIMIZED).optimize();
             if (value instanceof RowExpression) {

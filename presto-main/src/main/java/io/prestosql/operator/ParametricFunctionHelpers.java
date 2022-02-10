@@ -27,9 +27,10 @@ public class ParametricFunctionHelpers
 
     public static MethodHandle bindDependencies(MethodHandle handle, List<ImplementationDependency> dependencies, BoundVariables variables, FunctionAndTypeManager functionAndTypeManager)
     {
+        MethodHandle methodHandle = handle;
         for (ImplementationDependency dependency : dependencies) {
-            handle = MethodHandles.insertArguments(handle, 0, dependency.resolve(variables, functionAndTypeManager));
+            methodHandle = MethodHandles.insertArguments(methodHandle, 0, dependency.resolve(variables, functionAndTypeManager));
         }
-        return handle;
+        return methodHandle;
     }
 }

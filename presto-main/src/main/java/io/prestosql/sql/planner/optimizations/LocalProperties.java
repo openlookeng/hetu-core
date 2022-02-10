@@ -69,9 +69,9 @@ public final class LocalProperties
     /**
      * Translates the properties as much as possible, and truncates at the first non-translatable property
      */
-    public static <X, Y> List<LocalProperty<Y>> translate(List<? extends LocalProperty<X>> properties, Function<X, Optional<Y>> translator)
+    public static <X, Y> List<LocalProperty<Y>> translate(List<? extends LocalProperty<X>> inputProperties, Function<X, Optional<Y>> translator)
     {
-        properties = normalizeAndPrune(properties);
+        List<? extends LocalProperty<X>> properties = normalizeAndPrune(inputProperties);
 
         ImmutableList.Builder<LocalProperty<Y>> builder = ImmutableList.builder();
         for (LocalProperty<X> property : properties) {

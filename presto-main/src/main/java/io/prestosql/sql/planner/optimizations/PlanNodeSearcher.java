@@ -74,15 +74,15 @@ public class PlanNodeSearcher
         return findFirstRecursive(node);
     }
 
-    private <T extends PlanNode> Optional<T> findFirstRecursive(PlanNode node)
+    private <T extends PlanNode> Optional<T> findFirstRecursive(PlanNode inputNode)
     {
-        node = lookup.resolve(node);
+        PlanNode localNode = lookup.resolve(inputNode);
 
-        if (where.test(node)) {
-            return Optional.of((T) node);
+        if (where.test(localNode)) {
+            return Optional.of((T) localNode);
         }
-        if (recurseOnlyWhen.test(node)) {
-            for (PlanNode source : node.getSources()) {
+        if (recurseOnlyWhen.test(localNode)) {
+            for (PlanNode source : localNode.getSources()) {
                 Optional<T> found = findFirstRecursive(source);
                 if (found.isPresent()) {
                     return found;
@@ -126,15 +126,15 @@ public class PlanNodeSearcher
         return getOnlyElement(all);
     }
 
-    private <T extends PlanNode> void findAllRecursive(PlanNode node, ImmutableList.Builder<T> nodes)
+    private <T extends PlanNode> void findAllRecursive(PlanNode inputNode, ImmutableList.Builder<T> nodes)
     {
-        node = lookup.resolve(node);
+        PlanNode localNode = lookup.resolve(inputNode);
 
-        if (where.test(node)) {
-            nodes.add((T) node);
+        if (where.test(localNode)) {
+            nodes.add((T) localNode);
         }
-        if (recurseOnlyWhen.test(node)) {
-            for (PlanNode source : node.getSources()) {
+        if (recurseOnlyWhen.test(localNode)) {
+            for (PlanNode source : localNode.getSources()) {
                 findAllRecursive(source, nodes);
             }
         }
@@ -145,23 +145,23 @@ public class PlanNodeSearcher
         return removeAllRecursive(node);
     }
 
-    private PlanNode removeAllRecursive(PlanNode node)
+    private PlanNode removeAllRecursive(PlanNode inputNode)
     {
-        node = lookup.resolve(node);
+        PlanNode localNode = lookup.resolve(inputNode);
 
-        if (where.test(node)) {
+        if (where.test(localNode)) {
             checkArgument(
-                    node.getSources().size() == 1,
+                    localNode.getSources().size() == 1,
                     "Unable to remove plan node as it contains 0 or more than 1 children");
-            return node.getSources().get(0);
+            return localNode.getSources().get(0);
         }
-        if (recurseOnlyWhen.test(node)) {
-            List<PlanNode> sources = node.getSources().stream()
+        if (recurseOnlyWhen.test(localNode)) {
+            List<PlanNode> sources = localNode.getSources().stream()
                     .map(this::removeAllRecursive)
                     .collect(toImmutableList());
-            return ChildReplacer.replaceChildren(node, sources);
+            return ChildReplacer.replaceChildren(localNode, sources);
         }
-        return node;
+        return localNode;
     }
 
     public PlanNode removeFirst()
@@ -169,29 +169,29 @@ public class PlanNodeSearcher
         return removeFirstRecursive(node);
     }
 
-    private PlanNode removeFirstRecursive(PlanNode node)
+    private PlanNode removeFirstRecursive(PlanNode inputNode)
     {
-        node = lookup.resolve(node);
+        PlanNode localNode = lookup.resolve(inputNode);
 
-        if (where.test(node)) {
+        if (where.test(localNode)) {
             checkArgument(
-                    node.getSources().size() == 1,
+                    localNode.getSources().size() == 1,
                     "Unable to remove plan node as it contains 0 or more than 1 children");
-            return node.getSources().get(0);
+            return localNode.getSources().get(0);
         }
-        if (recurseOnlyWhen.test(node)) {
-            List<PlanNode> sources = node.getSources();
+        if (recurseOnlyWhen.test(localNode)) {
+            List<PlanNode> sources = localNode.getSources();
             if (sources.isEmpty()) {
-                return node;
+                return localNode;
             }
             else if (sources.size() == 1) {
-                return ChildReplacer.replaceChildren(node, ImmutableList.of(removeFirstRecursive(sources.get(0))));
+                return ChildReplacer.replaceChildren(localNode, ImmutableList.of(removeFirstRecursive(sources.get(0))));
             }
             else {
                 throw new IllegalArgumentException("Unable to remove first node when a node has multiple children, use removeAll instead");
             }
         }
-        return node;
+        return localNode;
     }
 
     public PlanNode replaceAll(PlanNode newPlanNode)
@@ -199,20 +199,20 @@ public class PlanNodeSearcher
         return replaceAllRecursive(node, newPlanNode);
     }
 
-    private PlanNode replaceAllRecursive(PlanNode node, PlanNode nodeToReplace)
+    private PlanNode replaceAllRecursive(PlanNode inputNode, PlanNode nodeToReplace)
     {
-        node = lookup.resolve(node);
+        PlanNode localNode = lookup.resolve(inputNode);
 
-        if (where.test(node)) {
+        if (where.test(localNode)) {
             return nodeToReplace;
         }
-        if (recurseOnlyWhen.test(node)) {
-            List<PlanNode> sources = node.getSources().stream()
+        if (recurseOnlyWhen.test(localNode)) {
+            List<PlanNode> sources = localNode.getSources().stream()
                     .map(source -> replaceAllRecursive(source, nodeToReplace))
                     .collect(toImmutableList());
-            return ChildReplacer.replaceChildren(node, sources);
+            return ChildReplacer.replaceChildren(localNode, sources);
         }
-        return node;
+        return localNode;
     }
 
     public PlanNode replaceFirst(PlanNode newPlanNode)
@@ -220,19 +220,19 @@ public class PlanNodeSearcher
         return replaceFirstRecursive(node, newPlanNode);
     }
 
-    private PlanNode replaceFirstRecursive(PlanNode node, PlanNode nodeToReplace)
+    private PlanNode replaceFirstRecursive(PlanNode inputNode, PlanNode nodeToReplace)
     {
-        node = lookup.resolve(node);
+        PlanNode localNode = lookup.resolve(inputNode);
 
-        if (where.test(node)) {
+        if (where.test(localNode)) {
             return nodeToReplace;
         }
-        List<PlanNode> sources = node.getSources();
+        List<PlanNode> sources = localNode.getSources();
         if (sources.isEmpty()) {
-            return node;
+            return localNode;
         }
         else if (sources.size() == 1) {
-            return ChildReplacer.replaceChildren(node, ImmutableList.of(replaceFirstRecursive(node, sources.get(0))));
+            return ChildReplacer.replaceChildren(localNode, ImmutableList.of(replaceFirstRecursive(localNode, sources.get(0))));
         }
         else {
             throw new IllegalArgumentException("Unable to replace first node when a node has multiple children, use replaceAll instead");

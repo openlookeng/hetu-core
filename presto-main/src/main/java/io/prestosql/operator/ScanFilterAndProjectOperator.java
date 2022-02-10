@@ -398,6 +398,7 @@ public class ScanFilterAndProjectOperator
                     }
                     catch (Throwable e) {
                         // ignore
+                        log.error("Filter page error: %s", e.getMessage());
                     }
                 }
                 pageBuilder.reset();
@@ -416,13 +417,14 @@ public class ScanFilterAndProjectOperator
 
         private Page filter(Page page)
         {
+            Page input = page;
             if (bloomFilters.isEmpty()) {
                 BloomFilterUtils.updateBloomFilter(queryIdOptional, isDcTable, stateStoreProviderOptional, tableScanNodeOptional, dynamicFilterCacheManagerOptional, bloomFiltersBackup, bloomFilters);
             }
             if (!bloomFilters.isEmpty()) {
-                page = BloomFilterUtils.filter(page, bloomFilters);
+                input = BloomFilterUtils.filter(input, bloomFilters);
             }
-            return page;
+            return input;
         }
     }
 
@@ -502,6 +504,7 @@ public class ScanFilterAndProjectOperator
                 }
                 catch (Throwable e) {
                     // ignore
+                    log.error("Filter page error: %s", e.getMessage());
                 }
             }
 
@@ -510,13 +513,14 @@ public class ScanFilterAndProjectOperator
 
         private Page filter(Page page)
         {
+            Page input = page;
             if (bloomFilters.isEmpty()) {
                 BloomFilterUtils.updateBloomFilter(queryIdOptional, isDcTable, stateStoreProviderOptional, tableScanNodeOptional, dynamicFilterCacheManagerOptional, bloomFiltersBackup, bloomFilters);
             }
             if (!bloomFilters.isEmpty()) {
-                page = BloomFilterUtils.filter(page, bloomFilters);
+                input = BloomFilterUtils.filter(input, bloomFilters);
             }
-            return page;
+            return input;
         }
     }
 

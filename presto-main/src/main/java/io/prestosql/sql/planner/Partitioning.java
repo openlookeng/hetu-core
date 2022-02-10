@@ -157,7 +157,6 @@ public final class Partitioning
     {
         if (leftArgument.isVariable()) {
             if (rightArgument.isVariable()) {
-                // variable == variable
                 Set<Symbol> mappedColumns = leftToRightMappings.apply(leftArgument.getColumn());
                 return mappedColumns.contains(rightArgument.getColumn());
             }
@@ -172,7 +171,6 @@ public final class Partitioning
         }
         else {
             if (rightArgument.isConstant()) {
-                // constant == constant
                 return leftArgument.getConstant().equals(rightArgument.getConstant());
             }
             else {

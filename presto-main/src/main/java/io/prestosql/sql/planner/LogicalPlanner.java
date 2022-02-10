@@ -543,9 +543,10 @@ public class LogicalPlanner
         return new RelationPlan(cubeFinishNode, analysis.getScope(insertCubeStatement), cubeFinishNode.getOutputSymbols());
     }
 
-    private boolean arePredicatesOverlapping(Expression newDataPredicate, CubeMetadata cubeMetadata)
+    private boolean arePredicatesOverlapping(Expression inputNewDataPredicate, CubeMetadata cubeMetadata)
     {
         //Cannot do this check inside StatementAnalyzer because predicate expressions have not been rewritten by then.
+        Expression newDataPredicate = inputNewDataPredicate;
         TypeProvider types = planSymbolAllocator.getTypes();
         newDataPredicate = ExpressionUtils.rewriteIdentifiersToSymbolReferences(newDataPredicate);
         ExpressionDomainTranslator.ExtractionResult decomposedNewDataPredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, newDataPredicate, types);
@@ -566,8 +567,9 @@ public class LogicalPlanner
         return decomposedCubePredicate.getTupleDomain().overlaps(decomposedNewDataPredicate.getTupleDomain());
     }
 
-    private boolean canSupportPredicate(Expression newDataPredicate)
+    private boolean canSupportPredicate(Expression inputNewDataPredicate)
     {
+        Expression newDataPredicate = inputNewDataPredicate;
         TypeProvider types = planSymbolAllocator.getTypes();
         newDataPredicate = ExpressionUtils.rewriteIdentifiersToSymbolReferences(newDataPredicate);
         ExpressionDomainTranslator.ExtractionResult decomposedNewDataPredicate = ExpressionDomainTranslator.fromPredicate(metadata, session, newDataPredicate, types);
@@ -723,10 +725,8 @@ public class LogicalPlanner
             Optional<NewTableLayout> newTableLayout = metadata.getUpdateLayout(session, handle);
             TableMetadata tableMetadata = metadata.getTableMetadata(session, handle);
             String catalogName = handle.getCatalogName().getCatalogName();
-            // TableStatisticsMetadata statisticsMetadata = metadata.getStatisticsCollectionMetadataForWrite(session,
-            //        catalogName, tableMetadata.getMetadata());
             Optional<Expression> constraint = deletePlan.getPredicate().isPresent() ? Optional.of(OriginalExpressionUtils.castToExpression(deletePlan.getPredicate().get())) : Optional.empty();
-            //Skip statistics collection for delete,
+            // Skip statistics collection for delete,
             // because stats collection for delete seems to corrupt existing statistics
             TableStatisticsMetadata statisticsMetadata = TableStatisticsMetadata.empty();
             return createTableWriterPlan(

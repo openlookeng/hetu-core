@@ -154,9 +154,9 @@ public class WindowOperator
         {
             checkState(!closed, "Factory is already closed");
 
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, WindowOperator.class.getSimpleName());
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, WindowOperator.class.getSimpleName());
             return new WindowOperator(
-                    operatorContext,
+                    addOperatorContext,
                     sourceTypes,
                     outputChannels,
                     windowFunctionDefinitions,

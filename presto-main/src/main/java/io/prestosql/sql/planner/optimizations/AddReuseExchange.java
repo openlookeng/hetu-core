@@ -183,8 +183,9 @@ public class AddReuseExchange
         }
 
         @Override
-        public PlanNode visitJoin(JoinNode node, RewriteContext<Void> context)
+        public PlanNode visitJoin(JoinNode inputNode, RewriteContext<Void> context)
         {
+            JoinNode node = inputNode;
             node = (JoinNode) visitPlan(node, context);
             // verify right side
             TableScanNode left = (TableScanNode) getTableScanNode(node.getLeft());
@@ -280,9 +281,9 @@ public class AddReuseExchange
         }
 
         @Override
-        public PlanNode visitProject(ProjectNode node, RewriteContext<Void> context)
+        public PlanNode visitProject(ProjectNode inputNode, RewriteContext<Void> context)
         {
-            node = (ProjectNode) visitPlan(node, context);
+            ProjectNode node = (ProjectNode) visitPlan(inputNode, context);
 
             // Incase of reuse exchange both consumer and producer should have assigments in same order.
             Assignments.Builder newAssignments = Assignments.builder();
@@ -312,9 +313,9 @@ public class AddReuseExchange
         }
 
         @Override
-        public PlanNode visitExchange(ExchangeNode node, RewriteContext<Void> context)
+        public PlanNode visitExchange(ExchangeNode inputNode, RewriteContext<Void> context)
         {
-            node = (ExchangeNode) visitPlan(node, context);
+            ExchangeNode node = (ExchangeNode) visitPlan(inputNode, context);
             node.getSources().stream().forEach(x -> {
                 if (x instanceof TableScanNode) {
                     visitTableScanInternal((TableScanNode) x, null);

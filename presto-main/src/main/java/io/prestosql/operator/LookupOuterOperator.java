@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
@@ -88,14 +89,14 @@ public class LookupOuterOperator
             }
             createdLifespans.add(lifespan);
 
-            LookupSourceFactory lookupSourceFactory = joinBridgeManager.getJoinBridge(lifespan);
-            ListenableFuture<OuterPositionIterator> outerPositionsFuture = joinBridgeManager.getOuterPositionsFuture(lifespan);
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, LookupOuterOperator.class.getSimpleName());
+            LookupSourceFactory sourceFactory = joinBridgeManager.getJoinBridge(lifespan);
+            ListenableFuture<OuterPositionIterator> positionsFuture = joinBridgeManager.getOuterPositionsFuture(lifespan);
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, LookupOuterOperator.class.getSimpleName());
             joinBridgeManager.outerOperatorCreated(lifespan);
-            LookupOuterOperator operator = new LookupOuterOperator(operatorContext, lookupSourceFactory, outerPositionsFuture, probeOutputTypes, buildOutputTypes, () -> joinBridgeManager.outerOperatorClosed(lifespan));
+            LookupOuterOperator operator = new LookupOuterOperator(addOperatorContext, sourceFactory, positionsFuture, probeOutputTypes, buildOutputTypes, () -> joinBridgeManager.outerOperatorClosed(lifespan));
             // Snapshot: Offer this operator to the lookup-source-factory, so that when the corresponding lookup-join operator receives a marker,
             // it can forward the marker to this operator through the lookup-source-factory.
-            lookupSourceFactory.setLookupOuterOperator(operator);
+            sourceFactory.setLookupOuterOperator(operator);
             return operator;
         }
 
@@ -330,7 +331,7 @@ public class LookupOuterOperator
             }
         }
         if (!drivers.add(driverId)) {
-            String message = String.format("Received duplicate marker '%s' from source driver '%d' to target '%s'", marker.toString(), driverId, operatorContext.getUniqueId());
+            String message = String.format(Locale.ENGLISH, "Received duplicate marker '%s' from source driver '%d' to target '%s'", marker.toString(), driverId, operatorContext.getUniqueId());
             LOG.error(message);
         }
         if (drivers.size() == totalDrivers) {

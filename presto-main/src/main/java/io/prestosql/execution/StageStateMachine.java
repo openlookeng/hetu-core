@@ -296,11 +296,11 @@ public class StageStateMachine
 
     public BasicStageStats getBasicStageStats(Supplier<Iterable<TaskInfo>> taskInfosSupplier)
     {
-        Optional<StageInfo> finalStageInfo = this.finalStageInfo.get();
-        if (finalStageInfo.isPresent()) {
-            return finalStageInfo.get()
+        Optional<StageInfo> localFinalStageInfo = this.finalStageInfo.get();
+        if (localFinalStageInfo.isPresent()) {
+            return localFinalStageInfo.get()
                     .getStageStats()
-                    .toBasicStageStats(finalStageInfo.get().getState());
+                    .toBasicStageStats(localFinalStageInfo.get().getState());
         }
 
         // stage state must be captured first in order to provide a
@@ -410,9 +410,9 @@ public class StageStateMachine
 
     public StageInfo getStageInfo(Supplier<Iterable<TaskInfo>> taskInfosSupplier)
     {
-        Optional<StageInfo> finalStageInfo = this.finalStageInfo.get();
-        if (finalStageInfo.isPresent()) {
-            return finalStageInfo.get();
+        Optional<StageInfo> localFinalStageInfo = this.finalStageInfo.get();
+        if (localFinalStageInfo.isPresent()) {
+            return localFinalStageInfo.get();
         }
 
         // stage state must be captured first in order to provide a

@@ -134,28 +134,28 @@ public class Driver
         this.activeOperators = new ArrayList<>(operators);
         checkArgument(!operators.isEmpty(), "There must be at least one operator");
 
-        Optional<SourceOperator> sourceOperator = Optional.empty();
-        Optional<DeleteOperator> deleteOperator = Optional.empty();
-        Optional<UpdateOperator> updateOperator = Optional.empty();
+        Optional<SourceOperator> optionalSourceOperator = Optional.empty();
+        Optional<DeleteOperator> optionalDeleteOperator = Optional.empty();
+        Optional<UpdateOperator> optionalUpdateOperator = Optional.empty();
         for (Operator operator : operators) {
             if (operator instanceof SourceOperator) {
-                checkArgument(!sourceOperator.isPresent(), "There must be at most one SourceOperator");
-                sourceOperator = Optional.of((SourceOperator) operator);
+                checkArgument(!optionalSourceOperator.isPresent(), "There must be at most one SourceOperator");
+                optionalSourceOperator = Optional.of((SourceOperator) operator);
             }
             else if (operator instanceof DeleteOperator) {
-                checkArgument(!deleteOperator.isPresent(), "There must be at most one DeleteOperator");
-                deleteOperator = Optional.of((DeleteOperator) operator);
+                checkArgument(!optionalDeleteOperator.isPresent(), "There must be at most one DeleteOperator");
+                optionalDeleteOperator = Optional.of((DeleteOperator) operator);
             }
             else if (operator instanceof UpdateOperator) {
-                checkArgument(!updateOperator.isPresent(), "There must be at most one UpdateOperator");
-                updateOperator = Optional.of((UpdateOperator) operator);
+                checkArgument(!optionalUpdateOperator.isPresent(), "There must be at most one UpdateOperator");
+                optionalUpdateOperator = Optional.of((UpdateOperator) operator);
             }
         }
-        this.sourceOperator = sourceOperator;
-        this.deleteOperator = deleteOperator;
-        this.updateOperator = updateOperator;
+        this.sourceOperator = optionalSourceOperator;
+        this.deleteOperator = optionalDeleteOperator;
+        this.updateOperator = optionalUpdateOperator;
 
-        currentTaskSource = sourceOperator.map(operator -> new TaskSource(operator.getSourceId(), ImmutableSet.of(), false)).orElse(null);
+        currentTaskSource = optionalSourceOperator.map(operator -> new TaskSource(operator.getSourceId(), ImmutableSet.of(), false)).orElse(null);
         // initially the driverBlockedFuture is not blocked (it is completed)
         SettableFuture<?> future = SettableFuture.create();
         future.set(null);
@@ -274,18 +274,18 @@ public class Driver
         Set<ScheduledSplit> newSplits = Sets.difference(newSource.getSplits(), currentTaskSource.getSplits());
 
         // add new splits
-        SourceOperator sourceOperator = this.sourceOperator.orElseThrow(VerifyException::new);
+        SourceOperator sourceOperatorNew = this.sourceOperator.orElseThrow(VerifyException::new);
         for (ScheduledSplit newSplit : newSplits) {
             Split split = newSplit.getSplit();
 
-            Supplier<Optional<UpdatablePageSource>> pageSource = sourceOperator.addSplit(split);
+            Supplier<Optional<UpdatablePageSource>> pageSource = sourceOperatorNew.addSplit(split);
             deleteOperator.ifPresent(deleteOperator -> deleteOperator.setPageSource(pageSource));
             updateOperator.ifPresent(updateOperator -> updateOperator.setPageSource(pageSource));
         }
 
         // set no more splits
         if (newSource.isNoMoreSplits()) {
-            sourceOperator.noMoreSplits();
+            sourceOperatorNew.noMoreSplits();
         }
 
         currentTaskSource = newSource;
@@ -713,14 +713,15 @@ public class Driver
 
     private static Throwable addSuppressedException(Throwable inFlightException, Throwable newException, String message, Object... args)
     {
+        Throwable inFlightExceptionNew = inFlightException;
         if (newException instanceof Error) {
-            if (inFlightException == null) {
-                inFlightException = newException;
+            if (inFlightExceptionNew == null) {
+                inFlightExceptionNew = newException;
             }
             else {
                 // Self-suppression not permitted
-                if (inFlightException != newException) {
-                    inFlightException.addSuppressed(newException);
+                if (inFlightExceptionNew != newException) {
+                    inFlightExceptionNew.addSuppressed(newException);
                 }
             }
         }
@@ -728,7 +729,7 @@ public class Driver
             // log normal exceptions instead of rethrowing them
             log.error(newException, message, args);
         }
-        return inFlightException;
+        return inFlightExceptionNew;
     }
 
     private synchronized void checkLockNotHeld(String message)

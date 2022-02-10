@@ -108,8 +108,8 @@ public class SetBuilderOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, SetBuilderOperator.class.getSimpleName());
-            return new SetBuilderOperator(operatorContext, setProvider, setChannel, hashChannel, expectedPositions, joinCompiler);
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, SetBuilderOperator.class.getSimpleName());
+            return new SetBuilderOperator(addOperatorContext, setProvider, setChannel, hashChannel, expectedPositions, joinCompiler);
         }
 
         @Override

@@ -98,12 +98,13 @@ public class SimplePagesHashStrategy
     @Override
     public void appendTo(int blockIndex, int position, PageBuilder pageBuilder, int outputChannelOffset)
     {
+        int channelOffset = outputChannelOffset;
         for (int outputIndex : outputChannels) {
             Type type = types.get(outputIndex);
             List<Block> channel = channels.get(outputIndex);
             Block block = channel.get(blockIndex);
-            type.appendTo(block, position, pageBuilder.getBlockBuilder(outputChannelOffset));
-            outputChannelOffset++;
+            type.appendTo(block, position, pageBuilder.getBlockBuilder(channelOffset));
+            channelOffset++;
         }
     }
 

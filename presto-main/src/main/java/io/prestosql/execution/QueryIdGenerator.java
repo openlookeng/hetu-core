@@ -60,11 +60,11 @@ public class QueryIdGenerator
 
     public QueryIdGenerator()
     {
-        StringBuilder coordinatorId = new StringBuilder(5);
+        StringBuilder localCoordinatorId = new StringBuilder(5);
         for (int i = 0; i < 5; i++) {
-            coordinatorId.append(BASE_32[ThreadLocalRandom.current().nextInt(32)]);
+            localCoordinatorId.append(BASE_32[ThreadLocalRandom.current().nextInt(32)]);
         }
-        this.coordinatorId = coordinatorId.toString();
+        this.coordinatorId = localCoordinatorId.toString();
     }
 
     public String getCoordinatorId()

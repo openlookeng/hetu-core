@@ -321,11 +321,11 @@ public class DataDefinitionExecution<T extends Statement>
                 HeuristicIndexerManager heuristicIndexerManager)
         {
             @SuppressWarnings("unchecked")
-            DataDefinitionTask<T> task = (DataDefinitionTask<T>) tasks.get(statement.getClass());
-            checkArgument(task != null, "no task for statement: %s", statement.getClass().getSimpleName());
+            DataDefinitionTask<T> localTask = (DataDefinitionTask<T>) tasks.get(statement.getClass());
+            checkArgument(localTask != null, "no task for statement: %s", statement.getClass().getSimpleName());
 
-            stateMachine.setUpdateType(task.getName());
-            return new DataDefinitionExecution<>(task, statement, slug, transactionManager, metadata, accessControl, stateMachine, parameters, heuristicIndexerManager);
+            stateMachine.setUpdateType(localTask.getName());
+            return new DataDefinitionExecution<>(localTask, statement, slug, transactionManager, metadata, accessControl, stateMachine, parameters, heuristicIndexerManager);
         }
     }
 }

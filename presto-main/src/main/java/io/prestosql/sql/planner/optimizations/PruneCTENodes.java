@@ -134,8 +134,9 @@ public class PruneCTENodes
         }
 
         @Override
-        public PlanNode visitCTEScan(CTEScanNode node, RewriteContext<Expression> context)
+        public PlanNode visitCTEScan(CTEScanNode inputNode, RewriteContext<Expression> context)
         {
+            CTEScanNode node = inputNode;
             Integer commonCTERefNum = node.getCommonCTERefNum();
             if (pruneCTEWithCrossJoin) {
                 if (cTEWithCrossJoinList.contains(commonCTERefNum)) {

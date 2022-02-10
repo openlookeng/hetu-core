@@ -241,21 +241,21 @@ public final class HttpPageBufferClient
     public void close()
     {
         boolean shouldSendDelete;
-        Future<?> future;
+        Future<?> futureStatus;
         synchronized (this) {
             shouldSendDelete = !closed;
 
             closed = true;
 
-            future = this.future;
+            futureStatus = this.future;
 
             this.future = null;
 
             lastUpdate = DateTime.now();
         }
 
-        if (future != null && !future.isDone()) {
-            future.cancel(true);
+        if (futureStatus != null && !futureStatus.isDone()) {
+            futureStatus.cancel(true);
         }
 
         // abort the output buffer on the remote node; response of delete is ignored
@@ -413,8 +413,8 @@ public final class HttpPageBufferClient
                 log.debug("Request to %s failed %s", uri, t);
                 checkNotHoldsLock(this);
 
-                t = rewriteException(t);
-                if (!(t instanceof PrestoException) && backoff.failure()) {
+                Throwable throwable = rewriteException(t);
+                if (!(throwable instanceof PrestoException) && backoff.failure()) {
                     String message = format("%s (%s - %s failures, failure duration %s, total failed request time %s)",
                             WORKER_NODE_ERROR,
                             uri,
@@ -423,14 +423,14 @@ public final class HttpPageBufferClient
                             backoff.getFailureRequestTimeTotal().convertTo(SECONDS));
                     if (querySnapshotManager != null) {
                         // Snapshot: recover from remote server errors
-                        log.debug(t, "Snapshot: remote task failed with resumable error: %s", message);
+                        log.debug(throwable, "Snapshot: remote task failed with resumable error: %s", message);
                         querySnapshotManager.cancelToResume();
-                        handleFailure(t, resultFuture);
+                        handleFailure(throwable, resultFuture);
                         return;
                     }
-                    t = new PageTransportTimeoutException(fromUri(uri), message, t);
+                    throwable = new PageTransportTimeoutException(fromUri(uri), message, throwable);
                 }
-                handleFailure(t, resultFuture);
+                handleFailure(throwable, resultFuture);
             }
         }, pageBufferClientCallbackExecutor);
     }
@@ -469,15 +469,16 @@ public final class HttpPageBufferClient
                 checkNotHoldsLock(this);
 
                 log.error("Request to delete %s failed %s", location, t);
-                if (!(t instanceof PrestoException) && backoff.failure()) {
+                Throwable throwable = t;
+                if (!(throwable instanceof PrestoException) && backoff.failure()) {
                     String message = format("Error closing remote buffer (%s - %s failures, failure duration %s, total failed request time %s)",
                             location,
                             backoff.getFailureCount(),
                             backoff.getFailureDuration().convertTo(SECONDS),
                             backoff.getFailureRequestTimeTotal().convertTo(SECONDS));
-                    t = new PrestoException(REMOTE_BUFFER_CLOSE_FAILED, message, t);
+                    throwable = new PrestoException(REMOTE_BUFFER_CLOSE_FAILED, message, throwable);
                 }
-                handleFailure(t, resultFuture);
+                handleFailure(throwable, resultFuture);
             }
         }, pageBufferClientCallbackExecutor);
     }
@@ -618,13 +619,13 @@ public final class HttpPageBufferClient
                             PRESTO_PAGES_TYPE, contentType));
                 }
 
-                long token = getToken(response);
+                long tokenInfo = getToken(response);
                 long nextToken = getNextToken(response);
                 boolean complete = getComplete(response);
 
                 try (SliceInput input = new InputStreamSliceInput(response.getInputStream())) {
                     List<SerializedPage> pages = ImmutableList.copyOf(readSerializedPages(input));
-                    return createPagesResponse(token, nextToken, pages, complete);
+                    return createPagesResponse(tokenInfo, nextToken, pages, complete);
                 }
                 catch (IOException e) {
                     throw new RuntimeException(e);

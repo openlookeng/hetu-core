@@ -330,7 +330,7 @@ public class AggregationRewriteWithCube
                 if (mappedValue == null || (mappedValue instanceof LongLiteral && ((LongLiteral) mappedValue).getValue() == 1)) {
                     // COUNT aggregation
                     if (CubeAggregateFunction.COUNT.getName().equals(aggFunction) && !aggregation.isDistinct()) {
-                        // COUNT(1)
+                        // COUNT 1
                         AggregationSignature aggregationSignature = AggregationSignature.count();
                         String cubeColumnName = cubeMetadata.getColumn(aggregationSignature)
                                 .orElseThrow(() -> new PrestoException(CUBE_ERROR, "Cannot find column associated with aggregation " + aggregationSignature));

@@ -346,7 +346,6 @@ public class PlanOptimizers
                         ImmutableSet.<Rule<?>>builder()
                                 .addAll(predicatePushDownRules)
                                 .addAll(columnPruningRules)
-                                // .addAll(projectionPushdownRules) // Project pushdown should be after SubQueryPushDown
                                 .addAll(ImmutableSet.of(
                                         new RemoveRedundantIdentityProjections(),
                                         new RemoveFullSample(),
@@ -627,9 +626,7 @@ public class PlanOptimizers
                 statsCalculator,
                 costCalculator,
                 ImmutableSet.of(new PushDeleteIntoConnector(metadata, true))); // Must run before AddExchanges
-        //noinspection UnusedAssignment
         estimatedExchangesCostCalculator = null; // Prevent accidental use after AddExchanges
-
         builder.add(
                 new IterativeOptimizer(
                         ruleStats,

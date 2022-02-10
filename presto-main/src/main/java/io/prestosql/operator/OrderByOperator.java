@@ -107,9 +107,9 @@ public class OrderByOperator
         {
             checkState(!closed, "Factory is already closed");
 
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, OrderByOperator.class.getSimpleName());
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, OrderByOperator.class.getSimpleName());
             return new OrderByOperator(
-                    operatorContext,
+                    addOperatorContext,
                     sourceTypes,
                     outputChannels,
                     expectedPositions,

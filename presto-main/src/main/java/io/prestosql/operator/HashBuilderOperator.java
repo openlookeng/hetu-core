@@ -132,18 +132,18 @@ public class HashBuilderOperator
             checkState(!closed, "Factory is already closed");
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, HashBuilderOperator.class.getSimpleName());
 
-            PartitionedLookupSourceFactory lookupSourceFactory = this.lookupSourceFactoryManager.getJoinBridge(driverContext.getLifespan());
-            int partitionIndex = getAndIncrementPartitionIndex(driverContext.getLifespan());
+            PartitionedLookupSourceFactory partitionedLookupSourceFactory = this.lookupSourceFactoryManager.getJoinBridge(driverContext.getLifespan());
+            int incrementPartitionIndex = getAndIncrementPartitionIndex(driverContext.getLifespan());
             // Snapshot: make driver ID and source/partition index the same, to ensure consistency before and after resuming.
             // LocalExchangeSourceOperator also uses the same mechanism to ensure consistency.
             if (operatorContext.isSnapshotEnabled()) {
-                partitionIndex = driverContext.getDriverId();
+                incrementPartitionIndex = driverContext.getDriverId();
             }
-            verify(partitionIndex < lookupSourceFactory.partitions());
+            verify(incrementPartitionIndex < partitionedLookupSourceFactory.partitions());
             return new HashBuilderOperator(
                     operatorContext,
-                    lookupSourceFactory,
-                    partitionIndex,
+                    partitionedLookupSourceFactory,
+                    incrementPartitionIndex,
                     outputChannels,
                     hashChannels,
                     preComputedHashChannel,

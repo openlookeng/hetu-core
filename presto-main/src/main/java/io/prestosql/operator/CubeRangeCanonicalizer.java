@@ -78,14 +78,14 @@ public class CubeRangeCanonicalizer
             //Only single column predicates can be merged
             return cubePredicate;
         }
-        cubePredicate = ExpressionUtils.rewriteIdentifiersToSymbolReferences(cubePredicate);
-        List<Expression> predicates = ExpressionUtils.extractDisjuncts(cubePredicate);
+        Expression cubePredicateRewrite = ExpressionUtils.rewriteIdentifiersToSymbolReferences(cubePredicate);
+        List<Expression> predicates = ExpressionUtils.extractDisjuncts(cubePredicateRewrite);
         CubeRangeVisitor visitor = new CubeRangeVisitor(types, metadata, session.toConnectorSession());
         Expression transformed = ExpressionUtils.or(predicates.stream().map(visitor::process).collect(Collectors.toList()));
         ExpressionDomainTranslator.ExtractionResult result = ExpressionDomainTranslator.fromPredicate(metadata, session, transformed, types);
         if (!result.getRemainingExpression().equals(BooleanLiteral.TRUE_LITERAL)) {
             log.info("Unable to transform predicate %s into tuple domain completely. Cannot merge ranges into single predicate.", transformed);
-            return cubePredicate;
+            return cubePredicateRewrite;
         }
         ExpressionDomainTranslator domainTranslator = new ExpressionDomainTranslator(new LiteralEncoder(metadata));
         return domainTranslator.toPredicate(result.getTupleDomain());

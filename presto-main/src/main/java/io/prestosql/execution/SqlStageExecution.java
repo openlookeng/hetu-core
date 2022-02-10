@@ -53,6 +53,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -466,9 +467,9 @@ public final class SqlStageExecution
         checkArgument(stateMachine.getFragment().getPartitionedSources().containsAll(splits.keySet()), "Invalid splits");
 
         ImmutableSet.Builder<RemoteTask> newTasks = ImmutableSet.builder();
-        Collection<RemoteTask> tasks = this.tasks.get(node);
+        Collection<RemoteTask> remoteTasks = this.tasks.get(node);
         RemoteTask task;
-        if (tasks == null) {
+        if (remoteTasks == null) {
             // The output buffer depends on the task id starting from 0 and being sequential, since each
             // task is assigned a private buffer based on task id.
             TaskId taskId = new TaskId(stateMachine.getStageId(), nextTaskId.getAndIncrement());
@@ -477,7 +478,7 @@ public final class SqlStageExecution
             newTasks.add(task);
         }
         else {
-            task = tasks.iterator().next();
+            task = remoteTasks.iterator().next();
             task.addSplits(splits);
         }
         if (noMoreSplitsNotification.size() > 1) {
@@ -515,8 +516,8 @@ public final class SqlStageExecution
             }
         });
 
-        OutputBuffers outputBuffers = this.outputBuffers.get();
-        checkState(outputBuffers != null, "Initial output buffers must be set before a task can be scheduled");
+        OutputBuffers localOutputBuffers = this.outputBuffers.get();
+        checkState(localOutputBuffers != null, "Initial output buffers must be set before a task can be scheduled");
 
         RemoteTask task = remoteTaskFactory.createRemoteTask(
                 stateMachine.getSession(),
@@ -526,7 +527,7 @@ public final class SqlStageExecution
                 stateMachine.getFragment(),
                 initialSplits.build(),
                 totalPartitions,
-                outputBuffers,
+                localOutputBuffers,
                 nodeTaskMap.createPartitionedSplitCountTracker(node, taskId),
                 summarizeTaskInfo,
                 Optional.ofNullable(parentId),
@@ -689,7 +690,7 @@ public final class SqlStageExecution
             queryIdReuseTableScanMappingIdFinishedMap.remove(state.getStageId().getQueryId());
             return uuidList;
         }
-        return null;
+        return Collections.emptyList();
     }
 
     private synchronized void updateFinalTaskInfo(TaskInfo finalTaskInfo)

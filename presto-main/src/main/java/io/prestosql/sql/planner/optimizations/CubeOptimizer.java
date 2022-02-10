@@ -376,10 +376,10 @@ public class CubeOptimizer
             return new ProjectNode(context.getIdAllocator().getNextId(), rewritten, assignments);
         }
         else if (node instanceof JoinNode) {
-            JoinNode joinNode = (JoinNode) node;
-            PlanNode rewrittenLeftChild = rewriteNodeRecursively(joinNode.getLeft());
-            PlanNode rewrittenRightChild = rewriteNodeRecursively(joinNode.getRight());
-            return rewriteJoinNode(joinNode, rewrittenLeftChild, rewrittenRightChild);
+            JoinNode localJoinNode = (JoinNode) node;
+            PlanNode rewrittenLeftChild = rewriteNodeRecursively(localJoinNode.getLeft());
+            PlanNode rewrittenRightChild = rewriteNodeRecursively(localJoinNode.getRight());
+            return rewriteJoinNode(localJoinNode, rewrittenLeftChild, rewrittenRightChild);
         }
         else if (node instanceof TableScanNode) {
             TableScanNode scanNode = (TableScanNode) node;
@@ -498,7 +498,7 @@ public class CubeOptimizer
         }, predicate);
     }
 
-    private PlanNode rewriteAggregationNode(CubeRewriteResult cubeRewriteResult, PlanNode planNode)
+    private PlanNode rewriteAggregationNode(CubeRewriteResult cubeRewriteResult, PlanNode inputPlanNode)
     {
         TypeProvider typeProvider = context.getSymbolAllocator().getTypes();
         // Add group by
@@ -536,6 +536,7 @@ public class CubeOptimizer
                     Optional.empty()));
         }
 
+        PlanNode planNode = inputPlanNode;
         AggregationNode aggNode = new AggregationNode(context.getIdAllocator().getNextId(),
                 planNode,
                 aggregationsBuilder.build(),
@@ -644,11 +645,11 @@ public class CubeOptimizer
             handleProjection(projection);
         }
         else if (node instanceof JoinNode) {
-            JoinNode joinNode = (JoinNode) node;
-            parseNodeRecursively(joinNode.getLeft());
-            parseNodeRecursively(joinNode.getRight());
-            joinNode.getOutputSymbols().stream().map(Symbol::getName).forEach(symbol -> originalPlanMappings.put(symbol, originalPlanMappings.get(symbol)));
-            joinNode.getCriteria().forEach(equiJoinClause -> {
+            JoinNode localJoinNode = (JoinNode) node;
+            parseNodeRecursively(localJoinNode.getLeft());
+            parseNodeRecursively(localJoinNode.getRight());
+            localJoinNode.getOutputSymbols().stream().map(Symbol::getName).forEach(symbol -> originalPlanMappings.put(symbol, originalPlanMappings.get(symbol)));
+            localJoinNode.getCriteria().forEach(equiJoinClause -> {
                 //Join condition(s) must be defined on column from Source table
                 ColumnWithTable leftColumn = originalPlanMappings.get(equiJoinClause.getLeft().getName());
                 ColumnWithTable rightColumn = originalPlanMappings.get(equiJoinClause.getRight().getName());
@@ -696,8 +697,9 @@ public class CubeOptimizer
         }));
     }
 
-    private static void validateExpression(Expression expression)
+    private static void validateExpression(Expression inputExpression)
     {
+        Expression expression = inputExpression;
         if (expression instanceof Cast) {
             while (expression instanceof Cast) {
                 expression = ((Cast) expression).getExpression();
@@ -708,8 +710,9 @@ public class CubeOptimizer
         }
     }
 
-    private static void validateRowExpression(RowExpression rowExpression)
+    private static void validateRowExpression(RowExpression inputRowExpression)
     {
+        RowExpression rowExpression = inputRowExpression;
         if (rowExpression instanceof CallExpression) {
             while (rowExpression instanceof CallExpression) {
                 rowExpression = ((CallExpression) rowExpression).getArguments().get(0);
@@ -735,8 +738,9 @@ public class CubeOptimizer
         });
     }
 
-    private Optional<Object> extractAssignedValue(RowExpression rowExpression)
+    private Optional<Object> extractAssignedValue(RowExpression inputRowExpression)
     {
+        RowExpression rowExpression = inputRowExpression;
         if (rowExpression == null) {
             return Optional.empty();
         }
@@ -939,8 +943,10 @@ public class CubeOptimizer
         return new ImmutablePair<>(cubePredicate1, cubePredicate2);
     }
 
-    private boolean arePredicatesEqual(Expression left, Expression right, Metadata metadata, Session session, TypeProvider types)
+    private boolean arePredicatesEqual(Expression inputLeft, Expression inputRight, Metadata metadata, Session session, TypeProvider types)
     {
+        Expression left = inputLeft;
+        Expression right = inputRight;
         if (left == null && right == null) {
             return true;
         }
