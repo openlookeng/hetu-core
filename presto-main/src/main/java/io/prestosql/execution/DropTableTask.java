@@ -133,7 +133,7 @@ public class DropTableTask
         catch (UnsupportedOperationException ignored) {
             // This exception is only thrown when heuristic index is not enabled so the noOpIndexClient is used.
             // In this case we want drop table to run as normal
-            LOG.debug("heuristic index is not enabled, then noOpIndexClient is used", ignored);
+            LOG.debug("heuristic index is not enabled, then noOpIndexClient is used: %s", ignored);
         }
         catch (IOException e) {
             throw new UncheckedIOException(e);
