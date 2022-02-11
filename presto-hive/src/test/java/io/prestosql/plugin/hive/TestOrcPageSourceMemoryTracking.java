@@ -584,13 +584,13 @@ public class TestOrcPageSourceMemoryTracking
             int stripeRows)
             throws Exception
     {
-        List<TestColumn> testColumns = columns;
+        List<TestColumn> testColumnList = columns;
                 // filter out partition keys, which are not written to the file
-        testColumns = ImmutableList.copyOf(filter(testColumns, not(TestColumn::isPartitionKey)));
+        testColumnList = ImmutableList.copyOf(filter(testColumnList, not(TestColumn::isPartitionKey)));
 
         Properties tableProperties = new Properties();
-        tableProperties.setProperty("columns", Joiner.on(',').join(transform(testColumns, TestColumn::getName)));
-        tableProperties.setProperty("columns.types", Joiner.on(',').join(transform(testColumns, TestColumn::getType)));
+        tableProperties.setProperty("columns", Joiner.on(',').join(transform(testColumnList, TestColumn::getName)));
+        tableProperties.setProperty("columns.types", Joiner.on(',').join(transform(testColumnList, TestColumn::getType)));
         serializer.initialize(CONFIGURATION, tableProperties);
 
         JobConf jobConf = new JobConf();
@@ -604,16 +604,16 @@ public class TestOrcPageSourceMemoryTracking
 
         try {
             SettableStructObjectInspector objectInspector = getStandardStructObjectInspector(
-                    ImmutableList.copyOf(transform(testColumns, TestColumn::getName)),
-                    ImmutableList.copyOf(transform(testColumns, TestColumn::getObjectInspector)));
+                    ImmutableList.copyOf(transform(testColumnList, TestColumn::getName)),
+                    ImmutableList.copyOf(transform(testColumnList, TestColumn::getObjectInspector)));
 
             Object row = objectInspector.create();
 
             List<StructField> fields = ImmutableList.copyOf(objectInspector.getAllStructFieldRefs());
 
             for (int rowNumber = 0; rowNumber < numRows; rowNumber++) {
-                for (int i = 0; i < testColumns.size(); i++) {
-                    Object writeValue = testColumns.get(i).getWriteValue();
+                for (int i = 0; i < testColumnList.size(); i++) {
+                    Object writeValue = testColumnList.get(i).getWriteValue();
                     if (writeValue instanceof Slice) {
                         writeValue = ((Slice) writeValue).getBytes();
                     }

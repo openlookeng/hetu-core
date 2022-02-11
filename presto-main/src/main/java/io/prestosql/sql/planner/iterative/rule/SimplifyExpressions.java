@@ -37,8 +37,9 @@ import static java.util.Objects.requireNonNull;
 public class SimplifyExpressions
         extends ExpressionRewriteRuleSet
 {
-    public static Expression rewrite(Expression expression, Session session, PlanSymbolAllocator planSymbolAllocator, Metadata metadata, LiteralEncoder literalEncoder, TypeAnalyzer typeAnalyzer)
+    public static Expression rewrite(Expression inputExpression, Session session, PlanSymbolAllocator planSymbolAllocator, Metadata metadata, LiteralEncoder literalEncoder, TypeAnalyzer typeAnalyzer)
     {
+        Expression expression = inputExpression;
         requireNonNull(metadata, "metadata is null");
         requireNonNull(typeAnalyzer, "typeAnalyzer is null");
         if (expression instanceof SymbolReference) {
