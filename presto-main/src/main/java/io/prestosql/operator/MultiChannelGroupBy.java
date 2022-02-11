@@ -213,9 +213,7 @@ public abstract class MultiChannelGroupBy
         {
             DictionaryLookBack.DictionaryLookBackState myState = (DictionaryLookBack.DictionaryLookBackState) state;
             int[] stored = myState.processed;
-            for (int i = 0; i < this.processed.length; i++) {
-                this.processed[i] = stored[i];
-            }
+            System.arraycopy(stored, 0, this.processed, 0, this.processed.length);
         }
 
         protected static class DictionaryLookBackState
