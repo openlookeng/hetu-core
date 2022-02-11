@@ -483,15 +483,15 @@ public class TaskContext
             physicalWrittenDataSize += pipeline.getPhysicalWrittenDataSize().toBytes();
         }
 
-        long startNanos = this.startNanos.get();
-        if (startNanos == 0) {
-            startNanos = System.nanoTime();
+        long localStartNanos = this.startNanos.get();
+        if (localStartNanos == 0) {
+            localStartNanos = System.nanoTime();
         }
-        Duration queuedTime = new Duration(startNanos - createNanos, NANOSECONDS);
+        Duration queuedTime = new Duration(localStartNanos - createNanos, NANOSECONDS);
 
         long endNanosTime = this.endNanos.get();
         Duration elapsedTime;
-        if (endNanosTime >= startNanos) {
+        if (endNanosTime >= localStartNanos) {
             elapsedTime = new Duration(endNanosTime - createNanos, NANOSECONDS);
         }
         else {

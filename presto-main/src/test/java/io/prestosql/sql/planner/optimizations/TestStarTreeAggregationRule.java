@@ -658,7 +658,7 @@ public class TestStarTreeAggregationRule
         assertEquals(new ArrayList<>(columnMapping.keySet()).toString(), "[orderkey, custkey, totalprice, orderdate]");
         assertTrue(columnMapping.values().containsAll(assignments.values()) && assignments.values().containsAll(columnMapping.values()));
 
-        //expression instanceof Literal
+        //expression Literal
         DoubleLiteral testDouble = new DoubleLiteral("1.0");
         Assignments assignment2 = Assignments.builder()
                 .put(columnCustkey, OriginalExpressionUtils.castToRowExpression(testDouble))
@@ -668,7 +668,7 @@ public class TestStarTreeAggregationRule
         columnMapping = CubeOptimizerUtil.buildSymbolMappings(countAggNode, projections2, Optional.of(filterNode), baseTableScan, baseTableMetadata);
         assertEquals(new ArrayList(columnMapping.values()).get(1), testDouble);
 
-        //expression instanceof Cast/SymbolReference
+        //expression Cast/SymbolReference
         Cast testCast = new Cast(SymbolUtils.toSymbolReference(columnCustkey), StandardTypes.INTEGER);
         Assignments assignment3 = Assignments.builder()
                 .put(columnCustkey, OriginalExpressionUtils.castToRowExpression(testCast))
@@ -678,7 +678,7 @@ public class TestStarTreeAggregationRule
         columnMapping = CubeOptimizerUtil.buildSymbolMappings(countAggNode, projections3, Optional.of(filterNode), baseTableScan, baseTableMetadata);
         assertEquals(new ArrayList(columnMapping.values()).get(1), custkeyHandle);
 
-        //expression instanceof Cast/Literal
+        //expression Cast/Literal
         Cast testCast2 = new Cast(testDouble, StandardTypes.DOUBLE);
         Assignments assignment4 = Assignments.builder()
                 .put(columnCustkey, OriginalExpressionUtils.castToRowExpression(testCast2))

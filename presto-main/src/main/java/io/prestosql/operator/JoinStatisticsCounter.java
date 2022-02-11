@@ -94,9 +94,7 @@ public class JoinStatisticsCounter
     public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
     {
         JoinStatisticsCounterState myState = (JoinStatisticsCounterState) state;
-        for (int i = 0; i < myState.logHistogramCounters.length; i++) {
-            this.logHistogramCounters[i] = myState.logHistogramCounters[i];
-        }
+        System.arraycopy(myState.logHistogramCounters, 0, this.logHistogramCounters, 0, myState.logHistogramCounters.length);
         this.lookupSourcePositions = Optional.empty();
         if (myState.lookupSourcePositions != null) {
             this.lookupSourcePositions = Optional.of(myState.lookupSourcePositions);

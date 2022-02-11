@@ -258,8 +258,9 @@ class TranslationMap
                 return coerceIfNecessary(node, analysis.getParameters().get(node.getPosition()));
             }
 
-            private Expression coerceIfNecessary(Expression original, Expression rewritten)
+            private Expression coerceIfNecessary(Expression original, Expression inputRewritten)
             {
+                Expression rewritten = inputRewritten;
                 Type coercion = analysis.getCoercion(original);
                 if (coercion != null) {
                     rewritten = new Cast(

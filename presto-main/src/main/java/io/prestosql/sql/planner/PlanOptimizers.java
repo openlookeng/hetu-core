@@ -248,11 +248,12 @@ public class PlanOptimizers
             PageSourceManager pageSourceManager,
             StatsCalculator statsCalculator,
             CostCalculator costCalculator,
-            CostCalculator estimatedExchangesCostCalculator,
+            CostCalculator inputEstimatedExchangesCostCalculator,
             CostComparator costComparator,
             TaskCountEstimator taskCountEstimator,
             CubeManager cubeManager)
     {
+        CostCalculator estimatedExchangesCostCalculator = inputEstimatedExchangesCostCalculator;
         this.exporter = exporter;
         ImmutableList.Builder<PlanOptimizer> builder = ImmutableList.builder();
         CostCalculationHandle costCalculationHandle = new CostCalculationHandle(statsCalculator, costCalculator, costComparator);

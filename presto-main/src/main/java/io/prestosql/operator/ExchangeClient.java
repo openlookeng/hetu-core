@@ -20,6 +20,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.http.client.HttpClient;
+import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.hetu.core.transport.execution.buffer.PageCodecMarker;
@@ -64,6 +65,7 @@ import static java.util.Objects.requireNonNull;
 public class ExchangeClient
         implements Closeable
 {
+    private static final Logger log = Logger.get(ExchangeClient.class);
     private static final SerializedPage NO_MORE_PAGES = new SerializedPage(EMPTY_SLICE, PageCodecMarker.MarkerSet.empty(), 0, 0);
 
     private final long bufferCapacity;
@@ -681,7 +683,7 @@ public class ExchangeClient
             client.close();
         }
         catch (RuntimeException e) {
-            // ignored
+            log.error("ExchangeClient close failed: %s", e.getMessage());
         }
     }
 }
