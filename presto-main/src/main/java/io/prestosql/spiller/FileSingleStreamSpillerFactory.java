@@ -20,21 +20,21 @@ import com.google.inject.Inject;
 import io.airlift.log.Logger;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.SpillContext;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.BlockEncodingSerde;
+import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.spiller.SpillCipher;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 
-import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
-import java.nio.file.FileStore;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -43,9 +43,7 @@ import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.prestosql.spi.StandardErrorCode.OUT_OF_SPILL_SPACE;
 import static java.lang.String.format;
-import static java.nio.file.Files.createDirectories;
 import static java.nio.file.Files.delete;
-import static java.nio.file.Files.getFileStore;
 import static java.nio.file.Files.newDirectoryStream;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newFixedThreadPool;
@@ -71,9 +69,13 @@ public class FileSingleStreamSpillerFactory
     private final boolean spillCompressionEnabled;
     private int roundRobinIndex;
     private int spillPrefetchReadPages;
+    private boolean spillToHdfs;
+    private String spillProfile;
+    private FileSystemClientManager fileSystemClientManager;
+    private boolean spillDirectoriesCreated;
 
     @Inject
-    public FileSingleStreamSpillerFactory(Metadata metadata, SpillerStats spillerStats, FeaturesConfig featuresConfig, NodeSpillConfig nodeSpillConfig)
+    public FileSingleStreamSpillerFactory(Metadata metadata, SpillerStats spillerStats, FeaturesConfig featuresConfig, NodeSpillConfig nodeSpillConfig, FileSystemClientManager fileSystemClientManager)
     {
         this(
                 listeningDecorator(newFixedThreadPool(
@@ -86,7 +88,10 @@ public class FileSingleStreamSpillerFactory
                 requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillCompressionEnabled(),
                 requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillEncryptionEnabled(),
                 requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillDirectSerdeEnabled(),
-                requireNonNull(nodeSpillConfig, "featuresConfig is null").getSpillPrefetchReadPages());
+                requireNonNull(nodeSpillConfig, "featuresConfig is null").getSpillPrefetchReadPages(),
+                requireNonNull(featuresConfig, "featuresConfig is null").isSpillToHdfs(),
+                requireNonNull(featuresConfig, "featuresConfig is null").getSpillProfile(),
+                requireNonNull(fileSystemClientManager, "fileSystemClientManager is null"));
     }
 
     @VisibleForTesting
@@ -99,35 +104,27 @@ public class FileSingleStreamSpillerFactory
             boolean spillCompressionEnabled,
             boolean spillEncryptionEnabled,
             boolean spillDirectSerdeEnabled,
-            int spillPrefetchReadPages)
+            int spillPrefetchReadPages,
+            boolean spillToHdfs,
+            String spillProfile,
+            FileSystemClientManager fileSystemClientManager)
     {
         this.serdeFactory = new PagesSerdeFactory(blockEncodingSerde, spillCompressionEnabled);
         this.executor = requireNonNull(executor, "executor is null");
         this.spillerStats = requireNonNull(spillerStats, "spillerStats can not be null");
         requireNonNull(spillPaths, "spillPaths is null");
         this.spillPaths = ImmutableList.copyOf(spillPaths);
-        spillPaths.forEach(path -> {
-            try {
-                createDirectories(path);
-            }
-            catch (IOException e) {
-                throw new IllegalArgumentException(
-                        format("could not create spill path %s; adjust experimental.spiller-spill-path config property or filesystem permissions", path), e);
-            }
-            if (!path.toFile().canWrite()) {
-                throw new IllegalArgumentException(
-                        format("spill path %s is not writable; adjust experimental.spiller-spill-path config property or filesystem permissions", path));
-            }
-        });
+        this.spillToHdfs = spillToHdfs;
+        this.spillProfile = spillProfile;
         this.maxUsedSpaceThreshold = maxUsedSpaceThreshold;
         this.spillEncryptionEnabled = spillEncryptionEnabled;
         this.spillCompressionEnabled = spillCompressionEnabled;
         this.roundRobinIndex = 0;
         this.spillDirectSerdeEnabled = spillDirectSerdeEnabled;
         this.spillPrefetchReadPages = spillPrefetchReadPages;
+        this.fileSystemClientManager = fileSystemClientManager;
     }
 
-    @PostConstruct
     public void cleanupOldSpillFiles()
     {
         spillPaths.forEach(FileSingleStreamSpillerFactory::cleanupOldSpillFiles);
@@ -158,14 +155,15 @@ public class FileSingleStreamSpillerFactory
     }
 
     @Override
-    public SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext)
+    public synchronized SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext)
     {
+        createSpillDirectories();
         Optional<SpillCipher> spillCipher = Optional.empty();
         if (spillEncryptionEnabled) {
             spillCipher = Optional.of(new AesSpillCipher());
         }
         PagesSerde serde = serdeFactory.createPagesSerdeForSpill(spillCipher, spillDirectSerdeEnabled);
-        return new FileSingleStreamSpiller(serde, executor, getNextSpillPath(), spillerStats, spillContext, memoryContext, spillCipher, spillCompressionEnabled, spillDirectSerdeEnabled, spillPrefetchReadPages);
+        return new FileSingleStreamSpiller(serde, executor, getNextSpillPath(), spillerStats, spillContext, memoryContext, spillCipher, spillCompressionEnabled, spillDirectSerdeEnabled, spillPrefetchReadPages, spillToHdfs, spillProfile, fileSystemClientManager);
     }
 
     private synchronized Path getNextSpillPath()
@@ -188,11 +186,43 @@ public class FileSingleStreamSpillerFactory
     private boolean hasEnoughDiskSpace(Path path)
     {
         try {
-            FileStore fileStore = getFileStore(path);
-            return fileStore.getUsableSpace() > fileStore.getTotalSpace() * (1.0 - maxUsedSpaceThreshold);
+            HetuFileSystemClient fileSystemClient = getFileSystem(path, spillToHdfs, spillProfile, fileSystemClientManager);
+            return fileSystemClient.getUsableSpace(path) > fileSystemClient.getTotalSpace(path) * (1.0 - maxUsedSpaceThreshold);
         }
         catch (IOException e) {
             throw new PrestoException(OUT_OF_SPILL_SPACE, "Cannot determine free space for spill", e);
+        }
+    }
+
+    private void createSpillDirectories()
+    {
+        if (!spillDirectoriesCreated) {
+            spillPaths.forEach(path -> {
+                try {
+                    getFileSystem(path, spillToHdfs, spillProfile, fileSystemClientManager).createDirectories(path);
+                }
+                catch (IOException e) {
+                    throw new IllegalArgumentException(
+                            format("could not create spill path %s; adjust experimental.spiller-spill-path config property or filesystem permissions", path), e);
+                }
+                if (!path.toFile().canWrite()) {
+                    throw new IllegalArgumentException(
+                            format("spill path %s is not writable; adjust experimental.spiller-spill-path config property or filesystem permissions", path));
+                }
+            });
+            this.spillDirectoriesCreated = true;
+            cleanupOldSpillFiles();
+        }
+    }
+
+    public static HetuFileSystemClient getFileSystem(Path path, boolean spillToHdfs, String spillProfile, FileSystemClientManager fileSystemClientManager)
+    {
+        try {
+            return spillToHdfs && !spillProfile.isEmpty() ? fileSystemClientManager.getFileSystemClient(spillProfile, path) : fileSystemClientManager.getFileSystemClient(path);
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException(
+                    format("could not get filesystem for the path %s; adjust experimental.spiller-spill-path config property or filesystem permissions", path), e);
         }
     }
 }

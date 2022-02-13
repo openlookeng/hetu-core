@@ -22,6 +22,7 @@ import io.airlift.slice.InputStreamSliceInput;
 import io.hetu.core.transport.execution.buffer.PageCodecMarker;
 import io.hetu.core.transport.execution.buffer.PagesSerdeUtil;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.PageAssertions;
 import io.prestosql.operator.WorkProcessor;
@@ -127,7 +128,11 @@ public class TestFileSingleStreamSpiller
                 1.0,
                 compression,
                 encryption,
-                false, 1);
+                false,
+                1,
+                false,
+                null,
+                new FileSystemClientManager());
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext);
         assertTrue(singleStreamSpiller instanceof FileSingleStreamSpiller);
@@ -208,7 +213,11 @@ public class TestFileSingleStreamSpiller
                 1.0,
                 compression,
                 encryption,
-                useDirectSerde, 1);
+                useDirectSerde,
+                1,
+                false,
+                null,
+                new FileSystemClientManager());
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         long startTime = System.currentTimeMillis();
         Stopwatch spillTimer = Stopwatch.createStarted();
@@ -359,7 +368,10 @@ public class TestFileSingleStreamSpiller
                 compression,
                 encryption,
                 useDirectSerde,
-                spillPrefetchReadPages);
+                spillPrefetchReadPages,
+                false,
+                null,
+                new FileSystemClientManager());
 
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         long startTime = System.currentTimeMillis();

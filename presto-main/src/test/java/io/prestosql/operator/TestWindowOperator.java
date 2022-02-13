@@ -1173,7 +1173,7 @@ public class TestWindowOperator
                 createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(),
                 new SpillerStats(),
                 ImmutableList.of(spillPath),
-                1.0, false, false, false, 1);
+                1.0, false, false, false, 1, false, null, new FileSystemClientManager());
         return new GenericSpillerFactory(streamSpillerFactory);
     }
 

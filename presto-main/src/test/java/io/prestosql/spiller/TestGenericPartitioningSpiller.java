@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Closer;
 import io.prestosql.RowPagesBuilder;
 import io.prestosql.SequencePageBuilder;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.operator.PartitionFunction;
 import io.prestosql.operator.SpillContext;
@@ -78,7 +79,8 @@ public class TestGenericPartitioningSpiller
                 createTestMetadataManager(),
                 new SpillerStats(),
                 featuresConfig,
-                new NodeSpillConfig());
+                new NodeSpillConfig(),
+                new FileSystemClientManager());
         factory = new GenericPartitioningSpillerFactory(singleStreamSpillerFactory);
         scheduledExecutor = newSingleThreadScheduledExecutor();
     }

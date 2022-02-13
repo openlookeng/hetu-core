@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.RowPagesBuilder;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.Page;
@@ -71,7 +72,7 @@ public class TestBinaryFileSpiller
         featuresConfig.setSpillerSpillPaths(spillPath.getAbsolutePath());
         featuresConfig.setSpillMaxUsedSpaceThreshold(1.0);
         NodeSpillConfig nodeSpillConfig = new NodeSpillConfig();
-        singleStreamSpillerFactory = new FileSingleStreamSpillerFactory(metadata, spillerStats, featuresConfig, nodeSpillConfig);
+        singleStreamSpillerFactory = new FileSingleStreamSpillerFactory(metadata, spillerStats, featuresConfig, nodeSpillConfig, new FileSystemClientManager());
         factory = new GenericSpillerFactory(singleStreamSpillerFactory);
         PagesSerdeFactory pagesSerdeFactory = new PagesSerdeFactory(metadata.getFunctionAndTypeManager().getBlockEncodingSerde(), nodeSpillConfig.isSpillCompressionEnabled());
         pagesSerde = pagesSerdeFactory.createPagesSerde();

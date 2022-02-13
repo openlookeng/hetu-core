@@ -66,6 +66,10 @@ public class FeaturesConfig
     static final String SPILL_ENABLED = "experimental.spill-enabled";
     @VisibleForTesting
     static final String SPILLER_SPILL_PATH = "experimental.spiller-spill-path";
+    @VisibleForTesting
+    static final String SPILLER_SPILL_TO_HDFS = "experimental.spiller-spill-to-hdfs";
+    @VisibleForTesting
+    static final String SPILLER_SPILL_PROFILE = "experimental.spiller-spill-profile";
 
     private double cpuCostWeight = 75;
     private double memoryCostWeight = 10;
@@ -119,6 +123,8 @@ public class FeaturesConfig
     private boolean spillWindowOperator = true;
     private DataSize aggregationOperatorUnspillMemoryLimit = new DataSize(4, DataSize.Unit.MEGABYTE);
     private List<Path> spillerSpillPaths = ImmutableList.of();
+    private boolean spillToHdfs;
+    private String spillProfile;
     private int spillerThreads = 4;
     private double spillMaxUsedSpaceThreshold = 0.9;
     private boolean iterativeOptimizerEnabled = true;
@@ -835,6 +841,40 @@ public class FeaturesConfig
     public boolean isSpillerSpillPathsConfiguredIfSpillEnabled()
     {
         return !isSpillEnabled() || !spillerSpillPaths.isEmpty();
+    }
+
+    public boolean isSpillToHdfs()
+    {
+        return spillToHdfs;
+    }
+
+    @Config(SPILLER_SPILL_TO_HDFS)
+    public void setSpillToHdfs(boolean spillToHdfs)
+    {
+        this.spillToHdfs = spillToHdfs;
+    }
+
+    public String getSpillProfile()
+    {
+        return spillProfile;
+    }
+
+    @Config(SPILLER_SPILL_PROFILE)
+    public void setSpillProfile(String spillProfile)
+    {
+        this.spillProfile = spillProfile;
+    }
+
+    @AssertTrue(message = SPILLER_SPILL_PATH + " must be only contain single path when " + SPILLER_SPILL_TO_HDFS + " is set to true")
+    public boolean isSpillerSpillPathConfiguredIfSpillToHdfsEnabled()
+    {
+        return !isSpillToHdfs() || spillerSpillPaths.size() == 1;
+    }
+
+    @AssertTrue(message = SPILLER_SPILL_PROFILE + " must be configured when " + SPILLER_SPILL_TO_HDFS + " is set to true")
+    public boolean isSpillerSpillProfileConfiguredIfSpillToHdfsEnabled()
+    {
+        return !isSpillToHdfs() || !spillProfile.isEmpty();
     }
 
     @Min(1)

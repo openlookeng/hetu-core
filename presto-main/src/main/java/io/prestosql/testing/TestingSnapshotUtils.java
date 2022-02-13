@@ -20,6 +20,7 @@ import io.prestosql.snapshot.SnapshotConfig;
 import io.prestosql.snapshot.SnapshotUtils;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.OpenOption;
@@ -95,7 +96,7 @@ public class TestingSnapshotUtils
         }
 
         @Override
-        public InputStream newInputStream(Path path)
+        public InputStream newInputStream(Path path, OpenOption... options)
         {
             return new InputStream()
             {
@@ -146,6 +147,30 @@ public class TestingSnapshotUtils
         @Override
         public void close()
         {
+        }
+
+        @Override
+        public long getUsableSpace(Path path) throws IOException
+        {
+            return 0;
+        }
+
+        @Override
+        public long getTotalSpace(Path path) throws IOException
+        {
+            return 0;
+        }
+
+        @Override
+        public Path createTemporaryFile(Path path, String prefix, String suffix) throws IOException
+        {
+            return null;
+        }
+
+        @Override
+        public Path createTemporaryFileName(Path path, String prefix, String suffix)
+        {
+            return null;
         }
     }
 }

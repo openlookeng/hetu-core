@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.MoreExecutors;
 import io.airlift.tpch.LineItem;
 import io.airlift.tpch.LineItemGenerator;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.BlockEncodingSerde;
@@ -130,7 +131,10 @@ public class BenchmarkBinaryFileSpiller
                     compressionEnabled,
                     encryptionEnabled,
                     directSerdeEnabled,
-                    spillPrefetchReadPages);
+                    spillPrefetchReadPages,
+                    false,
+                    null,
+                    new FileSystemClientManager());
             spillerFactory = new GenericSpillerFactory(singleStreamSpillerFactory);
             pages = createInputPages();
         }

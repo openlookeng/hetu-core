@@ -29,10 +29,12 @@ import io.airlift.slice.SliceOutput;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.PagesSerdeUtil;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.SpillContext;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.spiller.SpillCipher;
@@ -63,6 +65,7 @@ import static io.hetu.core.transport.execution.buffer.PagesSerdeUtil.writeSerial
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spiller.FileSingleStreamSpillerFactory.SPILL_FILE_PREFIX;
 import static io.prestosql.spiller.FileSingleStreamSpillerFactory.SPILL_FILE_SUFFIX;
+import static io.prestosql.spiller.FileSingleStreamSpillerFactory.getFileSystem;
 import static java.nio.file.StandardOpenOption.APPEND;
 import static java.util.Objects.requireNonNull;
 
@@ -90,8 +93,13 @@ public class FileSingleStreamSpiller
     private ListenableFuture<?> spillInProgress = Futures.immediateFuture(null);
     private boolean useDirectSerde;
     private boolean compressionEnabled;
+    private Path spillPath;
+    private boolean spillToHdfs;
+    private String spillProfile;
     private Optional<SpillCipher> spillCipher;
     private byte[] cipherIV;
+    private FileSystemClientManager fileSystemClientManager;
+    private HetuFileSystemClient fileSystemClient;
 
     // Snapshot: capture page sizes that are used to update localSpillContext and spillerStats during resume
     private List<Long> pageSizeList = new LinkedList<>();
@@ -107,11 +115,18 @@ public class FileSingleStreamSpiller
             Optional<SpillCipher> spillCipher,
             boolean compressionEnabled,
             boolean useDirectSerde,
-            int spillPrefetchReadPages)
+            int spillPrefetchReadPages,
+            boolean spillToHdfs,
+            String spillProfile,
+            FileSystemClientManager fileSystemClientManager)
     {
         this.serde = requireNonNull(serde, "serde is null");
         this.executor = requireNonNull(executor, "executor is null");
         this.spillerStats = requireNonNull(spillerStats, "spillerStats is null");
+        this.spillPath = spillPath;
+        this.fileSystemClientManager = requireNonNull(fileSystemClientManager, "fileSystemClient is null");
+        this.spillToHdfs = spillToHdfs;
+        this.spillProfile = spillProfile;
         this.localSpillContext = spillContext.newLocalSpillContext();
         this.memoryContext = requireNonNull(memoryContext, "memoryContext is null");
         if (requireNonNull(spillCipher, "spillCipher is null").isPresent()) {
@@ -129,7 +144,13 @@ public class FileSingleStreamSpiller
         // middle of execution when close() is called (note that this applies to both readPages() and writePages() methods).
         this.memoryContext.setBytes(BUFFER_SIZE);
         try {
-            this.targetFile = closer.register(new FileHolder(Files.createTempFile(spillPath, SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX)));
+            this.fileSystemClient = getFileSystem(spillPath, spillToHdfs, spillProfile, fileSystemClientManager);
+        }
+        catch (Exception e) {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to get filesystem", e);
+        }
+        try {
+            createSpillFiles();
         }
         catch (IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to create spill file", e);
@@ -176,7 +197,7 @@ public class FileSingleStreamSpiller
     private void writePages(Iterator<Page> pageIterator)
     {
         checkState(writable, "Spilling no longer allowed. The spiller has been made non-writable on first read for subsequent reads to be consistent");
-        try (SliceOutput output = new OutputStreamSliceOutput(targetFile.newOutputStream(APPEND), BUFFER_SIZE)) {
+        try (SliceOutput output = new OutputStreamSliceOutput(getOutputStreamBasedOnSpillLocation(), BUFFER_SIZE)) {
             Stopwatch timer = Stopwatch.createStarted();
             while (pageIterator.hasNext()) {
                 Page page = pageIterator.next();
@@ -214,7 +235,7 @@ public class FileSingleStreamSpiller
     private void writePagesDirect(Iterator<Page> pageIterator)
     {
         checkState(writable, "Spilling no longer allowed. The spiller has been made non-writable on first read for subsequent reads to be consistent");
-        try (OutputStream output = getStreamForWriting(targetFile.newOutputStream(APPEND), BUFFER_SIZE)) {
+        try (OutputStream output = getStreamForWriting(getOutputStreamBasedOnSpillLocation(), BUFFER_SIZE)) {
             Stopwatch timer = Stopwatch.createStarted();
             while (pageIterator.hasNext()) {
                 Page page = pageIterator.next();
@@ -361,7 +382,7 @@ public class FileSingleStreamSpiller
             Path path = Paths.get(myState.targetFile);
             // Actual file content is restored after this returns, in SingleInputSnapshotState.loadSpilledFiles
             Files.deleteIfExists(path);
-            this.targetFile = closer.register(new FileHolder(Files.createFile(path)));
+            this.targetFile = closer.register(new FileHolder(Files.createFile(path), getFileSystem(path, spillToHdfs, null, fileSystemClientManager)));
             for (Long pageSize : pageSizeList) {
                 // restore localSpillContext and spillerStats
                 this.localSpillContext.updateBytes(pageSize);
@@ -384,5 +405,25 @@ public class FileSingleStreamSpiller
         private String targetFile;
         private boolean compressionEnabled;
         private boolean useDirectSerde;
+    }
+
+    private void createSpillFiles() throws IOException
+    {
+        if (spillToHdfs) {
+            this.targetFile = closer.register(new FileHolder(fileSystemClient.createTemporaryFileName(spillPath, SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX), fileSystemClient));
+        }
+        else {
+            this.targetFile = closer.register(new FileHolder(fileSystemClient.createTemporaryFile(spillPath, SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX), fileSystemClient));
+        }
+    }
+
+    private OutputStream getOutputStreamBasedOnSpillLocation() throws IOException
+    {
+        if (spillToHdfs) {
+            return targetFile.newOutputStream();
+        }
+        else {
+            return targetFile.newOutputStream(APPEND);
+        }
     }
 }

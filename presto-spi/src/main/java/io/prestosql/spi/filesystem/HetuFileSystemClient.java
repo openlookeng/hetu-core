@@ -126,7 +126,7 @@ public interface HetuFileSystemClient
      * @throws NoSuchFileException If the given file does not exist.
      * @throws IOException Other exceptions occur during the process.
      */
-    InputStream newInputStream(Path path)
+    InputStream newInputStream(Path path, OpenOption... options)
             throws IOException;
 
     /**
@@ -198,4 +198,15 @@ public interface HetuFileSystemClient
     @Override
     void close()
             throws IOException;
+
+    long getUsableSpace(Path path)
+            throws IOException;
+
+    long getTotalSpace(Path path)
+            throws IOException;
+
+    Path createTemporaryFile(Path path, String prefix, String suffix)
+            throws IOException;
+
+    Path createTemporaryFileName(Path path, String prefix, String suffix);
 }

@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.BlockEncodingSerde;
@@ -87,7 +88,11 @@ public class TestFileSingleStreamSpillerFactory
                 1.0,
                 false,
                 false,
-                false, 1);
+                false,
+                1,
+                false,
+                null,
+                new FileSystemClientManager());
 
         assertEquals(listFiles(spillPath1.toPath()).size(), 0);
         assertEquals(listFiles(spillPath2.toPath()).size(), 0);
@@ -127,7 +132,11 @@ public class TestFileSingleStreamSpillerFactory
                 0.0,
                 false,
                 false,
-                false, 1);
+                false,
+                1,
+                false,
+                null,
+                new FileSystemClientManager());
 
         spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"));
     }
@@ -145,7 +154,11 @@ public class TestFileSingleStreamSpillerFactory
                 1.0,
                 false,
                 false,
-                false, 1);
+                false,
+                1,
+                false,
+                null,
+                new FileSystemClientManager());
         spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"));
     }
 
@@ -175,7 +188,11 @@ public class TestFileSingleStreamSpillerFactory
                 1.0,
                 false,
                 false,
-                false, 1);
+                false,
+                1,
+                false,
+                null,
+                new FileSystemClientManager());
         spillerFactory.cleanupOldSpillFiles();
 
         assertEquals(listFiles(spillPath1.toPath()).size(), 1);
