@@ -16,6 +16,8 @@ package io.prestosql.spiller;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Closer;
+import io.hetu.core.filesystem.HetuLocalFileSystemClient;
+import io.hetu.core.filesystem.LocalConfig;
 import io.prestosql.RowPagesBuilder;
 import io.prestosql.SequencePageBuilder;
 import io.prestosql.filesystem.FileSystemClientManager;
@@ -35,6 +37,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.IntPredicate;
 
@@ -50,6 +53,8 @@ import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.lang.Math.toIntExact;
 import static java.nio.file.Files.createTempDirectory;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
@@ -65,12 +70,14 @@ public class TestGenericPartitioningSpiller
     private Path tempDirectory;
     private GenericPartitioningSpillerFactory factory;
     private ScheduledExecutorService scheduledExecutor;
+    FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
 
     @BeforeClass
     public void setUp()
             throws Exception
     {
         tempDirectory = createTempDirectory(getClass().getSimpleName());
+        when(fileSystemClientManager.getFileSystemClient(tempDirectory)).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), tempDirectory));
         FeaturesConfig featuresConfig = new FeaturesConfig();
         featuresConfig.setSpillerSpillPaths(tempDirectory.toString());
         featuresConfig.setSpillerThreads(8);
@@ -80,7 +87,7 @@ public class TestGenericPartitioningSpiller
                 new SpillerStats(),
                 featuresConfig,
                 new NodeSpillConfig(),
-                new FileSystemClientManager());
+                fileSystemClientManager);
         factory = new GenericPartitioningSpillerFactory(singleStreamSpillerFactory);
         scheduledExecutor = newSingleThreadScheduledExecutor();
     }

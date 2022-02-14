@@ -218,7 +218,7 @@ public class FileSingleStreamSpillerFactory
     public static HetuFileSystemClient getFileSystem(Path path, boolean spillToHdfs, String spillProfile, FileSystemClientManager fileSystemClientManager)
     {
         try {
-            return spillToHdfs && !spillProfile.isEmpty() ? fileSystemClientManager.getFileSystemClient(spillProfile, path) : fileSystemClientManager.getFileSystemClient(path);
+            return spillToHdfs && spillProfile != null && !spillProfile.isEmpty() ? fileSystemClientManager.getFileSystemClient(spillProfile, path) : fileSystemClientManager.getFileSystemClient(path);
         }
         catch (IOException e) {
             throw new IllegalArgumentException(

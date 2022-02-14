@@ -19,6 +19,8 @@ import com.google.common.collect.Iterators;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import io.airlift.log.Logger;
 import io.airlift.slice.InputStreamSliceInput;
+import io.hetu.core.filesystem.HetuLocalFileSystemClient;
+import io.hetu.core.filesystem.LocalConfig;
 import io.hetu.core.transport.execution.buffer.PageCodecMarker;
 import io.hetu.core.transport.execution.buffer.PagesSerdeUtil;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
@@ -37,11 +39,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
@@ -61,6 +65,9 @@ import static java.nio.file.Files.createTempDirectory;
 import static java.nio.file.Files.newInputStream;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newFixedThreadPool;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -75,6 +82,7 @@ public class TestFileSingleStreamSpiller
     private final ListeningExecutorService executor = listeningDecorator(newCachedThreadPool());
     private final ListeningExecutorService executorBenchmark = listeningDecorator(newFixedThreadPool(1, daemonThreadsNamed("binary-spiller-%s")));
     private final File spillPath = createTempDirectory(getClass().getName()).toFile();
+    FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
 
     public TestFileSingleStreamSpiller()
             throws IOException
@@ -120,6 +128,7 @@ public class TestFileSingleStreamSpiller
     private void assertSpill(boolean compression, boolean encryption)
             throws Exception
     {
+        when(fileSystemClientManager.getFileSystemClient(any(Path.class))).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(spillPath.getAbsolutePath())));
         FileSingleStreamSpillerFactory spillerFactory = new FileSingleStreamSpillerFactory(
                 executor, // executor won't be closed, because we don't call destroy() on the spiller factory
                 createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(),
@@ -132,7 +141,7 @@ public class TestFileSingleStreamSpiller
                 1,
                 false,
                 null,
-                new FileSystemClientManager());
+                fileSystemClientManager);
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext);
         assertTrue(singleStreamSpiller instanceof FileSingleStreamSpiller);
@@ -205,6 +214,7 @@ public class TestFileSingleStreamSpiller
             throws Exception
     {
         List<FileSingleStreamSpiller> spillers = new ArrayList<>();
+        when(fileSystemClientManager.getFileSystemClient(any(Path.class))).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(spillPath.getAbsolutePath())));
         FileSingleStreamSpillerFactory spillerFactory = new FileSingleStreamSpillerFactory(
                 executorBenchmark, // executor won't be closed, because we don't call destroy() on the spiller factory
                 createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(),
@@ -217,7 +227,7 @@ public class TestFileSingleStreamSpiller
                 1,
                 false,
                 null,
-                new FileSystemClientManager());
+                fileSystemClientManager);
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         long startTime = System.currentTimeMillis();
         Stopwatch spillTimer = Stopwatch.createStarted();
@@ -359,6 +369,7 @@ public class TestFileSingleStreamSpiller
             throws Exception
     {
         List<FileSingleStreamSpiller> spillers = new ArrayList<>();
+        when(fileSystemClientManager.getFileSystemClient(any(Path.class))).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(spillPath.getAbsolutePath())));
         FileSingleStreamSpillerFactory spillerFactory = new FileSingleStreamSpillerFactory(
                 executorBenchmark, // executor won't be closed, because we don't call destroy() on the spiller factory
                 createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(),
@@ -371,7 +382,7 @@ public class TestFileSingleStreamSpiller
                 spillPrefetchReadPages,
                 false,
                 null,
-                new FileSystemClientManager());
+                fileSystemClientManager);
 
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         long startTime = System.currentTimeMillis();

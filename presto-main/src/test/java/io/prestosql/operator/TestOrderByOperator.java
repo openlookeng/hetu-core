@@ -14,7 +14,6 @@
 package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.io.Files;
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
@@ -41,6 +40,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -90,6 +90,7 @@ public class TestOrderByOperator
     private ScheduledExecutorService scheduledExecutor;
     private DummySpillerFactory spillerFactory;
     private SnapshotUtils snapshotUtils = NOOP_SNAPSHOT_UTILS;
+    private FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
 
     @DataProvider
     public static Object[][] spillEnabled()
@@ -103,11 +104,12 @@ public class TestOrderByOperator
     }
 
     @BeforeMethod
-    public void setUp()
+    public void setUp() throws IOException
     {
         executor = newCachedThreadPool(daemonThreadsNamed("test-executor-%s"));
         scheduledExecutor = newScheduledThreadPool(2, daemonThreadsNamed("test-scheduledExecutor-%s"));
         spillerFactory = new DummySpillerFactory();
+        when(fileSystemClientManager.getFileSystemClient(any(Path.class))).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/tmp/hetu/snapshot/")));
     }
 
     @AfterMethod(alwaysRun = true)
@@ -346,14 +348,14 @@ public class TestOrderByOperator
                 .addDriverContext();
     }
 
-    private static GenericSpillerFactory createGenericSpillerFactory(Path spillPath)
+    private static GenericSpillerFactory createGenericSpillerFactory(Path spillPath, FileSystemClientManager fileSystemClientManager)
     {
         FileSingleStreamSpillerFactory streamSpillerFactory = new FileSingleStreamSpillerFactory(
                 listeningDecorator(newCachedThreadPool()),
                 createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(),
                 new SpillerStats(),
                 ImmutableList.of(spillPath),
-                1.0, false, false, false, 1, false, null, new FileSystemClientManager());
+                1.0, false, false, false, 1, false, null, fileSystemClientManager);
         return new GenericSpillerFactory(streamSpillerFactory);
     }
 
@@ -369,10 +371,8 @@ public class TestOrderByOperator
             throws Exception
     {
         // Initialization
-        Path spillPath = Files.createTempDir().toPath();
-        GenericSpillerFactory spillerFactory = createGenericSpillerFactory(spillPath);
-        FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
-        when(fileSystemClientManager.getFileSystemClient(any(Path.class))).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/tmp/hetu/snapshot/")));
+        Path spillPath = Paths.get("/tmp/hetu/snapshot/");
+        GenericSpillerFactory spillerFactory = createGenericSpillerFactory(spillPath, fileSystemClientManager);
         SnapshotConfig snapshotConfig = new SnapshotConfig();
         snapshotUtils = new SnapshotUtils(fileSystemClientManager, snapshotConfig, new InMemoryNodeManager());
         snapshotUtils.initialize();

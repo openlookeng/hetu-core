@@ -17,6 +17,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import io.hetu.core.filesystem.HetuLocalFileSystemClient;
+import io.hetu.core.filesystem.LocalConfig;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.BlockBuilder;
@@ -29,8 +31,10 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.Executors;
 
 import static com.google.common.io.MoreFiles.deleteRecursively;
@@ -44,6 +48,8 @@ import static io.prestosql.spiller.FileSingleStreamSpillerFactory.SPILL_FILE_PRE
 import static io.prestosql.spiller.FileSingleStreamSpillerFactory.SPILL_FILE_SUFFIX;
 import static java.nio.file.Files.createTempDirectory;
 import static java.util.Collections.emptyList;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
 @Test(singleThreaded = true)
@@ -54,6 +60,7 @@ public class TestFileSingleStreamSpillerFactory
     private ListeningExecutorService executor;
     private File spillPath1;
     private File spillPath2;
+    FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
 
     @BeforeMethod
     public void setUp() throws IOException
@@ -65,6 +72,8 @@ public class TestFileSingleStreamSpillerFactory
         closer.register(() -> deleteRecursively(spillPath1.toPath(), ALLOW_INSECURE));
         spillPath2 = createTempDirectory(getClass().getName()).toFile();
         closer.register(() -> deleteRecursively(spillPath2.toPath(), ALLOW_INSECURE));
+        when(fileSystemClientManager.getFileSystemClient(spillPath1.toPath())).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(spillPath1.getAbsolutePath())));
+        when(fileSystemClientManager.getFileSystemClient(spillPath2.toPath())).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(spillPath2.getAbsolutePath())));
     }
 
     @AfterMethod(alwaysRun = true)
@@ -92,7 +101,7 @@ public class TestFileSingleStreamSpillerFactory
                 1,
                 false,
                 null,
-                new FileSystemClientManager());
+                fileSystemClientManager);
 
         assertEquals(listFiles(spillPath1.toPath()).size(), 0);
         assertEquals(listFiles(spillPath2.toPath()).size(), 0);
@@ -136,7 +145,7 @@ public class TestFileSingleStreamSpillerFactory
                 1,
                 false,
                 null,
-                new FileSystemClientManager());
+                fileSystemClientManager);
 
         spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"));
     }
@@ -158,7 +167,7 @@ public class TestFileSingleStreamSpillerFactory
                 1,
                 false,
                 null,
-                new FileSystemClientManager());
+                fileSystemClientManager);
         spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"));
     }
 
@@ -192,7 +201,7 @@ public class TestFileSingleStreamSpillerFactory
                 1,
                 false,
                 null,
-                new FileSystemClientManager());
+                fileSystemClientManager);
         spillerFactory.cleanupOldSpillFiles();
 
         assertEquals(listFiles(spillPath1.toPath()).size(), 1);
