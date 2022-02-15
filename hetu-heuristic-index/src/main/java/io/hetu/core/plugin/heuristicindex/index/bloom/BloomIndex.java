@@ -32,6 +32,8 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -86,10 +88,10 @@ public class BloomIndex
     public synchronized boolean addValues(List<Pair<String, List<Object>>> values)
     {
         // Currently expecting only one column
-        List<Object> columnIdxValue = values.get(0).getSecond();
+        HashSet<Object> columnIdxValue = new HashSet<>(values.get(0).getSecond());
         for (Object value : columnIdxValue) {
             if (value != null) {
-                getFilterFromMemory().add(value.toString().getBytes());
+                getFilterFromMemory().add(value.toString().getBytes(StandardCharsets.UTF_8));
             }
         }
         return true;
@@ -103,12 +105,12 @@ public class BloomIndex
             Domain predicate = (Domain) expression;
             if (predicate.isSingleValue()) {
                 Object value = getActualValue(predicate.getType(), predicate.getSingleValue());
-                return getFilter().test(value.toString().getBytes());
+                return getFilter().test(value.toString().getBytes(StandardCharsets.UTF_8));
             }
         }
         else if (expression instanceof CallExpression) {
             // test ComparisonExpression matching
-            return matchCallExpEqual(expression, object -> getFilter().test(object.toString().getBytes()));
+            return matchCallExpEqual(expression, object -> getFilter().test(object.toString().getBytes(StandardCharsets.UTF_8)));
         }
         throw new UnsupportedOperationException("Expression not supported by " + ID + " index.");
     }

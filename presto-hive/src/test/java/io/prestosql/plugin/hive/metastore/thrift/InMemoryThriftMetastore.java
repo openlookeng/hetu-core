@@ -100,8 +100,9 @@ public class InMemoryThriftMetastore
     }
 
     @Override
-    public synchronized void createDatabase(HiveIdentity identity, Database database)
+    public synchronized void createDatabase(HiveIdentity identity, Database inputDatabase)
     {
+        Database database = inputDatabase;
         requireNonNull(database, "database is null");
 
         File directory;

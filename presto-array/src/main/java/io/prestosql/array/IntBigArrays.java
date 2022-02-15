@@ -161,8 +161,10 @@ public class IntBigArrays
 
     private static void vecSwap(final int[][] x, long a, long b, final long n)
     {
-        for (int i = 0; i < n; i++, a++, b++) {
-            swap(x, a, b);
+        long tmpA = a;
+        long tmpB = b;
+        for (int i = 0; i < n; i++, tmpA++, tmpB++) {
+            swap(x, tmpA, tmpB);
         }
     }
 

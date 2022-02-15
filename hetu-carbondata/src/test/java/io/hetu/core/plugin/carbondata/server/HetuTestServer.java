@@ -91,11 +91,11 @@ public class HetuTestServer
         carbonProperties.putAll(properties);
 
         logger.info("------------ Starting Presto Server -------------");
-        DistributedQueryRunner queryRunner = createQueryRunner(hetuProperties);
+        DistributedQueryRunner distributedQueryRunner = createQueryRunner(hetuProperties);
         Connection connection = createJdbcConnection(dbName);
         statement = (PrestoStatement) connection.createStatement();
 
-        logger.info("STARTED SERVER AT :" + queryRunner.getCoordinator().getBaseUrl());
+        logger.info("STARTED SERVER AT :" + distributedQueryRunner.getCoordinator().getBaseUrl());
     }
 
     public void stopServer() throws SQLException
@@ -192,7 +192,7 @@ public class HetuTestServer
     {
         try {
             queryRunner.installPlugin(new CarbondataPlugin());
-            Map<String, String> carbonProperties = ImmutableMap.<String, String>builder()
+            Map<String, String> carbonPropertiesMap = ImmutableMap.<String, String>builder()
                     .putAll(this.carbonProperties)
                     .put("carbon.unsafe.working.memory.in.mb", "512")
                     .build();
@@ -203,7 +203,7 @@ public class HetuTestServer
                     .build();
 
             // CreateCatalog will create a catalog for CarbonData in etc/catalog.
-            queryRunner.createCatalog(carbonDataCatalog, carbonDataConnector, carbonProperties);
+            queryRunner.createCatalog(carbonDataCatalog, carbonDataConnector, carbonPropertiesMap);
             queryRunner.createCatalog(carbonDataCatalogLocationDisabled, carbonDataConnector, carbonPropertiesLocationDisabled);
         }
         catch (RuntimeException e) {

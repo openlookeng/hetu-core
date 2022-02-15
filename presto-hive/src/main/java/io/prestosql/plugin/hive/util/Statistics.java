@@ -353,7 +353,6 @@ public final class Statistics
     {
         HiveColumnStatistics.Builder result = HiveColumnStatistics.builder();
 
-        // MIN_VALUE, MAX_VALUE
         // We ask the engine to compute either both or neither
         verify(computedStatistics.containsKey(MIN_VALUE) == computedStatistics.containsKey(MAX_VALUE));
         if (computedStatistics.containsKey(MIN_VALUE)) {

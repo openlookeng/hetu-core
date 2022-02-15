@@ -442,11 +442,6 @@ public class SplitFiltering
                 return false;
             }
 
-            /* (!(table.getConnectorHandle().isFilterSupported()
-             *   && (isSupportedExpression(filterNode.getPredicate())
-             *       || (((TableScanNode) sourceNode).getPredicate().isPresent()
-             *           && isSupportedExpression(((TableScanNode) sourceNode).getPredicate().get())))))
-             */
             if (!table.getConnectorHandle().isFilterSupported()) {
                 return false;
             }

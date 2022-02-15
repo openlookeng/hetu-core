@@ -142,12 +142,12 @@ public class Backoff
 
     public synchronized long getBackoffDelayNanos()
     {
-        int failureCount = (int) min(backoffDelayIntervalsNanos.length, this.failureCount);
-        if (failureCount == 0) {
+        int tmpFailureCount = (int) min(backoffDelayIntervalsNanos.length, this.failureCount);
+        if (tmpFailureCount == 0) {
             return 0;
         }
         // expected amount of time to delay from the last failure time
-        long currentDelay = backoffDelayIntervalsNanos[failureCount - 1];
+        long currentDelay = backoffDelayIntervalsNanos[tmpFailureCount - 1];
 
         // calculate expected delay from now
         long nanosSinceLastFailure = ticker.read() - lastFailureTime;

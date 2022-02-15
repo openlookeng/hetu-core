@@ -18,6 +18,7 @@ import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static io.prestosql.cli.CsvPrinter.CsvOutputFormat.NO_HEADER;
@@ -172,7 +173,7 @@ public class TestCsvPrinter
         List<String> fieldNames = ImmutableList.of("first", "last", "quantity");
         OutputPrinter printer = new CsvPrinter(fieldNames, writer, NO_HEADER);
 
-        printRows(printer, TestAlignedTablePrinter.row("hello".getBytes(), null, 123));
+        printRows(printer, TestAlignedTablePrinter.row("hello".getBytes(StandardCharsets.UTF_8), null, 123));
         printer.finish();
 
         String expected = "\"68 65 6c 6c 6f\",\"\",\"123\"\n";

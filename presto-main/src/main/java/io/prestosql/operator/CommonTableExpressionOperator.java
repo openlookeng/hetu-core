@@ -113,11 +113,11 @@ public class CommonTableExpressionOperator
         {
             checkState(!closed, "Factory is already closed");
             checkArgument(parents.size() > 0, "No parent assigned for CTE");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, CommonTableExpressionOperator.class.getSimpleName());
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, CommonTableExpressionOperator.class.getSimpleName());
             return new CommonTableExpressionOperator(
                     planNodeId,
                     parents.stream().findAny().get(),
-                    operatorContext,
+                    addOperatorContext,
                     cteCtx,
                     operatorCounter.incrementAndGet(),
                     pagePreprocessor);
@@ -177,9 +177,9 @@ public class CommonTableExpressionOperator
     public void addInput(Page page)
     {
         /* Got a new page... Place it in the Queue! */
-        page = pagePreprocessor.apply(page);
-        cteContext.addPage(page);
-        LOG.debug("CTE(" + cteContext.getName() + ")" + "[" + consumer + "-" + operatorInstaceId + "] Page added with " + page.getPositionCount() + " rows");
+        Page addPage = pagePreprocessor.apply(page);
+        cteContext.addPage(addPage);
+        LOG.debug("CTE(" + cteContext.getName() + ")" + "[" + consumer + "-" + operatorInstaceId + "] Page added with " + addPage.getPositionCount() + " rows");
     }
 
     /**

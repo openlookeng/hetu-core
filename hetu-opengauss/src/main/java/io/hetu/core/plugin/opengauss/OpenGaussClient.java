@@ -143,6 +143,8 @@ public class OpenGaussClient
             case "timestamptz":
                 // OpenGauss's "timestamp with time zone" is reported as Types.TIMESTAMP rather than Types.TIMESTAMP_WITH_TIMEZONE
                 return Optional.of(timestampWithTimeZoneColumnMapping());
+            default:
+                break;
         }
         if (typeHandle.getJdbcType() == Types.VARCHAR && !jdbcTypeName.equals("varchar")) {
             // This can be e.g. an ENUM

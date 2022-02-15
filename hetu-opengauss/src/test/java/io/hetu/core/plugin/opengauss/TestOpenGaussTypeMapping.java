@@ -60,29 +60,34 @@ public class TestOpenGaussTypeMapping
 
     // not support
     @Test
+    @Override
     public void testPrestoCreatedParameterizedVarcharUnicode()
     {
     }
 
     // not support
     @Test
+    @Override
     public void testPostgreSqlCreatedParameterizedVarcharUnicode()
     {
     }
 
     // not support
     @Test
+    @Override
     public void testPrestoCreatedParameterizedCharUnicode()
     {
     }
 
     // not support
     @Test
+    @Override
     public void testPostgreSqlCreatedParameterizedCharUnicode()
     {
     }
 
     @Test
+    @Override
     public void testArray()
     {
         // basic types
@@ -107,6 +112,7 @@ public class TestOpenGaussTypeMapping
     }
 
     @Test
+    @Override
     public void testArrayMultidimensional()
     {
         // for multidimensional arrays, PostgreSQL requires subarrays to have the same dimensions, including nulls
@@ -123,6 +129,7 @@ public class TestOpenGaussTypeMapping
     }
 
     @Test
+    @Override
     public void testDate()
     {
         // Note: there is identical test for MySQL
@@ -156,6 +163,7 @@ public class TestOpenGaussTypeMapping
     }
 
     @Test(dataProvider = "testTimestampDataProvider")
+    @Override
     public void testTimestamp(boolean insertWithPresto)
     {
         // using two non-JVM zones so that we don't need to worry what Postgres system zone is
@@ -189,6 +197,7 @@ public class TestOpenGaussTypeMapping
 
     // not support
     @Test
+    @Override
     public void testJsonb()
     {
     }

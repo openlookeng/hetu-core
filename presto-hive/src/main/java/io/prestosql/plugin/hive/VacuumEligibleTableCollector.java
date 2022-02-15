@@ -42,11 +42,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import static java.util.Locale.ENGLISH;
+
 public class VacuumEligibleTableCollector
 {
     private static VacuumEligibleTableCollector instance;
     private final ScheduledExecutorService executorService;
-    private final Logger log = Logger.get(VacuumEligibleTableCollector.class);
+    private static final Logger log = Logger.get(VacuumEligibleTableCollector.class);
 
     private SemiTransactionalHiveMetastore metastore;
     private HdfsEnvironment hdfsEnvironment;
@@ -82,6 +84,7 @@ public class VacuumEligibleTableCollector
                 hdfsEnvironment.getFileSystem(context, new Path("/"));
             }
             catch (IOException e) {
+                log.warn("Get file system error(schema=%s tableName=%s)", context.getSchemaName(), context.getTableName());
             }
             // Also start preparing vacuumTableList
             instance.executorService.scheduleAtFixedRate(instance.task,
@@ -272,7 +275,7 @@ public class VacuumEligibleTableCollector
 
         private void logStats(String schema, String table, long baseSize, long deltaSize, int numOfDeltaDir)
         {
-            log.debug(String.format("Auto-vacuum stats for table '%s': baseSize='%d', delatSize='%d', numOfDeltaDir='%d'",
+            log.debug(String.format(ENGLISH, "Auto-vacuum stats for table '%s': baseSize='%d', delatSize='%d', numOfDeltaDir='%d'",
                     appendTableWithSchema(schema, table),
                     baseSize,
                     deltaSize,

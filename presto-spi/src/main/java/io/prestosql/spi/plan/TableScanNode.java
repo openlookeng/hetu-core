@@ -43,7 +43,7 @@ public class TableScanNode
 {
     private final TableHandle table;
     private final List<Symbol> outputSymbols;
-    private final Map<Symbol, ColumnHandle> assignments; // symbol -> column
+    private final Map<Symbol, ColumnHandle> assignments;
 
     private final TupleDomain<ColumnHandle> enforcedConstraint;
     private final Optional<RowExpression> predicate;

@@ -198,8 +198,9 @@ public final class QueryCardinalityUtil
             return applyLimit(node.getSource(), node.getCount());
         }
 
-        private Range<Long> applyLimit(PlanNode source, long limit)
+        private Range<Long> applyLimit(PlanNode source, long inputLimit)
         {
+            long limit = inputLimit;
             Range<Long> sourceCardinalityRange = source.accept(this, null);
             if (sourceCardinalityRange.hasUpperBound()) {
                 limit = min(sourceCardinalityRange.upperEndpoint(), limit);

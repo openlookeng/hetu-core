@@ -150,28 +150,28 @@ public final class PrestoThriftBigintArray
         if (positions == 0) {
             return bigintArrayData(new PrestoThriftBigintArray(null, null, null));
         }
-        boolean[] nulls = null;
-        int[] sizes = null;
+        boolean[] nulls1 = null;
+        int[] sizes1 = null;
         for (int position = 0; position < positions; position++) {
             if (arrayBlock.isNull(position)) {
-                if (nulls == null) {
-                    nulls = new boolean[positions];
+                if (nulls1 == null) {
+                    nulls1 = new boolean[positions];
                 }
-                nulls[position] = true;
+                nulls1[position] = true;
             }
             else {
-                if (sizes == null) {
-                    sizes = new int[positions];
+                if (sizes1 == null) {
+                    sizes1 = new int[positions];
                 }
-                sizes[position] = arrayBlock.apply((valuesBlock, startPosition, length) -> length, position);
+                sizes1[position] = arrayBlock.apply((valuesBlock, startPosition, length) -> length, position);
             }
         }
-        PrestoThriftBigint values = arrayBlock
+        PrestoThriftBigint values1 = arrayBlock
                 .apply((valuesBlock, startPosition, length) -> PrestoThriftBigint.fromBlock(valuesBlock), 0)
                 .getBigintData();
-        checkState(values != null, "values must be present");
-        checkState(totalSize(nulls, sizes) == values.numberOfRecords(), "unexpected number of values");
-        return bigintArrayData(new PrestoThriftBigintArray(nulls, sizes, values));
+        checkState(values1 != null, "values must be present");
+        checkState(totalSize(nulls1, sizes1) == values1.numberOfRecords(), "unexpected number of values");
+        return bigintArrayData(new PrestoThriftBigintArray(nulls1, sizes1, values1));
     }
 
     private static int numberOfValues(PrestoThriftBigint values)

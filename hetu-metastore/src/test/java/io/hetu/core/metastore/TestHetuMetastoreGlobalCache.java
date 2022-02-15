@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Resources;
 import com.google.inject.Injector;
 import io.airlift.bootstrap.Bootstrap;
+import io.airlift.log.Logger;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
 import io.hetu.core.metastore.hetufilesystem.HetuFsMetastoreModule;
@@ -84,6 +85,7 @@ public class TestHetuMetastoreGlobalCache
     private DatabaseEntity defaultDatabase;
     private String path = Resources.getResource("").getPath() + File.separator + "metastoreCache";
 
+    private static final Logger LOG = Logger.get(TestHetuMetastoreGlobalCache.class);
     private static final String LOCALHOST = "127.0.0.1";
     private static final String PORT1 = "7980";
     private static final String PORT3 = "5991";
@@ -241,7 +243,7 @@ public class TestHetuMetastoreGlobalCache
             client.deleteRecursively(Paths.get(path));
         }
         catch (IOException e) {
-            e.printStackTrace();
+            LOG.info("Error message: " + e.getStackTrace());
         }
     }
 

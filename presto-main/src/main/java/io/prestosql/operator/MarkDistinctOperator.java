@@ -75,8 +75,8 @@ public class MarkDistinctOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, MarkDistinctOperator.class.getSimpleName());
-            return new MarkDistinctOperator(operatorContext, types, markDistinctChannels, hashChannel, joinCompiler);
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, MarkDistinctOperator.class.getSimpleName());
+            return new MarkDistinctOperator(addOperatorContext, types, markDistinctChannels, hashChannel, joinCompiler);
         }
 
         @Override

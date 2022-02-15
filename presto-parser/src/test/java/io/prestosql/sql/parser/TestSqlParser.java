@@ -16,6 +16,7 @@ package io.prestosql.sql.parser;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import io.airlift.log.Logger;
 import io.prestosql.sql.tree.AddColumn;
 import io.prestosql.sql.tree.AliasedRelation;
 import io.prestosql.sql.tree.AllColumns;
@@ -195,6 +196,7 @@ import static org.testng.Assert.fail;
 
 public class TestSqlParser
 {
+    private static final Logger log = Logger.get(TestSqlParser.class);
     private static final SqlParser SQL_PARSER = new SqlParser();
 
     @Test
@@ -336,6 +338,7 @@ public class TestSqlParser
         }
         catch (RuntimeException e) {
             // Expected
+            log.error("test array subScript fail : ", e.getMessage());
         }
     }
 
@@ -2097,6 +2100,7 @@ public class TestSqlParser
         }
         catch (RuntimeException e) {
             //expected - schema can only be qualified by catalog
+            log.error("testSetPath error : ", e.getMessage());
         }
 
         try {
@@ -2105,6 +2109,7 @@ public class TestSqlParser
         }
         catch (RuntimeException e) {
             //expected - some form of parameter is required
+            log.error("testSetPath error : ", e.getMessage());
         }
     }
 

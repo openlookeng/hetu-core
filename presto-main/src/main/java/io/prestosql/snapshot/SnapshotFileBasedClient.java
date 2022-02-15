@@ -152,6 +152,7 @@ public class SnapshotFileBasedClient
         }
     }
 
+    @Override
     public Set<String> loadConsolidatedFiles(String queryId)
             throws IOException, ClassNotFoundException
     {

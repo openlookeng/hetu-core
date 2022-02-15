@@ -74,11 +74,12 @@ public class Re2JCastToRegexpFunction
 
     public static Re2JRegexp castToRegexp(int dfaStatesLimit, int dfaRetries, boolean padSpaces, long typeLength, Slice pattern)
     {
+        Slice finalPattern = pattern;
         try {
             if (padSpaces) {
-                pattern = padSpaces(pattern, (int) typeLength);
+                finalPattern = padSpaces(finalPattern, (int) typeLength);
             }
-            return new Re2JRegexp(dfaStatesLimit, dfaRetries, pattern);
+            return new Re2JRegexp(dfaStatesLimit, dfaRetries, finalPattern);
         }
         catch (Exception e) {
             throw new PrestoException(INVALID_FUNCTION_ARGUMENT, e);

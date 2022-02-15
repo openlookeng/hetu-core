@@ -139,8 +139,8 @@ public class FileHiveMetastore
     {
         HiveConfig hiveConfig = new HiveConfig();
         HdfsConfiguration hdfsConfiguration = new HiveHdfsConfiguration(new HdfsConfigurationInitializer(hiveConfig), ImmutableSet.of());
-        HdfsEnvironment hdfsEnvironment = new HdfsEnvironment(hdfsConfiguration, hiveConfig, new NoHdfsAuthentication());
-        return new FileHiveMetastore(hdfsEnvironment, catalogDirectory.toURI().toString(), "test");
+        HdfsEnvironment localHdfsEnvironment = new HdfsEnvironment(hdfsConfiguration, hiveConfig, new NoHdfsAuthentication());
+        return new FileHiveMetastore(localHdfsEnvironment, catalogDirectory.toURI().toString(), "test");
     }
 
     @Inject
@@ -647,6 +647,7 @@ public class FileHiveMetastore
                         metadataFileSystem.delete(createdFile, false);
                     }
                     catch (IOException ignored) {
+                        // could be ignored
                     }
                 }
                 throw e;

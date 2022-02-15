@@ -179,7 +179,7 @@ public class DataCenterPlanOptimizer
             List<RowExpression> pushable = new ArrayList<>();
             List<RowExpression> nonPushable = new ArrayList<>();
 
-            for (RowExpression conjunct : logicalRowExpressions.extractConjuncts(node.getPredicate())) {
+            for (RowExpression conjunct : LogicalRowExpressions.extractConjuncts(node.getPredicate())) {
                 try {
                     conjunct.accept(queryGenerator.getConverter(), new JdbcConverterContext());
                     pushable.add(conjunct);

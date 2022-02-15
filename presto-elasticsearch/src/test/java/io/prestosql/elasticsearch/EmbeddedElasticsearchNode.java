@@ -40,6 +40,16 @@ public class EmbeddedElasticsearchNode
         return new EmbeddedElasticsearchNode();
     }
 
+    private String getPath(File targetFile)
+    {
+        try {
+            return targetFile.getCanonicalPath();
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException("getCanonicalPath error");
+        }
+    }
+
     EmbeddedElasticsearchNode()
     {
         try {
@@ -54,8 +64,8 @@ public class EmbeddedElasticsearchNode
         Settings setting = Settings.builder()
                 .put("cluster.name", "test")
                 .put("path.home", elasticsearchDirectory.getPath())
-                .put("path.data", new File(elasticsearchDirectory, "data").getAbsolutePath())
-                .put("path.logs", new File(elasticsearchDirectory, "logs").getAbsolutePath())
+                .put("path.data", getPath(new File(elasticsearchDirectory, "data")))
+                .put("path.logs", getPath(new File(elasticsearchDirectory, "logs")))
                 .put("transport.type.default", "local")
                 .put("transport.type", "netty4")
                 .put("http.type", "netty4")

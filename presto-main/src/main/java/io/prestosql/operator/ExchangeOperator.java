@@ -73,18 +73,18 @@ public class ExchangeOperator
         public SourceOperator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, sourceId, ExchangeOperator.class.getSimpleName());
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, sourceId, ExchangeOperator.class.getSimpleName());
             if (exchangeClient == null) {
                 exchangeClient = exchangeClientSupplier.get(driverContext.getPipelineContext().localSystemMemoryContext());
-                if (operatorContext.isSnapshotEnabled()) {
+                if (addOperatorContext.isSnapshotEnabled()) {
                     exchangeClient.setSnapshotEnabled(driverContext.getPipelineContext().getTaskContext().getSnapshotManager().getQuerySnapshotManager());
                 }
             }
 
-            String uniqueId = operatorContext.getUniqueId();
+            String uniqueId = addOperatorContext.getUniqueId();
             ExchangeOperator ret = new ExchangeOperator(
                     uniqueId,
-                    operatorContext,
+                    addOperatorContext,
                     sourceId,
                     exchangeClient);
             exchangeClient.addTarget(uniqueId);

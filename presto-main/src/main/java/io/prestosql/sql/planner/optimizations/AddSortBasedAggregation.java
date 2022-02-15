@@ -118,8 +118,9 @@ public class AddSortBasedAggregation
         }
 
         @Override
-        public PlanNode visitAggregation(AggregationNode node, RewriteContext<TableHandleInfo> context)
+        public PlanNode visitAggregation(AggregationNode inputNode, RewriteContext<TableHandleInfo> context)
         {
+            AggregationNode node = inputNode;
             PartialAndFinalAggregationType partialAndFinalAggregationType = null;
             List<String> groupingKeyNames = new ArrayList<>();
             List<String> groupingKeyNamesTemp = groupingKeyNames;
@@ -253,8 +254,9 @@ public class AddSortBasedAggregation
         }
 
         @Override
-        public PlanNode visitSemiJoin(SemiJoinNode node, RewriteContext<TableHandleInfo> context)
+        public PlanNode visitSemiJoin(SemiJoinNode inputNode, RewriteContext<TableHandleInfo> context)
         {
+            SemiJoinNode node = inputNode;
             if (context.get() == null || (context.get().getGroupingKeyNames().size() == 0)) {
                 return visitPlan(node, context);
             }

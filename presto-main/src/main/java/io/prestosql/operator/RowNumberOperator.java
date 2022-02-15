@@ -93,9 +93,9 @@ public class RowNumberOperator
         {
             checkState(!closed, "Factory is already closed");
 
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, RowNumberOperator.class.getSimpleName());
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, RowNumberOperator.class.getSimpleName());
             return new RowNumberOperator(
-                    operatorContext,
+                    addOperatorContext,
                     sourceTypes,
                     outputChannels,
                     partitionChannels,
@@ -379,12 +379,12 @@ public class RowNumberOperator
 
     private static List<Type> toTypes(List<? extends Type> sourceTypes, List<Integer> outputChannels)
     {
-        ImmutableList.Builder<Type> types = ImmutableList.builder();
+        ImmutableList.Builder<Type> typeBuilder = ImmutableList.builder();
         for (int channel : outputChannels) {
-            types.add(sourceTypes.get(channel));
+            typeBuilder.add(sourceTypes.get(channel));
         }
-        types.add(BIGINT);
-        return types.build();
+        typeBuilder.add(BIGINT);
+        return typeBuilder.build();
     }
 
     @VisibleForTesting

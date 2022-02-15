@@ -371,8 +371,10 @@ public class TestOrderByOperator
             throws Exception
     {
         // Initialization
-        Path spillPath = Paths.get("/tmp/hetu/snapshot/");
-        GenericSpillerFactory spillerFactory = createGenericSpillerFactory(spillPath, fileSystemClientManager);
+        Path spillPath = Files.createTempDir().toPath();
+        GenericSpillerFactory genericSpillerFactory = createGenericSpillerFactory(spillPath);
+        FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
+        when(fileSystemClientManager.getFileSystemClient(any(Path.class))).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/tmp/hetu/snapshot/")));
         SnapshotConfig snapshotConfig = new SnapshotConfig();
         snapshotUtils = new SnapshotUtils(fileSystemClientManager, snapshotConfig, new InMemoryNodeManager());
         snapshotUtils.initialize();
@@ -403,7 +405,7 @@ public class TestOrderByOperator
                 ImmutableList.of(ASC_NULLS_LAST, DESC_NULLS_LAST),
                 new PagesIndex.TestingFactory(false),
                 true,
-                Optional.of(spillerFactory),
+                Optional.of(genericSpillerFactory),
                 new OrderingCompiler());
 
         DriverContext driverContext = createDriverContext(defaultMemoryLimit, TEST_SNAPSHOT_SESSION);
@@ -439,7 +441,7 @@ public class TestOrderByOperator
                 ImmutableList.of(ASC_NULLS_LAST, DESC_NULLS_LAST),
                 new PagesIndex.TestingFactory(false),
                 true,
-                Optional.of(spillerFactory),
+                Optional.of(genericSpillerFactory),
                 new OrderingCompiler());
         orderByOperator = (OrderByOperator) operatorFactory.createOperator(driverContext);
 

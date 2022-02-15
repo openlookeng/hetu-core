@@ -226,12 +226,12 @@ public final class TupleDomain<T>
     @SafeVarargs
     public static <T> TupleDomain<T> columnWiseUnion(TupleDomain<T> first, TupleDomain<T> second, TupleDomain<T>... rest)
     {
-        List<TupleDomain<T>> domains = new ArrayList<>(rest.length + 2);
-        domains.add(first);
-        domains.add(second);
-        domains.addAll(Arrays.asList(rest));
+        List<TupleDomain<T>> tupleDomains = new ArrayList<>(rest.length + 2);
+        tupleDomains.add(first);
+        tupleDomains.add(second);
+        tupleDomains.addAll(Arrays.asList(rest));
 
-        return columnWiseUnion(domains);
+        return columnWiseUnion(tupleDomains);
     }
 
     /**
@@ -266,9 +266,9 @@ public final class TupleDomain<T>
 
         // first, find a non-none domain
         boolean found = false;
-        Iterator<TupleDomain<T>> domains = tupleDomains.iterator();
-        while (domains.hasNext()) {
-            TupleDomain<T> domain = domains.next();
+        Iterator<TupleDomain<T>> domainIterator = tupleDomains.iterator();
+        while (domainIterator.hasNext()) {
+            TupleDomain<T> domain = domainIterator.next();
             if (!domain.isNone()) {
                 found = true;
                 commonColumns.addAll(domain.getDomains().get().keySet());
@@ -281,8 +281,8 @@ public final class TupleDomain<T>
         }
 
         // then, get the common columns
-        while (domains.hasNext()) {
-            TupleDomain<T> domain = domains.next();
+        while (domainIterator.hasNext()) {
+            TupleDomain<T> domain = domainIterator.next();
             if (!domain.isNone()) {
                 commonColumns.retainAll(domain.getDomains().get().keySet());
             }

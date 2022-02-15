@@ -113,7 +113,7 @@ public class DockerizedHive
                             "Please refer to READMD.md for set up guide. ##",
                     testName));
             System.out.println("Error message:");
-            e.printStackTrace();
+            System.out.println(e.getStackTrace());
             return null;
         }
     }
@@ -165,8 +165,8 @@ public class DockerizedHive
     {
         // if the service is not up, this will throw an error
         this.hostPortProvider = hostPortProvider;
-        FileSystem fs = getFs();
-        fs.exists(new Path("/"));
+        FileSystem fileSystem = getFs();
+        fileSystem.exists(new Path("/"));
     }
 
     private void checkHostnameResolution(String hostname)
@@ -248,9 +248,9 @@ public class DockerizedHive
             DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
             Document coreXml = documentBuilder.parse(coreIs);
             coreXml.getDocumentElement().normalize();
-            NodeList properties = coreXml.getElementsByTagName("property");
-            for (int i = 0; i < properties.getLength(); i++) {
-                Node node = properties.item(i);
+            NodeList localProperties = coreXml.getElementsByTagName("property");
+            for (int i = 0; i < localProperties.getLength(); i++) {
+                Node node = localProperties.item(i);
                 node.normalize();
                 if (node.getNodeType() == Node.ELEMENT_NODE) {
                     Element element = (Element) node;

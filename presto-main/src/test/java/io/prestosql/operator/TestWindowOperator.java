@@ -1184,8 +1184,10 @@ public class TestWindowOperator
             throws Exception
     {
         // Initialization
-        Path spillPath = Paths.get("/tmp/hetu/snapshot/");
-        GenericSpillerFactory spillerFactory = createGenericSpillerFactory(spillPath, fileSystemClientManager);
+        Path spillPath = Files.createTempDir().toPath();
+        GenericSpillerFactory genericSpillerFactory = createGenericSpillerFactory(spillPath);
+        FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
+        when(fileSystemClientManager.getFileSystemClient(any(Path.class))).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/tmp/hetu/snapshot/")));
         SnapshotConfig snapshotConfig = new SnapshotConfig();
         snapshotUtils = new SnapshotUtils(fileSystemClientManager, snapshotConfig, new InMemoryNodeManager());
         snapshotUtils.initialize();
@@ -1222,7 +1224,7 @@ public class TestWindowOperator
                 10,
                 new PagesIndex.TestingFactory(false),
                 true,
-                spillerFactory,
+                genericSpillerFactory,
                 new OrderingCompiler());
 
         DriverContext driverContext = createDriverContext(defaultMemoryLimit, TEST_SNAPSHOT_SESSION);
@@ -1265,7 +1267,7 @@ public class TestWindowOperator
                 10,
                 new PagesIndex.TestingFactory(false),
                 true,
-                spillerFactory,
+                genericSpillerFactory,
                 new OrderingCompiler());
         windowOperator = (WindowOperator) operatorFactory.createOperator(driverContext);
 

@@ -602,12 +602,13 @@ public class HashGenerationOptimizer
                     newHashSymbols);
         }
 
-        private PlanWithProperties visitExchangeForCTE(ExchangeNode node, HashComputationSet sourceContext)
+        private PlanWithProperties visitExchangeForCTE(ExchangeNode node, HashComputationSet inputSourceContext)
         {
             Assignments.Builder assignments = Assignments.builder();
             for (Symbol symbol : node.getOutputSymbols()) {
                 assignments.put(symbol, toVariableReference(symbol, planSymbolAllocator.getTypes().get(symbol)));
             }
+            HashComputationSet sourceContext = inputSourceContext;
             for (HashComputation hashComputation : sourceContext.getHashes()) {
                 Symbol hashSymbol = planSymbolAllocator.newHashSymbol();
                 assignments.put(hashSymbol, hashComputation.getHashExpression());

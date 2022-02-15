@@ -52,12 +52,7 @@ public final class CachingStatsProvider
 
     public CachingStatsProvider(StatsCalculator statsCalculator, Optional<Memo> memo, Lookup lookup, Session session, TypeProvider types)
     {
-        this.statsCalculator = requireNonNull(statsCalculator, "statsCalculator is null");
-        this.memo = requireNonNull(memo, "memo is null");
-        this.lookup = requireNonNull(lookup, "lookup is null");
-        this.session = requireNonNull(session, "session is null");
-        this.types = requireNonNull(types, "types is null");
-        this.enforceDefaultFilterFactor = false;
+        this(statsCalculator, memo, lookup, session, types, false);
     }
 
     public CachingStatsProvider(StatsCalculator statsCalculator, Optional<Memo> memo, Lookup lookup, Session session, TypeProvider types, boolean enforceDefaultFilterFactor)
@@ -70,6 +65,7 @@ public final class CachingStatsProvider
         this.enforceDefaultFilterFactor = enforceDefaultFilterFactor;
     }
 
+    @Override
     public boolean isEnforceDefaultFilterFactor()
     {
         return enforceDefaultFilterFactor;
@@ -110,16 +106,16 @@ public final class CachingStatsProvider
     private PlanNodeStatsEstimate getGroupStats(GroupReference groupReference)
     {
         int group = groupReference.getGroupId();
-        Memo memo = this.memo.orElseThrow(() -> new IllegalStateException("CachingStatsProvider without memo cannot handle GroupReferences"));
+        Memo tmpMemo = this.memo.orElseThrow(() -> new IllegalStateException("CachingStatsProvider without memo cannot handle GroupReferences"));
 
-        Optional<PlanNodeStatsEstimate> stats = memo.getStats(group);
+        Optional<PlanNodeStatsEstimate> stats = tmpMemo.getStats(group);
         if (stats.isPresent()) {
             return stats.get();
         }
 
-        PlanNodeStatsEstimate groupStats = statsCalculator.calculateStats(memo.getNode(group), this, lookup, session, types);
-        verify(!memo.getStats(group).isPresent(), "Group stats already set");
-        memo.storeStats(group, groupStats);
+        PlanNodeStatsEstimate groupStats = statsCalculator.calculateStats(tmpMemo.getNode(group), this, lookup, session, types);
+        verify(!tmpMemo.getStats(group).isPresent(), "Group stats already set");
+        tmpMemo.storeStats(group, groupStats);
         return groupStats;
     }
 }

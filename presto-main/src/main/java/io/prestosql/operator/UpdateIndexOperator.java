@@ -87,7 +87,7 @@ public class UpdateIndexOperator
 
     private UpdateIndexOperator.State state = UpdateIndexOperator.State.NEEDS_INPUT;
 
-    // NEEDS_INPUT -> PERSISTING -> FINISHED_PERSISTING -> FINISHED
+    // State change from NEEDS_INPUT to PERSISTING, PERSISTING to FINISHED_PERSISTING, FINISHED_PERSISTING to FINISHED
     private enum State
     {
         NEEDS_INPUT,
@@ -388,9 +388,9 @@ public class UpdateIndexOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, UpdateIndexOperator.class.getSimpleName());
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, UpdateIndexOperator.class.getSimpleName());
 
-            return new UpdateIndexOperator(operatorContext, createIndexMetadata, heuristicIndexerManager, pathToModifiedTime, indexLevelToMaxModifiedTime, levelWriter, persistBy, finished);
+            return new UpdateIndexOperator(addOperatorContext, createIndexMetadata, heuristicIndexerManager, pathToModifiedTime, indexLevelToMaxModifiedTime, levelWriter, persistBy, finished);
         }
 
         @Override

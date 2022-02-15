@@ -405,12 +405,12 @@ public class MultiChannelGroupByHash
     private static int calculateMaxFill(int hashSize)
     {
         checkArgument(hashSize > 0, "hashSize must be greater than 0");
-        int maxFill = (int) Math.ceil(hashSize * FILL_RATIO);
-        if (maxFill == hashSize) {
-            maxFill--;
+        int calculateFill = (int) Math.ceil(hashSize * FILL_RATIO);
+        if (calculateFill == hashSize) {
+            calculateFill--;
         }
-        checkArgument(hashSize > maxFill, "hashSize must be larger than maxFill");
-        return maxFill;
+        checkArgument(hashSize > calculateFill, "hashSize must be larger than calculateFill");
+        return calculateFill;
     }
 
     @Override

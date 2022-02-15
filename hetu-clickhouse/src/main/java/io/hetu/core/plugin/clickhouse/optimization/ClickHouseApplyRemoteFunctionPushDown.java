@@ -41,6 +41,7 @@ public class ClickHouseApplyRemoteFunctionPushDown
     /**
      * rewrite the remote function to a executable function in the data source.
      */
+    @Override
     public Optional<String> rewriteRemoteFunction(CallExpression callExpression, BaseJdbcRowExpressionConverter rowExpressionConverter, JdbcConverterContext jdbcConverterContext)
     {
         if (!isConnectorSupportedRemoteFunction(callExpression)) {

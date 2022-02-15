@@ -95,6 +95,7 @@ public abstract class AbstractCatalogStore
             List<String> catalogFileNames,
             List<String> globalFileNames);
 
+    @Override
     public void createCatalog(CatalogInfo catalogInfo, CatalogFileInputStream configFiles)
             throws IOException
     {
@@ -159,6 +160,7 @@ public abstract class AbstractCatalogStore
         }
     }
 
+    @Override
     public void deleteCatalog(String catalogName, boolean totalDelete)
     {
         CatalogFilePath catalogPath = new CatalogFilePath(baseDirectory, catalogName);
@@ -205,6 +207,7 @@ public abstract class AbstractCatalogStore
         }
     }
 
+    @Override
     public CatalogInfo getCatalogInformation(String catalogName)
             throws IOException
     {
@@ -235,6 +238,7 @@ public abstract class AbstractCatalogStore
         return new CatalogInfo(catalogName, connectorName, null, createdTime, version, catalogProperties);
     }
 
+    @Override
     public CatalogFileInputStream getCatalogFiles(String catalogName)
             throws IOException
     {
@@ -273,6 +277,7 @@ public abstract class AbstractCatalogStore
         }
     }
 
+    @Override
     public Set<String> listCatalogNames()
             throws IOException
     {

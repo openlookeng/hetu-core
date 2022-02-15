@@ -212,6 +212,7 @@ public class FileBasedAccessControl
         }
     }
 
+    @Override
     public void checkCanUpdateTable(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, SchemaTableName tableName)
     {
         if (!checkTablePermission(identity, tableName, UPDATE)) {

@@ -59,7 +59,6 @@ public class HBasePlugin
     @Override
     public Iterable<ConnectorFactory> getConnectorFactories()
     {
-        // connector.name
         return ImmutableList.of(new HBaseConnectorFactory(this.connectorId, module, getClassLoader()));
     }
 

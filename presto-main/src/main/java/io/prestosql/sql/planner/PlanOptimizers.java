@@ -248,11 +248,12 @@ public class PlanOptimizers
             PageSourceManager pageSourceManager,
             StatsCalculator statsCalculator,
             CostCalculator costCalculator,
-            CostCalculator estimatedExchangesCostCalculator,
+            CostCalculator inputEstimatedExchangesCostCalculator,
             CostComparator costComparator,
             TaskCountEstimator taskCountEstimator,
             CubeManager cubeManager)
     {
+        CostCalculator estimatedExchangesCostCalculator = inputEstimatedExchangesCostCalculator;
         this.exporter = exporter;
         ImmutableList.Builder<PlanOptimizer> builder = ImmutableList.builder();
         CostCalculationHandle costCalculationHandle = new CostCalculationHandle(statsCalculator, costCalculator, costComparator);
@@ -346,7 +347,6 @@ public class PlanOptimizers
                         ImmutableSet.<Rule<?>>builder()
                                 .addAll(predicatePushDownRules)
                                 .addAll(columnPruningRules)
-                                // .addAll(projectionPushdownRules) // Project pushdown should be after SubQueryPushDown
                                 .addAll(ImmutableSet.of(
                                         new RemoveRedundantIdentityProjections(),
                                         new RemoveFullSample(),
@@ -627,9 +627,7 @@ public class PlanOptimizers
                 statsCalculator,
                 costCalculator,
                 ImmutableSet.of(new PushDeleteIntoConnector(metadata, true))); // Must run before AddExchanges
-        //noinspection UnusedAssignment
         estimatedExchangesCostCalculator = null; // Prevent accidental use after AddExchanges
-
         builder.add(
                 new IterativeOptimizer(
                         ruleStats,

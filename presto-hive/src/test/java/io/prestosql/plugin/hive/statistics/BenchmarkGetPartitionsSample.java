@@ -62,12 +62,12 @@ public class BenchmarkGetPartitionsSample
         @Setup
         public void setup()
         {
-            ImmutableList.Builder<HivePartition> partitions = ImmutableList.builder();
+            ImmutableList.Builder<HivePartition> partitionBuilder = ImmutableList.builder();
             SchemaTableName table = new SchemaTableName("schema", "table");
             for (int i = 0; i < TOTAL_SIZE; i++) {
-                partitions.add(new HivePartition(table, "partition_" + i, ImmutableMap.of()));
+                partitionBuilder.add(new HivePartition(table, "partition_" + i, ImmutableMap.of()));
             }
-            this.partitions = partitions.build();
+            this.partitions = partitionBuilder.build();
         }
     }
 

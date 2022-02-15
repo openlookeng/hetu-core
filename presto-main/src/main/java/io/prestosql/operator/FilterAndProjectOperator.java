@@ -206,9 +206,9 @@ public class FilterAndProjectOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, FilterAndProjectOperator.class.getSimpleName());
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, FilterAndProjectOperator.class.getSimpleName());
             return new FilterAndProjectOperator(
-                    operatorContext,
+                    addOperatorContext,
                     processor.get(),
                     new MergingPageOutput(types, minOutputPageSize.toBytes(), minOutputPageRowCount));
         }

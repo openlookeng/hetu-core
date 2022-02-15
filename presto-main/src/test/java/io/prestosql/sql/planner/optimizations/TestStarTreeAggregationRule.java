@@ -624,7 +624,6 @@ public class TestStarTreeAggregationRule
     @Test
     public void testBuildSymbolMappings()
     {
-        //expression instanceof SymbolReference
         RowExpression rowExpression = planBuilder.variable(columnTotalprice.getName(), totalpriceHandle.getType());
         FilterNode filterNode = new FilterNode(newId(), baseTableScan, rowExpression);
 
@@ -659,7 +658,7 @@ public class TestStarTreeAggregationRule
         assertEquals(new ArrayList<>(columnMapping.keySet()).toString(), "[orderkey, custkey, totalprice, orderdate]");
         assertTrue(columnMapping.values().containsAll(assignments.values()) && assignments.values().containsAll(columnMapping.values()));
 
-        //expression instanceof Literal
+        //expression Literal
         DoubleLiteral testDouble = new DoubleLiteral("1.0");
         Assignments assignment2 = Assignments.builder()
                 .put(columnCustkey, OriginalExpressionUtils.castToRowExpression(testDouble))
@@ -669,7 +668,7 @@ public class TestStarTreeAggregationRule
         columnMapping = CubeOptimizerUtil.buildSymbolMappings(countAggNode, projections2, Optional.of(filterNode), baseTableScan, baseTableMetadata);
         assertEquals(new ArrayList(columnMapping.values()).get(1), testDouble);
 
-        //expression instanceof Cast/SymbolReference
+        //expression Cast/SymbolReference
         Cast testCast = new Cast(SymbolUtils.toSymbolReference(columnCustkey), StandardTypes.INTEGER);
         Assignments assignment3 = Assignments.builder()
                 .put(columnCustkey, OriginalExpressionUtils.castToRowExpression(testCast))
@@ -679,7 +678,7 @@ public class TestStarTreeAggregationRule
         columnMapping = CubeOptimizerUtil.buildSymbolMappings(countAggNode, projections3, Optional.of(filterNode), baseTableScan, baseTableMetadata);
         assertEquals(new ArrayList(columnMapping.values()).get(1), custkeyHandle);
 
-        //expression instanceof Cast/Literal
+        //expression Cast/Literal
         Cast testCast2 = new Cast(testDouble, StandardTypes.DOUBLE);
         Assignments assignment4 = Assignments.builder()
                 .put(columnCustkey, OriginalExpressionUtils.castToRowExpression(testCast2))
@@ -697,7 +696,7 @@ public class TestStarTreeAggregationRule
         Mockito.when(cubeManager.getMetaStore(anyString())).then(new Returns(Optional.of(cubeMetaStore)));
 
         TpchTableHandle orders = new TpchTableHandle("orders", 1.0);
-        TableHandle ordersTableHandle = new TableHandle(tester().getCurrentConnectorId(),
+        TableHandle tmpOrdersTableHandle = new TableHandle(tester().getCurrentConnectorId(),
                 orders, TpchTransactionHandle.INSTANCE,
                 Optional.of(new TpchTableLayoutHandle(orders, TupleDomain.all())));
 
@@ -711,7 +710,7 @@ public class TestStarTreeAggregationRule
                         .step(SINGLE)
                         .source(
                                 p.project(Assignments.builder().put(p.symbol("custkey"), p.variable("custkey", custkeyHandle.getType())).build(),
-                                        p.tableScan(ordersTableHandle, ImmutableList.of(p.symbol("orderkey", BIGINT)),
+                                        p.tableScan(tmpOrdersTableHandle, ImmutableList.of(p.symbol("orderkey", BIGINT)),
                                                 ImmutableMap.of(p.symbol("orderkey", BIGINT), new TpchColumnHandle("orderkey", BIGINT)))))))
                 .doesNotFire();
         Mockito.verify(cubeMetaStore, Mockito.never()).getMetadataList(eq("local.sf1.0.orders"));
@@ -724,7 +723,7 @@ public class TestStarTreeAggregationRule
         Mockito.when(cubeManager.getMetaStore(anyString())).then(new Returns(Optional.of(cubeMetaStore)));
 
         TpchTableHandle orders = new TpchTableHandle("orders", 1.0);
-        TableHandle ordersTableHandle = new TableHandle(tester().getCurrentConnectorId(),
+        TableHandle tmpOrdersTableHandle = new TableHandle(tester().getCurrentConnectorId(),
                 orders, TpchTransactionHandle.INSTANCE,
                 Optional.of(new TpchTableLayoutHandle(orders, TupleDomain.all())));
 
@@ -740,7 +739,7 @@ public class TestStarTreeAggregationRule
                         .step(SINGLE)
                         .source(
                                 p.project(Assignments.builder().put(p.symbol("custkey"), OriginalExpressionUtils.castToRowExpression(SymbolUtils.toSymbolReference(p.symbol("custkey")))).build(),
-                                        p.tableScan(ordersTableHandle, ImmutableList.of(p.symbol("orderkey", BIGINT)),
+                                        p.tableScan(tmpOrdersTableHandle, ImmutableList.of(p.symbol("orderkey", BIGINT)),
                                                 ImmutableMap.of(p.symbol("orderkey", BIGINT), new TpchColumnHandle("orderkey", BIGINT)))))))
                 .doesNotFire();
         Mockito.verify(cubeMetaStore, Mockito.atLeastOnce()).getMetadataList(eq("local.sf1.0.orders"));
@@ -753,7 +752,7 @@ public class TestStarTreeAggregationRule
         Mockito.when(cubeManager.getMetaStore(anyString())).then(new Returns(Optional.of(cubeMetaStore)));
 
         TpchTableHandle orders = new TpchTableHandle("orders", 1.0);
-        TableHandle ordersTableHandle = new TableHandle(tester().getCurrentConnectorId(),
+        TableHandle tmpOrdersTableHandle = new TableHandle(tester().getCurrentConnectorId(),
                 orders, TpchTransactionHandle.INSTANCE,
                 Optional.of(new TpchTableLayoutHandle(orders, TupleDomain.all())));
 
@@ -772,7 +771,7 @@ public class TestStarTreeAggregationRule
                         .source(
                                 p.project(Assignments.builder().put(p.symbol("custkey"), OriginalExpressionUtils.castToRowExpression(SymbolUtils.toSymbolReference(p.symbol("custkey")))).build(),
                                         p.filter(expression("orderkey=1"),
-                                                p.tableScan(ordersTableHandle, ImmutableList.of(p.symbol("orderkey", BIGINT)),
+                                                p.tableScan(tmpOrdersTableHandle, ImmutableList.of(p.symbol("orderkey", BIGINT)),
                                                         ImmutableMap.of(p.symbol("orderkey", BIGINT), new TpchColumnHandle("orderkey", BIGINT))))))))
                 .doesNotFire();
         Mockito.verify(cubeMetaStore, Mockito.atLeastOnce()).getMetadataList(eq("local.sf1.0.orders"));

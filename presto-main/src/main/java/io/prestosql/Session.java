@@ -341,14 +341,14 @@ public final class Session
         }
 
         // Now that there is a transaction, the catalog name can be resolved to a connector, and the catalog properties can be validated
-        ImmutableMap.Builder<CatalogName, Map<String, String>> connectorProperties = ImmutableMap.builder();
+        ImmutableMap.Builder<CatalogName, Map<String, String>> connProperties = ImmutableMap.builder();
         for (Entry<String, Map<String, String>> catalogEntry : unprocessedCatalogProperties.entrySet()) {
             String catalogName = catalogEntry.getKey();
             Map<String, String> catalogProperties = catalogEntry.getValue();
             if (catalogProperties.isEmpty()) {
                 continue;
             }
-            CatalogName catalog = transactionManager.getOptionalCatalogMetadata(transactionId, catalogName)
+            CatalogName tmpCatalog = transactionManager.getOptionalCatalogMetadata(transactionId, catalogName)
                     .orElseThrow(() -> new PrestoException(NOT_FOUND, "Session property catalog does not exist: " + catalogName))
                     .getCatalogName();
 
@@ -357,29 +357,29 @@ public final class Session
                 accessControl.checkCanSetCatalogSessionProperty(transactionId, identity, catalogName, property.getKey());
 
                 // validate session property value
-                sessionPropertyManager.validateCatalogSessionProperty(catalog, catalogName, property.getKey(), property.getValue());
+                sessionPropertyManager.validateCatalogSessionProperty(tmpCatalog, catalogName, property.getKey(), property.getValue());
             }
-            connectorProperties.put(catalog, catalogProperties);
+            connProperties.put(tmpCatalog, catalogProperties);
         }
 
         ImmutableMap.Builder<String, SelectedRole> roles = ImmutableMap.builder();
         for (Entry<String, SelectedRole> entry : identity.getRoles().entrySet()) {
             String catalogName = entry.getKey();
             SelectedRole role = entry.getValue();
-            CatalogName catalog = transactionManager.getOptionalCatalogMetadata(transactionId, catalogName)
+            CatalogName tmpCatalog = transactionManager.getOptionalCatalogMetadata(transactionId, catalogName)
                     .orElseThrow(() -> new PrestoException(NOT_FOUND, "Catalog does not exist: " + catalogName))
                     .getCatalogName();
             if (role.getType() == SelectedRole.Type.ROLE) {
                 accessControl.checkCanSetRole(transactionId, identity, role.getRole().get(), catalogName);
             }
-            roles.put(catalog.getCatalogName(), role);
+            roles.put(tmpCatalog.getCatalogName(), role);
 
-            String informationSchemaCatalogName = createInformationSchemaCatalogName(catalog).getCatalogName();
+            String informationSchemaCatalogName = createInformationSchemaCatalogName(tmpCatalog).getCatalogName();
             if (transactionManager.getCatalogNames(transactionId).containsKey(informationSchemaCatalogName)) {
                 roles.put(informationSchemaCatalogName, role);
             }
 
-            String systemTablesCatalogName = createSystemTablesCatalogName(catalog).getCatalogName();
+            String systemTablesCatalogName = createSystemTablesCatalogName(tmpCatalog).getCatalogName();
             if (transactionManager.getCatalogNames(transactionId).containsKey(systemTablesCatalogName)) {
                 roles.put(systemTablesCatalogName, role);
             }
@@ -405,7 +405,7 @@ public final class Session
                 resourceEstimates,
                 startTime,
                 systemProperties,
-                connectorProperties.build(),
+                connProperties.build(),
                 ImmutableMap.of(),
                 sessionPropertyManager,
                 preparedStatements,
@@ -422,17 +422,17 @@ public final class Session
                 !this.transactionId.isPresent() && this.connectorProperties.isEmpty(),
                 "Session properties cannot be overridden once a transaction is active");
 
-        Map<String, String> systemProperties = new HashMap<>();
-        systemProperties.putAll(systemPropertyDefaults);
-        systemProperties.putAll(this.systemProperties);
+        Map<String, String> tmpSystemProperties = new HashMap<>();
+        tmpSystemProperties.putAll(systemPropertyDefaults);
+        tmpSystemProperties.putAll(this.systemProperties);
 
-        Map<String, Map<String, String>> connectorProperties = catalogPropertyDefaults.entrySet().stream()
+        Map<String, Map<String, String>> connProperties = catalogPropertyDefaults.entrySet().stream()
                 .map(entry -> Maps.immutableEntry(entry.getKey(), new HashMap<>(entry.getValue())))
                 .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
         for (Entry<String, Map<String, String>> catalogProperties : this.unprocessedCatalogProperties.entrySet()) {
-            String catalog = catalogProperties.getKey();
+            String tmpCatalog = catalogProperties.getKey();
             for (Entry<String, String> entry : catalogProperties.getValue().entrySet()) {
-                connectorProperties.computeIfAbsent(catalog, id -> new HashMap<>())
+                connProperties.computeIfAbsent(tmpCatalog, id -> new HashMap<>())
                         .put(entry.getKey(), entry.getValue());
             }
         }
@@ -456,9 +456,9 @@ public final class Session
                 clientCapabilities,
                 resourceEstimates,
                 startTime,
-                systemProperties,
+                tmpSystemProperties,
                 ImmutableMap.of(),
-                connectorProperties,
+                connProperties,
                 sessionPropertyManager,
                 preparedStatements,
                 pageMetadataEnabled);

@@ -79,19 +79,19 @@ public abstract class MultiChannelGroupBy
         // add new values we append them to the existing block builder until it fills up and then
         // we add a new block builder to each list.
         ImmutableList.Builder<Integer> outputChannels = ImmutableList.builder();
-        ImmutableList.Builder<ObjectArrayList<Block>> channelBuilders = ImmutableList.builder();
+        ImmutableList.Builder<ObjectArrayList<Block>> channelBuilderList = ImmutableList.builder();
         for (int i = 0; i < hashChannels.length; i++) {
             outputChannels.add(i);
-            channelBuilders.add(ObjectArrayList.wrap(new Block[defaultBlockSize], 0));
+            channelBuilderList.add(ObjectArrayList.wrap(new Block[defaultBlockSize], 0));
         }
         if (inputHashChannel.isPresent()) {
             this.precomputedHashChannel = OptionalInt.of(hashChannels.length);
-            channelBuilders.add(ObjectArrayList.wrap(new Block[defaultBlockSize], 0));
+            channelBuilderList.add(ObjectArrayList.wrap(new Block[defaultBlockSize], 0));
         }
         else {
             this.precomputedHashChannel = OptionalInt.empty();
         }
-        this.channelBuilders = channelBuilders.build();
+        this.channelBuilders = channelBuilderList.build();
         JoinCompiler.PagesHashStrategyFactory pagesHashStrategyFactory = joinCompiler.compilePagesHashStrategyFactory(this.types, outputChannels.build());
         hashStrategy = pagesHashStrategyFactory.createPagesHashStrategy(this.channelBuilders, this.precomputedHashChannel);
     }
@@ -213,9 +213,7 @@ public abstract class MultiChannelGroupBy
         {
             DictionaryLookBack.DictionaryLookBackState myState = (DictionaryLookBack.DictionaryLookBackState) state;
             int[] stored = myState.processed;
-            for (int i = 0; i < this.processed.length; i++) {
-                this.processed[i] = stored[i];
-            }
+            System.arraycopy(stored, 0, this.processed, 0, this.processed.length);
         }
 
         protected static class DictionaryLookBackState

@@ -116,8 +116,8 @@ public class TableWriterOperator
             checkState(!closed, "Factory is already closed");
             OperatorContext context = driverContext.addOperatorContext(operatorId, planNodeId, TableWriterOperator.class.getSimpleName());
             Operator statisticsAggregationOperator = statisticsAggregationOperatorFactory.createOperator(driverContext);
-            boolean statisticsCpuTimerEnabled = !(statisticsAggregationOperator instanceof DevNullOperator) && isStatisticsCpuTimerEnabled(session);
-            return new TableWriterOperator(context, createPageSink(driverContext), columnChannels, statisticsAggregationOperator, types, statisticsCpuTimerEnabled);
+            boolean cpuTimerEnabled = !(statisticsAggregationOperator instanceof DevNullOperator) && isStatisticsCpuTimerEnabled(session);
+            return new TableWriterOperator(context, createPageSink(driverContext), columnChannels, statisticsAggregationOperator, types, cpuTimerEnabled);
         }
 
         private ConnectorPageSink createPageSink(DriverContext driverContext)

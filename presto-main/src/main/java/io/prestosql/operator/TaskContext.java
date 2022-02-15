@@ -380,30 +380,30 @@ public class TaskContext
 
     public Duration getFullGcTime()
     {
-        long startFullGcTimeNanos = this.startFullGcTimeNanos.get();
-        if (startFullGcTimeNanos < 0) {
+        long beginFullGcTimeNanos = this.startFullGcTimeNanos.get();
+        if (beginFullGcTimeNanos < 0) {
             return new Duration(0, MILLISECONDS);
         }
 
-        long endFullGcTimeNanos = this.endFullGcTimeNanos.get();
-        if (endFullGcTimeNanos < 0) {
-            endFullGcTimeNanos = gcMonitor.getMajorGcTime().roundTo(NANOSECONDS);
+        long finishFullGcTimeNanos = this.endFullGcTimeNanos.get();
+        if (finishFullGcTimeNanos < 0) {
+            finishFullGcTimeNanos = gcMonitor.getMajorGcTime().roundTo(NANOSECONDS);
         }
-        return new Duration(max(0, endFullGcTimeNanos - startFullGcTimeNanos), NANOSECONDS);
+        return new Duration(max(0, finishFullGcTimeNanos - beginFullGcTimeNanos), NANOSECONDS);
     }
 
     public int getFullGcCount()
     {
-        long startFullGcCount = this.startFullGcCount.get();
-        if (startFullGcCount < 0) {
+        long beginFullGcCount = this.startFullGcCount.get();
+        if (beginFullGcCount < 0) {
             return 0;
         }
 
-        long endFullGcCount = this.endFullGcCount.get();
-        if (endFullGcCount <= 0) {
-            endFullGcCount = gcMonitor.getMajorGcCount();
+        long finishFullGcCount = this.endFullGcCount.get();
+        if (finishFullGcCount <= 0) {
+            finishFullGcCount = gcMonitor.getMajorGcCount();
         }
-        return toIntExact(max(0, endFullGcCount - startFullGcCount));
+        return toIntExact(max(0, finishFullGcCount - beginFullGcCount));
     }
 
     public TaskStats getTaskStats()
@@ -483,16 +483,16 @@ public class TaskContext
             physicalWrittenDataSize += pipeline.getPhysicalWrittenDataSize().toBytes();
         }
 
-        long startNanos = this.startNanos.get();
-        if (startNanos == 0) {
-            startNanos = System.nanoTime();
+        long localStartNanos = this.startNanos.get();
+        if (localStartNanos == 0) {
+            localStartNanos = System.nanoTime();
         }
-        Duration queuedTime = new Duration(startNanos - createNanos, NANOSECONDS);
+        Duration queuedTime = new Duration(localStartNanos - createNanos, NANOSECONDS);
 
-        long endNanos = this.endNanos.get();
+        long endNanosTime = this.endNanos.get();
         Duration elapsedTime;
-        if (endNanos >= startNanos) {
-            elapsedTime = new Duration(endNanos - createNanos, NANOSECONDS);
+        if (endNanosTime >= localStartNanos) {
+            elapsedTime = new Duration(endNanosTime - createNanos, NANOSECONDS);
         }
         else {
             elapsedTime = new Duration(0, NANOSECONDS);

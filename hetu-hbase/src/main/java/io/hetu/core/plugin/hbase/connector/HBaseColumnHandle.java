@@ -141,6 +141,7 @@ public class HBaseColumnHandle
      *
      * @return name
      */
+    @Override
     public String getColumnName()
     {
         return name;

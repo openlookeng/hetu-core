@@ -68,8 +68,8 @@ public class HashSemiJoinOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, HashSemiJoinOperator.class.getSimpleName());
-            return new HashSemiJoinOperator(operatorContext, setSupplier, probeJoinChannel, probeJoinHashChannel);
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, HashSemiJoinOperator.class.getSimpleName());
+            return new HashSemiJoinOperator(addOperatorContext, setSupplier, probeJoinChannel, probeJoinHashChannel);
         }
 
         @Override

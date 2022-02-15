@@ -60,8 +60,8 @@ public class ValuesOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, ValuesOperator.class.getSimpleName());
-            return new ValuesOperator(operatorContext, pages, fromPosition);
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, ValuesOperator.class.getSimpleName());
+            return new ValuesOperator(addOperatorContext, pages, fromPosition);
         }
 
         @Override

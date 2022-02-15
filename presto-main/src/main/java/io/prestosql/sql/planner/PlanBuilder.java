@@ -44,9 +44,9 @@ class PlanBuilder
 
     public TranslationMap copyTranslations()
     {
-        TranslationMap translations = new TranslationMap(getRelationPlan(), getAnalysis(), getTranslations().getLambdaDeclarationToSymbolMap());
-        translations.copyMappingsFrom(getTranslations());
-        return translations;
+        TranslationMap translationMap = new TranslationMap(getRelationPlan(), getAnalysis(), getTranslations().getLambdaDeclarationToSymbolMap());
+        translationMap.copyMappingsFrom(getTranslations());
+        return translationMap;
     }
 
     private Analysis getAnalysis()
@@ -91,7 +91,7 @@ class PlanBuilder
 
     public PlanBuilder appendProjections(Iterable<Expression> expressions, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator)
     {
-        TranslationMap translations = copyTranslations();
+        TranslationMap translationMap = copyTranslations();
 
         Assignments.Builder projections = Assignments.builder();
 
@@ -103,14 +103,14 @@ class PlanBuilder
         ImmutableMap.Builder<Symbol, Expression> newTranslations = ImmutableMap.builder();
         for (Expression expression : expressions) {
             Symbol symbol = planSymbolAllocator.newSymbol(expression, getAnalysis().getTypeWithCoercions(expression));
-            projections.put(symbol, castToRowExpression(translations.rewrite(expression)));
+            projections.put(symbol, castToRowExpression(translationMap.rewrite(expression)));
             newTranslations.put(symbol, expression);
         }
-        // Now append the new translations into the TranslationMap
+        // Now append the new translationMap into the TranslationMap
         for (Map.Entry<Symbol, Expression> entry : newTranslations.build().entrySet()) {
-            translations.put(entry.getValue(), entry.getKey());
+            translationMap.put(entry.getValue(), entry.getKey());
         }
 
-        return new PlanBuilder(translations, new ProjectNode(idAllocator.getNextId(), getRoot(), projections.build()));
+        return new PlanBuilder(translationMap, new ProjectNode(idAllocator.getNextId(), getRoot(), projections.build()));
     }
 }

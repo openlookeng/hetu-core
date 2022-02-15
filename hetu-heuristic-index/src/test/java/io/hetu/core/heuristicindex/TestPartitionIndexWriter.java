@@ -14,6 +14,7 @@
  */
 package io.hetu.core.heuristicindex;
 
+import io.airlift.log.Logger;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
@@ -39,6 +40,8 @@ import static org.testng.Assert.assertEquals;
 
 public class TestPartitionIndexWriter
 {
+    private static final Logger LOGGER = Logger.get(TestPartitionIndexWriter.class);
+
     @Test
     public void testAddValue()
             throws IOException
@@ -139,7 +142,7 @@ public class TestPartitionIndexWriter
                 indexWriter.addData(valuesMap, connectorMetadata);
             }
             catch (IOException e) {
-                e.printStackTrace();
+                LOGGER.error("add data error : %s", e.getMessage());
             }
             latch.countDown();
         }

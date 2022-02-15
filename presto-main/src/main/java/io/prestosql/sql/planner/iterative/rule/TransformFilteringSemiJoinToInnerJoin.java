@@ -123,11 +123,11 @@ public class TransformFilteringSemiJoinToInnerJoin
         LogicalRowExpressions logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata),
                                                                                 new FunctionResolution(metadata.getFunctionAndTypeManager()),
                                                                                 metadata.getFunctionAndTypeManager());
-        List<RowExpression> conjuncts = logicalRowExpressions.extractConjuncts(filterNode.getPredicate());
+        List<RowExpression> conjuncts = LogicalRowExpressions.extractConjuncts(filterNode.getPredicate());
         if (conjuncts.stream().noneMatch(isSemiJoinSymbol)) {
             return Result.empty();
         }
-        RowExpression filteredPredicate = logicalRowExpressions.and(conjuncts.stream()
+        RowExpression filteredPredicate = LogicalRowExpressions.and(conjuncts.stream()
                 .filter(expression -> !expression.equals(toVariableReference(semiJoinSymbol, types)))
                 .collect(toImmutableList()));
 

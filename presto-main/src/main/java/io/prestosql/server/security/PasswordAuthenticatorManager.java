@@ -73,8 +73,8 @@ public class PasswordAuthenticatorManager
         PasswordAuthenticatorFactory factory = factories.get(name);
         checkState(factory != null, "Password authenticator %s is not registered", name);
 
-        PasswordAuthenticator authenticator = factory.create(ImmutableMap.copyOf(properties));
-        this.authenticator.set(requireNonNull(authenticator, "authenticator is null"));
+        PasswordAuthenticator tmpAuthenticator = factory.create(ImmutableMap.copyOf(properties));
+        this.authenticator.set(requireNonNull(tmpAuthenticator, "authenticator is null"));
 
         log.info("-- Loaded password authenticator %s --", name);
     }

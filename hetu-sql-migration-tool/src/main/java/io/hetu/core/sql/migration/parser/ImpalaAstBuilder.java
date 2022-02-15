@@ -1921,7 +1921,7 @@ public class ImpalaAstBuilder
     {
         String fieldString = context.identifier().getText();
         Extract.Field field;
-        field = Extract.Field.valueOf(fieldString.toUpperCase());
+        field = Extract.Field.valueOf(fieldString.toUpperCase(Locale.ROOT));
         return new Extract(getLocation(context), (Expression) visit(context.valueExpression()), field);
     }
 

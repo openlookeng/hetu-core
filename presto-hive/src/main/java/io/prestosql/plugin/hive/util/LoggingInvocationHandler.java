@@ -72,12 +72,12 @@ public class LoggingInvocationHandler
 
     private String invocationDescription(Method method, Object[] args)
     {
-        Optional<List<String>> parameterNames = this.parameterNames.getParameterNames(method);
+        Optional<List<String>> tmpParameterNames = this.parameterNames.getParameterNames(method);
         return "Invocation of " + method.getName() +
                 IntStream.range(0, args.length)
                         .mapToObj(i -> {
-                            if (parameterNames.isPresent()) {
-                                return format("%s=%s", parameterNames.get().get(i), formatArgument(args[i]));
+                            if (tmpParameterNames.isPresent()) {
+                                return format("%s=%s", tmpParameterNames.get().get(i), formatArgument(args[i]));
                             }
                             return formatArgument(args[i]);
                         })
@@ -125,13 +125,13 @@ public class LoggingInvocationHandler
             requireNonNull(interfaceClass, "interfaceClass is null");
             requireNonNull(implementationClass, "implementationClass is null");
 
-            ImmutableMap.Builder<Method, List<String>> parameterNames = ImmutableMap.builder();
+            ImmutableMap.Builder<Method, List<String>> tmpParameterNames = ImmutableMap.builder();
             for (Method interfaceMethod : interfaceClass.getMethods()) {
                 tryGetParameterNamesForMethod(interfaceMethod, implementationClass)
                         .map(ImmutableList::copyOf)
-                        .ifPresent(names -> parameterNames.put(interfaceMethod, names));
+                        .ifPresent(names -> tmpParameterNames.put(interfaceMethod, names));
             }
-            this.parameterNames = parameterNames.build();
+            this.parameterNames = tmpParameterNames.build();
         }
 
         private static Optional<List<String>> tryGetParameterNamesForMethod(Method interfaceMethod, Class<?> implementationClass)

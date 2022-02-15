@@ -48,6 +48,7 @@ public class CarbondataHandleResolver
         return CarbonDeleteAsInsertTableHandle.class;
     }
 
+    @Override
     public Class<? extends ConnectorOutputTableHandle> getOutputTableHandleClass()
     {
         return CarbondataOutputTableHandle.class;

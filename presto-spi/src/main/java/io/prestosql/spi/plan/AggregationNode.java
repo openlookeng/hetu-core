@@ -89,25 +89,26 @@ public class AggregationNode
         checkArgument(preGroupedSymbols.isEmpty() || groupingSets.getGroupingKeys().containsAll(preGroupedSymbols), "Pre-grouped symbols must be a subset of the grouping keys");
         this.preGroupedSymbols = ImmutableList.copyOf(preGroupedSymbols);
 
-        ImmutableList.Builder<Symbol> outputs = ImmutableList.builder();
-        outputs.addAll(groupingSets.getGroupingKeys());
-        hashSymbol.ifPresent(outputs::add);
-        outputs.addAll(aggregations.keySet());
+        ImmutableList.Builder<Symbol> outputs1 = ImmutableList.builder();
+        outputs1.addAll(groupingSets.getGroupingKeys());
+        hashSymbol.ifPresent(outputs1::add);
+        outputs1.addAll(aggregations.keySet());
 
-        if (aggregationType == AggregationType.SORT_BASED) {
+        AggregationType tmpAggregationType = aggregationType;
+        if (tmpAggregationType == AggregationType.SORT_BASED) {
             if (step.equals(Step.PARTIAL)) {
                 if (finalizeSymbol.isPresent()) {
                     List<Symbol> symbolList = new ArrayList<>(Arrays.asList(finalizeSymbol.get()));
-                    outputs.addAll(symbolList);
+                    outputs1.addAll(symbolList);
                 }
             }
             else if (step.equals(Step.FINAL) && !finalizeSymbol.isPresent()) {
-                aggregationType = AggregationType.HASH;
+                tmpAggregationType = AggregationType.HASH;
             }
         }
 
-        this.outputs = outputs.build();
-        this.aggregationType = aggregationType;
+        this.outputs = outputs1.build();
+        this.aggregationType = tmpAggregationType;
         this.finalizeSymbol = finalizeSymbol;
     }
 
@@ -391,10 +392,6 @@ public class AggregationNode
         {
             this.functionCall = requireNonNull(functionCall, "functionCall is null");
             this.arguments = ImmutableList.copyOf(requireNonNull(arguments, "arguments is null"));
-//            for (RowExpression argument : arguments) {
-//                checkArgument(isExpression(argument) && (castToExpression(argument) instanceof SymbolReference || castToExpression(argument) instanceof LambdaExpression),
-//                        "argument must be symbol or lambda expression: %s", argument.getClass().getSimpleName());
-//            }
             this.distinct = distinct;
             this.filter = requireNonNull(filter, "filter is null");
             this.orderingScheme = requireNonNull(orderingScheme, "orderingScheme is null");

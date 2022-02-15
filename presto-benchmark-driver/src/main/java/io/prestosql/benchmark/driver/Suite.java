@@ -147,11 +147,11 @@ public class Suite
             for (String q : query) {
                 queryNameTemplates.add(Pattern.compile(sanitizeString(q)));
             }
-            ImmutableList.Builder<RegexTemplate> schemaNameTemplates = ImmutableList.builder();
+            ImmutableList.Builder<RegexTemplate> schemaNameTemplatesBuilder = ImmutableList.builder();
             for (String s : schema) {
-                schemaNameTemplates.add(new RegexTemplate(sanitizeString(s)));
+                schemaNameTemplatesBuilder.add(new RegexTemplate(sanitizeString(s)));
             }
-            return new Suite(name, session, schemaNameTemplates.build(), queryNameTemplates.build());
+            return new Suite(name, session, schemaNameTemplatesBuilder.build(), queryNameTemplates.build());
         }
 
         private String sanitizeString(String name)

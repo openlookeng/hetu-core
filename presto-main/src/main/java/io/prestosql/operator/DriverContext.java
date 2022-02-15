@@ -321,9 +321,9 @@ public class DriverContext
         long totalCpuTime = overallTiming.getCpuNanos();
 
         long totalBlockedTime = blockedWallNanos.get();
-        BlockedMonitor blockedMonitor = this.blockedMonitor.get();
-        if (blockedMonitor != null) {
-            totalBlockedTime += blockedMonitor.getBlockedTime();
+        BlockedMonitor blockedMonitorInfo = this.blockedMonitor.get();
+        if (blockedMonitorInfo != null) {
+            totalBlockedTime += blockedMonitorInfo.getBlockedTime();
         }
 
         List<OperatorStats> operators = getOperatorStats();
@@ -390,16 +390,16 @@ public class DriverContext
                 .mapToLong(DataSize::toBytes)
                 .sum();
 
-        long startNanos = this.startNanos.get();
-        if (startNanos < createNanos) {
-            startNanos = System.nanoTime();
+        long startNanosTime = this.startNanos.get();
+        if (startNanosTime < createNanos) {
+            startNanosTime = System.nanoTime();
         }
-        Duration queuedTime = new Duration(startNanos - createNanos, NANOSECONDS);
+        Duration queuedTime = new Duration(startNanosTime - createNanos, NANOSECONDS);
 
-        long endNanos = this.endNanos.get();
+        long endNanosTime = this.endNanos.get();
         Duration elapsedTime;
-        if (endNanos >= startNanos) {
-            elapsedTime = new Duration(endNanos - createNanos, NANOSECONDS);
+        if (endNanosTime >= startNanosTime) {
+            elapsedTime = new Duration(endNanosTime - createNanos, NANOSECONDS);
         }
         else {
             elapsedTime = new Duration(0, NANOSECONDS);
@@ -426,7 +426,7 @@ public class DriverContext
                 new Duration(totalScheduledTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
                 new Duration(totalCpuTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
                 new Duration(totalBlockedTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
-                blockedMonitor != null,
+                blockedMonitorInfo != null,
                 builder.build(),
                 physicalInputDataSize.convertToMostSuccinctDataSize(),
                 physicalInputPositions,

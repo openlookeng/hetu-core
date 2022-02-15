@@ -230,7 +230,6 @@ public class BitmapIndex
                         ConcurrentNavigableMap<Object, byte[]> concurrentNavigableMap = null;
 
                         if (highBoundless && !lowBoundless) {
-                            // >= or >
                             Object low = getActualValue(predicate.getType(), range.getLow().getValue());
                             Object high = getBtreeReadOptimized().lastKey();
                             boolean fromInclusive = range.getLow().getBound().equals(Marker.Bound.EXACTLY);

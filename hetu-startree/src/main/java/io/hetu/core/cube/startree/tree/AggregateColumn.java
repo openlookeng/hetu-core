@@ -56,6 +56,7 @@ public class AggregateColumn
     }
 
     @JsonIgnore
+    @Override
     public String getUserFriendlyName()
     {
         return aggregateFunction + "(" + originalColumn + ")";

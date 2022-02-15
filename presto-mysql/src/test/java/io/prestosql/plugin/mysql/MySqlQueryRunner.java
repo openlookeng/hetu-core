@@ -89,9 +89,10 @@ public final class MySqlQueryRunner
         }
     }
 
-    public static QueryRunner createMySqlQueryRunner(String jdbcUrl, Map<String, String> connectorProperties, Iterable<TpchTable<?>> tables)
+    public static QueryRunner createMySqlQueryRunner(String jdbcUrl, Map<String, String> connectorPropertiesMap, Iterable<TpchTable<?>> tables)
             throws Exception
     {
+        Map<String, String> connectorProperties = connectorPropertiesMap;
         DistributedQueryRunner queryRunner = null;
         try {
             queryRunner = new DistributedQueryRunner(createSession(), 3);

@@ -280,7 +280,7 @@ public final class PartitionedLookupSourceFactory
     {
         checkState(!lock.isWriteLockedByCurrentThread());
 
-        List<SettableFuture<LookupSourceProvider>> lookupSourceFutures;
+        List<SettableFuture<LookupSourceProvider>> lookupSourceFutureList;
 
         lock.writeLock().lock();
         try {
@@ -292,8 +292,8 @@ public final class PartitionedLookupSourceFactory
             }
 
             if (partitionsSet != 1) {
-                List<Supplier<LookupSource>> partitions = ImmutableList.copyOf(this.partitions);
-                this.lookupSourceSupplier = createPartitionedLookupSourceSupplier(partitions, hashChannelTypes, outer, restoredJoinPositions);
+                List<Supplier<LookupSource>> partitionList = ImmutableList.copyOf(this.partitions);
+                this.lookupSourceSupplier = createPartitionedLookupSourceSupplier(partitionList, hashChannelTypes, outer, restoredJoinPositions);
             }
             else if (outer) {
                 this.lookupSourceSupplier = createOuterLookupSourceSupplier(partitions[0], restoredJoinPositions);
@@ -304,13 +304,13 @@ public final class PartitionedLookupSourceFactory
             }
 
             // store futures into local variables so they can be used outside of the lock
-            lookupSourceFutures = ImmutableList.copyOf(this.lookupSourceFutures);
+            lookupSourceFutureList = ImmutableList.copyOf(this.lookupSourceFutures);
         }
         finally {
             lock.writeLock().unlock();
         }
 
-        for (SettableFuture<LookupSourceProvider> lookupSourceFuture : lookupSourceFutures) {
+        for (SettableFuture<LookupSourceProvider> lookupSourceFuture : lookupSourceFutureList) {
             lookupSourceFuture.set(new SpillAwareLookupSourceProvider());
         }
     }
@@ -383,18 +383,18 @@ public final class PartitionedLookupSourceFactory
     @Override
     public OuterPositionIterator getOuterPositionIterator()
     {
-        TrackingLookupSourceSupplier lookupSourceSupplier;
+        TrackingLookupSourceSupplier trackingLookupSourceSupplier;
 
         lock.writeLock().lock();
         try {
             checkState(this.lookupSourceSupplier != null, "lookup source not ready yet");
-            lookupSourceSupplier = this.lookupSourceSupplier;
+            trackingLookupSourceSupplier = this.lookupSourceSupplier;
         }
         finally {
             lock.writeLock().unlock();
         }
 
-        return lookupSourceSupplier.getOuterPositionIterator();
+        return trackingLookupSourceSupplier.getOuterPositionIterator();
     }
 
     @Override

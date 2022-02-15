@@ -193,6 +193,7 @@ public class KylinClient
         }
         catch (Exception e) {
             log.debug("There is a problem %s", e.getLocalizedMessage());
+            log.debug("Error message: " + e.getStackTrace());
             e.printStackTrace();
             // No need to raise an error.
             // This method is used inside applySubQuery method to extract the column types from a sub-query.

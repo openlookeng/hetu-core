@@ -45,6 +45,7 @@ public class LocalFileColumnHandle
         this.ordinalPosition = ordinalPosition;
     }
 
+    @Override
     @JsonProperty
     public String getColumnName()
     {

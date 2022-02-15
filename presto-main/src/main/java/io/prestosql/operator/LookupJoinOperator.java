@@ -190,13 +190,13 @@ public class LookupJoinOperator
             return false;
         }
 
-        boolean finished = this.finished && probe == null && pageBuilder.isEmpty() && outputPage == null;
+        boolean finishedNow = this.finished && probe == null && pageBuilder.isEmpty() && outputPage == null;
 
-        // if finished drop references so memory is freed early
-        if (finished) {
+        // if finishedNow drop references so memory is freed early
+        if (finishedNow) {
             close();
         }
-        return finished;
+        return finishedNow;
     }
 
     @Override
@@ -267,16 +267,17 @@ public class LookupJoinOperator
     {
         requireNonNull(spillInfoSnapshot, "spillInfoSnapshot is null");
 
+        Page newPage = page;
         if (spillInfoSnapshot.hasSpilled()) {
-            page = spillAndMaskSpilledPositions(page, spillInfoSnapshot.getSpillMask());
-            if (page.getPositionCount() == 0) {
+            newPage = spillAndMaskSpilledPositions(page, spillInfoSnapshot.getSpillMask());
+            if (newPage.getPositionCount() == 0) {
                 return;
             }
         }
 
         // create probe
         inputPageSpillEpoch = spillInfoSnapshot.getSpillEpoch();
-        probe = joinProbeFactory.createJoinProbe(page);
+        probe = joinProbeFactory.createJoinProbe(newPage);
 
         // initialize to invalid join position to force output code to advance the cursors
         joinPosition = -1;
@@ -500,7 +501,7 @@ public class LookupJoinOperator
         Page currentPage = probe.getPage();
         int currentPosition = probe.getPosition();
         long currentJoinPosition = this.joinPosition;
-        boolean currentProbePositionProducedRow = this.currentProbePositionProducedRow;
+        boolean probePositionProducedRow = this.currentProbePositionProducedRow;
 
         clearProbe();
 
@@ -515,7 +516,7 @@ public class LookupJoinOperator
             if (currentRowSpilled) {
                 savedRows.merge(
                         currentRowPartition,
-                        new SavedRow(currentPage, currentPosition, joinPositionWithinPartition, currentProbePositionProducedRow, joinSourcePositions),
+                        new SavedRow(currentPage, currentPosition, joinPositionWithinPartition, probePositionProducedRow, joinSourcePositions),
                         (oldValue, newValue) -> {
                             throw new IllegalStateException(format("Partition %s is already spilled", currentRowPartition));
                         });
@@ -525,7 +526,7 @@ public class LookupJoinOperator
             }
             else {
                 Page remaining = pageTail(currentPage, currentPosition);
-                restoreProbe(remaining, currentJoinPosition, currentProbePositionProducedRow, joinSourcePositions, spillInfoSnapshot);
+                restoreProbe(remaining, currentJoinPosition, probePositionProducedRow, joinSourcePositions, spillInfoSnapshot);
             }
         }
     }

@@ -230,18 +230,20 @@ public class SnapshotUtils
      */
     public static Path createStatePath(Path root, Collection<String> subpaths)
     {
+        Path newRoot = root;
         for (String sub : subpaths) {
-            root = root.resolve(sub);
+            newRoot = newRoot.resolve(sub);
         }
-        return root;
+        return newRoot;
     }
 
     public static Path createStatePath(Path root, String... subpaths)
     {
+        Path newRoot = root;
         for (String sub : subpaths) {
-            root = root.resolve(sub);
+            newRoot = newRoot.resolve(sub);
         }
-        return root;
+        return newRoot;
     }
 
     public static Object captureHelper(Object obj, BlockEncodingSerdeProvider serdeProvider)

@@ -244,15 +244,15 @@ public class TestDecimalStream
             throws IOException
     {
         // encode the signed number as a positive integer
-        value = value.shiftLeft(1);
-        int sign = value.signum();
+        BigInteger tmpValue = value.shiftLeft(1);
+        int sign = tmpValue.signum();
         if (sign < 0) {
-            value = value.negate();
-            value = value.subtract(ONE);
+            tmpValue = tmpValue.negate();
+            tmpValue = tmpValue.subtract(ONE);
         }
-        int length = value.bitLength();
+        int length = tmpValue.bitLength();
         while (true) {
-            long lowBits = value.longValue() & 0x7fffffffffffffffL;
+            long lowBits = tmpValue.longValue() & 0x7fffffffffffffffL;
             length -= 63;
             // write out the next 63 bits worth of data
             for (int i = 0; i < 9; ++i) {
@@ -266,7 +266,7 @@ public class TestDecimalStream
                     lowBits >>>= 7;
                 }
             }
-            value = value.shiftRight(63);
+            tmpValue = tmpValue.shiftRight(63);
         }
     }
 

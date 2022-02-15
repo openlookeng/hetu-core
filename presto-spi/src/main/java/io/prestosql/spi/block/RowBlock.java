@@ -46,12 +46,12 @@ public class RowBlock<T>
      */
     public static <T> Block<T> fromFieldBlocks(int positionCount, Optional<boolean[]> rowIsNull, Block<T>[] fieldBlocks)
     {
-        int[] fieldBlockOffsets = new int[positionCount + 1];
+        int[] finalFieldBlockOffsets = new int[positionCount + 1];
         for (int position = 0; position < positionCount; position++) {
-            fieldBlockOffsets[position + 1] = fieldBlockOffsets[position] + (rowIsNull.isPresent() && rowIsNull.get()[position] ? 0 : 1);
+            finalFieldBlockOffsets[position + 1] = finalFieldBlockOffsets[position] + (rowIsNull.isPresent() && rowIsNull.get()[position] ? 0 : 1);
         }
-        validateConstructorArguments(0, positionCount, rowIsNull.orElse(null), fieldBlockOffsets, fieldBlocks);
-        return new RowBlock(0, positionCount, rowIsNull.orElse(null), fieldBlockOffsets, fieldBlocks);
+        validateConstructorArguments(0, positionCount, rowIsNull.orElse(null), finalFieldBlockOffsets, fieldBlocks);
+        return new RowBlock(0, positionCount, rowIsNull.orElse(null), finalFieldBlockOffsets, fieldBlocks);
     }
 
     /**
@@ -111,11 +111,11 @@ public class RowBlock<T>
         this.fieldBlocks = fieldBlocks;
 
         this.sizeInBytes = -1;
-        long retainedSizeInBytes = INSTANCE_SIZE + sizeOf(fieldBlockOffsets) + sizeOf(rowIsNull);
+        long finalRetainedSizeInBytes = INSTANCE_SIZE + sizeOf(fieldBlockOffsets) + sizeOf(rowIsNull);
         for (Block fieldBlock : fieldBlocks) {
-            retainedSizeInBytes += fieldBlock.getRetainedSizeInBytes();
+            finalRetainedSizeInBytes += fieldBlock.getRetainedSizeInBytes();
         }
-        this.retainedSizeInBytes = retainedSizeInBytes;
+        this.retainedSizeInBytes = finalRetainedSizeInBytes;
     }
 
     @Override
@@ -164,11 +164,11 @@ public class RowBlock<T>
         int endFieldBlockOffset = fieldBlockOffsets[startOffset + positionCount];
         int fieldBlockLength = endFieldBlockOffset - startFieldBlockOffset;
 
-        long sizeInBytes = (Integer.BYTES + Byte.BYTES) * (long) positionCount;
+        long finalSizeInBytes = (Integer.BYTES + Byte.BYTES) * (long) positionCount;
         for (int i = 0; i < numFields; i++) {
-            sizeInBytes += fieldBlocks[i].getRegionSizeInBytes(startFieldBlockOffset, fieldBlockLength);
+            finalSizeInBytes += fieldBlocks[i].getRegionSizeInBytes(startFieldBlockOffset, fieldBlockLength);
         }
-        this.sizeInBytes = sizeInBytes;
+        this.sizeInBytes = finalSizeInBytes;
     }
 
     @Override

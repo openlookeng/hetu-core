@@ -219,17 +219,18 @@ public class FileSingleStreamSpiller
 
     private OutputStream getStreamForWriting(OutputStream outputStream, int bufferSize) throws IOException
     {
+        OutputStream tmpOutputStream = outputStream;
         if (spillCipher.isPresent()) {
             Cipher cipher = spillCipher.get().getEncryptionCipher();
-            byte[] cipherIV = cipher.getIV();
-            this.cipherIV = new byte[cipherIV.length];
-            System.arraycopy(cipherIV, 0, this.cipherIV, 0, cipherIV.length);
-            outputStream = new CipherOutputStream(outputStream, cipher);
+            byte[] tmpCipherIV = cipher.getIV();
+            this.cipherIV = new byte[tmpCipherIV.length];
+            System.arraycopy(tmpCipherIV, 0, this.cipherIV, 0, tmpCipherIV.length);
+            tmpOutputStream = new CipherOutputStream(tmpOutputStream, cipher);
         }
         if (compressionEnabled) {
-            outputStream = new SnappyFramedOutputStream(outputStream);
+            tmpOutputStream = new SnappyFramedOutputStream(tmpOutputStream);
         }
-        return new OutputStreamSliceOutput(outputStream, bufferSize);
+        return new OutputStreamSliceOutput(tmpOutputStream, bufferSize);
     }
 
     private void writePagesDirect(Iterator<Page> pageIterator)
@@ -256,13 +257,14 @@ public class FileSingleStreamSpiller
 
     private InputStream getStreamForReading(InputStream inputStream, int bufferSize) throws IOException
     {
+        InputStream tmpInputStream = inputStream;
         if (spillCipher.isPresent()) {
-            inputStream = new CipherInputStream(inputStream, spillCipher.get().getDecryptionCipher(cipherIV));
+            tmpInputStream = new CipherInputStream(tmpInputStream, spillCipher.get().getDecryptionCipher(cipherIV));
         }
         if (compressionEnabled) {
-            inputStream = new SnappyFramedInputStream(inputStream);
+            tmpInputStream = new SnappyFramedInputStream(tmpInputStream);
         }
-        return new InputStreamSliceInput(inputStream, bufferSize);
+        return new InputStreamSliceInput(tmpInputStream, bufferSize);
     }
 
     private Predicate<InputStream> getStreamEndOfData()

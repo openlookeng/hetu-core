@@ -144,20 +144,20 @@ public class ExecutionFailureInfo
 
     public FailureInfo toFailureInfo()
     {
-        List<FailureInfo> suppressed = this.suppressed.stream()
+        List<FailureInfo> localSuppressed = this.suppressed.stream()
                 .map(ExecutionFailureInfo::toFailureInfo)
                 .collect(toImmutableList());
 
-        return new FailureInfo(type, message, cause == null ? null : cause.toFailureInfo(), suppressed, stack, errorLocation);
+        return new FailureInfo(type, message, cause == null ? null : cause.toFailureInfo(), localSuppressed, stack, errorLocation);
     }
 
     public FailureInfo toFailureInfoWithoutStack()
     {
-        List<FailureInfo> suppressed = this.suppressed.stream()
+        List<FailureInfo> localSuppressed = this.suppressed.stream()
                 .map(ExecutionFailureInfo::toFailureInfo)
                 .collect(toImmutableList());
 
-        return new FailureInfo(type, message, cause == null ? null : cause.toFailureInfo(), suppressed, ImmutableList.of(), errorLocation);
+        return new FailureInfo(type, message, cause == null ? null : cause.toFailureInfo(), localSuppressed, ImmutableList.of(), errorLocation);
     }
 
     public RuntimeException toException()

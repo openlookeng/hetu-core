@@ -143,8 +143,8 @@ public class AccessControlManager
         SystemAccessControlFactory systemAccessControlFactory = systemAccessControlFactories.get(name);
         checkState(systemAccessControlFactory != null, "Access control %s is not registered", name);
 
-        SystemAccessControl systemAccessControl = systemAccessControlFactory.create(ImmutableMap.copyOf(properties));
-        this.systemAccessControl.set(systemAccessControl);
+        SystemAccessControl tmpSystemAccessControl = systemAccessControlFactory.create(ImmutableMap.copyOf(properties));
+        this.systemAccessControl.set(tmpSystemAccessControl);
 
         log.info("-- Loaded system access control %s --", name);
     }
@@ -308,13 +308,13 @@ public class AccessControlManager
             return ImmutableSet.of();
         }
 
-        schemaNames = systemAccessControl.get().filterSchemas(identity, catalogName, schemaNames);
+        Set<String> tmpSchemaNames = systemAccessControl.get().filterSchemas(identity, catalogName, schemaNames);
 
         CatalogAccessControlEntry entry = getConnectorAccessControl(transactionId, catalogName);
         if (entry != null) {
-            schemaNames = entry.getAccessControl().filterSchemas(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(catalogName), schemaNames);
+            tmpSchemaNames = entry.getAccessControl().filterSchemas(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(catalogName), tmpSchemaNames);
         }
-        return schemaNames;
+        return tmpSchemaNames;
     }
 
     @Override
@@ -409,13 +409,13 @@ public class AccessControlManager
             return ImmutableSet.of();
         }
 
-        tableNames = systemAccessControl.get().filterTables(identity, catalogName, tableNames);
+        Set<SchemaTableName> tmpTableNames = systemAccessControl.get().filterTables(identity, catalogName, tableNames);
 
         CatalogAccessControlEntry entry = getConnectorAccessControl(transactionId, catalogName);
         if (entry != null) {
-            tableNames = entry.getAccessControl().filterTables(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(catalogName), tableNames);
+            tmpTableNames = entry.getAccessControl().filterTables(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(catalogName), tmpTableNames);
         }
-        return tableNames;
+        return tmpTableNames;
     }
 
     @Override
@@ -443,13 +443,13 @@ public class AccessControlManager
             return ImmutableList.of();
         }
 
-        columns = systemAccessControl.get().filterColumns(identity, table, columns);
+        List<ColumnMetadata> tmpColumns = systemAccessControl.get().filterColumns(identity, table, columns);
 
         CatalogAccessControlEntry entry = getConnectorAccessControl(transactionId, table.getCatalogName());
         if (entry != null) {
-            columns = entry.getAccessControl().filterColumns(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(), table.getSchemaTableName(), columns);
+            tmpColumns = entry.getAccessControl().filterColumns(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(), table.getSchemaTableName(), tmpColumns);
         }
-        return columns;
+        return tmpColumns;
     }
 
     @Override

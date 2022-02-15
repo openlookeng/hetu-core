@@ -36,8 +36,7 @@ public class CubeFilter
 
     public CubeFilter(String sourceTablePredicate)
     {
-        this.sourceTablePredicate = sourceTablePredicate;
-        this.cubePredicate = null;
+        this(sourceTablePredicate, null);
     }
 
     public String getSourceTablePredicate()

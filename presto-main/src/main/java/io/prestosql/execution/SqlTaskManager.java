@@ -156,7 +156,7 @@ public class SqlTaskManager
         infoCacheTime = config.getInfoMaxAge();
         clientTimeout = config.getClientTimeout();
 
-        DataSize maxBufferSize = config.getSinkMaxBufferSize();
+        DataSize localMaxBufferSize = config.getSinkMaxBufferSize();
 
         taskNotificationExecutor = newFixedThreadPool(config.getTaskNotificationThreads(), threadsNamed("task-notification-%s"));
         taskNotificationExecutorMBean = new ThreadPoolExecutorMBean((ThreadPoolExecutor) taskNotificationExecutor);
@@ -164,7 +164,7 @@ public class SqlTaskManager
         this.taskManagementExecutor = requireNonNull(taskManagementExecutor, "taskManagementExecutor cannot be null").getExecutor();
         this.driverYieldExecutor = newScheduledThreadPool(config.getTaskYieldThreads(), threadsNamed("task-yield-%s"));
 
-        SqlTaskExecutionFactory sqlTaskExecutionFactory = new SqlTaskExecutionFactory(taskNotificationExecutor, taskExecutor, planner, splitMonitor, config, metadata);
+        SqlTaskExecutionFactory localSqlTaskExecutionFactory = new SqlTaskExecutionFactory(taskNotificationExecutor, taskExecutor, planner, splitMonitor, config, metadata);
 
         this.localMemoryManager = requireNonNull(localMemoryManager, "localMemoryManager is null");
         DataSize maxQueryUserMemoryPerNode = nodeMemoryConfig.getMaxQueryMemoryPerNode();
@@ -177,8 +177,8 @@ public class SqlTaskManager
 
         this.locationFactory = locationFactory;
         this.nodeInfo = nodeInfo;
-        this.sqlTaskExecutionFactory = sqlTaskExecutionFactory;
-        this.maxBufferSize = maxBufferSize;
+        this.sqlTaskExecutionFactory = localSqlTaskExecutionFactory;
+        this.maxBufferSize = localMaxBufferSize;
         this.metadata = metadata;
         // currentTaskInstanceIds and seenInstanceIds are already initialized
     }

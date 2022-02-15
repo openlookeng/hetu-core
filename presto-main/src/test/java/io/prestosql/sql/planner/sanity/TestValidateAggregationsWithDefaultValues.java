@@ -112,18 +112,18 @@ public class TestValidateAggregationsWithDefaultValues
     @Test
     public void testGloballyDistributedFinalAggregationSeparatedFromPartialAggregationByRemoteHashExchange()
     {
-        Symbol symbol = new Symbol("symbol");
+        Symbol symbolObj = new Symbol("symbol");
         PlanNode root = builder.aggregation(
                 af -> af.step(FINAL)
-                        .groupingSets(groupingSets(ImmutableList.of(symbol), 2, ImmutableSet.of(0)))
+                        .groupingSets(groupingSets(ImmutableList.of(symbolObj), 2, ImmutableSet.of(0)))
                         .source(builder.exchange(e -> e
                                 .type(REPARTITION)
                                 .scope(REMOTE)
-                                .fixedHashDistributionParitioningScheme(ImmutableList.of(symbol), ImmutableList.of(symbol))
-                                .addInputsSet(symbol)
+                                .fixedHashDistributionParitioningScheme(ImmutableList.of(symbolObj), ImmutableList.of(symbolObj))
+                                .addInputsSet(symbolObj)
                                 .addSource(builder.aggregation(ap -> ap
                                         .step(PARTIAL)
-                                        .groupingSets(groupingSets(ImmutableList.of(symbol), 2, ImmutableSet.of(0)))
+                                        .groupingSets(groupingSets(ImmutableList.of(symbolObj), 2, ImmutableSet.of(0)))
                                         .source(tableScanNode))))));
         validatePlan(root, false);
     }
@@ -131,18 +131,18 @@ public class TestValidateAggregationsWithDefaultValues
     @Test
     public void testSingleNodeFinalAggregationSeparatedFromPartialAggregationByLocalHashExchange()
     {
-        Symbol symbol = new Symbol("symbol");
+        Symbol symbolObj = new Symbol("symbol");
         PlanNode root = builder.aggregation(
                 af -> af.step(FINAL)
-                        .groupingSets(groupingSets(ImmutableList.of(symbol), 2, ImmutableSet.of(0)))
+                        .groupingSets(groupingSets(ImmutableList.of(symbolObj), 2, ImmutableSet.of(0)))
                         .source(builder.exchange(e -> e
                                 .type(REPARTITION)
                                 .scope(LOCAL)
-                                .fixedHashDistributionParitioningScheme(ImmutableList.of(symbol), ImmutableList.of(symbol))
-                                .addInputsSet(symbol)
+                                .fixedHashDistributionParitioningScheme(ImmutableList.of(symbolObj), ImmutableList.of(symbolObj))
+                                .addInputsSet(symbolObj)
                                 .addSource(builder.aggregation(ap -> ap
                                         .step(PARTIAL)
-                                        .groupingSets(groupingSets(ImmutableList.of(symbol), 2, ImmutableSet.of(0)))
+                                        .groupingSets(groupingSets(ImmutableList.of(symbolObj), 2, ImmutableSet.of(0)))
                                         .source(tableScanNode))))));
         validatePlan(root, true);
     }
@@ -150,20 +150,20 @@ public class TestValidateAggregationsWithDefaultValues
     @Test
     public void testWithPartialAggregationBelowJoin()
     {
-        Symbol symbol = new Symbol("symbol");
+        Symbol symbolObj = new Symbol("symbol");
         PlanNode root = builder.aggregation(
                 af -> af.step(FINAL)
-                        .groupingSets(groupingSets(ImmutableList.of(symbol), 2, ImmutableSet.of(0)))
+                        .groupingSets(groupingSets(ImmutableList.of(symbolObj), 2, ImmutableSet.of(0)))
                         .source(builder.join(
                                 INNER,
                                 builder.exchange(e -> e
                                         .type(REPARTITION)
                                         .scope(LOCAL)
-                                        .fixedHashDistributionParitioningScheme(ImmutableList.of(symbol), ImmutableList.of(symbol))
-                                        .addInputsSet(symbol)
+                                        .fixedHashDistributionParitioningScheme(ImmutableList.of(symbolObj), ImmutableList.of(symbolObj))
+                                        .addInputsSet(symbolObj)
                                         .addSource(builder.aggregation(ap -> ap
                                                 .step(PARTIAL)
-                                                .groupingSets(groupingSets(ImmutableList.of(symbol), 2, ImmutableSet.of(0)))
+                                                .groupingSets(groupingSets(ImmutableList.of(symbolObj), 2, ImmutableSet.of(0)))
                                                 .source(tableScanNode)))),
                                 builder.values())));
         validatePlan(root, true);
@@ -172,15 +172,15 @@ public class TestValidateAggregationsWithDefaultValues
     @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "Final aggregation with default value not separated from partial aggregation by local hash exchange")
     public void testWithPartialAggregationBelowJoinWithoutSeparatingExchange()
     {
-        Symbol symbol = new Symbol("symbol");
+        Symbol symbolObj = new Symbol("symbol");
         PlanNode root = builder.aggregation(
                 af -> af.step(FINAL)
-                        .groupingSets(groupingSets(ImmutableList.of(symbol), 2, ImmutableSet.of(0)))
+                        .groupingSets(groupingSets(ImmutableList.of(symbolObj), 2, ImmutableSet.of(0)))
                         .source(builder.join(
                                 INNER,
                                 builder.aggregation(ap -> ap
                                         .step(PARTIAL)
-                                        .groupingSets(groupingSets(ImmutableList.of(symbol), 2, ImmutableSet.of(0)))
+                                        .groupingSets(groupingSets(ImmutableList.of(symbolObj), 2, ImmutableSet.of(0)))
                                         .source(tableScanNode)),
                                 builder.values())));
         validatePlan(root, true);

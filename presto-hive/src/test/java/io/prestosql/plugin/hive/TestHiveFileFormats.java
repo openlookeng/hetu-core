@@ -841,10 +841,10 @@ public class TestHiveFileFormats
             try {
                 FileSplit split;
                 if (fileWriterFactory != null) {
-                    split = createTestFilePresto(file.getAbsolutePath(), storageFormat, compressionCodec, writeColumns, session, rowsCount, fileWriterFactory);
+                    split = createTestFilePresto(file.getCanonicalPath(), storageFormat, compressionCodec, writeColumns, session, rowsCount, fileWriterFactory);
                 }
                 else {
-                    split = createTestFileHive(file.getAbsolutePath(), storageFormat, compressionCodec, writeColumns, rowsCount);
+                    split = createTestFileHive(file.getCanonicalPath(), storageFormat, compressionCodec, writeColumns, rowsCount);
                 }
                 if (pageSourceFactory.isPresent()) {
                     testPageSourceFactory(pageSourceFactory.get(), split, storageFormat, readColumns, session, rowsCount);

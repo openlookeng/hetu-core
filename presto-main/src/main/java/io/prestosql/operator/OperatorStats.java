@@ -435,100 +435,100 @@ public class OperatorStats
 
     public OperatorStats add(Iterable<OperatorStats> operators)
     {
-        long totalDrivers = this.totalDrivers;
+        long totalDriverNumber = this.totalDrivers;
 
-        long addInputCalls = this.addInputCalls;
-        long addInputWall = this.addInputWall.roundTo(NANOSECONDS);
-        long addInputCpu = this.addInputCpu.roundTo(NANOSECONDS);
-        long physicalInputDataSize = this.physicalInputDataSize.toBytes();
-        long physicalInputPositions = this.physicalInputPositions;
-        long internalNetworkInputDataSize = this.internalNetworkInputDataSize.toBytes();
-        long internalNetworkInputPositions = this.internalNetworkInputPositions;
-        long rawInputDataSize = this.rawInputDataSize.toBytes();
-        long inputDataSize = this.inputDataSize.toBytes();
-        long inputPositions = this.inputPositions;
-        double sumSquaredInputPositions = this.sumSquaredInputPositions;
+        long addInputCallNumber = this.addInputCalls;
+        long addInputWallTime = this.addInputWall.roundTo(NANOSECONDS);
+        long addInputCpuTime = this.addInputCpu.roundTo(NANOSECONDS);
+        long currentPhysicalInputDataSize = this.physicalInputDataSize.toBytes();
+        long currentPhysicalInputPositions = this.physicalInputPositions;
+        long currentInternalNetworkInputDataSize = this.internalNetworkInputDataSize.toBytes();
+        long currentInternalNetworkInputPositions = this.internalNetworkInputPositions;
+        long currentRawInputDataSize = this.rawInputDataSize.toBytes();
+        long currentInputDataSize = this.inputDataSize.toBytes();
+        long currentInputPositions = this.inputPositions;
+        double squaredInputPositions = this.sumSquaredInputPositions;
 
-        long getOutputCalls = this.getOutputCalls;
-        long getOutputWall = this.getOutputWall.roundTo(NANOSECONDS);
-        long getOutputCpu = this.getOutputCpu.roundTo(NANOSECONDS);
-        long outputDataSize = this.outputDataSize.toBytes();
-        long outputPositions = this.outputPositions;
+        long outputCallNumber = this.getOutputCalls;
+        long outputWallTime = this.getOutputWall.roundTo(NANOSECONDS);
+        long outputCpuTime = this.getOutputCpu.roundTo(NANOSECONDS);
+        long currentOutputDataSize = this.outputDataSize.toBytes();
+        long currentOutputPositions = this.outputPositions;
 
-        long physicalWrittenDataSize = this.physicalWrittenDataSize.toBytes();
+        long currentPhysicalWrittenDataSize = this.physicalWrittenDataSize.toBytes();
 
-        long blockedWall = this.blockedWall.roundTo(NANOSECONDS);
+        long blockedWallTime = this.blockedWall.roundTo(NANOSECONDS);
 
-        long finishCalls = this.finishCalls;
-        long finishWall = this.finishWall.roundTo(NANOSECONDS);
-        long finishCpu = this.finishCpu.roundTo(NANOSECONDS);
+        long finishCallNumber = this.finishCalls;
+        long finishWallTime = this.finishWall.roundTo(NANOSECONDS);
+        long finishCpuTime = this.finishCpu.roundTo(NANOSECONDS);
 
         long memoryReservation = this.userMemoryReservation.toBytes();
-        long revocableMemoryReservation = this.revocableMemoryReservation.toBytes();
-        long systemMemoryReservation = this.systemMemoryReservation.toBytes();
+        long revocableMemoryReservationBytes = this.revocableMemoryReservation.toBytes();
+        long systemMemoryReservationBytes = this.systemMemoryReservation.toBytes();
         long peakUserMemory = this.peakUserMemoryReservation.toBytes();
         long peakSystemMemory = this.peakSystemMemoryReservation.toBytes();
         long peakRevocableMemory = this.peakRevocableMemoryReservation.toBytes();
         long peakTotalMemory = this.peakTotalMemoryReservation.toBytes();
 
-        long spilledDataSize = this.spilledDataSize.toBytes();
-        long spillReadTime = this.spillReadTime.roundTo(NANOSECONDS);
-        long spillWriteTime = this.spillWriteTime.roundTo(NANOSECONDS);
+        long currentSpilledDataSize = this.spilledDataSize.toBytes();
+        long spillRead = this.spillReadTime.roundTo(NANOSECONDS);
+        long spillWrite = this.spillWriteTime.roundTo(NANOSECONDS);
 
-        Optional<BlockedReason> blockedReason = this.blockedReason;
+        Optional<BlockedReason> blockedReasonOptional = this.blockedReason;
 
         Mergeable<OperatorInfo> base = getMergeableInfoOrNull(info);
         for (OperatorStats operator : operators) {
             checkArgument(operator.getOperatorId() == operatorId, "Expected operatorId to be %s but was %s", operatorId, operator.getOperatorId());
 
-            totalDrivers += operator.totalDrivers;
+            totalDriverNumber += operator.totalDrivers;
 
-            addInputCalls += operator.getAddInputCalls();
-            addInputWall += operator.getAddInputWall().roundTo(NANOSECONDS);
-            addInputCpu += operator.getAddInputCpu().roundTo(NANOSECONDS);
-            physicalInputDataSize += operator.getPhysicalInputDataSize().toBytes();
-            physicalInputPositions += operator.getPhysicalInputPositions();
-            internalNetworkInputDataSize += operator.getInternalNetworkInputDataSize().toBytes();
-            internalNetworkInputPositions += operator.getInternalNetworkInputPositions();
-            rawInputDataSize += operator.getRawInputDataSize().toBytes();
-            inputDataSize += operator.getInputDataSize().toBytes();
-            inputPositions += operator.getInputPositions();
-            sumSquaredInputPositions += operator.getSumSquaredInputPositions();
+            addInputCallNumber += operator.getAddInputCalls();
+            addInputWallTime += operator.getAddInputWall().roundTo(NANOSECONDS);
+            addInputCpuTime += operator.getAddInputCpu().roundTo(NANOSECONDS);
+            currentPhysicalInputDataSize += operator.getPhysicalInputDataSize().toBytes();
+            currentPhysicalInputPositions += operator.getPhysicalInputPositions();
+            currentInternalNetworkInputDataSize += operator.getInternalNetworkInputDataSize().toBytes();
+            currentInternalNetworkInputPositions += operator.getInternalNetworkInputPositions();
+            currentRawInputDataSize += operator.getRawInputDataSize().toBytes();
+            currentInputDataSize += operator.getInputDataSize().toBytes();
+            currentInputPositions += operator.getInputPositions();
+            squaredInputPositions += operator.getSumSquaredInputPositions();
 
-            getOutputCalls += operator.getGetOutputCalls();
-            getOutputWall += operator.getGetOutputWall().roundTo(NANOSECONDS);
-            getOutputCpu += operator.getGetOutputCpu().roundTo(NANOSECONDS);
-            outputDataSize += operator.getOutputDataSize().toBytes();
-            outputPositions += operator.getOutputPositions();
+            outputCallNumber += operator.getGetOutputCalls();
+            outputWallTime += operator.getGetOutputWall().roundTo(NANOSECONDS);
+            outputCpuTime += operator.getGetOutputCpu().roundTo(NANOSECONDS);
+            currentOutputDataSize += operator.getOutputDataSize().toBytes();
+            currentOutputPositions += operator.getOutputPositions();
 
-            physicalWrittenDataSize += operator.getPhysicalWrittenDataSize().toBytes();
+            currentPhysicalWrittenDataSize += operator.getPhysicalWrittenDataSize().toBytes();
 
-            finishCalls += operator.getFinishCalls();
-            finishWall += operator.getFinishWall().roundTo(NANOSECONDS);
-            finishCpu += operator.getFinishCpu().roundTo(NANOSECONDS);
+            finishCallNumber += operator.getFinishCalls();
+            finishWallTime += operator.getFinishWall().roundTo(NANOSECONDS);
+            finishCpuTime += operator.getFinishCpu().roundTo(NANOSECONDS);
 
-            blockedWall += operator.getBlockedWall().roundTo(NANOSECONDS);
+            blockedWallTime += operator.getBlockedWall().roundTo(NANOSECONDS);
 
             memoryReservation += operator.getUserMemoryReservation().toBytes();
-            revocableMemoryReservation += operator.getRevocableMemoryReservation().toBytes();
-            systemMemoryReservation += operator.getSystemMemoryReservation().toBytes();
+            revocableMemoryReservationBytes += operator.getRevocableMemoryReservation().toBytes();
+            systemMemoryReservationBytes += operator.getSystemMemoryReservation().toBytes();
 
             peakUserMemory = max(peakUserMemory, operator.getPeakUserMemoryReservation().toBytes());
             peakSystemMemory = max(peakSystemMemory, operator.getPeakSystemMemoryReservation().toBytes());
             peakRevocableMemory = max(peakRevocableMemory, operator.getPeakRevocableMemoryReservation().toBytes());
             peakTotalMemory = max(peakTotalMemory, operator.getPeakTotalMemoryReservation().toBytes());
 
-            spilledDataSize += operator.getSpilledDataSize().toBytes();
-            spillReadTime += operator.getSpillReadTime().roundTo(NANOSECONDS);
-            spillWriteTime += operator.getSpillWriteTime().roundTo(NANOSECONDS);
+            currentSpilledDataSize += operator.getSpilledDataSize().toBytes();
+            spillRead += operator.getSpillReadTime().roundTo(NANOSECONDS);
+            spillWrite += operator.getSpillWriteTime().roundTo(NANOSECONDS);
 
             if (operator.getBlockedReason().isPresent()) {
-                blockedReason = operator.getBlockedReason();
+                blockedReasonOptional = operator.getBlockedReason();
             }
 
-            OperatorInfo info = operator.getInfo();
-            if (base != null && info != null && base.getClass() == info.getClass()) {
-                base = mergeInfo(base, info);
+            OperatorInfo operatorInfo = operator.getInfo();
+            if (base != null && operatorInfo != null && base.getClass() == operatorInfo.getClass()) {
+                base = mergeInfo(base, operatorInfo);
             }
         }
 
@@ -539,46 +539,46 @@ public class OperatorStats
                 planNodeId,
                 operatorType,
 
-                totalDrivers,
+                totalDriverNumber,
 
-                addInputCalls,
-                new Duration(addInputWall, NANOSECONDS).convertToMostSuccinctTimeUnit(),
-                new Duration(addInputCpu, NANOSECONDS).convertToMostSuccinctTimeUnit(),
-                succinctBytes(physicalInputDataSize),
-                physicalInputPositions,
-                succinctBytes(internalNetworkInputDataSize),
-                internalNetworkInputPositions,
-                succinctBytes(rawInputDataSize),
-                succinctBytes(inputDataSize),
-                inputPositions,
-                sumSquaredInputPositions,
+                addInputCallNumber,
+                new Duration(addInputWallTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
+                new Duration(addInputCpuTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
+                succinctBytes(currentPhysicalInputDataSize),
+                currentPhysicalInputPositions,
+                succinctBytes(currentInternalNetworkInputDataSize),
+                currentInternalNetworkInputPositions,
+                succinctBytes(currentRawInputDataSize),
+                succinctBytes(currentInputDataSize),
+                currentInputPositions,
+                squaredInputPositions,
 
-                getOutputCalls,
-                new Duration(getOutputWall, NANOSECONDS).convertToMostSuccinctTimeUnit(),
-                new Duration(getOutputCpu, NANOSECONDS).convertToMostSuccinctTimeUnit(),
-                succinctBytes(outputDataSize),
-                outputPositions,
+                outputCallNumber,
+                new Duration(outputWallTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
+                new Duration(outputCpuTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
+                succinctBytes(currentOutputDataSize),
+                currentOutputPositions,
 
-                succinctBytes(physicalWrittenDataSize),
+                succinctBytes(currentPhysicalWrittenDataSize),
 
-                new Duration(blockedWall, NANOSECONDS).convertToMostSuccinctTimeUnit(),
+                new Duration(blockedWallTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
 
-                finishCalls,
-                new Duration(finishWall, NANOSECONDS).convertToMostSuccinctTimeUnit(),
-                new Duration(finishCpu, NANOSECONDS).convertToMostSuccinctTimeUnit(),
+                finishCallNumber,
+                new Duration(finishWallTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
+                new Duration(finishCpuTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
 
                 succinctBytes(memoryReservation),
-                succinctBytes(revocableMemoryReservation),
-                succinctBytes(systemMemoryReservation),
+                succinctBytes(revocableMemoryReservationBytes),
+                succinctBytes(systemMemoryReservationBytes),
                 succinctBytes(peakUserMemory),
                 succinctBytes(peakSystemMemory),
                 succinctBytes(peakRevocableMemory),
                 succinctBytes(peakTotalMemory),
 
-                succinctBytes(spilledDataSize),
-                new Duration(spillReadTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
-                new Duration(spillWriteTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
-                blockedReason,
+                succinctBytes(currentSpilledDataSize),
+                new Duration(spillRead, NANOSECONDS).convertToMostSuccinctTimeUnit(),
+                new Duration(spillWrite, NANOSECONDS).convertToMostSuccinctTimeUnit(),
+                blockedReasonOptional,
 
                 (OperatorInfo) base);
     }

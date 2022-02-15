@@ -90,16 +90,17 @@ public class CarbondataTableProperties
 
     private static SortingColumn sortingColumnFromString(String name)
     {
+        String finalName = name;
         SortingColumn.Order order = SortingColumn.Order.ASCENDING;
         String lower = name.toUpperCase(ENGLISH);
         if (lower.endsWith(" ASC")) {
-            name = name.substring(0, name.length() - 4).trim();
+            finalName = name.substring(0, name.length() - 4).trim();
         }
         else if (lower.endsWith(" DESC")) {
-            name = name.substring(0, name.length() - 5).trim();
+            finalName = name.substring(0, name.length() - 5).trim();
             order = SortingColumn.Order.DESCENDING;
         }
-        return new SortingColumn(name, order);
+        return new SortingColumn(finalName, order);
     }
 
     private static String sortingColumnToString(SortingColumn column)

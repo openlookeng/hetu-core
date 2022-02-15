@@ -308,7 +308,7 @@ public enum FileFormat
                 .createRecordCursor(
                         conf,
                         session,
-                        new Path(targetFile.getAbsolutePath()),
+                        getPath(targetFile),
                         0,
                         targetFile.length(),
                         targetFile.length(),
@@ -343,7 +343,7 @@ public enum FileFormat
                 .createPageSource(
                         conf,
                         session,
-                        new Path(targetFile.getAbsolutePath()),
+                        getPath(targetFile),
                         0,
                         targetFile.length(),
                         targetFile.length(),
@@ -358,6 +358,16 @@ public enum FileFormat
                         false,
                         targetFile.lastModified())
                 .get();
+    }
+
+    private static Path getPath(File targetFile)
+    {
+        try {
+            return new Path(targetFile.getCanonicalPath());
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException("Path Traversal vulnerabilities may exist！");
+        }
     }
 
     private static class RecordFormatWriter

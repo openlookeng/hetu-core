@@ -191,7 +191,7 @@ public class CarbondataMetadataFactory
     @Override
     public HiveMetadata get()
     {
-        SemiTransactionalHiveMetastore metastore =
+        SemiTransactionalHiveMetastore semiTransactionalHiveMetastore =
                 new SemiTransactionalHiveMetastore(this.hdfsEnvironment,
                         CachingHiveMetastore.memoizeMetastore(this.metastore, this.perTransactionCacheMaximumSize),
                         this.renameExecution,
@@ -200,7 +200,7 @@ public class CarbondataMetadataFactory
                         this.hiveTransactionHeartbeatInterval,
                         this.heartbeatService, hiveMetastoreClientService, hmsWriteBatchSize);
 
-        return new CarbondataMetadata(metastore,
+        return new CarbondataMetadata(semiTransactionalHiveMetastore,
                 this.hdfsEnvironment,
                 this.partitionManager,
                 this.writesToNonManagedTablesEnabled,
@@ -212,8 +212,8 @@ public class CarbondataMetadataFactory
                 this.segmentInfoCodec,
                 this.typeTranslator,
                 this.hetuVersion,
-                new MetastoreHiveStatisticsProvider(metastore, statsCache, samplePartitionCache),
-                this.accessControlMetadataFactory.create(metastore),
+                new MetastoreHiveStatisticsProvider(semiTransactionalHiveMetastore, statsCache, samplePartitionCache),
+                this.accessControlMetadataFactory.create(semiTransactionalHiveMetastore),
                 carbondataTableReader,
                 this.carbondataTableStore,
                 this.carbondataMajorVacuumSegmentSize,

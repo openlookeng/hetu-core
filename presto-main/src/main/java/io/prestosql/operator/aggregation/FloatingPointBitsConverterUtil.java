@@ -34,8 +34,8 @@ public final class FloatingPointBitsConverterUtil
      */
     public static double sortableLongToDouble(long value)
     {
-        value = value ^ (value >> 63) & Long.MAX_VALUE;
-        return Double.longBitsToDouble(value);
+        long newValue = value ^ (value >> 63) & Long.MAX_VALUE;
+        return Double.longBitsToDouble(newValue);
     }
 
     /**
@@ -56,7 +56,7 @@ public final class FloatingPointBitsConverterUtil
      */
     public static float sortableIntToFloat(int value)
     {
-        value = value ^ (value >> 31) & Integer.MAX_VALUE;
-        return Float.intBitsToFloat(value);
+        int newValue = value ^ (value >> 31) & Integer.MAX_VALUE;
+        return Float.intBitsToFloat(newValue);
     }
 }

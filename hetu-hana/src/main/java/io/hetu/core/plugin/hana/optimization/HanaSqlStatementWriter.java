@@ -38,8 +38,9 @@ public class HanaSqlStatementWriter
     }
 
     @Override
-    public String aggregation(String functionName, List<String> arguments, boolean isDistinct)
+    public String aggregation(String inputFunctionName, List<String> arguments, boolean isDistinct)
     {
+        String functionName = inputFunctionName;
         if (functionName.toUpperCase(Locale.ENGLISH).equals("VARIANCE")) {
             functionName = "VAR";
         }

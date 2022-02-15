@@ -117,15 +117,15 @@ public class ThriftIndexPageSource
                 .collect(toImmutableList());
 
         requireNonNull(outputColumns, "outputColumns is null");
-        ImmutableList.Builder<String> outputColumnNames = new ImmutableList.Builder<>();
-        ImmutableList.Builder<Type> outputColumnTypes = new ImmutableList.Builder<>();
+        ImmutableList.Builder<String> outputColumnNames1 = new ImmutableList.Builder<>();
+        ImmutableList.Builder<Type> outputColumnTypes1 = new ImmutableList.Builder<>();
         for (ColumnHandle columnHandle : outputColumns) {
             ThriftColumnHandle thriftColumnHandle = (ThriftColumnHandle) columnHandle;
-            outputColumnNames.add(thriftColumnHandle.getColumnName());
-            outputColumnTypes.add(thriftColumnHandle.getColumnType());
+            outputColumnNames1.add(thriftColumnHandle.getColumnName());
+            outputColumnTypes1.add(thriftColumnHandle.getColumnType());
         }
-        this.outputColumnNames = outputColumnNames.build();
-        this.outputColumnTypes = outputColumnTypes.build();
+        this.outputColumnNames = outputColumnNames1.build();
+        this.outputColumnTypes = outputColumnTypes1.build();
 
         this.keys = fromRecordSet(requireNonNull(keys, "keys is null"));
 

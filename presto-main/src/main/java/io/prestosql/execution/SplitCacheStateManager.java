@@ -50,9 +50,7 @@ public class SplitCacheStateManager
     @Inject
     public SplitCacheStateManager(StateStoreProvider provider, Metadata metadata)
     {
-        this.provider = provider;
-        this.metadata = metadata;
-        this.splitCacheMap = SplitCacheMap.getInstance();
+        this(provider, metadata, SplitCacheMap.getInstance());
     }
 
     public SplitCacheStateManager(StateStoreProvider provider, Metadata metadata, SplitCacheMap splitCacheMap)

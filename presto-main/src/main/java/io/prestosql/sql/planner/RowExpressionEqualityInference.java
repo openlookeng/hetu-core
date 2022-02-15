@@ -397,8 +397,9 @@ public class RowExpressionEqualityInference
             return this;
         }
 
-        public RowExpressionEqualityInference.Builder addEquality(RowExpression expression)
+        public RowExpressionEqualityInference.Builder addEquality(RowExpression inputExpression)
         {
+            RowExpression expression = inputExpression;
             expression = normalizeInPredicateToEquality(expression);
             checkArgument(isInferenceCandidate().apply(expression), "RowExpression must be a simple equality: " + expression);
             addEquality(getLeft(expression), getRight(expression));

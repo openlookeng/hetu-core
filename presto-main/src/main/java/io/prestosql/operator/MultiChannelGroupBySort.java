@@ -111,7 +111,8 @@ public class MultiChannelGroupBySort
     public void appendValuesTo(int groupId, PageBuilder pageBuilder, int outputChannelOffset)
     {
         int currentSliceIndex = sliceIndex;
-        if (groupId == nextGroupIdStartingRange) {
+        int currentGroupId = groupId;
+        if (currentGroupId == nextGroupIdStartingRange) {
             currentGroupIdStartingRange = nextGroupIdStartingRange;
             if (maxGroupId.size() != 0) {
                 nextGroupIdStartingRange = maxGroupId.get(0);
@@ -121,15 +122,15 @@ public class MultiChannelGroupBySort
                 nextGroupIdStartingRange = Integer.MAX_VALUE;
             }
             sliceIndex++;
-            groupId = newGroupId == 0 ? groupId : newGroupId;
+            currentGroupId = newGroupId == 0 ? currentGroupId : newGroupId;
             newGroupId = 0;
         }
-        else if (groupId > currentGroupIdStartingRange) {
-            groupId = newGroupId++;
+        else if (currentGroupId > currentGroupIdStartingRange) {
+            currentGroupId = newGroupId++;
         }
 
         int blockIndex = currentSliceIndex;
-        int position = groupId;
+        int position = currentGroupId;
         hashStrategy.appendTo(blockIndex, position, pageBuilder, outputChannelOffset);
     }
 

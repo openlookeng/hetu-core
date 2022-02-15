@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
@@ -107,8 +108,9 @@ public abstract class AbstractResourceConfigurationManager
         return selectors.build();
     }
 
-    private void validateSelectors(List<ResourceGroupSpec> groups, SelectorSpec spec)
+    private void validateSelectors(List<ResourceGroupSpec> inputGroups, SelectorSpec spec)
     {
+        List<ResourceGroupSpec> groups = inputGroups;
         spec.getQueryType().ifPresent(this::validateQueryType);
         StringBuilder fullyQualifiedGroupName = new StringBuilder();
         for (ResourceGroupNameTemplate groupName : spec.getGroup().getSegments()) {
@@ -128,7 +130,7 @@ public abstract class AbstractResourceConfigurationManager
     private void validateQueryType(String queryType)
     {
         try {
-            QueryType.valueOf(queryType.toUpperCase());
+            QueryType.valueOf(queryType.toUpperCase(Locale.ROOT));
         }
         catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(format("Selector specifies an invalid query type: %s", queryType));

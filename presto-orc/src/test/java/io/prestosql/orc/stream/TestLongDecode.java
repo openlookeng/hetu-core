@@ -106,14 +106,15 @@ public class TestLongDecode
     private static void writeVulong(OutputStream output, long value)
             throws IOException
     {
+        long tmpValue = value;
         while (true) {
-            if ((value & ~0x7f) == 0) {
-                output.write((byte) value);
+            if ((tmpValue & ~0x7f) == 0) {
+                output.write((byte) tmpValue);
                 return;
             }
             else {
-                output.write((byte) (0x80 | (value & 0x7f)));
-                value >>>= 7;
+                output.write((byte) (0x80 | (tmpValue & 0x7f)));
+                tmpValue >>>= 7;
             }
         }
     }

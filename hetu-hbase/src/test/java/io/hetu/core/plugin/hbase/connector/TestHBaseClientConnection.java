@@ -14,6 +14,7 @@
  */
 package io.hetu.core.plugin.hbase.connector;
 
+import io.airlift.log.Logger;
 import io.hetu.core.plugin.hbase.client.TestHBaseConnection;
 import io.hetu.core.plugin.hbase.conf.HBaseConfig;
 import io.hetu.core.plugin.hbase.metadata.HBaseMetastore;
@@ -30,6 +31,8 @@ import java.io.IOException;
 public class TestHBaseClientConnection
         extends HBaseConnection
 {
+    private static final Logger LOG = Logger.get(TestHBaseClientConnection.class);
+
     public TestHBaseClientConnection(HBaseConfig conf, HBaseMetastore metastore)
     {
         super(metastore, conf);
@@ -47,7 +50,7 @@ public class TestHBaseClientConnection
             }
         }
         catch (IOException e) {
-            e.printStackTrace();
+            LOG.info("Error message: " + e.getStackTrace());
         }
         return conn;
     }

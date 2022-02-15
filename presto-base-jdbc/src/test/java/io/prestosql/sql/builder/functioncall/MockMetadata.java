@@ -47,6 +47,7 @@ public class MockMetadata
         return ((BuiltInFunctionHandle) delegate.getFunctionAndTypeManager().resolveFunction(Optional.empty(), QualifiedObjectName.valueOf(name.toString()), parameterTypes)).getSignature();
     }
 
+    @Override
     public FunctionAndTypeManager getFunctionAndTypeManager()
     {
         return delegate.getFunctionAndTypeManager();

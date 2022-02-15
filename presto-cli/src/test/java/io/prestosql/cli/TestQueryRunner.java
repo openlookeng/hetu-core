@@ -134,7 +134,6 @@ public class TestQueryRunner
                 ImmutableList.of(new Column("_col0", BIGINT, new ClientTypeSignature(BIGINT))),
                 ImmutableList.of(ImmutableList.of(123)),
                 StatementStats.builder().setState("FINISHED").build(),
-                //new StatementStats("FINISHED", false, true, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null),
                 null,
                 ImmutableList.of(),
                 null,

@@ -563,11 +563,13 @@ public class LocalQueryRunner
         return planOptimizerManager;
     }
 
+    @Override
     public PageSourceManager getPageSourceManager()
     {
         return pageSourceManager;
     }
 
+    @Override
     public SplitManager getSplitManager()
     {
         return splitManager;

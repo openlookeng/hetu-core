@@ -72,7 +72,7 @@ public class TestPruneFilterColumns
         return planBuilder.project(
                 Assignments.copyOf(Stream.of(a, b).filter(projectionFilter).collect(Collectors.toMap(v -> v, v -> planBuilder.variable(v.getName())))),
                 planBuilder.filter(
-                        planBuilder.expression("b > 5"),
+                        PlanBuilder.expression("b > 5"),
                         planBuilder.values(a, b)));
     }
 }

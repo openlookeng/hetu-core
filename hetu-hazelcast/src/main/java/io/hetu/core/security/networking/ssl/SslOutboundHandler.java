@@ -163,13 +163,13 @@ public class SslOutboundHandler
             return null;
         }
 
-        ScheduledFuture<?> timeoutFuture = SslContext.scheduleExecutor.schedule(() -> {
+        ScheduledFuture<?> tmpTimeoutFuture = SslContext.scheduleExecutor.schedule(() -> {
             if (!handshakeFinished.get()) {
                 isTimeout = true;
             }
         }, handshakeTimeoutMillis, TimeUnit.MILLISECONDS);
 
-        return timeoutFuture;
+        return tmpTimeoutFuture;
     }
 
     private void updateOutboundPipeline()

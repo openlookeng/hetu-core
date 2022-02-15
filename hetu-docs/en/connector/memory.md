@@ -179,11 +179,12 @@ Use these properties when creating a table with the Memory Connector to make que
 
 Index Types
 --------------
-These are the types of indices that are built on the columns you specify in `sorted_by` or `index_columns`. If a query operator is not supported by a particular index, you can still use that operator, but the query will not benefit from the index.
+These are the types of indices that are built on the columns you specify in `sorted_by` or `index_columns`.
+If a query operator is not supported by a particular index, you can still use that operator, but the query will not benefit from the index.
 
 | Index ID                          |Built for Columns In | Supported query operators             |
 |-----------------------------------|----------------------------------------|---------------------------------------|
-| Bloom   | `sorted_by,index_columns`                                 | `=` `IN`                             |                   
+| Bloom   | `index_columns`                                 | `=` `IN`                             |                   
 | MinMax  | `sorted_by,index_columns`                            | `=` `>` `>=` `<` `<=` `IN` `BETWEEN` |
 | Sparse  | `sorted_by`                            | `=` `>` `>=` `<` `<=` `IN` `BETWEEN` |
 

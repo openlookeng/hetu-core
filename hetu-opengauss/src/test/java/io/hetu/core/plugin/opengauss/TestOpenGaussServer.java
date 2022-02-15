@@ -86,6 +86,7 @@ public class TestOpenGaussServer
         execute(SQL_STATEMENT, jdbcUrl);
     }
 
+    @Override
     public void execute(String sql) throws Exception
     {
         execute(sql, getJdbcUrl());
@@ -123,6 +124,7 @@ public class TestOpenGaussServer
      *
      * @return String
      */
+    @Override
     public String getJdbcUrl()
     {
         return format(connectionUrl, dockerContainer.getHostPort(port), db);
@@ -133,6 +135,7 @@ public class TestOpenGaussServer
      *
      * @return String
      */
+    @Override
     public String getUser()
     {
         return user;
@@ -143,6 +146,7 @@ public class TestOpenGaussServer
      *
      * @return String
      */
+    @Override
     public String getPassWd()
     {
         return passWd;

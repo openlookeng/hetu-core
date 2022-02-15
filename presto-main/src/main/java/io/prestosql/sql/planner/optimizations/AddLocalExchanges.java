@@ -632,8 +632,9 @@ public class AddLocalExchanges
         //
 
         @Override
-        public PlanWithProperties visitJoin(JoinNode node, StreamPreferredProperties parentPreferences)
+        public PlanWithProperties visitJoin(JoinNode inputNode, StreamPreferredProperties parentPreferences)
         {
+            JoinNode node = inputNode;
             PlanWithProperties probe = planAndEnforce(
                     node.getLeft(),
                     defaultParallelism(session),

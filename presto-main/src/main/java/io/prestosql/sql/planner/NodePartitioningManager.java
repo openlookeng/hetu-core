@@ -147,12 +147,13 @@ public class NodePartitioningManager
             NodeSelector nodeSelector = nodeScheduler.createNodeSelector(catalogName, false, null);
             List<InternalNode> nodes;
             if (isSnapshotEnabled) {
-                if (nodeCount == null) {
+                Integer count = nodeCount;
+                if (count == null) {
                     // Initial schedule: reserve some nodes
-                    nodeCount = calculateTaskCount(nodeSelector.selectableNodeCount());
+                    count = calculateTaskCount(nodeSelector.selectableNodeCount());
                 }
-                nodes = nodeSelector.selectRandomNodes(nodeCount);
-                checkCondition(nodes.size() == nodeCount, NO_NODES_AVAILABLE, "Snapshot: not enough worker nodes to resume expected number of tasks: " + nodeCount);
+                nodes = nodeSelector.selectRandomNodes(count);
+                checkCondition(nodes.size() == count, NO_NODES_AVAILABLE, "Snapshot: not enough worker nodes to resume expected number of tasks: " + count);
             }
             else {
                 nodes = nodeSelector.allNodes();
@@ -188,8 +189,9 @@ public class NodePartitioningManager
     }
 
     // Snapshot: When nodeCount > 0, it indicates how many nodes must be allocated
-    public BucketNodeMap getBucketNodeMap(Session session, PartitioningHandle partitioningHandle, boolean preferDynamic, List<InternalNode> nodes)
+    public BucketNodeMap getBucketNodeMap(Session session, PartitioningHandle partitioningHandle, boolean preferDynamic, List<InternalNode> inputNodes)
     {
+        List<InternalNode> nodes = inputNodes;
         ConnectorBucketNodeMap connectorBucketNodeMap = getConnectorBucketNodeMap(session, partitioningHandle);
 
         // Snapshot: this is never true for all implementations, so no change

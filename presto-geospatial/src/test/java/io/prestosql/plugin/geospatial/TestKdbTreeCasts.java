@@ -50,8 +50,8 @@ public class TestKdbTreeCasts
     private String makeKdbTreeJson()
     {
         ImmutableList.Builder<Rectangle> rectangles = ImmutableList.builder();
-        for (double x = 0; x < 10; x += 1) {
-            for (double y = 0; y < 5; y += 1) {
+        for (int x = 0; x < 10; x += 1) {
+            for (int y = 0; y < 5; y += 1) {
                 rectangles.add(new Rectangle(x, y, x + 1, y + 2));
             }
         }

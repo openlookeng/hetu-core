@@ -61,9 +61,9 @@ public class TestIntervalYearMonth
     {
         assertFunction(projection, expectedType, expectedValue);
 
-        projection = projection.replace("INTERVAL '", "INTERVAL '-");
-        expectedValue = new SqlIntervalYearMonth(-expectedValue.getMonths());
-        assertFunction(projection, expectedType, expectedValue);
+        String actualProjection = projection.replace("INTERVAL '", "INTERVAL '-");
+        SqlIntervalYearMonth expectedProjection = new SqlIntervalYearMonth(-expectedValue.getMonths());
+        assertFunction(actualProjection, expectedType, expectedProjection);
     }
 
     @Test

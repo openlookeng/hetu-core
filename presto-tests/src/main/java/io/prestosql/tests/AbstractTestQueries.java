@@ -3302,11 +3302,11 @@ public abstract class AbstractTestQueries
                         "GROUP BY o1.orderkey ORDER BY o1.orderkey LIMIT 5",
                 joinType,
                 condition);
-        List<QueryTemplate.Parameter> conditions = condition.of(
+        List<QueryTemplate.Parameter> conditions = condition.ofStringList(
                 "EXISTS(SELECT avg(orderkey) FROM orders)",
                 "(SELECT avg(orderkey) FROM orders) > 3");
         for (QueryTemplate.Parameter actualCondition : conditions) {
-            for (QueryTemplate.Parameter actualJoinType : joinType.of("", "LEFT", "RIGHT")) {
+            for (QueryTemplate.Parameter actualJoinType : joinType.ofStringList("", "LEFT", "RIGHT")) {
                 assertQuery(queryTemplate.replace(actualJoinType, actualCondition));
             }
             assertQuery(
@@ -4913,20 +4913,20 @@ public abstract class AbstractTestQueries
         //the %subquery% is wrapped in a SELECT so that H2 does not blow up on the VALUES subquery
         return queryTemplate("SELECT %value% %operator% %quantifier% (SELECT * FROM (%subquery%))")
                 .replaceAll(
-                        parameter("subquery").of(
+                        parameter("subquery").ofStringList(
                                 "SELECT 1 WHERE false",
                                 "SELECT CAST(NULL AS INTEGER)",
                                 "VALUES (1), (NULL)"),
-                        parameter("quantifier").of("ALL", "ANY"),
-                        parameter("value").of("1", "NULL"),
-                        parameter("operator").of("=", "!=", "<", ">", "<=", ">="))
+                        parameter("quantifier").ofStringList("ALL", "ANY"),
+                        parameter("value").ofStringList("1", "NULL"),
+                        parameter("operator").ofStringList("=", "!=", "<", ">", "<=", ">="))
                 .collect(toDataProvider());
     }
 
     @Test
     public void testPreparedStatementWithSubqueries()
     {
-        List<QueryTemplate.Parameter> leftValues = parameter("left").of(
+        List<QueryTemplate.Parameter> leftValues = parameter("left").ofStringList(
                 "", "1 = ",
                 "EXISTS",
                 "1 IN",
@@ -5068,8 +5068,8 @@ public abstract class AbstractTestQueries
     @Test
     public void testSubqueriesWithDisjunction()
     {
-        List<QueryTemplate.Parameter> projections = parameter("projection").of("count(*)", "*", "%condition%");
-        List<QueryTemplate.Parameter> conditions = parameter("condition").of(
+        List<QueryTemplate.Parameter> projections = parameter("projection").ofStringList("count(*)", "*", "%condition%");
+        List<QueryTemplate.Parameter> conditions = parameter("condition").ofStringList(
                 "nationkey IN (SELECT 1) OR TRUE",
                 "EXISTS(SELECT 1) OR TRUE");
 

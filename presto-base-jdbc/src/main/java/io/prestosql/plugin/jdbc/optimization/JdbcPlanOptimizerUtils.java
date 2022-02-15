@@ -93,8 +93,9 @@ public class JdbcPlanOptimizerUtils
         throw new PrestoException(JDBC_QUERY_GENERATOR_FAILURE, "unhandled type: " + type);
     }
 
-    public static String quote(String quote, String name)
+    public static String quote(String quote, String inputName)
     {
+        String name = inputName;
         name = name.replace(quote, quote + quote);
         return quote + name + quote;
     }

@@ -61,8 +61,8 @@ public class MapBlock<T>
 
         int mapCount = offsets.length - 1;
         int elementCount = keyBlock.getPositionCount();
-        int[] hashTables = new int[elementCount * HASH_MULTIPLIER];
-        Arrays.fill(hashTables, -1);
+        int[] finalHashTables = new int[elementCount * HASH_MULTIPLIER];
+        Arrays.fill(finalHashTables, -1);
         for (int i = 0; i < mapCount; i++) {
             int keyOffset = offsets[i];
             int keyCount = offsets[i + 1] - keyOffset;
@@ -72,7 +72,7 @@ public class MapBlock<T>
             if (mapIsNull.isPresent() && mapIsNull.get()[i] && keyCount != 0) {
                 throw new IllegalArgumentException("A null map must have zero entries");
             }
-            buildHashTable(keyBlock, keyOffset, keyCount, mapType, hashTables, keyOffset * HASH_MULTIPLIER, keyCount * HASH_MULTIPLIER);
+            buildHashTable(keyBlock, keyOffset, keyCount, mapType, finalHashTables, keyOffset * HASH_MULTIPLIER, keyCount * HASH_MULTIPLIER);
         }
 
         return createMapBlockInternal(
@@ -83,7 +83,7 @@ public class MapBlock<T>
                 offsets,
                 keyBlock,
                 valueBlock,
-                hashTables);
+                finalHashTables);
     }
 
     /**

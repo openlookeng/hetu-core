@@ -63,8 +63,8 @@ public class AggregationOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, AggregationOperator.class.getSimpleName());
-            return new AggregationOperator(operatorContext, step, accumulatorFactories, useSystemMemory);
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, AggregationOperator.class.getSimpleName());
+            return new AggregationOperator(addOperatorContext, step, accumulatorFactories, useSystemMemory);
         }
 
         @Override

@@ -99,7 +99,7 @@ public class TestCarbondataMinorConfig
                     "/carbon.store/mytestdb/mytesttable/Fact/Part0/Segment_0.1", false), true);
         } catch (IOException e) {
             hetuServer.execute("DROP TABLE if exists mytestdb.mytesttable");
-            e.printStackTrace();
+            logger.error(e.getMessage());
         }
 
         hetuServer.execute("DROP TABLE if exists mytestdb.mytesttable");

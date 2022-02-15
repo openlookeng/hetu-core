@@ -650,8 +650,9 @@ class QueryPlanner
                 ImmutableList.of());
     }
 
-    private PlanBuilder filter(PlanBuilder subPlan, Expression predicate, Node node)
+    private PlanBuilder filter(PlanBuilder inputSubPlan, Expression predicate, Node node)
     {
+        PlanBuilder subPlan = inputSubPlan;
         if (predicate == null) {
             return subPlan;
         }
@@ -878,8 +879,9 @@ class QueryPlanner
                 assignments));
     }
 
-    private PlanBuilder aggregate(PlanBuilder subPlan, QuerySpecification node)
+    private PlanBuilder aggregate(PlanBuilder inputSubPlan, QuerySpecification node)
     {
+        PlanBuilder subPlan = inputSubPlan;
         if (!analysis.isAggregation(node)) {
             return subPlan;
         }
@@ -1168,8 +1170,9 @@ class QueryPlanner
         return window(subPlan, ImmutableList.copyOf(analysis.getWindowFunctions(node)));
     }
 
-    private PlanBuilder window(PlanBuilder subPlan, List<FunctionCall> windowFunctions)
+    private PlanBuilder window(PlanBuilder inputSubPlan, List<FunctionCall> windowFunctions)
     {
+        PlanBuilder subPlan = inputSubPlan;
         if (windowFunctions.isEmpty()) {
             return subPlan;
         }
@@ -1311,8 +1314,9 @@ class QueryPlanner
         return subPlan;
     }
 
-    private PlanBuilder handleSubqueries(PlanBuilder subPlan, Node node, Iterable<Expression> inputs)
+    private PlanBuilder handleSubqueries(PlanBuilder inputSubPlan, Node node, Iterable<Expression> inputs)
     {
+        PlanBuilder subPlan = inputSubPlan;
         for (Expression input : inputs) {
             subPlan = subqueryPlanner.handleSubqueries(subPlan, subPlan.rewrite(input), node);
         }
@@ -1411,8 +1415,9 @@ class QueryPlanner
      *
      * @return the new subplan and a mapping of each expression to the symbol representing the coercion or an existing symbol if a coercion wasn't needed
      */
-    public static PlanAndMappings coerce(PlanBuilder subPlan, List<Expression> expressions, Analysis analysis, PlanNodeIdAllocator idAllocator, PlanSymbolAllocator planSymbolAllocator, TypeCoercion typeCoercion)
+    public static PlanAndMappings coerce(PlanBuilder inputSubPlan, List<Expression> expressions, Analysis analysis, PlanNodeIdAllocator idAllocator, PlanSymbolAllocator planSymbolAllocator, TypeCoercion typeCoercion)
     {
+        PlanBuilder subPlan = inputSubPlan;
         Assignments.Builder assignments = Assignments.builder();
         assignments.putAll(AssignmentUtils.identityAsSymbolReferences(subPlan.getRoot().getOutputSymbols()));
 

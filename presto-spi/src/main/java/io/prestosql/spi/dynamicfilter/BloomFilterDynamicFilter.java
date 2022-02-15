@@ -22,6 +22,7 @@ import io.prestosql.spi.util.BloomFilter;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -46,10 +47,7 @@ public class BloomFilterDynamicFilter
 
     public BloomFilterDynamicFilter(String filterId, ColumnHandle columnHandle, BloomFilter bloomFilterDeserialized, Type type)
     {
-        this.filterId = filterId;
-        this.type = type;
-        this.columnHandle = columnHandle;
-        this.bloomFilterDeserialized = bloomFilterDeserialized;
+        this(filterId, columnHandle, bloomFilterDeserialized, null, type);
     }
 
     private BloomFilterDynamicFilter(String filterId, ColumnHandle columnHandle, BloomFilter bloomFilterDeserialized, byte[] bloomFilterSerialized, Type type)
@@ -83,7 +81,7 @@ public class BloomFilterDynamicFilter
                 bloomFilter.add((Slice) value);
             }
             else {
-                bloomFilter.add(String.valueOf(value).getBytes());
+                bloomFilter.add(String.valueOf(value).getBytes(StandardCharsets.UTF_8));
             }
         }
         return bloomFilter;

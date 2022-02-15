@@ -29,6 +29,7 @@ import javax.inject.Inject;
 import javax.inject.Named;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.Date;
@@ -246,7 +247,7 @@ public class JdbcTests
             assertThat(query("select {fn convert('1234.567', SQL_DECIMAL)}")).containsExactly(row(new BigDecimal(1235)));
 
             assertThat(query("select {fn convert('123456', SQL_INTEGER)}")).containsExactly(row(123456));
-            assertThat(query("select {fn convert('123abcd', SQL_VARBINARY)}")).containsExactly(row("123abcd".getBytes()));
+            assertThat(query("select {fn convert('123abcd', SQL_VARBINARY)}")).containsExactly(row("123abcd".getBytes(StandardCharsets.UTF_8)));
             assertThat(query("select {fn dayofmonth(date '2016-10-20')}")).containsExactly(row(20));
             assertThat(query("select {fn dayofweek(date '2016-10-20')}")).containsExactly(row(5));
             assertThat(query("select {fn dayofyear(date '2016-10-20')}")).containsExactly(row(294));

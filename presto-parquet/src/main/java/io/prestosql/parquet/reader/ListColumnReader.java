@@ -58,8 +58,9 @@ public class ListColumnReader
         }
     }
 
-    private static int getNextCollectionStartIndex(int[] repetitionLevels, int maxRepetitionLevel, int elementIndex)
+    private static int getNextCollectionStartIndex(int[] repetitionLevels, int maxRepetitionLevel, int inputElementIndex)
     {
+        int elementIndex = inputElementIndex;
         do {
             elementIndex++;
         }
@@ -70,9 +71,10 @@ public class ListColumnReader
     /**
      * This method is only called for non-empty collections
      */
-    private static int getCollectionSize(int[] repetitionLevels, int maxRepetitionLevel, int nextIndex)
+    private static int getCollectionSize(int[] repetitionLevels, int maxRepetitionLevel, int inputNextIndex)
     {
         int size = 1;
+        int nextIndex = inputNextIndex;
         while (hasMoreElements(repetitionLevels, nextIndex) && !isCollectionBeginningMarker(repetitionLevels, maxRepetitionLevel, nextIndex)) {
             // Collection elements can not only be primitive, but also can have nested structure
             // Counting only elements which belong to current collection, skipping inner elements of nested collections/structs

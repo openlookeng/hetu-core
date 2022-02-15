@@ -43,21 +43,21 @@ public class TableFinishInfo
 
     public TableFinishInfo(Optional<ConnectorOutputMetadata> metadata, Duration statisticsWallTime, Duration statisticsCpuTime)
     {
-        String connectorOutputMetadata = null;
-        boolean jsonLengthLimitExceeded = false;
+        String connectorMetadata = null;
+        boolean jsonLengthExceeded = false;
         if (metadata.isPresent()) {
             Optional<String> serializedMetadata = INFO_CODEC.toJsonWithLengthLimit(metadata.get().getInfo(), JSON_LENGTH_LIMIT);
             if (!serializedMetadata.isPresent()) {
-                connectorOutputMetadata = null;
-                jsonLengthLimitExceeded = true;
+                connectorMetadata = null;
+                jsonLengthExceeded = true;
             }
             else {
-                connectorOutputMetadata = serializedMetadata.get();
-                jsonLengthLimitExceeded = false;
+                connectorMetadata = serializedMetadata.get();
+                jsonLengthExceeded = false;
             }
         }
-        this.connectorOutputMetadata = connectorOutputMetadata;
-        this.jsonLengthLimitExceeded = jsonLengthLimitExceeded;
+        this.connectorOutputMetadata = connectorMetadata;
+        this.jsonLengthLimitExceeded = jsonLengthExceeded;
         this.statisticsWallTime = requireNonNull(statisticsWallTime, "statisticsWallTime is null");
         this.statisticsCpuTime = requireNonNull(statisticsCpuTime, "statisticsCpuTime is null");
     }

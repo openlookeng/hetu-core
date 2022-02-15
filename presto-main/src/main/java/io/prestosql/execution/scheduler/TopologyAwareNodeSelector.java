@@ -135,9 +135,9 @@ public class TopologyAwareNodeSelector
     @Override
     public SplitPlacementResult computeAssignments(Set<Split> splits, List<RemoteTask> existingTasks, Optional<SqlStageExecution> stage)
     {
-        NodeMap nodeMap = this.nodeMap.get().get();
+        NodeMap nodeMapSlice = this.nodeMap.get().get();
         Multimap<InternalNode, Split> assignment = HashMultimap.create();
-        NodeAssignmentStats assignmentStats = new NodeAssignmentStats(nodeTaskMap, nodeMap, existingTasks);
+        NodeAssignmentStats assignmentStats = new NodeAssignmentStats(nodeTaskMap, nodeMapSlice, existingTasks);
 
         int[] topologicCounters = new int[topologicalSplitCounters.size()];
         Set<NetworkLocation> filledLocations = new HashSet<>();
@@ -145,9 +145,9 @@ public class TopologyAwareNodeSelector
         boolean splitWaitingForAnyNode = false;
         for (Split split : splits) {
             if (!split.isRemotelyAccessible()) {
-                List<InternalNode> candidateNodes = selectExactNodes(nodeMap, split.getAddresses(), includeCoordinator);
+                List<InternalNode> candidateNodes = selectExactNodes(nodeMapSlice, split.getAddresses(), includeCoordinator);
                 if (candidateNodes.isEmpty()) {
-                    log.debug("No nodes available to schedule %s. Available nodes %s", split, nodeMap.getNodesByHost().keys());
+                    log.debug("No nodes available to schedule %s. Available nodes %s", split, nodeMapSlice.getNodesByHost().keys());
                     throw new PrestoException(NO_NODES_AVAILABLE, "No nodes available to run query");
                 }
                 InternalNode chosenNode = bestNodeSplitCount(candidateNodes.iterator(), minCandidates, maxPendingSplitsPerTask, assignmentStats);
@@ -186,7 +186,7 @@ public class TopologyAwareNodeSelector
                     if (filledLocations.contains(location)) {
                         continue;
                     }
-                    Set<InternalNode> nodes = nodeMap.getWorkersByNetworkPath().get(location);
+                    Set<InternalNode> nodes = nodeMapSlice.getWorkersByNetworkPath().get(location);
                     chosenNode = bestNodeSplitCount(new ResettableRandomizedIterator<>(nodes), minCandidates, calculateMaxPendingSplits(i, depth), assignmentStats);
                     if (chosenNode != null) {
                         chosenDepth = i;

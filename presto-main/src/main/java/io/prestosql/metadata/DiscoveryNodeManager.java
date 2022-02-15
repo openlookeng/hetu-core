@@ -162,12 +162,12 @@ public final class DiscoveryNodeManager
 
     private void pollWorkers()
     {
-        AllNodes allNodes = getAllNodes();
+        AllNodes allNodesOverDiscovery = getAllNodes();
         Set<InternalNode> aliveNodes = ImmutableSet.<InternalNode>builder()
-                .addAll(allNodes.getActiveNodes())
-                .addAll(allNodes.getIsolatingNodes())
-                .addAll(allNodes.getIsolatedNodes())
-                .addAll(allNodes.getShuttingDownNodes())
+                .addAll(allNodesOverDiscovery.getActiveNodes())
+                .addAll(allNodesOverDiscovery.getIsolatingNodes())
+                .addAll(allNodesOverDiscovery.getIsolatedNodes())
+                .addAll(allNodesOverDiscovery.getShuttingDownNodes())
                 .build();
 
         ImmutableSet<String> aliveNodeIds = aliveNodes.stream()
@@ -293,18 +293,18 @@ public final class DiscoveryNodeManager
         activeNodesByCatalogName = byConnectorIdBuilder.build();
         allNodesByCatalogName = byAllConnectorIdBuilder.build();
 
-        AllNodes allNodes = new AllNodes(activeNodesBuilder.build(), inactiveNodesBuilder.build(),
+        AllNodes allNodesBuild = new AllNodes(activeNodesBuilder.build(), inactiveNodesBuilder.build(),
                 shuttingDownNodesBuilder.build(), coordinatorsBuilder.build(),
                 isolatingNodesBuilder.build(), isolatedNodesBuilder.build());
         // only update if all nodes actually changed (note: this does not include the connectors registered with the nodes)
-        if (!allNodes.equals(this.allNodes)) {
+        if (!allNodesBuild.equals(this.allNodes)) {
             // assign allNodes to a local variable for use in the callback below
-            this.allNodes = allNodes;
+            this.allNodes = allNodesBuild;
             coordinators = coordinatorsBuilder.build();
 
             // notify listeners
-            List<Consumer<AllNodes>> listeners = ImmutableList.copyOf(this.listeners);
-            nodeStateEventExecutor.submit(() -> listeners.forEach(listener -> listener.accept(allNodes)));
+            List<Consumer<AllNodes>> listenersList = ImmutableList.copyOf(this.listeners);
+            nodeStateEventExecutor.submit(() -> listenersList.forEach(listener -> listener.accept(allNodesBuild)));
         }
     }
 
@@ -404,8 +404,8 @@ public final class DiscoveryNodeManager
     public synchronized void addNodeChangeListener(Consumer<AllNodes> listener)
     {
         listeners.add(requireNonNull(listener, "listener is null"));
-        AllNodes allNodes = this.allNodes;
-        nodeStateEventExecutor.submit(() -> listener.accept(allNodes));
+        AllNodes allNodesToListener = this.allNodes;
+        nodeStateEventExecutor.submit(() -> listener.accept(allNodesToListener));
     }
 
     @Override
@@ -422,6 +422,7 @@ public final class DiscoveryNodeManager
                 return new URI(url);
             }
             catch (URISyntaxException ignored) {
+                // could be ignored
             }
         }
         return null;

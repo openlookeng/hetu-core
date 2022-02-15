@@ -14,6 +14,7 @@
 package io.prestosql.sql;
 
 import com.google.common.collect.ImmutableSet;
+import io.airlift.log.Logger;
 import io.prestosql.sql.parser.ParsingException;
 import io.prestosql.sql.parser.SqlBaseLexer;
 import io.prestosql.sql.parser.SqlParser;
@@ -37,6 +38,7 @@ import static java.lang.String.format;
 
 public final class ReservedIdentifiers
 {
+    private static final Logger LOGGER = Logger.get(ReservedIdentifiers.class);
     private static final Pattern IDENTIFIER = Pattern.compile("'([A-Z_]+)'");
     private static final Pattern TABLE_ROW = Pattern.compile("``([A-Z_]+)``.*");
     private static final String TABLE_PREFIX = "============================== ";
@@ -53,7 +55,7 @@ public final class ReservedIdentifiers
                 validateDocs(Paths.get(args[1]));
             }
             catch (Throwable t) {
-                t.printStackTrace();
+                LOGGER.error("validateDocs error : %s", t.getMessage());
                 System.exit(100);
             }
         }

@@ -440,6 +440,7 @@ public class OracleClient
      * @param tableName tableName
      * @param newTable newTable
      */
+    @Override
     protected void renameTable(JdbcIdentity identity, String catalogName, String schemaName, String tableName,
             SchemaTableName newTable)
     {
@@ -924,8 +925,9 @@ public class OracleClient
     }
 
     @Override
-    public void renameColumn(JdbcIdentity identity, JdbcTableHandle handle, JdbcColumnHandle jdbcColumn, String newColumnName)
+    public void renameColumn(JdbcIdentity identity, JdbcTableHandle handle, JdbcColumnHandle jdbcColumn, String inputNewColumnName)
     {
+        String newColumnName = inputNewColumnName;
         try (Connection connection = connectionFactory.openConnection(identity)) {
             if (connection.getMetaData().storesUpperCaseIdentifiers()) {
                 newColumnName = newColumnName.toUpperCase(ENGLISH);

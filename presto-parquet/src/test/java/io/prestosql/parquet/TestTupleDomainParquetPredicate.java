@@ -36,6 +36,7 @@ import org.apache.parquet.schema.PrimitiveType;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Optional;
 
@@ -281,7 +282,7 @@ public class TestTupleDomainParquetPredicate
         TupleDomainParquetPredicate parquetPredicate = new TupleDomainParquetPredicate(effectivePredicate, singletonList(column));
         Statistics<?> stats = getStatsBasedOnType(column.getType());
         stats.setNumNulls(1L);
-        stats.setMinMaxFromBytes(value.getBytes(), value.getBytes());
+        stats.setMinMaxFromBytes(value.getBytes(StandardCharsets.UTF_8), value.getBytes(StandardCharsets.UTF_8));
         assertTrue(parquetPredicate.matches(2, ImmutableMap.of(column, stats), ID, true));
     }
 

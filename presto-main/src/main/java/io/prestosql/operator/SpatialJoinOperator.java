@@ -105,13 +105,13 @@ public class SpatialJoinOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(
                     operatorId,
                     planNodeId,
                     SpatialJoinOperator.class.getSimpleName());
             referenceCount.retain();
             return new SpatialJoinOperator(
-                    operatorContext,
+                    addOperatorContext,
                     joinType,
                     probeTypes,
                     probeOutputChannels,

@@ -77,6 +77,7 @@ public class DefaultConnectorConfigFunctionRewriter
      * @param functionCallArgsPackage the package of SqlQueryWriter's function call methods args
      * @return result string
      */
+    @Override
     public String rewriteFunctionCall(FunctionCallArgsPackage functionCallArgsPackage)
     {
         String functionPropertyName = propertyNameBuilder.apply(functionCallArgsPackage);

@@ -104,7 +104,7 @@ public class LocalExchangeSource
         checkNotHoldsLock();
 
         boolean added = false;
-        SettableFuture<?> notEmptyFuture;
+        SettableFuture<?> notEmptySettableFuture;
         synchronized (lock) {
             // ignore pages after finish
             if (!finishing) {
@@ -127,9 +127,9 @@ public class LocalExchangeSource
                         // whenever local exchange source sees a marker page, it's going to check whether operator after local merge is blocked by it.
                         // if it is, this local exchange source will unblock in order for next operator to ask for output to pass down the marker.
                         if (!this.notEmptyFuture.isDone()) {
-                            notEmptyFuture = this.notEmptyFuture;
+                            notEmptySettableFuture = this.notEmptyFuture;
                             this.notEmptyFuture = NOT_EMPTY;
-                            notEmptyFuture.set(null);
+                            notEmptySettableFuture.set(null);
                         }
                         return;
                     }
@@ -143,7 +143,7 @@ public class LocalExchangeSource
             }
 
             // we just added a page (or we are finishing) so we are not empty
-            notEmptyFuture = this.notEmptyFuture;
+            notEmptySettableFuture = this.notEmptyFuture;
             this.notEmptyFuture = NOT_EMPTY;
         }
 
@@ -153,7 +153,7 @@ public class LocalExchangeSource
         }
 
         // notify readers outside of lock since this may result in a callback
-        notEmptyFuture.set(null);
+        notEmptySettableFuture.set(null);
     }
 
     public WorkProcessor<Page> pages()
@@ -262,19 +262,19 @@ public class LocalExchangeSource
     {
         checkNotHoldsLock();
 
-        SettableFuture<?> notEmptyFuture;
+        SettableFuture<?> notEmptySettableFuture;
         synchronized (lock) {
             if (finishing) {
                 return;
             }
             finishing = true;
 
-            notEmptyFuture = this.notEmptyFuture;
+            notEmptySettableFuture = this.notEmptyFuture;
             this.notEmptyFuture = NOT_EMPTY;
         }
 
         // notify readers outside of lock since this may result in a callback
-        notEmptyFuture.set(null);
+        notEmptySettableFuture.set(null);
 
         checkFinished();
     }
@@ -284,7 +284,7 @@ public class LocalExchangeSource
         checkNotHoldsLock();
 
         List<PageReference> remainingPages;
-        SettableFuture<?> notEmptyFuture;
+        SettableFuture<?> notEmptySettableFuture;
         synchronized (lock) {
             finishing = true;
 
@@ -293,7 +293,7 @@ public class LocalExchangeSource
             originBuffer.clear();
             bufferedBytes.addAndGet(-remainingPages.stream().mapToLong(PageReference::getRetainedSizeInBytes).sum());
 
-            notEmptyFuture = this.notEmptyFuture;
+            notEmptySettableFuture = this.notEmptyFuture;
             this.notEmptyFuture = NOT_EMPTY;
         }
 
@@ -301,7 +301,7 @@ public class LocalExchangeSource
         remainingPages.forEach(PageReference::removePage);
 
         // notify readers outside of lock since this may result in a callback
-        notEmptyFuture.set(null);
+        notEmptySettableFuture.set(null);
 
         // this will always fire the finished event
         checkState(isFinished(), "Expected buffer to be finished");

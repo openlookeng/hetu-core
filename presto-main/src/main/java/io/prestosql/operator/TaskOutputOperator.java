@@ -92,10 +92,10 @@ public class TaskOutputOperator
         @Override
         public Operator createOperator(DriverContext driverContext)
         {
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, TaskOutputOperator.class.getSimpleName());
-            String id = operatorContext.getUniqueId();
-            outputBuffer.addInputChannel(id);
-            return new TaskOutputOperator(id, operatorContext, outputBuffer, pagePreprocessor);
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, TaskOutputOperator.class.getSimpleName());
+            String uniqueId = addOperatorContext.getUniqueId();
+            outputBuffer.addInputChannel(uniqueId);
+            return new TaskOutputOperator(uniqueId, addOperatorContext, outputBuffer, pagePreprocessor);
         }
 
         @Override
@@ -171,29 +171,30 @@ public class TaskOutputOperator
     {
         requireNonNull(page, "page is null");
 
+        Page inputPage = page;
         if (snapshotState != null) {
-            if (snapshotState.processPage(page)) {
-                page = snapshotState.nextMarker();
+            if (snapshotState.processPage(inputPage)) {
+                inputPage = snapshotState.nextMarker();
             }
         }
 
-        if (page.getPositionCount() == 0) {
+        if (inputPage.getPositionCount() == 0) {
             return;
         }
 
-        if (!(page instanceof MarkerPage)) {
-            page = pagePreprocessor.apply(page);
+        if (!(inputPage instanceof MarkerPage)) {
+            inputPage = pagePreprocessor.apply(inputPage);
         }
         else if (isStage0) {
             // Do not add marker to final output.
             return;
         }
 
-        List<SerializedPage> serializedPages = splitPage(page, DEFAULT_MAX_PAGE_SIZE_IN_BYTES).stream()
+        List<SerializedPage> serializedPages = splitPage(inputPage, DEFAULT_MAX_PAGE_SIZE_IN_BYTES).stream()
                 .map(p -> serde.serialize(p))
                 .collect(toImmutableList());
 
-        if (page instanceof MarkerPage) {
+        if (inputPage instanceof MarkerPage) {
             // Snapshot: driver/thread 1 reaches here and adds marker 1 to the output buffer.
             // It's the first time marker 1 is received, so marker 1 will be broadcasted to all client buffers.
             // Then driver/thread 2 adds markers 1 and 2 to the output buffer.
@@ -208,7 +209,7 @@ public class TaskOutputOperator
         else {
             outputBuffer.enqueue(serializedPages, id);
         }
-        operatorContext.recordOutput(page.getSizeInBytes(), page.getPositionCount());
+        operatorContext.recordOutput(inputPage.getSizeInBytes(), inputPage.getPositionCount());
     }
 
     @Override

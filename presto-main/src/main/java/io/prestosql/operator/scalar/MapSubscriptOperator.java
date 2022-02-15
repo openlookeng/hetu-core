@@ -188,13 +188,14 @@ public class MapSubscriptOperator
         {
             functionInvoker = new InterpretedFunctionInvoker(functionAndTypeManager);
 
-            FunctionHandle castFunction = null;
+            FunctionHandle castFunctionHandle = null;
             try {
-                castFunction = functionAndTypeManager.lookupCast(CAST, keyType.getTypeSignature(), VARCHAR.getTypeSignature());
+                castFunctionHandle = functionAndTypeManager.lookupCast(CAST, keyType.getTypeSignature(), VARCHAR.getTypeSignature());
             }
             catch (PrestoException ignored) {
+                // the exception could be ignored
             }
-            this.castFunction = castFunction;
+            this.castFunction = castFunctionHandle;
         }
 
         public PrestoException create(ConnectorSession session, Object value)
@@ -205,6 +206,7 @@ public class MapSubscriptOperator
                     return new PrestoException(INVALID_FUNCTION_ARGUMENT, format("Key not present in map: %s", varcharValue.toStringUtf8()));
                 }
                 catch (RuntimeException ignored) {
+                    // the exception could be ignored
                 }
             }
             return new PrestoException(INVALID_FUNCTION_ARGUMENT, "Key not present in map");

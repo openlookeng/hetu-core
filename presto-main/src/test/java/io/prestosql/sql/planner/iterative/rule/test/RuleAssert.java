@@ -131,13 +131,13 @@ public class RuleAssert
     public void matches(PlanMatchPattern pattern)
     {
         RuleApplication ruleApplication = applyRule();
-        TypeProvider types = ruleApplication.types;
+        TypeProvider typeProvider = ruleApplication.types;
 
         if (!ruleApplication.wasRuleApplied()) {
             fail(format(
                     "%s did not fire for:\n%s",
                     rule.getClass().getName(),
-                    formatPlan(plan, types)));
+                    formatPlan(plan, typeProvider)));
         }
 
         PlanNode actual = ruleApplication.getTransformedPlan();
@@ -146,7 +146,7 @@ public class RuleAssert
             fail(format(
                     "%s: rule fired but return the original plan:\n%s",
                     rule.getClass().getName(),
-                    formatPlan(plan, types)));
+                    formatPlan(plan, typeProvider)));
         }
 
         if (!ImmutableSet.copyOf(plan.getOutputSymbols()).equals(ImmutableSet.copyOf(actual.getOutputSymbols()))) {
@@ -160,7 +160,7 @@ public class RuleAssert
         }
 
         inTransaction(session -> {
-            assertPlan(session, metadata, ruleApplication.statsProvider, new Plan(actual, types, StatsAndCosts.empty()), ruleApplication.lookup, pattern);
+            assertPlan(session, metadata, ruleApplication.statsProvider, new Plan(actual, typeProvider, StatsAndCosts.empty()), ruleApplication.lookup, pattern);
             return null;
         });
     }

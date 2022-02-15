@@ -224,14 +224,14 @@ public class TestingPrestoServer
         this.baseDataDir = baseDataDir.orElseGet(TestingPrestoServer::tempDirectory);
         this.preserveData = baseDataDir.isPresent();
 
-        properties = new HashMap<>(properties);
-        String coordinatorPort = properties.remove("http-server.http.port");
+        Map<String, String> propertiesMap = new HashMap<>(properties);
+        String coordinatorPort = propertiesMap.remove("http-server.http.port");
         if (coordinatorPort == null) {
             coordinatorPort = "0";
         }
 
         ImmutableMap.Builder<String, String> serverProperties = ImmutableMap.<String, String>builder()
-                .putAll(properties)
+                .putAll(propertiesMap)
                 .put("coordinator", String.valueOf(coordinator))
                 .put("presto.version", "testversion")
                 .put("task.concurrency", "4")

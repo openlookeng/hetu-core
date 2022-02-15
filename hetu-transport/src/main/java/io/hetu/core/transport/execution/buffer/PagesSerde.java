@@ -60,6 +60,7 @@ public class PagesSerde
         this.spillCipher = requireNonNull(spillCipher, "spillCipher is null");
     }
 
+    @Override
     public SerializedPage serialize(Page page)
     {
         if (page instanceof MarkerPage) {
@@ -68,6 +69,7 @@ public class PagesSerde
         return serializeImpl(page);
     }
 
+    @Override
     public Page deserialize(SerializedPage page)
     {
         if (page.isMarkerPage()) {

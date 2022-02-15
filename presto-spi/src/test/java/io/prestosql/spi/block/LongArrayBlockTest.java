@@ -18,7 +18,6 @@ import org.testng.annotations.Test;
 
 import java.util.Arrays;
 import java.util.Optional;
-import java.util.Random;
 
 public class LongArrayBlockTest
 {
@@ -77,7 +76,6 @@ public class LongArrayBlockTest
     private long[] getValues(int count)
     {
         long[] values = new long[count];
-        Random rnd = new Random();
         for (int i = 0; i < values.length; i++) {
             values[i] = i;
         }
@@ -86,8 +84,6 @@ public class LongArrayBlockTest
 
     private BloomFilter getBf(int size)
     {
-        Random rnd = new Random();
-
         BloomFilter bf = new BloomFilter(size, 0.01);
         for (int i = 10; i < 100; i++) {
             bf.addLong((long) i);

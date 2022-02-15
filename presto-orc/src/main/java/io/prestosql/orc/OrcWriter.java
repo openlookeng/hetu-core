@@ -16,6 +16,7 @@ package io.prestosql.orc;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.UnsignedBytes;
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.prestosql.orc.OrcWriteValidation.OrcWriteValidationBuilder;
@@ -82,6 +83,7 @@ import static java.util.stream.Collectors.toList;
 public final class OrcWriter
         implements Closeable
 {
+    private static final Logger log = Logger.get(OrcWriter.class);
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(OrcWriter.class).instanceSize();
 
     private static final String PRESTO_ORC_WRITER_VERSION_METADATA_KEY = "presto.writer.version";
@@ -164,15 +166,15 @@ public final class OrcWriter
         recordValidation(validation -> validation.setColumnNames(columnNames));
 
         // create column writers
-        OrcType rootType = orcTypes.get(ROOT_COLUMN);
-        checkArgument(rootType.getFieldCount() == types.size());
-        ImmutableList.Builder<ColumnWriter> columnWriters = ImmutableList.builder();
+        OrcType localRootType = orcTypes.get(ROOT_COLUMN);
+        checkArgument(localRootType.getFieldCount() == types.size());
+        ImmutableList.Builder<ColumnWriter> localColumnWriters = ImmutableList.builder();
         ImmutableSet.Builder<SliceDictionaryColumnWriter> sliceColumnWriters = ImmutableSet.builder();
         for (int fieldId = 0; fieldId < types.size(); fieldId++) {
-            OrcColumnId fieldColumnIndex = rootType.getFieldTypeIndex(fieldId);
+            OrcColumnId fieldColumnIndex = localRootType.getFieldTypeIndex(fieldId);
             Type fieldType = types.get(fieldId);
             ColumnWriter columnWriter = createColumnWriter(fieldColumnIndex, orcTypes, fieldType, compression, maxCompressionBufferSize, options.getMaxStringStatisticsLimit());
-            columnWriters.add(columnWriter);
+            localColumnWriters.add(columnWriter);
 
             if (columnWriter instanceof SliceDictionaryColumnWriter) {
                 sliceColumnWriters.add((SliceDictionaryColumnWriter) columnWriter);
@@ -185,7 +187,7 @@ public final class OrcWriter
                 }
             }
         }
-        this.columnWriters = columnWriters.build();
+        this.columnWriters = localColumnWriters.build();
         this.dictionaryCompressionOptimizer = new DictionaryCompressionOptimizer(
                 sliceColumnWriters.build(),
                 stripeMinBytes,
@@ -236,9 +238,10 @@ public final class OrcWriter
                 (validationBuilder == null ? 0 : validationBuilder.getRetainedSize());
     }
 
-    public void write(Page page)
+    public void write(Page inputPage)
             throws IOException
     {
+        Page page = inputPage;
         requireNonNull(page, "page is null");
         if (page.getPositionCount() == 0) {
             return;
@@ -335,7 +338,7 @@ public final class OrcWriter
                 preStripeFlushCallback.get().call();
             }
             catch (Exception e) {
-                //ignored;
+                log.debug("Call pre stripe flush call back error");
             }
         }
         List<OrcDataOutput> outputData = new ArrayList<>();
@@ -475,7 +478,7 @@ public final class OrcWriter
                 preCloseCallback.get().call();
             }
             catch (Exception e) {
-                //ignored
+                log.debug("Call pre close call back error");
             }
         }
         List<OrcDataOutput> outputData = new ArrayList<>();
@@ -497,7 +500,7 @@ public final class OrcWriter
                 .collect(toList()));
         recordValidation(validation -> validation.setFileStatistics(fileStats));
 
-        Map<String, Slice> userMetadata = this.userMetadata.entrySet().stream()
+        Map<String, Slice> localUserMetadata = this.userMetadata.entrySet().stream()
                 .collect(Collectors.toMap(Entry::getKey, entry -> utf8Slice(entry.getValue())));
 
         Footer footer = new Footer(
@@ -508,7 +511,7 @@ public final class OrcWriter
                         .collect(toImmutableList()),
                 orcTypes,
                 fileStats,
-                userMetadata);
+                localUserMetadata);
 
         closedStripes.clear();
         closedStripesRetainedBytes = 0;

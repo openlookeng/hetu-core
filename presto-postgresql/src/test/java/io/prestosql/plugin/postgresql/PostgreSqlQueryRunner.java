@@ -48,9 +48,10 @@ public final class PostgreSqlQueryRunner
         return createPostgreSqlQueryRunner(server, ImmutableMap.of(), ImmutableList.copyOf(tables));
     }
 
-    public static QueryRunner createPostgreSqlQueryRunner(TestingPostgreSqlServer server, Map<String, String> connectorProperties, Iterable<TpchTable<?>> tables)
+    public static QueryRunner createPostgreSqlQueryRunner(TestingPostgreSqlServer server, Map<String, String> inputConnectorProperties, Iterable<TpchTable<?>> tables)
             throws Exception
     {
+        Map<String, String> connectorProperties = inputConnectorProperties;
         DistributedQueryRunner queryRunner = null;
         try {
             queryRunner = new DistributedQueryRunner(createSession(), 3);

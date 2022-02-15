@@ -146,10 +146,10 @@ public final class ColorFunctions
         checkCondition(lowColor >= 0, INVALID_FUNCTION_ARGUMENT, "lowColor not a valid RGB color");
         checkCondition(highColor >= 0, INVALID_FUNCTION_ARGUMENT, "highColor not a valid RGB color");
 
-        fraction = Math.min(1, fraction);
-        fraction = Math.max(0, fraction);
+        double finalFraction = Math.min(1, fraction);
+        finalFraction = Math.max(0, finalFraction);
 
-        return interpolate((float) fraction, lowColor, highColor);
+        return interpolate((float) finalFraction, lowColor, highColor);
     }
 
     @ScalarFunction
@@ -249,11 +249,11 @@ public final class ColorFunctions
     private static int toAnsi(int red, int green, int blue)
     {
         // rescale to 0-5 range
-        red = red * 6 / 256;
-        green = green * 6 / 256;
-        blue = blue * 6 / 256;
+        int finalRed = red * 6 / 256;
+        int finalGreen = green * 6 / 256;
+        int finalBlue = blue * 6 / 256;
 
-        return 16 + red * 36 + green * 6 + blue;
+        return 16 + finalRed * 36 + finalGreen * 6 + finalBlue;
     }
 
     private static String ansiColorEscape(long color)

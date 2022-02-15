@@ -73,16 +73,17 @@ public class CarbondataColumnVectorWrapper
     @Override
     public void putShorts(int rowId, int count, short value)
     {
+        int inputRowId = rowId;
         if (filteredRowsExist) {
             for (int i = 0; i < count; i++) {
-                if (!filteredRows[rowId]) {
+                if (!filteredRows[inputRowId]) {
                     columnVector.putShort(counter++, value);
                 }
-                rowId++;
+                inputRowId++;
             }
         }
         else {
-            columnVector.putShorts(rowId, count, value);
+            columnVector.putShorts(inputRowId, count, value);
         }
     }
 
@@ -97,16 +98,17 @@ public class CarbondataColumnVectorWrapper
     @Override
     public void putInts(int rowId, int count, int value)
     {
+        int inputRowId = rowId;
         if (filteredRowsExist) {
             for (int i = 0; i < count; i++) {
-                if (!filteredRows[rowId]) {
+                if (!filteredRows[inputRowId]) {
                     columnVector.putInt(counter++, value);
                 }
-                rowId++;
+                inputRowId++;
             }
         }
         else {
-            columnVector.putInts(rowId, count, value);
+            columnVector.putInts(inputRowId, count, value);
         }
     }
 
@@ -121,16 +123,17 @@ public class CarbondataColumnVectorWrapper
     @Override
     public void putLongs(int rowId, int count, long value)
     {
+        int inputRowId = rowId;
         if (filteredRowsExist) {
             for (int i = 0; i < count; i++) {
-                if (!filteredRows[rowId]) {
+                if (!filteredRows[inputRowId]) {
                     columnVector.putLong(counter++, value);
                 }
-                rowId++;
+                inputRowId++;
             }
         }
         else {
-            columnVector.putLongs(rowId, count, value);
+            columnVector.putLongs(inputRowId, count, value);
         }
     }
 
@@ -145,11 +148,12 @@ public class CarbondataColumnVectorWrapper
     @Override
     public void putDecimals(int rowId, int count, BigDecimal value, int precision)
     {
+        int inputRowId = rowId;
         for (int i = 0; i < count; i++) {
-            if (!filteredRows[rowId]) {
+            if (!filteredRows[inputRowId]) {
                 columnVector.putDecimal(counter++, value, precision);
             }
-            rowId++;
+            inputRowId++;
         }
     }
 
@@ -164,16 +168,17 @@ public class CarbondataColumnVectorWrapper
     @Override
     public void putDoubles(int rowId, int count, double value)
     {
+        int inputRowId = rowId;
         if (filteredRowsExist) {
             for (int i = 0; i < count; i++) {
-                if (!filteredRows[rowId]) {
+                if (!filteredRows[inputRowId]) {
                     columnVector.putDouble(counter++, value);
                 }
-                rowId++;
+                inputRowId++;
             }
         }
         else {
-            columnVector.putDoubles(rowId, count, value);
+            columnVector.putDoubles(inputRowId, count, value);
         }
     }
 
@@ -196,11 +201,12 @@ public class CarbondataColumnVectorWrapper
     @Override
     public void putByteArray(int rowId, int count, byte[] value)
     {
+        int inputRowId = rowId;
         for (int i = 0; i < count; i++) {
-            if (!filteredRows[rowId]) {
+            if (!filteredRows[inputRowId]) {
                 columnVector.putByteArray(counter++, value);
             }
-            rowId++;
+            inputRowId++;
         }
     }
 
@@ -223,16 +229,17 @@ public class CarbondataColumnVectorWrapper
     @Override
     public void putNulls(int rowId, int count)
     {
+        int inputRowId = rowId;
         if (filteredRowsExist) {
             for (int i = 0; i < count; i++) {
-                if (!filteredRows[rowId]) {
+                if (!filteredRows[inputRowId]) {
                     columnVector.putNull(counter++);
                 }
-                rowId++;
+                inputRowId++;
             }
         }
         else {
-            columnVector.putNulls(rowId, count);
+            columnVector.putNulls(inputRowId, count);
         }
     }
 
@@ -319,66 +326,72 @@ public class CarbondataColumnVectorWrapper
     @Override
     public void putFloats(int rowId, int count, float[] src, int srcIndex)
     {
+        int inputRowId = rowId;
         for (int i = srcIndex; i < count; i++) {
-            if (!filteredRows[rowId]) {
+            if (!filteredRows[inputRowId]) {
                 columnVector.putFloat(counter++, src[i]);
             }
-            rowId++;
+            inputRowId++;
         }
     }
 
     @Override
     public void putShorts(int rowId, int count, short[] src, int srcIndex)
     {
+        int inputRowId = rowId;
         for (int i = srcIndex; i < count; i++) {
-            if (!filteredRows[rowId]) {
+            if (!filteredRows[inputRowId]) {
                 columnVector.putShort(counter++, src[i]);
             }
-            rowId++;
+            inputRowId++;
         }
     }
 
     @Override
     public void putInts(int rowId, int count, int[] src, int srcIndex)
     {
+        int inputRowId = rowId;
         for (int i = srcIndex; i < count; i++) {
-            if (!filteredRows[rowId]) {
+            if (!filteredRows[inputRowId]) {
                 columnVector.putInt(counter++, src[i]);
             }
-            rowId++;
+            inputRowId++;
         }
     }
 
     @Override
     public void putLongs(int rowId, int count, long[] src, int srcIndex)
     {
+        int inputRowId = rowId;
         for (int i = srcIndex; i < count; i++) {
-            if (!filteredRows[rowId]) {
+            if (!filteredRows[inputRowId]) {
                 columnVector.putLong(counter++, src[i]);
             }
-            rowId++;
+            inputRowId++;
         }
     }
 
     @Override
     public void putDoubles(int rowId, int count, double[] src, int srcIndex)
     {
+        int inputRowId = rowId;
         for (int i = srcIndex; i < count; i++) {
-            if (!filteredRows[rowId]) {
+            if (!filteredRows[inputRowId]) {
                 columnVector.putDouble(counter++, src[i]);
             }
-            rowId++;
+            inputRowId++;
         }
     }
 
     @Override
     public void putBytes(int rowId, int count, byte[] src, int srcIndex)
     {
+        int inputRowId = rowId;
         for (int i = srcIndex; i < count; i++) {
-            if (!filteredRows[rowId]) {
+            if (!filteredRows[inputRowId]) {
                 columnVector.putByte(counter++, src[i]);
             }
-            rowId++;
+            inputRowId++;
         }
     }
 

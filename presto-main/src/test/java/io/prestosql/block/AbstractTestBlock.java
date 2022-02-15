@@ -14,6 +14,7 @@
 package io.prestosql.block;
 
 import com.google.common.collect.ImmutableList;
+import io.airlift.log.Logger;
 import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
@@ -57,6 +58,7 @@ import static org.testng.Assert.fail;
 @Test
 public abstract class AbstractTestBlock
 {
+    private static final Logger LOG = Logger.get(AbstractTestBlock.class);
     private static final Metadata METADATA = createTestMetadataManager();
 
     protected <T> void assertBlock(Block block, Supplier<BlockBuilder> newBlockBuilder, T[] expectedValues)
@@ -78,12 +80,14 @@ public abstract class AbstractTestBlock
             fail("expected IllegalArgumentException");
         }
         catch (IllegalArgumentException expected) {
+            LOG.info("Error message: " + expected.getStackTrace());
         }
         try {
             block.isNull(block.getPositionCount());
             fail("expected IllegalArgumentException");
         }
         catch (IllegalArgumentException expected) {
+            LOG.info("Error message: " + expected.getStackTrace());
         }
     }
 

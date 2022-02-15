@@ -270,13 +270,15 @@ public class TestTaskSnapshotManager
         try {
             snapshotManager2.failedToRestore(new SnapshotStateId(1, taskId2, "component1"), false);
         }
-        catch (Exception e) { // Ignore
+        catch (Exception e) {
+            // Ignore
         }
         Assert.assertEquals(snapshotManager2.getSnapshotRestoreResult().getSnapshotResult(), SnapshotResult.IN_PROGRESS_FAILED);
         try {
             snapshotManager2.failedToRestore(new SnapshotStateId(1, taskId2, "component2"), true);
         }
-        catch (Exception e) { // Ignore
+        catch (Exception e) {
+            // Ignore
         }
         Assert.assertEquals(snapshotManager2.getSnapshotRestoreResult().getSnapshotResult(), SnapshotResult.IN_PROGRESS_FAILED_FATAL);
         snapshotManager2.succeededToRestore(new SnapshotStateId(1, taskId2, "component3"));

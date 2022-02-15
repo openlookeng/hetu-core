@@ -107,9 +107,9 @@ public class TopNRankingNumberOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, TopNRankingNumberOperator.class.getSimpleName());
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, TopNRankingNumberOperator.class.getSimpleName());
             return new TopNRankingNumberOperator(
-                    operatorContext,
+                    addOperatorContext,
                     sourceTypes,
                     outputChannels,
                     partitionChannels,

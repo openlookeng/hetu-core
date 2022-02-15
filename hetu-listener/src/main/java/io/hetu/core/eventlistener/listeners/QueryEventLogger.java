@@ -48,13 +48,13 @@ class QueryEventLogger
 
     private static java.util.logging.Logger createLogger(Path filePath, int limit, int count)
     {
-        java.util.logging.Logger logger = java.util.logging.Logger.getLogger(QueryEventLogger.class.getName());
+        java.util.logging.Logger localLogger = java.util.logging.Logger.getLogger(QueryEventLogger.class.getName());
         try {
             FileHandler fileHandler = new FileHandler(filePath.toAbsolutePath().toString(), limit, count, true);
             fileHandler.setFormatter(new SimpleFormatter());
-            logger.addHandler(fileHandler);
-            logger.setUseParentHandlers(false);
-            return logger;
+            localLogger.addHandler(fileHandler);
+            localLogger.setUseParentHandlers(false);
+            return localLogger;
         }
         catch (IOException ex) {
             throw new PrestoException(ListenerErrorCode.LOCAL_FILE_FILESYSTEM_ERROR,

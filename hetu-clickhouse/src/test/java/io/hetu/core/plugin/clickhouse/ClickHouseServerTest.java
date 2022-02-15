@@ -205,7 +205,7 @@ public final class ClickHouseServerTest
     {
         String actualTable = tablePattern;
 
-        for (String table : tables) { //tableName + _ + UUID
+        for (String table : tables) {
             int lastIndex = table.lastIndexOf("_");
             if (lastIndex == -1) {
                 continue;

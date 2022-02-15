@@ -414,8 +414,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public Optional<Table> getTable(HiveIdentity identity, String databaseName, String tableName)
+    public Optional<Table> getTable(HiveIdentity inputIdentity, String databaseName, String tableName)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         if (skipTableCache) {
             return delegate.getTable(identity, databaseName, tableName);
@@ -561,8 +562,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void updateTableStatistics(HiveIdentity identity, String databaseName, String tableName, Function<PartitionStatistics, PartitionStatistics> update)
+    public void updateTableStatistics(HiveIdentity inputIdentity, String databaseName, String tableName, Function<PartitionStatistics, PartitionStatistics> update)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         try {
             delegate.updateTableStatistics(identity, databaseName, tableName, update);
@@ -574,8 +576,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void updatePartitionStatistics(HiveIdentity identity, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update)
+    public void updatePartitionStatistics(HiveIdentity inputIdentity, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         try {
             delegate.updatePartitionStatistics(identity, databaseName, tableName, partitionName, update);
@@ -633,8 +636,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void createDatabase(HiveIdentity identity, Database database)
+    public void createDatabase(HiveIdentity inputIdentity, Database database)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         try {
             delegate.createDatabase(identity, database);
@@ -645,8 +649,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void dropDatabase(HiveIdentity identity, String databaseName)
+    public void dropDatabase(HiveIdentity inputIdentity, String databaseName)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         try {
             delegate.dropDatabase(identity, databaseName);
@@ -657,8 +662,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void renameDatabase(HiveIdentity identity, String databaseName, String newDatabaseName)
+    public void renameDatabase(HiveIdentity inputIdentity, String databaseName, String newDatabaseName)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         try {
             delegate.renameDatabase(identity, databaseName, newDatabaseName);
@@ -676,8 +682,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void createTable(HiveIdentity identity, Table table, PrincipalPrivileges principalPrivileges)
+    public void createTable(HiveIdentity inputIdentity, Table table, PrincipalPrivileges principalPrivileges)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         try {
             delegate.createTable(identity, table, principalPrivileges);
@@ -688,8 +695,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void dropTable(HiveIdentity identity, String databaseName, String tableName, boolean deleteData)
+    public void dropTable(HiveIdentity inputIdentity, String databaseName, String tableName, boolean deleteData)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         try {
             delegate.dropTable(identity, databaseName, tableName, deleteData);
@@ -700,8 +708,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void replaceTable(HiveIdentity identity, String databaseName, String tableName, Table newTable, PrincipalPrivileges principalPrivileges)
+    public void replaceTable(HiveIdentity inputIdentity, String databaseName, String tableName, Table newTable, PrincipalPrivileges principalPrivileges)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         try {
             delegate.replaceTable(identity, databaseName, tableName, newTable, principalPrivileges);
@@ -713,8 +722,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void renameTable(HiveIdentity identity, String databaseName, String tableName, String newDatabaseName, String newTableName)
+    public void renameTable(HiveIdentity inputIdentity, String databaseName, String tableName, String newDatabaseName, String newTableName)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         try {
             delegate.renameTable(identity, databaseName, tableName, newDatabaseName, newTableName);
@@ -726,8 +736,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void commentTable(HiveIdentity identity, String databaseName, String tableName, Optional<String> comment)
+    public void commentTable(HiveIdentity inputIdentity, String databaseName, String tableName, Optional<String> comment)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         try {
             delegate.commentTable(identity, databaseName, tableName, comment);
@@ -738,8 +749,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void addColumn(HiveIdentity identity, String databaseName, String tableName, String columnName, HiveType columnType, String columnComment)
+    public void addColumn(HiveIdentity inputIdentity, String databaseName, String tableName, String columnName, HiveType columnType, String columnComment)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         try {
             delegate.addColumn(identity, databaseName, tableName, columnName, columnType, columnComment);
@@ -750,8 +762,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void renameColumn(HiveIdentity identity, String databaseName, String tableName, String oldColumnName, String newColumnName)
+    public void renameColumn(HiveIdentity inputIdentity, String databaseName, String tableName, String oldColumnName, String newColumnName)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         try {
             delegate.renameColumn(identity, databaseName, tableName, oldColumnName, newColumnName);
@@ -762,8 +775,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void dropColumn(HiveIdentity identity, String databaseName, String tableName, String columnName)
+    public void dropColumn(HiveIdentity inputIdentity, String databaseName, String tableName, String columnName)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         try {
             delegate.dropColumn(identity, databaseName, tableName, columnName);
@@ -815,8 +829,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public Optional<Partition> getPartition(HiveIdentity identity, String databaseName, String tableName, List<String> partitionValues)
+    public Optional<Partition> getPartition(HiveIdentity inputIdentity, String databaseName, String tableName, List<String> partitionValues)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         if (skipTableCache) {
             return delegate.getPartition(identity, databaseName, tableName, partitionValues);
@@ -839,8 +854,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public Optional<List<String>> getPartitionNames(HiveIdentity identity, String databaseName, String tableName)
+    public Optional<List<String>> getPartitionNames(HiveIdentity inputIdentity, String databaseName, String tableName)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         if (skipTableCache) {
             return delegate.getPartitionNames(identity, databaseName, tableName);
@@ -856,8 +872,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public Optional<List<String>> getPartitionNamesByParts(HiveIdentity identity, String databaseName, String tableName, List<String> parts)
+    public Optional<List<String>> getPartitionNamesByParts(HiveIdentity inputIdentity, String databaseName, String tableName, List<String> parts)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         if (skipTableCache) {
             return delegate.getPartitionNamesByParts(identity, databaseName, tableName, parts);
@@ -983,8 +1000,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void addPartitions(HiveIdentity identity, String databaseName, String tableName, List<PartitionWithStatistics> partitions)
+    public void addPartitions(HiveIdentity inputIdentity, String databaseName, String tableName, List<PartitionWithStatistics> partitions)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         try {
             delegate.addPartitions(identity, databaseName, tableName, partitions);
@@ -996,8 +1014,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void dropPartition(HiveIdentity identity, String databaseName, String tableName, List<String> parts, boolean deleteData)
+    public void dropPartition(HiveIdentity inputIdentity, String databaseName, String tableName, List<String> parts, boolean deleteData)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         try {
             delegate.dropPartition(identity, databaseName, tableName, parts, deleteData);
@@ -1008,8 +1027,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void alterPartition(HiveIdentity identity, String databaseName, String tableName, PartitionWithStatistics partition)
+    public void alterPartition(HiveIdentity inputIdentity, String databaseName, String tableName, PartitionWithStatistics partition)
     {
+        HiveIdentity identity = inputIdentity;
         identity = updateIdentity(identity);
         try {
             delegate.alterPartition(identity, databaseName, tableName, partition);

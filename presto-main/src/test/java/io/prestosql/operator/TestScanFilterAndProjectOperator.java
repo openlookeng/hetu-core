@@ -287,17 +287,17 @@ public class TestScanFilterAndProjectOperator
                 return value;
             }));
         }
-        Metadata metadata = functionAssertions.getMetadata();
-        metadata.getFunctionAndTypeManager().registerBuiltInFunctions(functions.build());
+        Metadata localMetadata = functionAssertions.getMetadata();
+        localMetadata.getFunctionAndTypeManager().registerBuiltInFunctions(functions.build());
 
         // match each column with a projection
-        ExpressionCompiler expressionCompiler = new ExpressionCompiler(metadata, new PageFunctionCompiler(metadata, 0));
+        ExpressionCompiler compiler = new ExpressionCompiler(localMetadata, new PageFunctionCompiler(localMetadata, 0));
         ImmutableList.Builder<RowExpression> projections = ImmutableList.builder();
         for (int i = 0; i < totalColumns; i++) {
             projections.add(call(QualifiedObjectName.valueOfDefaultFunction("generic_long_page_col" + i).toString(), new BuiltInFunctionHandle(internalScalarFunction(QualifiedObjectName.valueOfDefaultFunction("generic_long_page_col" + i), BIGINT.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature()))), BIGINT, field(0, BIGINT)));
         }
-        Supplier<CursorProcessor> cursorProcessor = expressionCompiler.compileCursorProcessor(Optional.empty(), projections.build(), "key");
-        Supplier<PageProcessor> pageProcessor = expressionCompiler.compilePageProcessor(Optional.empty(), projections.build(), MAX_BATCH_SIZE);
+        Supplier<CursorProcessor> cursorProcessor = compiler.compileCursorProcessor(Optional.empty(), projections.build(), "key");
+        Supplier<PageProcessor> pageProcessor = compiler.compilePageProcessor(Optional.empty(), projections.build(), MAX_BATCH_SIZE);
 
         ScanFilterAndProjectOperator.ScanFilterAndProjectOperatorFactory factory = new ScanFilterAndProjectOperator.ScanFilterAndProjectOperatorFactory(
                 0,
@@ -352,19 +352,19 @@ public class TestScanFilterAndProjectOperator
         DriverContext driverContext = newDriverContext();
 
         // set up generic long function with a callback to force yield
-        Metadata metadata = functionAssertions.getMetadata();
-        metadata.getFunctionAndTypeManager().registerBuiltInFunctions(ImmutableList.of(new GenericLongFunction("record_cursor", value -> {
+        Metadata localMetadata = functionAssertions.getMetadata();
+        localMetadata.getFunctionAndTypeManager().registerBuiltInFunctions(ImmutableList.of(new GenericLongFunction("record_cursor", value -> {
             driverContext.getYieldSignal().forceYieldForTesting();
             return value;
         })));
-        ExpressionCompiler expressionCompiler = new ExpressionCompiler(metadata, new PageFunctionCompiler(metadata, 0));
+        ExpressionCompiler compiler = new ExpressionCompiler(localMetadata, new PageFunctionCompiler(localMetadata, 0));
 
         List<RowExpression> projections = ImmutableList.of(call(QualifiedObjectName.valueOfDefaultFunction("generic_long_record_cursor").toString(),
                 new BuiltInFunctionHandle(internalScalarFunction(QualifiedObjectName.valueOfDefaultFunction("generic_long_record_cursor"), BIGINT.getTypeSignature(), ImmutableList.of(BIGINT.getTypeSignature()))),
                 BIGINT,
                 field(0, BIGINT)));
-        Supplier<CursorProcessor> cursorProcessor = expressionCompiler.compileCursorProcessor(Optional.empty(), projections, "key");
-        Supplier<PageProcessor> pageProcessor = expressionCompiler.compilePageProcessor(Optional.empty(), projections);
+        Supplier<CursorProcessor> cursorProcessor = compiler.compileCursorProcessor(Optional.empty(), projections, "key");
+        Supplier<PageProcessor> pageProcessor = compiler.compilePageProcessor(Optional.empty(), projections);
 
         ScanFilterAndProjectOperator.ScanFilterAndProjectOperatorFactory factory = new ScanFilterAndProjectOperator.ScanFilterAndProjectOperatorFactory(
                 0,
@@ -669,6 +669,7 @@ public class TestScanFilterAndProjectOperator
                     privateStringMethod.invoke(workProcessorSourceOperatorAdapter, null);
         }
         catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+            // the exception could be ignored
         }
         return returnValue;
     }
@@ -786,9 +787,9 @@ public class TestScanFilterAndProjectOperator
         @Override
         public Page getNextPage()
         {
-            Page page = this.page;
+            Page tmpPage = this.page;
             this.page = null;
-            return page;
+            return tmpPage;
         }
     }
 }

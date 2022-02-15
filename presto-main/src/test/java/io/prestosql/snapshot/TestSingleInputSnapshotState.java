@@ -96,8 +96,8 @@ public class TestSingleInputSnapshotState
                 .addDriverContext();
         OperatorContext operatorContext = driverContext.addOperatorContext(1, new PlanNodeId("planNodeId"), "test");
 
-        SingleInputSnapshotState state = SingleInputSnapshotState.forOperator(mock(Operator.class), operatorContext);
-        state.processPage(regularPage);
+        SingleInputSnapshotState singleInputSnapshotState = SingleInputSnapshotState.forOperator(mock(Operator.class), operatorContext);
+        singleInputSnapshotState.processPage(regularPage);
     }
 
     @Test
@@ -204,17 +204,17 @@ public class TestSingleInputSnapshotState
     public void testResumeBacktrack()
             throws Exception
     {
-        SingleInputSnapshotState state = new SingleInputSnapshotState(restorable, snapshotManager, null, TestSingleInputSnapshotState::createSnapshotStateId, TestSingleInputSnapshotState::createSnapshotStateId, snapshotMemoryContext);
-        state.processPage(regularPage);
+        SingleInputSnapshotState singleInputSnapshotState = new SingleInputSnapshotState(restorable, snapshotManager, null, TestSingleInputSnapshotState::createSnapshotStateId, TestSingleInputSnapshotState::createSnapshotStateId, snapshotMemoryContext);
+        singleInputSnapshotState.processPage(regularPage);
         restorable.state++;
         int saved1 = restorable.state;
-        state.processPage(marker1);
+        singleInputSnapshotState.processPage(marker1);
         restorable.state++;
-        state.processPage(regularPage);
+        singleInputSnapshotState.processPage(regularPage);
         restorable.state++;
 
         when(snapshotManager.loadState(createSnapshotStateId(marker2.getSnapshotId()))).thenReturn(Optional.of(saved1));
-        state.processPage(resume2);
+        singleInputSnapshotState.processPage(resume2);
         Assert.assertEquals(restorable.state, saved1);
     }
 
@@ -222,23 +222,23 @@ public class TestSingleInputSnapshotState
     public void testSaveLoadSpilledFiles()
             throws Exception
     {
-        SingleInputSnapshotState state = new SingleInputSnapshotState(
+        SingleInputSnapshotState singleInputSnapshotState = new SingleInputSnapshotState(
                 new TestingSpillableRestorable(),
                 snapshotManager,
                 null,
                 TestSingleInputSnapshotState::createSnapshotStateId,
                 TestSingleInputSnapshotState::createSnapshotStateId,
                 snapshotMemoryContext);
-        state.processPage(marker1);
+        singleInputSnapshotState.processPage(marker1);
         when(snapshotManager.loadState(anyObject())).thenReturn(Optional.of(1));
         when(snapshotManager.loadFile(anyObject(), anyObject()))
                 .thenReturn(Boolean.TRUE) // 2 calls for each resume attempt for 2 files
                 .thenReturn(Boolean.TRUE)
                 .thenReturn(Boolean.FALSE) // 1 call for the failure; 2nd call won't happen
                 .thenReturn(null); // 1 call for the failure; 2nd call won't happen
-        state.processPage(resume1);
-        state.processPage(resume1);
-        state.processPage(resume1);
+        singleInputSnapshotState.processPage(resume1);
+        singleInputSnapshotState.processPage(resume1);
+        singleInputSnapshotState.processPage(resume1);
         verify(snapshotManager, times(2)).storeFile(anyObject(), anyObject());
         verify(snapshotManager, times(4)).loadFile(anyObject(), anyObject());
         verify(snapshotManager, times(1)).succeededToRestore(anyObject());
@@ -249,18 +249,18 @@ public class TestSingleInputSnapshotState
     public void testStoreLoadConsolidatedSnapshot()
             throws Exception
     {
-        TestingRestorable restorable = new TestingRestorable();
-        restorable.setSupportsConsolidatedWrites(true);
-        SingleInputSnapshotState state = new SingleInputSnapshotState(
-                restorable,
+        TestingRestorable testingRestorable = new TestingRestorable();
+        testingRestorable.setSupportsConsolidatedWrites(true);
+        SingleInputSnapshotState singleInputSnapshotState = new SingleInputSnapshotState(
+                testingRestorable,
                 snapshotManager,
                 null,
                 TestSingleInputSnapshotState::createSnapshotStateId,
                 TestSingleInputSnapshotState::createSnapshotStateId,
                 snapshotMemoryContext);
-        state.processPage(marker1);
+        singleInputSnapshotState.processPage(marker1);
         when(snapshotManager.loadConsolidatedState(anyObject())).thenReturn(Optional.of(0));
-        state.processPage(resume1);
+        singleInputSnapshotState.processPage(resume1);
         verify(snapshotManager, times(0)).storeState(anyObject(), anyObject());
         verify(snapshotManager, times(1)).storeConsolidatedState(anyObject(), anyObject());
         verify(snapshotManager, times(0)).loadState(anyObject());
@@ -271,18 +271,18 @@ public class TestSingleInputSnapshotState
     public void testStoreLoadComplexSnapshot()
             throws Exception
     {
-        TestingRestorable restorable = new TestingRestorable();
-        restorable.setSupportsConsolidatedWrites(false);
-        SingleInputSnapshotState state = new SingleInputSnapshotState(
-                restorable,
+        TestingRestorable testingRestorable = new TestingRestorable();
+        testingRestorable.setSupportsConsolidatedWrites(false);
+        SingleInputSnapshotState singleInputSnapshotState = new SingleInputSnapshotState(
+                testingRestorable,
                 snapshotManager,
                 null,
                 TestSingleInputSnapshotState::createSnapshotStateId,
                 TestSingleInputSnapshotState::createSnapshotStateId,
                 snapshotMemoryContext);
-        state.processPage(marker1);
+        singleInputSnapshotState.processPage(marker1);
         when(snapshotManager.loadState(anyObject())).thenReturn(Optional.of(0));
-        state.processPage(resume1);
+        singleInputSnapshotState.processPage(resume1);
         verify(snapshotManager, times(0)).storeConsolidatedState(anyObject(), anyObject());
         verify(snapshotManager, times(1)).storeState(anyObject(), anyObject());
         verify(snapshotManager, times(0)).loadConsolidatedState(anyObject());

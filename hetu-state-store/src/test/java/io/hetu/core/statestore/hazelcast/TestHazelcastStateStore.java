@@ -150,6 +150,8 @@ public class TestHazelcastStateStore
             Lock lock1 = stateStore.getLock(STATE_STORE_NAME);
             assertFalse(lock1.tryLock());
         });
+        t1.setName("t1");
+        t1.setUncaughtExceptionHandler((tr, ex) -> System.out.println(tr.getName() + " : " + ex.getMessage()));
         t1.start();
 
         TimeUnit.MILLISECONDS.sleep(sleep100);
@@ -159,6 +161,8 @@ public class TestHazelcastStateStore
             Lock lock1 = stateStore.getLock(STATE_STORE_NAME);
             assertTrue(lock1.tryLock());
         });
+        t2.setName("t2");
+        t2.setUncaughtExceptionHandler((tr, ex) -> System.out.println(tr.getName() + " : " + ex.getMessage()));
         t2.start();
     }
 
@@ -180,6 +184,8 @@ public class TestHazelcastStateStore
                 ignored();
             }
         });
+        t1.setName("thread-1");
+        t1.setUncaughtExceptionHandler((tr, ex) -> System.out.println(tr.getName() + " : " + ex.getMessage()));
         t1.start();
         try {
             Thread.sleep(sleep100);

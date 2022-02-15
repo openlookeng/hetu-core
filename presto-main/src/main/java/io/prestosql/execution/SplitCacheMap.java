@@ -171,9 +171,9 @@ public class SplitCacheMap
 
     public List<String> getAndClearDroppedCaches()
     {
-        List<String> droppedCaches = ImmutableList.copyOf(this.droppedCaches);
+        List<String> localDroppedCaches = ImmutableList.copyOf(this.droppedCaches);
         this.droppedCaches.clear();
-        return droppedCaches;
+        return localDroppedCaches;
     }
 
     public void setTableCacheInfo(String fqTableName, TableCacheInfo tableCacheInfo)

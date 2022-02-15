@@ -40,6 +40,7 @@ public class TestOpenGaussCaseInsensitiveMapping
     }
 
     @Test
+    @Override
     public void testNonLowerCaseTableName()
             throws Exception
     {

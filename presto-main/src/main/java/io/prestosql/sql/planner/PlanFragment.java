@@ -93,9 +93,9 @@ public class PlanFragment
 
         this.partitionedSourceNodes = findSources(root, partitionedSources);
 
-        ImmutableList.Builder<RemoteSourceNode> remoteSourceNodes = ImmutableList.builder();
-        findRemoteSourceNodes(root, remoteSourceNodes);
-        this.remoteSourceNodes = remoteSourceNodes.build();
+        ImmutableList.Builder<RemoteSourceNode> remoteSourceNodeList = ImmutableList.builder();
+        findRemoteSourceNodes(root, remoteSourceNodeList);
+        this.remoteSourceNodes = remoteSourceNodeList.build();
 
         this.partitioningScheme = requireNonNull(partitioningScheme, "partitioningScheme is null");
     }

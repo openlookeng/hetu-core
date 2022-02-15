@@ -169,9 +169,9 @@ public class BenchmarkArraySubscript
         private static Block createArrayBlock(int positionCount, Block elementsBlock)
         {
             int[] offsets = new int[positionCount + 1];
-            int arraySize = elementsBlock.getPositionCount() / positionCount;
+            int blockArraySize = elementsBlock.getPositionCount() / positionCount;
             for (int i = 0; i < offsets.length; i++) {
-                offsets[i] = arraySize * i;
+                offsets[i] = blockArraySize * i;
             }
             return ArrayBlock.fromElementBlock(positionCount, Optional.empty(), offsets, elementsBlock);
         }

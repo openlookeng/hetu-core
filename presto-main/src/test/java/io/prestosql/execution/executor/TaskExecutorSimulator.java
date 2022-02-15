@@ -298,6 +298,7 @@ public class TaskExecutorSimulator
                         (int) splitQueue.getSelectedCountLevel4().getOneMinute().getRate());
             }
             catch (Exception ignored) {
+                //could be ignored
             }
         }, 1, 1, SECONDS);
     }

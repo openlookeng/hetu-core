@@ -226,7 +226,7 @@ public final class DockerContainer
 
     private void waitForContainerPorts(List<Integer> ports)
     {
-        List<Integer> hostPorts = ports.stream()
+        List<Integer> hostPortsList = ports.stream()
                 .map(this::getHostPort)
                 .collect(toImmutableList());
 
@@ -235,7 +235,7 @@ public final class DockerContainer
                 .withMaxAttempts(Integer.MAX_VALUE) // limited by MaxDuration
                 .abortOn(error -> !isContainerUp())
                 .withDelay(Duration.of(5, SECONDS))
-                .onRetry(event -> LOG.info("Waiting for ports %s that are exposed on %s on %s ...", ports, HOST_IP, hostPorts));
+                .onRetry(event -> LOG.info("Waiting for ports %s that are exposed on %s on %s ...", ports, HOST_IP, hostPortsList));
 
         Failsafe.with(retryPolicy).run(() -> {
             for (int port : ports) {

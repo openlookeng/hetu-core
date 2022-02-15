@@ -138,19 +138,19 @@ public class PlanNodeStats
     {
         checkArgument(planNodeId.equals(other.getPlanNodeId()), "planNodeIds do not match. %s != %s", planNodeId, other.getPlanNodeId());
 
-        long planNodeInputPositions = this.planNodeInputPositions + other.planNodeInputPositions;
-        DataSize planNodeInputDataSize = succinctBytes(this.planNodeInputDataSize.toBytes() + other.planNodeInputDataSize.toBytes());
-        long planNodeOutputPositions = this.planNodeOutputPositions + other.planNodeOutputPositions;
-        DataSize planNodeOutputDataSize = succinctBytes(this.planNodeOutputDataSize.toBytes() + other.planNodeOutputDataSize.toBytes());
+        long mergedPlanNodeInputPositions = this.planNodeInputPositions + other.planNodeInputPositions;
+        DataSize mergedPlanNodeInputDataSize = succinctBytes(this.planNodeInputDataSize.toBytes() + other.planNodeInputDataSize.toBytes());
+        long mergedPlanNodeOutputPositions = this.planNodeOutputPositions + other.planNodeOutputPositions;
+        DataSize mergedPlanNodeOutputDataSize = succinctBytes(this.planNodeOutputDataSize.toBytes() + other.planNodeOutputDataSize.toBytes());
 
-        Map<String, OperatorInputStats> operatorInputStats = mergeMaps(this.operatorInputStats, other.operatorInputStats, OperatorInputStats::merge);
+        Map<String, OperatorInputStats> mergedOperatorInputStats = mergeMaps(this.operatorInputStats, other.operatorInputStats, OperatorInputStats::merge);
 
         return new PlanNodeStats(
                 planNodeId,
                 new Duration(planNodeScheduledTime.toMillis() + other.getPlanNodeScheduledTime().toMillis(), MILLISECONDS),
                 new Duration(planNodeCpuTime.toMillis() + other.getPlanNodeCpuTime().toMillis(), MILLISECONDS),
-                planNodeInputPositions, planNodeInputDataSize,
-                planNodeOutputPositions, planNodeOutputDataSize,
-                operatorInputStats);
+                mergedPlanNodeInputPositions, mergedPlanNodeInputDataSize,
+                mergedPlanNodeOutputPositions, mergedPlanNodeOutputDataSize,
+                mergedOperatorInputStats);
     }
 }

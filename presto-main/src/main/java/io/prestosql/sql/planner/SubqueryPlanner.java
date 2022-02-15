@@ -114,18 +114,20 @@ class SubqueryPlanner
 
     public PlanBuilder handleSubqueries(PlanBuilder builder, Collection<Expression> expressions, Node node)
     {
+        PlanBuilder planBuilder = builder;
         for (Expression expression : expressions) {
-            builder = handleSubqueries(builder, expression, node, true);
+            planBuilder = handleSubqueries(planBuilder, expression, node, true);
         }
-        return builder;
+        return planBuilder;
     }
 
     public PlanBuilder handleUncorrelatedSubqueries(PlanBuilder builder, Collection<Expression> expressions, Node node)
     {
+        PlanBuilder planBuilder = builder;
         for (Expression expression : expressions) {
-            builder = handleSubqueries(builder, expression, node, false);
+            planBuilder = handleSubqueries(planBuilder, expression, node, false);
         }
-        return builder;
+        return planBuilder;
     }
 
     public PlanBuilder handleSubqueries(PlanBuilder builder, Expression expression, Node node)
@@ -133,8 +135,9 @@ class SubqueryPlanner
         return handleSubqueries(builder, expression, node, true);
     }
 
-    private PlanBuilder handleSubqueries(PlanBuilder builder, Expression expression, Node node, boolean correlationAllowed)
+    private PlanBuilder handleSubqueries(PlanBuilder inputBuilder, Expression expression, Node node, boolean correlationAllowed)
     {
+        PlanBuilder builder = inputBuilder;
         builder = appendInPredicateApplyNodes(builder, collectInPredicateSubqueries(expression, node), correlationAllowed, node);
         builder = appendScalarSubqueryApplyNodes(builder, collectScalarSubqueries(expression, node), correlationAllowed);
         builder = appendExistsSubqueryApplyNodes(builder, collectExistsSubqueries(expression, node), correlationAllowed);
@@ -176,14 +179,16 @@ class SubqueryPlanner
 
     private PlanBuilder appendInPredicateApplyNodes(PlanBuilder subPlan, Set<InPredicate> inPredicates, boolean correlationAllowed, Node node)
     {
+        PlanBuilder planBuilder = subPlan;
         for (InPredicate inPredicate : inPredicates) {
-            subPlan = appendInPredicateApplyNode(subPlan, inPredicate, correlationAllowed, node);
+            planBuilder = appendInPredicateApplyNode(planBuilder, inPredicate, correlationAllowed, node);
         }
-        return subPlan;
+        return planBuilder;
     }
 
-    private PlanBuilder appendInPredicateApplyNode(PlanBuilder subPlan, InPredicate inPredicate, boolean correlationAllowed, Node node)
+    private PlanBuilder appendInPredicateApplyNode(PlanBuilder inputSubPlan, InPredicate inPredicate, boolean correlationAllowed, Node node)
     {
+        PlanBuilder subPlan = inputSubPlan;
         if (subPlan.canTranslate(inPredicate)) {
             // given subquery is already appended
             return subPlan;
@@ -210,8 +215,9 @@ class SubqueryPlanner
         return appendApplyNode(subPlan, inPredicate, subqueryPlan.getRoot(), Assignments.of(inPredicateSubquerySymbol, castToRowExpression(inPredicateSubqueryExpression)), correlationAllowed);
     }
 
-    private PlanBuilder appendScalarSubqueryApplyNodes(PlanBuilder builder, Set<SubqueryExpression> scalarSubqueries, boolean correlationAllowed)
+    private PlanBuilder appendScalarSubqueryApplyNodes(PlanBuilder inputBuilder, Set<SubqueryExpression> scalarSubqueries, boolean correlationAllowed)
     {
+        PlanBuilder builder = inputBuilder;
         for (SubqueryExpression scalarSubquery : scalarSubqueries) {
             builder = appendScalarSubqueryApplyNode(builder, scalarSubquery, correlationAllowed);
         }
@@ -267,10 +273,11 @@ class SubqueryPlanner
 
     private PlanBuilder appendExistsSubqueryApplyNodes(PlanBuilder builder, Set<ExistsPredicate> existsPredicates, boolean correlationAllowed)
     {
+        PlanBuilder planBuilder = builder;
         for (ExistsPredicate existsPredicate : existsPredicates) {
-            builder = appendExistSubqueryApplyNode(builder, existsPredicate, correlationAllowed);
+            planBuilder = appendExistSubqueryApplyNode(planBuilder, existsPredicate, correlationAllowed);
         }
-        return builder;
+        return planBuilder;
     }
 
     /**
@@ -313,18 +320,21 @@ class SubqueryPlanner
 
     private PlanBuilder appendQuantifiedComparisonApplyNodes(PlanBuilder subPlan, Set<QuantifiedComparisonExpression> quantifiedComparisons, boolean correlationAllowed, Node node)
     {
+        PlanBuilder planBuilder = subPlan;
         for (QuantifiedComparisonExpression quantifiedComparison : quantifiedComparisons) {
-            subPlan = appendQuantifiedComparisonApplyNode(subPlan, quantifiedComparison, correlationAllowed, node);
+            planBuilder = appendQuantifiedComparisonApplyNode(planBuilder, quantifiedComparison, correlationAllowed, node);
         }
-        return subPlan;
+        return planBuilder;
     }
 
-    private PlanBuilder appendQuantifiedComparisonApplyNode(PlanBuilder subPlan, QuantifiedComparisonExpression quantifiedComparison, boolean correlationAllowed, Node node)
+    private PlanBuilder appendQuantifiedComparisonApplyNode(PlanBuilder inputSubPlan, QuantifiedComparisonExpression quantifiedComparison, boolean correlationAllowed, Node node)
     {
+        PlanBuilder subPlan = inputSubPlan;
         if (subPlan.canTranslate(quantifiedComparison)) {
             // given subquery is already appended
             return subPlan;
         }
+
         switch (quantifiedComparison.getOperator()) {
             case EQUAL:
                 switch (quantifiedComparison.getQuantifier()) {
@@ -381,8 +391,9 @@ class SubqueryPlanner
                 String.format("Unexpected quantified comparison: '%s %s'", quantifiedComparison.getOperator().getValue(), quantifiedComparison.getQuantifier()));
     }
 
-    private PlanBuilder planQuantifiedApplyNode(PlanBuilder subPlan, QuantifiedComparisonExpression quantifiedComparison, boolean correlationAllowed)
+    private PlanBuilder planQuantifiedApplyNode(PlanBuilder inputSubPlan, QuantifiedComparisonExpression quantifiedComparison, boolean correlationAllowed)
     {
+        PlanBuilder subPlan = inputSubPlan;
         subPlan = subPlan.appendProjections(ImmutableList.of(quantifiedComparison.getValue()), planSymbolAllocator, idAllocator);
 
         checkState(quantifiedComparison.getSubquery() instanceof SubqueryExpression);
@@ -439,25 +450,26 @@ class SubqueryPlanner
     }
 
     private PlanBuilder appendApplyNode(
-            PlanBuilder subPlan,
+            PlanBuilder inputSubPlan,
             Node subquery,
             PlanNode subqueryNode,
             Assignments subqueryAssignments,
             boolean correlationAllowed)
     {
+        PlanBuilder subPlan = inputSubPlan;
         Map<Expression, Expression> correlation = extractCorrelation(subPlan, subqueryNode);
         if (!correlationAllowed && !correlation.isEmpty()) {
             throw notSupportedException(subquery, "Correlated subquery in given context");
         }
         subPlan = subPlan.appendProjections(correlation.keySet(), planSymbolAllocator, idAllocator);
-        subqueryNode = replaceExpressionsWithSymbols(subqueryNode, correlation);
+        PlanNode planNode = replaceExpressionsWithSymbols(subqueryNode, correlation);
 
         TranslationMap translations = subPlan.copyTranslations();
         PlanNode root = subPlan.getRoot();
         return new PlanBuilder(translations,
                 new ApplyNode(idAllocator.getNextId(),
                         root,
-                        subqueryNode,
+                        planNode,
                         subqueryAssignments,
                         ImmutableList.copyOf(SymbolsExtractor.extractUnique(correlation.values())),
                         subquery));

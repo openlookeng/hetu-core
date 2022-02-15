@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
@@ -210,7 +211,7 @@ public class FileIndexWriter
         // Get sum of expected entries
         int expectedNumEntries = 0;
         for (Pair<String, List<Object>> l : stripeData) {
-            expectedNumEntries += l.getSecond().size();
+            expectedNumEntries += new HashSet<>(l.getSecond()).size();
         }
 
         // Create index and put values

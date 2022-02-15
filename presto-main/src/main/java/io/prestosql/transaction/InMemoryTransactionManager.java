@@ -443,8 +443,8 @@ public class InMemoryTransactionManager
 
         public boolean isExpired(Duration idleTimeout)
         {
-            Long idleStartTime = this.idleStartTime.get();
-            return idleStartTime != null && Duration.nanosSince(idleStartTime).compareTo(idleTimeout) > 0;
+            Long localIdleStartTime = this.idleStartTime.get();
+            return localIdleStartTime != null && Duration.nanosSince(localIdleStartTime).compareTo(idleTimeout) > 0;
         }
 
         public void checkOpenTransaction()
@@ -513,8 +513,8 @@ public class InMemoryTransactionManager
         {
             checkOpenTransaction();
 
-            CatalogMetadata catalogMetadata = this.catalogMetadata.get(catalogName);
-            if (catalogMetadata == null) {
+            CatalogMetadata localCatalogMetadata = this.catalogMetadata.get(catalogName);
+            if (localCatalogMetadata == null) {
                 Catalog catalog = catalogsByName.get(catalogName);
                 verify(catalog != null, "Unknown catalog: %s", catalogName);
                 Connector connector = catalog.getConnector(catalogName);
@@ -523,7 +523,7 @@ public class InMemoryTransactionManager
                 ConnectorTransactionMetadata informationSchema = createConnectorTransactionMetadata(catalog.getInformationSchemaId(), catalog);
                 ConnectorTransactionMetadata systemTables = createConnectorTransactionMetadata(catalog.getSystemTablesId(), catalog);
 
-                catalogMetadata = new CatalogMetadata(
+                localCatalogMetadata = new CatalogMetadata(
                         metadata.getCatalogName(),
                         metadata.getConnectorMetadata(),
                         metadata.getTransactionHandle(),
@@ -535,11 +535,11 @@ public class InMemoryTransactionManager
                         systemTables.getTransactionHandle(),
                         connector.getCapabilities());
 
-                this.catalogMetadata.put(catalog.getConnectorCatalogName(), catalogMetadata);
-                this.catalogMetadata.put(catalog.getInformationSchemaId(), catalogMetadata);
-                this.catalogMetadata.put(catalog.getSystemTablesId(), catalogMetadata);
+                this.catalogMetadata.put(catalog.getConnectorCatalogName(), localCatalogMetadata);
+                this.catalogMetadata.put(catalog.getInformationSchemaId(), localCatalogMetadata);
+                this.catalogMetadata.put(catalog.getSystemTablesId(), localCatalogMetadata);
             }
-            return catalogMetadata;
+            return localCatalogMetadata;
         }
 
         public synchronized ConnectorTransactionMetadata createConnectorTransactionMetadata(CatalogName catalogName, Catalog catalog)
@@ -676,12 +676,12 @@ public class InMemoryTransactionManager
                     .orElse(new Duration(0, MILLISECONDS));
 
             // dereferencing this field is safe because the field is atomic
-            @SuppressWarnings("FieldAccessNotGuarded") Optional<CatalogName> writtenConnectorId = Optional.ofNullable(this.writtenConnectorId.get());
+            @SuppressWarnings("FieldAccessNotGuarded") Optional<CatalogName> localWrittenConnectorId = Optional.ofNullable(this.writtenConnectorId.get());
 
             // copying the key set is safe here because the map is concurrent
             @SuppressWarnings("FieldAccessNotGuarded") List<CatalogName> catalogNames = ImmutableList.copyOf(connectorIdToMetadata.keySet());
 
-            return new TransactionInfo(transactionId, isolationLevel, readOnly, autoCommitContext, createTime, idleTime, catalogNames, writtenConnectorId);
+            return new TransactionInfo(transactionId, isolationLevel, readOnly, autoCommitContext, createTime, idleTime, catalogNames, localWrittenConnectorId);
         }
 
         private static class ConnectorTransactionMetadata

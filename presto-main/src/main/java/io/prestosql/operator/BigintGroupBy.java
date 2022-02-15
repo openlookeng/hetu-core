@@ -56,12 +56,12 @@ public abstract class BigintGroupBy
     public static int calculateMaxFill(int hashSize)
     {
         checkArgument(hashSize > 0, "hashSize must be greater than 0");
-        int maxFill = (int) Math.ceil(hashSize * FILL_RATIO);
-        if (maxFill == hashSize) {
-            maxFill--;
+        int calculatemaxFill = (int) Math.ceil(hashSize * FILL_RATIO);
+        if (calculatemaxFill == hashSize) {
+            calculatemaxFill--;
         }
-        checkArgument(hashSize > maxFill, "hashSize must be larger than maxFill");
-        return maxFill;
+        checkArgument(hashSize > calculatemaxFill, "hashSize must be larger than maxFill");
+        return calculatemaxFill;
     }
 
     protected class AddPageWork

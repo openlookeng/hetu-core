@@ -1083,6 +1083,7 @@ public class SemiTransactionalHiveMetastore
                 case EMPTY:
                     //release locks if any.
                     abortTransaction();
+                    // $FALL-THROUGH$
                 case EXCLUSIVE_OPERATION_BUFFERED:
                     break;
                 case SHARED_OPERATION_BUFFERED:
@@ -1777,6 +1778,7 @@ public class SemiTransactionalHiveMetastore
                 }
                 catch (Throwable t) {
                     // ignore
+                    log.debug("Get future(%s) error", future.toString());
                 }
             }
         }
@@ -1837,13 +1839,13 @@ public class SemiTransactionalHiveMetastore
 
         private void updatePartitionsStatistics(HiveIdentity identity, HiveMetastore metastore, SchemaTableName schemaTableName, List<UpdateStatisticsOperation> partitionUpdateStatisticsOperations)
         {
-            List<String> partitionNames = new ArrayList<>();
+            List<String> localPartitionNames = new ArrayList<>();
             Map<String, Function<PartitionStatistics, PartitionStatistics>> partNamesUpdateFunctionMap = new HashMap<>();
             for (UpdateStatisticsOperation operation : partitionUpdateStatisticsOperations) {
                 partNamesUpdateFunctionMap.put(operation.partitionName.get(), operation::updateStatistics);
-                partitionNames.add(operation.partitionName.get());
+                localPartitionNames.add(operation.partitionName.get());
             }
-            if (partitionNames.size() == partNamesUpdateFunctionMap.size() && partitionUpdateStatisticsOperations.size() > 0) {
+            if (localPartitionNames.size() == partNamesUpdateFunctionMap.size() && partitionUpdateStatisticsOperations.size() > 0) {
                 metastore.updatePartitionsStatistics(identity, schemaTableName.getSchemaName(), schemaTableName.getTableName(), partNamesUpdateFunctionMap);
             }
         }
@@ -2095,8 +2097,9 @@ public class SemiTransactionalHiveMetastore
         }
     }
 
-    private static boolean isSameOrParent(Path parent, Path child)
+    private static boolean isSameOrParent(Path parent, Path inputCchild)
     {
+        Path child = inputCchild;
         int parentDepth = parent.depth();
         int childDepth = child.depth();
         if (parentDepth > childDepth) {
@@ -2132,10 +2135,11 @@ public class SemiTransactionalHiveMetastore
             HdfsContext context,
             Path currentPath,
             Path targetPath,
-            List<String> fileNames,
+            List<String> inputFileNames,
             List<DirectoryCleanUpTask> cleanUpTasksForAbort,
             boolean useDirectExecutor)
     {
+        List<String> fileNames = inputFileNames;
         FileSystem fileSystem;
         try {
             fileSystem = hdfsEnvironment.getFileSystem(context, currentPath);
@@ -2149,7 +2153,7 @@ public class SemiTransactionalHiveMetastore
 
         //In case of concurrent vacuums on same partitioned table,
         // different partitions must be renamed in same sequence to avoid conflicts. So rename synchronously
-        Executor renameExecutor = (useDirectExecutor) ? MoreExecutors.directExecutor() : executor;
+        Executor localRenameExecutor = (useDirectExecutor) ? MoreExecutors.directExecutor() : executor;
         for (String fileName : fileNames) {
             Path source = new Path(currentPath, fileName);
             Path target = new Path(targetPath, fileName);
@@ -2172,7 +2176,7 @@ public class SemiTransactionalHiveMetastore
                 catch (IOException e) {
                     throw new PrestoException(HiveErrorCode.HIVE_FILESYSTEM_ERROR, format("Error moving data files from %s to final location %s", source, target), e);
                 }
-            }, renameExecutor));
+            }, localRenameExecutor));
         }
     }
 
@@ -2752,14 +2756,14 @@ public class SemiTransactionalHiveMetastore
             // This method augments the location field of the partition to the staging location.
             // This way, if the partition is accessed in an ongoing transaction, staged data
             // can be found and accessed.
-            Partition partition = this.partition;
-            String currentLocation = this.currentLocation.toString();
-            if (!currentLocation.equals(partition.getStorage().getLocation())) {
-                partition = Partition.builder(partition)
-                        .withStorage(storage -> storage.setLocation(currentLocation))
+            Partition localPartition = this.partition;
+            String localCurrentLocation = this.currentLocation.toString();
+            if (!localCurrentLocation.equals(localPartition.getStorage().getLocation())) {
+                localPartition = Partition.builder(localPartition)
+                        .withStorage(storage -> storage.setLocation(localCurrentLocation))
                         .build();
             }
-            return partition;
+            return localPartition;
         }
 
         public boolean isUpdateStats()
@@ -3032,6 +3036,7 @@ public class SemiTransactionalHiveMetastore
                     // Deleting the table when aborting commit has the risk of deleting table not added in this transaction.
                     // Not deleting the table may leave garbage behind. The former is much more dangerous than the latter.
                     // Therefore, the table is not considered added.
+                    log.debug("Create table error(dataBaseName=%s tableName=%s)", newTable.getDatabaseName(), newTable.getTableName());
                 }
 
                 if (!done) {
@@ -3328,6 +3333,8 @@ public class SemiTransactionalHiveMetastore
                 catch (PartitionNotFoundException e) {
                     // Maybe some one deleted the partition we added.
                     // Anyways, we are good because the partition is not there anymore.
+                    log.debug("Drop partition error(schemaName=%s tableName=%s), may be partition is not there anymore",
+                            schemaName, tableName);
                 }
                 catch (Throwable t) {
                     partitionsFailedToRollback.add(createdPartitionValue);

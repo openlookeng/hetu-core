@@ -58,6 +58,14 @@ public class TestResourceGroupsDao
     private static final JsonCodec<List<String>> LIST_STRING_CODEC = listJsonCodec(String.class);
     private static final JsonCodec<SelectorResourceEstimate> SELECTOR_RESOURCE_ESTIMATE_JSON_CODEC = jsonCodec(SelectorResourceEstimate.class);
 
+    private static final Pattern PING_USER = Pattern.compile("ping_user");
+    private static final Pattern ANY = Pattern.compile(".*");
+    private static final Pattern ADMIN_USER = Pattern.compile("admin_user");
+    private static final Pattern PING = Pattern.compile("ping.*");
+    private static final Pattern PING_SOURCE = Pattern.compile("ping_source");
+    private static final Pattern USER1 = Pattern.compile("user1");
+    private static final Pattern PIPELINE = Pattern.compile("pipeline");
+
     static H2ResourceGroupsDao setup(String prefix)
     {
         DbResourceGroupConfig config = new DbResourceGroupConfig().setConfigDbUrl("jdbc:h2:mem:test_" + prefix + System.nanoTime() + ThreadLocalRandom.current().nextLong());
@@ -124,8 +132,8 @@ public class TestResourceGroupsDao
                 new SelectorRecord(
                         2L,
                         1L,
-                        Optional.of(Pattern.compile("ping_user")),
-                        Optional.of(Pattern.compile(".*")),
+                        Optional.of(PING_USER),
+                        Optional.of(ANY),
                         Optional.empty(),
                         Optional.empty(),
                         Optional.empty()));
@@ -133,8 +141,8 @@ public class TestResourceGroupsDao
                 new SelectorRecord(
                         3L,
                         2L,
-                        Optional.of(Pattern.compile("admin_user")),
-                        Optional.of(Pattern.compile(".*")),
+                        Optional.of(ADMIN_USER),
+                        Optional.of(ANY),
                         Optional.of(EXPLAIN.name()),
                         Optional.of(ImmutableList.of("tag1", "tag2")),
                         Optional.empty()));
@@ -166,8 +174,8 @@ public class TestResourceGroupsDao
         SelectorRecord updated = new SelectorRecord(
                 2,
                 1L,
-                Optional.of(Pattern.compile("ping.*")),
-                Optional.of(Pattern.compile("ping_source")),
+                Optional.of(PING),
+                Optional.of(PING_SOURCE),
                 Optional.empty(),
                 Optional.of(ImmutableList.of("tag1")),
                 Optional.empty());
@@ -184,8 +192,8 @@ public class TestResourceGroupsDao
         updated = new SelectorRecord(
                 2,
                 2L,
-                Optional.of(Pattern.compile("ping.*")),
-                Optional.of(Pattern.compile("ping_source")),
+                Optional.of(PING),
+                Optional.of(PING_SOURCE),
                 Optional.of(EXPLAIN.name()),
                 Optional.of(ImmutableList.of("tag1", "tag2")),
                 Optional.empty());
@@ -221,8 +229,8 @@ public class TestResourceGroupsDao
         map.put(3L, new SelectorRecord(
                 3L,
                 3L,
-                Optional.of(Pattern.compile("user1")),
-                Optional.of(Pattern.compile("pipeline")),
+                Optional.of(USER1),
+                Optional.of(PIPELINE),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty()));

@@ -166,7 +166,7 @@ class HiveSplitSource
             HiveConfig hiveConfig,
             HiveStorageFormat hiveStorageFormat)
     {
-        AtomicReference<State> stateReference = new AtomicReference<>(State.initial());
+        AtomicReference<State> localStateReference = new AtomicReference<>(State.initial());
         return new HiveSplitSource(
                 session,
                 databaseName,
@@ -205,7 +205,7 @@ class HiveSplitSource
                 maxInitialSplits,
                 maxOutstandingSplitsSize,
                 splitLoader,
-                stateReference,
+                localStateReference,
                 highMemorySplitSourceCounter,
                 dynamicFilterSupplier,
                 userDefinedCachePredicates,
@@ -231,7 +231,7 @@ class HiveSplitSource
             HiveConfig hiveConfig,
             HiveStorageFormat hiveStorageFormat)
     {
-        AtomicReference<State> stateReference = new AtomicReference<>(State.initial());
+        AtomicReference<State> localStateReference = new AtomicReference<>(State.initial());
         return new HiveSplitSource(
                 session,
                 databaseName,
@@ -290,7 +290,7 @@ class HiveSplitSource
                 maxInitialSplits,
                 maxOutstandingSplitsSize,
                 splitLoader,
-                stateReference,
+                localStateReference,
                 highMemorySplitSourceCounter,
                 dynamicFilterSupplier,
                 userDefinedCachePredicates,
@@ -708,13 +708,12 @@ class HiveSplitSource
                 List<HiveSplit> locationBaseHiveSplits = new ArrayList<>();
                 hostAddressHiveSplits.get(hostAddressText).forEach(split1 -> locationBaseHiveSplits.add(split1));
 
-                //4> sort in descending order by file size
-                //locationBaseHiveSplits.sort(new HiveSplitSortBySize());
+                // sort in descending order by file size
                 locationBaseHiveSplits.sort((split1, split2) -> ((int) (split2.getFileSize() - split1.getFileSize())));
 
                 int numberOfSplitsPerLocation = locationBaseHiveSplits.size();
 
-                //when number of flies are less than number of replication factor,splits are grouped in to single group.
+                // when number of flies are less than number of replication factor,splits are grouped in to single group.
                 int avgSplitsPerNode = ((replicationFactor != 0) && (numberOfSplitsPerLocation >= replicationFactor)) ? numberOfSplitsPerLocation / replicationFactor : numberOfSplitsPerLocation;
 
                 List<HiveSplit> groupedHiveSplit = new ArrayList<>();

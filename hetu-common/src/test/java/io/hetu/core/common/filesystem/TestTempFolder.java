@@ -34,9 +34,9 @@ public class TestTempFolder
             root = folder.getRoot();
             assertTrue(root.exists());
             File newFile = folder.newFile("aNewFile");
-            assertEquals(newFile.getAbsolutePath(), folder.getRoot().getAbsolutePath() + "/aNewFile");
+            assertEquals(newFile.getCanonicalPath(), folder.getRoot().getCanonicalPath() + "/aNewFile");
             File newFolder = folder.newFile("aNewFolder");
-            assertEquals(newFolder.getAbsolutePath(), folder.getRoot().getAbsolutePath() + "/aNewFolder");
+            assertEquals(newFolder.getCanonicalPath(), folder.getRoot().getCanonicalPath() + "/aNewFolder");
         }
         assertFalse(root.exists());
     }

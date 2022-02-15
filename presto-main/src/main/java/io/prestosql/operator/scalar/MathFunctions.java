@@ -1161,7 +1161,7 @@ public final class MathFunctions
         checkCondition(!isNaN(operand), INVALID_FUNCTION_ARGUMENT, "operand must not be NaN");
         checkCondition(isFinite(bound1), INVALID_FUNCTION_ARGUMENT, "first bound must be finite");
         checkCondition(isFinite(bound2), INVALID_FUNCTION_ARGUMENT, "second bound must be finite");
-        checkCondition(bound1 != bound2, INVALID_FUNCTION_ARGUMENT, "bounds cannot equal each other");
+        checkCondition(!(Math.abs(bound1 - bound2) < 1e-6f), INVALID_FUNCTION_ARGUMENT, "bounds cannot equal each other");
 
         long result;
 

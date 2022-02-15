@@ -80,12 +80,12 @@ public class StaticFunctionNamespaceStore
     private void loadFunctionNamespaceManager(String catalogName, Map<String, String> properties)
     {
         log.info("-- Loading function namespace manager for catalog %s --", catalogName);
-        properties = new HashMap<>(properties);
-        String functionNamespaceManagerName = properties.remove(FUNCTION_NAMESPACE_MANAGER_NAME);
+        Map<String, String> loadedProperties = new HashMap<>(properties);
+        String functionNamespaceManagerName = loadedProperties.remove(FUNCTION_NAMESPACE_MANAGER_NAME);
         checkState(!isNullOrEmpty(functionNamespaceManagerName), "%s property must be present", FUNCTION_NAMESPACE_MANAGER_NAME);
 
         functionAndTypeManager.loadFunctionNamespaceManager(hetuMetaStoreManager, functionNamespaceManagerName,
-                catalogName, properties);
+                catalogName, loadedProperties);
         log.info("-- Added function namespace manager [%s] --", catalogName);
     }
 

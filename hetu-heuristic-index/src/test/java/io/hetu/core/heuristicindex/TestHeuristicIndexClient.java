@@ -43,7 +43,6 @@ public class TestHeuristicIndexClient
         String tableName = "catalog.schema.UT_test";
 
         try (TempFolder folder = new TempFolder()) {
-            // root/catalog.schema.UT_test/testColumn/bloom/testIndex.index
             folder.create();
             File tableFolder = new File(folder.getRoot().getPath(), tableName);
             assertTrue(tableFolder.mkdir());

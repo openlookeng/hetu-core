@@ -15,6 +15,7 @@
 
 package io.hetu.core.plugin.carbondata.integrationtest;
 
+import io.airlift.log.Logger;
 import io.hetu.core.plugin.carbondata.server.HetuTestServer;
 import org.apache.carbondata.core.constants.CarbonCommonConstants;
 import org.apache.carbondata.core.datastore.impl.FileFactory;
@@ -36,6 +37,7 @@ import static org.testng.Assert.assertTrue;
 
 public class TestsWithHiveConnector
 {
+    private static final Logger log = Logger.get(TestsWithHiveConnector.class);
     private String rootPath = new File(this.getClass().getResource("/").getPath() + "../..")
             .getCanonicalPath();
 
@@ -114,7 +116,7 @@ public class TestsWithHiveConnector
         assertEquals(FileFactory.isFileExist(storePath +
                 "hive.store/default/parttable/year=2013", false), false);
         } catch (IOException exception) {
-            exception.printStackTrace();
+            log.error(exception.getMessage());
         }
         hetuServer.execute("DROP TABLE hive.default.parttable");
     }
@@ -141,7 +143,7 @@ public class TestsWithHiveConnector
             assertEquals(FileFactory.isFileExist(storePath +
                     "hive.store/default/parttable2/year=2013", false), false);
         } catch (IOException exception) {
-            exception.printStackTrace();
+            log.error(exception.getMessage());
         }
 
         hetuServer.execute("insert into hive.default.parttable2 values (4,2014)");
@@ -150,7 +152,7 @@ public class TestsWithHiveConnector
             assertEquals(FileFactory.isFileExist(storePath +
                     "hive.store/default/parttable2/year=2014", false), false);
         } catch (IOException exception) {
-            exception.printStackTrace();
+            log.error(exception.getMessage());
         }
 
         hetuServer.execute("DROP TABLE hive.default.parttable2");
@@ -178,7 +180,7 @@ public class TestsWithHiveConnector
             assertEquals(FileFactory.isFileExist(storePath +
                     "/hive.store/default/parttable3/year=2013", false), true);
         } catch (IOException exception) {
-            exception.printStackTrace();
+            log.error(exception.getMessage());
         }
         hetuServer.execute("DROP TABLE hive.default.parttable3");
     }

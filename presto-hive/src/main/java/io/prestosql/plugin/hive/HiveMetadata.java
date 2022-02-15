@@ -491,7 +491,7 @@ public class HiveMetadata
             properties.put(HiveTableProperties.STORAGE_FORMAT_PROPERTY, format);
         }
         catch (PrestoException ignored) {
-            // todo fail if format is not known
+            log.debug("Format is not known error");
         }
 
         // Partitioning property
@@ -684,10 +684,10 @@ public class HiveMetadata
                 columns.put(tableName, getTableMetadata(session, tableName).getColumns());
             }
             catch (HiveViewNotSupportedException e) {
-                // view is not supported
+                log.debug("View is not supported error");
             }
             catch (TableNotFoundException e) {
-                // table disappeared during listing operation
+                log.debug("Table disappeared during listing operation error");
             }
         }
         return columns.build();
@@ -1445,6 +1445,7 @@ public class HiveMetadata
                     future.get();
                 }
                 catch (InterruptedException | ExecutionException ignore) {
+                    log.debug("Get future error");
                 }
             });
         }

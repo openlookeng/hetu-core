@@ -242,8 +242,8 @@ public class SqlQueryScheduler
         }
 
         // todo come up with a better way to build this, or eliminate this map
-        ImmutableMap.Builder<StageId, StageScheduler> stageSchedulers = ImmutableMap.builder();
-        ImmutableMap.Builder<StageId, StageLinkage> stageLinkages = ImmutableMap.builder();
+        ImmutableMap.Builder<StageId, StageScheduler> stageSchedulerBuilder = ImmutableMap.builder();
+        ImmutableMap.Builder<StageId, StageLinkage> stageLinkageBuilder = ImmutableMap.builder();
 
         // Only fetch a distribution once per query to assure all stages see the same machine assignments
         Map<PartitioningHandle, NodePartitionMap> partitioningCache = new HashMap<>();
@@ -251,7 +251,7 @@ public class SqlQueryScheduler
         OutputBufferId rootBufferId = Iterables.getOnlyElement(rootOutputBuffers.getBuffers().keySet());
         visitedPlanFrags.add(plan.getFragment().getId());
         final boolean isSnapshotEnabled = SystemSessionProperties.isSnapshotEnabled(session);
-        List<SqlStageExecution> stages = createStages(
+        List<SqlStageExecution> stageExecutions = createStages(
                 (fragmentId, tasks, noMoreExchangeLocations) -> updateQueryOutputLocations(queryStateMachine, rootBufferId, tasks, noMoreExchangeLocations),
                 new AtomicInteger(),
                 locationFactory,
@@ -266,30 +266,30 @@ public class SqlQueryScheduler
                 schedulerExecutor,
                 failureDetector,
                 nodeTaskMap,
-                stageSchedulers,
-                stageLinkages,
+                stageSchedulerBuilder,
+                stageLinkageBuilder,
                 isSnapshotEnabled,
                 snapshotManager,
                 stageTaskCounts);
 
-        SqlStageExecution rootStage = stages.get(0);
+        SqlStageExecution rootStage = stageExecutions.get(0);
         rootStage.setOutputBuffers(rootOutputBuffers);
         this.rootStageId = rootStage.getStageId();
 
-        this.stages = stages.stream()
+        this.stages = stageExecutions.stream()
                 .collect(toImmutableMap(SqlStageExecution::getStageId, identity()));
 
         if (isSnapshotEnabled) {
             // Snapshot: add minimum number of tasks to task list in query snapshot manager, so that we don't complete prematurely,
             // e.g. 1 task is schedule and finishes right away, before other tasks are scheduled, then snapshot manager may think
             // snapshot is complete, because all known tasks are covered.
-            for (SqlStageExecution stage : stages) {
+            for (SqlStageExecution stage : stageExecutions) {
                 snapshotManager.addNewTask(new TaskId(stage.getStageId(), 0));
             }
         }
 
-        this.stageSchedulers = stageSchedulers.build();
-        this.stageLinkages = stageLinkages.build();
+        this.stageSchedulers = stageSchedulerBuilder.build();
+        this.stageLinkages = stageLinkageBuilder.build();
 
         this.executor = queryExecutor;
         this.session = session;
@@ -321,6 +321,7 @@ public class SqlQueryScheduler
                         Thread.sleep(wait);
                     }
                     catch (InterruptedException e) {
+                        // could be ignored
                     }
                 }
 
@@ -432,7 +433,7 @@ public class SqlQueryScheduler
         ImmutableList.Builder<SqlStageExecution> stages = ImmutableList.builder();
 
         StageId stageId = new StageId(queryStateMachine.getQueryId(), nextStageId.getAndIncrement());
-        SqlStageExecution stage = createSqlStageExecution(
+        SqlStageExecution stageExecution = createSqlStageExecution(
                 stageId,
                 locationFactory.createStageLocation(stageId),
                 plan.getFragment(),
@@ -447,7 +448,7 @@ public class SqlQueryScheduler
                 dynamicFilterService,
                 snapshotManager);
 
-        stages.add(stage);
+        stages.add(stageExecution);
 
         Optional<int[]> bucketToPartition;
         PartitioningHandle partitioningHandle = plan.getFragment().getPartitioning();
@@ -467,11 +468,11 @@ public class SqlQueryScheduler
                 // otherwise assumptions about how many "input channels" may be broken.
                 nodeSelector.lockDownNodes();
             }
-            SplitPlacementPolicy placementPolicy = new DynamicSplitPlacementPolicy(nodeSelector, stage::getAllTasks);
+            SplitPlacementPolicy placementPolicy = new DynamicSplitPlacementPolicy(nodeSelector, stageExecution::getAllTasks);
 
             checkArgument(!plan.getFragment().getStageExecutionDescriptor().isStageGroupedExecution());
 
-            stageSchedulers.put(stageId, newSourcePartitionedSchedulerAsStageScheduler(stage, planNodeId, splitSource,
+            stageSchedulers.put(stageId, newSourcePartitionedSchedulerAsStageScheduler(stageExecution, planNodeId, splitSource,
                     placementPolicy, splitBatchSize, session, heuristicIndexerManager));
 
             bucketToPartition = Optional.of(new int[1]);
@@ -543,7 +544,7 @@ public class SqlQueryScheduler
                 }
 
                 stageSchedulers.put(stageId, new FixedSourcePartitionedScheduler(
-                        stage,
+                        stageExecution,
                         splitSources,
                         plan.getFragment().getStageExecutionDescriptor(),
                         schedulingOrder,
@@ -563,7 +564,7 @@ public class SqlQueryScheduler
                 List<InternalNode> partitionToNode = nodePartitionMap.getPartitionToNode();
                 // todo this should asynchronously wait a standard timeout period before failing
                 checkCondition(!partitionToNode.isEmpty(), NO_NODES_AVAILABLE, "No worker nodes available");
-                stageSchedulers.put(stageId, new FixedCountScheduler(stage, partitionToNode));
+                stageSchedulers.put(stageId, new FixedCountScheduler(stageExecution, partitionToNode));
                 bucketToPartition = Optional.of(nodePartitionMap.getBucketToPartition());
             }
         }
@@ -576,7 +577,7 @@ public class SqlQueryScheduler
 
             visitedPlanFrags.add(subStagePlan.getFragment().getId());
             List<SqlStageExecution> subTree = createStages(
-                    stage::addExchangeLocations,
+                    stageExecution::addExchangeLocations,
                     nextStageId,
                     locationFactory,
                     subStagePlan.withBucketToPartition(bucketToPartition),
@@ -605,7 +606,7 @@ public class SqlQueryScheduler
             childStage.setParentId(parentNode.get().getId());
         }
         Set<SqlStageExecution> childStages = childStagesBuilder.build();
-        stage.addStateChangeListener(newState -> {
+        stageExecution.addStateChangeListener(newState -> {
             if (newState.isDone() && newState != StageState.RESCHEDULING) {
                 // Snapshot: For "rescheduling", tasks are already cancelled (for resume)
                 childStages.forEach(SqlStageExecution::cancel);
@@ -621,12 +622,12 @@ public class SqlQueryScheduler
                     .map(RemoteTask::getTaskStatus)
                     .collect(toList());
 
-            Supplier<Collection<TaskStatus>> writerTasksProvider = () -> stage.getAllTasks().stream()
+            Supplier<Collection<TaskStatus>> writerTasksProvider = () -> stageExecution.getAllTasks().stream()
                     .map(RemoteTask::getTaskStatus)
                     .collect(toList());
 
             ScaledWriterScheduler scheduler = new ScaledWriterScheduler(
-                    stage,
+                    stageExecution,
                     sourceTasksProvider,
                     writerTasksProvider,
                     nodeScheduler.createNodeSelector(null, keepConsumerOnFeederNodes, feederScheduledNodes),
@@ -952,21 +953,29 @@ public class SqlQueryScheduler
             boolean noMoreTasks = false;
             switch (newState) {
                 case PLANNED:
+                    // $FALL-THROUGH$
                 case SCHEDULING:
                     // workers are still being added to the query
                     break;
                 case SCHEDULING_SPLITS:
+                    // $FALL-THROUGH$
                 case SCHEDULED:
+                    // $FALL-THROUGH$
                 case RUNNING:
+                    // $FALL-THROUGH$
                 case FINISHED:
+                    // $FALL-THROUGH$
                 case CANCELED:
                     // no more workers will be added to the query
                     noMoreTasks = true;
                 case ABORTED:
+                    // $FALL-THROUGH$
                 case FAILED:
                     // DO NOT complete a FAILED or ABORTED stage.  This will cause the
                     // stage above to finish normally, which will result in a query
                     // completing successfully when it should fail..
+                    break;
+                default:
                     break;
             }
 

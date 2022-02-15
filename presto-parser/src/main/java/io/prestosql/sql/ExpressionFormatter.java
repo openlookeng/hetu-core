@@ -706,17 +706,17 @@ public final class ExpressionFormatter
 
     public static String formatStringLiteral(String s)
     {
-        s = s.replace("'", "''");
-        if (CharMatcher.inRange((char) 0x20, (char) 0x7E).matchesAllOf(s)) {
-            return "'" + s + "'";
+        String tmpStr = s.replace("'", "''");
+        if (CharMatcher.inRange((char) 0x20, (char) 0x7E).matchesAllOf(tmpStr)) {
+            return "'" + tmpStr + "'";
         }
 
         StringBuilder builder = new StringBuilder();
         builder.append("U&'");
-        PrimitiveIterator.OfInt iterator = s.codePoints().iterator();
+        PrimitiveIterator.OfInt iterator = tmpStr.codePoints().iterator();
         while (iterator.hasNext()) {
             int codePoint = iterator.nextInt();
-            checkArgument(codePoint >= 0, "Invalid UTF-8 encoding in characters: %s", s);
+            checkArgument(codePoint >= 0, "Invalid UTF-8 encoding in characters: %s", tmpStr);
             if (isAsciiPrintable(codePoint)) {
                 char ch = (char) codePoint;
                 if (ch == '\\') {

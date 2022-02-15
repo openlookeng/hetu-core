@@ -47,14 +47,14 @@ public class DecimalStatistics
         this.minimum = minimum;
         this.maximum = maximum;
 
-        long retainedSizeInBytes = 0;
+        long tmpRetainedSizeInBytes = 0;
         if (minimum != null) {
-            retainedSizeInBytes += BIG_DECIMAL_INSTANCE_SIZE + decimalSizeInBytes;
+            tmpRetainedSizeInBytes += BIG_DECIMAL_INSTANCE_SIZE + decimalSizeInBytes;
         }
         if (maximum != null && minimum != maximum) {
-            retainedSizeInBytes += BIG_DECIMAL_INSTANCE_SIZE + decimalSizeInBytes;
+            tmpRetainedSizeInBytes += BIG_DECIMAL_INSTANCE_SIZE + decimalSizeInBytes;
         }
-        this.retainedSizeInBytes = retainedSizeInBytes + INSTANCE_SIZE;
+        this.retainedSizeInBytes = tmpRetainedSizeInBytes + INSTANCE_SIZE;
     }
 
     @Override

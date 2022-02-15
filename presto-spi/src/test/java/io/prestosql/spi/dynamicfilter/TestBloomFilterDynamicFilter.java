@@ -17,6 +17,7 @@ package io.prestosql.spi.dynamicfilter;
 import io.airlift.slice.Slice;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 
 import static io.airlift.slice.Slices.utf8Slice;
@@ -50,7 +51,7 @@ public class TestBloomFilterDynamicFilter
         assertTrue(bfdf.contains(v3));
         assertTrue(bfdf.contains(String.valueOf(v4)));
         assertTrue(bfdf.contains(v5));
-        assertTrue(bfdf.contains(new String(v5.getBytes())));
+        assertTrue(bfdf.contains(new String(v5.getBytes(), StandardCharsets.UTF_8)));
         assertFalse(bfdf.contains(String.valueOf(5)));
         assertTrue(bfdf.contains(v6));
     }

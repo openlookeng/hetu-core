@@ -135,8 +135,8 @@ public final class KafkaQueryRunner
         Logging.initialize();
         DistributedQueryRunner queryRunner = createKafkaQueryRunner(EmbeddedKafka.createEmbeddedKafka(), TpchTable.getTables());
         Thread.sleep(10);
-        Logger log = Logger.get(KafkaQueryRunner.class);
-        log.info("======== SERVER STARTED ========");
-        log.info("\n====\n%s\n====", queryRunner.getCoordinator().getBaseUrl());
+        Logger logger = Logger.get(KafkaQueryRunner.class);
+        logger.info("======== SERVER STARTED ========");
+        logger.info("\n====\n%s\n====", queryRunner.getCoordinator().getBaseUrl());
     }
 }

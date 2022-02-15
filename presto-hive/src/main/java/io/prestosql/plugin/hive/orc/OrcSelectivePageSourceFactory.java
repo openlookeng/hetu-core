@@ -229,41 +229,6 @@ public class OrcSelectivePageSourceFactory
                     dataSourceLastModifiedTime));
 
             /* Todo(Nitin): For Append Pattern
-            appendPredicates.get().stream().forEach(newDomainPredicate ->
-                    pageSources.add(createOrcPageSource(
-                            hdfsEnvironment,
-                            session.getUser(),
-                            configuration,
-                            path,
-                            start,
-                            length,
-                            fileSize,
-                            columns,
-                            useOrcColumnNames,
-                            isFullAcidTable(Maps.fromProperties(schema)),
-                            prefilledValues,
-                            outputColumns,
-                            newDomainPredicate,
-                            hiveStorageTimeZone,
-                            typeManager,
-                            getOrcMaxMergeDistance(session),
-                            getOrcMaxBufferSize(session),
-                            getOrcStreamBufferSize(session),
-                            getOrcTinyStripeThreshold(session),
-                            getOrcMaxReadBlockSize(session),
-                            getOrcLazyReadSmallRanges(session),
-                            isOrcBloomFiltersEnabled(session),
-                            stats,
-                            deleteDeltaLocations,
-                            startRowOffsetOfFile,
-                            indexes,
-                            orcCacheStore,
-                            orcCacheProperties,
-                            additionPredicates.orElseGet(() -> ImmutableList.of()),
-                            positions)));
-
-            // Create a Concatenating Page Source
-            return Optional.of(new OrcConcatPageSource(pageSources));
             */
         }
 
@@ -540,9 +505,7 @@ public class OrcSelectivePageSourceFactory
 
             return new OrcSelectivePageSource(
                     recordReader,
-                    orcDataSource,      //TODO- Rajeev: Do we need to pass deleted rows here?
-//                    deletedRows,
-//                    isFullAcid && indexes.isPresent(),
+                    orcDataSource,
                     systemMemoryUsage,
                     stats,
                     columnMappings,

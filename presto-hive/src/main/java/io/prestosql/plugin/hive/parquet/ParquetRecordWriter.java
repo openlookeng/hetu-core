@@ -62,14 +62,14 @@ public final class ParquetRecordWriter
         conf.setLong(ParquetOutputFormat.BLOCK_SIZE, getParquetWriterBlockSize(session).toBytes());
         conf.setLong(ParquetOutputFormat.PAGE_SIZE, getParquetWriterPageSize(session).toBytes());
 
-        RecordWriter recordWriter = new MapredParquetOutputFormat()
+        RecordWriter hiveRecordWriter = new MapredParquetOutputFormat()
                 .getHiveRecordWriter(conf, target, Text.class, false, properties, Reporter.NULL);
 
-        Object realWriter = REAL_WRITER_FIELD.get(recordWriter);
+        Object realWriter = REAL_WRITER_FIELD.get(hiveRecordWriter);
         Object internalWriter = INTERNAL_WRITER_FIELD.get(realWriter);
-        ParquetFileWriter fileWriter = (ParquetFileWriter) FILE_WRITER_FIELD.get(internalWriter);
+        ParquetFileWriter parquetFileWriter = (ParquetFileWriter) FILE_WRITER_FIELD.get(internalWriter);
 
-        return new ParquetRecordWriter(recordWriter, fileWriter);
+        return new ParquetRecordWriter(hiveRecordWriter, parquetFileWriter);
     }
 
     private final RecordWriter recordWriter;

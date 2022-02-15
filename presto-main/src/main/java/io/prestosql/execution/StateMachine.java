@@ -115,8 +115,8 @@ public class StateMachine<T>
         requireNonNull(newState, "newState is null");
 
         T oldState;
-        FutureStateChange<T> futureStateChange;
-        ImmutableList<StateChangeListener<T>> stateChangeListeners;
+        FutureStateChange<T> localFutureStateChange;
+        ImmutableList<StateChangeListener<T>> localStateChangeListeners;
         synchronized (lock) {
             if (state.equals(newState)) {
                 return state;
@@ -127,8 +127,8 @@ public class StateMachine<T>
             oldState = state;
             state = newState;
 
-            futureStateChange = this.futureStateChange.getAndSet(new FutureStateChange<>());
-            stateChangeListeners = ImmutableList.copyOf(this.stateChangeListeners);
+            localFutureStateChange = this.futureStateChange.getAndSet(new FutureStateChange<>());
+            localStateChangeListeners = ImmutableList.copyOf(this.stateChangeListeners);
 
             // if we are now in a terminal state, free the listeners since this will be the last notification
             if (isTerminalState(state)) {
@@ -136,7 +136,7 @@ public class StateMachine<T>
             }
         }
 
-        fireStateChanged(newState, futureStateChange, stateChangeListeners);
+        fireStateChanged(newState, localFutureStateChange, localStateChangeListeners);
         return oldState;
     }
 
@@ -184,8 +184,8 @@ public class StateMachine<T>
         requireNonNull(expectedState, "expectedState is null");
         requireNonNull(newState, "newState is null");
 
-        FutureStateChange<T> futureStateChange;
-        ImmutableList<StateChangeListener<T>> stateChangeListeners;
+        FutureStateChange<T> localFutureStateChange;
+        ImmutableList<StateChangeListener<T>> localStateChangeListeners;
         synchronized (lock) {
             if (!state.equals(expectedState)) {
                 return false;
@@ -200,8 +200,8 @@ public class StateMachine<T>
 
             state = newState;
 
-            futureStateChange = this.futureStateChange.getAndSet(new FutureStateChange<>());
-            stateChangeListeners = ImmutableList.copyOf(this.stateChangeListeners);
+            localFutureStateChange = this.futureStateChange.getAndSet(new FutureStateChange<>());
+            localStateChangeListeners = ImmutableList.copyOf(this.stateChangeListeners);
 
             // if we are now in a terminal state, free the listeners since this will be the last notification
             if (isTerminalState(state)) {
@@ -209,7 +209,7 @@ public class StateMachine<T>
             }
         }
 
-        fireStateChanged(newState, futureStateChange, stateChangeListeners);
+        fireStateChanged(newState, localFutureStateChange, localStateChangeListeners);
         return true;
     }
 

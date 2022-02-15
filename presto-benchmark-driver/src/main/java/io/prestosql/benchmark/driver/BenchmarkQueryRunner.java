@@ -22,6 +22,7 @@ import io.airlift.http.client.HttpClientConfig;
 import io.airlift.http.client.JsonResponseHandler;
 import io.airlift.http.client.Request;
 import io.airlift.http.client.jetty.JettyHttpClient;
+import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.prestosql.client.ClientSession;
 import io.prestosql.client.QueryData;
@@ -58,6 +59,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 public class BenchmarkQueryRunner
         implements Closeable
 {
+    private static final Logger LOG = Logger.get(BenchmarkQueryRunner.class);
     private final int warm;
     private final int runs;
     private final boolean debug;
@@ -236,13 +238,14 @@ public class BenchmarkQueryRunner
     }
 
     @SuppressWarnings("CallToPrintStackTrace")
-    public void handleFailure(Exception e)
+    public void handleFailure(Exception exception)
     {
+        Exception e = exception;
         if (debug) {
             if (e == null) {
                 e = new RuntimeException("Unknown error");
             }
-            e.printStackTrace();
+            LOG.debug("Error message: " + e.getStackTrace());
         }
 
         failures++;

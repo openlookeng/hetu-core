@@ -276,9 +276,9 @@ public class TestMarkerSplitSource
         markerSource.resumeSnapshot(3);
         SplitBatch result = getNextBatchIgnoreMarkerZero(null, lifespan, 2).get();
         assertFalse(result.isLastBatch());
-        List<Split> splits = result.getSplits();
-        assertEquals(splits.size(), 1);
-        ConnectorSplit split = splits.get(0).getConnectorSplit();
+        List<Split> resultSplits = result.getSplits();
+        assertEquals(resultSplits.size(), 1);
+        ConnectorSplit split = resultSplits.get(0).getConnectorSplit();
         assertTrue(split instanceof MarkerSplit);
         MarkerSplit marker = (MarkerSplit) split;
         assertEquals(marker.getSnapshotId(), 3);
@@ -296,17 +296,17 @@ public class TestMarkerSplitSource
                 .thenReturn(Futures.immediateFuture(null));
 
         Future<SplitBatch> result = getNextBatchIgnoreMarkerZero(null, lifespan, 2);
-        List<Split> splits = result.get().getSplits();
-        assertEquals(splits.size(), 2);
-        assertEquals(splits.get(0), split1);
-        assertEquals(splits.get(1), split2);
+        List<Split> resultSplits = result.get().getSplits();
+        assertEquals(resultSplits.size(), 2);
+        assertEquals(resultSplits.get(0), split1);
+        assertEquals(resultSplits.get(1), split2);
         assertFalse(markerSource.isFinished());
 
         result = getNextBatchIgnoreMarkerZero(null, lifespan, 2);
-        splits = result.get().getSplits();
-        assertEquals(splits.size(), 2);
-        assertEquals(splits.get(0), split3);
-        assertEquals(splits.get(1), split1);
+        resultSplits = result.get().getSplits();
+        assertEquals(resultSplits.size(), 2);
+        assertEquals(resultSplits.get(0), split3);
+        assertEquals(resultSplits.get(1), split1);
 
         result = getNextBatchIgnoreMarkerZero(null, lifespan, 3);
         assertNull(result.get());
@@ -325,20 +325,20 @@ public class TestMarkerSplitSource
                 .thenThrow(new IllegalStateException());
 
         Future<SplitBatch> result = getNextBatchIgnoreMarkerZero(null, lifespan, 2);
-        List<Split> splits = result.get().getSplits();
-        assertEquals(splits.size(), 2);
-        assertEquals(splits.get(0), split1);
-        assertEquals(splits.get(1), split2);
+        List<Split> resultSplits = result.get().getSplits();
+        assertEquals(resultSplits.size(), 2);
+        assertEquals(resultSplits.get(0), split1);
+        assertEquals(resultSplits.get(1), split2);
         assertFalse(markerSource.isFinished());
 
         result = getNextBatchIgnoreMarkerZero(null, lifespan, 3);
-        splits = result.get().getSplits();
-        assertEquals(splits.size(), 1);
-        assertEquals(splits.get(0), split3);
+        resultSplits = result.get().getSplits();
+        assertEquals(resultSplits.size(), 1);
+        assertEquals(resultSplits.get(0), split3);
         result = getNextBatchIgnoreMarkerZero(null, lifespan, 3);
-        splits = result.get().getSplits();
-        assertEquals(splits.size(), 1);
-        assertTrue(splits.get(0).getConnectorSplit() instanceof MarkerSplit);
+        resultSplits = result.get().getSplits();
+        assertEquals(resultSplits.size(), 1);
+        assertTrue(resultSplits.get(0).getConnectorSplit() instanceof MarkerSplit);
         assertTrue(markerSource.isFinished());
     }
 
@@ -407,21 +407,21 @@ public class TestMarkerSplitSource
         markerSource.addDependency(otherSource);
 
         Future<SplitBatch> result = getNextBatchIgnoreMarkerZero(null, lifespan, 2);
-        List<Split> splits = result.get().getSplits();
-        assertTrue(splits.isEmpty());
+        List<Split> resultSplits = result.get().getSplits();
+        assertTrue(resultSplits.isEmpty());
         markerSource.finishDependency(otherSource);
         result = getNextBatchIgnoreMarkerZero(null, lifespan, 2);
-        splits = result.get().getSplits();
-        assertTrue(!splits.isEmpty());
+        resultSplits = result.get().getSplits();
+        assertTrue(!resultSplits.isEmpty());
 
         markerSource.resumeSnapshot(0);
         result = getNextBatchIgnoreMarkerZero(null, lifespan, 2);
-        splits = result.get().getSplits();
-        assertTrue(splits.isEmpty());
+        resultSplits = result.get().getSplits();
+        assertTrue(resultSplits.isEmpty());
         markerSource.finishDependency(otherSource);
         result = getNextBatchIgnoreMarkerZero(null, lifespan, 2);
-        splits = result.get().getSplits();
-        assertTrue(!splits.isEmpty());
+        resultSplits = result.get().getSplits();
+        assertTrue(!resultSplits.isEmpty());
     }
 
     @Test(dataProvider = "initializers")
@@ -471,11 +471,11 @@ public class TestMarkerSplitSource
         when(announcer.shouldGenerateMarker(anyObject())).thenReturn(OptionalLong.of(3));
         Future<SplitBatch> result = getNextBatchIgnoreMarkerZero(null, lifespan, 3);
         assertTrue(result.isDone());
-        List<Split> splits = result.get().getSplits();
-        assertEquals(splits.size(), 1);
-        assertTrue(splits.get(0).getConnectorSplit() instanceof MarkerSplit);
+        List<Split> resultSplits = result.get().getSplits();
+        assertEquals(resultSplits.size(), 1);
+        assertTrue(resultSplits.get(0).getConnectorSplit() instanceof MarkerSplit);
         // Confirm what's returned is the snapshot marker (as opposed to the resume marker for snapshot id 7)
-        assertFalse(((MarkerSplit) splits.get(0).getConnectorSplit()).isResuming());
+        assertFalse(((MarkerSplit) resultSplits.get(0).getConnectorSplit()).isResuming());
     }
 
     @Test

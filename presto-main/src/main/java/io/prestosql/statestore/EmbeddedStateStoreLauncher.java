@@ -251,6 +251,7 @@ public class EmbeddedStateStoreLauncher
             Thread.sleep((long) (new SecureRandom().nextDouble() * 1000));
         }
         catch (InterruptedException e) {
+            LOG.debug("Error message: " + e.getMessage());
         }
 
         boolean registered = false;

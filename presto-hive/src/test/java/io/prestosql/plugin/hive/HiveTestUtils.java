@@ -257,6 +257,7 @@ public final class HiveTestUtils
                 dynamicFilters.add(new BloomFilterDynamicFilter("filter", columnHandle, out.toByteArray(), DynamicFilter.Type.GLOBAL));
             }
             catch (IOException e) {
+                // could be ignored
             }
 
             return ImmutableList.of(dynamicFilters);

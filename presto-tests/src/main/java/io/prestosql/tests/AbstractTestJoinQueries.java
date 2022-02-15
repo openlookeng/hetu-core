@@ -873,7 +873,7 @@ public class AbstractTestJoinQueries
                 queryTemplate.replace(condition.of("(x+y in (VALUES 4,5)) AND (x in (VALUES 4,5)) != (y in (VALUES 4,5))")),
                 "VALUES (4,1)");
 
-        for (QueryTemplate.Parameter joinType : type.of("left", "right", "full")) {
+        for (QueryTemplate.Parameter joinType : type.ofStringList("left", "right", "full")) {
             assertQueryFails(
                     queryTemplate.replace(
                             joinType,

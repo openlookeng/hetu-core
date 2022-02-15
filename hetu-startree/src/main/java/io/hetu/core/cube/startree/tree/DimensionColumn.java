@@ -44,6 +44,7 @@ public class DimensionColumn
     }
 
     @JsonIgnore
+    @Override
     public String getUserFriendlyName()
     {
         return "(" + originalColumn + ")";

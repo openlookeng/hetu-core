@@ -32,18 +32,18 @@ public class TestHindexBitmapIndex
         createTableBitmapSupportedDataTypes(tableName);
         String indexName = getNewIndexName();
 
-        predicateQuery = "SELECT * FROM " + tableName + " WHERE " + predicateQuery;
+        String tmpPredicateQuery = "SELECT * FROM " + tableName + " WHERE " + predicateQuery;
 
         assertQuerySucceeds("CREATE INDEX " + indexName + " USING bitmap ON " + tableName + " (p1)");
 
-        MaterializedResult predicateQueryResultLoadingIndex = computeActual(predicateQuery);
-        long predicateQueryInputRowsLoadingIndex = getInputRowsOfLastQueryExecution(predicateQuery);
+        MaterializedResult predicateQueryResultLoadingIndex = computeActual(tmpPredicateQuery);
+        long predicateQueryInputRowsLoadingIndex = getInputRowsOfLastQueryExecution(tmpPredicateQuery);
 
         // Wait before continuing
         Thread.sleep(1000);
 
-        MaterializedResult predicateQueryResultIndexLoaded = computeActual(predicateQuery);
-        long predicateQueryInputRowsIndexLoaded = getInputRowsOfLastQueryExecution(predicateQuery);
+        MaterializedResult predicateQueryResultIndexLoaded = computeActual(tmpPredicateQuery);
+        long predicateQueryInputRowsIndexLoaded = getInputRowsOfLastQueryExecution(tmpPredicateQuery);
 
         assertTrue(verifyEqualResults(predicateQueryResultLoadingIndex, predicateQueryResultIndexLoaded),
                 "The results should be equal.");

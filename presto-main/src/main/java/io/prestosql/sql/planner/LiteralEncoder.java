@@ -117,9 +117,10 @@ public final class LiteralEncoder
         return expressions.build();
     }
 
-    public Expression toExpression(Object object, Type type)
+    public Expression toExpression(Object inputObject, Type type)
     {
         requireNonNull(type, "type is null");
+        Object object = inputObject;
 
         if (object instanceof Expression) {
             return (Expression) object;

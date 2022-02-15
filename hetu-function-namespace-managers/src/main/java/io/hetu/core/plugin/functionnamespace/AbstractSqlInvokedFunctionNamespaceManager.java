@@ -89,11 +89,11 @@ public abstract class AbstractSqlInvokedFunctionNamespaceManager
                     @ParametersAreNonnullByDefault
                     public Collection<SqlInvokedFunction> load(QualifiedObjectName functionName)
                     {
-                        Collection<SqlInvokedFunction> functions = fetchFunctionsDirect(functionName);
-                        for (SqlInvokedFunction function : functions) {
+                        Collection<SqlInvokedFunction> sqlInvokedFunctions = fetchFunctionsDirect(functionName);
+                        for (SqlInvokedFunction function : sqlInvokedFunctions) {
                             metadataByHandle.put(function.getRequiredFunctionHandle(), sqlInvokedFunctionToMetadata(function));
                         }
-                        return functions;
+                        return sqlInvokedFunctions;
                     }
                 });
 
@@ -302,9 +302,9 @@ public abstract class AbstractSqlInvokedFunctionNamespaceManager
 
         public synchronized List<SqlInvokedFunction> loadAndGetFunctionsTransactional(QualifiedObjectName functionName)
         {
-            Collection<SqlInvokedFunction> functions = this.functions.computeIfAbsent(functionName, AbstractSqlInvokedFunctionNamespaceManager.this::fetchFunctions);
-            functionHandles.putAll(functions.stream().collect(toImmutableMap(SqlInvokedFunction::getFunctionId, SqlInvokedFunction::getRequiredFunctionHandle)));
-            return new ArrayList<>(functions);
+            Collection<SqlInvokedFunction> sqlInvokedFunctions = this.functions.computeIfAbsent(functionName, AbstractSqlInvokedFunctionNamespaceManager.this::fetchFunctions);
+            functionHandles.putAll(sqlInvokedFunctions.stream().collect(toImmutableMap(SqlInvokedFunction::getFunctionId, SqlInvokedFunction::getRequiredFunctionHandle)));
+            return new ArrayList<>(sqlInvokedFunctions);
         }
 
         public synchronized FunctionHandle getFunctionHandle(SqlFunctionId functionId)

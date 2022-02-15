@@ -146,7 +146,7 @@ public class OrcDeletedRows
                 return;
             }
 
-            int[] validPositions = new int[sourcePage.getPositionCount()];
+            int[] localValidPositions = new int[sourcePage.getPositionCount()];
             OrcAcidRowId sourcePageRowId = new OrcAcidRowId(0, 0, 0);
             int validPositionsIndex = 0;
             for (int pagePosition = 0; pagePosition < sourcePage.getPositionCount(); pagePosition++) {
@@ -159,12 +159,12 @@ public class OrcDeletedRows
                 }
                 boolean deleted = isDeleted(sourcePageRowId);
                 if (!deleted) {
-                    validPositions[validPositionsIndex] = pagePosition;
+                    localValidPositions[validPositionsIndex] = pagePosition;
                     validPositionsIndex++;
                 }
             }
             this.positionCount = validPositionsIndex;
-            this.validPositions = validPositions;
+            this.validPositions = localValidPositions;
             this.sourcePage = null;
         }
     }

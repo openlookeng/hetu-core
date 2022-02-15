@@ -76,7 +76,6 @@ public class TestValuesNodeStats
                                         SymbolStatsEstimate.builder()
                                                 .setNullsFraction(0.25)
                                                 .setDistinctValuesCount(3)
-                                                // TODO .setAverageRowSize(4 + 1. / 3)
                                                 .build())
                                 .build()));
     }

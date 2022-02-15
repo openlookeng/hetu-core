@@ -91,8 +91,8 @@ public class StatsAndCosts
     {
         Iterable<PlanNode> planIterator = Traverser.forTree(PlanNode::getSources)
                 .depthFirstPreOrder(root);
-        ImmutableMap.Builder<PlanNodeId, PlanNodeStatsEstimate> stats = ImmutableMap.builder();
-        ImmutableMap.Builder<PlanNodeId, PlanCostEstimate> costs = ImmutableMap.builder();
+        ImmutableMap.Builder<PlanNodeId, PlanNodeStatsEstimate> tmpStats = ImmutableMap.builder();
+        ImmutableMap.Builder<PlanNodeId, PlanCostEstimate> tmpCosts = ImmutableMap.builder();
         Set<PlanNodeId> visitedPlanNodeId = new HashSet<>();
         for (PlanNode node : planIterator) {
             PlanNodeId id = node.getId();
@@ -102,10 +102,10 @@ public class StatsAndCosts
             }
 
             visitedPlanNodeId.add(id);
-            stats.put(id, statsProvider.getStats(node));
-            costs.put(id, costProvider.getCost(node));
+            tmpStats.put(id, statsProvider.getStats(node));
+            tmpCosts.put(id, costProvider.getCost(node));
         }
-        return new StatsAndCosts(stats.build(), costs.build());
+        return new StatsAndCosts(tmpStats.build(), tmpCosts.build());
     }
 
     public static StatsAndCosts create(StageInfo stageInfo)

@@ -172,8 +172,9 @@ public class QuerySnapshotManager
             return result;
         }
 
-        if (!beforeThis.isPresent()) {
-            beforeThis = OptionalLong.of(Long.MAX_VALUE);
+        OptionalLong localBeforeThis = beforeThis;
+        if (!localBeforeThis.isPresent()) {
+            localBeforeThis = OptionalLong.of(Long.MAX_VALUE);
         }
 
         synchronized (captureResults) {
@@ -181,13 +182,13 @@ public class QuerySnapshotManager
             // iterate in reverse order
             for (int i = entryList.size() - 1; i >= 0; i--) {
                 long snapshotId = entryList.get(i).getKey();
-                SnapshotResult restoreResult = entryList.get(i).getValue();
+                SnapshotResult snapshotResult = entryList.get(i).getValue();
                 // Update the snapshot result to n/a where snapshotId > resumeSnapshotId && snapshotId <= beforeThis
-                if (snapshotId == beforeThis.getAsLong()) {
+                if (snapshotId == localBeforeThis.getAsLong()) {
                     captureResults.put(snapshotId, SnapshotResult.NA);
                 }
-                else if (snapshotId < beforeThis.getAsLong()) {
-                    if (restoreResult == SnapshotResult.SUCCESSFUL) {
+                else if (snapshotId < localBeforeThis.getAsLong()) {
+                    if (snapshotResult == SnapshotResult.SUCCESSFUL) {
                         result = OptionalLong.of(snapshotId);
                         break;
                     }

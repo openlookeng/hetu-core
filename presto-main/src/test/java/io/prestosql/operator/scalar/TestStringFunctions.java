@@ -292,8 +292,10 @@ public class TestStringFunctions
         testStrPosAndPosition(null, null, null);
     }
 
-    private void testStrPosAndPosition(String string, String substring, Long expected)
+    private void testStrPosAndPosition(String inputString, String inputSubString, Long expected)
     {
+        String string = inputString;
+        String substring = inputSubString;
         string = (string == null) ? "NULL" : ("'" + string + "'");
         substring = (substring == null) ? "NULL" : ("'" + substring + "'");
 

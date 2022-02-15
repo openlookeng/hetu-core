@@ -79,8 +79,8 @@ public class PageConsumerOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, PageConsumerOperator.class.getSimpleName());
-            return new PageConsumerOperator(operatorContext, pageConsumer, pagePreprocessor);
+            OperatorContext oprContext = driverContext.addOperatorContext(operatorId, planNodeId, PageConsumerOperator.class.getSimpleName());
+            return new PageConsumerOperator(oprContext, pageConsumer, pagePreprocessor);
         }
 
         @Override
@@ -144,9 +144,9 @@ public class PageConsumerOperator
         requireNonNull(page, "page is null");
         checkState(!finished, "operator finished");
 
-        page = pagePreprocessor.apply(page);
-        pageConsumer.accept(page);
-        operatorContext.recordOutput(page.getSizeInBytes(), page.getPositionCount());
+        Page tmpPage = pagePreprocessor.apply(page);
+        pageConsumer.accept(tmpPage);
+        operatorContext.recordOutput(tmpPage.getSizeInBytes(), tmpPage.getPositionCount());
     }
 
     @Override

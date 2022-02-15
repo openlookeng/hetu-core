@@ -38,7 +38,7 @@ public final class KylinKeywords
     public static String getAlias(String name)
     {
         if (getKeywords().contains(name.toLowerCase(Locale.ENGLISH))) {
-            return KylinConstants.KYLIN_IDENTIFIER_QUOTE + name.toUpperCase() + KylinConstants.KYLIN_IDENTIFIER_QUOTE;
+            return KylinConstants.KYLIN_IDENTIFIER_QUOTE + name.toUpperCase(Locale.ROOT) + KylinConstants.KYLIN_IDENTIFIER_QUOTE;
         }
         return name;
     }

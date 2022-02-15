@@ -79,7 +79,7 @@ public class CreateIndexOperator
 
     private State state = State.NEEDS_INPUT;
 
-    // NEEDS_INPUT -> PERSISTING -> FINISHED_PERSISTING -> FINISHED
+    // States change sequence: from NEEDS_INPUT to PERSISTING, PERSISTING to FINISHED_PERSISTING, then FINISHED_PERSISTING to FINISHED
     private enum State
     {
         NEEDS_INPUT,
@@ -326,8 +326,8 @@ public class CreateIndexOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, CreateIndexOperator.class.getSimpleName());
-            return new CreateIndexOperator(operatorContext, createIndexMetadata, heuristicIndexerManager, levelWriter, persistBy, finished);
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, CreateIndexOperator.class.getSimpleName());
+            return new CreateIndexOperator(addOperatorContext, createIndexMetadata, heuristicIndexerManager, levelWriter, persistBy, finished);
         }
 
         @Override

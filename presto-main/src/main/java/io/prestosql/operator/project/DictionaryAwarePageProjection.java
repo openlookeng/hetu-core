@@ -94,16 +94,16 @@ public class DictionaryAwarePageProjection
             this.session = session;
             this.yieldSignal = requireNonNull(yieldSignal, "yieldSignal is null");
 
-            Block block = requireNonNull(page, "page is null").getBlock(0).getLoadedBlock();
-            this.block = block;
+            Block loadedBlock = requireNonNull(page, "page is null").getBlock(0).getLoadedBlock();
+            this.block = loadedBlock;
             this.selectedPositions = requireNonNull(selectedPositions, "selectedPositions is null");
 
             Optional<Block> dictionary = Optional.empty();
-            if (block instanceof RunLengthEncodedBlock) {
-                dictionary = Optional.of(((RunLengthEncodedBlock) block).getValue());
+            if (loadedBlock instanceof RunLengthEncodedBlock) {
+                dictionary = Optional.of(((RunLengthEncodedBlock) loadedBlock).getValue());
             }
-            else if (block instanceof DictionaryBlock) {
-                dictionary = Optional.of(((DictionaryBlock) block).getDictionary());
+            else if (loadedBlock instanceof DictionaryBlock) {
+                dictionary = Optional.of(((DictionaryBlock) loadedBlock).getDictionary());
             }
 
             // Try use dictionary processing first; if it fails, fall back to the generic case

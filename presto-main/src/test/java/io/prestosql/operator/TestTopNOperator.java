@@ -272,6 +272,7 @@ public class TestTopNOperator
             fail("must fail because of exceeding local memory limit");
         }
         catch (ExceededMemoryLimitException ignore) {
+            // the exception could be ignored
         }
     }
 

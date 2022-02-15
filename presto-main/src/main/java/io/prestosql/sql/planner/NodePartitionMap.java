@@ -41,9 +41,7 @@ public class NodePartitionMap
 
     public NodePartitionMap(List<InternalNode> partitionToNode, ToIntFunction<Split> splitToBucket)
     {
-        this.partitionToNode = ImmutableList.copyOf(requireNonNull(partitionToNode, "partitionToNode is null"));
-        this.bucketToPartition = IntStream.range(0, partitionToNode.size()).toArray();
-        this.splitToBucket = requireNonNull(splitToBucket, "splitToBucket is null");
+        this(partitionToNode, IntStream.range(0, partitionToNode.size()).toArray(), splitToBucket);
     }
 
     public NodePartitionMap(List<InternalNode> partitionToNode, int[] bucketToPartition, ToIntFunction<Split> splitToBucket)

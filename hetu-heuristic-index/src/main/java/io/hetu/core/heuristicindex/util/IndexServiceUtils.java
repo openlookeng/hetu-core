@@ -318,6 +318,8 @@ public class IndexServiceUtils
                 return Serializer.BIG_DECIMAL;
             case "Date":
                 return Serializer.DATE;
+            default:
+                break;
         }
         throw new RuntimeException("Index is not supported for type: (" + type + ")");
     }

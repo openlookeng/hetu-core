@@ -129,16 +129,16 @@ public class ExpressionEquivalence
         }
 
         @Override
-        public RowExpression visitCall(CallExpression call, Void context)
+        public RowExpression visitCall(CallExpression inputCall, Void context)
         {
-            call = new CallExpression(
-                    call.getDisplayName(),
-                    call.getFunctionHandle(),
-                    call.getType(),
-                    call.getArguments().stream()
+            CallExpression call = new CallExpression(
+                    inputCall.getDisplayName(),
+                    inputCall.getFunctionHandle(),
+                    inputCall.getType(),
+                    inputCall.getArguments().stream()
                             .map(expression -> expression.accept(this, context))
                             .collect(toImmutableList()),
-                    call.getFilter());
+                    inputCall.getFilter());
 
             QualifiedObjectName callName = functionAndTypeManager.getFunctionMetadata(call.getFunctionHandle()).getName();
 
@@ -172,12 +172,12 @@ public class ExpressionEquivalence
         }
 
         @Override
-        public RowExpression visitSpecialForm(SpecialForm specialForm, Void context)
+        public RowExpression visitSpecialForm(SpecialForm inputSpecialForm, Void context)
         {
-            specialForm = new SpecialForm(
-                    specialForm.getForm(),
-                    specialForm.getType(),
-                    specialForm.getArguments().stream()
+            SpecialForm specialForm = new SpecialForm(
+                    inputSpecialForm.getForm(),
+                    inputSpecialForm.getType(),
+                    inputSpecialForm.getArguments().stream()
                             .map(expression -> expression.accept(this, context))
                             .collect(toImmutableList()));
 

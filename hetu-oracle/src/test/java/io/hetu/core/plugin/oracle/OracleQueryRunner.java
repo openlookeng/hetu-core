@@ -80,14 +80,14 @@ public class OracleQueryRunner
 
             queryRunner.installPlugin(new TpchPlugin());
             queryRunner.createCatalog(TPCH_CATALOG, TPCH_CATALOG);
-            connectorProperties = new HashMap<>(ImmutableMap.copyOf(connectorProperties));
-            connectorProperties.putIfAbsent("connection-url", testingOracleServer.getJdbcUrl());
-            connectorProperties.putIfAbsent("connection-user", testingOracleServer.getUser());
-            connectorProperties.putIfAbsent("connection-password", testingOracleServer.getPassWd());
-            connectorProperties.putIfAbsent("allow-drop-table", "true");
+            HashMap<String, String> connProperties = new HashMap<>(ImmutableMap.copyOf(connectorProperties));
+            connProperties.putIfAbsent("connection-url", testingOracleServer.getJdbcUrl());
+            connProperties.putIfAbsent("connection-user", testingOracleServer.getUser());
+            connProperties.putIfAbsent("connection-password", testingOracleServer.getPassWd());
+            connProperties.putIfAbsent("allow-drop-table", "true");
 
             queryRunner.installPlugin(new OraclePlugin());
-            queryRunner.createCatalog(CATALOG, "oracle", connectorProperties);
+            queryRunner.createCatalog(CATALOG, "oracle", connProperties);
 
             copyTpchTables(queryRunner, TPCH_CATALOG, TINY_SCHEMA_NAME, createSession(), tables);
 

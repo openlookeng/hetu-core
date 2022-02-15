@@ -58,8 +58,9 @@ public class BooleanStreamReader
     @Override
     public void putBytes(int rowId, int count, byte[] src, int srcIndex)
     {
+        int srcIdx = srcIndex;
         for (int i = 0; i < count; i++) {
-            type.writeBoolean(builder, src[srcIndex++] == 1);
+            type.writeBoolean(builder, src[srcIdx++] == 1);
         }
     }
 

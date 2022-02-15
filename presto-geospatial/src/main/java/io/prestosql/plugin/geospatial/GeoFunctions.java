@@ -1547,19 +1547,20 @@ public final class GeoFunctions
 
     private static double computeSphericalExcess(Polygon polygon, int start, int end)
     {
+        int tmpEnd = end;
         // Our calculations rely on not processing the same point twice
-        if (polygon.getPoint(end - 1).equals(polygon.getPoint(start))) {
-            end = end - 1;
+        if (polygon.getPoint(tmpEnd - 1).equals(polygon.getPoint(start))) {
+            tmpEnd = tmpEnd - 1;
         }
 
-        if (end - start < 3) {
+        if (tmpEnd - start < 3) {
             // A path with less than 3 distinct points is not valid for calculating an area
             throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "Polygon is not valid: a loop contains less then 3 vertices.");
         }
 
         Point point = new Point();
         // Initialize the calculator with the last point
-        polygon.getPoint(end - 1, point);
+        polygon.getPoint(tmpEnd - 1, point);
 
         double sphericalExcess = 0;
         double courseDelta = 0;
@@ -1572,7 +1573,7 @@ public final class GeoFunctions
         double previousTan = Math.tan(previousPhi / 2);
         double previousLongitude = toRadians(point.getX());
 
-        for (int i = start; i < end; i++) {
+        for (int i = start; i < tmpEnd; i++) {
             polygon.getPoint(i, point);
             double phi = toRadians(point.getY());
             double tan = Math.tan(phi / 2);

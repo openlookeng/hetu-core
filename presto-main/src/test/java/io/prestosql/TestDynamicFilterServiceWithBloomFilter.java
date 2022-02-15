@@ -35,6 +35,7 @@ import org.testng.annotations.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -102,9 +103,9 @@ public class TestDynamicFilterServiceWithBloomFilter
         Thread.sleep(3000);
         BloomFilter bf = fetchDynamicFilter(filterId, session.getQueryId().toString());
         for (int i = 1; i < 9; i++) {
-            assertTrue(bf.test((String.valueOf(i).getBytes())));
+            assertTrue(bf.test((String.valueOf(i).getBytes(StandardCharsets.UTF_8))));
         }
-        assertFalse(bf.test("10".getBytes()));
+        assertFalse(bf.test("10".getBytes(StandardCharsets.UTF_8)));
 
         // Test getDynamicFilterSupplier
         dynamicFilterSupplier = DynamicFilterService.getDynamicFilterSupplier(session.getQueryId(),
@@ -158,7 +159,7 @@ public class TestDynamicFilterServiceWithBloomFilter
     {
         BloomFilter bloomFilter = new BloomFilter(1024 * 1024, 0.1);
         for (String val : values) {
-            bloomFilter.add(val.getBytes());
+            bloomFilter.add(val.getBytes(StandardCharsets.UTF_8));
         }
 
         String key = DynamicFilterUtils.createKey(DynamicFilterUtils.PARTIALPREFIX, filterId, queryId);

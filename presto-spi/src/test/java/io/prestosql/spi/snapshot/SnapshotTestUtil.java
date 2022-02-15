@@ -14,6 +14,8 @@
  */
 package io.prestosql.spi.snapshot;
 
+import io.airlift.log.Logger;
+
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -25,6 +27,8 @@ import java.util.Set;
 
 public final class SnapshotTestUtil
 {
+    private static final Logger LOG = Logger.get(SnapshotTestUtil.class);
+
     private SnapshotTestUtil() {}
 
     public static Map<String, Object> toSimpleSnapshotMapping(Object snapshot)
@@ -37,7 +41,7 @@ public final class SnapshotTestUtil
                 fieldValue = field.get(snapshot);
             }
             catch (IllegalAccessException e) {
-                e.printStackTrace();
+                LOG.info("Error message: " + e.getStackTrace());
             }
             if (fieldValue == null) {
                 continue;
@@ -113,7 +117,7 @@ public final class SnapshotTestUtil
                 }
             }
             catch (IllegalAccessException e) {
-                e.printStackTrace();
+                LOG.info("Error message: " + e.getStackTrace());
             }
         }
         return result;

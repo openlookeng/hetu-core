@@ -16,6 +16,7 @@ package io.prestosql.plugin.kafka;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.log.Logger;
 import io.prestosql.decoder.dummy.DummyRowDecoder;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -48,6 +49,7 @@ import static java.util.Objects.requireNonNull;
 public class KafkaMetadata
         implements ConnectorMetadata
 {
+    private static final Logger LOG = Logger.get(KafkaMetadata.class);
     private final boolean hideInternalColumns;
     private final Map<SchemaTableName, KafkaTopicDescription> tableDescriptions;
 
@@ -178,6 +180,7 @@ public class KafkaMetadata
             }
             catch (TableNotFoundException e) {
                 // information_schema table or a system table
+                LOG.debug("Error message: " + e.getMessage());
             }
         }
         return columns.build();

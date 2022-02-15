@@ -41,8 +41,9 @@ public class JdbcHetuMetastoreFactory
 
     @Override
     public HetuMetastore create(String name, Map<String, String> config, HetuFileSystemClient client,
-            StateStore stateStore, String type)
+            StateStore stateStore, String inputType)
     {
+        String type = inputType;
         requireNonNull(config, "config is null");
         Bootstrap app;
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {

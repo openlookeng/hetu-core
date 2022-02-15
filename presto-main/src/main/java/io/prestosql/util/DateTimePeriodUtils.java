@@ -156,12 +156,13 @@ public final class DateTimePeriodUtils
 
     private static Period parsePeriod(PeriodFormatter periodFormatter, String value)
     {
-        boolean negative = value.startsWith("-");
+        String tmpValue = value;
+        boolean negative = tmpValue.startsWith("-");
         if (negative) {
-            value = value.substring(1);
+            tmpValue = tmpValue.substring(1);
         }
 
-        Period period = periodFormatter.parsePeriod(value);
+        Period period = periodFormatter.parsePeriod(tmpValue);
         for (DurationFieldType type : period.getFieldTypes()) {
             checkArgument(period.get(type) >= 0, "Period field %s is negative", type);
         }
@@ -186,9 +187,7 @@ public final class DateTimePeriodUtils
 
     private static PeriodFormatter cretePeriodFormatter(IntervalField startField, IntervalField endField)
     {
-        if (endField == null) {
-            endField = startField;
-        }
+        IntervalField tmpEndField = endField == null ? startField : endField;
 
         List<PeriodParser> parsers = new ArrayList<>();
 
@@ -197,7 +196,7 @@ public final class DateTimePeriodUtils
             case YEAR:
                 builder.appendYears();
                 parsers.add(builder.toParser());
-                if (endField == IntervalField.YEAR) {
+                if (tmpEndField == IntervalField.YEAR) {
                     break;
                 }
                 builder.appendLiteral("-");
@@ -206,15 +205,15 @@ public final class DateTimePeriodUtils
             case MONTH:
                 builder.appendMonths();
                 parsers.add(builder.toParser());
-                if (endField != IntervalField.MONTH) {
-                    throw new IllegalArgumentException("Invalid interval qualifier: " + startField + " to " + endField);
+                if (tmpEndField != IntervalField.MONTH) {
+                    throw new IllegalArgumentException("Invalid interval qualifier: " + startField + " to " + tmpEndField);
                 }
                 break;
 
             case DAY:
                 builder.appendDays();
                 parsers.add(builder.toParser());
-                if (endField == IntervalField.DAY) {
+                if (tmpEndField == IntervalField.DAY) {
                     break;
                 }
                 builder.appendLiteral(" ");
@@ -223,7 +222,7 @@ public final class DateTimePeriodUtils
             case HOUR:
                 builder.appendHours();
                 parsers.add(builder.toParser());
-                if (endField == IntervalField.HOUR) {
+                if (tmpEndField == IntervalField.HOUR) {
                     break;
                 }
                 builder.appendLiteral(":");
@@ -232,7 +231,7 @@ public final class DateTimePeriodUtils
             case MINUTE:
                 builder.appendMinutes();
                 parsers.add(builder.toParser());
-                if (endField == IntervalField.MINUTE) {
+                if (tmpEndField == IntervalField.MINUTE) {
                     break;
                 }
                 builder.appendLiteral(":");

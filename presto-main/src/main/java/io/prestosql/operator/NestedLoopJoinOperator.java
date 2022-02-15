@@ -80,11 +80,11 @@ public class NestedLoopJoinOperator
             checkState(!closed, "Factory is already closed");
             NestedLoopJoinBridge nestedLoopJoinBridge = joinBridgeManager.getJoinBridge(driverContext.getLifespan());
 
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, NestedLoopJoinOperator.class.getSimpleName());
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, NestedLoopJoinOperator.class.getSimpleName());
 
             joinBridgeManager.probeOperatorCreated(driverContext.getLifespan());
             return new NestedLoopJoinOperator(
-                    operatorContext,
+                    addOperatorContext,
                     nestedLoopJoinBridge,
                     () -> joinBridgeManager.probeOperatorClosed(driverContext.getLifespan()));
         }
@@ -317,6 +317,7 @@ public class NestedLoopJoinOperator
                 }
                 catch (ArithmeticException exception) {
                     // return -1 to disable the shortcut if overflows.
+                    return -1;
                 }
             }
             return -1;

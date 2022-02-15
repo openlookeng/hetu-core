@@ -59,15 +59,15 @@ public final class GreenPlumQueryRunner
             queryRunner.installPlugin(new TpchPlugin());
             queryRunner.createCatalog("tpch", "tpch");
 
-            connectorProperties = new HashMap<>(ImmutableMap.copyOf(connectorProperties));
-            connectorProperties.putIfAbsent("connection-url", server.getJdbcUrl());
-            connectorProperties.putIfAbsent("allow-drop-table", "true");
-            connectorProperties.putIfAbsent("jdbc.pushdown-enabled", "false");
+            Map<String, String> connectorPropertiesMap = new HashMap<>(ImmutableMap.copyOf(connectorProperties));
+            connectorPropertiesMap.putIfAbsent("connection-url", server.getJdbcUrl());
+            connectorPropertiesMap.putIfAbsent("allow-drop-table", "true");
+            connectorPropertiesMap.putIfAbsent("jdbc.pushdown-enabled", "false");
 
             createSchema(server.getJdbcUrl(), "tpch");
 
             queryRunner.installPlugin(new GreenPlumSqlPlugin());
-            queryRunner.createCatalog(GREENPLUM_CONNECTOR_NAME, GREENPLUM_CONNECTOR_NAME, connectorProperties);
+            queryRunner.createCatalog(GREENPLUM_CONNECTOR_NAME, GREENPLUM_CONNECTOR_NAME, connectorPropertiesMap);
 
             copyTpchTables(queryRunner, "tpch", TINY_SCHEMA_NAME, createSession(), tables);
 

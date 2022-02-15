@@ -64,10 +64,10 @@ public class StaticSelector
         this.queryType = requireNonNull(queryType, "queryType is null");
         this.group = requireNonNull(group, "group is null");
 
-        HashSet<String> variableNames = new HashSet<>(ImmutableList.of(USER_VARIABLE, SOURCE_VARIABLE));
-        userRegex.ifPresent(u -> addNamedGroups(u, variableNames));
-        sourceRegex.ifPresent(s -> addNamedGroups(s, variableNames));
-        this.variableNames = ImmutableSet.copyOf(variableNames);
+        HashSet<String> variableNamesSet = new HashSet<>(ImmutableList.of(USER_VARIABLE, SOURCE_VARIABLE));
+        userRegex.ifPresent(u -> addNamedGroups(u, variableNamesSet));
+        sourceRegex.ifPresent(s -> addNamedGroups(s, variableNamesSet));
+        this.variableNames = ImmutableSet.copyOf(variableNamesSet);
 
         Set<String> unresolvedVariables = Sets.difference(group.getVariableNames(), variableNames);
         checkArgument(unresolvedVariables.isEmpty(), "unresolved variables %s in resource group ID '%s', available: %s\"", unresolvedVariables, group, variableNames);

@@ -634,21 +634,22 @@ public final class ThriftMetastoreUtil
 
     private static long fromMetastoreDistinctValuesCount(long distinctValuesCount, long nullsCount, long rowCount)
     {
+        long tmpDistinctValuesCount = distinctValuesCount;
         long nonNullsCount = rowCount - nullsCount;
-        if (nullsCount > 0 && distinctValuesCount > 0) {
-            distinctValuesCount--;
+        if (nullsCount > 0 && tmpDistinctValuesCount > 0) {
+            tmpDistinctValuesCount--;
         }
 
         // normalize distinctValuesCount in case there is a non null element
-        if (nonNullsCount > 0 && distinctValuesCount == 0) {
-            distinctValuesCount = 1;
+        if (nonNullsCount > 0 && tmpDistinctValuesCount == 0) {
+            tmpDistinctValuesCount = 1;
         }
 
         // the metastore may store an estimate, so the value stored may be higher than the total number of rows
-        if (distinctValuesCount > nonNullsCount) {
+        if (tmpDistinctValuesCount > nonNullsCount) {
             return nonNullsCount;
         }
-        return distinctValuesCount;
+        return tmpDistinctValuesCount;
     }
 
     public static Set<RoleGrant> fromRolePrincipalGrants(Collection<RolePrincipalGrant> grants, boolean isRoleNameCaseSensitive)

@@ -60,7 +60,6 @@ public class TestVarArgsToArrayAdapterGenerator
         assertFunction("var_args_sum(1, null, 2, null, 3)", INTEGER, null);
         assertFunction("var_args_sum(1, 2, 3)", INTEGER, 6);
 
-        // var_args_sum(1, 2, 3, ..., k)
         int k = 100;
         int expectedSum = (1 + k) * k / 2;
         assertFunction(format("var_args_sum(%s)", Joiner.on(",").join(IntStream.rangeClosed(1, k).boxed().collect(toSet()))), INTEGER, expectedSum);
