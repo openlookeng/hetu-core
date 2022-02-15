@@ -1184,8 +1184,8 @@ public class TestWindowOperator
             throws Exception
     {
         // Initialization
-        Path spillPath = Files.createTempDir().toPath();
-        GenericSpillerFactory genericSpillerFactory = createGenericSpillerFactory(spillPath);
+        Path spillPath = Paths.get("/tmp/hetu/snapshot/");
+        GenericSpillerFactory genericSpillerFactory = createGenericSpillerFactory(spillPath, fileSystemClientManager);
         FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
         when(fileSystemClientManager.getFileSystemClient(any(Path.class))).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/tmp/hetu/snapshot/")));
         SnapshotConfig snapshotConfig = new SnapshotConfig();
