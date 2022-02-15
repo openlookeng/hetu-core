@@ -17,6 +17,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import io.hetu.core.filesystem.HdfsConfig;
+import io.hetu.core.filesystem.HetuHdfsFileSystemClient;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
 import io.prestosql.filesystem.FileSystemClientManager;
@@ -74,6 +76,18 @@ public class TestFileSingleStreamSpillerFactory
         closer.register(() -> deleteRecursively(spillPath2.toPath(), ALLOW_INSECURE));
         when(fileSystemClientManager.getFileSystemClient(spillPath1.toPath())).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(spillPath1.getAbsolutePath())));
         when(fileSystemClientManager.getFileSystemClient(spillPath2.toPath())).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(spillPath2.getAbsolutePath())));
+        when(fileSystemClientManager.getFileSystemClient("hdfs", spillPath1.toPath())).thenReturn(getLocalHdfs(spillPath1.toString()));
+        when(fileSystemClientManager.getFileSystemClient("hdfs", spillPath2.toPath())).thenReturn(getLocalHdfs(spillPath2.toString()));
+    }
+
+    private HetuHdfsFileSystemClient getLocalHdfs(String rootPath)
+            throws IOException
+    {
+        Properties properties = new Properties();
+        properties.setProperty("fs.client.type", "hdfs");
+        properties.setProperty("hdfs.config.resources", "");
+        properties.setProperty("hdfs.authentication.type", "NONE");
+        return new HetuHdfsFileSystemClient(new HdfsConfig(properties), Paths.get(rootPath));
     }
 
     @AfterMethod(alwaysRun = true)
@@ -150,6 +164,28 @@ public class TestFileSingleStreamSpillerFactory
         spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"));
     }
 
+    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "No free space available for spill")
+    public void throwsIfNoDiskSpaceWhenHdfsSpillEnabled()
+    {
+        List<Type> types = ImmutableList.of(BIGINT);
+        List<Path> spillPaths = ImmutableList.of(spillPath1.toPath(), spillPath2.toPath());
+        FileSingleStreamSpillerFactory spillerFactory = new FileSingleStreamSpillerFactory(
+                executor, // executor won't be closed, because we don't call destroy() on the spiller factory
+                blockEncodingSerde,
+                new SpillerStats(),
+                spillPaths,
+                0.0,
+                false,
+                false,
+                false,
+                1,
+                true,
+                "hdfs",
+                fileSystemClientManager);
+
+        spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"));
+    }
+
     @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "No spill paths configured")
     public void throwIfNoSpillPaths()
     {
@@ -167,6 +203,27 @@ public class TestFileSingleStreamSpillerFactory
                 1,
                 false,
                 null,
+                fileSystemClientManager);
+        spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"));
+    }
+
+    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "No spill paths configured")
+    public void throwIfNoSpillPathsWhenSpillToHdfsEnabled()
+    {
+        List<Path> spillPaths = emptyList();
+        List<Type> types = ImmutableList.of(BIGINT);
+        FileSingleStreamSpillerFactory spillerFactory = new FileSingleStreamSpillerFactory(
+                executor, // executor won't be closed, because we don't call destroy() on the spiller factory
+                blockEncodingSerde,
+                new SpillerStats(),
+                spillPaths,
+                1.0,
+                false,
+                false,
+                false,
+                1,
+                true,
+                "hdfs",
                 fileSystemClientManager);
         spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"));
     }
@@ -206,5 +263,36 @@ public class TestFileSingleStreamSpillerFactory
 
         assertEquals(listFiles(spillPath1.toPath()).size(), 1);
         assertEquals(listFiles(spillPath2.toPath()).size(), 2);
+    }
+
+    @Test
+    public void testCleanupOldSpillFilesWhenSpillToHdfsEnabled()
+            throws Exception
+    {
+        List<Path> spillPaths = ImmutableList.of(spillPath1.toPath(), spillPath2.toPath());
+        spillPath1.mkdirs();
+
+        java.nio.file.Files.createTempFile(spillPath1.toPath(), SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX);
+        java.nio.file.Files.createTempFile(spillPath1.toPath(), SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX);
+        java.nio.file.Files.createTempFile(spillPath1.toPath(), SPILL_FILE_PREFIX, "blah");
+
+        assertEquals(listFiles(spillPath1.toPath()).size(), 3);
+
+        FileSingleStreamSpillerFactory spillerFactory = new FileSingleStreamSpillerFactory(
+                executor, // executor won't be closed, because we don't call destroy() on the spiller factory
+                blockEncodingSerde,
+                new SpillerStats(),
+                spillPaths,
+                1.0,
+                false,
+                false,
+                false,
+                1,
+                true,
+                "hdfs",
+                fileSystemClientManager);
+        spillerFactory.cleanupOldSpillFiles();
+
+        assertEquals(listFiles(spillPath1.toPath()).size(), 1);
     }
 }

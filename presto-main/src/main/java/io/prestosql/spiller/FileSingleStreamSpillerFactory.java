@@ -43,7 +43,6 @@ import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.prestosql.spi.StandardErrorCode.OUT_OF_SPILL_SPACE;
 import static java.lang.String.format;
-import static java.nio.file.Files.delete;
 import static java.nio.file.Files.newDirectoryStream;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newFixedThreadPool;
@@ -127,7 +126,7 @@ public class FileSingleStreamSpillerFactory
 
     public void cleanupOldSpillFiles()
     {
-        spillPaths.forEach(FileSingleStreamSpillerFactory::cleanupOldSpillFiles);
+        spillPaths.forEach(path -> cleanupOldSpillFiles(path, spillToHdfs, spillProfile, fileSystemClientManager));
     }
 
     @PreDestroy
@@ -136,13 +135,14 @@ public class FileSingleStreamSpillerFactory
         executor.shutdownNow();
     }
 
-    private static void cleanupOldSpillFiles(Path path)
+    private static void cleanupOldSpillFiles(Path path, boolean spillToHdfs, String spillProfile, FileSystemClientManager fileSystemClientManager)
     {
         try (DirectoryStream<Path> stream = newDirectoryStream(path, SPILL_FILE_GLOB)) {
+            HetuFileSystemClient fileSystemClient = getFileSystem(path, spillToHdfs, spillProfile, fileSystemClientManager);
             stream.forEach(spillFile -> {
                 try {
                     log.info("Deleting old spill file: " + spillFile);
-                    delete(spillFile);
+                    fileSystemClient.delete(spillFile);
                 }
                 catch (Exception e) {
                     log.warn("Could not cleanup old spill file: " + spillFile);
