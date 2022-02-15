@@ -368,8 +368,8 @@ public class DistributedResourceGroup
                 }
 
                 resourceGroupState.ifPresent(state -> this.lastExecutionTime = state.getLastExecutionTime());
-                Set<SharedQueryState> runningQueries = resourceGroupState.get().getRunningQueries();
-                for (SharedQueryState state : runningQueries) {
+                Set<SharedQueryState> sharedQueryStates = resourceGroupState.get().getRunningQueries();
+                for (SharedQueryState state : sharedQueryStates) {
                     cachedMemoryUsageBytes += state.getTotalMemoryReservation().toBytes();
                 }
 

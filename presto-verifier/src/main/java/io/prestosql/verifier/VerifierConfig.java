@@ -31,6 +31,7 @@ import javax.validation.constraints.NotNull;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -189,7 +190,7 @@ public class VerifierConfig
 
         ImmutableSet.Builder<QueryType> builder = ImmutableSet.builder();
         for (String value : Splitter.on(',').trimResults().omitEmptyStrings().split(types)) {
-            builder.add(QueryType.valueOf(value.toUpperCase()));
+            builder.add(QueryType.valueOf(value.toUpperCase(Locale.ROOT)));
         }
 
         this.controlQueryTypes = builder.build();
@@ -212,7 +213,7 @@ public class VerifierConfig
 
         ImmutableSet.Builder<QueryType> builder = ImmutableSet.builder();
         for (String value : Splitter.on(',').trimResults().omitEmptyStrings().split(types)) {
-            builder.add(QueryType.valueOf(value.toUpperCase()));
+            builder.add(QueryType.valueOf(value.toUpperCase(Locale.ROOT)));
         }
 
         this.testQueryTypes = builder.build();

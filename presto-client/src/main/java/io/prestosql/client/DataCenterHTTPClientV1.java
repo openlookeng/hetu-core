@@ -165,7 +165,6 @@ public class DataCenterHTTPClientV1
             state.compareAndSet(State.RUNNING, State.FINISHED);
         }
         else {
-            // isQueryFinishedByOtherSplit = false;
             if (!result.isRegistered()) {
                 state.compareAndSet(State.RUNNING, State.FINISHED);
             }
@@ -483,9 +482,9 @@ public class DataCenterHTTPClientV1
                 deallocatedPreparedStatements.add(urlDecode(entry));
             }
 
-            String startedTransactionId = headers.get(PRESTO_STARTED_TRANSACTION_ID);
-            if (startedTransactionId != null) {
-                this.startedTransactionId.set(startedTransactionId);
+            String transactionId = headers.get(PRESTO_STARTED_TRANSACTION_ID);
+            if (transactionId != null) {
+                this.startedTransactionId.set(transactionId);
             }
             if (headers.get(PRESTO_CLEAR_TRANSACTION_ID) != null) {
                 clearTransactionId.set(true);

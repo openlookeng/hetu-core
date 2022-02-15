@@ -41,34 +41,36 @@ public final class IntervalYearMonth
 
     public static String formatMonths(int months)
     {
-        if (months == Integer.MIN_VALUE) {
+        int mon = months;
+        if (mon == Integer.MIN_VALUE) {
             return INT_MIN_VALUE;
         }
 
         String sign = "";
-        if (months < 0) {
+        if (mon < 0) {
             sign = "-";
-            months = -months;
+            mon = -mon;
         }
 
-        return format("%s%d-%d", sign, months / 12, months % 12);
+        return format("%s%d-%d", sign, mon / 12, mon % 12);
     }
 
     public static int parseMonths(String value)
     {
-        if (value.equals(INT_MIN_VALUE)) {
+        String val = value;
+        if (val.equals(INT_MIN_VALUE)) {
             return Integer.MIN_VALUE;
         }
 
         int signum = 1;
-        if (value.startsWith("-")) {
+        if (val.startsWith("-")) {
             signum = -1;
-            value = value.substring(1);
+            val = val.substring(1);
         }
 
-        Matcher matcher = FORMAT.matcher(value);
+        Matcher matcher = FORMAT.matcher(val);
         if (!matcher.matches()) {
-            throw new IllegalArgumentException("Invalid year-month interval: " + value);
+            throw new IllegalArgumentException("Invalid year-month interval: " + val);
         }
 
         int years = parseInt(matcher.group(1));

@@ -271,7 +271,7 @@ public interface Block<T>
     Block<T> getRegion(int positionOffset, int length);
 
     /**
-     * Ret>urns a block starting at the specified position and extends for the
+     * Returns a block starting at the specified position and extends for the
      * specified length.  The specified region must be entirely contained
      * within this block.
      * <p>

@@ -134,23 +134,23 @@ public class ClientTypeSignatureParameter
                 throws IOException
         {
             JsonNode node = jp.getCodec().readTree(jp);
-            ParameterKind kind = MAPPER.readValue(MAPPER.treeAsTokens(node.get("kind")), ParameterKind.class);
+            ParameterKind parameterKind = MAPPER.readValue(MAPPER.treeAsTokens(node.get("kind")), ParameterKind.class);
             JsonParser jsonValue = MAPPER.treeAsTokens(node.get("value"));
-            Object value;
-            switch (kind) {
+            Object val;
+            switch (parameterKind) {
                 case TYPE:
-                    value = MAPPER.readValue(jsonValue, ClientTypeSignature.class);
+                    val = MAPPER.readValue(jsonValue, ClientTypeSignature.class);
                     break;
                 case NAMED_TYPE:
-                    value = MAPPER.readValue(jsonValue, NamedClientTypeSignature.class);
+                    val = MAPPER.readValue(jsonValue, NamedClientTypeSignature.class);
                     break;
                 case LONG:
-                    value = MAPPER.readValue(jsonValue, Long.class);
+                    val = MAPPER.readValue(jsonValue, Long.class);
                     break;
                 default:
-                    throw new UnsupportedOperationException(format("Unsupported kind [%s]", kind));
+                    throw new UnsupportedOperationException(format("Unsupported kind [%s]", parameterKind));
             }
-            return new ClientTypeSignatureParameter(kind, value);
+            return new ClientTypeSignatureParameter(parameterKind, val);
         }
     }
 }

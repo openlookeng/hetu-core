@@ -50,13 +50,14 @@ public class HetuFsMetastoreFactory
     {
         requireNonNull(config, "config is null");
         Bootstrap app;
+        String newType = type;
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             if (stateStore == null) {
-                type = HETU_METASTORE_CACHE_TYPE_DEFAULT;
-                app = new Bootstrap(new HetuFsMetastoreModule(client, type));
+                newType = HETU_METASTORE_CACHE_TYPE_DEFAULT;
+                app = new Bootstrap(new HetuFsMetastoreModule(client, newType));
             }
             else {
-                app = new Bootstrap(new HetuFsMetastoreModule(client, stateStore, type));
+                app = new Bootstrap(new HetuFsMetastoreModule(client, stateStore, newType));
             }
             Injector injector =
                     app.strictConfig().doNotInitializeLogging().setRequiredConfigurationProperties(config).initialize();

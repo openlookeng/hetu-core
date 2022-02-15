@@ -561,14 +561,15 @@ public class BaseJdbcClient
     public void renameColumn(JdbcIdentity identity, JdbcTableHandle handle, JdbcColumnHandle jdbcColumn, String newColumnName)
     {
         try (Connection connection = connectionFactory.openConnection(identity)) {
+            String colName = newColumnName;
             if (connection.getMetaData().storesUpperCaseIdentifiers()) {
-                newColumnName = newColumnName.toUpperCase(ENGLISH);
+                colName = colName.toUpperCase(ENGLISH);
             }
             String sql = format(
                     "ALTER TABLE %s RENAME COLUMN %s TO %s",
                     quoted(handle.getCatalogName(), handle.getSchemaName(), handle.getTableName()),
                     quoted(jdbcColumn.getColumnName()),
-                    newColumnName);
+                    colName);
             execute(connection, sql);
         }
         catch (SQLException e) {
@@ -842,8 +843,8 @@ public class BaseJdbcClient
 
     protected String quoted(String name)
     {
-        name = name.replace(identifierQuote, identifierQuote + identifierQuote);
-        return identifierQuote + name + identifierQuote;
+        String nameReplace = name.replace(identifierQuote, identifierQuote + identifierQuote);
+        return identifierQuote + nameReplace + identifierQuote;
     }
 
     protected String quoted(String catalog, String schema, String table)
@@ -873,10 +874,10 @@ public class BaseJdbcClient
         requireNonNull(escape, "escape is null");
         checkArgument(!escape.equals("_"), "Escape string must not be '_'");
         checkArgument(!escape.equals("%"), "Escape string must not be '%'");
-        name = name.replace(escape, escape + escape);
-        name = name.replace("_", escape + "_");
-        name = name.replace("%", escape + "%");
-        return name;
+        String nameReplace = name.replace(escape, escape + escape);
+        nameReplace = nameReplace.replace("_", escape + "_");
+        nameReplace = nameReplace.replace("%", escape + "%");
+        return nameReplace;
     }
 
     protected static ResultSet getColumns(JdbcTableHandle tableHandle, DatabaseMetaData metadata)
@@ -909,19 +910,19 @@ public class BaseJdbcClient
                 ResultSet result = statement.executeQuery(sql);
                 //only one row
                 if (result.next()) {
-                    SplitStatLog log = new SplitStatLog();
-                    log.setCatalogName(split.getCatalogName());
-                    log.setSchemaName(split.getSchemaName());
-                    log.setTableName(split.getTableName());
-                    log.setSplitField(split.getSplitField());
-                    log.setBeginIndex(Long.parseLong(split.getRangeStart()));
-                    log.setEndIndex(Long.parseLong(split.getRangEnd()));
-                    log.setRows(result.getLong(1));
-                    log.setRecordFlag(SplitStatLog.LogState.STATE_NEW);
-                    log.setTimeStamp(timeStamp);
-                    log.setSplitCount(split.getSplitCount());
+                    SplitStatLog splitStatLog = new SplitStatLog();
+                    splitStatLog.setCatalogName(split.getCatalogName());
+                    splitStatLog.setSchemaName(split.getSchemaName());
+                    splitStatLog.setTableName(split.getTableName());
+                    splitStatLog.setSplitField(split.getSplitField());
+                    splitStatLog.setBeginIndex(Long.parseLong(split.getRangeStart()));
+                    splitStatLog.setEndIndex(Long.parseLong(split.getRangEnd()));
+                    splitStatLog.setRows(result.getLong(1));
+                    splitStatLog.setRecordFlag(SplitStatLog.LogState.STATE_NEW);
+                    splitStatLog.setTimeStamp(timeStamp);
+                    splitStatLog.setSplitCount(split.getSplitCount());
                     result.close();
-                    splitStatLogList.add(log);
+                    splitStatLogList.add(splitStatLog);
                 }
             }
         }

@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.util.List;
+import java.util.Locale;
 import java.util.OptionalInt;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -184,7 +185,7 @@ Spilled: 20GB
         if (debug) {
             // CPU Time: 565.2s total,   26K rows/s, 3.85MB/s
             Duration cpuTime = millis(stats.getCpuTimeMillis());
-            String cpuTimeSummary = String.format("CPU Time: %.1fs total, %5s rows/s, %8s, %d%% active",
+            String cpuTimeSummary = String.format(Locale.ROOT, "CPU Time: %.1fs total, %5s rows/s, %8s, %d%% active",
                     cpuTime.getValue(SECONDS),
                     FormatUtils.formatCountRate(stats.getProcessedRows(), cpuTime, false),
                     FormatUtils.formatDataRate(bytes(stats.getProcessedBytes()), cpuTime, true),
@@ -252,14 +253,14 @@ Spilled: 20GB
                 reprintLine("80 characters wide");
                 reprintLine("");
                 reprintLine(stats.getState());
-                reprintLine(String.format("%s %d%%", FormatUtils.formatTime(wallTime, timeInMilliseconds), progressPercentage));
+                reprintLine(String.format(Locale.ROOT, "%s %d%%", FormatUtils.formatTime(wallTime, timeInMilliseconds), progressPercentage));
                 return;
             }
 
             int nodes = stats.getNodes();
 
             // Query 10, RUNNING, 1 node, 778 splits
-            String querySummary = String.format("Query %s, %s, %,d %s, %,d splits",
+            String querySummary = String.format(Locale.ROOT, "Query %s, %s, %,d %s, %,d splits",
                     results.getId(),
                     stats.getState(),
                     nodes,
@@ -286,7 +287,7 @@ Spilled: 20GB
 
                 // CPU Time: 56.5s total, 36.4K rows/s, 4.44MB/s, 60% active
                 Duration cpuTime = millis(stats.getCpuTimeMillis());
-                String cpuTimeSummary = String.format("CPU Time: %.1fs total, %5s rows/s, %8s, %d%% active",
+                String cpuTimeSummary = String.format(Locale.ROOT, "CPU Time: %.1fs total, %5s rows/s, %8s, %d%% active",
                         cpuTime.getValue(SECONDS),
                         FormatUtils.formatCountRate(stats.getProcessedRows(), cpuTime, false),
                         FormatUtils.formatDataRate(bytes(stats.getProcessedBytes()), cpuTime, true),
@@ -330,7 +331,7 @@ Spilled: 20GB
                         stats.getTotalSplits());
 
                 // 0:17 [ 103MB,  802K rows] [5.74MB/s, 44.9K rows/s] [=====>>                                   ] 10%
-                String progressLine = String.format("%s [%5s rows, %6s] [%5s rows/s, %8s] [%s] %d%%",
+                String progressLine = String.format(Locale.ROOT, "%s [%5s rows, %6s] [%5s rows/s, %8s] [%s] %d%%",
                         FormatUtils.formatTime(wallTime, timeInMilliseconds),
                         FormatUtils.formatCount(stats.getProcessedRows()),
                         FormatUtils.formatDataSize(bytes(stats.getProcessedBytes()), true),
@@ -345,7 +346,7 @@ Spilled: 20GB
                 String progressBar = FormatUtils.formatProgressBar(progressWidth, Ints.saturatedCast(nanosSince(start).roundTo(SECONDS)));
 
                 // 0:17 [ 103MB,  802K rows] [5.74MB/s, 44.9K rows/s] [    <=>                                  ]
-                String progressLine = String.format("%s [%5s rows, %6s] [%5s rows/s, %8s] [%s]",
+                String progressLine = String.format(Locale.ROOT, "%s [%5s rows, %6s] [%5s rows/s, %8s] [%s]",
                         FormatUtils.formatTime(wallTime, timeInMilliseconds),
                         FormatUtils.formatCount(stats.getProcessedRows()),
                         FormatUtils.formatDataSize(bytes(stats.getProcessedBytes()), true),
@@ -480,6 +481,7 @@ Spilled: 20GB
         }
         catch (IOException e) {
             // ignore errors reading keyboard input
+            log.warn(e.toString());
         }
         return -1;
     }

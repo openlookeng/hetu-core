@@ -205,12 +205,13 @@ public class ClientOptions
 
     public static URI parseServer(String server)
     {
-        server = server.toLowerCase(ENGLISH);
-        if (server.startsWith("http://") || server.startsWith("https://")) {
-            return URI.create(server);
+        String newServer = server;
+        newServer = newServer.toLowerCase(ENGLISH);
+        if (newServer.startsWith("http://") || newServer.startsWith("https://")) {
+            return URI.create(newServer);
         }
 
-        HostAndPort host = HostAndPort.fromString(server);
+        HostAndPort host = HostAndPort.fromString(newServer);
         try {
             return new URI("http", null, host.getHost(), host.getPortOrDefault(80), null, null, null);
         }

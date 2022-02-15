@@ -82,15 +82,15 @@ public class Page
 
     public long getSizeInBytes()
     {
-        long sizeInBytes = this.sizeInBytes.get();
-        if (sizeInBytes < 0) {
-            sizeInBytes = 0;
+        long size = this.sizeInBytes.get();
+        if (size < 0) {
+            size = 0;
             for (Block block : blocks) {
-                sizeInBytes += block.getSizeInBytes();
+                size += block.getSizeInBytes();
             }
-            this.sizeInBytes.set(sizeInBytes);
+            this.sizeInBytes.set(size);
         }
-        return sizeInBytes;
+        return size;
     }
 
     public long getLogicalSizeInBytes()
@@ -205,16 +205,16 @@ public class Page
         DictionaryBlock firstDictionaryBlock = blocks.get(0);
         Block dictionary = firstDictionaryBlock.getDictionary();
 
-        int positionCount = firstDictionaryBlock.getPositionCount();
+        int count = firstDictionaryBlock.getPositionCount();
         int dictionarySize = dictionary.getPositionCount();
 
         // determine which dictionary entries are referenced and build a reindex for them
-        int[] dictionaryPositionsToCopy = new int[min(dictionarySize, positionCount)];
+        int[] dictionaryPositionsToCopy = new int[min(dictionarySize, count)];
         int[] remapIndex = new int[dictionarySize];
         Arrays.fill(remapIndex, -1);
 
         int numberOfIndexes = 0;
-        for (int i = 0; i < positionCount; i++) {
+        for (int i = 0; i < count; i++) {
             int position = firstDictionaryBlock.getId(i);
             if (remapIndex[position] == -1) {
                 dictionaryPositionsToCopy[numberOfIndexes] = position;
@@ -229,7 +229,7 @@ public class Page
         }
 
         // compact the dictionaries
-        int[] newIds = getNewIds(positionCount, firstDictionaryBlock, remapIndex);
+        int[] newIds = getNewIds(count, firstDictionaryBlock, remapIndex);
         List<DictionaryBlock> outputDictionaryBlocks = new ArrayList<>(blocks.size());
         DictionaryId newDictionaryId = randomDictionaryId();
         for (DictionaryBlock dictionaryBlock : blocks) {
@@ -239,7 +239,7 @@ public class Page
 
             try {
                 Block compactDictionary = dictionaryBlock.getDictionary().copyPositions(dictionaryPositionsToCopy, 0, numberOfIndexes);
-                outputDictionaryBlocks.add(new DictionaryBlock(positionCount, compactDictionary, newIds, true, newDictionaryId));
+                outputDictionaryBlocks.add(new DictionaryBlock(count, compactDictionary, newIds, true, newDictionaryId));
             }
             catch (UnsupportedOperationException e) {
                 // ignore if copy positions is not supported for the dictionary
@@ -312,9 +312,9 @@ public class Page
     {
         requireNonNull(retainedPositions, "retainedPositions is null");
 
-        Block[] blocks = new Block[this.blocks.length];
-        Arrays.setAll(blocks, i -> this.blocks[i].getPositions(retainedPositions, offset, length));
-        return new Page(length, blocks);
+        Block[] blockArrays = new Block[this.blocks.length];
+        Arrays.setAll(blockArrays, i -> this.blocks[i].getPositions(retainedPositions, offset, length));
+        return new Page(length, blockArrays);
     }
 
     public Page prependColumn(Block column)
@@ -332,11 +332,11 @@ public class Page
 
     private void updateRetainedSize()
     {
-        long retainedSizeInBytes = INSTANCE_SIZE + sizeOf(blocks);
+        long instanceSizeInBytes = INSTANCE_SIZE + sizeOf(blocks);
         for (Block block : blocks) {
-            retainedSizeInBytes += block.getRetainedSizeInBytes();
+            instanceSizeInBytes += block.getRetainedSizeInBytes();
         }
-        this.retainedSizeInBytes.set(retainedSizeInBytes);
+        this.retainedSizeInBytes.set(instanceSizeInBytes);
     }
 
     private static class DictionaryBlockIndexes

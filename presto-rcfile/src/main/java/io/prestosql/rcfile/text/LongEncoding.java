@@ -94,26 +94,27 @@ public class LongEncoding
 
     private static long parseLong(Slice slice, int start, int length)
     {
-        if (slice.equals(start, length, MIN_LONG, 0, MIN_LONG.length())) {
+        int startIndex = start;
+        if (slice.equals(startIndex, length, MIN_LONG, 0, MIN_LONG.length())) {
             return Long.MIN_VALUE;
         }
 
-        int limit = start + length;
+        int limit = startIndex + length;
 
         int sign;
-        if (slice.getByte(start) == '-') {
+        if (slice.getByte(startIndex) == '-') {
             sign = -1;
-            start++;
+            startIndex++;
         }
         else {
             sign = 1;
         }
 
-        long value = slice.getByte(start) - ((int) '0');
-        start++;
-        while (start < limit) {
-            value = value * 10 + (slice.getByte(start) - ((int) '0'));
-            start++;
+        long value = slice.getByte(startIndex) - ((int) '0');
+        startIndex++;
+        while (startIndex < limit) {
+            value = value * 10 + (slice.getByte(startIndex) - ((int) '0'));
+            startIndex++;
         }
 
         return value * sign;

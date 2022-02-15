@@ -36,8 +36,8 @@ public class SqlTypeBytecodeExpression
         requireNonNull(callSiteBinder, "callSiteBinder is null");
         requireNonNull(type, "type is null");
 
-        Binding binding = callSiteBinder.bind(type, Type.class);
-        return new SqlTypeBytecodeExpression(type, binding, BOOTSTRAP_METHOD);
+        Binding bind = callSiteBinder.bind(type, Type.class);
+        return new SqlTypeBytecodeExpression(type, bind, BOOTSTRAP_METHOD);
     }
 
     private static String generateName(Type type)

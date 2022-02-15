@@ -109,10 +109,10 @@ public class TestInformationSchemaMetadata
         Constraint constraint = new Constraint(TupleDomain.withColumnDomains(domains.build()));
 
         ConnectorSession session = createNewSession(transactionId);
-        ConnectorMetadata metadata = new InformationSchemaMetadata("test_catalog", this.metadata);
+        ConnectorMetadata connectorMetadata = new InformationSchemaMetadata("test_catalog", this.metadata);
         InformationSchemaTableHandle tableHandle = (InformationSchemaTableHandle)
-                metadata.getTableHandle(session, new SchemaTableName("information_schema", "views"));
-        tableHandle = metadata.applyFilter(session, tableHandle, constraint)
+                connectorMetadata.getTableHandle(session, new SchemaTableName("information_schema", "views"));
+        tableHandle = connectorMetadata.applyFilter(session, tableHandle, constraint)
                 .map(ConstraintApplicationResult::getHandle)
                 .map(InformationSchemaTableHandle.class::cast)
                 .orElseThrow(AssertionError::new);
@@ -144,10 +144,10 @@ public class TestInformationSchemaMetadata
                 });
 
         ConnectorSession session = createNewSession(transactionId);
-        ConnectorMetadata metadata = new InformationSchemaMetadata("test_catalog", this.metadata);
+        ConnectorMetadata connectorMetadata = new InformationSchemaMetadata("test_catalog", this.metadata);
         InformationSchemaTableHandle tableHandle = (InformationSchemaTableHandle)
-                metadata.getTableHandle(session, new SchemaTableName("information_schema", "views"));
-        tableHandle = metadata.applyFilter(session, tableHandle, constraint)
+                connectorMetadata.getTableHandle(session, new SchemaTableName("information_schema", "views"));
+        tableHandle = connectorMetadata.applyFilter(session, tableHandle, constraint)
                 .map(ConstraintApplicationResult::getHandle)
                 .map(InformationSchemaTableHandle.class::cast)
                 .orElseThrow(AssertionError::new);

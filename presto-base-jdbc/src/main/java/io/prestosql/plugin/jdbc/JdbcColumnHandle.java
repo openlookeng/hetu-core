@@ -47,6 +47,7 @@ public final class JdbcColumnHandle
     }
 
     @JsonProperty
+    @Override
     public String getColumnName()
     {
         return columnName;

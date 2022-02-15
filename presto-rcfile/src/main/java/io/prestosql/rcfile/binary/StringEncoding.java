@@ -21,6 +21,8 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.type.Type;
 
+import java.nio.charset.StandardCharsets;
+
 import static io.airlift.slice.Slices.EMPTY_SLICE;
 import static io.prestosql.rcfile.RcFileDecoderUtils.calculateTruncationLength;
 import static io.prestosql.rcfile.RcFileDecoderUtils.decodeVIntSize;
@@ -51,9 +53,9 @@ public class StringEncoding
                     output.writeByte(HIVE_EMPTY_STRING_BYTE);
                 }
                 else {
-                    String escapedValue = unescapeText(new String(slice.getBytes()));
-                    if (escapedValue.getBytes().length < slice.getBytes().length) {
-                        output.writeBytes(escapedValue.getBytes());
+                    String escapedValue = unescapeText(new String(slice.getBytes(), StandardCharsets.UTF_8));
+                    if (escapedValue.getBytes(StandardCharsets.UTF_8).length < slice.getBytes().length) {
+                        output.writeBytes(escapedValue.getBytes(StandardCharsets.UTF_8));
                     }
                     else {
                         output.writeBytes(slice);
@@ -115,7 +117,7 @@ public class StringEncoding
     public void decodeValueInto(BlockBuilder builder, Slice slice, int offset, int length)
     {
         // Note strings nested in complex structures do no use the empty string marker
-        length = calculateTruncationLength(type, slice, offset, length);
-        type.writeSlice(builder, slice, offset, length);
+        int len = calculateTruncationLength(type, slice, offset, length);
+        type.writeSlice(builder, slice, offset, len);
     }
 }

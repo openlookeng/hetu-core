@@ -240,18 +240,19 @@ public class PrestoServer
 
     private static void logLocation(Logger log, String name, Path path)
     {
-        if (!Files.exists(path, NOFOLLOW_LINKS)) {
+        Path newPath = path;
+        if (!Files.exists(newPath, NOFOLLOW_LINKS)) {
             log.info("%s: [does not exist]", name);
             return;
         }
         try {
-            path = path.toAbsolutePath().toRealPath();
+            newPath = newPath.toAbsolutePath().toRealPath();
         }
         catch (IOException e) {
             log.info("%s: [not accessible]", name);
             return;
         }
-        log.info("%s: %s", name, path);
+        log.info("%s: %s", name, newPath);
     }
 
     private static void registerStateStoreListeners(

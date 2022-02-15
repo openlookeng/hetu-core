@@ -95,10 +95,10 @@ public class TestQueryManager
     public void testQueryCpuLimit()
             throws Exception
     {
-        try (DistributedQueryRunner queryRunner = TpchQueryRunnerBuilder.builder().setSingleExtraProperty("query.max-cpu-time", "1ms").build()) {
-            QueryId queryId = createQuery(queryRunner, TEST_SESSION, "SELECT COUNT(*) FROM lineitem");
-            waitForQueryState(queryRunner, queryId, FAILED);
-            QueryManager queryManager = queryRunner.getCoordinator().getQueryManager();
+        try (DistributedQueryRunner distributedQueryRunner = TpchQueryRunnerBuilder.builder().setSingleExtraProperty("query.max-cpu-time", "1ms").build()) {
+            QueryId queryId = createQuery(distributedQueryRunner, TEST_SESSION, "SELECT COUNT(*) FROM lineitem");
+            waitForQueryState(distributedQueryRunner, queryId, FAILED);
+            QueryManager queryManager = distributedQueryRunner.getCoordinator().getQueryManager();
             BasicQueryInfo queryInfo = queryManager.getQueryInfo(queryId);
             assertEquals(queryInfo.getState(), FAILED);
             assertEquals(queryInfo.getErrorCode(), EXCEEDED_CPU_LIMIT.toErrorCode());

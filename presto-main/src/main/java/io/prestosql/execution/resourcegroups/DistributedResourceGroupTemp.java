@@ -447,8 +447,8 @@ public class DistributedResourceGroupTemp
                 return;
             }
 
-            long globalCachedMemoryUsageBytes = getGlobalCachedMemoryUsageBytes();
-            if (globalCachedMemoryUsageBytes <= softMemoryLimitBytes) {
+            long cachedMemoryUsageBytes = getGlobalCachedMemoryUsageBytes();
+            if (cachedMemoryUsageBytes <= softMemoryLimitBytes) {
                 return;
             }
 
@@ -503,7 +503,7 @@ public class DistributedResourceGroupTemp
                             sortedQueryList = new ArrayList<>();
                     }
 
-                    long tempGlobalCachedMemoryUsage = globalCachedMemoryUsageBytes;
+                    long tempGlobalCachedMemoryUsage = cachedMemoryUsageBytes;
                     long tempLocalCachedMemoryUsage = localCachedMemoryUsageBytes;
 
                     // As per the kill policy, top queries are selected across all coordinators but we kill only local queries

@@ -72,31 +72,32 @@ public class MapEncoding
     public void decodeValueInto(int depth, BlockBuilder builder, Slice slice, int offset, int length)
             throws RcFileCorruptionException
     {
+        int newOffset = offset;
         byte elementSeparator = getSeparator(depth);
         byte keyValueSeparator = getSeparator(depth + 1);
-        int end = offset + length;
+        int end = newOffset + length;
 
         BlockBuilder mapBuilder = builder.beginBlockEntry();
         if (length > 0) {
-            int elementOffset = offset;
+            int elementOffset = newOffset;
             int keyValueSeparatorPosition = -1;
-            while (offset < end) {
-                byte currentByte = slice.getByte(offset);
+            while (newOffset < end) {
+                byte currentByte = slice.getByte(newOffset);
                 if (currentByte == elementSeparator) {
-                    decodeEntryInto(depth, mapBuilder, slice, elementOffset, offset - elementOffset, keyValueSeparatorPosition);
-                    elementOffset = offset + 1;
+                    decodeEntryInto(depth, mapBuilder, slice, elementOffset, newOffset - elementOffset, keyValueSeparatorPosition);
+                    elementOffset = newOffset + 1;
                     keyValueSeparatorPosition = -1;
                 }
                 else if (currentByte == keyValueSeparator && keyValueSeparatorPosition == -1) {
-                    keyValueSeparatorPosition = offset;
+                    keyValueSeparatorPosition = newOffset;
                 }
-                else if (isEscapeByte(currentByte) && offset + 1 < length) {
+                else if (isEscapeByte(currentByte) && newOffset + 1 < length) {
                     // ignore the char after escape_char
-                    offset++;
+                    newOffset++;
                 }
-                offset++;
+                newOffset++;
             }
-            decodeEntryInto(depth, mapBuilder, slice, elementOffset, offset - elementOffset, keyValueSeparatorPosition);
+            decodeEntryInto(depth, mapBuilder, slice, elementOffset, newOffset - elementOffset, keyValueSeparatorPosition);
         }
         builder.closeEntry();
     }
