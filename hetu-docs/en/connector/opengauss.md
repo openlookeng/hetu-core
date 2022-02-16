@@ -45,6 +45,95 @@ Finally, you can access the `hetutb` table in the `public` schema:
 
 If you used a different name for your catalog properties file, use that catalog name instead of `opengauss` in the above examples.
 
+## openGauss Update/Delete Support
+
+### Create openGauss Table
+
+Example：
+
+```sql
+CREATE TABLE opengauss_table (
+    id int,
+    name varchar(255));
+```
+
+### INSERT on openGauss tables
+
+Example：
+
+```sql
+INSERT INTO opengauss_table
+  VALUES
+     (1, 'Jack'),
+     (2, 'Bob');
+```
+
+### UPDATE on openGauss tables
+
+Example：
+
+```sql
+UPDATE opengauss_table
+  SET name='Tim'
+  WHERE id=1;
+```
+
+Above example updates the column `name`'s value to `Tim` of rows with column `id` having value `1`.
+
+SELECT result before UPDATE:
+
+```sql
+lk:default> SELECT * FROM opengauss_table;
+id | name
+----+------
+  1 | Jack
+  2 | Bob
+(2 rows)
+```
+
+SELECT result after UPDATE
+
+```sql
+lk:default> SELECT * FROM opengauss_table;
+id | name
+----+------
+2 | Bob
+1 | Tim
+(2 rows)
+```
+
+### DELETE on openGauss tables
+
+Example：
+
+```sql
+DELETE FROM opengauss_table
+  WHERE id=2;
+```
+
+Above example delete the rows with column `id` having value `2`.
+
+SELECT result before DELETE:
+
+```sql
+lk:default> SELECT * FROM opengauss_table;
+ id | name
+----+------
+  2 | Bob
+  1 | Tim
+(2 rows)
+```
+
+SELECT result after DELETE:
+
+```sql
+lk:default> SELECT * FROM opengauss_table;
+ id | name
+----+------
+  1 | Tim
+(1 row)
+```
+
 ****Note:****
 
 > - When the compatibility type of the openGuass database is O (DBCOMPATIBILITY = A), the `Date` data type is not supported.
@@ -64,4 +153,4 @@ openGauss Connector Limitations
 
 The following SQL statements are not yet supported:
 
-[DELETE](../sql/delete.md), [GRANT](../sql/grant.md), [REVOKE](../sql/revoke.md), [SHOW GRANTS](../sql/show-grants.md), [SHOW ROLES](../sql/show-roles.md), [SHOW ROLE GRANTS](../sql/show-role-grants.md)
+[GRANT](../sql/grant.md), [REVOKE](../sql/revoke.md), [SHOW GRANTS](../sql/show-grants.md), [SHOW ROLES](../sql/show-roles.md), [SHOW ROLE GRANTS](../sql/show-role-grants.md)

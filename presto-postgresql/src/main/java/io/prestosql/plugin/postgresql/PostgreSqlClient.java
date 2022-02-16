@@ -16,8 +16,12 @@ package io.prestosql.plugin.postgresql;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.ColumnMapping;
 import io.prestosql.plugin.jdbc.ConnectionFactory;
+import io.prestosql.plugin.jdbc.JdbcIdentity;
+import io.prestosql.plugin.jdbc.JdbcSplit;
+import io.prestosql.plugin.jdbc.JdbcTypeHandle;
 import io.prestosql.plugin.jdbc.SliceWriteFunction;
 import io.prestosql.plugin.jdbc.WriteMapping;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.StandardTypes;
@@ -29,8 +33,15 @@ import org.postgresql.util.PGobject;
 
 import javax.inject.Inject;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Types;
+import java.util.Optional;
+
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.plugin.jdbc.ColumnMapping.DISABLE_PUSHDOWN;
+import static io.prestosql.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
+import static io.prestosql.plugin.jdbc.StandardColumnMappings.timestampColumnMapping;
 import static io.prestosql.plugin.jdbc.StandardColumnMappings.timestampWriteFunction;
 import static io.prestosql.plugin.jdbc.StandardColumnMappings.tinyintWriteFunction;
 import static io.prestosql.plugin.jdbc.StandardColumnMappings.varbinaryWriteFunction;
@@ -47,6 +58,64 @@ public class PostgreSqlClient
                             ConnectionFactory connectionFactory, TypeManager typeManager)
     {
         super(config, postgresqlConfig, connectionFactory, typeManager);
+    }
+
+    @Override
+    public Connection getConnection(JdbcIdentity identity, JdbcSplit split)
+            throws SQLException
+    {
+        Connection connection = connectionFactory.openConnection(identity);
+        return connection;
+    }
+
+    @Override
+    public Optional<ColumnMapping> toPrestoType(ConnectorSession session, Connection connection, JdbcTypeHandle typeHandle)
+    {
+        String jdbcTypeName = typeHandle.getJdbcTypeName()
+                .orElseThrow(() -> new PrestoException(JDBC_ERROR, "Type name is missing: " + typeHandle));
+
+        switch (jdbcTypeName) {
+            case "uuid":
+                return Optional.of(uuidColumnMapping());
+            case "jsonb":
+            case "json":
+                return Optional.of(jsonColumnMapping());
+            case "timestamptz":
+                // PostgreSQL's "timestamp with time zone" is reported as Types.TIMESTAMP rather than Types.TIMESTAMP_WITH_TIMEZONE
+                return Optional.of(timestampWithTimeZoneColumnMapping());
+            default:
+                break;
+        }
+        if (typeHandle.getJdbcType() == Types.VARCHAR && !jdbcTypeName.equals("varchar")) {
+            // This can be e.g. an ENUM
+            return Optional.of(typedVarcharColumnMapping(jdbcTypeName));
+        }
+        if (typeHandle.getJdbcType() == Types.TIMESTAMP) {
+            return Optional.of(timestampColumnMapping());
+        }
+        if (typeHandle.getJdbcType() == Types.ARRAY && supportArrays) {
+            if (!typeHandle.getArrayDimensions().isPresent()) {
+                return Optional.empty();
+            }
+            JdbcTypeHandle elementTypeHandle = getArrayElementTypeHandle(connection, typeHandle);
+            String elementTypeName = typeHandle.getJdbcTypeName()
+                    .orElseThrow(() -> new PrestoException(JDBC_ERROR, "Element type name is missing: " + elementTypeHandle));
+            if (elementTypeHandle.getJdbcType() == Types.VARBINARY) {
+                // PostgreSQL jdbc driver doesn't currently support array of varbinary (bytea[])
+                // https://github.com/pgjdbc/pgjdbc/pull/1184
+                return Optional.empty();
+            }
+            return toPrestoType(session, connection, elementTypeHandle)
+                    .map(elementMapping -> {
+                        ArrayType prestoArrayType = new ArrayType(elementMapping.getType());
+                        int arrayDimensions = typeHandle.getArrayDimensions().get();
+                        for (int i = 1; i < arrayDimensions; i++) {
+                            prestoArrayType = new ArrayType(prestoArrayType);
+                        }
+                        return arrayColumnMapping(session, prestoArrayType, elementTypeName);
+                    });
+        }
+        return super.toPrestoType(session, connection, typeHandle);
     }
 
     @Override

@@ -41,8 +41,97 @@ PostgreSQL连接器为每个PostgreSQL模式提供一个模式。可通过执行
 
 如果对目录属性文件使用不同的名称，请使用该目录名称，而不要使用上述示例中的`postgresql`。
 
+## PostgreSQL Update/Delete 支持
+
+### 使用PostgreSQL连接器创建表
+
+示例：
+
+```sql
+CREATE TABLE postgresql_table (
+    id int,
+    name varchar(255));
+```
+
+### 对表执行INSERT
+
+示例：
+
+```sql
+INSERT INTO postgresql_table
+  VALUES
+     (1, 'Jack'),
+     (2, 'Bob');
+```
+
+### 对表执行UPDATE
+
+示例：
+
+```sql
+UPDATE postgresql_table
+  SET name='Tim'
+  WHERE id=1;
+```
+
+上述示例将列`id`中值为`1`所在行的列`name`的值更新为`Tim`。
+
+UPDATE前的SELECT结果：
+
+```sql
+lk:default> SELECT * FROM postgresql_table;
+id | name
+----+------
+  1 | Jack
+  2 | Bob
+(2 rows)
+```
+
+UPDATE后的SELECT结果
+
+```sql
+lk:default> SELECT * FROM postgresql_table;
+ id | name
+----+------
+  2 | Bob
+  1 | Tim
+(2 rows)
+```
+
+### 对表执行DELETE
+
+示例：
+
+```sql
+DELETE FROM postgresql_table
+  WHERE id=2;
+```
+
+以上示例删除了值为`2`的列`id`的行。
+
+DELETE前的SELECT结果：
+
+```sql
+lk:default> SELECT * FROM postgresql_table;
+ id | name
+----+------
+  2 | Bob
+  1 | Tim
+(2 rows)
+```
+
+DELETE后的SELECT结果：
+
+```sql
+lk:default> SELECT * FROM postgresql_table;
+ id | name
+----+------
+  1 | Tim
+(1 row)
+```
+
 ## PostgreSQL连接器限制
 
 暂不支持以下SQL语句：
 
-[DELETE](../sql/delete.md)、[GRANT](../sql/grant.md)、[REVOKE](../sql/revoke.md)、[SHOW GRANTS](../sql/show-grants.md)、[SHOW ROLES](../sql/show-roles.md)、[SHOW ROLE GRANTS](../sql/show-role-grants.md)
+[GRANT](../sql/grant.md)、[REVOKE](../sql/revoke.md)、[SHOW GRANTS](../sql/show-grants.md)、[SHOW ROLES](../sql/show-roles.md)、[SHOW ROLE GRANTS](../sql/show-role-grants.md)
