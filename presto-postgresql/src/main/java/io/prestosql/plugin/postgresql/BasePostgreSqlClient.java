@@ -16,9 +16,11 @@ package io.prestosql.plugin.postgresql;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.VerifyException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.json.ObjectMapperProvider;
+import io.airlift.log.Logger;
 import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
@@ -26,8 +28,10 @@ import io.prestosql.plugin.jdbc.BaseJdbcClient;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.BlockReadFunction;
 import io.prestosql.plugin.jdbc.BlockWriteFunction;
+import io.prestosql.plugin.jdbc.BooleanWriteFunction;
 import io.prestosql.plugin.jdbc.ColumnMapping;
 import io.prestosql.plugin.jdbc.ConnectionFactory;
+import io.prestosql.plugin.jdbc.DoubleWriteFunction;
 import io.prestosql.plugin.jdbc.JdbcColumnHandle;
 import io.prestosql.plugin.jdbc.JdbcIdentity;
 import io.prestosql.plugin.jdbc.JdbcTableHandle;
@@ -35,8 +39,15 @@ import io.prestosql.plugin.jdbc.JdbcTypeHandle;
 import io.prestosql.plugin.jdbc.LongWriteFunction;
 import io.prestosql.plugin.jdbc.SliceWriteFunction;
 import io.prestosql.plugin.jdbc.StatsCollecting;
+import io.prestosql.plugin.jdbc.WriteFunction;
+import io.prestosql.plugin.jdbc.WriteMapping;
+import io.prestosql.plugin.jdbc.WriteNullFunction;
+import io.prestosql.plugin.jdbc.optimization.JdbcPushDownModule;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.block.Block;
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.TableNotFoundException;
@@ -59,19 +70,23 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.function.BiFunction;
 
 import static com.fasterxml.jackson.core.JsonFactory.Feature.CANONICALIZE_FIELD_NAMES;
 import static com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS;
+import static com.google.common.base.Strings.isNullOrEmpty;
+import static com.google.common.base.Verify.verify;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.airlift.slice.SizeOf.SIZE_OF_LONG;
 import static io.airlift.slice.Slices.wrappedLongArray;
 import static io.prestosql.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
-import static io.prestosql.plugin.jdbc.StandardColumnMappings.timestampColumnMapping;
 import static io.prestosql.plugin.postgresql.TypeUtils.getJdbcObjectArray;
 import static io.prestosql.plugin.postgresql.TypeUtils.jdbcObjectArrayToBlock;
 import static io.prestosql.plugin.postgresql.TypeUtils.toBoxedArray;
@@ -82,13 +97,21 @@ import static io.prestosql.spi.type.DateTimeEncoding.packDateTimeWithZone;
 import static io.prestosql.spi.type.DateTimeEncoding.unpackMillisUtc;
 import static io.prestosql.spi.type.TimeZoneKey.UTC_KEY;
 import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
+import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.sql.DatabaseMetaData.columnNoNulls;
+import static java.util.Locale.ENGLISH;
 
 public abstract class BasePostgreSqlClient
         extends BaseJdbcClient
 {
+    private static final Logger log = Logger.get(BasePostgreSqlClient.class);
+
+    /**
+     * If disabled, do not accept sub-query push down.
+     */
+    private final JdbcPushDownModule pushDownModule;
     protected static final String DUPLICATE_TABLE_SQLSTATE = "42P07";
 
     protected final Type jsonType;
@@ -104,6 +127,7 @@ public abstract class BasePostgreSqlClient
         super(config, "\"", connectionFactory);
         this.jsonType = typeManager.getType(new TypeSignature(StandardTypes.JSON));
         this.uuidType = typeManager.getType(new TypeSignature(StandardTypes.UUID));
+        this.pushDownModule = config.getPushDownModule();
 
         switch (postgresqlConfig.getArrayMapping()) {
             case DISABLED:
@@ -242,56 +266,6 @@ public abstract class BasePostgreSqlClient
     }
 
     @Override
-    public Optional<ColumnMapping> toPrestoType(ConnectorSession session, Connection connection, JdbcTypeHandle typeHandle)
-    {
-        String jdbcTypeName = typeHandle.getJdbcTypeName()
-                .orElseThrow(() -> new PrestoException(JDBC_ERROR, "Type name is missing: " + typeHandle));
-
-        switch (jdbcTypeName) {
-            case "uuid":
-                return Optional.of(uuidColumnMapping());
-            case "jsonb":
-            case "json":
-                return Optional.of(jsonColumnMapping());
-            case "timestamptz":
-                // PostgreSQL's "timestamp with time zone" is reported as Types.TIMESTAMP rather than Types.TIMESTAMP_WITH_TIMEZONE
-                return Optional.of(timestampWithTimeZoneColumnMapping());
-            default:
-                break;
-        }
-        if (typeHandle.getJdbcType() == Types.VARCHAR && !jdbcTypeName.equals("varchar")) {
-            // This can be e.g. an ENUM
-            return Optional.of(typedVarcharColumnMapping(jdbcTypeName));
-        }
-        if (typeHandle.getJdbcType() == Types.TIMESTAMP) {
-            return Optional.of(timestampColumnMapping());
-        }
-        if (typeHandle.getJdbcType() == Types.ARRAY && supportArrays) {
-            if (!typeHandle.getArrayDimensions().isPresent()) {
-                return Optional.empty();
-            }
-            JdbcTypeHandle elementTypeHandle = getArrayElementTypeHandle(connection, typeHandle);
-            String elementTypeName = typeHandle.getJdbcTypeName()
-                    .orElseThrow(() -> new PrestoException(JDBC_ERROR, "Element type name is missing: " + elementTypeHandle));
-            if (elementTypeHandle.getJdbcType() == Types.VARBINARY) {
-                // PostgreSQL jdbc driver doesn't currently support array of varbinary (bytea[])
-                // https://github.com/pgjdbc/pgjdbc/pull/1184
-                return Optional.empty();
-            }
-            return toPrestoType(session, connection, elementTypeHandle)
-                    .map(elementMapping -> {
-                        ArrayType prestoArrayType = new ArrayType(elementMapping.getType());
-                        int arrayDimensions = typeHandle.getArrayDimensions().get();
-                        for (int i = 1; i < arrayDimensions; i++) {
-                            prestoArrayType = new ArrayType(prestoArrayType);
-                        }
-                        return arrayColumnMapping(session, prestoArrayType, elementTypeName);
-                    });
-        }
-        return super.toPrestoType(session, connection, typeHandle);
-    }
-
-    @Override
     protected Optional<BiFunction<String, Long, String>> limitFunction()
     {
         return Optional.of((sql, limit) -> sql + " LIMIT " + limit);
@@ -419,5 +393,256 @@ public abstract class BasePostgreSqlClient
         // Jackson tries to detect the character encoding automatically when using InputStream
         // so we pass an InputStreamReader instead.
         return JSON_FACTORY.createParser(new InputStreamReader(json.getInput(), UTF_8));
+    }
+
+    @Override
+    public ConnectorTableHandle beginUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, List<Type> updatedColumnTypes)
+    {
+        JdbcTableHandle jdbcTableHandle = (JdbcTableHandle) tableHandle;
+        jdbcTableHandle.setUpdatedColumnTypes(updatedColumnTypes);
+        jdbcTableHandle.setDeleteOrUpdate(true);
+        return jdbcTableHandle;
+    }
+
+    private void setStatement(ConnectorSession session, ConnectorTableHandle tableHandle, PreparedStatement statement, Block block, int position, int channel)
+            throws SQLException
+    {
+        JdbcTableHandle jdbcTableHandle = (JdbcTableHandle) tableHandle;
+        List<Type> updatedColumnTypes = jdbcTableHandle.getUpdatedColumnTypes();
+
+        List<WriteMapping> writeMappings = updatedColumnTypes.stream()
+                .map(type ->
+                {
+                    WriteMapping writeMapping = toWriteMapping(session, type);
+                    WriteFunction writeFunction = writeMapping.getWriteFunction();
+                    verify(
+                            type.getJavaType() == writeFunction.getJavaType(),
+                            "openLooKeng type %s is not compatible with write function %s accepting %s",
+                            type,
+                            writeFunction,
+                            writeFunction.getJavaType());
+                    return writeMapping;
+                })
+                .collect(toImmutableList());
+
+        List<WriteFunction> columnWriters = writeMappings.stream()
+                .map(WriteMapping::getWriteFunction)
+                .collect(toImmutableList());
+
+        List<WriteNullFunction> nullWriters = writeMappings.stream()
+                .map(WriteMapping::getWriteNullFunction)
+                .collect(toImmutableList());
+
+        int parameterIndex = channel + 1;
+
+        if (block.isNull(position)) {
+            nullWriters.get(channel).setNull(statement, parameterIndex);
+            return;
+        }
+
+        Type type = jdbcTableHandle.getUpdatedColumnTypes().get(channel);
+        Class<?> javaType = type.getJavaType();
+        WriteFunction writeFunction = columnWriters.get(channel);
+        if (javaType == boolean.class) {
+            ((BooleanWriteFunction) writeFunction).set(statement, parameterIndex, type.getBoolean(block, position));
+        }
+        else if (javaType == long.class) {
+            ((LongWriteFunction) writeFunction).set(statement, parameterIndex, type.getLong(block, position));
+        }
+        else if (javaType == double.class) {
+            ((DoubleWriteFunction) writeFunction).set(statement, parameterIndex, type.getDouble(block, position));
+        }
+        else if (javaType == Slice.class) {
+            ((SliceWriteFunction) writeFunction).set(statement, parameterIndex, type.getSlice(block, position));
+        }
+        else if (javaType == Block.class) {
+            ((BlockWriteFunction) writeFunction).set(statement, parameterIndex, (Block) type.getObject(block, position));
+        }
+        else {
+            throw new VerifyException(format("Unexpected type %s with java type %s", type, javaType.getName()));
+        }
+    }
+
+    @Override
+    public void finishUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, Collection<Slice> fragments)
+    {
+    }
+
+    private Map<String, String> getColumnNameMap(ConnectorSession session, JdbcTableHandle tableHandle)
+    {
+        HashMap<String, String> columnNameMap = new HashMap<>(); //<columnName in lower case, columnName in datasource>
+        List<JdbcColumnHandle> columnList = getColumns(session, tableHandle);
+
+        for (JdbcColumnHandle columnHandle : columnList) {
+            String columnName = columnHandle.getColumnName();
+            columnNameMap.put(columnName.toLowerCase(ENGLISH), columnName);
+        }
+
+        return columnNameMap;
+    }
+
+    private List<String> getColumnNameFromDataSource(ConnectorSession session, JdbcTableHandle tableHandle, List<String> columns)
+    {
+        Map<String, String> columnNameMap = getColumnNameMap(session, tableHandle);
+        List<String> updatedColumns = new ArrayList<>();
+
+        for (String columnName : columns) {
+            String originName = columnNameMap.get(columnName.toLowerCase(ENGLISH));
+            updatedColumns.add((originName != null) ? originName : columnName);
+        }
+
+        return updatedColumns;
+    }
+
+    private String buildRemoteSchemaTableName(JdbcTableHandle tableHandle)
+    {
+        StringBuilder remoteSchemaTable = new StringBuilder();
+
+        if (!isNullOrEmpty(tableHandle.getSchemaName())) {
+            remoteSchemaTable.append(quoted(tableHandle.getSchemaName())).append(".");
+        }
+
+        remoteSchemaTable.append(quoted(tableHandle.getTableName()));
+
+        return remoteSchemaTable.toString();
+    }
+
+    @Override
+    public String buildUpdateSql(ConnectorSession session, ConnectorTableHandle handle, int setNum,
+                                 List<String> updatedColumns)
+    {
+        JdbcTableHandle tableHandle = (JdbcTableHandle) handle;
+        StringBuilder sqlBuilder = new StringBuilder();
+        sqlBuilder.append(format("UPDATE %s SET ", buildRemoteSchemaTableName(tableHandle)));
+        List<String> columnList = getColumnNameFromDataSource(session, tableHandle, updatedColumns);
+        for (int i = 0; i < setNum; i++) {
+            sqlBuilder.append(quoted(columnList.get(i)));
+            sqlBuilder.append(" = ? ");
+            if (i != setNum - 1) {
+                sqlBuilder.append(", ");
+            }
+        }
+
+        sqlBuilder.append("WHERE " + "ctid" + "=?::tid");
+        return sqlBuilder.toString();
+    }
+
+    @Override
+    public void setUpdateSql(ConnectorSession session, ConnectorTableHandle tableHandle, PreparedStatement statement, List<Block> columnValueAndCtidBlock, int position, List<String> updatedColumns)
+    {
+        Block ctids = columnValueAndCtidBlock.get(columnValueAndCtidBlock.size() - 1);
+
+        try {
+            for (int i = 0; i < updatedColumns.size(); i++) {
+                setStatement(session, tableHandle, statement, columnValueAndCtidBlock.get(i), position, i);
+            }
+            String ctid = ctids.getString(position, position, 10);
+            statement.setString(updatedColumns.size() + 1, ctid);
+        }
+        catch (SQLException e) {
+            throw new PrestoException(JDBC_ERROR, e);
+        }
+    }
+
+    @Override
+    public ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle, List<ColumnHandle> updatedColumns)
+    {
+        JdbcTypeHandle jdbcTypeHandle = new JdbcTypeHandle(Types.CHAR, Optional.of("char"), 10, 0, Optional.empty());
+        return new JdbcColumnHandle("ctid", jdbcTypeHandle, VARCHAR, true);
+    }
+
+    @Override
+    public ColumnHandle getDeleteRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        JdbcTypeHandle jdbcTypeHandle = new JdbcTypeHandle(Types.CHAR, Optional.of("char"), 10, 0, Optional.empty());
+        return new JdbcColumnHandle("ctid", jdbcTypeHandle, VARCHAR, true);
+    }
+
+    @Override
+    public Optional<ConnectorTableHandle> applyDelete(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        if (pushDownModule.equals(JdbcPushDownModule.DEFAULT)) {
+            return Optional.empty();
+        }
+        return Optional.of(handle);
+    }
+
+    private String extractSubQuery(String subQuery)
+    {
+        String query = subQuery.substring(subQuery.indexOf("WHERE"));
+        int count = 1;
+        int lastIndex = 0;
+        for (int i = query.indexOf("(") + 1; i < query.length(); i++) {
+            if (String.valueOf(query.charAt(i)).equals("(")) {
+                count++;
+            }
+            if (String.valueOf(query.charAt(i)).equals(")")) {
+                count--;
+            }
+            if (count == 0) {
+                lastIndex = i;
+                break;
+            }
+        }
+        return query.substring(0, lastIndex + 1);
+    }
+
+    @Override
+    public OptionalLong executeDelete(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        JdbcIdentity identity = JdbcIdentity.from(session);
+        JdbcTableHandle basePostgresqlHandle = (JdbcTableHandle) handle;
+        try (Connection connection = connectionFactory.openConnection(identity)) {
+            String sql = "DELETE FROM " + basePostgresqlHandle.getSchemaPrefixedTableName();
+            if (basePostgresqlHandle.getGeneratedSql().isPresent()) {
+                String subQuery = basePostgresqlHandle.getGeneratedSql().get().getSql();
+                sql = String.format("%s %s", sql, extractSubQuery(subQuery));
+                try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                    return OptionalLong.of(statement.executeUpdate());
+                }
+            }
+            else {
+                try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                    log.debug("Execute: %s", sql);
+                    return OptionalLong.of(statement.executeUpdate());
+                }
+            }
+        }
+        catch (SQLException e) {
+            throw new PrestoException(JDBC_ERROR, e);
+        }
+    }
+
+    @Override
+    public ConnectorTableHandle beginDelete(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        JdbcTableHandle jdbcTableHandle = (JdbcTableHandle) tableHandle;
+        jdbcTableHandle.setDeleteOrUpdate(true);
+        return jdbcTableHandle;
+    }
+
+    @Override
+    public void finishDelete(ConnectorSession session, ConnectorTableHandle tableHandle, Collection<Slice> fragments)
+    {
+    }
+
+    @Override
+    public String buildDeleteSql(ConnectorTableHandle handle)
+    {
+        JdbcTableHandle tableHandle = (JdbcTableHandle) handle;
+        return format(
+                "DELETE FROM %s WHERE ctid=%s", buildRemoteSchemaTableName(tableHandle), "?::tid");
+    }
+
+    @Override
+    public void setDeleteSql(PreparedStatement statement, Block ctids, int position)
+    {
+        String ctid = ctids.getString(position, position, 10);
+        try {
+            statement.setString(1, ctid);
+        }
+        catch (SQLException e) {
+            throw new PrestoException(JDBC_ERROR, e);
+        }
     }
 }
