@@ -97,7 +97,7 @@ public class MongoClientConfig
         return this;
     }
 
-    public MongoClientConfig setSeeds(String... seeds)
+    public MongoClientConfig setSeedsBatch(String... seeds)
     {
         this.seeds = buildSeeds(Arrays.asList(seeds));
         return this;
@@ -116,7 +116,7 @@ public class MongoClientConfig
         return this;
     }
 
-    public MongoClientConfig setCredentials(String... credentials)
+    public MongoClientConfig setCredentialsBatch(String... credentials)
     {
         this.credentials = buildCredentials(Arrays.asList(credentials));
         return this;

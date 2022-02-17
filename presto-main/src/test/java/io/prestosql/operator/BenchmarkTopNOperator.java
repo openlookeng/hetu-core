@@ -126,7 +126,7 @@ public class BenchmarkTopNOperator
 
         private static List<Page> createInputPages(int positionsPerPage, List<Type> types)
         {
-            ImmutableList.Builder<Page> pages = ImmutableList.builder();
+            ImmutableList.Builder<Page> localPages = ImmutableList.builder();
             PageBuilder pageBuilder = new PageBuilder(types);
             LineItemGenerator lineItemGenerator = new LineItemGenerator(1, 1, 1);
             Iterator<LineItem> iterator = lineItemGenerator.iterator();
@@ -140,15 +140,15 @@ public class BenchmarkTopNOperator
                 DOUBLE.writeDouble(pageBuilder.getBlockBuilder(QUANTITY), lineItem.getQuantity());
 
                 if (pageBuilder.getPositionCount() == positionsPerPage) {
-                    pages.add(pageBuilder.build());
+                    localPages.add(pageBuilder.build());
                     pageBuilder.reset();
                 }
             }
 
             if (pageBuilder.getPositionCount() > 0) {
-                pages.add(pageBuilder.build());
+                localPages.add(pageBuilder.build());
             }
-            return pages.build();
+            return localPages.build();
         }
     }
 

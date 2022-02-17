@@ -63,8 +63,10 @@ public class ListEncoding
     }
 
     @Override
-    public void decodeValueInto(BlockBuilder builder, Slice slice, int offset, int length)
+    public void decodeValueInto(BlockBuilder builder, Slice slice, int inputOffset, int length)
     {
+        int offset = inputOffset;
+
         // entries in list
         int entries = toIntExact(readVInt(slice, offset));
         offset += decodeVIntSize(slice.getByte(offset));

@@ -106,16 +106,16 @@ public class TestDiscoveryNodeManager
 
             assertEqualsIgnoreOrder(activeNodeSet, manager.getNodes(ACTIVE));
 
-            Set<InternalNode> inactiveNodes = allNodes.getInactiveNodes();
-            assertEqualsIgnoreOrder(inactiveNodes, this.inactiveNodes);
+            Set<InternalNode> localInactiveNodes = allNodes.getInactiveNodes();
+            assertEqualsIgnoreOrder(localInactiveNodes, this.inactiveNodes);
 
-            for (InternalNode actual : inactiveNodes) {
+            for (InternalNode actual : localInactiveNodes) {
                 for (InternalNode expected : this.inactiveNodes) {
                     assertNotSame(actual, expected);
                 }
             }
 
-            assertEqualsIgnoreOrder(inactiveNodes, manager.getNodes(INACTIVE));
+            assertEqualsIgnoreOrder(localInactiveNodes, manager.getNodes(INACTIVE));
         }
         finally {
             manager.stop();

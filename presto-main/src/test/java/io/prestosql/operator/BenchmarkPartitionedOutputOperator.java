@@ -43,6 +43,7 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.VerboseMode;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -176,7 +177,7 @@ public class BenchmarkPartitionedOutputOperator
                     if (fieldTypes.get(j) == VARCHAR) {
                         byte[] data = new byte[ThreadLocalRandom.current().nextInt(128)];
                         ThreadLocalRandom.current().nextBytes(data);
-                        testRow.add(new String(data));
+                        testRow.add(new String(data, StandardCharsets.UTF_8));
                     }
                     else {
                         throw new UnsupportedOperationException();

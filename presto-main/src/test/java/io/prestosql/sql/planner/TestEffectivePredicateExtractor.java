@@ -1004,10 +1004,10 @@ public class TestEffectivePredicateExtractor
 
     private Set<Expression> normalizeConjuncts(Expression... conjuncts)
     {
-        return normalizeConjuncts(Arrays.asList(conjuncts));
+        return normalizeOneConjuncts(Arrays.asList(conjuncts));
     }
 
-    private Set<Expression> normalizeConjuncts(Collection<Expression> conjuncts)
+    private Set<Expression> normalizeOneConjuncts(Collection<Expression> conjuncts)
     {
         return normalizeConjuncts(combineConjuncts(conjuncts));
     }

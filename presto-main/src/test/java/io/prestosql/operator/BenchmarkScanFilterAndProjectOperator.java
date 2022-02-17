@@ -136,23 +136,23 @@ public class BenchmarkScanFilterAndProjectOperator
             executor = newCachedThreadPool(daemonThreadsNamed("test-executor-%s"));
             scheduledExecutor = newScheduledThreadPool(2, daemonThreadsNamed("test-scheduledExecutor-%s"));
 
-            Type type = TYPE_MAP.get(this.type);
+            Type localType = TYPE_MAP.get(this.type);
 
             for (int i = 0; i < columnCount; i++) {
-                Symbol symbol = new Symbol(type.getDisplayName().toLowerCase(ENGLISH) + i);
-                symbolTypes.put(symbol, type);
+                Symbol symbol = new Symbol(localType.getDisplayName().toLowerCase(ENGLISH) + i);
+                symbolTypes.put(symbol, localType);
                 sourceLayout.put(symbol, i);
             }
 
-            List<RowExpression> projections = getProjections(type);
+            List<RowExpression> projections = getProjections(localType);
             List<Type> types = projections.stream().map(RowExpression::getType).collect(toList());
             List<ColumnHandle> columnHandles = IntStream.range(0, columnCount)
                     .mapToObj(i -> new TestingColumnHandle(Integer.toString(i)))
                     .collect(toImmutableList());
 
             PageFunctionCompiler pageFunctionCompiler = new PageFunctionCompiler(METADATA, 0);
-            PageProcessor pageProcessor = new ExpressionCompiler(METADATA, pageFunctionCompiler).compilePageProcessor(Optional.of(getFilter(type)), projections).get();
-            CursorProcessor cursorProcessor = new ExpressionCompiler(METADATA, pageFunctionCompiler).compileCursorProcessor(Optional.of(getFilter(type)), projections, "key").get();
+            PageProcessor pageProcessor = new ExpressionCompiler(METADATA, pageFunctionCompiler).compilePageProcessor(Optional.of(getFilter(localType)), projections).get();
+            CursorProcessor cursorProcessor = new ExpressionCompiler(METADATA, pageFunctionCompiler).compileCursorProcessor(Optional.of(getFilter(localType)), projections, "key").get();
 
             createTaskContext();
             createScanFilterAndProjectOperatorFactories(createInputPages(types), pageProcessor, cursorProcessor, columnHandles, types);

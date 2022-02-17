@@ -173,8 +173,10 @@ public final class ChunkedSliceOutput
     }
 
     @Override
-    public void writeBytes(Slice source, int sourceIndex, int length)
+    public void writeBytes(Slice source, int inputSourceIndex, int inputLength)
     {
+        int sourceIndex = inputSourceIndex;
+        int length = inputLength;
         while (length > 0) {
             int batch = tryEnsureBatchSize(length);
             slice.setBytes(bufferPosition, source, sourceIndex, batch);
@@ -191,8 +193,10 @@ public final class ChunkedSliceOutput
     }
 
     @Override
-    public void writeBytes(byte[] source, int sourceIndex, int length)
+    public void writeBytes(byte[] source, int inputSourceIndex, int inputLength)
     {
+        int sourceIndex = inputSourceIndex;
+        int length = inputLength;
         while (length > 0) {
             int batch = tryEnsureBatchSize(length);
             slice.setBytes(bufferPosition, source, sourceIndex, batch);
@@ -203,9 +207,10 @@ public final class ChunkedSliceOutput
     }
 
     @Override
-    public void writeBytes(InputStream in, int length)
+    public void writeBytes(InputStream in, int inputLength)
             throws IOException
     {
+        int length = inputLength;
         while (length > 0) {
             int batch = tryEnsureBatchSize(length);
             slice.setBytes(bufferPosition, in, batch);
@@ -215,8 +220,9 @@ public final class ChunkedSliceOutput
     }
 
     @Override
-    public void writeZero(int length)
+    public void writeZero(int inputLength)
     {
+        int length = inputLength;
         checkArgument(length >= 0, "length must be greater than or equal to 0");
 
         while (length > 0) {
@@ -369,17 +375,17 @@ public final class ChunkedSliceOutput
 
         public byte[] get()
         {
-            byte[] buffer;
+            byte[] localBuffer;
             if (bufferPool.isEmpty()) {
                 currentSize = min(multiplyExact(currentSize, 2), maxChunkSize);
-                buffer = new byte[currentSize];
+                localBuffer = new byte[currentSize];
             }
             else {
-                buffer = bufferPool.remove(0);
-                currentSize = buffer.length;
+                localBuffer = bufferPool.remove(0);
+                currentSize = localBuffer.length;
             }
-            usedBuffers.add(buffer);
-            return buffer;
+            usedBuffers.add(localBuffer);
+            return localBuffer;
         }
     }
 }

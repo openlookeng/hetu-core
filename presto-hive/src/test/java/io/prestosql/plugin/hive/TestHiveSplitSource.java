@@ -180,6 +180,7 @@ public class TestHiveSplitSource
                 splits.setException(e);
             }
         });
+        getterThread.setName("testReaderWaitsForSplits");
         getterThread.setUncaughtExceptionHandler((thread, throwable) -> System.out.println(thread.getName() + " : " + throwable.getMessage()));
         getterThread.start();
 

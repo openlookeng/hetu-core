@@ -53,6 +53,7 @@ public class TestDateTimeOperators
     private static final TimeZoneKey TIME_ZONE_KEY = getTimeZoneKey("Europe/Berlin");
     private static final DateTimeZone WEIRD_TIME_ZONE = DateTimeZone.forOffsetHoursMinutes(5, 9);
     private static final TimeZoneKey WEIRD_TIME_ZONE_KEY = getTimeZoneKeyForOffset(5 * 60 + 9);
+    private static final Pattern STATIC_VALUE_PATTERN = Pattern.compile("'(.*)'");
 
     public TestDateTimeOperators()
     {
@@ -224,8 +225,7 @@ public class TestDateTimeOperators
 
     private static String valueFromLiteral(String literal)
     {
-        Pattern p = Pattern.compile("'(.*)'");
-        Matcher m = p.matcher(literal);
+        Matcher m = STATIC_VALUE_PATTERN.matcher(literal);
         verify(m.find());
         return m.group(1);
     }

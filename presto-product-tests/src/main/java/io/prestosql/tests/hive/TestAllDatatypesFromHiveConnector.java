@@ -284,7 +284,7 @@ public class TestAllDatatypesFromHiveConnector
                         "ala ma kot",
                         "ala ma    ",
                         true,
-                        "kot binarny".getBytes()));
+                        "kot binarny".getBytes(StandardCharsets.UTF_8)));
     }
 
     private void assertProperAllDatatypesSchema(String tableName)
