@@ -26,7 +26,7 @@ public class SqlIntervalYearMonth
 
     public SqlIntervalYearMonth(int months)
     {
-        this.months = months;
+        this(0, months);
     }
 
     public SqlIntervalYearMonth(int year, int months)

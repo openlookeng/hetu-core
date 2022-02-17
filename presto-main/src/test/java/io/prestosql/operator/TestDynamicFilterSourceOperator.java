@@ -110,8 +110,9 @@ public class TestDynamicFilterSourceOperator
     private PipelineContext pipelineContext;
     private StateStoreProvider stateStoreProvider;
 
-    private static Channel channel(int index, Type type, String filterId)
+    private static Channel channel(int index, Type type, String inputFilterId)
     {
+        String filterId = inputFilterId;
         String queryId = TEST_SESSION.getQueryId().toString();
         if (filterId.equals("0")) {
             filterId = String.valueOf(index);

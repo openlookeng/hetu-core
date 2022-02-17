@@ -121,7 +121,7 @@ public class SslInboundHandler
                 outer:
                 while (true) {
                     switch (handshakeStatus) {
-                        case NOT_HANDSHAKING:
+                        case NOT_HANDSHAKING: // $FALL-THROUGH$
                         case FINISHED:
                             if (logger.isFineEnabled()) {
                                 logger.fine("handshakeStatus: " + handshakeStatus);

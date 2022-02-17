@@ -75,7 +75,7 @@ public class TestMongoClientConfig
         MongoClientConfig expected = new MongoClientConfig()
                 .setSchemaCollection("_my_schema")
                 .setCaseInsensitiveNameMatching(true)
-                .setSeeds("host1", "host2:27016")
+                .setSeedsBatch("host1", "host2:27016")
                 .setCredentials("username:password@collection")
                 .setMinConnectionsPerHost(1)
                 .setConnectionsPerHost(99)

@@ -430,7 +430,7 @@ public class SqlQueryScheduler
             QuerySnapshotManager snapshotManager,
             Map<StageId, Integer> stageTaskCounts)
     {
-        ImmutableList.Builder<SqlStageExecution> stages = ImmutableList.builder();
+        ImmutableList.Builder<SqlStageExecution> localStages = ImmutableList.builder();
 
         StageId stageId = new StageId(queryStateMachine.getQueryId(), nextStageId.getAndIncrement());
         SqlStageExecution stageExecution = createSqlStageExecution(
@@ -448,7 +448,7 @@ public class SqlQueryScheduler
                 dynamicFilterService,
                 snapshotManager);
 
-        stages.add(stageExecution);
+        localStages.add(stageExecution);
 
         Optional<int[]> bucketToPartition;
         PartitioningHandle partitioningHandle = plan.getFragment().getPartitioning();
@@ -596,7 +596,7 @@ public class SqlQueryScheduler
                     isSnapshotEnabled,
                     snapshotManager,
                     stageTaskCounts);
-            stages.addAll(subTree);
+            localStages.addAll(subTree);
 
             SqlStageExecution childStage = subTree.get(0);
             childStagesBuilder.add(childStage);
@@ -640,7 +640,7 @@ public class SqlQueryScheduler
             stageSchedulers.put(stageId, scheduler);
         }
 
-        return stages.build();
+        return localStages.build();
     }
 
     public BasicStageStats getBasicStageStats()
@@ -968,6 +968,7 @@ public class SqlQueryScheduler
                 case CANCELED:
                     // no more workers will be added to the query
                     noMoreTasks = true;
+                    // $FALL-THROUGH$
                 case ABORTED:
                     // $FALL-THROUGH$
                 case FAILED:

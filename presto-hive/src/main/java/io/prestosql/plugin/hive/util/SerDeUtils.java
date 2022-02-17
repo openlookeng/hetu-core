@@ -238,8 +238,9 @@ public final class SerDeUtils
         }
     }
 
-    private static Block serializeStruct(Type type, BlockBuilder builder, Object object, StructObjectInspector inspector)
+    private static Block serializeStruct(Type type, BlockBuilder inputBuilder, Object object, StructObjectInspector inspector)
     {
+        BlockBuilder builder = inputBuilder;
         if (object == null) {
             requireNonNull(builder, "parent builder is null").appendNull();
             return null;

@@ -183,7 +183,14 @@ public class DockerizedHive
     private void checkFileExist(String path)
     {
         File file = new File(path);
-        Preconditions.checkArgument(file.exists(), file.getAbsolutePath() + " is not found");
+        String canonicalPath = "";
+        try {
+            canonicalPath = file.getCanonicalPath();
+        }
+        catch (IOException exception) {
+            // can be ignored
+        }
+        Preconditions.checkArgument(file.exists(), canonicalPath + " is not found");
     }
 
     public synchronized Configuration getHadoopConfiguration()

@@ -186,6 +186,9 @@ public class DataSourceTableSplitManager
                     handleSplitStatic(identity, jdbcSplitsList);
                 }
             });
+            collectStaticLogs.setName("splitStatic");
+            collectStaticLogs.setUncaughtExceptionHandler(
+                    (tr, ex) -> System.out.println(tr.getName() + ":" + ex.getMessage()));
             collectStaticLogs.start();
         }
         return new DataSourceSplitSource(jdbcSplitsList);

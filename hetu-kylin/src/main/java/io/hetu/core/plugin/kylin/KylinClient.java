@@ -194,7 +194,6 @@ public class KylinClient
         catch (Exception e) {
             log.debug("There is a problem %s", e.getLocalizedMessage());
             log.debug("Error message: " + e.getStackTrace());
-            e.printStackTrace();
             // No need to raise an error.
             // This method is used inside applySubQuery method to extract the column types from a sub-query.
             // Returning empty map will indicate that something wrong and let the Presto to execute the query as usual.

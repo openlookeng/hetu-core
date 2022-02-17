@@ -888,11 +888,12 @@ public final class OperatorAssertion
 
     public static void assertPagesEqualIgnoreOrder(
             DriverContext driverContext,
-            List<Page> actualPages,
+            List<Page> inputActualPages,
             MaterializedResult expected,
             boolean hashEnabled,
             Optional<Integer> hashChannel)
     {
+        List<Page> actualPages = inputActualPages;
         if (hashEnabled && hashChannel.isPresent()) {
             // Drop the hashChannel for all pages
             actualPages = dropChannel(actualPages, ImmutableList.of(hashChannel.get()));

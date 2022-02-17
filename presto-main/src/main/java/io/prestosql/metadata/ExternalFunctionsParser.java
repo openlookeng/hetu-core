@@ -25,9 +25,9 @@ import io.prestosql.spi.function.SqlInvokedFunction;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.TypeSignature;
 
+import java.security.SecureRandom;
 import java.util.List;
 import java.util.Optional;
-import java.util.Random;
 import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkState;
@@ -56,6 +56,7 @@ public class ExternalFunctionsParser
             StandardTypes.TIMESTAMP,
             StandardTypes.TIME_WITH_TIME_ZONE,
             StandardTypes.TIMESTAMP_WITH_TIME_ZONE);
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     public static Optional<SqlInvokedFunction> parseExternalFunction(ExternalFunctionInfo externalFunctionInfo, CatalogSchemaName catalogSchemaName, RoutineCharacteristics.Language language)
     {
@@ -112,10 +113,9 @@ public class ExternalFunctionsParser
     private static String getRandomString(int length, String base)
     {
         checkState(base.length() >= length, "the base should be longer than the str length needed");
-        Random random = new Random();
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < length; i++) {
-            int number = random.nextInt(base.length());
+            int number = RANDOM.nextInt();
             sb.append(base.charAt(number));
         }
         return sb.toString();

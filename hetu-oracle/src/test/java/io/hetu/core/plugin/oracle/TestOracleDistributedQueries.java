@@ -195,6 +195,7 @@ public class TestOracleDistributedQueries
     /**
      * testView
      */
+    @Override
     public void testView()
     {
         // view is not supported

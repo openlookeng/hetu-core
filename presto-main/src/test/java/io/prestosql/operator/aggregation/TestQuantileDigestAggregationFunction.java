@@ -324,14 +324,14 @@ public class TestQuantileDigestAggregationFunction
 
         // Test each quantile individually (value_at_quantile)
         for (double percentile : percentiles) {
-            assertPercentileWithinError(type, binary, error, rows, percentile);
+            assertOnePercentileWithinError(type, binary, error, rows, percentile);
         }
 
         // Test all the quantiles (values_at_quantiles)
         assertPercentilesWithinErrorWithArray(type, binary, error, rows, percentiles);
     }
 
-    private void assertPercentileWithinError(String type, SqlVarbinary binary, double error, List<? extends Number> rows, double percentile)
+    private void assertOnePercentileWithinError(String type, SqlVarbinary binary, double error, List<? extends Number> rows, double percentile)
     {
         Number lowerBound = getLowerBound(error, rows, percentile);
         Number upperBound = getUpperBound(error, rows, percentile);

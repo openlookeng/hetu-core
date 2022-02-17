@@ -103,7 +103,7 @@ public class TestTablePartitioningSelect
         }
         catch (QueryExecutionException expectedDueToInvalidPartitionData) {
             System.out.println("query fail");
-            expectedDueToInvalidPartitionData.printStackTrace();
+            System.out.println(expectedDueToInvalidPartitionData.getStackTrace().toString());
         }
     }
 }

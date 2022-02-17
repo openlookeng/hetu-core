@@ -173,8 +173,9 @@ public final class RcFileDecoderUtils
         out.writeBytes(slice);
     }
 
-    public static void writeVInt(SliceOutput out, int value)
+    public static void writeVInt(SliceOutput out, int inputValue)
     {
+        int value = inputValue;
         if (value >= -112 && value <= 127) {
             out.writeByte(value);
             return;
@@ -202,8 +203,9 @@ public final class RcFileDecoderUtils
         }
     }
 
-    public static void writeVLong(SliceOutput out, long value)
+    public static void writeVLong(SliceOutput out, long inputValue)
     {
+        long value = inputValue;
         if (value >= -112 && value <= 127) {
             out.writeByte((byte) value);
             return;
