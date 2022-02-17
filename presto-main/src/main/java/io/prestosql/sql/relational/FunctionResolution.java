@@ -70,6 +70,7 @@ public final class FunctionResolution
         return functionAndTypeManager.lookupFunction("not", fromTypes(BOOLEAN));
     }
 
+    @Override
     public boolean isNotFunction(FunctionHandle functionHandle)
     {
         return functionAndTypeManager.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "not"));
@@ -88,11 +89,13 @@ public final class FunctionResolution
         return functionAndTypeManager.lookupFunction("LIKE", fromTypes(valueType, LIKE_PATTERN));
     }
 
+    @Override
     public boolean isLikeFunction(FunctionHandle functionHandle)
     {
         return functionAndTypeManager.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "LIKE"));
     }
 
+    @Override
     public FunctionHandle likePatternFunction()
     {
         return functionAndTypeManager.lookupFunction("LIKE_PATTERN", fromTypes(VARCHAR, VARCHAR));
@@ -115,6 +118,7 @@ public final class FunctionResolution
         return functionAndTypeManager.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "TRY_CAST"));
     }
 
+    @Override
     public boolean isArrayConstructor(FunctionHandle functionHandle)
     {
         return functionAndTypeManager.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, ARRAY_CONSTRUCTOR));
@@ -253,11 +257,13 @@ public final class FunctionResolution
         return functionAndTypeManager.getFunctionMetadata(functionHandle).getOperatorType().equals(Optional.of(SUBSCRIPT));
     }
 
+    @Override
     public FunctionHandle tryFunction(Type returnType)
     {
         return functionAndTypeManager.lookupFunction("$internal$try", fromTypes(returnType));
     }
 
+    @Override
     public boolean isTryFunction(FunctionHandle functionHandle)
     {
         return functionAndTypeManager.getFunctionMetadata(functionHandle).getName().equals("$internal$try");

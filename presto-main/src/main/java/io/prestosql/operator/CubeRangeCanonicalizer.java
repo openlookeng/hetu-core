@@ -15,12 +15,17 @@
 
 package io.prestosql.operator;
 
+import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
+import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 import io.prestosql.Session;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.heuristicindex.Pair;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.VarcharType;
 import io.prestosql.sql.ExpressionUtils;
 import io.prestosql.sql.planner.ExpressionDomainTranslator;
 import io.prestosql.sql.planner.LiteralEncoder;
@@ -34,10 +39,13 @@ import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.Identifier;
 import io.prestosql.sql.tree.LogicalBinaryExpression;
+import io.prestosql.sql.tree.NullLiteral;
 import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -98,6 +106,9 @@ public class CubeRangeCanonicalizer
         private final Metadata metadata;
         private final ConnectorSession session;
         private final LiteralEncoder encoder;
+        private static final Pattern NUMBER_PATTERN = Pattern.compile("\\d+$");
+        private static final Set<Type> SUPPORTED_TYPES = ImmutableSet.<Type>builder()
+                .add(BIGINT).add(INTEGER).add(SMALLINT).add(TINYINT).add(DATE).build();
 
         public CubeRangeVisitor(TypeProvider types, Metadata metadata, ConnectorSession session)
         {
@@ -117,8 +128,35 @@ public class CubeRangeCanonicalizer
         public Expression visitComparisonExpression(ComparisonExpression comparisonExpression, Void ignored)
         {
             ComparisonExpression.Operator operator = comparisonExpression.getOperator();
+            Pair<SymbolReference, Expression> symbolAndValuePair = extractSymbolAndValue(comparisonExpression);
+            SymbolReference symbolReference = symbolAndValuePair.getFirst();
+            Expression valueExpr = symbolAndValuePair.getSecond();
+            Type type = types.get(new Symbol(symbolReference.getName()));
+            if (!isTypeSupported(type)) {
+                return super.visitComparisonExpression(comparisonExpression, ignored);
+            }
+            Object value = evaluate(valueExpr, type);
+            if (value == null) {
+                return super.visitComparisonExpression(comparisonExpression, ignored);
+            }
+            if (operator == EQUAL) {
+                return new LogicalBinaryExpression(AND,
+                        new ComparisonExpression(GREATER_THAN_OR_EQUAL, symbolReference, encode(value, type)),
+                        new ComparisonExpression(LESS_THAN, symbolReference, incrementAndEncode(value, type)));
+            }
+            else if (operator == LESS_THAN_OR_EQUAL) {
+                return new ComparisonExpression(LESS_THAN, symbolReference, incrementAndEncode(value, type));
+            }
+            else if (operator == GREATER_THAN) {
+                return new ComparisonExpression(GREATER_THAN_OR_EQUAL, symbolReference, incrementAndEncode(value, type));
+            }
+            return super.visitComparisonExpression(comparisonExpression, ignored);
+        }
+
+        private Pair<SymbolReference, Expression> extractSymbolAndValue(ComparisonExpression comparisonExpression)
+        {
             SymbolReference symbolReference;
-            Expression value;
+            Expression valueExpr;
             if (comparisonExpression.getLeft() instanceof SymbolReference || comparisonExpression.getLeft() instanceof Cast) {
                 if (comparisonExpression.getLeft() instanceof Cast) {
                     symbolReference = ((SymbolReference) ((Cast) comparisonExpression.getLeft()).getExpression());
@@ -126,7 +164,7 @@ public class CubeRangeCanonicalizer
                 else {
                     symbolReference = (SymbolReference) comparisonExpression.getLeft();
                 }
-                value = comparisonExpression.getRight();
+                valueExpr = comparisonExpression.getRight();
             }
             else {
                 if (comparisonExpression.getRight() instanceof Cast) {
@@ -135,34 +173,58 @@ public class CubeRangeCanonicalizer
                 else {
                     symbolReference = (SymbolReference) comparisonExpression.getRight();
                 }
-                value = comparisonExpression.getLeft();
+                valueExpr = comparisonExpression.getLeft();
             }
-            Type type = types.get(new Symbol(symbolReference.getName()));
-            if (isTypeNotSupported(type)) {
-                return super.visitComparisonExpression(comparisonExpression, ignored);
+            if (valueExpr instanceof Cast) {
+                valueExpr = ((Cast) valueExpr).getExpression();
             }
-            if (value instanceof Cast) {
-                value = ((Cast) value).getExpression();
+            return new Pair<>(symbolReference, valueExpr);
+        }
+
+        private boolean isTypeSupported(Type type)
+        {
+            return (type instanceof VarcharType) || SUPPORTED_TYPES.contains(type);
+        }
+
+        private Object evaluate(Expression valueExpr, Type type)
+        {
+            if (valueExpr instanceof NullLiteral) {
+                return null;
             }
-            if (LiteralInterpreter.evaluate(metadata, session, value) == null) {
-                return super.visitComparisonExpression(comparisonExpression, ignored);
+            Object value = LiteralInterpreter.evaluate(metadata, session, valueExpr);
+            if (type instanceof VarcharType) {
+                String valueString = value instanceof Slice ? ((Slice) value).toStringUtf8() : (String) value;
+                Matcher m = NUMBER_PATTERN.matcher(valueString);
+                return m.find() ? valueString : null;
             }
-            if (operator == EQUAL) {
-                Expression low = encoder.toExpression(LiteralInterpreter.evaluate(metadata, session, value), type);
-                Expression high = encoder.toExpression(((Long) LiteralInterpreter.evaluate(metadata, session, value) + 1), type);
-                return new LogicalBinaryExpression(AND,
-                        new ComparisonExpression(GREATER_THAN_OR_EQUAL, symbolReference, low),
-                        new ComparisonExpression(LESS_THAN, symbolReference, high));
+            return value instanceof Long ? value : null;
+        }
+
+        private Expression encode(Object value, Type type)
+        {
+            if (type instanceof VarcharType) {
+                return encoder.toExpression(Slices.utf8Slice((String) value), type);
             }
-            else if (operator == LESS_THAN_OR_EQUAL) {
-                value = encoder.toExpression(((Long) LiteralInterpreter.evaluate(metadata, session, value) + 1), type);
-                return new ComparisonExpression(LESS_THAN, symbolReference, value);
+            return encoder.toExpression(value, type);
+        }
+
+        private Expression incrementAndEncode(Object value, Type type)
+        {
+            Object incrementedValue;
+            if (type instanceof VarcharType) {
+                String valueAsString = (String) value;
+                Matcher m = NUMBER_PATTERN.matcher(valueAsString);
+                //Following must always be true. Pattern has earlier tested against the predicate value.
+                m.find();
+                String num = m.group();
+                int inc = Integer.parseInt(num) + 1;
+                String incStr = String.format("%0" + num.length() + "d", inc);
+                incrementedValue = Slices.utf8Slice(m.replaceFirst(incStr));
             }
-            else if (operator == GREATER_THAN) {
-                value = encoder.toExpression(((Long) LiteralInterpreter.evaluate(metadata, session, value) + 1), type);
-                return new ComparisonExpression(GREATER_THAN_OR_EQUAL, symbolReference, value);
+            else {
+                incrementedValue = ((Long) value) + 1;
             }
-            return super.visitComparisonExpression(comparisonExpression, ignored);
+            return encoder.toExpression(incrementedValue, type);
         }
 
         @Override
@@ -193,27 +255,29 @@ public class CubeRangeCanonicalizer
                 symbolReference = (SymbolReference) predicate.getValue();
             }
             Type type = types.get(new Symbol(symbolReference.getName()));
-            if (isTypeNotSupported(type)) {
+            if (!isTypeSupported(type)) {
                 return super.visitBetweenPredicate(predicate, ignored);
             }
-            Expression low = predicate.getMin();
-            if (low instanceof Cast) {
-                low = ((Cast) low).getExpression();
+            Expression lowValueExpr = predicate.getMin();
+            if (lowValueExpr instanceof Cast) {
+                lowValueExpr = ((Cast) lowValueExpr).getExpression();
             }
-            low = encoder.toExpression(LiteralInterpreter.evaluate(metadata, session, low), type);
-            Expression high = predicate.getMax();
-            if (high instanceof Cast) {
-                high = ((Cast) high).getExpression();
+            Object lowValue = evaluate(lowValueExpr, type);
+            if (lowValue == null) {
+                return super.visitBetweenPredicate(predicate, ignored);
             }
-            high = encoder.toExpression(((Long) LiteralInterpreter.evaluate(metadata, session, high) + 1), type);
-            return new LogicalBinaryExpression(AND,
-                    new ComparisonExpression(GREATER_THAN_OR_EQUAL, predicate.getValue(), low),
-                    new ComparisonExpression(LESS_THAN, predicate.getValue(), high));
-        }
 
-        private boolean isTypeNotSupported(Type type)
-        {
-            return type != BIGINT && type != INTEGER && type != SMALLINT && type != TINYINT && type != DATE;
+            Expression highValueExpr = predicate.getMax();
+            if (highValueExpr instanceof Cast) {
+                highValueExpr = ((Cast) highValueExpr).getExpression();
+            }
+            Object highValue = evaluate(highValueExpr, type);
+            if (highValue == null) {
+                return super.visitBetweenPredicate(predicate, ignored);
+            }
+            return new LogicalBinaryExpression(AND,
+                    new ComparisonExpression(GREATER_THAN_OR_EQUAL, predicate.getValue(), encode(lowValue, type)),
+                    new ComparisonExpression(LESS_THAN, predicate.getValue(), incrementAndEncode(highValue, type)));
         }
     }
 }

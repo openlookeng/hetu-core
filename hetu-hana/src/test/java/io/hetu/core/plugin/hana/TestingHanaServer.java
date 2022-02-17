@@ -203,7 +203,7 @@ public final class TestingHanaServer
     {
         String actualTable = tablePattern;
 
-        for (String table : tables) { //tableName + _ + UUID
+        for (String table : tables) { // tableName + _ + UUID
             int lastIndex = table.lastIndexOf("_");
             if (lastIndex == -1) {
                 continue;

@@ -169,6 +169,7 @@ public abstract class InternalPlanVisitor<R, C>
         return visitPlan(node, context);
     }
 
+    @Override
     public R visitCTEScan(CTEScanNode node, C context)
     {
         return visitPlan(node, context);

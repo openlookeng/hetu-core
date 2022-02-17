@@ -196,28 +196,28 @@ public class DbResourceGroupConfigurationManager
         try {
             Map.Entry<ManagerSpec, Map<ResourceGroupIdTemplate, ResourceGroupSpec>> specsFromDb = buildSpecsFromDb();
             ManagerSpec managerSpec = specsFromDb.getKey();
-            Map<ResourceGroupIdTemplate, ResourceGroupSpec> resourceGroupSpecs = specsFromDb.getValue();
+            Map<ResourceGroupIdTemplate, ResourceGroupSpec> resourceGroupSpecMap = specsFromDb.getValue();
             Set<ResourceGroupIdTemplate> changedSpecs = new HashSet<>();
-            Set<ResourceGroupIdTemplate> deletedSpecs = Sets.difference(this.resourceGroupSpecs.keySet(), resourceGroupSpecs.keySet());
+            Set<ResourceGroupIdTemplate> deletedSpecs = Sets.difference(this.resourceGroupSpecs.keySet(), resourceGroupSpecMap.keySet());
 
-            for (Map.Entry<ResourceGroupIdTemplate, ResourceGroupSpec> entry : resourceGroupSpecs.entrySet()) {
+            for (Map.Entry<ResourceGroupIdTemplate, ResourceGroupSpec> entry : resourceGroupSpecMap.entrySet()) {
                 if (!entry.getValue().sameConfig(this.resourceGroupSpecs.get(entry.getKey()))) {
                     changedSpecs.add(entry.getKey());
                 }
             }
 
-            this.resourceGroupSpecs = resourceGroupSpecs;
+            this.resourceGroupSpecs = resourceGroupSpecMap;
             this.cpuQuotaPeriod.set(managerSpec.getCpuQuotaPeriod());
             this.rootGroups.set(managerSpec.getRootGroups());
-            List<ResourceGroupSelector> selectors = buildSelectors(managerSpec);
+            List<ResourceGroupSelector> selectorList = buildSelectors(managerSpec);
             if (exactMatchSelectorEnabled) {
                 ImmutableList.Builder<ResourceGroupSelector> builder = ImmutableList.builder();
                 builder.add(new DbSourceExactMatchSelector(environment, dao));
-                builder.addAll(selectors);
+                builder.addAll(selectorList);
                 this.selectors.set(builder.build());
             }
             else {
-                this.selectors.set(selectors);
+                this.selectors.set(selectorList);
             }
 
             configureChangedGroups(changedSpecs);
@@ -228,7 +228,7 @@ public class DbResourceGroupConfigurationManager
                     log.info("Resource group spec deleted %s", deleted);
                 }
                 for (ResourceGroupIdTemplate changed : changedSpecs) {
-                    log.info("Resource group spec %s changed to %s", changed, resourceGroupSpecs.get(changed));
+                    log.info("Resource group spec %s changed to %s", changed, resourceGroupSpecMap.get(changed));
                 }
             }
             else {
@@ -268,7 +268,7 @@ public class DbResourceGroupConfigurationManager
     private synchronized Map.Entry<ManagerSpec, Map<ResourceGroupIdTemplate, ResourceGroupSpec>> buildSpecsFromDb()
     {
         // New resource group spec map
-        Map<ResourceGroupIdTemplate, ResourceGroupSpec> resourceGroupSpecs = new HashMap<>();
+        Map<ResourceGroupIdTemplate, ResourceGroupSpec> resourceGroupSpecHashMap = new HashMap<>();
         // Set of root group db ids
         Set<Long> rootGroupIds = new HashSet<>();
         // Map of id from db to resource group spec
@@ -296,7 +296,7 @@ public class DbResourceGroupConfigurationManager
                 ResourceGroupSpec resourceGroupSpec = builder.build();
                 resourceGroupSpecMap.put(id, resourceGroupSpec);
                 // Add newly built spec to spec map
-                resourceGroupSpecs.put(resourceGroupIdTemplateMap.get(id), resourceGroupSpec);
+                resourceGroupSpecHashMap.put(resourceGroupIdTemplateMap.get(id), resourceGroupSpec);
                 // Add this resource group spec to parent subgroups and remove id from subgroup ids to build
                 builder.getParentId().ifPresent(parentId -> {
                     recordMap.get(parentId).addSubGroup(resourceGroupSpec);
@@ -312,9 +312,9 @@ public class DbResourceGroupConfigurationManager
         }
 
         // Specs are built from db records, validate and return manager spec
-        List<ResourceGroupSpec> rootGroups = rootGroupIds.stream().map(resourceGroupSpecMap::get).collect(Collectors.toList());
+        List<ResourceGroupSpec> resourceGroupSpecList = rootGroupIds.stream().map(resourceGroupSpecMap::get).collect(Collectors.toList());
 
-        List<SelectorSpec> selectors = dao.getSelectors(environment)
+        List<SelectorSpec> selectorSpecList = dao.getSelectors(environment)
                 .stream()
                 .map(selectorRecord ->
                         new SelectorSpec(
@@ -325,9 +325,9 @@ public class DbResourceGroupConfigurationManager
                                 selectorRecord.getSelectorResourceEstimate(),
                                 resourceGroupIdTemplateMap.get(selectorRecord.getResourceGroupId()))
                 ).collect(Collectors.toList());
-        ManagerSpec managerSpec = new ManagerSpec(rootGroups, selectors, getCpuQuotaPeriodFromDb());
+        ManagerSpec managerSpec = new ManagerSpec(resourceGroupSpecList, selectorSpecList, getCpuQuotaPeriodFromDb());
         validateRootGroups(managerSpec);
-        return new AbstractMap.SimpleImmutableEntry<>(managerSpec, resourceGroupSpecs);
+        return new AbstractMap.SimpleImmutableEntry<>(managerSpec, resourceGroupSpecHashMap);
     }
 
     private synchronized void configureChangedGroups(Set<ResourceGroupIdTemplate> changedSpecs)
@@ -352,12 +352,12 @@ public class DbResourceGroupConfigurationManager
 
     private List<ResourceGroupId> configuredGroups(ResourceGroupIdTemplate idTemplate)
     {
-        List<ResourceGroupId> groups = configuredGroups.get(idTemplate);
-        if (groups == null) {
+        List<ResourceGroupId> groupIdList = configuredGroups.get(idTemplate);
+        if (groupIdList == null) {
             return ImmutableList.of();
         }
-        synchronized (groups) { // configuredGroups values are synchronized lists
-            return ImmutableList.copyOf(groups);
+        synchronized (groupIdList) { // configuredGroups values are synchronized lists
+            return ImmutableList.copyOf(groupIdList);
         }
     }
 
@@ -370,13 +370,14 @@ public class DbResourceGroupConfigurationManager
 
     private ResourceGroup getRootGroup(ResourceGroupId groupId)
     {
-        Optional<ResourceGroupId> parent = groupId.getParent();
+        ResourceGroupId resourceGroupId = groupId;
+        Optional<ResourceGroupId> parent = resourceGroupId.getParent();
         while (parent.isPresent()) {
-            groupId = parent.get();
-            parent = groupId.getParent();
+            resourceGroupId = parent.get();
+            parent = resourceGroupId.getParent();
         }
         // GroupId is guaranteed to be in groups: it is added before the first call to this method in configure()
-        return groups.get(groupId);
+        return groups.get(resourceGroupId);
     }
 
     @Managed

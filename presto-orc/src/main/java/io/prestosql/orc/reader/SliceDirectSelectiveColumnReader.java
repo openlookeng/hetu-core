@@ -36,6 +36,7 @@ import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.BitSet;
@@ -242,7 +243,7 @@ public class SliceDirectSelectiveColumnReader
             else {
                 int length = lengthVector[lengthIndex];
                 int dataOffset = outputRequired ? offset : 0;
-                if (true /* filters.get(0).testLength(length) */) {
+                if (true) {
                     if (dataStream != null) {
                         dataStream.skip(dataToSkip);
                         dataToSkip = 0;
@@ -256,7 +257,7 @@ public class SliceDirectSelectiveColumnReader
                     }
                     else {
                         if ((accumulator != null && accumulator.get(position))
-                                || filters == null || filters.stream().anyMatch(f -> f.testBytes("".getBytes(), 0, 0))) {
+                                || filters == null || filters.stream().anyMatch(f -> f.testBytes("".getBytes(StandardCharsets.UTF_8), 0, 0))) {
                             if (accumulator != null) {
                                 accumulator.set(position);
                             }
@@ -339,7 +340,7 @@ public class SliceDirectSelectiveColumnReader
                         }
                     }
                     else {
-                        if (filters == null || filters.get(0).testBytes("".getBytes(), 0, 0)) {
+                        if (filters == null || filters.get(0).testBytes("".getBytes(StandardCharsets.UTF_8), 0, 0)) {
                             if (outputRequired) {
                                 offsets[outputPositionCount + 1] = offset;
                                 if (nullsAllowed && isNullVector != null) {

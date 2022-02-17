@@ -50,27 +50,27 @@ public class JavaVersion
     {
         Matcher matcher = LEGACY_PATTERN.matcher(version);
         if (matcher.matches()) {
-            int major = Integer.parseInt(matcher.group("MAJOR"));
-            int minor = Optional.ofNullable(matcher.group("MINOR"))
+            int majorMatcher = Integer.parseInt(matcher.group("MAJOR"));
+            int minorMatcher = Optional.ofNullable(matcher.group("MINOR"))
                     .map(Integer::parseInt)
                     .orElse(0);
 
-            String update = matcher.group("UPDATE");
-            if (update == null) {
-                return new JavaVersion(major, minor);
+            String updateMatcher = matcher.group("UPDATE");
+            if (updateMatcher == null) {
+                return new JavaVersion(majorMatcher, minorMatcher);
             }
 
-            return new JavaVersion(major, minor, OptionalInt.of(Integer.parseInt(update)));
+            return new JavaVersion(majorMatcher, minorMatcher, OptionalInt.of(Integer.parseInt(updateMatcher)));
         }
 
         matcher = PATTERN.matcher(version);
         if (matcher.matches()) {
-            int major = Integer.parseInt(matcher.group("MAJOR"));
-            int minor = Optional.ofNullable(matcher.group("MINOR"))
+            int majorMatcher = Integer.parseInt(matcher.group("MAJOR"));
+            int minorMatcher = Optional.ofNullable(matcher.group("MINOR"))
                     .map(Integer::parseInt)
                     .orElse(0);
 
-            return new JavaVersion(major, minor);
+            return new JavaVersion(majorMatcher, minorMatcher);
         }
 
         throw new IllegalArgumentException(format("Cannot parse version %s", version));

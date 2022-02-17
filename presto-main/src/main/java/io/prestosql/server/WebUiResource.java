@@ -32,12 +32,13 @@ public class WebUiResource
             @HeaderParam(X_FORWARDED_PROTO) String proto,
             @Context UriInfo uriInfo)
     {
-        if (isNullOrEmpty(proto)) {
-            proto = uriInfo.getRequestUri().getScheme();
+        String newProto = proto;
+        if (isNullOrEmpty(newProto)) {
+            newProto = uriInfo.getRequestUri().getScheme();
         }
 
         return Response.status(TEMPORARY_REDIRECT)
-                .location(uriInfo.getRequestUriBuilder().scheme(proto).path("/ui/").build())
+                .location(uriInfo.getRequestUriBuilder().scheme(newProto).path("/ui/").build())
                 .build();
     }
 }

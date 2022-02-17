@@ -321,8 +321,8 @@ public class TestSourcePartitionedScheduler
     {
         assertPrestoExceptionThrownBy(() -> {
             NodeTaskMap nodeTaskMap = new NodeTaskMap(finalizerService);
-            InMemoryNodeManager nodeManager = new InMemoryNodeManager();
-            NodeScheduler nodeScheduler = new NodeScheduler(new LegacyNetworkTopology(), nodeManager, new NodeSchedulerConfig().setIncludeCoordinator(false), nodeTaskMap);
+            InMemoryNodeManager memoryNodeManager = new InMemoryNodeManager();
+            NodeScheduler nodeScheduler = new NodeScheduler(new LegacyNetworkTopology(), memoryNodeManager, new NodeSchedulerConfig().setIncludeCoordinator(false), nodeTaskMap);
 
             StageExecutionPlan plan = createPlan(createFixedSplitSource(20, TestingSplit::createRemoteSplit));
             SqlStageExecution stage = createSqlStageExecution(plan, nodeTaskMap);
@@ -341,8 +341,8 @@ public class TestSourcePartitionedScheduler
     public void testBalancedSplitAssignment()
     {
         // use private node manager so we can add a node later
-        InMemoryNodeManager nodeManager = new InMemoryNodeManager();
-        nodeManager.addNode(CONNECTOR_ID,
+        InMemoryNodeManager memoryNodeManager = new InMemoryNodeManager();
+        memoryNodeManager.addNode(CONNECTOR_ID,
                 new InternalNode("other1", URI.create("http://127.0.0.1:11"), NodeVersion.UNKNOWN, false),
                 new InternalNode("other2", URI.create("http://127.0.0.1:12"), NodeVersion.UNKNOWN, false),
                 new InternalNode("other3", URI.create("http://127.0.0.1:13"), NodeVersion.UNKNOWN, false));
@@ -351,7 +351,7 @@ public class TestSourcePartitionedScheduler
         // Schedule 15 splits - there are 3 nodes, each node should get 5 splits
         StageExecutionPlan firstPlan = createPlan(createFixedSplitSource(15, TestingSplit::createRemoteSplit));
         SqlStageExecution firstStage = createSqlStageExecution(firstPlan, nodeTaskMap);
-        StageScheduler firstScheduler = getSourcePartitionedScheduler(firstPlan, firstStage, nodeManager, nodeTaskMap, 200);
+        StageScheduler firstScheduler = getSourcePartitionedScheduler(firstPlan, firstStage, memoryNodeManager, nodeTaskMap, 200);
 
         ScheduleResult scheduleResult = firstScheduler.schedule();
         assertEffectivelyFinished(scheduleResult, firstScheduler);
@@ -364,12 +364,12 @@ public class TestSourcePartitionedScheduler
 
         // Add new node
         InternalNode additionalNode = new InternalNode("other4", URI.create("http://127.0.0.1:14"), NodeVersion.UNKNOWN, false);
-        nodeManager.addNode(CONNECTOR_ID, additionalNode);
+        memoryNodeManager.addNode(CONNECTOR_ID, additionalNode);
 
         // Schedule 5 splits in another query. Since the new node does not have any splits, all 5 splits are assigned to the new node
         StageExecutionPlan secondPlan = createPlan(createFixedSplitSource(5, TestingSplit::createRemoteSplit));
         SqlStageExecution secondStage = createSqlStageExecution(secondPlan, nodeTaskMap);
-        StageScheduler secondScheduler = getSourcePartitionedScheduler(secondPlan, secondStage, nodeManager, nodeTaskMap, 200);
+        StageScheduler secondScheduler = getSourcePartitionedScheduler(secondPlan, secondStage, memoryNodeManager, nodeTaskMap, 200);
 
         scheduleResult = secondScheduler.schedule();
         assertEffectivelyFinished(scheduleResult, secondScheduler);

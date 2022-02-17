@@ -126,25 +126,26 @@ public class DecimalEncoding
 
     private long parseLong(Slice slice, int offset)
     {
+        int newOffset = offset;
         // first vint is scale
-        int scale = toIntExact(readVInt(slice, offset));
-        offset += decodeVIntSize(slice, offset);
+        int scale = toIntExact(readVInt(slice, newOffset));
+        newOffset += decodeVIntSize(slice, newOffset);
 
         // second vint is length
-        int length = toIntExact(readVInt(slice, offset));
-        offset += decodeVIntSize(slice, offset);
+        int length = toIntExact(readVInt(slice, newOffset));
+        newOffset += decodeVIntSize(slice, newOffset);
 
         checkState(length <= 8);
 
         // reset the results buffer
-        if (slice.getByte(offset) >= 0) {
+        if (slice.getByte(newOffset) >= 0) {
             resultSlice.setLong(0, 0L);
         }
         else {
             resultSlice.setLong(0, 0xFFFF_FFFF_FFFF_FFFFL);
         }
 
-        resultSlice.setBytes(8 - length, slice, offset, length);
+        resultSlice.setBytes(8 - length, slice, newOffset, length);
 
         long value = Long.reverseBytes(resultSlice.getLong(0));
         if (scale != type.getScale()) {
@@ -156,18 +157,19 @@ public class DecimalEncoding
 
     private Slice parseSlice(Slice slice, int offset)
     {
+        int newOffset = offset;
         // first vint is scale
-        int scale = toIntExact(readVInt(slice, offset));
-        offset += decodeVIntSize(slice, offset);
+        int scale = toIntExact(readVInt(slice, newOffset));
+        newOffset += decodeVIntSize(slice, newOffset);
 
         // second vint is length
-        int length = toIntExact(readVInt(slice, offset));
-        offset += decodeVIntSize(slice, offset);
+        int length = toIntExact(readVInt(slice, newOffset));
+        newOffset += decodeVIntSize(slice, newOffset);
 
         checkState(length <= BYTES_IN_LONG_DECIMAL);
 
         // reset the results buffer
-        if (slice.getByte(offset) >= 0) {
+        if (slice.getByte(newOffset) >= 0) {
             resultSlice.setLong(0, 0L);
             resultSlice.setLong(8, 0L);
         }
@@ -176,7 +178,7 @@ public class DecimalEncoding
             resultSlice.setLong(8, 0xFFFF_FFFF_FFFF_FFFFL);
         }
 
-        resultSlice.setBytes(BYTES_IN_LONG_DECIMAL - length, slice, offset, length);
+        resultSlice.setBytes(BYTES_IN_LONG_DECIMAL - length, slice, newOffset, length);
 
         // todo get rid of BigInteger
         BigInteger decimal = new BigInteger(resultBytes);
@@ -204,13 +206,14 @@ public class DecimalEncoding
 
     private static int getWriteByteCount(long value)
     {
+        long val = value;
         // if the value is negative flip the bits, so we can always count leading zero bytes
-        if (value < 0) {
-            value = ~value;
+        if (val < 0) {
+            val = ~val;
         }
 
         // count number of leading zero bytes
-        return (Long.SIZE - Long.numberOfLeadingZeros(value)) / BITS_IN_BYTE + 1;
+        return (Long.SIZE - Long.numberOfLeadingZeros(val)) / BITS_IN_BYTE + 1;
     }
 
     private void writeSlice(SliceOutput output, Block block, int position)

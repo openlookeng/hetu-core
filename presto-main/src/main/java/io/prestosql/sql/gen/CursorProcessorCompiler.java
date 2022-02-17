@@ -47,6 +47,7 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.LambdaBytecodeGenerator.CompiledLambda;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -353,7 +354,7 @@ public class CursorProcessorCompiler
 
                 IfStatement ifStatement = new IfStatement();
                 ifStatement.condition()
-                        .setDescription(String.format("cursor.get%s(%d)", type, field))
+                        .setDescription(String.format(Locale.ROOT, "cursor.get%s(%d)", type, field))
                         .getVariable(cursorVariable)
                         .push(field)
                         .invokeInterface(RecordCursor.class, "isNull", boolean.class, int.class);

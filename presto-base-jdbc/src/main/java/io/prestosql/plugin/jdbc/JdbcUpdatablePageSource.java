@@ -194,9 +194,9 @@ public class JdbcUpdatablePageSource
     public void abort()
     {
         // rollback and close
-        try (Connection connection = this.connection) {
-            if (!connection.isClosed()) {
-                connection.rollback();
+        try (Connection conn = this.connection) {
+            if (!conn.isClosed()) {
+                conn.rollback();
             }
         }
         catch (SQLException e) {

@@ -232,18 +232,18 @@ final class StochasticPriorityQueue<E>
         {
             checkState(parent.isPresent(), "Cannot remove root node");
             checkState(isLeaf(), "Can only remove leaf nodes");
-            Node<E> parent = this.parent.get();
-            if (parent.getRight().map(node -> node.equals(this)).orElse(false)) {
-                parent.right = Optional.empty();
+            Node<E> parentNode = this.parent.get();
+            if (parentNode.getRight().map(node -> node.equals(this)).orElse(false)) {
+                parentNode.right = Optional.empty();
             }
             else {
-                checkState(parent.getLeft().map(node -> node.equals(this)).orElse(false), "Inconsistent parent pointer");
-                parent.left = Optional.empty();
+                checkState(parentNode.getLeft().map(node -> node.equals(this)).orElse(false), "Inconsistent parent pointer");
+                parentNode.left = Optional.empty();
             }
-            while (parent != null) {
-                parent.descendants--;
-                parent.totalTickets -= tickets;
-                parent = parent.parent.orElse(null);
+            while (parentNode != null) {
+                parentNode.descendants--;
+                parentNode.totalTickets -= tickets;
+                parentNode = parentNode.parent.orElse(null);
             }
             this.parent = Optional.empty();
         }

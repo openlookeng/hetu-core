@@ -39,7 +39,7 @@ public final class SymbolAliases
 
     public SymbolAliases()
     {
-        this.map = ImmutableMap.of();
+        this(new HashMap<>());
     }
 
     private SymbolAliases(Map<String, SymbolReference> aliases)
@@ -213,18 +213,19 @@ public final class SymbolAliases
 
         public Builder put(String alias, SymbolReference symbolReference)
         {
-            requireNonNull(alias, "alias is null");
+            String newAlias = alias;
+            requireNonNull(newAlias, "alias is null");
             requireNonNull(symbolReference, "symbolReference is null");
 
-            alias = toKey(alias);
+            newAlias = toKey(newAlias);
 
             // Special case to allow identity binding (i.e. "ALIAS" -> expression("ALIAS"))
-            if (bindings.containsKey(alias) && bindings.get(alias).equals(symbolReference)) {
+            if (bindings.containsKey(newAlias) && bindings.get(newAlias).equals(symbolReference)) {
                 return this;
             }
 
-            checkState(!bindings.containsKey(alias), "Alias '%s' already bound to expression '%s'. Tried to rebind to '%s'", alias, bindings.get(alias), symbolReference);
-            bindings.put(alias, symbolReference);
+            checkState(!bindings.containsKey(newAlias), "Alias '%s' already bound to expression '%s'. Tried to rebind to '%s'", newAlias, bindings.get(newAlias), symbolReference);
+            bindings.put(newAlias, symbolReference);
             return this;
         }
 

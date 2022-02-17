@@ -160,9 +160,9 @@ public class FailureInfo
         @Override
         public String toString()
         {
-            String message = getMessage();
-            if (message != null) {
-                return type + ": " + message;
+            String msg = getMessage();
+            if (msg != null) {
+                return type + ": " + msg;
             }
             return type;
         }

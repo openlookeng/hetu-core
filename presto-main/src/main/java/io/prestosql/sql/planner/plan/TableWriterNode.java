@@ -90,14 +90,14 @@ public class TableWriterNode
         this.statisticsAggregationDescriptor = requireNonNull(statisticsAggregationDescriptor, "statisticsAggregationDescriptor is null");
         checkArgument(statisticsAggregation.isPresent() == statisticsAggregationDescriptor.isPresent(), "statisticsAggregation and statisticsAggregationDescriptor must be either present or absent");
 
-        ImmutableList.Builder<Symbol> outputs = ImmutableList.<Symbol>builder()
+        ImmutableList.Builder<Symbol> outputBuilder = ImmutableList.<Symbol>builder()
                 .add(rowCountSymbol)
                 .add(fragmentSymbol);
         statisticsAggregation.ifPresent(aggregation -> {
-            outputs.addAll(aggregation.getGroupingSymbols());
-            outputs.addAll(aggregation.getAggregations().keySet());
+            outputBuilder.addAll(aggregation.getGroupingSymbols());
+            outputBuilder.addAll(aggregation.getAggregations().keySet());
         });
-        this.outputs = outputs.build();
+        this.outputs = outputBuilder.build();
     }
 
     @JsonProperty

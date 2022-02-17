@@ -22,6 +22,8 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.type.Type;
 
+import java.nio.charset.StandardCharsets;
+
 import static io.prestosql.rcfile.RcFileDecoderUtils.calculateTruncationLength;
 import static io.prestosql.rcfile.RcFileDecoderUtils.unescapeText;
 
@@ -40,23 +42,23 @@ public class StringEncoding
     }
 
     @Override
-    public void encodeColumn(Block block, SliceOutput output, EncodeOutput encodeOutput)
+    public void encodeColumn(Block block, SliceOutput sliceOutput, EncodeOutput encodeOutput)
     {
         for (int position = 0; position < block.getPositionCount(); position++) {
             if (block.isNull(position)) {
-                output.writeBytes(nullSequence);
+                sliceOutput.writeBytes(nullSequence);
             }
             else {
                 Slice slice = type.getSlice(block, position);
                 if (escapeByte != null && slice.indexOfByte(escapeByte) < 0) {
                     throw new IllegalArgumentException("escape not implemented");
                 }
-                String escapedValue = unescapeText(new String(slice.getBytes()));
+                String escapedValue = unescapeText(new String(slice.getBytes(), StandardCharsets.UTF_8));
                 if (escapedValue.getBytes().length < slice.getBytes().length) {
-                    output.writeBytes(escapedValue.getBytes());
+                    sliceOutput.writeBytes(escapedValue.getBytes(StandardCharsets.UTF_8));
                 }
                 else {
-                    output.writeBytes(slice);
+                    sliceOutput.writeBytes(slice);
                 }
             }
             encodeOutput.closeEntry();
@@ -76,17 +78,18 @@ public class StringEncoding
     @Override
     public Block decodeColumn(ColumnData columnData)
     {
+        ColumnData data = columnData;
         if (escapeByte != null) {
-            columnData = unescape(columnData, escapeByte);
+            data = unescape(data, escapeByte);
         }
 
-        int size = columnData.rowCount();
+        int size = data.rowCount();
         BlockBuilder builder = type.createBlockBuilder(null, size);
 
-        Slice slice = columnData.getSlice();
+        Slice slice = data.getSlice();
         for (int i = 0; i < size; i++) {
-            int offset = columnData.getOffset(i);
-            int length = columnData.getLength(i);
+            int offset = data.getOffset(i);
+            int length = data.getLength(i);
             if (nullSequence.equals(0, nullSequence.length(), slice, offset, length)) {
                 builder.appendNull();
             }
@@ -131,7 +134,8 @@ public class StringEncoding
     @Override
     public void decodeValueInto(int depth, BlockBuilder builder, Slice slice, int offset, int length)
     {
-        length = calculateTruncationLength(type, slice, offset, length);
-        type.writeSlice(builder, slice, offset, length);
+        int len = length;
+        len = calculateTruncationLength(type, slice, offset, len);
+        type.writeSlice(builder, slice, offset, len);
     }
 }

@@ -64,24 +64,25 @@ public class StructEncoding
     public void decodeValueInto(int depth, BlockBuilder builder, Slice slice, int offset, int length)
             throws RcFileCorruptionException
     {
+        int newOffset = offset;
         byte separator = getSeparator(depth);
-        int end = offset + length;
+        int end = newOffset + length;
 
         BlockBuilder structBuilder = builder.beginBlockEntry();
-        int elementOffset = offset;
+        int elementOffset = newOffset;
         int fieldIndex = 0;
-        while (offset < end && (!lastColumnTakesRest || fieldIndex < structFields.size())) {
-            byte currentByte = slice.getByte(offset);
+        while (newOffset < end && (!lastColumnTakesRest || fieldIndex < structFields.size())) {
+            byte currentByte = slice.getByte(newOffset);
             if (currentByte == separator) {
-                decodeElementValueInto(depth, fieldIndex, structBuilder, slice, elementOffset, offset - elementOffset);
-                elementOffset = offset + 1;
+                decodeElementValueInto(depth, fieldIndex, structBuilder, slice, elementOffset, newOffset - elementOffset);
+                elementOffset = newOffset + 1;
                 fieldIndex++;
             }
-            else if (isEscapeByte(currentByte) && offset + 1 < length) {
+            else if (isEscapeByte(currentByte) && newOffset + 1 < length) {
                 // ignore the char after escape_char
-                offset++;
+                newOffset++;
             }
-            offset++;
+            newOffset++;
         }
         decodeElementValueInto(depth, fieldIndex, structBuilder, slice, elementOffset, end - elementOffset);
         fieldIndex++;

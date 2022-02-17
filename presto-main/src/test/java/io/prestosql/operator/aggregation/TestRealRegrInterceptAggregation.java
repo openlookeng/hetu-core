@@ -73,7 +73,8 @@ public class TestRealRegrInterceptAggregation
             regression.addData(x[i], y[i]);
         }
         float expected = (float) regression.getIntercept();
-        checkArgument(Float.isFinite(expected) && expected != 0.f, "Expected result is trivial");
+        final float epsilon = 0.0000001f;
+        checkArgument(Float.isFinite(expected) && Math.abs(expected - 0.f) >= epsilon, "Expected result is trivial");
         testAggregation(expected, createBlockOfReals(y), createBlockOfReals(x));
     }
 }

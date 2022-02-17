@@ -43,6 +43,7 @@ public class RowExpressionDeterminismEvaluator
         this.metadata = requireNonNull(metadata, "metadata is null");
     }
 
+    @Override
     public boolean isDeterministic(RowExpression expression)
     {
         return expression.accept(new Visitor(metadata.getFunctionAndTypeManager()), null);

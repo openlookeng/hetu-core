@@ -13,6 +13,7 @@
  */
 package io.prestosql.jdbc;
 
+import io.airlift.log.Logger;
 import io.airlift.log.Logging;
 import io.prestosql.server.testing.TestingPrestoServer;
 import org.testng.annotations.AfterClass;
@@ -24,6 +25,7 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
@@ -52,6 +54,7 @@ import static org.testng.Assert.assertTrue;
 @Test(singleThreaded = true)
 public class TestJdbcResultSet
 {
+    private static final Logger log = Logger.get(TestJdbcResultSet.class);
     private TestingPrestoServer server;
 
     private Connection connection;
@@ -115,11 +118,11 @@ public class TestJdbcResultSet
             try {
                 bytes = new byte[inputStream.available()];
                 inputStream.read(bytes);
-                String str = new String(bytes);
+                String str = new String(bytes, StandardCharsets.UTF_8);
                 assertEquals(str, "123");
             }
             catch (IOException e) {
-                e.printStackTrace();
+                log.warn(e.toString());
             }
         }
 
@@ -130,11 +133,11 @@ public class TestJdbcResultSet
             try {
                 bytes = new byte[inputStream.available()];
                 inputStream.read(bytes);
-                String str = new String(bytes);
+                String str = new String(bytes, StandardCharsets.UTF_8);
                 assertEquals(str, "123");
             }
             catch (IOException e) {
-                e.printStackTrace();
+                log.warn(e.getMessage());
             }
         }
 

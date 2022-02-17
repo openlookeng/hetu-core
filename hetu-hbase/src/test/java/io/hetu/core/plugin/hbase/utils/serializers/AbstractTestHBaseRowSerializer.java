@@ -27,6 +27,7 @@ import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import java.lang.invoke.MethodHandle;
+import java.nio.charset.StandardCharsets;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -98,7 +99,7 @@ public abstract class AbstractTestHBaseRowSerializer
         boolean flag = true;
         Text text = new Text();
         text.set(this.serializer.setObjectBytes(BOOLEAN, flag));
-        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes()));
+        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes(), StandardCharsets.UTF_8));
 
         flag = this.serializer.getBytesObject(BOOLEAN, COLUMN_NAME);
         assertEquals(true, flag);
@@ -115,7 +116,7 @@ public abstract class AbstractTestHBaseRowSerializer
         Text text = new Text();
         Long expected = Long.valueOf(date.toEpochDay());
         text.set(this.serializer.setObjectBytes(DATE, expected));
-        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes()));
+        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes(), StandardCharsets.UTF_8));
 
         Long actual = this.serializer.getBytesObject(DATE, COLUMN_NAME);
         assertEquals(actual.toString(), expected.toString());
@@ -130,7 +131,7 @@ public abstract class AbstractTestHBaseRowSerializer
         Double expected = 123.45678;
         Text text = new Text();
         text.set(this.serializer.setObjectBytes(DOUBLE, expected));
-        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes()));
+        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes(), StandardCharsets.UTF_8));
 
         Double actual = serializer.getBytesObject(DOUBLE, COLUMN_NAME);
         assertEquals(actual, expected);
@@ -148,7 +149,7 @@ public abstract class AbstractTestHBaseRowSerializer
             Long expectedLong = expectedDouble.longValue();
             Text text = new Text();
             text.set(this.serializer.setObjectBytes(REAL, expectedLong));
-            TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes()));
+            TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes(), StandardCharsets.UTF_8));
 
             Long actual = serializer.getBytesObject(REAL, COLUMN_NAME);
             assertEquals(actual, expectedLong);
@@ -168,7 +169,7 @@ public abstract class AbstractTestHBaseRowSerializer
         Integer expected = 123456;
         Text text = new Text();
         text.set(this.serializer.setObjectBytes(INTEGER, expected));
-        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes()));
+        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes(), StandardCharsets.UTF_8));
 
         Long actual = serializer.getBytesObject(INTEGER, COLUMN_NAME);
         Integer readActual = actual.intValue();
@@ -184,7 +185,7 @@ public abstract class AbstractTestHBaseRowSerializer
         Long expected = 12345678901L;
         Text text = new Text();
         text.set(this.serializer.setObjectBytes(BIGINT, expected));
-        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes()));
+        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes(), StandardCharsets.UTF_8));
 
         Long actual = serializer.getBytesObject(BIGINT, COLUMN_NAME);
         assertEquals(actual, expected);
@@ -199,7 +200,7 @@ public abstract class AbstractTestHBaseRowSerializer
         Integer expected = 123456;
         Text text = new Text();
         text.set(this.serializer.setObjectBytes(BIGINT, expected));
-        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes()));
+        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes(), StandardCharsets.UTF_8));
 
         Long actual = serializer.getBytesObject(BIGINT, COLUMN_NAME);
         Integer realActual = actual.intValue();
@@ -215,7 +216,7 @@ public abstract class AbstractTestHBaseRowSerializer
         Long expected = 123456789L;
         Text text = new Text();
         text.set(this.serializer.setObjectBytes(INTEGER, expected));
-        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes()));
+        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes(), StandardCharsets.UTF_8));
 
         Long actual = serializer.getBytesObject(INTEGER, COLUMN_NAME);
         assertEquals(actual, expected);
@@ -230,7 +231,7 @@ public abstract class AbstractTestHBaseRowSerializer
         Short expected = 12345;
         Text text = new Text();
         text.set(this.serializer.setObjectBytes(SMALLINT, expected.longValue()));
-        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes()));
+        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes(), StandardCharsets.UTF_8));
 
         Long actual = serializer.getBytesObject(SMALLINT, COLUMN_NAME);
         Short realActual = actual.shortValue();
@@ -247,7 +248,7 @@ public abstract class AbstractTestHBaseRowSerializer
         Long expectedTime = expected.getTime();
         Text text = new Text();
         text.set(this.serializer.setObjectBytes(TIME, expectedTime));
-        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes()));
+        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes(), StandardCharsets.UTF_8));
 
         Long actual = serializer.getBytesObject(TIME, COLUMN_NAME);
         assertEquals(new Time(actual).toString(), expected.toString());
@@ -263,7 +264,7 @@ public abstract class AbstractTestHBaseRowSerializer
         Long expectedTime = expected.getTime();
         Text text = new Text();
         text.set(this.serializer.setObjectBytes(TIMESTAMP, expectedTime));
-        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes()));
+        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes(), StandardCharsets.UTF_8));
 
         Long actual = serializer.getBytesObject(TIMESTAMP, COLUMN_NAME);
         assertEquals(actual, expectedTime);
@@ -278,7 +279,7 @@ public abstract class AbstractTestHBaseRowSerializer
         Byte expected = 123;
         Text text = new Text();
         text.set(this.serializer.setObjectBytes(TINYINT, expected.longValue()));
-        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes()));
+        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes(), StandardCharsets.UTF_8));
 
         Long actual = serializer.getBytesObject(TINYINT, COLUMN_NAME);
         Byte realActual = actual.byteValue();
@@ -292,10 +293,10 @@ public abstract class AbstractTestHBaseRowSerializer
     public void testVarbinary()
     {
         try {
-            byte[] expected = UUID.randomUUID().toString().getBytes();
+            byte[] expected = UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8);
             Text text = new Text();
             text.set(this.serializer.setObjectBytes(VARBINARY, expected));
-            TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes()));
+            TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes(), StandardCharsets.UTF_8));
 
             Slice actual = serializer.getBytesObject(VARBINARY, COLUMN_NAME);
             assertEquals(actual.getBytes(), expected);
@@ -318,7 +319,7 @@ public abstract class AbstractTestHBaseRowSerializer
         String expected = UUID.randomUUID().toString();
         Text text = new Text();
         text.set(this.serializer.setObjectBytes(VARCHAR, expected));
-        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes()));
+        TestStringRowSerializer.PSERIALIZER.getColumnValues().put(COLUMN_NAME, new String(text.getBytes(), StandardCharsets.UTF_8));
 
         Slice actual = serializer.getBytesObject(VARCHAR, COLUMN_NAME);
         assertEquals(actual.toStringUtf8(), expected);

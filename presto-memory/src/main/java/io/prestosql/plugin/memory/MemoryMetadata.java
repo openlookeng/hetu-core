@@ -727,32 +727,8 @@ public class MemoryMetadata
     }
 
     // TODO: disabled for now
-//    @Override
-//    public Optional<LimitApplicationResult<ConnectorTableHandle>> applyLimit(ConnectorSession session, ConnectorTableHandle handle, long limit)
-//    {
-//        MemoryTableHandle table = (MemoryTableHandle) handle;
-//
-//        if (table.getLimit().isPresent() && table.getLimit().getAsLong() <= limit) {
-//            return Optional.empty();
-//        }
-//
-//        return Optional.of(new LimitApplicationResult<>(
-//                new MemoryTableHandle(table.getId(), OptionalLong.of(limit), OptionalDouble.empty(), table.getPredicate()),
-//                true));
-//    }
 
     // TODO: disabled for now
-//    @Override
-//    public Optional<ConnectorTableHandle> applySample(ConnectorSession session, ConnectorTableHandle handle, SampleType sampleType, double sampleRatio)
-//    {
-//        MemoryTableHandle table = (MemoryTableHandle) handle;
-//
-//        if ((table.getSampleRatio().isPresent() && table.getSampleRatio().getAsDouble() == sampleRatio) || sampleType != SYSTEM || table.getLimit().isPresent()) {
-//            return Optional.empty();
-//        }
-//
-//        return Optional.of(new MemoryTableHandle(table.getId(), table.getLimit(), OptionalDouble.of(table.getSampleRatio().orElse(1) * sampleRatio), table.getPredicate()));
-//    }
 
     @Override
     public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle handle, Constraint constraint)
@@ -793,11 +769,11 @@ public class MemoryMetadata
      */
     private Stream<SchemaTableName> getTableStream(Optional<String> schemaName, boolean isView)
     {
-        Stream<TableEntity> tables = schemaName.isPresent() ?
+        Stream<TableEntity> tableStream = schemaName.isPresent() ?
                 metastore.getAllTables(MEM_KEY, schemaName.get()).stream() :
                 metastore.getAllDatabases(MEM_KEY).stream()
                         .flatMap(databaseEntity -> metastore.getAllTables(MEM_KEY, databaseEntity.getName()).stream());
-        return tables
+        return tableStream
                 .filter(tableEntity -> isView(tableEntity) == isView)
                 .map(tableEntity -> new SchemaTableName(tableEntity.getDatabaseName(), tableEntity.getName()));
     }

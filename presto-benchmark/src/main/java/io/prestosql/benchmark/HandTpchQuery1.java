@@ -163,8 +163,8 @@ public class HandTpchQuery1
             @Override
             public Operator createOperator(DriverContext driverContext)
             {
-                OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, new PlanNodeId("test"), TpchQuery1Operator.class.getSimpleName());
-                return new TpchQuery1Operator(operatorContext);
+                OperatorContext context = driverContext.addOperatorContext(operatorId, new PlanNodeId("test"), TpchQuery1Operator.class.getSimpleName());
+                return new TpchQuery1Operator(context);
             }
 
             @Override

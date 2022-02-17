@@ -282,7 +282,7 @@ public abstract class AbstractOperatorBenchmark
     @Override
     protected Map<String, Long> runOnce()
     {
-        Session session = testSessionBuilder()
+        Session setSession = testSessionBuilder()
                 .setSystemProperty("optimizer.optimize-hash-generation", "true")
                 .build();
         MemoryPool memoryPool = new MemoryPool(new MemoryPoolId("test"), new DataSize(1, GIGABYTE));
@@ -300,7 +300,7 @@ public abstract class AbstractOperatorBenchmark
                 spillSpaceTracker,
                 NOOP_SNAPSHOT_UTILS)
                 .addTaskContext(new TaskStateMachine(new TaskId("query", 0, 0), localQueryRunner.getExecutor()),
-                        session,
+                        setSession,
                         false,
                         false,
                         OptionalInt.empty(),

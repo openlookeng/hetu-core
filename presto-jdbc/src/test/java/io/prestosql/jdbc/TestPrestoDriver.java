@@ -1339,6 +1339,7 @@ public class TestPrestoDriver
 
                 assertTrue(statement.execute("SELECT 123 x, 'foo' y"));
                 assertFalse(statement.getMoreResults(Statement.CLOSE_CURRENT_RESULT));
+                result.close();
             }
         }
     }
@@ -1408,30 +1409,35 @@ public class TestPrestoDriver
     {
         String prefix = format("jdbc:presto://%s", server.getAddress());
 
-        Connection connection;
-        connection = DriverManager.getConnection(prefix + "/a/b/", "test", null);
-        assertEquals(connection.getCatalog(), "a");
-        assertEquals(connection.getSchema(), "b");
+        Connection connection = null;
+        try {
+            connection = DriverManager.getConnection(prefix + "/a/b/", "test", null);
+            assertEquals(connection.getCatalog(), "a");
+            assertEquals(connection.getSchema(), "b");
 
-        connection = DriverManager.getConnection(prefix + "/a/b", "test", null);
-        assertEquals(connection.getCatalog(), "a");
-        assertEquals(connection.getSchema(), "b");
+            connection = DriverManager.getConnection(prefix + "/a/b", "test", null);
+            assertEquals(connection.getCatalog(), "a");
+            assertEquals(connection.getSchema(), "b");
 
-        connection = DriverManager.getConnection(prefix + "/a/", "test", null);
-        assertEquals(connection.getCatalog(), "a");
-        assertNull(connection.getSchema());
+            connection = DriverManager.getConnection(prefix + "/a/", "test", null);
+            assertEquals(connection.getCatalog(), "a");
+            assertNull(connection.getSchema());
 
-        connection = DriverManager.getConnection(prefix + "/a", "test", null);
-        assertEquals(connection.getCatalog(), "a");
-        assertNull(connection.getSchema());
+            connection = DriverManager.getConnection(prefix + "/a", "test", null);
+            assertEquals(connection.getCatalog(), "a");
+            assertNull(connection.getSchema());
 
-        connection = DriverManager.getConnection(prefix + "/", "test", null);
-        assertNull(connection.getCatalog());
-        assertNull(connection.getSchema());
+            connection = DriverManager.getConnection(prefix + "/", "test", null);
+            assertNull(connection.getCatalog());
+            assertNull(connection.getSchema());
 
-        connection = DriverManager.getConnection(prefix, "test", null);
-        assertNull(connection.getCatalog());
-        assertNull(connection.getSchema());
+            connection = DriverManager.getConnection(prefix, "test", null);
+            assertNull(connection.getCatalog());
+            assertNull(connection.getSchema());
+        }
+        finally {
+            connection.close();
+        }
     }
 
     @Test

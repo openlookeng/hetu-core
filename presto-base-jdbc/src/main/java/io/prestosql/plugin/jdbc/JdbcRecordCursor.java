@@ -235,29 +235,31 @@ public class JdbcRecordCursor
         DateTime toClose = DateTime.now();
 
         // use try with resources to close everything properly
-        try (Statement statement = this.statement;
-                ResultSet resultSet = this.resultSet) {
+        try (Statement stat = this.statement;
+                ResultSet result = this.resultSet) {
             checkState(closed, "just for check style handle");
         }
         catch (SQLException e) {
             // ignore exception from close
+            log.warn(e.toString());
         }
 
-        try (Connection connection = this.connection) {
-            if (connection != null) {
-                jdbcClient.abortReadConnection(connection);
+        try (Connection conn = this.connection) {
+            if (conn != null) {
+                jdbcClient.abortReadConnection(conn);
 
-                DateTime closed = DateTime.now();
+                DateTime closedTime = DateTime.now();
                 log.debug("connect open cost %dms, execute cost %dms, fetch data cost %dms, connect close cost %dms, total cost %dms, fetch rows %d.",
                         connected.getMillis() - start.getMillis(),
                         executed.getMillis() - connected.getMillis(),
                         toClose.getMillis() - executed.getMillis(),
-                        closed.getMillis() - toClose.getMillis(),
-                        closed.getMillis() - start.getMillis(), fetchCnt - 1);
+                        closedTime.getMillis() - toClose.getMillis(),
+                        closedTime.getMillis() - start.getMillis(), fetchCnt - 1);
             }
         }
         catch (SQLException e) {
             // ignore exception from close
+            log.warn(e.toString());
         }
     }
 

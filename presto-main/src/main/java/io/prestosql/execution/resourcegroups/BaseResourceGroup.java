@@ -477,22 +477,23 @@ public abstract class BaseResourceGroup
      */
     protected int adjustHardConcurrency(int hardConcurrencyLimit, long cpuUsageMillis)
     {
+        int concurrencyLimit = hardConcurrencyLimit;
         // No need to apply penalty if softCpuLimit is bigger than hardCpuLimit
         if (hardCpuLimitMillis <= softCpuLimitMillis) {
-            return hardConcurrencyLimit;
+            return concurrencyLimit;
         }
 
         if (cpuUsageMillis >= softCpuLimitMillis) {
             // TODO: Consider whether cpu limit math should be performed on softConcurrency or hardConcurrency
             // Linear penalty between soft and hard limit
             double penalty = (cpuUsageMillis - softCpuLimitMillis) / (double) (hardCpuLimitMillis - softCpuLimitMillis);
-            hardConcurrencyLimit = (int) Math.floor(hardConcurrencyLimit * (1 - penalty));
+            concurrencyLimit = (int) Math.floor(concurrencyLimit * (1 - penalty));
             // Always penalize by at least one
-            hardConcurrencyLimit = min(this.hardConcurrencyLimit - 1, hardConcurrencyLimit);
+            concurrencyLimit = min(this.hardConcurrencyLimit - 1, concurrencyLimit);
             // Always allow at least one running query
-            hardConcurrencyLimit = Math.max(1, hardConcurrencyLimit);
+            concurrencyLimit = Math.max(1, concurrencyLimit);
         }
-        return hardConcurrencyLimit;
+        return concurrencyLimit;
     }
 
     @Override
