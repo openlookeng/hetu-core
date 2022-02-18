@@ -408,10 +408,10 @@ public class RcFileTester
     {
         List<?> finalValues = Lists.newArrayList(writeValues);
 
-        Set<Format> formats = new LinkedHashSet<>(this.formats);
-        formats.removeAll(skipFormats);
+        Set<Format> localFormats = new LinkedHashSet<>(this.formats);
+        localFormats.removeAll(skipFormats);
 
-        for (Format format : formats) {
+        for (Format format : localFormats) {
             for (Compression compression : compressions) {
                 // write old, read new
                 try (TempFile tempFile = new TempFile()) {
@@ -804,8 +804,9 @@ public class RcFileTester
         assertFalse(iterator.hasNext());
     }
 
-    private static Object decodeRecordReaderValue(Format format, Type type, Object actualValue)
+    private static Object decodeRecordReaderValue(Format format, Type type, Object inputActualValue)
     {
+        Object actualValue = inputActualValue;
         if (actualValue instanceof LazyPrimitive) {
             actualValue = ((LazyPrimitive<?, ?>) actualValue).getWritableObject();
         }

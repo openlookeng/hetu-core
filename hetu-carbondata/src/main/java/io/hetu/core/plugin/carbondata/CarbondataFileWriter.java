@@ -131,12 +131,12 @@ public class CarbondataFileWriter
                                 JobConf configuration, TypeManager typeManager, Optional<AcidOutputFormat.Options> acidOptions,
                                 Optional<HiveACIDWriteType> acidWriteType, OptionalInt taskId) throws SerDeException
     {
-        Path outPutPath = paramOutPutPath;
-        this.outPutPath = requireNonNull(outPutPath, "path is null");
+        Path localOutPutPath = paramOutPutPath;
+        this.outPutPath = requireNonNull(localOutPutPath, "path is null");
         // in table creation this can be null
         if (null != properties.getProperty("location")) {
             this.outPutPath = new Path(properties.getProperty("location"));
-            outPutPath = new Path(properties.getProperty("location"));
+            localOutPutPath = new Path(properties.getProperty("location"));
         }
         this.configuration = requireNonNull(configuration, "conf is null");
         this.properties = requireNonNull(properties, "Properties is null");
@@ -212,7 +212,7 @@ public class CarbondataFileWriter
                     Object writer =
                             Class.forName(MapredCarbonOutputFormat.class.getName()).getConstructor().newInstance();
                     recordWriter = ((MapredCarbonOutputFormat<?>) writer)
-                            .getHiveRecordWriter(this.configuration, outPutPath, Text.class, compress,
+                            .getHiveRecordWriter(this.configuration, localOutPutPath, Text.class, compress,
                                     properties, Reporter.NULL);
                 }
 

@@ -85,8 +85,9 @@ public final class SymbolAliases
         return getOptional(alias).orElseThrow(() -> new IllegalStateException(format("missing expression for alias %s", alias)));
     }
 
-    public Optional<SymbolReference> getOptional(String alias)
+    public Optional<SymbolReference> getOptional(String inputAlias)
     {
+        String alias = inputAlias;
         alias = toKey(alias);
         SymbolReference result = map.get(alias);
         return Optional.ofNullable(result);

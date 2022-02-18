@@ -412,7 +412,7 @@ public class BaseJdbcClient
         }
     }
 
-    protected JdbcOutputTableHandle createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, String tableName)
+    protected JdbcOutputTableHandle createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, String inputTableName)
             throws SQLException
     {
         SchemaTableName schemaTableName = tableMetadata.getTable();
@@ -422,6 +422,7 @@ public class BaseJdbcClient
             throw new PrestoException(NOT_FOUND, "Schema not found: " + schemaTableName.getSchemaName());
         }
 
+        String tableName = inputTableName;
         try (Connection connection = connectionFactory.openConnection(identity)) {
             boolean uppercase = connection.getMetaData().storesUpperCaseIdentifiers();
             String remoteSchema = toRemoteSchemaName(identity, connection, schemaTableName.getSchemaName());

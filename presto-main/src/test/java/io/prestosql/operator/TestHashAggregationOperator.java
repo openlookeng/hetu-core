@@ -165,12 +165,12 @@ public class TestHashAggregationOperator
     {
         // make operator produce multiple pages during finish phase
         int numberOfRows = 40_000;
-        Metadata metadata = createTestMetadataManager();
-        InternalAggregationFunction countVarcharColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+        Metadata localMetadata = createTestMetadataManager();
+        InternalAggregationFunction countVarcharColumn = localMetadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
                 new Signature(QualifiedObjectName.valueOfDefaultFunction("count"), AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.VARCHAR)));
-        InternalAggregationFunction countBooleanColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+        InternalAggregationFunction countBooleanColumn = localMetadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
                 new Signature(QualifiedObjectName.valueOfDefaultFunction("count"), AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.BOOLEAN)));
-        InternalAggregationFunction maxVarcharColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+        InternalAggregationFunction maxVarcharColumn = localMetadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
                 new Signature(QualifiedObjectName.valueOfDefaultFunction("max"), AGGREGATE, parseTypeSignature(StandardTypes.VARCHAR), parseTypeSignature(StandardTypes.VARCHAR)));
         List<Integer> hashChannels = Ints.asList(1);
         RowPagesBuilder rowPagesBuilder = rowPagesBuilder(hashEnabled, hashChannels, VARCHAR, VARCHAR, VARCHAR, BIGINT, BOOLEAN);
@@ -227,12 +227,12 @@ public class TestHashAggregationOperator
         long memoryLimitForMerge = 0;
         long memoryLimitForMergeWithMemory = 0;
         int numberOfRows = 40_000;
-        Metadata metadata = createTestMetadataManager();
-        InternalAggregationFunction countVarcharColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+        Metadata localMetadata = createTestMetadataManager();
+        InternalAggregationFunction countVarcharColumn = localMetadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
                 new Signature(QualifiedObjectName.valueOfDefaultFunction("count"), AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.VARCHAR)));
-        InternalAggregationFunction countBooleanColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+        InternalAggregationFunction countBooleanColumn = localMetadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
                 new Signature(QualifiedObjectName.valueOfDefaultFunction("count"), AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.BOOLEAN)));
-        InternalAggregationFunction maxVarcharColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+        InternalAggregationFunction maxVarcharColumn = localMetadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
                 new Signature(QualifiedObjectName.valueOfDefaultFunction("max"), AGGREGATE, parseTypeSignature(StandardTypes.VARCHAR), parseTypeSignature(StandardTypes.VARCHAR)));
         List<Integer> hashChannels = Ints.asList(1);
         RowPagesBuilder rowPagesBuilder = rowPagesBuilder(false, hashChannels, VARCHAR, VARCHAR, VARCHAR, BIGINT, BOOLEAN);
@@ -451,12 +451,12 @@ public class TestHashAggregationOperator
     @Test(dataProvider = "hashEnabledAndMemoryLimitForMergeValues")
     public void testHashAggregationWithGlobals(boolean hashEnabled, boolean spillEnabled, boolean revokeMemoryWhenAddingPages, long memoryLimitForMerge, long memoryLimitForMergeWithMemory)
     {
-        Metadata metadata = createTestMetadataManager();
-        InternalAggregationFunction countVarcharColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+        Metadata localMetadata = createTestMetadataManager();
+        InternalAggregationFunction countVarcharColumn = localMetadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
                 new Signature(QualifiedObjectName.valueOfDefaultFunction("count"), AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.VARCHAR)));
-        InternalAggregationFunction countBooleanColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+        InternalAggregationFunction countBooleanColumn = localMetadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
                 new Signature(QualifiedObjectName.valueOfDefaultFunction("count"), AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.BOOLEAN)));
-        InternalAggregationFunction maxVarcharColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+        InternalAggregationFunction maxVarcharColumn = localMetadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
                 new Signature(QualifiedObjectName.valueOfDefaultFunction("max"), AGGREGATE, parseTypeSignature(StandardTypes.VARCHAR), parseTypeSignature(StandardTypes.VARCHAR)));
 
         Optional<Integer> groupIdChannel = Optional.of(1);
@@ -502,8 +502,8 @@ public class TestHashAggregationOperator
     @Test(dataProvider = "hashEnabledAndMemoryLimitForMergeValues")
     public void testHashAggregationMemoryReservation(boolean hashEnabled, boolean spillEnabled, boolean revokeMemoryWhenAddingPages, long memoryLimitForMerge, long memoryLimitForMergeWithMemory)
     {
-        Metadata metadata = createTestMetadataManager();
-        InternalAggregationFunction arrayAggColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+        Metadata localMetadata = createTestMetadataManager();
+        InternalAggregationFunction arrayAggColumn = localMetadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
                 new Signature(QualifiedObjectName.valueOfDefaultFunction("array_agg"), AGGREGATE, parseTypeSignature("array(bigint)"), parseTypeSignature(StandardTypes.BIGINT)));
 
         List<Integer> hashChannels = Ints.asList(1);
@@ -546,8 +546,8 @@ public class TestHashAggregationOperator
     @Test(dataProvider = "hashEnabled", expectedExceptions = ExceededMemoryLimitException.class, expectedExceptionsMessageRegExp = "Query exceeded per-node user memory limit of 10B.*")
     public void testMemoryLimit(boolean hashEnabled)
     {
-        Metadata metadata = createTestMetadataManager();
-        InternalAggregationFunction maxVarcharColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+        Metadata localMetadata = createTestMetadataManager();
+        InternalAggregationFunction maxVarcharColumn = localMetadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
                 new Signature(QualifiedObjectName.valueOfDefaultFunction("max"), AGGREGATE, parseTypeSignature(StandardTypes.VARCHAR), parseTypeSignature(StandardTypes.VARCHAR)));
 
         List<Integer> hashChannels = Ints.asList(1);
@@ -858,8 +858,8 @@ public class TestHashAggregationOperator
     @Test
     public void testSpillerFailure()
     {
-        Metadata metadata = createTestMetadataManager();
-        InternalAggregationFunction maxVarcharColumn = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
+        Metadata localMetadata = createTestMetadataManager();
+        InternalAggregationFunction maxVarcharColumn = localMetadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
                 new Signature(QualifiedObjectName.valueOfDefaultFunction("max"), AGGREGATE, parseTypeSignature(StandardTypes.VARCHAR), parseTypeSignature(StandardTypes.VARCHAR)));
         List<Integer> hashChannels = Ints.asList(1);
         ImmutableList<Type> types = ImmutableList.of(VARCHAR, BIGINT, VARCHAR, BIGINT);

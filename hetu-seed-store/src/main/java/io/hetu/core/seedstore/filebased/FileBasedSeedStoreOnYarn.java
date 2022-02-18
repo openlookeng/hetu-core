@@ -221,7 +221,7 @@ public class FileBasedSeedStoreOnYarn
             throws IOException
     {
         try (OutputStream os = (overwrite) ? fs.newOutputStream(file) : fs.newOutputStream(file, CREATE_NEW)) {
-            os.write(content.getBytes());
+            os.write(content.getBytes(StandardCharsets.UTF_8));
         }
     }
 

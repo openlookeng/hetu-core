@@ -197,9 +197,11 @@ public class TestKdbTree
             }
         }
 
-        for (double x = 5; x < 6; x += 0.2) {
-            for (double y = 1; y < 2; y += 0.5) {
-                rectangles.add(new Rectangle(x, y, x + width, y + height));
+        int devid = 10;
+        for (int x = 50; x < 60; x += 2) {
+            for (int y = 10; y < 20; y += 5) {
+                rectangles.add(new Rectangle((double) x / devid, (double) y / devid,
+                        (double) (x + width) / devid, (double) (y + height) / devid));
             }
         }
 

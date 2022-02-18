@@ -154,6 +154,7 @@ public class TestMemorySpilling
 
         public QueryThread(@Language("SQL") String query)
         {
+            super.setName(query);
             this.query = query;
         }
 

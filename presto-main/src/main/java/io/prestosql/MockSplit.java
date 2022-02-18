@@ -52,8 +52,6 @@ public class MockSplit
             @JsonProperty("lastModifiedTime") long lastModifiedTime)
     {
         this(filepath, startIndex, endIndex, lastModifiedTime, false);
-        this.schema = TEST_SCHEMA;
-        this.table = TEST_TABLE;
     }
 
     @JsonCreator

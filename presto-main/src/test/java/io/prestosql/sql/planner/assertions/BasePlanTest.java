@@ -75,12 +75,12 @@ public class BasePlanTest
 
         sessionProperties.entrySet().forEach(entry -> sessionBuilder.setSystemProperty(entry.getKey(), entry.getValue()));
 
-        LocalQueryRunner queryRunner = new LocalQueryRunner(sessionBuilder.build());
+        LocalQueryRunner localQueryRunner = new LocalQueryRunner(sessionBuilder.build());
 
-        queryRunner.createCatalog(queryRunner.getDefaultSession().getCatalog().get(),
+        localQueryRunner.createCatalog(localQueryRunner.getDefaultSession().getCatalog().get(),
                 new TpchConnectorFactory(1),
                 ImmutableMap.of());
-        return queryRunner;
+        return localQueryRunner;
     }
 
     @BeforeClass
