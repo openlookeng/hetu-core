@@ -243,7 +243,7 @@ public class TestEffectivePredicateExtractor
 
         // Rewrite in terms of group by symbols
         assertEquals(normalizeConjuncts(effectivePredicate),
-                normalizeConjuncts(
+                normalizeConjunctsSet(
                         lessThan(AE, bigintLiteral(10)),
                         lessThan(BE, AE),
                         greaterThan(AE, bigintLiteral(2)),
@@ -302,7 +302,7 @@ public class TestEffectivePredicateExtractor
 
         // Rewrite in terms of project output symbols
         assertEquals(normalizeConjuncts(effectivePredicate),
-                normalizeConjuncts(
+                normalizeConjunctsSet(
                         lessThan(DE, bigintLiteral(10)),
                         equals(DE, EE)));
     }
@@ -322,7 +322,7 @@ public class TestEffectivePredicateExtractor
 
         // Pass through
         assertEquals(normalizeConjuncts(effectivePredicate),
-                normalizeConjuncts(
+                normalizeConjunctsSet(
                         equals(AE, BE),
                         equals(BE, CE),
                         lessThan(CE, bigintLiteral(10))));
@@ -344,7 +344,7 @@ public class TestEffectivePredicateExtractor
 
         // Pass through
         assertEquals(normalizeConjuncts(effectivePredicate),
-                normalizeConjuncts(
+                normalizeConjunctsSet(
                         equals(AE, BE),
                         equals(BE, CE),
                         lessThan(CE, bigintLiteral(10))));
@@ -366,7 +366,7 @@ public class TestEffectivePredicateExtractor
 
         // Pass through
         assertEquals(normalizeConjuncts(effectivePredicate),
-                normalizeConjuncts(
+                normalizeConjunctsSet(
                         equals(AE, BE),
                         equals(BE, CE),
                         lessThan(CE, bigintLiteral(10))));
@@ -395,7 +395,7 @@ public class TestEffectivePredicateExtractor
 
         // Pass through
         assertEquals(normalizeConjuncts(effectivePredicate),
-                normalizeConjuncts(
+                normalizeConjunctsSet(
                         equals(AE, BE),
                         equals(BE, CE),
                         lessThan(CE, bigintLiteral(10))));
@@ -440,7 +440,7 @@ public class TestEffectivePredicateExtractor
                 assignments,
                 predicate, Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0, false);
         effectivePredicate = effectivePredicateExtractorWithoutTableProperties.extract(SESSION, node, TypeProvider.empty(), typeAnalyzer);
-        assertEquals(normalizeConjuncts(effectivePredicate), normalizeConjuncts(equals(bigintLiteral(2L), BE), equals(bigintLiteral(1L), AE)));
+        assertEquals(normalizeConjuncts(effectivePredicate), normalizeConjunctsSet(equals(bigintLiteral(2L), BE), equals(bigintLiteral(1L), AE)));
 
         node = new TableScanNode(
                 newId(),
@@ -464,7 +464,7 @@ public class TestEffectivePredicateExtractor
                 Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
                 new UUID(0, 0), 0, false);
         effectivePredicate = effectivePredicateExtractor.extract(SESSION, node, TypeProvider.empty(), typeAnalyzer);
-        assertEquals(normalizeConjuncts(effectivePredicate), normalizeConjuncts(equals(bigintLiteral(2L), BE), equals(bigintLiteral(1L), AE)));
+        assertEquals(normalizeConjuncts(effectivePredicate), normalizeConjunctsSet(equals(bigintLiteral(2L), BE), equals(bigintLiteral(1L), AE)));
 
         node = new TableScanNode(
                 newId(),
@@ -659,7 +659,7 @@ public class TestEffectivePredicateExtractor
 
         // All predicates having output symbol should be carried through
         assertEquals(normalizeConjuncts(effectivePredicate),
-                normalizeConjuncts(lessThan(BE, AE),
+                normalizeConjunctsSet(lessThan(BE, AE),
                         lessThan(CE, bigintLiteral(10)),
                         equals(DE, EE),
                         lessThan(FE, bigintLiteral(100)),
@@ -775,7 +775,7 @@ public class TestEffectivePredicateExtractor
 
         // All right side symbols having output symbols should be checked against NULL
         assertEquals(normalizeConjuncts(effectivePredicate),
-                normalizeConjuncts(lessThan(BE, AE),
+                normalizeConjunctsSet(lessThan(BE, AE),
                         lessThan(CE, bigintLiteral(10)),
                         or(equals(DE, EE), and(isNull(DE), isNull(EE))),
                         or(lessThan(FE, bigintLiteral(100)), isNull(FE)),
@@ -820,7 +820,7 @@ public class TestEffectivePredicateExtractor
 
         // False literal on the right side should be ignored
         assertEquals(normalizeConjuncts(effectivePredicate),
-                normalizeConjuncts(lessThan(BE, AE),
+                normalizeConjunctsSet(lessThan(BE, AE),
                         lessThan(CE, bigintLiteral(10)),
                         or(equals(AE, DE), isNull(DE))));
     }
@@ -868,7 +868,7 @@ public class TestEffectivePredicateExtractor
 
         // All left side symbols should be checked against NULL
         assertEquals(normalizeConjuncts(effectivePredicate),
-                normalizeConjuncts(or(lessThan(BE, AE), and(isNull(BE), isNull(AE))),
+                normalizeConjunctsSet(or(lessThan(BE, AE), and(isNull(BE), isNull(AE))),
                         or(lessThan(CE, bigintLiteral(10)), isNull(CE)),
                         equals(DE, EE),
                         lessThan(FE, bigintLiteral(100)),
@@ -912,7 +912,7 @@ public class TestEffectivePredicateExtractor
 
         // False literal on the left side should be ignored
         assertEquals(normalizeConjuncts(effectivePredicate),
-                normalizeConjuncts(equals(DE, EE),
+                normalizeConjunctsSet(equals(DE, EE),
                         lessThan(FE, bigintLiteral(100)),
                         or(equals(AE, DE), isNull(AE))));
     }
@@ -1002,12 +1002,12 @@ public class TestEffectivePredicateExtractor
         return new IsNullPredicate(expression);
     }
 
-    private Set<Expression> normalizeConjuncts(Expression... conjuncts)
+    private Set<Expression> normalizeConjunctsSet(Expression... conjuncts)
     {
-        return normalizeOneConjuncts(Arrays.asList(conjuncts));
+        return normalizeConjunctsCollection(Arrays.asList(conjuncts));
     }
 
-    private Set<Expression> normalizeOneConjuncts(Collection<Expression> conjuncts)
+    private Set<Expression> normalizeConjunctsCollection(Collection<Expression> conjuncts)
     {
         return normalizeConjuncts(combineConjuncts(conjuncts));
     }

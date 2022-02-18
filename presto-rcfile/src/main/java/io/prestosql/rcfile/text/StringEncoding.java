@@ -54,7 +54,7 @@ public class StringEncoding
                     throw new IllegalArgumentException("escape not implemented");
                 }
                 String escapedValue = unescapeText(new String(slice.getBytes(), StandardCharsets.UTF_8));
-                if (escapedValue.getBytes().length < slice.getBytes().length) {
+                if (escapedValue.getBytes(StandardCharsets.UTF_8).length < slice.getBytes().length) {
                     sliceOutput.writeBytes(escapedValue.getBytes(StandardCharsets.UTF_8));
                 }
                 else {
