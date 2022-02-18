@@ -68,10 +68,7 @@ public class MockSplit
             @JsonProperty("endIndex") long endIndex,
             @JsonProperty("lastModifiedTime") long lastModifiedTime)
     {
-        this.filepath = filepath;
-        this.startIndex = startIndex;
-        this.endIndex = endIndex;
-        this.lastModifiedTime = lastModifiedTime;
+        this(filepath, startIndex, endIndex, lastModifiedTime);
         this.schema = TEST_SCHEMA;
         this.table = TEST_TABLE;
     }
