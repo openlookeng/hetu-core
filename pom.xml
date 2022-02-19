@@ -62,6 +62,7 @@
         <dep.jetty.version>9.4.43.v20210629</dep.jetty.version>
         <dep.bcprov.version>1.66</dep.bcprov.version>
         <dep.hudi.version>0.7.0</dep.hudi.version>
+        <dep.kryo.version>5.0.3</dep.kryo.version>
         <!--
           America/Bahia_Banderas has:
            - offset change since 1970 (offset Jan 1970: -08:00, offset Jan 2018: -06:00)
@@ -1585,6 +1586,11 @@
                 <groupId>org.apache.calcite</groupId>
                 <artifactId>calcite-core</artifactId>
                 <version>1.18.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.esotericsoftware</groupId>
+                <artifactId>kryo</artifactId>
+                <version>${dep.kryo.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

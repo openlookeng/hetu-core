@@ -35,7 +35,7 @@ public class TestSnapshotFileBasedClient
     public void testSnapshotResult()
             throws Exception
     {
-        SnapshotFileBasedClient client = new SnapshotFileBasedClient(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(ROOT_PATH_STR)), Paths.get(ROOT_PATH_STR));
+        SnapshotFileBasedClient client = new SnapshotFileBasedClient(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(ROOT_PATH_STR)), Paths.get(ROOT_PATH_STR), false);
         String queryId = "query1";
         LinkedHashMap<Long, SnapshotResult> map = new LinkedHashMap<>();
         map.put(3L, SnapshotResult.SUCCESSFUL);

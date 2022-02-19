@@ -43,11 +43,13 @@ public class SnapshotFileBasedClient
 
     private final HetuFileSystemClient fsClient;
     private final Path rootPath;
+    private final boolean useKryo;
 
-    public SnapshotFileBasedClient(HetuFileSystemClient fsClient, Path rootPath)
+    public SnapshotFileBasedClient(HetuFileSystemClient fsClient, Path rootPath, boolean useKryo)
     {
         this.fsClient = fsClient;
         this.rootPath = rootPath;
+        this.useKryo = useKryo;
     }
 
     @Override
@@ -59,7 +61,14 @@ public class SnapshotFileBasedClient
         fsClient.createDirectories(file.getParent());
 
         try (OutputStream outputStream = fsClient.newOutputStream(file)) {
-            SnapshotUtils.serializeState(state, outputStream);
+            SnapshotUtils.serializeState(state, outputStream, useKryo);
+        }
+        catch (Exception e) {
+            LOG.info("[SURYA] exception e " + e.getMessage());
+            throw e;
+        }
+        finally {
+            LOG.info("[SURYA] storeState fileSize written " + fsClient.getAttribute(file, "size"));
         }
     }
 
@@ -73,7 +82,14 @@ public class SnapshotFileBasedClient
         }
 
         try (InputStream inputStream = fsClient.newInputStream(file)) {
-            return Optional.of(SnapshotUtils.deserializeState(inputStream));
+            return Optional.of(SnapshotUtils.deserializeState(inputStream, useKryo));
+        }
+        catch (Exception e) {
+            LOG.info("[SURYA] exception e " + e.getMessage());
+            throw e;
+        }
+        finally {
+            LOG.info("[SURYA] loadState fileSize read " + fsClient.getAttribute(file, "size"));
         }
     }
 

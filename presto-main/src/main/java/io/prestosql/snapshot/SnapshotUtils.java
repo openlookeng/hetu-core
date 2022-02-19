@@ -14,8 +14,14 @@
  */
 package io.prestosql.snapshot;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import com.esotericsoftware.kryo.util.DefaultInstantiatorStrategy;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableSet;
+import de.javakaffee.kryoserializers.SynchronizedCollectionsSerializer;
 import io.airlift.log.Logger;
 import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
@@ -28,6 +34,7 @@ import io.prestosql.spi.QueryId;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import org.objenesis.strategy.StdInstantiatorStrategy;
 
 import javax.inject.Inject;
 
@@ -71,6 +78,21 @@ public class SnapshotUtils
     // Key is query id; value is number of attempts
     private final Map<String, Long> snapshotsToDelete = new ConcurrentHashMap<>();
     private final ScheduledThreadPoolExecutor deleteSnapshotExecutor = new ScheduledThreadPoolExecutor(1);
+    private static final String COLLECTIONS_SYNCHRONIZED_MAP_CLASS = "java.util.Collections$SynchronizedMap";
+    static private final ThreadLocal<Kryo> kryos = new ThreadLocal<Kryo>() {
+        protected Kryo initialValue() {
+            Kryo kryo = new Kryo();
+            // Configure the Kryo instance.
+            kryo.setInstantiatorStrategy(new DefaultInstantiatorStrategy(new StdInstantiatorStrategy()));
+            kryo.setRegistrationRequired(false);
+            try {
+                kryo.register(Class.forName(COLLECTIONS_SYNCHRONIZED_MAP_CLASS), new SynchronizedCollectionsSerializer());
+            }
+            catch (ClassNotFoundException e) {
+            }
+            return kryo;
+        }
+    };
 
     @Inject
     public SnapshotUtils(FileSystemClientManager fileSystemClientManager, SnapshotConfig snapshotConfig, InternalNodeManager nodeManager)
@@ -117,7 +139,7 @@ public class SnapshotUtils
             try {
                 HetuFileSystemClient fs = profile == null ?
                         fileSystemClientManager.getFileSystemClient(root) : fileSystemClientManager.getFileSystemClient(profile, root);
-                return new SnapshotFileBasedClient(fs, root);
+                return new SnapshotFileBasedClient(fs, root, snapshotConfig.isSnapshotUseKryoSerialization());
             }
             catch (Exception e) {
                 LOG.warn(e, "Failed to create SnapshotFileBasedClient");
@@ -201,24 +223,53 @@ public class SnapshotUtils
     /**
      * Serialize state to outputStream
      */
-    public static void serializeState(Object state, OutputStream outputStream)
+    public static void serializeState(Object state, OutputStream outputStream, boolean useKryo)
             throws IOException
     {
-        // java serialization
-        ObjectOutputStream oos = new ObjectOutputStream(outputStream);
-        oos.writeObject(state);
-        oos.flush();
+        Stopwatch timer = Stopwatch.createStarted();
+        if (useKryo) {
+            // Kryo serialization
+            Output output = new Output(outputStream);
+            Kryo kryo1 = kryos.get();
+            kryo1.writeClassAndObject(output, state);
+            output.flush();
+            timer.stop();
+            LOG.info("[SURYA] SerializeState Kryo timeTaken " + timer.elapsed(TimeUnit.MILLISECONDS));
+        }
+        else {
+            // java serialization
+            ObjectOutputStream oos = new ObjectOutputStream(outputStream);
+            oos.writeObject(state);
+            oos.flush();
+            timer.stop();
+            LOG.info("[SURYA] SerializeState Java timeTaken " + timer.elapsed(TimeUnit.MILLISECONDS));
+        }
     }
 
     /**
      * Deserialize state from inputStream
      */
-    public static Object deserializeState(InputStream inputStream)
+    public static Object deserializeState(InputStream inputStream, boolean useKryo)
             throws IOException, ClassNotFoundException
     {
-        // java deserialization
-        ObjectInputStream ois = new ObjectInputStream(inputStream);
-        return ois.readObject();
+        Stopwatch timer = Stopwatch.createStarted();
+        if (useKryo) {
+            // Kryo deserialization
+            Input input = new Input(inputStream);
+            Kryo kryo1 = kryos.get();
+            Object state = kryo1.readClassAndObject(input);
+            timer.stop();
+            LOG.info("[SURYA] deserializeState Kryo timeTaken " + timer.elapsed(TimeUnit.MILLISECONDS));
+            return state;
+        }
+        else {
+            // java deserialization
+            ObjectInputStream ois = new ObjectInputStream(inputStream);
+            Object state = ois.readObject();
+            timer.stop();
+            LOG.info("[SURYA] deserializeState Java timeTaken " + timer.elapsed(TimeUnit.MILLISECONDS));
+            return state;
+        }
     }
 
     /**
