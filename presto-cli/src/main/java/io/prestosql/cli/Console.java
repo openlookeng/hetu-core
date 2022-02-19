@@ -75,7 +75,8 @@ public class Console
 
     private static final String PROMPT_NAME = "lk";
     private static final Duration EXIT_DELAY = new Duration(3, SECONDS);
-    private static final Pattern createCubePattern = Pattern.compile("^(create)\\s*cube.*where.*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CREATE_CUBE_PATTERN = Pattern.compile("^(create)\\s*cube.*where.*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern RELOAD_CUBE_PATTERN = Pattern.compile("^(reload)\\s*cube.*", Pattern.CASE_INSENSITIVE);
 
     @Inject
     public HelpOption helpOption;
@@ -265,18 +266,32 @@ public class Console
                     if (split.terminator().equals("\\G")) {
                         outputFormat = ClientOptions.OutputFormat.VERTICAL;
                     }
-                    if (createCubePattern.matcher(split.statement()).matches()) {
+                    if (CREATE_CUBE_PATTERN.matcher(split.statement()).matches()) {
                         PrintStream out = System.out;
                         PrintStream errorChannel = System.out;
                         CubeConsole cubeConsole = new CubeConsole(this);
                         queryRunner.setCubeConsole(cubeConsole);
-                        cubeConsole.createCubeCommand(split.statement(), queryRunner, ClientOptions.OutputFormat.NULL, tableNameCompleter::populateCache, false, true, reader.getTerminal(), out, errorChannel);
+                        boolean isCreateCubeSucceed = cubeConsole.createCubeCommand(split.statement(), queryRunner, ClientOptions.OutputFormat.NULL, tableNameCompleter::populateCache, false, true, reader.getTerminal(), out, errorChannel);
+                    }
+                    else if (RELOAD_CUBE_PATTERN.matcher(split.statement()).matches()) {
+                        PrintStream out = System.out;
+                        PrintStream errorChannel = System.out;
+                        ReloadCubeConsole reloadCubeConsole = new ReloadCubeConsole(this);
+                        queryRunner.setReloadCubeConsole(reloadCubeConsole);
+                        boolean isReloadCubeSucceed = reloadCubeConsole.reload(split.statement(), queryRunner, ClientOptions.OutputFormat.VERTICAL, tableNameCompleter::populateCache, true, true, reader.getTerminal(), out, errorChannel);
+                        if (isReloadCubeSucceed) {
+                            CubeConsole cubeConsole = new CubeConsole(this);
+                            queryRunner.setCubeConsole(cubeConsole);
+                            boolean isCreateCubeSucceed = cubeConsole.createCubeCommand(reloadCubeConsole.getNewQuery(), queryRunner, ClientOptions.OutputFormat.NULL, tableNameCompleter::populateCache, false, true, reader.getTerminal(), out, errorChannel);
+                            if (!isCreateCubeSucceed) {
+                                System.out.println("An Error occurred. The cube needs to be created manually. Query to create the cube: " + reloadCubeConsole.getNewQuery());
+                            }
+                        }
                     }
                     else {
                         process(queryRunner, split.statement(), outputFormat, tableNameCompleter::populateCache, true, true, reader.getTerminal(), System.out, System.out);
                     }
                 }
-
                 // replace remaining with trailing partial statement
                 remaining = whitespace().trimTrailingFrom(splitter.getPartialStatement());
             }
@@ -302,7 +317,9 @@ public class Console
                     String statement = split.statement();
                     CubeConsole cubeConsole = new CubeConsole(this);
                     queryRunner.setCubeConsole(cubeConsole);
-                    if (createCubePattern.matcher(statement).matches()) {
+                    ReloadCubeConsole reloadCubeConsole = new ReloadCubeConsole(this);
+                    queryRunner.setReloadCubeConsole(reloadCubeConsole);
+                    if (CREATE_CUBE_PATTERN.matcher(statement).matches()) {
                         PrintStream out = System.out;
                         PrintStream errorChannel = System.out;
                         if (!cubeConsole.createCubeCommand(statement, queryRunner, ClientOptions.OutputFormat.NULL, () -> {}, false, showProgress, terminal, out, errorChannel)) {
@@ -310,6 +327,27 @@ public class Console
                                 return false;
                             }
                             success = false;
+                        }
+                    }
+                    if (RELOAD_CUBE_PATTERN.matcher(statement).matches()) {
+                        PrintStream out = System.out;
+                        PrintStream errorChannel = System.out;
+                        boolean isReloadCubeSucceed = reloadCubeConsole.reload(statement, queryRunner, ClientOptions.OutputFormat.NULL, () -> {}, false, showProgress, terminal, out, errorChannel);
+                        if (!isReloadCubeSucceed) {
+                            if (!ignoreErrors) {
+                                return false;
+                            }
+                            success = false;
+                        }
+                        else {
+                            boolean isCreateCubeSucceed = cubeConsole.createCubeCommand(reloadCubeConsole.getNewQuery(), queryRunner, ClientOptions.OutputFormat.NULL, () -> {}, false, showProgress, terminal, out, errorChannel);
+                            if (!isCreateCubeSucceed) {
+                                System.err.println("An Error occurred. The cube needs to be created manually. Query to create the cube: " + reloadCubeConsole.getNewQuery());
+                                if (!ignoreErrors) {
+                                    return false;
+                                }
+                                success = false;
+                            }
                         }
                     }
                     else {

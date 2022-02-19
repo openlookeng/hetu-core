@@ -64,6 +64,7 @@ statement
         (WHERE expression)? #createCube
     | INSERT INTO CUBE cubeName=qualifiedName (WHERE expression)?     #insertCube
     | INSERT OVERWRITE CUBE cubeName=qualifiedName (WHERE expression)?     #insertOverwriteCube
+    | RELOAD CUBE (IF EXISTS)? cubeName=qualifiedName                    #reloadCube
     | DROP CUBE (IF EXISTS)? cubeName=qualifiedName                    #dropCube
     | SHOW CUBES (FOR tableName=qualifiedName)?                                 #showCubes
     | CREATE INDEX (IF NOT EXISTS)? indexName=qualifiedName
@@ -122,6 +123,7 @@ statement
     | SHOW EXTERNAL FUNCTION qualifiedName types?                        #showExternalFunction
     | SHOW CREATE TABLE qualifiedName                                  #showCreateTable
     | SHOW CREATE VIEW qualifiedName                                   #showCreateView
+    | SHOW CREATE CUBE qualifiedName                                   #showCreateCube
     | SHOW TABLES ((FROM | IN) qualifiedName)?
         (LIKE pattern=string (ESCAPE escape=string)?)?                 #showTables
     | SHOW (SCHEMAS | DATABASES) ((FROM | IN) (cluster=identifier '.')? catalog=identifier)?
@@ -870,6 +872,7 @@ MINMAX: 'MINMAX';
 BTREE: 'BTREE';
 REFRESH: 'REFRESH';
 META: 'META';
+RELOAD: 'RELOAD';
 
 EQ  : '=';
 NEQ : '<>' | '!=';

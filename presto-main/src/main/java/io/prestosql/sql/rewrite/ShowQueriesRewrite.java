@@ -57,15 +57,18 @@ import io.prestosql.spi.security.PrincipalType;
 import io.prestosql.spi.service.PropertyService;
 import io.prestosql.spi.session.PropertyMetadata;
 import io.prestosql.spi.type.TypeSignature;
+import io.prestosql.sql.ExpressionUtils;
 import io.prestosql.sql.analyzer.QueryExplainer;
 import io.prestosql.sql.analyzer.SemanticException;
 import io.prestosql.sql.parser.ParsingException;
+import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.tree.AllColumns;
 import io.prestosql.sql.tree.ArrayConstructor;
 import io.prestosql.sql.tree.AstVisitor;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.ColumnDefinition;
+import io.prestosql.sql.tree.CreateCube;
 import io.prestosql.sql.tree.CreateFunction;
 import io.prestosql.sql.tree.CreateTable;
 import io.prestosql.sql.tree.CreateView;
@@ -73,6 +76,7 @@ import io.prestosql.sql.tree.DoubleLiteral;
 import io.prestosql.sql.tree.Explain;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.ExternalBodyReference;
+import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.sql.tree.FunctionProperty;
 import io.prestosql.sql.tree.Identifier;
 import io.prestosql.sql.tree.LikePredicate;
@@ -108,6 +112,7 @@ import io.prestosql.sql.tree.Values;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -166,12 +171,14 @@ import static io.prestosql.sql.SqlFormatter.formatSql;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.CATALOG_NOT_SPECIFIED;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_CACHE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_CATALOG;
+import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_CUBE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_SCHEMA;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.MISSING_TABLE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.NOT_SUPPORTED;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.VIEW_PARSE_ERROR;
 import static io.prestosql.sql.tree.BooleanLiteral.FALSE_LITERAL;
 import static io.prestosql.sql.tree.BooleanLiteral.TRUE_LITERAL;
+import static io.prestosql.sql.tree.ShowCreate.Type.CUBE;
 import static io.prestosql.sql.tree.ShowCreate.Type.TABLE;
 import static io.prestosql.sql.tree.ShowCreate.Type.VIEW;
 import static java.lang.String.format;
@@ -632,7 +639,76 @@ final class ShowQueriesRewrite
                 return singleValueQuery("Create Table", formatSql(createTable, Optional.of(parameters)).trim());
             }
 
-            throw new UnsupportedOperationException("SHOW CREATE only supported for tables and views");
+            if (node.getType() == CUBE) {
+                SqlParser parser = new SqlParser();
+                ImmutableList.Builder<Expression> rows = ImmutableList.builder();
+                CubeMetaStore cubeMetaStore = this.cubeManager.getMetaStore(STAR_TREE).orElseThrow(() -> new RuntimeException("HetuMetastore is not initialized"));
+                Optional<TableHandle> tableHandle = metadata.getTableHandle(session, objectName);
+                if (!tableHandle.isPresent()) {
+                    throw new SemanticException(MISSING_CUBE, node, "CUBE '%s' does not exist", objectName);
+                }
+                ConnectorTableMetadata connectorTableMetadata = metadata.getTableMetadata(session, tableHandle.get()).getMetadata();
+                QualifiedObjectName cubeTableName = createQualifiedObjectName(session, node, node.getName());
+                Optional<CubeMetadata> matchedCube = cubeMetaStore.getMetadataFromCubeName(cubeTableName.toString());
+                CubeMetadata cubeMetadata = matchedCube.orElseThrow(() -> new SemanticException(MISSING_CUBE, node, "Cube '%s' does not exist", objectName));
+                QualifiedObjectName qualifiedTableName = QualifiedObjectName.valueOf(cubeMetadata.getSourceTableName());
+                String aggregation = cubeMetadata.getAggregationSignatures().stream()
+                        .map(String::valueOf)
+                        .collect(Collectors.joining(", "));
+                String predicate = Optional.ofNullable(cubeMetadata.getCubeFilter())
+                        .map(CubeFilter::getCubePredicate)
+                        .orElse(null);
+                String dimension = "";
+                if (cubeMetadata.getCubeFilter() != null && cubeMetadata.getCubeFilter().getSourceTablePredicate() != null) {
+                    Set<Identifier> sourceFilterPredicateColumns = ExpressionUtils.getIdentifiers(sqlParser.createExpression(cubeMetadata.getCubeFilter().getSourceTablePredicate(), new ParsingOptions()));
+                    final List filterColumns = sourceFilterPredicateColumns.stream().map(i -> i.getValue()).map(String::valueOf).collect(Collectors.toList());
+                    dimension = cubeMetadata.getGroup().stream()
+                            .filter(x -> !filterColumns.contains(x))
+                            .map(String::valueOf)
+                            .collect(Collectors.joining(", "));
+                }
+                else {
+                    dimension = cubeMetadata.getGroup().stream()
+                            .map(String::valueOf)
+                            .collect(Collectors.joining(", "));
+                }
+                String allPartitions = "";
+                if (connectorTableMetadata.getProperties().containsKey("partitioned_by")) {
+                    allPartitions = Arrays.asList(connectorTableMetadata.getProperties().get("partitioned_by").toString()
+                            .substring(1, connectorTableMetadata.getProperties().get("partitioned_by").toString().length() - 1).split(",")).stream()
+                            .map(String::valueOf)
+                            .map(i -> "'" + i.trim() + "'")
+                            .collect(Collectors.joining(", "));
+                }
+                StringBuilder query = new StringBuilder();
+                query.append("CREATE CUBE ").append(cubeTableName.toString()).append(" ON ").append(qualifiedTableName.toString()).append(" WITH (AGGREGATIONS=(").append(aggregation).append("), GROUP=(").append(dimension).append(")");
+                if (connectorTableMetadata.getProperties().containsKey("format")) {
+                    query.append(", format='").append(Optional.ofNullable(connectorTableMetadata.getProperties().get("format"))
+                            .map(String::valueOf)
+                            .orElse(null)).append("'");
+                }
+                if (!allPartitions.equals("")) {
+                    query.append(", partitioned_by=ARRAY[").append(allPartitions).append("]");
+                }
+                if (cubeMetadata.getCubeFilter() != null && cubeMetadata.getCubeFilter().getSourceTablePredicate() != null) {
+                    query.append(", FILTER=(").append(cubeMetadata.getCubeFilter().getSourceTablePredicate()).append(")");
+                }
+                query.append(")");
+                if (predicate != null) {
+                    query.append(" WHERE ").append(predicate);
+                }
+                CreateCube createCube = (CreateCube) parser.createStatement(query.toString(), new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DOUBLE));
+                QualifiedName cubeName = createCube.getCubeName();
+                Optional<Expression> cubePredicate = createCube.getWhere();
+                QualifiedName sourceTableName = createCube.getSourceTableName();
+                Set<FunctionCall> aggregations = createCube.getAggregations();
+                List<Identifier> groupingSet = createCube.getGroupingSet();
+                List<Property> properties = createCube.getProperties();
+                boolean notExists = createCube.isNotExists();
+                CreateCube modifiedCreateCube = new CreateCube(cubeName, sourceTableName, groupingSet, aggregations, notExists, properties, cubePredicate, createCube.getSourceFilter().orElse(null));
+                return singleValueQuery("Create Cube", formatSql(modifiedCreateCube, Optional.of(parameters)).trim());
+            }
+            throw new UnsupportedOperationException("SHOW CREATE only supported for tables, views and cubes");
         }
 
         private List<Property> buildProperties(

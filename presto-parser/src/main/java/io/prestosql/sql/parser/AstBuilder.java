@@ -134,6 +134,7 @@ import io.prestosql.sql.tree.QueryBody;
 import io.prestosql.sql.tree.QuerySpecification;
 import io.prestosql.sql.tree.RefreshMetadataCache;
 import io.prestosql.sql.tree.Relation;
+import io.prestosql.sql.tree.ReloadCube;
 import io.prestosql.sql.tree.RenameColumn;
 import io.prestosql.sql.tree.RenameIndex;
 import io.prestosql.sql.tree.RenameSchema;
@@ -523,6 +524,12 @@ class AstBuilder
     public Node visitDropCube(SqlBaseParser.DropCubeContext context)
     {
         return new DropCube(getLocation(context), getQualifiedName(context.qualifiedName()), context.EXISTS() != null);
+    }
+
+    @Override
+    public Node visitReloadCube(SqlBaseParser.ReloadCubeContext context)
+    {
+        return new ReloadCube(getLocation(context), getQualifiedName(context.qualifiedName()), context.EXISTS() != null);
     }
 
     @Override
@@ -1212,6 +1219,12 @@ class AstBuilder
     public Node visitShowCreateView(SqlBaseParser.ShowCreateViewContext context)
     {
         return new ShowCreate(getLocation(context), ShowCreate.Type.VIEW, getQualifiedName(context.qualifiedName()));
+    }
+
+    @Override
+    public Node visitShowCreateCube(SqlBaseParser.ShowCreateCubeContext context)
+    {
+        return new ShowCreate(getLocation(context), ShowCreate.Type.CUBE, getQualifiedName(context.qualifiedName()));
     }
 
     @Override
