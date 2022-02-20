@@ -195,4 +195,16 @@ public interface HetuFileSystemClient
     @Override
     void close()
             throws IOException;
+
+    long getUsableSpace(Path path)
+            throws IOException;
+
+    long getTotalSpace(Path path)
+            throws IOException;
+
+    Path createTemporaryFile(Path path, String prefix, String suffix)
+            throws IOException;
+
+    Path createFile(Path path)
+            throws IOException;
 }

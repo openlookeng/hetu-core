@@ -17,6 +17,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.MoreExecutors;
 import io.airlift.tpch.LineItem;
 import io.airlift.tpch.LineItemGenerator;
+import io.hetu.core.filesystem.HetuLocalFileSystemClient;
+import io.hetu.core.filesystem.LocalConfig;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.BlockEncodingSerde;
@@ -45,10 +48,12 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.VerboseMode;
 import org.testng.annotations.Test;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -59,6 +64,8 @@ import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @BenchmarkMode(Mode.Throughput)
 @State(Scope.Thread)
@@ -119,8 +126,10 @@ public class BenchmarkBinaryFileSpiller
 
         @Setup
         public void setup()
-                throws ExecutionException, InterruptedException
+                throws ExecutionException, InterruptedException, IOException
         {
+            FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
+            when(fileSystemClientManager.getFileSystemClient(SPILL_PATH)).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), SPILL_PATH));
             singleStreamSpillerFactory = new FileSingleStreamSpillerFactory(
                     MoreExecutors.newDirectExecutorService(),
                     BLOCK_ENCODING_SERDE,
@@ -130,7 +139,10 @@ public class BenchmarkBinaryFileSpiller
                     compressionEnabled,
                     encryptionEnabled,
                     directSerdeEnabled,
-                    spillPrefetchReadPages);
+                    spillPrefetchReadPages,
+                    false,
+                    null,
+                    fileSystemClientManager);
             spillerFactory = new GenericSpillerFactory(singleStreamSpillerFactory);
             pages = createInputPages();
         }
@@ -178,7 +190,7 @@ public class BenchmarkBinaryFileSpiller
     }
 
     @Test
-    public void testBenchmark() throws ExecutionException, InterruptedException
+    public void testBenchmark() throws ExecutionException, InterruptedException, IOException
     {
         BenchmarkData ctx = new BenchmarkData();
         ctx.setup();

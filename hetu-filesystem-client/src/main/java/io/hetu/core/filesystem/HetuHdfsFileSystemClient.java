@@ -35,6 +35,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import static java.nio.file.StandardOpenOption.CREATE_NEW;
@@ -271,6 +272,34 @@ public class HetuHdfsFileSystemClient
             throws IOException
     {
         getHdfs().close();
+    }
+
+    @Override
+    public long getUsableSpace(Path path) throws IOException
+    {
+        return getHdfs().getStatus(toHdfsPath(path)).getRemaining();
+    }
+
+    @Override
+    public long getTotalSpace(Path path) throws IOException
+    {
+        return getHdfs().getStatus(toHdfsPath(path)).getCapacity();
+    }
+
+    @Override
+    public Path createTemporaryFile(Path path, String prefix, String suffix) throws IOException
+    {
+        String randomNo = UUID.randomUUID().toString();
+        Path finalPath = Paths.get(String.valueOf(path), prefix + randomNo + suffix);
+        unwrapHdfsExceptions(() -> getHdfs().create(toHdfsPath(finalPath)));
+        return finalPath;
+    }
+
+    @Override
+    public Path createFile(Path path) throws IOException
+    {
+        unwrapHdfsExceptions(() -> getHdfs().create(toHdfsPath(path)));
+        return path;
     }
 
     /**

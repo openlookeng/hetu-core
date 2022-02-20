@@ -14,6 +14,7 @@
 package io.prestosql.tests;
 
 import com.google.common.collect.ImmutableMap;
+import io.hetu.core.filesystem.HetuFileSystemClientPlugin;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.plugin.tpch.TpchPlugin;
@@ -48,12 +49,14 @@ public class TestDistributedSpilledQueries
                 .put("experimental.spiller-max-used-space-threshold", "1.0")
                 .put("experimental.memory-revoking-threshold", "0.0") // revoke always
                 .put("experimental.memory-revoking-target", "0.0")
+                .put("experimental.spiller-spill-to-hdfs", "false")
                 .build();
 
         DistributedQueryRunner queryRunner = new DistributedQueryRunner(defaultSession, 2, extraProperties);
 
         try {
             queryRunner.installPlugin(new TpchPlugin());
+            queryRunner.installPlugin(new HetuFileSystemClientPlugin());
             queryRunner.createCatalog("tpch", "tpch");
             return queryRunner;
         }

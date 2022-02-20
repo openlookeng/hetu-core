@@ -39,8 +39,12 @@ public class SnapshotConfig
     public static final String SNAPSHOT_MAX_RETRIES = "hetu.snapshot.maxRetries";
     public static final String SNAPSHOT_RETRY_TIMEOUT = "hetu.snapshot.retryTimeout";
     public static final String SNAPSHOT_USE_KRYO_SERIALIZATION = "hetu.snapshot.useKryoSerialization";
+    public static final String SPILLER_SPILL_PROFILE = "experimental.spiller-spill-profile";
+    public static final String SPILLER_SPILL_TO_HDFS = "experimental.spiller-spill-to-hdfs";
 
     private String snapshotProfile;
+    private String spillProfile;
+    private boolean spillToHdfs;
 
     private IntervalType snapshotIntervalType = IntervalType.TIME;
     private Duration snapshotTimeInterval = new Duration(5, TimeUnit.MINUTES);
@@ -157,6 +161,32 @@ public class SnapshotConfig
     public SnapshotConfig setSnapshotUseKryoSerialization(boolean snapshotUseKryoSerialization)
     {
         this.snapshotUseKryoSerialization = snapshotUseKryoSerialization;
+        return this;
+    }
+
+    public String getSpillProfile()
+    {
+        return spillProfile;
+    }
+
+    @Config(SPILLER_SPILL_PROFILE)
+    @ConfigDescription("spill profile")
+    public SnapshotConfig setSpillProfile(String spillProfile)
+    {
+        this.spillProfile = spillProfile;
+        return this;
+    }
+
+    public boolean isSpillToHdfs()
+    {
+        return spillToHdfs;
+    }
+
+    @Config(SPILLER_SPILL_TO_HDFS)
+    @ConfigDescription("spill to hdfs")
+    public SnapshotConfig setSpillToHdfs(boolean spillToHdfs)
+    {
+        this.spillToHdfs = spillToHdfs;
         return this;
     }
 }

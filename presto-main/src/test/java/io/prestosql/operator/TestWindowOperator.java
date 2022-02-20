@@ -14,10 +14,11 @@
 package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.io.Files;
 import com.google.common.primitives.Ints;
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
+import io.hetu.core.filesystem.HdfsConfig;
+import io.hetu.core.filesystem.HetuHdfsFileSystemClient;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
 import io.prestosql.ExceededMemoryLimitException;
@@ -53,6 +54,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -126,13 +128,15 @@ public class TestWindowOperator
     private ScheduledExecutorService scheduledExecutor;
     private DummySpillerFactory spillerFactory;
     private SnapshotUtils snapshotUtils = NOOP_SNAPSHOT_UTILS;
+    private FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
 
     @BeforeMethod
-    public void setUp()
+    public void setUp() throws IOException
     {
         executor = newCachedThreadPool(daemonThreadsNamed("test-executor-%s"));
         scheduledExecutor = newScheduledThreadPool(2, daemonThreadsNamed("test-scheduledExecutor-%s"));
         spillerFactory = new DummySpillerFactory();
+        when(fileSystemClientManager.getFileSystemClient(any(Path.class))).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/tmp/hetu/snapshot/")));
     }
 
     @AfterMethod(alwaysRun = true)
@@ -1166,15 +1170,25 @@ public class TestWindowOperator
                 .addDriverContext();
     }
 
-    private static GenericSpillerFactory createGenericSpillerFactory(Path spillPath)
+    private static GenericSpillerFactory createGenericSpillerFactory(Path spillPath, FileSystemClientManager fileSystemClientManager, boolean spillToHdfs, String spillProfile) throws IOException
     {
         FileSingleStreamSpillerFactory streamSpillerFactory = new FileSingleStreamSpillerFactory(
                 listeningDecorator(newCachedThreadPool()),
                 createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(),
                 new SpillerStats(),
                 ImmutableList.of(spillPath),
-                1.0, false, false, false, 1);
+                1.0, false, false, false, 1, false, null, fileSystemClientManager);
         return new GenericSpillerFactory(streamSpillerFactory);
+    }
+
+    private HetuHdfsFileSystemClient getLocalHdfs()
+            throws IOException
+    {
+        Properties properties = new Properties();
+        properties.setProperty("fs.client.type", "hdfs");
+        properties.setProperty("hdfs.config.resources", "");
+        properties.setProperty("hdfs.authentication.type", "NONE");
+        return new HetuHdfsFileSystemClient(new HdfsConfig(properties), Paths.get("/tmp/hetu/snapshot/"));
     }
 
     @Test
@@ -1182,10 +1196,8 @@ public class TestWindowOperator
             throws Exception
     {
         // Initialization
-        Path spillPath = Files.createTempDir().toPath();
-        GenericSpillerFactory genericSpillerFactory = createGenericSpillerFactory(spillPath);
-        FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
-        when(fileSystemClientManager.getFileSystemClient(any(Path.class))).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/tmp/hetu/snapshot/")));
+        Path spillPath = Paths.get("/tmp/hetu/snapshot/");
+        GenericSpillerFactory genericSpillerFactory = createGenericSpillerFactory(spillPath, fileSystemClientManager, false, null);
         SnapshotConfig snapshotConfig = new SnapshotConfig();
         snapshotUtils = new SnapshotUtils(fileSystemClientManager, snapshotConfig, new InMemoryNodeManager());
         snapshotUtils.initialize();
@@ -1306,11 +1318,138 @@ public class TestWindowOperator
     }
 
     @Test
-    public void testCaptureRestoreWithoutSpill()
+    public void testCaptureRestoreWithSpillToHdfsEnabled()
             throws Exception
     {
-        FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
-        when(fileSystemClientManager.getFileSystemClient(any(Path.class))).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/tmp/hetu/snapshot/")));
+        // Initialization
+        Path spillPath = Paths.get("/tmp/hetu/snapshot/");
+        HetuHdfsFileSystemClient fs = getLocalHdfs();
+        when(fileSystemClientManager.getFileSystemClient(any(String.class), any(Path.class))).thenReturn(fs);
+        GenericSpillerFactory genericSpillerFactory = createGenericSpillerFactory(spillPath, fileSystemClientManager, false, null);
+        SnapshotConfig snapshotConfig = new SnapshotConfig();
+        snapshotConfig.setSpillProfile("hdfs");
+        snapshotConfig.setSpillToHdfs(true);
+        snapshotUtils = new SnapshotUtils(fileSystemClientManager, snapshotConfig, new InMemoryNodeManager());
+        snapshotUtils.initialize();
+        ImmutableList.Builder<Page> outputPages = ImmutableList.builder();
+
+        List<Page> input1 = rowPagesBuilder(VARCHAR, BIGINT, DOUBLE, BOOLEAN)
+                .row("b", -1L, -0.1, true)
+                .row("a", 2L, 0.3, false)
+                .row("a", 4L, 0.2, true)
+                .pageBreak()
+                .row("b", 5L, 0.4, false)
+                .row("a", 6L, 0.1, true)
+                .build();
+
+        List<Page> input2 = rowPagesBuilder(VARCHAR, BIGINT, DOUBLE, BOOLEAN)
+                .row("c", -1L, -0.1, true)
+                .row("d", 2L, 0.3, false)
+                .row("c", 4L, 0.2, true)
+                .pageBreak()
+                .row("d", 5L, 0.4, false)
+                .build();
+
+        WindowOperatorFactory operatorFactory = new WindowOperatorFactory(
+                0,
+                new PlanNodeId("test"),
+                ImmutableList.of(VARCHAR, BIGINT, DOUBLE, BOOLEAN),
+                Ints.asList(0, 1, 2, 3),
+                ROW_NUMBER,
+                Ints.asList(0),
+                ImmutableList.of(),
+                Ints.asList(1),
+                ImmutableList.copyOf(new SortOrder[] {SortOrder.ASC_NULLS_LAST}),
+                0,
+                10,
+                new PagesIndex.TestingFactory(false),
+                true,
+                genericSpillerFactory,
+                new OrderingCompiler());
+
+        DriverContext driverContext = createDriverContext(defaultMemoryLimit, TEST_SNAPSHOT_SESSION);
+        WindowOperator windowOperator = (WindowOperator) operatorFactory.createOperator(driverContext);
+
+        // Step1: add the first 2 pages
+        for (Page page : input1) {
+            windowOperator.addInput(page);
+            windowOperator.getOutput();
+        }
+        // Step2: spilling happened here
+        getFutureValue(windowOperator.startMemoryRevoke());
+        windowOperator.finishMemoryRevoke();
+
+        // Step3: add a marker page to make 'capture1' happened
+        MarkerPage marker = MarkerPage.snapshotPage(1);
+        windowOperator.addInput(marker);
+        windowOperator.getOutput();
+
+        // Step4: add another 2 pages
+        for (Page page : input2) {
+            windowOperator.addInput(page);
+            windowOperator.getOutput();
+        }
+
+        // Step5: assume the task is rescheduled due to failure and everything is re-constructed
+
+        driverContext = createDriverContext(8, TEST_SNAPSHOT_SESSION);
+        operatorFactory = new WindowOperatorFactory(
+                0,
+                new PlanNodeId("test"),
+                ImmutableList.of(VARCHAR, BIGINT, DOUBLE, BOOLEAN),
+                Ints.asList(0, 1, 2, 3),
+                ROW_NUMBER,
+                Ints.asList(0),
+                ImmutableList.of(),
+                Ints.asList(1),
+                ImmutableList.copyOf(new SortOrder[] {SortOrder.ASC_NULLS_LAST}),
+                0,
+                10,
+                new PagesIndex.TestingFactory(false),
+                true,
+                genericSpillerFactory,
+                new OrderingCompiler());
+        windowOperator = (WindowOperator) operatorFactory.createOperator(driverContext);
+
+        // Step6: restore to 'capture1', the spiller should contains the reference of the first 2 pages for now.
+        MarkerPage resumeMarker = MarkerPage.resumePage(1);
+        windowOperator.addInput(resumeMarker);
+        windowOperator.getOutput();
+
+        // Step7: continue to add another 2 pages
+        for (Page page : input2) {
+            windowOperator.addInput(page);
+            windowOperator.getOutput();
+        }
+        windowOperator.finish();
+
+        // Compare the results
+        MaterializedResult expected = resultBuilder(driverContext.getSession(), VARCHAR, BIGINT, DOUBLE, BOOLEAN, BIGINT)
+                .row("a", 2L, 0.3, false, 1L)
+                .row("a", 4L, 0.2, true, 2L)
+                .row("a", 6L, 0.1, true, 3L)
+                .row("b", -1L, -0.1, true, 1L)
+                .row("b", 5L, 0.4, false, 2L)
+                .row("c", -1L, -0.1, true, 1L)
+                .row("c", 4L, 0.2, true, 2L)
+                .row("d", 2L, 0.3, false, 1L)
+                .row("d", 5L, 0.4, false, 2L)
+                .build();
+
+        Page p = windowOperator.getOutput();
+        while (p == null) {
+            p = windowOperator.getOutput();
+        }
+
+        outputPages.add(p);
+        MaterializedResult actual = toMaterializedResult(driverContext.getSession(), expected.getTypes(), outputPages.build());
+
+        Assert.assertEquals(actual, expected);
+    }
+
+    @Test
+    public void testCaptureRestoreWithoutSpill()
+    {
         SnapshotConfig snapshotConfig = new SnapshotConfig();
         snapshotUtils = new SnapshotUtils(fileSystemClientManager, snapshotConfig, new InMemoryNodeManager());
         snapshotUtils.initialize();

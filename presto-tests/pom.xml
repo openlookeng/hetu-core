@@ -246,6 +246,11 @@
             <artifactId>jmh-generator-annprocess</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-filesystem-client</artifactId>
+            <scope>test</scope>
+        </dependency>
 
     </dependencies>
 

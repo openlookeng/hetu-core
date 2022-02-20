@@ -19,9 +19,14 @@ import com.google.common.collect.Iterators;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import io.airlift.log.Logger;
 import io.airlift.slice.InputStreamSliceInput;
+import io.hetu.core.filesystem.HdfsConfig;
+import io.hetu.core.filesystem.HetuHdfsFileSystemClient;
+import io.hetu.core.filesystem.HetuLocalFileSystemClient;
+import io.hetu.core.filesystem.LocalConfig;
 import io.hetu.core.transport.execution.buffer.PageCodecMarker;
 import io.hetu.core.transport.execution.buffer.PagesSerdeUtil;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.PageAssertions;
 import io.prestosql.operator.WorkProcessor;
@@ -29,6 +34,7 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.type.Type;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -36,13 +42,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.io.MoreFiles.deleteRecursively;
@@ -60,6 +69,9 @@ import static java.nio.file.Files.createTempDirectory;
 import static java.nio.file.Files.newInputStream;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newFixedThreadPool;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -74,10 +86,37 @@ public class TestFileSingleStreamSpiller
     private final ListeningExecutorService executor = listeningDecorator(newCachedThreadPool());
     private final ListeningExecutorService executorBenchmark = listeningDecorator(newFixedThreadPool(1, daemonThreadsNamed("binary-spiller-%s")));
     private final File spillPath = createTempDirectory(getClass().getName()).toFile();
+    FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
+    private final String rootPath = spillPath.getAbsolutePath();
+    private HetuHdfsFileSystemClient fs;
 
     public TestFileSingleStreamSpiller()
             throws IOException
     {}
+
+    @BeforeClass
+    public void prepare()
+            throws IOException
+    {
+        fs = getLocalHdfs();
+        if (fs.exists(Paths.get(rootPath))) {
+            fs.delete(Paths.get(rootPath));
+        }
+        fs.createDirectories(Paths.get(rootPath));
+
+        when(fileSystemClientManager.getFileSystemClient(any(Path.class))).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(spillPath.getCanonicalPath())));
+        when(fileSystemClientManager.getFileSystemClient(any(String.class), any(Path.class))).thenReturn(fs);
+    }
+
+    private HetuHdfsFileSystemClient getLocalHdfs()
+            throws IOException
+    {
+        Properties properties = new Properties();
+        properties.setProperty("fs.client.type", "hdfs");
+        properties.setProperty("hdfs.config.resources", "");
+        properties.setProperty("hdfs.authentication.type", "NONE");
+        return new HetuHdfsFileSystemClient(new HdfsConfig(properties), Paths.get(rootPath));
+    }
 
     @AfterClass(alwaysRun = true)
     public void tearDown()
@@ -92,31 +131,35 @@ public class TestFileSingleStreamSpiller
     public void testSpill()
             throws Exception
     {
-        assertSpill(false, false);
+        assertSpill(false, false, false, null);
+        assertSpill(false, false, true, "hdfs");
     }
 
     @Test
     public void testSpillCompression()
             throws Exception
     {
-        assertSpill(true, false);
+        assertSpill(true, false, false, null);
+        assertSpill(true, false, true, "hdfs");
     }
 
     @Test
     public void testSpillEncryption()
             throws Exception
     {
-        assertSpill(false, true);
+        assertSpill(false, true, false, null);
+        assertSpill(false, true, true, "hdfs");
     }
 
     @Test
     public void testSpillEncryptionWithCompression()
             throws Exception
     {
-        assertSpill(true, true);
+        assertSpill(true, true, false, null);
+        assertSpill(true, true, true, "hdfs");
     }
 
-    private void assertSpill(boolean compression, boolean encryption)
+    private void assertSpill(boolean compression, boolean encryption, boolean spillToHdfs, String spillProfile)
             throws Exception
     {
         FileSingleStreamSpillerFactory spillerFactory = new FileSingleStreamSpillerFactory(
@@ -127,7 +170,11 @@ public class TestFileSingleStreamSpiller
                 1.0,
                 compression,
                 encryption,
-                false, 1);
+                false,
+                1,
+                spillToHdfs,
+                spillProfile,
+                fileSystemClientManager);
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext);
         assertTrue(singleStreamSpiller instanceof FileSingleStreamSpiller);
@@ -139,10 +186,10 @@ public class TestFileSingleStreamSpiller
         assertEquals(memoryContext.getBytes(), 4096);
         spiller.spill(page).get();
         spiller.spill(Iterators.forArray(page, page, page)).get();
-        assertEquals(listFiles(spillPath.toPath()).size(), 1);
+        assertEquals(listFiles(spillPath.toPath()).stream().filter(path -> path.toString().endsWith(".bin")).count(), 1);
 
         // Assert the spill codec flags match the expected configuration
-        try (InputStream is = newInputStream(listFiles(spillPath.toPath()).get(0))) {
+        try (InputStream is = newInputStream((listFiles(spillPath.toPath()).stream().filter(path -> path.toString().endsWith(".bin")).collect(Collectors.toList())).get(0))) {
             Iterator<SerializedPage> serializedPages = PagesSerdeUtil.readSerializedPages(new InputStreamSliceInput(is));
             assertTrue(serializedPages.hasNext(), "at least one page should be successfully read back");
             byte markers = serializedPages.next().getPageCodecMarkers();
@@ -159,9 +206,17 @@ public class TestFileSingleStreamSpiller
         // The spillers release their memory reservations when they are closed, therefore at this point
         // they will have non-zero memory reservation.
 
-        assertEquals(4, spilledPages.size());
-        for (int i = 0; i < 4; ++i) {
-            PageAssertions.assertPageEquals(TYPES, page, spilledPages.get(i));
+        if (spillToHdfs) {
+            assertEquals(3, spilledPages.size());
+            for (int i = 0; i < 3; ++i) {
+                PageAssertions.assertPageEquals(TYPES, page, spilledPages.get(i));
+            }
+        }
+        else {
+            assertEquals(4, spilledPages.size());
+            for (int i = 0; i < 4; ++i) {
+                PageAssertions.assertPageEquals(TYPES, page, spilledPages.get(i));
+            }
         }
 
         spiller.close();
@@ -186,44 +241,59 @@ public class TestFileSingleStreamSpiller
     public void testSpillWithSingleFile()
             throws Exception
     {
-        assertSpillBenchmark(false, false, "1GB", 1, false, false);
+        assertSpillBenchmark(false, false, "1GB", 1, false, false, false, null);
+        assertSpillBenchmark(false, false, "1GB", 1, false, true, false, null);
+        assertSpillBenchmark(false, false, "1GB", 1, false, false, true, "hdfs");
+        assertSpillBenchmark(false, false, "1GB", 1, false, true, true, "hdfs");
     }
 
     @Test
     public void testSpillWithMultiFile()
             throws Exception
     {
-        assertSpillBenchmark(false, false, "2MB", 500, false, false);
+        assertSpillBenchmark(false, false, "2MB", 500, false, false, false, null);
+        assertSpillBenchmark(false, false, "2MB", 500, false, false, true, "hdfs");
     }
 
     @Test
     public void testSpillWithSingleFileWithKryo()
             throws Exception
     {
-        assertSpillBenchmark(false, false, "1GB", 1, true, true);
+        assertSpillBenchmark(false, false, "1GB", 1, true, true, false, null);
+        assertSpillBenchmark(false, false, "1GB", 1, true, true, false, null);
+        assertSpillBenchmark(false, false, "1GB", 1, true, true, true, "hdfs");
+        assertSpillBenchmark(false, false, "1GB", 1, true, true, true, "hdfs");
     }
 
     @Test
     public void testSpillWithMultiFileWithKryo()
             throws Exception
     {
-        assertSpillBenchmark(false, false, "2MB", 2, true, true);
+        assertSpillBenchmark(false, false, "2MB", 2, true, true, false, null);
+        assertSpillBenchmark(false, false, "2MB", 2, true, true, false, null);
+        assertSpillBenchmark(false, false, "2MB", 2, true, true, true, "hdfs");
+        assertSpillBenchmark(false, false, "2MB", 2, true, true, true, "hdfs");
     }
 
     @Test
     public void testSpillWithSingleSpillerConsolidatedWithoutWorkProcessor()
             throws Exception
     {
-        assertSpillBenchmark(false, false, "1GB", 1, false, false);
-        assertSpillBenchmark(false, false, "1GB", 1, true, true);
-        assertSpillBenchmark(false, false, "2MB", 512, false, false);
-        assertSpillBenchmark(false, false, "2MB", 512, true, true);
+        assertSpillBenchmark(false, false, "1GB", 1, false, false, false, null);
+        assertSpillBenchmark(false, false, "1GB", 1, true, true, false, null);
+        assertSpillBenchmark(false, false, "2MB", 512, false, false, false, null);
+        assertSpillBenchmark(false, false, "2MB", 512, true, true, false, null);
+        assertSpillBenchmark(false, false, "1GB", 1, false, false, true, "hdfs");
+        assertSpillBenchmark(false, false, "1GB", 1, true, true, true, "hdfs");
+        assertSpillBenchmark(false, false, "2MB", 512, false, false, true, "hdfs");
+        assertSpillBenchmark(false, false, "2MB", 512, true, true, true, "hdfs");
     }
 
-    private void assertSpillBenchmark(boolean compression, boolean encryption, String pageSize, int fileCount, boolean useKryo, boolean useDirectSerde)
+    private void assertSpillBenchmark(boolean compression, boolean encryption, String pageSize, int fileCount, boolean useKryo, boolean useDirectSerde, boolean spillToHdfs, String spillProfile)
             throws Exception
     {
         List<FileSingleStreamSpiller> spillers = new ArrayList<>();
+        when(fileSystemClientManager.getFileSystemClient(any(Path.class))).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(spillPath.getCanonicalPath())));
         FileSingleStreamSpillerFactory spillerFactory = new FileSingleStreamSpillerFactory(
                 executorBenchmark, // executor won't be closed, because we don't call destroy() on the spiller factory
                 (useKryo) ? createTestMetadataManager().getFunctionAndTypeManager().getBlockKryoEncodingSerde() : createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(),
@@ -234,7 +304,10 @@ public class TestFileSingleStreamSpiller
                 encryption,
                 useDirectSerde,
                 1,
-                useKryo);
+                useKryo,
+                spillToHdfs,
+                spillProfile,
+                fileSystemClientManager);
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         long startTime = System.currentTimeMillis();
         Stopwatch spillTimer = Stopwatch.createStarted();
@@ -271,7 +344,7 @@ public class TestFileSingleStreamSpiller
             };
 
             spiller.spill(pageIterator).get();
-            assertEquals(listFiles(spillPath.toPath()).size(), j);
+            assertEquals(listFiles(spillPath.toPath()).stream().filter(path -> path.toString().endsWith(".bin")).count(), j);
         }
         spillTimer.stop();
         System.out.println("Time To Spill: " + spillTimer.elapsed(TimeUnit.MILLISECONDS) + " ms Traditional Timer: " + (System.currentTimeMillis() - startTime));
@@ -315,63 +388,82 @@ public class TestFileSingleStreamSpiller
     public void testSpillWithSingleSpillerConsolidated()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false, 1, false);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, 1, true);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, false, 1, false);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, true, 1, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false, 1, false, false, null);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, 1, true, false, null);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, false, 1, false, false, null);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, true, 1, true, false, null);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false, 1, false, true, "hdfs");
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, 1, true, true, "hdfs");
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, false, 1, false, true, "hdfs");
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, true, 1, true, true, "hdfs");
     }
 
     @Test
     public void testSpillWithSingleSpillerConsolidatedWithCompression()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, false, 1, false);
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, true, 1, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, false, 1, false, false, null);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, true, 1, false, false, null);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, false, 1, false, true, "hdfs");
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, true, 1, false, true, "hdfs");
     }
 
     @Test
     public void testSpillWithSingleSpillerConsolidatedWithCompressionMultiFile()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, false, 1, false);
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, true, 1, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, false, 1, false, false, null);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, true, 1, false, false, null);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, false, 1, false, true, "hdfs");
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, true, 1, false, true, "hdfs");
     }
 
     @Test
     public void testSpillWithSingleSpillerConsolidatedWithoutCompression()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false, 25, false);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, 25, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false, 25, false, false, null);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, 25, false, false, null);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false, 25, false, true, "hdfs");
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, 25, false, true, "hdfs");
     }
 
     @Test
     public void testSpillWithSingleSpillerConsolidatedWithoutCompressionMultiFile()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, false, 25, false);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, true, 25, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, false, 25, false, false, null);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, true, 25, false, false, null);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, false, 25, false, true, "hdfs");
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, true, 25, false, true, "hdfs");
     }
 
     @Test
     public void testSpillWithSingleSpillerConsolidatedWithEncryption()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, false, 25, false);
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, true, 25, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, false, 25, false, false, null);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, true, 25, false, false, null);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, false, 25, false, true, "hdfs");
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, true, 25, false, true, "hdfs");
     }
 
     @Test
     public void testSpillWithSingleSpillerConsolidatedDirectWriteCompareWithWorkProcessorWithKryo()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, 1, true);
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, true, 1, true);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, true, "1GB", 1, true, 1, true);
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, true, 1, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, 1, true, false, null);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, true, 1, true, false, null);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, true, "1GB", 1, true, 1, true, false, null);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, true, 1, true, false, null);
+
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, 1, true, true, "hdfs");
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, true, 1, true, true, "hdfs");
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, true, "1GB", 1, true, 1, true, true, "hdfs");
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, true, 1, true, true, "hdfs");
     }
 
-    private void assertSpillBenchmarkReadingUsingWorkProcessor(boolean compression, boolean encryption, String pageSize, int fileCount, boolean useDirectSerde, int spillPrefetchReadPages, boolean useKryo)
+    private void assertSpillBenchmarkReadingUsingWorkProcessor(boolean compression, boolean encryption, String pageSize, int fileCount, boolean useDirectSerde, int spillPrefetchReadPages, boolean useKryo, boolean spillToHdfs, String spillProfile)
             throws Exception
     {
         List<FileSingleStreamSpiller> spillers = new ArrayList<>();
@@ -385,7 +477,10 @@ public class TestFileSingleStreamSpiller
                 encryption,
                 useDirectSerde,
                 spillPrefetchReadPages,
-                useKryo);
+                useKryo,
+                spillToHdfs,
+                spillProfile,
+                fileSystemClientManager);
 
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         long startTime = System.currentTimeMillis();
@@ -423,7 +518,7 @@ public class TestFileSingleStreamSpiller
             };
 
             spiller.spill(pageIterator).get();
-            assertEquals(listFiles(spillPath.toPath()).size(), j);
+            assertEquals(listFiles(spillPath.toPath()).stream().filter(path -> path.toString().endsWith(".bin")).count(), j);
         }
         spillTimer.stop();
         long timeToSpill = spillTimer.elapsed(TimeUnit.MILLISECONDS);
