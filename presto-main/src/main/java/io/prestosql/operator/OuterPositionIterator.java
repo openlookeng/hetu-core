@@ -13,9 +13,17 @@
  */
 package io.prestosql.operator;
 
+import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.spi.PageBuilder;
+
+import static com.google.common.util.concurrent.Futures.immediateFuture;
 
 public interface OuterPositionIterator
 {
     boolean appendToNext(PageBuilder pageBuilder, int outputChannelOffset);
+
+    default ListenableFuture<OuterPositionIterator> getNextBatch()
+    {
+        return immediateFuture(null);
+    }
 }

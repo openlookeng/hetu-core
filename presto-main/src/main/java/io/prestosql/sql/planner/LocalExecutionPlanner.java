@@ -2440,7 +2440,9 @@ public class LocalExecutionPlanner
             PhysicalOperation probeSource = probeNode.accept(this, context);
 
             // Plan build
-            boolean spillEnabled = isSpillEnabled(session) && node.isSpillable().orElseThrow(() -> new IllegalArgumentException("spillable not yet set"));
+            boolean spillEnabled = isSpillEnabled(session)
+                    && node.isSpillable().orElseThrow(() -> new IllegalArgumentException("spillable not yet set"))
+                    && probeSource.getPipelineExecutionStrategy() == UNGROUPED_EXECUTION;
             JoinBridgeManager<PartitionedLookupSourceFactory> lookupSourceFactory =
                     createLookupSourceFactory(node, buildNode, buildSymbols, buildHashSymbol, probeSource, context, spillEnabled);
 
@@ -2517,6 +2519,7 @@ public class LocalExecutionPlanner
 
             boolean buildOuter = node.getType() == RIGHT || node.getType() == FULL;
             int taskCount = buildContext.getDriverInstanceCount().orElse(1);
+            /* Spill can take outer */
 
             Optional<JoinFilterFunctionFactory> filterFunctionFactory = node.getFilter()
                     .map(filterExpression -> compileJoinFilterFunction(
@@ -2600,7 +2603,7 @@ public class LocalExecutionPlanner
                     searchFunctionFactories,
                     10_000,
                     pagesIndexFactory,
-                    spillEnabled && !buildOuter && taskCount > 1,
+                    spillEnabled && taskCount > 1,
                     singleStreamSpillerFactory);
 
             factoriesBuilder.add(hashBuilderOperatorFactory);

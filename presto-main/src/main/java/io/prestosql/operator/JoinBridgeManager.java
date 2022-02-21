@@ -487,7 +487,12 @@ public class JoinBridgeManager<T extends JoinBridge>
             // * Each probe operator count as 1
             probeReferenceCount = new ReferenceCount(probeFactoryCount);
 
-            whenBuildAndProbeFinishes = Futures.whenAllSucceed(joinBridge.whenBuildFinishes(), probeReferenceCount.getFreeFuture()).call(() -> null, directExecutor());
+            if (joinBridge instanceof PartitionedLookupSourceFactory) {
+                whenBuildAndProbeFinishes = Futures.whenAllSucceed(joinBridge.whenBuildFinishes(), joinBridge.whenMemProbeFinishes()).call(() -> null, directExecutor());
+            }
+            else {
+                whenBuildAndProbeFinishes = Futures.whenAllSucceed(joinBridge.whenBuildFinishes(), probeReferenceCount.getFreeFuture()).call(() -> null, directExecutor());
+            }
             whenAllFinishes = Futures.whenAllSucceed(whenBuildAndProbeFinishes, outerReferenceCount.getFreeFuture()).call(() -> null, directExecutor());
             whenAllFinishes.addListener(joinBridge::destroy, directExecutor());
         }

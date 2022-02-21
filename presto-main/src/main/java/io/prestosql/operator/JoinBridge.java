@@ -30,4 +30,9 @@ public interface JoinBridge
     void destroy();
 
     ListenableFuture<?> whenBuildFinishes();
+
+    default ListenableFuture<?> whenMemProbeFinishes()
+    {
+        throw new UnsupportedOperationException();
+    }
 }

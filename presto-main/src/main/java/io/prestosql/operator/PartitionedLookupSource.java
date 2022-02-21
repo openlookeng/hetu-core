@@ -13,28 +13,40 @@
  */
 package io.prestosql.operator;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import io.prestosql.operator.exchange.LocalPartitionGenerator;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.type.Type;
+import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.NotThreadSafe;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static io.airlift.concurrent.MoreFutures.whenAnyComplete;
 import static java.lang.Integer.numberOfTrailingZeros;
 import static java.lang.Math.toIntExact;
 
@@ -46,7 +58,7 @@ public class PartitionedLookupSource
             List<Type> hashChannelTypes, boolean outer, Object restoredJoinPositions)
     {
         if (outer) {
-            OuterPositionTracker.Factory outerPositionTrackerFactory = new OuterPositionTracker.Factory(partitions, restoredJoinPositions);
+            OuterPositionTrackerFactory outerPositionTrackerFactory = new OuterPositionTrackerFactory(partitions, restoredJoinPositions);
 
             return new TrackingLookupSourceSupplier()
             {
@@ -68,9 +80,20 @@ public class PartitionedLookupSource
                 }
 
                 @Override
+                public ListenableFuture<?> setOuterPartitionReady(int partition)
+                {
+                    return outerPositionTrackerFactory.setPartitionReady(partition);
+                }
+
+                @Override
                 public Object captureJoinPositions()
                 {
-                    return outerPositionTrackerFactory.captureJoinPositions();
+                    try {
+                        return outerPositionTrackerFactory.captureJoinPositions();
+                    }
+                    catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
                 }
 
                 @Override
@@ -220,6 +243,18 @@ public class PartitionedLookupSource
         closed = true;
     }
 
+    public void setPartitionLookup(LookupSource lookupSource, int partition)
+    {
+        verify(partition < lookupSources.length);
+        verify(lookupSources[partition] instanceof PartitionedLookupSourceFactory.SpilledLookupSource);
+        verify(!(lookupSource instanceof PartitionedLookupSourceFactory.SpilledLookupSource));
+
+        this.lookupSources[partition] = lookupSource;
+        if (outerPositionTracker != null) {
+            lookupSource.getJoinPositionCount();
+        }
+    }
+
     private int decodePartition(long partitionedJoinPosition)
     {
         return (int) (partitionedJoinPosition & partitionMask);
@@ -239,7 +274,9 @@ public class PartitionedLookupSource
             implements OuterPositionIterator
     {
         private final LookupSource[] lookupSources;
-        private final boolean[][] visitedPositions;
+        private final RoaringBitmap[] visitedPositions;
+        private final OuterPositionTrackerFactory outerPositionTrackerFactory;
+        private final int[] partitionNumbers;
 
         @GuardedBy("this")
         private int currentSource;
@@ -247,18 +284,22 @@ public class PartitionedLookupSource
         @GuardedBy("this")
         private int currentPosition;
 
-        public PartitionedLookupOuterPositionIterator(LookupSource[] lookupSources, boolean[][] visitedPositions)
+        public PartitionedLookupOuterPositionIterator(LookupSource[] lookupSources, RoaringBitmap[] visitedPositions,
+                                                      int[] partitionNumbers, OuterPositionTrackerFactory outerPositionTrackerFactory)
         {
             this.lookupSources = lookupSources;
             this.visitedPositions = visitedPositions;
+            this.partitionNumbers = partitionNumbers;
+            this.outerPositionTrackerFactory = outerPositionTrackerFactory;
         }
 
         @Override
         public synchronized boolean appendToNext(PageBuilder pageBuilder, int outputChannelOffset)
         {
             while (currentSource < lookupSources.length) {
-                while (currentPosition < visitedPositions[currentSource].length) {
-                    if (!visitedPositions[currentSource][currentPosition]) {
+                long visitedPosCount = lookupSources[currentSource].getJoinPositionCount();
+                while (currentPosition < visitedPosCount) {
+                    if (!visitedPositions[currentSource].contains(currentPosition)) {
                         lookupSources[currentSource].appendTo(currentPosition, pageBuilder, outputChannelOffset);
                         currentPosition++;
                         return true;
@@ -266,9 +307,17 @@ public class PartitionedLookupSource
                     currentPosition++;
                 }
                 currentPosition = 0;
+                outerPositionTrackerFactory.setPartitionDone(partitionNumbers[currentSource]);
                 currentSource++;
             }
+
             return false;
+        }
+
+        @Override
+        public ListenableFuture<OuterPositionIterator> getNextBatch()
+        {
+            return outerPositionTrackerFactory.getNextReady();
         }
     }
 
@@ -286,67 +335,249 @@ public class PartitionedLookupSource
      * getVisitedPositions() is guaranteed by accessing AtomicLong referenceCount
      * variables in those two methods.
      */
-    private static class OuterPositionTracker
+    public static class OuterPositionTrackerFactory
     {
-        public static class Factory
+        private final List<LookupSource> lookupSources;
+        private final List<RoaringBitmap> visitedPositions;
+        private final ReentrantReadWriteLock[] locks;
+        private final AtomicBoolean[] finished;
+        private final AtomicLong[] referenceCount;
+        private final List<SettableFuture<OuterPositionIterator>> partitionReady;
+        private final List<SettableFuture<?>> partitionDone;
+
+        public OuterPositionTrackerFactory(List<Supplier<LookupSource>> partitions, Object restoredJoinPositions)
         {
-            private final LookupSource[] lookupSources;
-            private final boolean[][] visitedPositions;
-            private final AtomicBoolean finished = new AtomicBoolean();
-            private final AtomicLong referenceCount = new AtomicLong();
+            this.lookupSources = partitions.stream()
+                    .map(Supplier::get)
+                    .collect(Collectors.toList());
 
-            public Factory(List<Supplier<LookupSource>> partitions, Object restoredJoinPositions)
-            {
-                this.lookupSources = partitions.stream()
-                        .map(Supplier::get)
-                        .toArray(LookupSource[]::new);
+            visitedPositions = new ArrayList<>();
+            if (restoredJoinPositions != null) {
+                restoreJoinPositions(restoredJoinPositions);
+            }
 
-                if (restoredJoinPositions != null) {
-                    visitedPositions = (boolean[][]) restoredJoinPositions;
+            finished = new AtomicBoolean[lookupSources.size()];
+            referenceCount = new AtomicLong[lookupSources.size()];
+
+            partitionReady = new ArrayList<>();
+            partitionDone = new ArrayList<>();
+            locks = new ReentrantReadWriteLock[lookupSources.size()];
+            for (int i = 0; i < partitions.size(); i++) {
+                finished[i] = new AtomicBoolean();
+                referenceCount[i] = new AtomicLong();
+
+                partitionReady.add(SettableFuture.create());
+                partitionDone.add(SettableFuture.create());
+                if (!(partitions.get(i).get() instanceof PartitionedLookupSourceFactory.SpilledLookupSource)) {
+                    partitionReady.get(i).set(null);
                 }
-                else {
-                    visitedPositions = Arrays.stream(this.lookupSources)
-                            .map(LookupSource::getJoinPositionCount)
-                            .map(Math::toIntExact)
-                            .map(boolean[]::new)
-                            .toArray(boolean[][]::new);
+
+                if (restoredJoinPositions == null) {
+                    visitedPositions.add(new RoaringBitmap());
                 }
-            }
-
-            public OuterPositionTracker create()
-            {
-                return new OuterPositionTracker(visitedPositions, finished, referenceCount);
-            }
-
-            public OuterPositionIterator getOuterPositionIterator()
-            {
-                // touching atomic values ensures memory visibility between commit and getVisitedPositions
-                verify(referenceCount.get() == 0);
-                finished.set(true);
-                return new PartitionedLookupOuterPositionIterator(lookupSources, visitedPositions);
-            }
-
-            public Object captureJoinPositions()
-            {
-                return visitedPositions;
-            }
-
-            public void restoreJoinPositions(Object state)
-            {
-                boolean[][] joinPositions = (boolean[][]) state;
-                for (int i = 0; i < joinPositions.length; i++) {
-                    checkState(joinPositions[i].length == visitedPositions[i].length);
-                    System.arraycopy(joinPositions[i], 0, visitedPositions[i], 0, joinPositions[i].length);
-                }
+                locks[i] = new ReentrantReadWriteLock();
             }
         }
 
-        private final boolean[][] visitedPositions; // shared across multiple operators/drivers
+        public OuterPositionTracker create()
+        {
+            return new InMemoryOuterPositionTracker(visitedPositions, locks, finished, referenceCount);
+        }
+
+        public OuterPositionIterator getOuterPositionIterator()
+        {
+            int[] selectedPartitions = new int[lookupSources.size()];
+            int count = 0;
+            for (int i = 0; i < lookupSources.size(); i++) {
+                if (partitionReady.get(i).isDone()) {
+                    if (!partitionDone.get(i).isDone()) {
+                        if (lookupSources.get(i).getJoinPositionCount() <= 0
+                                || lookupSources.get(i).getJoinPositionCount() <= visitedPositions.get(i).getCardinality()) {
+                            setPartitionDone(i);
+                            continue;
+                        }
+                        selectedPartitions[count++] = i;
+                    }
+                }
+            }
+
+            LookupSource[] ls = new LookupSource[count];
+            RoaringBitmap[] rb = new RoaringBitmap[count];
+            for (int i = 0; i < count; i++) {
+                ls[i] = lookupSources.get(selectedPartitions[i]);
+                rb[i] = visitedPositions.get(selectedPartitions[i]);
+
+                // touching atomic values ensures memory visibility between commit and getVisitedPositions
+                verify(referenceCount[selectedPartitions[i]].get() == 0);
+                finished[selectedPartitions[i]].set(true);
+            }
+
+            return new PartitionedLookupOuterPositionIterator(ls, rb, selectedPartitions, this);
+        }
+
+        protected synchronized ListenableFuture<OuterPositionIterator> getNextReady()
+        {
+            ImmutableList.Builder<ListenableFuture<OuterPositionIterator>> builder = ImmutableList.builder();
+
+            int objs = 0;
+            for (int i = 0; i < lookupSources.size(); i++) {
+                if (!partitionDone.get(i).isDone()) {
+                    builder.add(partitionReady.get(i));
+                    objs++;
+                }
+            }
+
+            if (objs > 0) {
+                return whenAnyComplete(builder.build());
+            }
+
+            return immediateFuture(null);
+        }
+
+        protected synchronized void setOuterPositionIterator(int partitionNumber)
+        {
+            verify(partitionNumber < lookupSources.size());
+            verify(!partitionReady.get(partitionNumber).isDone());
+
+            partitionReady.get(partitionNumber)
+                    .set(new PartitionedLookupOuterPositionIterator(
+                            new LookupSource[] {lookupSources.get(partitionNumber)},
+                            new RoaringBitmap[] {visitedPositions.get(partitionNumber)},
+                            new int[] {0},
+                            this));
+        }
+
+        public Object captureJoinPositions() throws IOException
+        {
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            DataOutputStream dos = new DataOutputStream(bos);
+            for (RoaringBitmap rr : visitedPositions) {
+                rr.serialize(dos);
+            }
+            dos.close();
+            return bos.toByteArray();
+        }
+
+        public void restoreJoinPositions(Object state)
+        {
+            ByteBuffer bb = ByteBuffer.wrap((byte[]) state);
+            visitedPositions.clear();
+            for (int i = 0; i < lookupSources.size(); i++) {
+                ImmutableRoaringBitmap bm = new ImmutableRoaringBitmap(bb);
+                visitedPositions.add(new RoaringBitmap(bm));
+                bb.position(bb.position() + visitedPositions.get(i).serializedSizeInBytes());
+            }
+        }
+
+        public void setPartitionDone(int partition)
+        {
+            verify(partition < partitionDone.size());
+            partitionDone.get(partition).set(null);
+
+            locks[partition].writeLock().lock();
+            try {
+                visitedPositions.get(partition).clear();
+            }
+            finally {
+                locks[partition].writeLock().unlock();
+            }
+        }
+
+        public ListenableFuture<?> setPartitionReady(int partition)
+        {
+            verify(partition < lookupSources.size());
+            verify(!partitionReady.get(partition).isDone());
+
+            locks[partition].writeLock().lock();
+            try {
+                if (lookupSources.get(partition).getJoinPositionCount() <= 0
+                        || lookupSources.get(partition).getJoinPositionCount() <= visitedPositions.get(partition).getCardinality()) {
+                    setPartitionDone(partition); /* all matched in this partition; skip it! */
+                }
+                else {
+                    partitionReady.get(partition)
+                            .set(new PartitionedLookupOuterPositionIterator(
+                                    new LookupSource[]{lookupSources.get(partition)},
+                                    new RoaringBitmap[]{visitedPositions.get(partition)},
+                                    new int[]{0},
+                                    this));
+                }
+                return partitionDone.get(partition);
+            }
+            finally {
+                locks[partition].writeLock().unlock();
+            }
+        }
+    }
+
+    public interface OuterPositionTracker
+    {
+        void positionVisited(int partitioned, int position);
+
+        void commit();
+    }
+
+    private static class InMemoryOuterPositionTracker
+            implements OuterPositionTracker
+    {
+        private final RoaringBitmap[] visitedPositions; // shared across multiple operators/drivers
+        private final ReentrantReadWriteLock[] locks;
+        private final AtomicBoolean[] finished; // shared across multiple operators/drivers
+        private final AtomicLong[] referenceCount; // shared across multiple operators/drivers
+        private boolean[] written; // unique per each operator/driver
+
+        private InMemoryOuterPositionTracker(List<RoaringBitmap> visitedPositions, ReentrantReadWriteLock[] locks, AtomicBoolean[] finished, AtomicLong[] referenceCount)
+        {
+            this.visitedPositions = visitedPositions.toArray(new RoaringBitmap[visitedPositions.size()]);
+            this.locks = locks;
+            this.finished = finished;
+            this.referenceCount = referenceCount;
+            this.written = new boolean[visitedPositions.size()];
+        }
+
+        /**
+         * No synchronization here, because it would be very expensive. Check comment above.
+         */
+        @Override
+        public void positionVisited(int partition, int position)
+        {
+            verify(partition < referenceCount.length);
+            if (!written[partition]) {
+                written[partition] = true;
+                verify(!finished[partition].get());
+                referenceCount[partition].incrementAndGet();
+            }
+
+            locks[partition].writeLock().lock();
+            try {
+                visitedPositions[partition].add(position);
+            }
+            finally {
+                locks[partition].writeLock().unlock();
+            }
+        }
+
+        @Override
+        public void commit()
+        {
+            for (int i = 0; i < written.length; i++) {
+                if (written[i]) {
+                    // touching atomic values ensures memory visibility between commit and getVisitedPositions
+                    referenceCount[i].decrementAndGet();
+                }
+            }
+        }
+    }
+
+    private static class SpillableOuterPositionTracker
+            implements OuterPositionTracker
+    {
+        private final RoaringBitmap[] visitedPositions; // shared across multiple operators/drivers
         private final AtomicBoolean finished; // shared across multiple operators/drivers
         private final AtomicLong referenceCount; // shared across multiple operators/drivers
         private boolean written; // unique per each operator/driver
 
-        private OuterPositionTracker(boolean[][] visitedPositions, AtomicBoolean finished, AtomicLong referenceCount)
+        private SpillableOuterPositionTracker(RoaringBitmap[] visitedPositions, AtomicBoolean finished, AtomicLong referenceCount)
         {
             this.visitedPositions = visitedPositions;
             this.finished = finished;
@@ -356,16 +587,18 @@ public class PartitionedLookupSource
         /**
          * No synchronization here, because it would be very expensive. Check comment above.
          */
-        public void positionVisited(int partition, int position)
+        @Override
+        public void positionVisited(int partitioned, int position)
         {
             if (!written) {
                 written = true;
                 verify(!finished.get());
                 referenceCount.incrementAndGet();
             }
-            visitedPositions[partition][position] = true;
+            visitedPositions[partitioned].add(position); /* Todo: Trigger spill if needed */
         }
 
+        @Override
         public void commit()
         {
             if (written) {
