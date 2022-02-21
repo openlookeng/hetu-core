@@ -315,8 +315,12 @@ public class TaskSnapshotManager
                         // Save the consolidated state.
                         SnapshotStateId newId = createConsolidatedId(snapshotId, componentIdTaskId);
                         try {
-                            Map<String, Object> map = storeCache.remove(snapshotId);
-                            if (map == null) {
+                            Map<String, Object> inputMap = storeCache.remove(snapshotId);
+                            Map<String, Object> map = new HashMap<>();
+                            if (inputMap != null) {
+                                map.putAll(inputMap);
+                            }
+                            else {
                                 map = Collections.emptyMap();
                             }
                             snapshotUtils.storeState(newId, map);

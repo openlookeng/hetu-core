@@ -824,6 +824,14 @@ helps with cache affinity scheduling.
 >
 > This can also be specified on a per-query basis using the `snapshot_retry_timeout` session property.
 
+### `hetu.snapshot.useKryoSerialization`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Enables Kryo based serialization for snapshot, instead of default java serializer.
+
+
 ## HTTP Client Configurations
 
 ### `http.client.idle-timeout`

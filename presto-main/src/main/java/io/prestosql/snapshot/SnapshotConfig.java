@@ -38,6 +38,7 @@ public class SnapshotConfig
     public static final String SNAPSHOT_SPLIT_COUNT_INTERVAL = "hetu.internal.snapshot.splitCountInterval";
     public static final String SNAPSHOT_MAX_RETRIES = "hetu.snapshot.maxRetries";
     public static final String SNAPSHOT_RETRY_TIMEOUT = "hetu.snapshot.retryTimeout";
+    public static final String SNAPSHOT_USE_KRYO_SERIALIZATION = "hetu.snapshot.useKryoSerialization";
 
     private String snapshotProfile;
 
@@ -46,6 +47,7 @@ public class SnapshotConfig
     private long snapshotSplitCountInterval = 1_000;
     private long snapshotMaxRetries = 10;
     private Duration snapshotRetryTimeout = new Duration(10, TimeUnit.MINUTES);
+    private boolean snapshotUseKryoSerialization;
 
     public enum IntervalType
     {
@@ -142,6 +144,19 @@ public class SnapshotConfig
     public SnapshotConfig setSnapshotRetryTimeout(Duration snapshotRetryTimeout)
     {
         this.snapshotRetryTimeout = snapshotRetryTimeout;
+        return this;
+    }
+
+    public boolean isSnapshotUseKryoSerialization()
+    {
+        return snapshotUseKryoSerialization;
+    }
+
+    @Config(SNAPSHOT_USE_KRYO_SERIALIZATION)
+    @ConfigDescription("snapshot use kryo serialization")
+    public SnapshotConfig setSnapshotUseKryoSerialization(boolean snapshotUseKryoSerialization)
+    {
+        this.snapshotUseKryoSerialization = snapshotUseKryoSerialization;
         return this;
     }
 }
