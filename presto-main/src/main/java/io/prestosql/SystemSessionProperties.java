@@ -100,6 +100,7 @@ public final class SystemSessionProperties
     public static final String QUERY_PRIORITY = "query_priority";
     public static final String SPILL_ENABLED = "spill_enabled";
     public static final String SPILL_ORDER_BY = "spill_order_by";
+    public static final String SPILL_NON_BLOCKING_ORDERBY = "spill_non_blocking_orderby";
     public static final String SPILL_WINDOW_OPERATOR = "spill_window_operator";
     public static final String AGGREGATION_OPERATOR_UNSPILL_MEMORY_LIMIT = "aggregation_operator_unspill_memory_limit";
     public static final String OPTIMIZE_DISTINCT_AGGREGATIONS = "optimize_mixed_distinct_aggregations";
@@ -496,6 +497,11 @@ public final class SystemSessionProperties
                         SPILL_ORDER_BY,
                         "Spill in OrderBy if spill_enabled is also set",
                         featuresConfig.isSpillOrderBy(),
+                        false),
+                booleanProperty(
+                        SPILL_NON_BLOCKING_ORDERBY,
+                        "Spill orderby in non blocking manner",
+                        featuresConfig.isNonBlockingSpill(),
                         false),
                 booleanProperty(
                         SPILL_WINDOW_OPERATOR,
@@ -1055,6 +1061,11 @@ public final class SystemSessionProperties
     public static boolean isSpillEnabled(Session session)
     {
         return session.getSystemProperty(SPILL_ENABLED, Boolean.class);
+    }
+
+    public static boolean isNonBlockingSpillOrderby(Session session)
+    {
+        return session.getSystemProperty(SPILL_NON_BLOCKING_ORDERBY, Boolean.class);
     }
 
     public static boolean isSpillOrderBy(Session session)

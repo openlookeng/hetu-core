@@ -2875,6 +2875,11 @@ public abstract class AbstractTestQueries
     @Test
     public void testChainedUnionsWithOrder()
     {
+        Session session1 = Session.builder(getSession())
+                .setSystemProperty("spill_non_blocking_orderby", "true")
+                .build();
+        assertQueryOrdered(session1,
+                "SELECT orderkey FROM orders UNION (SELECT custkey FROM orders UNION SELECT linenumber FROM lineitem) UNION ALL SELECT orderkey FROM lineitem ORDER BY orderkey");
         assertQueryOrdered(
                 "SELECT orderkey FROM orders UNION (SELECT custkey FROM orders UNION SELECT linenumber FROM lineitem) UNION ALL SELECT orderkey FROM lineitem ORDER BY orderkey");
     }

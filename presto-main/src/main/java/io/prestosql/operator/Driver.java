@@ -411,7 +411,7 @@ public class Driver
                 }
 
                 // skip blocked operator
-                if (!(current instanceof CommonTableExpressionOperator) && getBlockedFuture(current).isPresent()) {
+                if (isOperatorBlocked(current, next)) {
                     continue;
                 }
 
@@ -539,6 +539,14 @@ public class Driver
             driverContext.failed(newException);
             throw newException;
         }
+    }
+
+    private boolean isOperatorBlocked(Operator current, Operator next)
+    {
+        if (SystemSessionProperties.isNonBlockingSpillOrderby(driverContext.getSession())) {
+            return !(current instanceof CommonTableExpressionOperator || next instanceof OrderByOperator) && getBlockedFuture(current).isPresent();
+        }
+        return !(current instanceof CommonTableExpressionOperator) && getBlockedFuture(current).isPresent();
     }
 
     @GuardedBy("exclusiveLock")
@@ -694,6 +702,9 @@ public class Driver
         ListenableFuture<?> blocked = revokingOperators.get(operator);
         if (blocked != null) {
             // We mark operator as blocked regardless of blocked.isDone(), because finishMemoryRevoke has not been called yet.
+            if (SystemSessionProperties.isNonBlockingSpillOrderby(driverContext.getSession()) && operator instanceof OrderByOperator) {
+                return Optional.empty();
+            }
             return Optional.of(blocked);
         }
         blocked = operator.isBlocked();
