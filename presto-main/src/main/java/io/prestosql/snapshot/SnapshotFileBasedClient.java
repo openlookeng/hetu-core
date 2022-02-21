@@ -51,15 +51,23 @@ public class SnapshotFileBasedClient
     }
 
     @Override
-    public void storeState(SnapshotStateId snapshotStateId, Object state)
+    public void storeState(SnapshotStateId snapshotStateId, Object state, SnapshotDataCollector dataCollector)
             throws IOException
     {
+        long snapshotId = 0;
+        long size = 0;
+        long cpuTime = 0;
+
         Path file = SnapshotUtils.createStatePath(rootPath, snapshotStateId.getHierarchy());
 
         fsClient.createDirectories(file.getParent());
 
         try (OutputStream outputStream = fsClient.newOutputStream(file)) {
             SnapshotUtils.serializeState(state, outputStream);
+        }
+        if (dataCollector != null) {
+            dataCollector.updateSnapshotSize(snapshotId, size);
+            dataCollector.updateSnapshotTime(snapshotId, cpuTime);
         }
     }
 
@@ -78,9 +86,13 @@ public class SnapshotFileBasedClient
     }
 
     @Override
-    public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile)
+    public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile, SnapshotDataCollector dataCollector)
             throws IOException
     {
+        long snapshotId = 0;
+        long size = 0;
+        long cpuTime = 0;
+
         List<String> hierarchy = new ArrayList<>(snapshotStateId.getHierarchy());
         hierarchy.add(sourceFile.getFileName().toString());
         Path file = SnapshotUtils.createStatePath(rootPath, hierarchy);
@@ -90,6 +102,10 @@ public class SnapshotFileBasedClient
         try (OutputStream outputStream = fsClient.newOutputStream(file);
                 InputStream inputStream = Files.newInputStream(sourceFile)) {
             ByteStreams.copy(inputStream, outputStream);
+        }
+        if (dataCollector != null) {
+            dataCollector.updateSnapshotSize(snapshotId, size);
+            dataCollector.updateSnapshotTime(snapshotId, cpuTime);
         }
     }
 

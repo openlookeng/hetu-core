@@ -27,7 +27,7 @@ public interface SnapshotStoreClient
     /**
      * Store state in snapshot store
      */
-    void storeState(SnapshotStateId snapshotStateId, Object state)
+    void storeState(SnapshotStateId snapshotStateId, Object state, SnapshotDataCollector dataCollector)
             throws Exception;
 
     /**
@@ -39,7 +39,7 @@ public interface SnapshotStoreClient
     /**
      * Store file from sourcePath to snapshotStateId of snapshot store
      */
-    void storeFile(SnapshotStateId snapshotStateId, Path sourcePath)
+    void storeFile(SnapshotStateId snapshotStateId, Path sourcePath, SnapshotDataCollector dataCollector)
             throws Exception;
 
     /**

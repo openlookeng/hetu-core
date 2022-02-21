@@ -337,18 +337,20 @@ public class QuerySnapshotManager
     }
 
     // Update capture results based on TaskInfo
-    public void updateQueryCapture(TaskId taskId, Map<Long, SnapshotResult> captureResult)
+    public void updateQueryCapture(TaskId taskId, Map<Long, SnapshotInfo> captureResult)
     {
-        for (Map.Entry<Long, SnapshotResult> entry : captureResult.entrySet()) {
+        for (Map.Entry<Long, SnapshotInfo> entry : captureResult.entrySet()) {
             Long snapshotId = entry.getKey();
-            SnapshotResult result = entry.getValue();
+            SnapshotInfo info = entry.getValue();
+            SnapshotResult result = info.getSnapshotResult();
+
             if (snapshotId < 0) {
                 // Special case. Task will never receive any marker. Add it to the "finished" list
                 checkArgument(result == SnapshotResult.SUCCESSFUL);
                 updateCapturedComponents(ImmutableList.of(taskId), false);
             }
             else {
-                if (updateQueryCapture(taskId, entry.getKey(), entry.getValue())) {
+                if (updateQueryCapture(taskId, entry.getKey(), result)) {
                     // if the capture works, then that means a consolidated file was created and we need to add it to the list
                     addConsolidatedFileToList(TaskSnapshotManager.createConsolidatedId(snapshotId, taskId).toString());
                 }
@@ -507,7 +509,9 @@ public class QuerySnapshotManager
                 // Update ongoing snapshots
                 for (Long snapshotId : captureComponentCounters.keySet()) {
                     for (TaskId taskId : capturedTasks) {
-                        updateQueryCapture(taskId, ImmutableMap.of(snapshotId, SnapshotResult.SUCCESSFUL));
+                        SnapshotInfo info = new SnapshotInfo();
+                        info.setSnapshotResult(SnapshotResult.SUCCESSFUL);
+                        updateQueryCapture(taskId, ImmutableMap.of(snapshotId, info));
                     }
                 }
             }

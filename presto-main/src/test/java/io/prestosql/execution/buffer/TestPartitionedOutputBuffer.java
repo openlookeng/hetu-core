@@ -332,7 +332,7 @@ public class TestPartitionedOutputBuffer
         ArgumentCaptor<SnapshotStateId> idArgument = ArgumentCaptor.forClass(SnapshotStateId.class);
         ArgumentCaptor<Object> stateArgument = ArgumentCaptor.forClass(Object.class);
         // storeState is called once for each partition
-        verify(snapshotUtils, times(3)).storeState(idArgument.capture(), stateArgument.capture());
+        verify(snapshotUtils, times(3)).storeState(idArgument.capture(), stateArgument.capture(), null);
         List<SnapshotStateId> ids = idArgument.getAllValues();
         List<Object> states = stateArgument.getAllValues();
         when(snapshotUtils.loadState(ids.get(0))).thenReturn(Optional.of(states.get(0)));

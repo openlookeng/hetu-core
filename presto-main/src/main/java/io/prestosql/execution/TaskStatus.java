@@ -21,7 +21,7 @@ import com.google.common.collect.ImmutableSet;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.snapshot.RestoreResult;
-import io.prestosql.snapshot.SnapshotResult;
+import io.prestosql.snapshot.SnapshotInfo;
 
 import java.net.URI;
 import java.util.List;
@@ -80,7 +80,7 @@ public class TaskStatus
     // snapshotCaptureResult and snapshotRestoreResult are used to store result of snapshot capture and restore. They are empty when the following conditions happened:
     // (1) Snapshot is not enabled
     // (2) Snapshot is enabled but no data for capture/restore result
-    private final Map<Long, SnapshotResult> snapshotCaptureResult;
+    private final Map<Long, SnapshotInfo> snapshotCaptureResult;
     private final Optional<RestoreResult> snapshotRestoreResult;
 
     @JsonCreator
@@ -102,7 +102,7 @@ public class TaskStatus
             @JsonProperty("revocableMemoryReservation") DataSize revocableMemoryReservation,
             @JsonProperty("fullGcCount") long fullGcCount,
             @JsonProperty("fullGcTime") Duration fullGcTime,
-            @JsonProperty("snapshotCaptureResult") Map<Long, SnapshotResult> snapshotCaptureResult,
+            @JsonProperty("snapshotCaptureResult") Map<Long, SnapshotInfo> snapshotCaptureResult,
             @JsonProperty("snapshotRestoreResult") Optional<RestoreResult> snapshotRestoreResult)
     {
         this.taskId = requireNonNull(taskId, "taskId is null");
@@ -241,7 +241,7 @@ public class TaskStatus
     }
 
     @JsonProperty
-    public Map<Long, SnapshotResult> getSnapshotCaptureResult()
+    public Map<Long, SnapshotInfo> getSnapshotCaptureResult()
     {
         return snapshotCaptureResult;
     }
