@@ -479,6 +479,7 @@ public final class OperatorAssertion
     public static List<Page> toPagesCompareStateSimple(OperatorFactory operatorFactory, DriverContext driverContext, List<Page> input, boolean revokeMemoryWhenAddingPages, Map<String, Object> expectedMapping)
     {
         try (Operator operator = operatorFactory.createOperator(driverContext)) {
+            operatorFactory.noMoreOperators(driverContext.getLifespan());
             operatorFactory.noMoreOperators();
             return toPagesCompareStateSimple(operator, input, revokeMemoryWhenAddingPages, expectedMapping);
         }

@@ -98,7 +98,7 @@ public class HashBuildAndJoinBenchmark
                         .collect(toImmutableList()),
                 1,
                 requireNonNull(ImmutableMap.of(), "layout is null"),
-                false));
+                false, false));
         HashBuilderOperatorFactory hashBuilder = new HashBuilderOperatorFactory(
                 2,
                 new PlanNodeId("test"),

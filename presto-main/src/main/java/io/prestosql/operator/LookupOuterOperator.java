@@ -124,7 +124,7 @@ public class LookupOuterOperator
 
     private final OperatorContext operatorContext;
     private final LookupSourceFactory lookupSourceFactory;
-    private final ListenableFuture<OuterPositionIterator> outerPositionsFuture;
+    private ListenableFuture<OuterPositionIterator> outerPositionsFuture;
 
     private final List<Type> probeOutputTypes;
     private final Runnable onClose;
@@ -274,7 +274,12 @@ public class LookupOuterOperator
         }
 
         if (outputPositionsFinished) {
-            close();
+            outerPositionsFuture = outerPositions.getNextBatch();
+            outerPositions = null;
+            outerPositions = tryGetFutureValue(outerPositionsFuture).orElse(null);
+            if (outerPositions == null) {
+                close();
+            }
         }
         return page;
     }

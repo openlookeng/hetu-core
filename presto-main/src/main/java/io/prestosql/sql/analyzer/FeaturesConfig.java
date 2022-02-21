@@ -118,6 +118,8 @@ public class FeaturesConfig
     private boolean spillOrderBy = true;
     private boolean nonBlockingSpill;
     private boolean spillWindowOperator = true;
+    private boolean spillBuildForOuterJoinEnabled;
+    private boolean innerJoinSpillFilterEnabled;
     private DataSize aggregationOperatorUnspillMemoryLimit = new DataSize(4, DataSize.Unit.MEGABYTE);
     private List<Path> spillerSpillPaths = ImmutableList.of();
     private int spillerThreads = 4;
@@ -725,6 +727,30 @@ public class FeaturesConfig
     public boolean isNonBlockingSpill()
     {
         return nonBlockingSpill;
+    }
+
+    public boolean isSpillBuildForOuterJoinEnabled()
+    {
+        return spillBuildForOuterJoinEnabled;
+    }
+
+    @Config("experimental.spill-build-for-outer-join-enabled")
+    public FeaturesConfig setSpillBuildForOuterJoinEnabled(boolean spillBuildForOuterJoinEnabled)
+    {
+        this.spillBuildForOuterJoinEnabled = spillBuildForOuterJoinEnabled;
+        return this;
+    }
+
+    public boolean isInnerJoinSpillFilterEnabled()
+    {
+        return innerJoinSpillFilterEnabled;
+    }
+
+    @Config("experimental.inner-join-spill-filter-enabled")
+    public FeaturesConfig setInnerJoinSpillFilterEnabled(boolean innerJoinSpillFilterEnabled)
+    {
+        this.innerJoinSpillFilterEnabled = innerJoinSpillFilterEnabled;
+        return this;
     }
 
     @Config("experimental.spill-order-by")

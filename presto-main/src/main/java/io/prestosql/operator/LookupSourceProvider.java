@@ -13,6 +13,7 @@
  */
 package io.prestosql.operator;
 
+import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.IntPredicate;
 
@@ -33,5 +34,10 @@ public interface LookupSourceProvider
         long spillEpoch();
 
         IntPredicate getSpillMask();
+
+        default BiPredicate<Integer, Long> getSpillMatcher()
+        {
+            return (a, b) -> true;
+        }
     }
 }

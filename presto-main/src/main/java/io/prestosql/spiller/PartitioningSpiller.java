@@ -20,6 +20,7 @@ import io.prestosql.spi.snapshot.Restorable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.function.BiPredicate;
 import java.util.function.IntPredicate;
 
 import static java.util.Objects.requireNonNull;
@@ -34,6 +35,8 @@ public interface PartitioningSpiller
      * This method may not be called if previously initiated spilling is not finished yet.
      */
     PartitioningSpillResult partitionAndSpill(Page page, IntPredicate spillPartitionMask);
+
+    PartitioningSpillResult partitionAndSpill(Page page, IntPredicate spillPartitionMask, BiPredicate<Integer, Long> spillPartitionMatcher);
 
     /**
      * Returns iterator of previously spilled pages from given partition. Callers are expected to call

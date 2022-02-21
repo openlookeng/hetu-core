@@ -102,6 +102,8 @@ public final class SystemSessionProperties
     public static final String SPILL_ORDER_BY = "spill_order_by";
     public static final String SPILL_NON_BLOCKING_ORDERBY = "spill_non_blocking_orderby";
     public static final String SPILL_WINDOW_OPERATOR = "spill_window_operator";
+    public static final String SPILL_OUTER_JOIN_ENABLED = "spill_build_for_outer_join_enabled";
+    public static final String INNER_JOIN_SPILL_FILTER_ENABLED = "inner_join_spill_filter_enabled";
     public static final String AGGREGATION_OPERATOR_UNSPILL_MEMORY_LIMIT = "aggregation_operator_unspill_memory_limit";
     public static final String OPTIMIZE_DISTINCT_AGGREGATIONS = "optimize_mixed_distinct_aggregations";
     public static final String ITERATIVE_OPTIMIZER = "iterative_optimizer_enabled";
@@ -502,6 +504,16 @@ public final class SystemSessionProperties
                         SPILL_NON_BLOCKING_ORDERBY,
                         "Spill orderby in non blocking manner",
                         featuresConfig.isNonBlockingSpill(),
+                        false),
+                booleanProperty(
+                        SPILL_OUTER_JOIN_ENABLED,
+                        "Enable build side spill for Right or Full Outer Join",
+                        featuresConfig.isSpillBuildForOuterJoinEnabled(),
+                        false),
+                booleanProperty(
+                        INNER_JOIN_SPILL_FILTER_ENABLED,
+                        "Enable build side spill matching optimization for Inner Join",
+                        featuresConfig.isInnerJoinSpillFilterEnabled(),
                         false),
                 booleanProperty(
                         SPILL_WINDOW_OPERATOR,
@@ -1061,6 +1073,16 @@ public final class SystemSessionProperties
     public static boolean isSpillEnabled(Session session)
     {
         return session.getSystemProperty(SPILL_ENABLED, Boolean.class);
+    }
+
+    public static boolean isSpillForOuterJoinEnabled(Session session)
+    {
+        return session.getSystemProperty(SPILL_OUTER_JOIN_ENABLED, Boolean.class);
+    }
+
+    public static boolean isInnerJoinSpillFilteringEnabled(Session session)
+    {
+        return session.getSystemProperty(INNER_JOIN_SPILL_FILTER_ENABLED, Boolean.class);
     }
 
     public static boolean isNonBlockingSpillOrderby(Session session)

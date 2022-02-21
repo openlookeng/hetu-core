@@ -161,6 +161,30 @@ This section describes the most important config properties that may be used to 
 >
 > This config property can be overridden by the `spill_window_operator` session property.
 
+
+### `experimental.spill-build-for-outer-join-enabled`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Enables spill feature for right-outer and full-outer join operations.
+>
+>
+>
+> This config property can be overridden by the `spill_build_for_outer_join_enabled` session property.
+
+### `experimental.inner-join-spill-filter-enabled`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Enables bloom filter based build-side spill matching for probe side spill decision.
+>
+>
+>
+> This config property can be overridden by the `inner_join_spill_filter_enabled` session property.
+
+
 ### `experimental.spill-reuse-tablescan`
 
 > -   **Type:** `boolean`
