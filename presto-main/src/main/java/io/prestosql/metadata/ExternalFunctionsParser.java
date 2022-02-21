@@ -115,7 +115,7 @@ public class ExternalFunctionsParser
         checkState(base.length() >= length, "the base should be longer than the str length needed");
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < length; i++) {
-            int number = RANDOM.nextInt();
+            int number = Math.abs(RANDOM.nextInt()) % base.length();
             sb.append(base.charAt(number));
         }
         return sb.toString();
