@@ -134,13 +134,13 @@ public class SnapshotUtils
     /**
      * Store the state of snapshotStateId in snapshot store
      */
-    public void storeState(SnapshotStateId snapshotStateId, Object state)
+    public void storeState(SnapshotStateId snapshotStateId, Object state, SnapshotDataCollector dataCollector)
             throws Exception
     {
         requireNonNull(snapshotStoreClient);
         requireNonNull(state);
 
-        snapshotStoreClient.storeState(snapshotStateId, state);
+        snapshotStoreClient.storeState(snapshotStateId, state, dataCollector);
     }
 
     /**
@@ -156,13 +156,13 @@ public class SnapshotUtils
         return snapshotStoreClient.loadState(snapshotStateId);
     }
 
-    public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile)
+    public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile, SnapshotDataCollector dataCollector)
             throws Exception
     {
         requireNonNull(snapshotStoreClient);
         requireNonNull(sourceFile);
 
-        snapshotStoreClient.storeFile(snapshotStateId, sourceFile);
+        snapshotStoreClient.storeFile(snapshotStateId, sourceFile, dataCollector);
     }
 
     public Boolean loadFile(SnapshotStateId snapshotStateId, Path targetFile)

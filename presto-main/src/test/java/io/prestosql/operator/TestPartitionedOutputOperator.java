@@ -86,7 +86,7 @@ public class TestPartitionedOutputOperator
         operator.addInput(input.get(0));
         operator.addInput(marker);
         ArgumentCaptor<Object> stateArgument = ArgumentCaptor.forClass(Object.class);
-        verify(snapshotUtils, times(1)).storeState(anyObject(), stateArgument.capture());
+        verify(snapshotUtils, times(1)).storeState(anyObject(), stateArgument.capture(), null);
         Object snapshot = stateArgument.getValue();
 
         when(snapshotUtils.loadState(anyObject())).thenReturn(Optional.of(snapshot));
@@ -94,7 +94,7 @@ public class TestPartitionedOutputOperator
         operator.addInput(resume);
 
         operator.addInput(marker2);
-        verify(snapshotUtils, times(2)).storeState(anyObject(), stateArgument.capture());
+        verify(snapshotUtils, times(2)).storeState(anyObject(), stateArgument.capture(), null);
         snapshot = stateArgument.getValue();
         Object snapshotEntry = ((Map<String, Object>) snapshot).get("query/2/1/1/0/0/0");
         assertEquals(SnapshotTestUtil.toFullSnapshotMapping(snapshotEntry), createExpectedMappingBeforeFinish());
@@ -102,7 +102,7 @@ public class TestPartitionedOutputOperator
         operator.addInput(input.get(1));
         operator.finish();
         operator.addInput(marker3);
-        verify(snapshotUtils, times(3)).storeState(anyObject(), stateArgument.capture());
+        verify(snapshotUtils, times(3)).storeState(anyObject(), stateArgument.capture(), null);
         snapshot = stateArgument.getValue();
         snapshotEntry = ((Map<String, Object>) snapshot).get("query/3/1/1/0/0/0");
         assertEquals(SnapshotTestUtil.toFullSnapshotMapping(snapshotEntry), createExpectedMappingAfterFinish());

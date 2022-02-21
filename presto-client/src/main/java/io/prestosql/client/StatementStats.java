@@ -48,6 +48,7 @@ public class StatementStats
     private long elapsedSpillWriteTimeMillis;
     private int spilledNodes;
     private final StageStats rootStage;
+    private final SnapshotStats snapshotStats;
 
     @JsonCreator
     public StatementStats(
@@ -70,7 +71,8 @@ public class StatementStats
             @JsonProperty("elapsedSpillReadTimeMillis") long elapsedSpillReadTimeMillis,
             @JsonProperty("elapsedSpillWriteTimeMillis") long elapsedSpillWriteTimeMillis,
             @JsonProperty("spilledNodes") int spilledNodes,
-            @JsonProperty("rootStage") StageStats rootStage)
+            @JsonProperty("rootStage") StageStats rootStage,
+            @JsonProperty("snapshotStats") SnapshotStats snapshotStats)
     {
         this.state = requireNonNull(state, "state is null");
         this.queued = queued;
@@ -92,6 +94,7 @@ public class StatementStats
         this.elapsedSpillWriteTimeMillis = elapsedSpillWriteTimeMillis;
         this.spilledNodes = spilledNodes;
         this.rootStage = rootStage;
+        this.snapshotStats = snapshotStats;
     }
 
     @JsonProperty
@@ -224,6 +227,11 @@ public class StatementStats
         return spilledNodes;
     }
 
+    public SnapshotStats getSnapshotStats()
+    {
+        return snapshotStats;
+    }
+
     @Override
     public String toString()
     {
@@ -247,6 +255,7 @@ public class StatementStats
                 .add("elapsedSpillReadTime", elapsedSpillReadTimeMillis)
                 .add("elapsedSpillWriteTime", elapsedSpillWriteTimeMillis)
                 .add("rootStage", rootStage)
+                .add("snapshotStats", snapshotStats)
                 .toString();
     }
 
@@ -277,6 +286,7 @@ public class StatementStats
         private long spillReadTimeMillis;
         private long spillWriteTimeMillis;
         private int spilledNodes;
+        private SnapshotStats snapshotStats;
 
         private Builder() {}
 
@@ -400,6 +410,11 @@ public class StatementStats
             return this;
         }
 
+        public void setSnapshotStats(SnapshotStats snapshotStats)
+        {
+            this.snapshotStats = snapshotStats;
+        }
+
         public StatementStats build()
         {
             return new StatementStats(
@@ -422,7 +437,8 @@ public class StatementStats
                     spillReadTimeMillis,
                     spillWriteTimeMillis,
                     spilledNodes,
-                    rootStage);
+                    rootStage,
+                    snapshotStats);
         }
     }
 }
