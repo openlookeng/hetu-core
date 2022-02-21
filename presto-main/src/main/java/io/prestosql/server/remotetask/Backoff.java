@@ -17,6 +17,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ticker;
 import com.google.common.collect.ImmutableList;
 import io.airlift.units.Duration;
+import io.prestosql.operator.ExchangeClientConfig;
 
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -33,6 +34,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
 public class Backoff
 {
     private static final int MIN_RETRIES = 3;
+    private static final int MAX_RETRIES = ExchangeClientConfig.MAX_RETRY_COUNT;
     private static final List<Duration> DEFAULT_BACKOFF_DELAY_INTERVALS = ImmutableList.<Duration>builder()
             .add(new Duration(0, MILLISECONDS))
             .add(new Duration(50, MILLISECONDS))
@@ -42,6 +44,7 @@ public class Backoff
             .build();
 
     private final int minTries;
+    private final int maxTries;
     private final long maxFailureIntervalNanos;
     private final Ticker ticker;
     private final long[] backoffDelayIntervalsNanos;
@@ -60,7 +63,31 @@ public class Backoff
 
     public Backoff(Duration maxFailureInterval, Ticker ticker)
     {
-        this(MIN_RETRIES, maxFailureInterval, ticker, DEFAULT_BACKOFF_DELAY_INTERVALS);
+        this(MIN_RETRIES, maxFailureInterval, ticker, DEFAULT_BACKOFF_DELAY_INTERVALS, MAX_RETRIES);
+    }
+
+    public Backoff(Duration maxFailureInterval, Ticker ticker, int maxTries)
+    {
+        this(MIN_RETRIES, maxFailureInterval, ticker, DEFAULT_BACKOFF_DELAY_INTERVALS, maxTries);
+    }
+
+    @VisibleForTesting
+    public Backoff(int minTries, Duration maxFailureInterval, Ticker ticker, List<Duration> backoffDelayIntervals, int maxTries)
+    {
+        checkArgument(minTries > 0, "minTries must be at least 1");
+        checkArgument(maxTries > 0, "maxTries must be at least 1");
+        requireNonNull(maxFailureInterval, "maxFailureInterval is null");
+        requireNonNull(ticker, "ticker is null");
+        requireNonNull(backoffDelayIntervals, "backoffDelayIntervals is null");
+        checkArgument(!backoffDelayIntervals.isEmpty(), "backoffDelayIntervals must contain at least one entry");
+
+        this.minTries = minTries;
+        this.maxTries = maxTries;
+        this.maxFailureIntervalNanos = maxFailureInterval.roundTo(NANOSECONDS);
+        this.ticker = ticker;
+        this.backoffDelayIntervalsNanos = backoffDelayIntervals.stream()
+                .mapToLong(duration -> duration.roundTo(NANOSECONDS))
+                .toArray();
     }
 
     @VisibleForTesting
@@ -73,6 +100,7 @@ public class Backoff
         checkArgument(!backoffDelayIntervals.isEmpty(), "backoffDelayIntervals must contain at least one entry");
 
         this.minTries = minTries;
+        this.maxTries = minTries + MAX_RETRIES; // to guaranty higher max retry value when min retry is > MAX_RETRIES
         this.maxFailureIntervalNanos = maxFailureInterval.roundTo(NANOSECONDS);
         this.ticker = ticker;
         this.backoffDelayIntervalsNanos = backoffDelayIntervals.stream()
@@ -113,7 +141,45 @@ public class Backoff
     }
 
     /**
+     * @return true if max retry failed, now it is time to check node status from HeartbeatFailureDetector
+     */
+    public synchronized boolean maxTried()
+    {
+        long now = ticker.read();
+
+        lastFailureTime = now;
+        failureCount++;
+        if (lastRequestStart != 0) {
+            failureRequestTimeTotal += now - lastRequestStart;
+            lastRequestStart = 0;
+        }
+
+        if (firstFailureTime == 0) {
+            firstFailureTime = now;
+            // can not fail on first failure
+            return false;
+        }
+
+        if (failureCount < minTries) {
+            return false;
+        }
+
+        return failureCount > maxTries;
+    }
+
+    /**
+     * @return true if maxErrorDuration is passed. Does not matter how many retry has happened.
+     */
+    public synchronized boolean timeout()
+    {
+        long now = ticker.read();
+        long failureDuration = now - firstFailureTime;
+        return failureDuration >= maxFailureIntervalNanos;
+    }
+
+    /**
      * @return true if the failure is considered permanent
+     * min retried and maxErrorDuration is passed.
      */
     public synchronized boolean failure()
     {

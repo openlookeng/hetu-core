@@ -25,6 +25,7 @@ import io.airlift.units.Duration;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.block.BlockAssertions;
+import io.prestosql.failuredetector.NoOpFailureDetector;
 import io.prestosql.memory.context.SimpleLocalMemoryContext;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.QueryId;
@@ -110,7 +111,7 @@ public class TestExchangeClient
                 new TestingHttpClient(processor, scheduler),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor);
+                pageBufferClientCallbackExecutor, new NoOpFailureDetector());
 
         exchangeClient.addLocation(new TaskLocation(location, instanceId));
         exchangeClient.noMoreLocations();
@@ -156,7 +157,7 @@ public class TestExchangeClient
                 new TestingHttpClient(processor, scheduler),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor);
+                pageBufferClientCallbackExecutor, new NoOpFailureDetector());
         exchangeClient.setSnapshotEnabled(NOOP_SNAPSHOT_UTILS.getQuerySnapshotManager(new QueryId("query")));
 
         final String target1 = "target1";
@@ -211,7 +212,7 @@ public class TestExchangeClient
                 mock(HttpClient.class),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor);
+                pageBufferClientCallbackExecutor, new NoOpFailureDetector());
         exchangeClient.setSnapshotEnabled(NOOP_SNAPSHOT_UTILS.getQuerySnapshotManager(new QueryId("query")));
 
         String origin1 = "location1";
@@ -251,7 +252,7 @@ public class TestExchangeClient
                 new TestingHttpClient(processor, newCachedThreadPool(daemonThreadsNamed("test-%s"))),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor);
+                pageBufferClientCallbackExecutor, new NoOpFailureDetector());
 
         URI location1 = URI.create("http://localhost:8081/foo");
         String instanceId1 = "testing instance id";
@@ -326,7 +327,7 @@ public class TestExchangeClient
                 new TestingHttpClient(processor, newCachedThreadPool(daemonThreadsNamed("test-%s"))),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor);
+                pageBufferClientCallbackExecutor, new NoOpFailureDetector());
 
         exchangeClient.addLocation(new TaskLocation(location, instanceId));
         exchangeClient.noMoreLocations();
@@ -409,7 +410,7 @@ public class TestExchangeClient
                 new TestingHttpClient(processor, newCachedThreadPool(daemonThreadsNamed("test-%s"))),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor);
+                pageBufferClientCallbackExecutor, new NoOpFailureDetector());
         exchangeClient.addLocation(new TaskLocation(location, instanceId));
         exchangeClient.noMoreLocations();
 
