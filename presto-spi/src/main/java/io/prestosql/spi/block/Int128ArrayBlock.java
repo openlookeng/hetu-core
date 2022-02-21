@@ -38,11 +38,11 @@ public class Int128ArrayBlock
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(Int128ArrayBlock.class).instanceSize();
     public static final int INT128_BYTES = Long.BYTES + Long.BYTES;
 
-    private final int positionOffset;
+    protected final int positionOffset;
     private final int positionCount;
     @Nullable
-    private final boolean[] valueIsNull;
-    private final long[] values;
+    protected final boolean[] valueIsNull;
+    protected final long[] values;
 
     private final long sizeInBytes;
     private final long retainedSizeInBytes;

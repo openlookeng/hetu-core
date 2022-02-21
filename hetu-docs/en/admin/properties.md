@@ -254,6 +254,15 @@ This section describes the most important config properties that may be used to 
 >
 > Sets number of pages prefetched while reading from spilled files.
 
+
+### `experimental.spill-use-kryo-serialization`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Enables Kryo based serialization for spill to disk, instead of default java serializer.
+
+
 ### `experimental.revocable-memory-selection-threshold`
 
 > -   **Type:** `data size`

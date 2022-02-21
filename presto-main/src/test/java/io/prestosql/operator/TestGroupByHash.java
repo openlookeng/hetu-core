@@ -331,7 +331,7 @@ public class TestGroupByHash
         expectedMapping.put("hashCollisions", 37L);
         expectedMapping.put("expectedHashCollisions", 0.0);
         expectedMapping.put("preallocatedMemoryInBytes", 0L);
-        expectedMapping.put("currentPageSizeInBytes", 4732L);
+        expectedMapping.put("currentPageSizeInBytes", 4740L);
 
         return expectedMapping;
     }

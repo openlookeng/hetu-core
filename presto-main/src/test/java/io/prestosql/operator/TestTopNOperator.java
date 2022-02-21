@@ -179,7 +179,7 @@ public class TestTopNOperator
         expectedMapping.put("operatorContext", 0);
         expectedMapping.put("workProcessorOperator", workProcessorOperatorMapping);
 
-        workProcessorOperatorMapping.put("localUserMemoryContext", 19152L);
+        workProcessorOperatorMapping.put("localUserMemoryContext", 19168L);
         workProcessorOperatorMapping.put("topNBuilder", topNBuilderMapping);
         workProcessorOperatorMapping.put("outputIterator", false);
 
@@ -187,7 +187,7 @@ public class TestTopNOperator
         topNBuilderMapping.put("groupedRows", groupedRowsMapping);
         topNBuilderMapping.put("pageReferences", pageReferencesMapping);
         topNBuilderMapping.put("emptyPageReferenceSlots", emptyPageReferenceSlots);
-        topNBuilderMapping.put("memorySizeInBytes", 2496L);
+        topNBuilderMapping.put("memorySizeInBytes", 2512L);
         topNBuilderMapping.put("currentPageCount", 2);
 
         groupedRowsMapping.put("array", Object[][].class);

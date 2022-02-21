@@ -17,7 +17,7 @@
         <version.annotations>13.0</version.annotations>
         <version.validation-api>2.0.1.Final</version.validation-api>
         <version.commons-lang3>3.10</version.commons-lang3>
-        <version.mockito-all>1.10.18</version.mockito-all>
+        <version.mockito-all>1.10.19</version.mockito-all>
         <version.testing>6.10</version.testing>
         <version.hbase>2.2.3</version.hbase>
         <version.jacoco-maven-plugin>0.8.2</version.jacoco-maven-plugin>
@@ -315,7 +315,7 @@
 
         <dependency>
             <groupId>org.mockito</groupId>
-            <artifactId>mockito-all</artifactId>
+            <artifactId>mockito-core</artifactId>
             <version>${version.mockito-all}</version>
             <scope>test</scope>
         </dependency>

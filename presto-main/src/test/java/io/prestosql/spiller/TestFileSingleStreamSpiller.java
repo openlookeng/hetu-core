@@ -186,29 +186,55 @@ public class TestFileSingleStreamSpiller
     public void testSpillWithSingleFile()
             throws Exception
     {
-        assertSpillBenchmark(false, false, "1GB", 1, false);
+        assertSpillBenchmark(false, false, "1GB", 1, false, false);
     }
 
     @Test
     public void testSpillWithMultiFile()
             throws Exception
     {
-        assertSpillBenchmark(false, false, "2MB", 500, false);
+        assertSpillBenchmark(false, false, "2MB", 500, false, false);
     }
 
-    private void assertSpillBenchmark(boolean compression, boolean encryption, String pageSize, int fileCount, boolean useDirectSerde)
+    @Test
+    public void testSpillWithSingleFileWithKryo()
+            throws Exception
+    {
+        assertSpillBenchmark(false, false, "1GB", 1, true, true);
+    }
+
+    @Test
+    public void testSpillWithMultiFileWithKryo()
+            throws Exception
+    {
+        assertSpillBenchmark(false, false, "2MB", 2, true, true);
+    }
+
+    @Test
+    public void testSpillWithSingleSpillerConsolidatedWithoutWorkProcessor()
+            throws Exception
+    {
+        assertSpillBenchmark(false, false, "1GB", 1, false, false);
+        assertSpillBenchmark(false, false, "1GB", 1, true, true);
+        assertSpillBenchmark(false, false, "2MB", 512, false, false);
+        assertSpillBenchmark(false, false, "2MB", 512, true, true);
+    }
+
+    private void assertSpillBenchmark(boolean compression, boolean encryption, String pageSize, int fileCount, boolean useKryo, boolean useDirectSerde)
             throws Exception
     {
         List<FileSingleStreamSpiller> spillers = new ArrayList<>();
         FileSingleStreamSpillerFactory spillerFactory = new FileSingleStreamSpillerFactory(
                 executorBenchmark, // executor won't be closed, because we don't call destroy() on the spiller factory
-                createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(),
+                (useKryo) ? createTestMetadataManager().getFunctionAndTypeManager().getBlockKryoEncodingSerde() : createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(),
                 new SpillerStats(),
                 ImmutableList.of(spillPath.toPath()),
                 1.0,
                 compression,
                 encryption,
-                useDirectSerde, 1);
+                useDirectSerde,
+                1,
+                useKryo);
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         long startTime = System.currentTimeMillis();
         Stopwatch spillTimer = Stopwatch.createStarted();
@@ -286,80 +312,80 @@ public class TestFileSingleStreamSpiller
     }
 
     @Test
+    public void testSpillWithSingleSpillerConsolidated()
+            throws Exception
+    {
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false, 1, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, 1, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, false, 1, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, true, 1, true);
+    }
+
+    @Test
     public void testSpillWithSingleSpillerConsolidatedWithCompression()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, false, 1);
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, true, 1);
-
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, false, 25);
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, true, 25);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, false, 1, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, true, 1, false);
     }
 
     @Test
     public void testSpillWithSingleSpillerConsolidatedWithCompressionMultiFile()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, false, 1);
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, true, 1);
-
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, false, 25);
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, true, 25);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, false, 1, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "2MB", 512, true, 1, false);
     }
 
     @Test
     public void testSpillWithSingleSpillerConsolidatedWithoutCompression()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false, 1);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, 1);
-
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false, 25);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, 25);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, false, 25, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, 25, false);
     }
 
     @Test
     public void testSpillWithSingleSpillerConsolidatedWithoutCompressionMultiFile()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, false, 1);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, true, 1);
-
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, false, 25);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, true, 25);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, false, 25, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "2MB", 512, true, 25, false);
     }
 
     @Test
     public void testSpillWithSingleSpillerConsolidatedWithEncryption()
             throws Exception
     {
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, true, "1GB", 1, false, 1);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, true, "1GB", 1, true, 1);
-
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, false, 1);
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, true, 1);
-
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, true, "1GB", 1, false, 25);
-        assertSpillBenchmarkReadingUsingWorkProcessor(false, true, "1GB", 1, true, 25);
-
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, false, 25);
-        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, true, 25);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, false, 25, false);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, true, 25, false);
     }
 
-    private void assertSpillBenchmarkReadingUsingWorkProcessor(boolean compression, boolean encryption, String pageSize, int fileCount, boolean useDirectSerde, int spillPrefetchReadPages)
+    @Test
+    public void testSpillWithSingleSpillerConsolidatedDirectWriteCompareWithWorkProcessorWithKryo()
+            throws Exception
+    {
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, false, "1GB", 1, true, 1, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, false, "1GB", 1, true, 1, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(false, true, "1GB", 1, true, 1, true);
+        assertSpillBenchmarkReadingUsingWorkProcessor(true, true, "1GB", 1, true, 1, true);
+    }
+
+    private void assertSpillBenchmarkReadingUsingWorkProcessor(boolean compression, boolean encryption, String pageSize, int fileCount, boolean useDirectSerde, int spillPrefetchReadPages, boolean useKryo)
             throws Exception
     {
         List<FileSingleStreamSpiller> spillers = new ArrayList<>();
         FileSingleStreamSpillerFactory spillerFactory = new FileSingleStreamSpillerFactory(
                 executorBenchmark, // executor won't be closed, because we don't call destroy() on the spiller factory
-                createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(),
+                (useKryo) ? createTestMetadataManager().getFunctionAndTypeManager().getBlockKryoEncodingSerde() : createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(),
                 new SpillerStats(),
                 ImmutableList.of(spillPath.toPath()),
                 1.0,
                 compression,
                 encryption,
                 useDirectSerde,
-                spillPrefetchReadPages);
+                spillPrefetchReadPages,
+                useKryo);
 
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         long startTime = System.currentTimeMillis();
@@ -420,13 +446,9 @@ public class TestFileSingleStreamSpiller
         }
         spillTimer.stop();
         long timeToUnspill = spillTimer.elapsed(TimeUnit.MILLISECONDS);
-        /*
-        * System.out.println(String.format("[isEncrypted: %6s, isCompressed: %6s, isDirect: %6s, SpillSize: %4s, SpillFiles: %4d] --> Spill: %8d, Unspill: %8d",
-        *      encryption, compression, useDirectSerde, pageSize, fileCount, timeToSpill, timeToUnspill, humanReadableByteCountBin(spilledDiskSize)));
-        */
         log.debug("TimeTakenReadingFromSpill = " + (System.currentTimeMillis() - startTime));
-        log.info("[isEncrypted: %6s, isCompressed: %6s, isDirect: %6s, SpillSize: %4s, SpillFiles: %4d] --> Spill: %8d, Unspill: %8d, DiskUsed: %5s",
-                encryption, compression, useDirectSerde, pageSize, fileCount,
+        log.info("[isEncrypted: %6s, isCompressed: %6s, isDirect: %6s, SpillSize: %4s, SpillFiles: %4d, useKryo: %6s] --> Spill: %8d, Unspill: %8d, DiskUsed: %5s",
+                encryption, compression, useDirectSerde, pageSize, fileCount, useKryo,
                 timeToSpill, timeToUnspill, humanReadableByteCountBin(spilledDiskSize));
         spillers.stream().forEach(spiller -> spiller.close());
         assertEquals(listFiles(spillPath.toPath()).size(), 0);

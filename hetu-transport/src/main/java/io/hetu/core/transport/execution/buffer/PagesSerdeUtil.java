@@ -13,6 +13,10 @@
  */
 package io.hetu.core.transport.execution.buffer;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.Serializer;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import com.google.common.collect.AbstractIterator;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceInput;
@@ -44,6 +48,25 @@ public class PagesSerdeUtil
 
     private PagesSerdeUtil()
     {
+    }
+
+    static void writeRawPage(Kryo kryo, Page page, Output output, Serializer serde)
+    {
+        output.write(page.getChannelCount());
+        for (int channel = 0; channel < page.getChannelCount(); channel++) {
+            writeBlock(kryo, serde, output, page.getBlock(channel));
+        }
+    }
+
+    static Page readRawPage(Kryo kryo, int positionCount, Input input, Serializer blockEncodingSerde)
+    {
+        int numberOfBlocks = input.readInt();
+        Block[] blocks = new Block[numberOfBlocks];
+        for (int i = 0; i < blocks.length; i++) {
+            blocks[i] = readBlock(kryo, blockEncodingSerde, input);
+        }
+
+        return new Page(positionCount, blocks);
     }
 
     static void writeRawPage(Page page, SliceOutput output, BlockEncodingSerde serde)

@@ -13,6 +13,7 @@
  */
 package io.prestosql.testing;
 
+import com.esotericsoftware.kryo.Kryo;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -340,7 +341,7 @@ public class LocalQueryRunner
         this.planOptimizerManager = new ConnectorPlanOptimizerManager();
 
         this.metadata = new MetadataManager(
-                new FunctionAndTypeManager(transactionManager, featuresConfig, new HandleResolver(), ImmutableSet.of()),
+                new FunctionAndTypeManager(transactionManager, featuresConfig, new HandleResolver(), ImmutableSet.of(), new Kryo()),
                 featuresConfig,
                 // new HetuConfig object passed, if split filtering is needed in the runner, a modified HetuConfig object with filter settings manually set must be used.
                 new SessionPropertyManager(new SystemSessionProperties(new QueryManagerConfig(), taskManagerConfig, new MemoryManagerConfig(), featuresConfig, new HetuConfig(), new SnapshotConfig())),

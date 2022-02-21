@@ -16,6 +16,7 @@
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
         <air.check.fail-duplicate-finder>false</air.check.fail-duplicate-finder>
         <org.slf4j.version>1.7.30</org.slf4j.version>
+        <powermock.version>2.0.2</powermock.version>
     </properties>
 
     <build>
@@ -100,36 +101,25 @@
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>3.5.13</version>
+            <version>1.10.19</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.powermock</groupId>
             <artifactId>powermock-core</artifactId>
-            <version>2.0.2</version>
+            <version>${powermock.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.powermock</groupId>
             <artifactId>powermock-module-testng</artifactId>
-            <version>2.0.2</version>
+            <version>${powermock.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.powermock</groupId>
             <artifactId>powermock-module-testng-common</artifactId>
-            <version>2.0.2</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.powermock</groupId>
-            <artifactId>powermock-api-mockito2</artifactId>
-            <version>2.0.2</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.objenesis</groupId>
-            <artifactId>objenesis</artifactId>
+            <version>${powermock.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>

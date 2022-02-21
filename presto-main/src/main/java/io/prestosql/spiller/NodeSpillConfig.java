@@ -31,6 +31,7 @@ public class NodeSpillConfig
     private boolean spillDirectSerdeEnabled;
 
     private int spillPrefetchReadPages = 1;
+    private boolean spillUseKryoSerialization;
 
     @NotNull
     public DataSize getMaxSpillPerNode()
@@ -105,6 +106,18 @@ public class NodeSpillConfig
     public NodeSpillConfig setSpillPrefetchReadPages(int spillPrefetchedReadPages)
     {
         this.spillPrefetchReadPages = spillPrefetchedReadPages;
+        return this;
+    }
+
+    public boolean isSpillUseKryoSerialization()
+    {
+        return spillUseKryoSerialization;
+    }
+
+    @Config("experimental.spill-use-kryo-serialization")
+    public NodeSpillConfig setSpillUseKryoSerialization(boolean spillUseKryoSerialization)
+    {
+        this.spillUseKryoSerialization = spillUseKryoSerialization;
         return this;
     }
 }
