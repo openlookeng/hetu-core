@@ -25,6 +25,7 @@ import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.memory.VersionedMemoryPoolId;
 import io.prestosql.operator.TaskLocation;
 import io.prestosql.server.BasicQueryInfo;
+import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.Plan;
 
@@ -54,6 +55,11 @@ public interface QueryExecution
     String getSlug();
 
     Duration getTotalCpuTime();
+
+    default QuerySnapshotManager getQuerySnapshotManager()
+    {
+        return null;
+    }
 
     DataSize getUserMemoryReservation();
 

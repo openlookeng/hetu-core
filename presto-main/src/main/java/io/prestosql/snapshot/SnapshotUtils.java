@@ -146,13 +146,13 @@ public class SnapshotUtils
     /**
      * Store the state of snapshotStateId in snapshot store
      */
-    public void storeState(SnapshotStateId snapshotStateId, Object state)
+    public void storeState(SnapshotStateId snapshotStateId, Object state, SnapshotDataCollector dataCollector)
             throws Exception
     {
         requireNonNull(snapshotStoreClient);
         requireNonNull(state);
 
-        snapshotStoreClient.storeState(snapshotStateId, state);
+        snapshotStoreClient.storeState(snapshotStateId, state, dataCollector);
     }
 
     /**
@@ -161,38 +161,38 @@ public class SnapshotUtils
      * - NO_STATE: bug situation
      * - Other object: previously saved state
      */
-    public Optional<Object> loadState(SnapshotStateId snapshotStateId)
+    public Optional<Object> loadState(SnapshotStateId snapshotStateId, SnapshotDataCollector dataCollector)
             throws Exception
     {
         requireNonNull(snapshotStoreClient);
-        return snapshotStoreClient.loadState(snapshotStateId);
+        return snapshotStoreClient.loadState(snapshotStateId, dataCollector);
     }
 
-    public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile)
+    public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile, SnapshotDataCollector dataCollector)
             throws Exception
     {
         requireNonNull(snapshotStoreClient);
         requireNonNull(sourceFile);
 
-        snapshotStoreClient.storeFile(snapshotStateId, sourceFile);
+        snapshotStoreClient.storeFile(snapshotStateId, sourceFile, dataCollector);
     }
 
-    public Boolean loadFile(SnapshotStateId snapshotStateId, Path targetFile)
+    public Boolean loadFile(SnapshotStateId snapshotStateId, Path targetFile, SnapshotDataCollector dataCollector)
             throws Exception
     {
         requireNonNull(snapshotStoreClient);
         requireNonNull(targetFile);
 
-        return snapshotStoreClient.loadFile(snapshotStateId, targetFile);
+        return snapshotStoreClient.loadFile(snapshotStateId, targetFile, dataCollector);
     }
 
-    public void storeSnapshotResult(String queryId, Map<Long, SnapshotResult> result)
+    public void storeSnapshotResult(String queryId, Map<Long, SnapshotInfo> result)
             throws Exception
     {
         snapshotStoreClient.storeSnapshotResult(queryId, result);
     }
 
-    public Map<Long, SnapshotResult> loadSnapshotResult(String queryId)
+    public Map<Long, SnapshotInfo> loadSnapshotResult(String queryId)
             throws Exception
     {
         return snapshotStoreClient.loadSnapshotResult(queryId);

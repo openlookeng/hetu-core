@@ -40,7 +40,7 @@ import io.prestosql.operator.PipelineStatus;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.operator.TaskStats;
 import io.prestosql.snapshot.RestoreResult;
-import io.prestosql.snapshot.SnapshotResult;
+import io.prestosql.snapshot.SnapshotInfo;
 import io.prestosql.snapshot.TaskSnapshotManager;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.planner.PlanFragment;
@@ -264,7 +264,7 @@ public class SqlTask
         Set<Lifespan> completedDriverGroups = ImmutableSet.of();
         long fullGcCount = 0;
         Duration fullGcTime = new Duration(0, MILLISECONDS);
-        Map<Long, SnapshotResult> snapshotCaptureResult = ImmutableMap.of();
+        Map<Long, SnapshotInfo> snapshotCaptureResult = ImmutableMap.of();
         Optional<RestoreResult> snapshotRestoreResult = Optional.empty();
         TaskInfo finalTaskInfo = taskHolder.getFinalTaskInfo();
         if (finalTaskInfo != null) {

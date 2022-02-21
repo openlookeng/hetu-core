@@ -14,6 +14,7 @@
  */
 package io.prestosql.snapshot;
 
+import com.google.common.base.Stopwatch;
 import io.airlift.log.Logger;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.prestosql.memory.context.LocalMemoryContext;
@@ -28,6 +29,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
@@ -122,7 +124,9 @@ public class SingleInputSnapshotState
                     LOG.error("BUG! State of component %s has never been stored successfully before snapshot %d", restorableId, snapshotId);
                 }
                 else {
+                    Stopwatch timer = Stopwatch.createStarted();
                     restorable.restore(state.get(), pagesSerde);
+                    timer.stop();
                     boolean successful = true;
                     if (restorable instanceof Spillable && ((Spillable) restorable).isSpilled()) {
                         Boolean result = loadSpilledFiles(snapshotId, (Spillable) restorable);
@@ -139,7 +143,7 @@ public class SingleInputSnapshotState
                     }
                     if (successful) {
                         LOG.debug("Successfully restored state to snapshot %d for %s", snapshotId, restorableId);
-                        snapshotManager.succeededToRestore(componentId);
+                        snapshotManager.succeededToRestore(componentId, timer.elapsed(TimeUnit.MILLISECONDS));
                     }
                 }
                 // Previous pending snapshots no longer need to be carried out
@@ -173,12 +177,7 @@ public class SingleInputSnapshotState
             return;
         }
         try {
-            if (restorable.supportsConsolidatedWrites()) {
-                snapshotManager.storeConsolidatedState(componentId, restorable.capture(pagesSerde));
-            }
-            else {
-                snapshotManager.storeState(componentId, restorable.capture(pagesSerde));
-            }
+            storeState(componentId);
             if (restorable instanceof Spillable && ((Spillable) restorable).isSpilled()) {
                 storeSpilledFiles(snapshotId, (Spillable) restorable);
             }
@@ -196,6 +195,22 @@ public class SingleInputSnapshotState
         }
         finally {
             snapshotMemoryContext.setBytes(0);
+        }
+    }
+
+    private void storeState(SnapshotStateId componentId)
+            throws Exception
+    {
+        Stopwatch timer = Stopwatch.createStarted();
+        Object state = restorable.capture(pagesSerde);
+        timer.stop();
+        long serTime = timer.elapsed(TimeUnit.MILLISECONDS);
+
+        if (restorable.supportsConsolidatedWrites()) {
+            snapshotManager.storeConsolidatedState(componentId, state, serTime);
+        }
+        else {
+            snapshotManager.storeState(componentId, state, serTime);
         }
     }
 

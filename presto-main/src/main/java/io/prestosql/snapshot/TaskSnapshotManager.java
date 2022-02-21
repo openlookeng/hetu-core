@@ -40,6 +40,7 @@ import static java.util.Objects.requireNonNull;
  * TaskSnapshotManager keeps track of snapshot status of task components
  */
 public class TaskSnapshotManager
+        implements SnapshotDataCollector
 {
     private static final Logger LOG = Logger.get(TaskSnapshotManager.class);
     public static final Object NO_STATE = new Object();
@@ -52,7 +53,7 @@ public class TaskSnapshotManager
     private int totalComponents = -1;
     // LinkedHashMap can be used to keep ordering
     private final Map<Long, SnapshotComponentCounter<SnapshotStateId>> captureComponentCounters = Collections.synchronizedMap(new LinkedHashMap<>());
-    private final Map<Long, SnapshotResult> captureResults = new LinkedHashMap<>();
+    private final Map<Long, SnapshotInfo> captureResults = new LinkedHashMap<>();
     private final Map<Long, SnapshotComponentCounter<SnapshotStateId>> restoreComponentCounters = Collections.synchronizedMap(new LinkedHashMap<>());
     private final RestoreResult restoreResult = new RestoreResult();
 
@@ -86,22 +87,25 @@ public class TaskSnapshotManager
         return SnapshotStateId.forTaskComponent(snapshotId, taskId, CONSOLIDATED_STATE_COMPONENT);
     }
 
-    public void storeConsolidatedState(SnapshotStateId snapshotStateId, Object state)
+    public void storeConsolidatedState(SnapshotStateId snapshotStateId, Object state, long serCpuTime)
     {
         Map<String, Object> map = storeCache.computeIfAbsent(snapshotStateId.getSnapshotId(), (x) -> Collections.synchronizedMap(new HashMap<>()));
         map.put(snapshotStateId.toString(), state);
+        updateSnapshotCaptureCpuTime(snapshotStateId.getSnapshotId(), serCpuTime);
     }
 
     /**
      * Store the state of snapshotStateId in snapshot store
      */
-    public void storeState(SnapshotStateId snapshotStateId, Object state)
+    public void storeState(SnapshotStateId snapshotStateId, Object state, long serCpuTime)
             throws Exception
     {
-        snapshotUtils.storeState(snapshotStateId, state);
+        snapshotUtils.storeState(snapshotStateId, state, this);
+
         // store dummy value
         Map<String, Object> map = storeCache.computeIfAbsent(snapshotStateId.getSnapshotId(), (x) -> Collections.synchronizedMap(new HashMap<>()));
         map.put(snapshotStateId.toString(), snapshotStateId.toString());
+        updateSnapshotCaptureCpuTime(snapshotStateId.getSnapshotId(), serCpuTime);
     }
 
     private void loadMapIfNecessary(long snapshotId, TaskId taskId)
@@ -113,7 +117,7 @@ public class TaskSnapshotManager
                 if (!loadCache.containsKey(snapshotId)) {
                     String queryId = taskId.getQueryId().getId();
                     SnapshotStateId stateId = createConsolidatedId(snapshotId, taskId);
-                    Optional<Object> loadedState = snapshotUtils.loadState(stateId);
+                    Optional<Object> loadedState = snapshotUtils.loadState(stateId, this);
                     if (createdConsolidatedFiles == null) {
                         createdConsolidatedFiles = snapshotUtils.loadConsolidatedFiles(queryId);
                     }
@@ -143,7 +147,7 @@ public class TaskSnapshotManager
         Optional<Object> state;
         loadMapIfNecessary(snapshotId, snapshotStateIdTaskId);
         state = Optional.ofNullable(loadCache.get(snapshotId).get(newSnapshotStateId.toString()));
-        Map<Long, SnapshotResult> snapshotToSnapshotResultMap = null;
+        Map<Long, SnapshotInfo> snapshotToSnapshotResultMap = null;
         while (!state.isPresent()) {
             // Snapshot is complete but no entry for this id, then the component must have finished
             // before the snapshot was taken. Look at previous complete snapshots for last saved state.
@@ -186,7 +190,7 @@ public class TaskSnapshotManager
     {
         Optional<Object> loadedValue = loadWithBacktrack(snapshotStateId);
         if (loadedValue.isPresent() && loadedValue.get() != NO_STATE) {
-            return snapshotUtils.loadState(SnapshotStateId.fromString((String) loadedValue.get()));
+            return snapshotUtils.loadState(SnapshotStateId.fromString((String) loadedValue.get()), this);
         }
         return loadedValue;
     }
@@ -194,7 +198,7 @@ public class TaskSnapshotManager
     public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile)
             throws Exception
     {
-        snapshotUtils.storeFile(snapshotStateId, sourceFile);
+        snapshotUtils.storeFile(snapshotStateId, sourceFile, this);
         // store dummy value
         Map<String, Object> map = storeCache.computeIfAbsent(snapshotStateId.getSnapshotId(), (x) -> Collections.synchronizedMap(new HashMap<>()));
         map.put(snapshotStateId.toString(), snapshotStateId.toString());
@@ -212,16 +216,16 @@ public class TaskSnapshotManager
         if (loadedValue.get() == NO_STATE) {
             return null;
         }
-        return snapshotUtils.loadFile(SnapshotStateId.fromString((String) loadedValue.get()), targetFile);
+        return snapshotUtils.loadFile(SnapshotStateId.fromString((String) loadedValue.get()), targetFile, this);
     }
 
-    private OptionalLong getPreviousSnapshotIdIfComplete(Map<Long, SnapshotResult> snapshotToSnapshotResultMap, long snapshotId)
+    private OptionalLong getPreviousSnapshotIdIfComplete(Map<Long, SnapshotInfo> snapshotToSnapshotResultMap, long snapshotId)
     {
         try {
-            List<Map.Entry<Long, SnapshotResult>> entryList = new ArrayList<>(snapshotToSnapshotResultMap.entrySet());
+            List<Map.Entry<Long, SnapshotInfo>> entryList = new ArrayList<>(snapshotToSnapshotResultMap.entrySet());
             for (int i = entryList.size() - 1; i >= 0; i--) {
                 long sId = entryList.get(i).getKey();
-                SnapshotResult snapshotRestoreResult = entryList.get(i).getValue();
+                SnapshotResult snapshotRestoreResult = entryList.get(i).getValue().getSnapshotResult();
                 if (sId < snapshotId) {
                     if (snapshotRestoreResult == SnapshotResult.SUCCESSFUL) {
                         return OptionalLong.of(sId);
@@ -260,8 +264,9 @@ public class TaskSnapshotManager
         updateCapture(componentId, SnapshotComponentCounter.ComponentState.FAILED);
     }
 
-    public void succeededToRestore(SnapshotStateId componentId)
+    public void succeededToRestore(SnapshotStateId componentId, long deserCpuTime)
     {
+        updateSnapshotRestoreCpuTime(deserCpuTime);
         updateRestore(componentId, SnapshotComponentCounter.ComponentState.SUCCESSFUL);
     }
 
@@ -276,13 +281,13 @@ public class TaskSnapshotManager
         }
     }
 
-    public Map<Long, SnapshotResult> getSnapshotCaptureResult()
+    public Map<Long, SnapshotInfo> getSnapshotCaptureResult()
     {
         if (totalComponents == 0) {
             // Special case: don't expect any more markers from this task.
             // It's as if this task has finished.
             // Use -1 to indicate "all snapshots".
-            return ImmutableMap.of(-1L, SnapshotResult.SUCCESSFUL);
+            return ImmutableMap.of(-1L, SnapshotInfo.withStatus(SnapshotResult.SUCCESSFUL));
         }
         // Need to make a copy, otherwise there may be concurrent modification errors
         synchronized (captureResults) {
@@ -308,7 +313,7 @@ public class TaskSnapshotManager
             // update capturedSnapshotResultMap
             SnapshotResult snapshotResult = counter.getSnapshotResult();
             synchronized (captureResults) {
-                SnapshotResult oldResult = captureResults.put(snapshotId, snapshotResult);
+                SnapshotResult oldResult = updateSnapshotStatus(snapshotId, snapshotResult);
                 if (snapshotResult != oldResult && snapshotResult.isDone()) {
                     if (snapshotResult == SnapshotResult.SUCCESSFUL) {
                         // All components for the task have captured their states successfully.
@@ -323,12 +328,12 @@ public class TaskSnapshotManager
                             else {
                                 map = Collections.emptyMap();
                             }
-                            snapshotUtils.storeState(newId, map);
+                            snapshotUtils.storeState(newId, map, this);
                         }
                         catch (Exception e) {
                             LOG.error(e, "Failed to store state for " + newId);
                             snapshotResult = SnapshotResult.FAILED;
-                            captureResults.put(snapshotId, snapshotResult);
+                            updateSnapshotStatus(snapshotId, snapshotResult);
                         }
                     }
                     if (snapshotUtils.isCoordinator()) {
@@ -338,7 +343,8 @@ public class TaskSnapshotManager
                             if (snapshotResult == SnapshotResult.SUCCESSFUL) {
                                 querySnapshotManager.addConsolidatedFileToList(createConsolidatedId(snapshotId, componentIdTaskId).toString());
                             }
-                            querySnapshotManager.updateQueryCapture(componentIdTaskId, snapshotId, snapshotResult);
+                            SnapshotInfo snapshotInfo = captureResults.get(snapshotId);
+                            querySnapshotManager.updateQueryCapture(componentIdTaskId, snapshotId, snapshotInfo);
                         }
                     }
                     LOG.debug("Finished capturing snapshot %d for task %s. Result is %s.", snapshotId, componentIdTaskId, snapshotResult);
@@ -398,6 +404,55 @@ public class TaskSnapshotManager
         }
 
         checkState(totalComponents >= 0);
+    }
+
+    @Override
+    public void updateSnapshotCaptureSize(long snapshotId, long sizeBytes)
+    {
+        synchronized (captureResults) {
+            SnapshotInfo snapshotInfo = captureResults.computeIfAbsent(snapshotId, k -> getNewSnapshotInfo(k));
+            snapshotInfo.updateSizeBytes(sizeBytes);
+        }
+    }
+
+    @Override
+    public void updateSnapshotCaptureCpuTime(long snapshotId, long time)
+    {
+        synchronized (captureResults) {
+            SnapshotInfo snapshotInfo = captureResults.computeIfAbsent(snapshotId, k -> getNewSnapshotInfo(k));
+            snapshotInfo.updateCpuTime(time);
+        }
+    }
+
+    @Override
+    public void updateSnapshotRestoreSize(long sizeBytes)
+    {
+        synchronized (restoreResult) {
+            SnapshotInfo snapshotInfo = restoreResult.getSnapshotInfo();
+            snapshotInfo.updateSizeBytes(sizeBytes);
+        }
+    }
+
+    @Override
+    public void updateSnapshotRestoreCpuTime(long time)
+    {
+        synchronized (restoreResult) {
+            SnapshotInfo snapshotInfo = restoreResult.getSnapshotInfo();
+            snapshotInfo.updateCpuTime(time);
+        }
+    }
+
+    private SnapshotResult updateSnapshotStatus(long snapshotId, SnapshotResult newStatus)
+    {
+        SnapshotInfo snapshotInfo = captureResults.computeIfAbsent(snapshotId, k -> getNewSnapshotInfo(k));
+        SnapshotResult oldStatus = snapshotInfo.getSnapshotResult();
+        snapshotInfo.setSnapshotResult(newStatus);
+        return oldStatus;
+    }
+
+    private SnapshotInfo getNewSnapshotInfo(long snapshotId)
+    {
+        return new SnapshotInfo(0, 0, 0, 0, SnapshotResult.IN_PROGRESS);
     }
 
     @Override

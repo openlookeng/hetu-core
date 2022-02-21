@@ -30,6 +30,7 @@ import io.prestosql.memory.ClusterMemoryManager;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.queryeditorui.QueryEditorUIModule;
 import io.prestosql.server.BasicQueryInfo;
+import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.ErrorType;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
@@ -473,6 +474,12 @@ public class SqlQueryManager
             // UI related queries need not take up the history space.
             queryTracker.removeQuery(queryId);
         }
+    }
+
+    @Override
+    public QuerySnapshotManager getQuerySnapshotManager(QueryId queryId)
+    {
+        return queryTracker.getQuery(queryId).getQuerySnapshotManager();
     }
 
     private boolean isIndexCreationQuery(QueryInfo queryInfo)

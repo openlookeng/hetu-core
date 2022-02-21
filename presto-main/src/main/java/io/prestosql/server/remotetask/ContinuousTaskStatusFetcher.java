@@ -28,7 +28,7 @@ import io.prestosql.protocol.BaseResponse;
 import io.prestosql.protocol.Codec;
 import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.snapshot.RestoreResult;
-import io.prestosql.snapshot.SnapshotResult;
+import io.prestosql.snapshot.SnapshotInfo;
 import io.prestosql.spi.PrestoException;
 
 import javax.annotation.concurrent.GuardedBy;
@@ -285,7 +285,7 @@ class ContinuousTaskStatusFetcher
         stats.statusRoundTripMillis(nanosSince(currentRequestStartNanos).toMillis());
     }
 
-    private void updateSnapshots(Map<Long, SnapshotResult> captureResult, Optional<RestoreResult> restoreResult)
+    private void updateSnapshots(Map<Long, SnapshotInfo> captureResult, Optional<RestoreResult> restoreResult)
     {
         snapshotManager.updateQueryCapture(taskId, captureResult);
         snapshotManager.updateQueryRestore(taskId, restoreResult);

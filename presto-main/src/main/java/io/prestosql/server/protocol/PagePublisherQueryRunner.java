@@ -69,13 +69,13 @@ public class PagePublisherQueryRunner
     private static final Logger LOGGER = Logger.get(PagePublisherQueryRunner.class);
 
     private static final DataCenterQueryResults RUNNING_RESULTS = new DataCenterQueryResults("", URI.create(""), null, URI.create(""), null, null,
-            new StatementStats("RUNNING", false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null), null,
+            new StatementStats("RUNNING", false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null, null), null,
             Collections.emptyList(), null, true);
     private static final DataCenterQueryResults FINISHED_RESULTS = new DataCenterQueryResults("", URI.create(""), null, null, null, null,
-            new StatementStats("FINISHED", false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null), null,
+            new StatementStats("FINISHED", false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null, null), null,
             Collections.emptyList(), null, true);
     private static final DataCenterQueryResults FAILED_RESULTS = new DataCenterQueryResults("", URI.create(""), null, null, null, null,
-            new StatementStats("FAILED", false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null), null,
+            new StatementStats("FAILED", false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null, null), null,
             Collections.emptyList(), null, true);
     private static final Ordering<Comparable<Duration>> WAIT_ORDERING = Ordering.natural().nullsLast();
     private static final Duration MAX_WAIT_TIME = new Duration(1, SECONDS);
