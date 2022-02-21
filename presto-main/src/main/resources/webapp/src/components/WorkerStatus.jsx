@@ -67,7 +67,7 @@ export class WorkerStatus extends React.Component {
 
             this.resetTimer();
         }.bind(this))
-            .error(function () {
+            .fail(function () {
                 this.setState({
                     initialized: true,
                 });
