@@ -34,3 +34,31 @@ and statistics about the query is available by clicking the *JSON* link. These v
 > -   **Default value:** `false`
 >
 > Insecure authentication over HTTP is disabled by default. This could be overridden via "hetu.queryeditor-ui.allow-insecure-over-http" property of "etc/config.properties" (e.g. hetu.queryeditor-ui.allow-insecure-over-http=true).
+
+### `hetu.queryeditor-ui.execution-timeout`
+
+> -   **Type:** `duration`
+> -   **Default value:** `1 DAYS`>
+>
+> UI Execution timeout is set to 1 day as default. This could be overridden via "hetu.queryeditor-ui.execution-timeout" of "etc/config.properties"
+
+### `hetu.queryeditor-ui.max-result-count`
+
+> - **Type:** `int`
+> - **Default value:** `1000`
+>
+> UI max result count is set to 1000 as default. This could be overridden via "hetu.queryeditor-ui.max-result-count" of "etc/config.properties"
+
+### `hetu.queryeditor-ui.max-result-size-mb`
+
+>- **Type:** `size`
+>- **Default value:** `1GB`
+>
+> UI max result size is set to 1 GB as default. This could be overridden via "hetu.queryeditor-ui.max-result-size-mb" of "etc/config.properties"
+
+### `hetu.queryeditor-ui.session-timeout`
+
+> -   **Type:** `duration`
+> -   **Default value:** `1 DAYS`
+>
+> UI session timeout is set to 1 day as default. This could be overridden via "hetu.queryeditor-ui.session-timeout" of "etc/config.properties"
