@@ -116,6 +116,7 @@ public class FeaturesConfig
     private MultimapAggGroupImplementation multimapAggGroupImplementation = MultimapAggGroupImplementation.NEW;
     private boolean spillEnabled;
     private boolean spillOrderBy = true;
+    private boolean nonBlockingSpill;
     private boolean spillWindowOperator = true;
     private DataSize aggregationOperatorUnspillMemoryLimit = new DataSize(4, DataSize.Unit.MEGABYTE);
     private List<Path> spillerSpillPaths = ImmutableList.of();
@@ -712,6 +713,18 @@ public class FeaturesConfig
     public boolean isSpillOrderBy()
     {
         return spillOrderBy;
+    }
+
+    @Config("experimental.spill-non-blocking-orderby")
+    public FeaturesConfig setNonBlockingSpill(boolean nonBlockingSpill)
+    {
+        this.nonBlockingSpill = nonBlockingSpill;
+        return this;
+    }
+
+    public boolean isNonBlockingSpill()
+    {
+        return nonBlockingSpill;
     }
 
     @Config("experimental.spill-order-by")
