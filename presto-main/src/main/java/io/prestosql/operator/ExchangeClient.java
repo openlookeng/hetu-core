@@ -25,6 +25,7 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.hetu.core.transport.execution.buffer.PageCodecMarker;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.HttpPageBufferClient.ClientCallback;
 import io.prestosql.operator.WorkProcessor.ProcessState;
@@ -75,6 +76,9 @@ public class ExchangeClient
     private final boolean acknowledgePages;
     private final HttpClient httpClient;
     private final ScheduledExecutorService scheduler;
+    private final FailureDetector failureDetector;
+    private final boolean detectTimeoutFailures;
+    private final int maxRetryCount;
 
     @GuardedBy("this")
     private boolean noMoreLocations;
@@ -126,16 +130,32 @@ public class ExchangeClient
 
     // ExchangeClientStatus.mergeWith assumes all clients have the same bufferCapacity.
     // Please change that method accordingly when this assumption becomes not true.
-    public ExchangeClient(
-            DataSize bufferCapacity,
-            DataSize maxResponseSize,
-            int concurrentRequestMultiplier,
-            Duration maxErrorDuration,
-            boolean acknowledgePages,
-            HttpClient httpClient,
-            ScheduledExecutorService scheduler,
-            LocalMemoryContext systemMemoryContext,
-            Executor pageBufferClientCallbackExecutor)
+    public ExchangeClient(DataSize bufferCapacity,
+                          DataSize maxResponseSize,
+                          int concurrentRequestMultiplier,
+                          Duration maxErrorDuration,
+                          boolean acknowledgePages,
+                          HttpClient httpClient,
+                          ScheduledExecutorService scheduler,
+                          LocalMemoryContext systemMemoryContext,
+                          Executor pageBufferClientCallbackExecutor,
+                          FailureDetector failureDetector)
+    {
+        this(bufferCapacity, maxResponseSize, concurrentRequestMultiplier, maxErrorDuration, acknowledgePages, httpClient, scheduler, systemMemoryContext, pageBufferClientCallbackExecutor, failureDetector, ExchangeClientConfig.DETECT_TIMEOUT_FAILURES, ExchangeClientConfig.MAX_RETRY_COUNT);
+    }
+
+    public ExchangeClient(DataSize bufferCapacity,
+                           DataSize maxResponseSize,
+                           int concurrentRequestMultiplier,
+                           Duration maxErrorDuration,
+                           boolean acknowledgePages,
+                           HttpClient httpClient,
+                           ScheduledExecutorService scheduler,
+                           LocalMemoryContext systemMemoryContext,
+                           Executor pageBufferClientCallbackExecutor,
+                           FailureDetector failureDetector,
+                           boolean detectTimeoutFailures,
+                           int maxRetryCount)
     {
         this.bufferCapacity = bufferCapacity.toBytes();
         this.maxResponseSize = maxResponseSize;
@@ -145,6 +165,9 @@ public class ExchangeClient
         this.httpClient = httpClient;
         this.scheduler = scheduler;
         this.systemMemoryContext = systemMemoryContext;
+        this.failureDetector = failureDetector;
+        this.detectTimeoutFailures = detectTimeoutFailures;
+        this.maxRetryCount = maxRetryCount;
         this.maxBufferRetainedSizeInBytes = Long.MIN_VALUE;
         this.pageBufferClientCallbackExecutor = requireNonNull(pageBufferClientCallbackExecutor, "pageBufferClientCallbackExecutor is null");
     }
@@ -250,7 +273,10 @@ public class ExchangeClient
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 snapshotEnabled,
-                querySnapshotManager);
+                querySnapshotManager,
+                failureDetector,
+                detectTimeoutFailures,
+                maxRetryCount);
         allClients.put(uri, client);
         queuedClients.add(client);
 

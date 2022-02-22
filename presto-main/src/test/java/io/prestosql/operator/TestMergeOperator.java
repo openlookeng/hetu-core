@@ -17,10 +17,28 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
+import com.google.inject.Binder;
+import com.google.inject.Injector;
+import com.google.inject.Key;
+import com.google.inject.Module;
+import io.airlift.bootstrap.Bootstrap;
+import io.airlift.discovery.client.ServiceSelector;
+import io.airlift.discovery.client.testing.TestingDiscoveryModule;
 import io.airlift.http.client.HttpClient;
 import io.airlift.http.client.testing.TestingHttpClient;
+import io.airlift.http.server.testing.TestingHttpServerModule;
+import io.airlift.jaxrs.JaxrsModule;
+import io.airlift.jmx.testing.TestingJmxModule;
+import io.airlift.json.JsonModule;
+import io.airlift.node.testing.TestingNodeModule;
+import io.airlift.tracetoken.TraceTokenModule;
 import io.prestosql.execution.Lifespan;
+import io.prestosql.execution.QueryManagerConfig;
+import io.prestosql.failuredetector.FailureDetectorModule;
+import io.prestosql.failuredetector.HeartbeatFailureDetector;
+import io.prestosql.failuredetector.TestHeartbeatFailureDetector;
 import io.prestosql.metadata.Split;
+import io.prestosql.server.InternalCommunicationConfig;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -42,6 +60,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
+import static io.airlift.configuration.ConfigBinder.configBinder;
+import static io.airlift.discovery.client.DiscoveryBinder.discoveryBinder;
+import static io.airlift.discovery.client.ServiceTypes.serviceType;
+import static io.airlift.jaxrs.JaxrsBinder.jaxrsBinder;
 import static io.prestosql.RowPagesBuilder.rowPagesBuilder;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
 import static io.prestosql.operator.OperatorAssertion.assertOperatorIsBlocked;
@@ -77,11 +99,47 @@ public class TestMergeOperator
     @BeforeMethod
     public void setUp()
     {
+        Bootstrap app = new Bootstrap(
+                new TestingNodeModule(),
+                new TestingJmxModule(),
+                new TestingDiscoveryModule(),
+                new TestingHttpServerModule(),
+                new TraceTokenModule(),
+                new JsonModule(),
+                new JaxrsModule(),
+                new FailureDetectorModule(),
+                new Module()
+                {
+                    @Override
+                    public void configure(Binder binder)
+                    {
+                        configBinder(binder).bindConfig(InternalCommunicationConfig.class);
+                        configBinder(binder).bindConfig(QueryManagerConfig.class);
+                        discoveryBinder(binder).bindSelector("presto");
+                        discoveryBinder(binder).bindHttpAnnouncement("presto");
+
+                        // Jersey with jetty 9 requires at least one resource
+                        // todo add a dummy resource to airlift jaxrs in this case
+                        jaxrsBinder(binder).bind(TestHeartbeatFailureDetector.FooResource.class);
+                    }
+                });
+
+        Injector injector = app
+                .strictConfig()
+                .doNotInitializeLogging()
+                .quiet()
+                .initialize();
+
+        ServiceSelector selector = injector.getInstance(Key.get(ServiceSelector.class, serviceType("presto")));
+        assertEquals(selector.selectAllServices().size(), 1);
+
+        HeartbeatFailureDetector detector = injector.getInstance(HeartbeatFailureDetector.class);
+
         executor = newSingleThreadScheduledExecutor(daemonThreadsNamed("test-merge-operator-%s"));
 
         taskBuffers = CacheBuilder.newBuilder().build(CacheLoader.from(TestingTaskBuffer::new));
         httpClient = new TestingHttpClient(new TestingExchangeHttpClientHandler(taskBuffers), executor);
-        exchangeClientFactory = new ExchangeClientFactory(new ExchangeClientConfig(), httpClient, executor);
+        exchangeClientFactory = new ExchangeClientFactory(new ExchangeClientConfig(), httpClient, executor, detector);
         orderingCompiler = new OrderingCompiler();
     }
 

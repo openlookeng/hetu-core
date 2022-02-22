@@ -324,7 +324,20 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 >
 > The maximum amount of time coordinator waits for inter-task related errors to be resolved before it's considered a failure.
 
+### `exchange.is-timeout-failure-detection-enabled`
 
+> -   **Type:** `boolean`
+> -   **Default value:** `true`
+>
+> The failure detection mechanism in use. Default is timeout based failure detection. Otherwise, i.e. when this property is set to false, maximum retry based failure detection mechanism is enabled.
+>
+
+### `exchange.max-retry-count`
+
+> -   **Type:** `integer`
+> -   **Default value:** `10`
+>
+> The maximum number of retry for failed task performed by the coordinator before considering it as a permanent failure. This property is used only when exchange.is-timeout-failure-detection-enabled is set to false.
 ### `sink.max-buffer-size`
 
 > -   **Type:** `data size`

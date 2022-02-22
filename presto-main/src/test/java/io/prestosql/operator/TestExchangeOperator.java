@@ -23,6 +23,7 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.execution.Lifespan;
+import io.prestosql.failuredetector.NoOpFailureDetector;
 import io.prestosql.metadata.Split;
 import io.prestosql.operator.ExchangeOperator.ExchangeOperatorFactory;
 import io.prestosql.spi.Page;
@@ -96,7 +97,7 @@ public class TestExchangeOperator
                 httpClient,
                 scheduler,
                 systemMemoryUsageListener,
-                pageBufferClientCallbackExecutor);
+                pageBufferClientCallbackExecutor, new NoOpFailureDetector(), true, 3);
     }
 
     @AfterClass(alwaysRun = true)
