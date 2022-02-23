@@ -17,14 +17,19 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.Spiller;
 import io.prestosql.spiller.SpillerFactory;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
@@ -43,13 +48,25 @@ public class DummySpillerFactory
             private final RestorableConfig restorableConfig = null;
 
             private final List<Iterable<Page>> spills = new ArrayList<>();
+            private final List<AtomicBoolean> spillCommitted = new ArrayList<>();
 
             @Override
             public ListenableFuture<?> spill(Iterator<Page> pageIterator)
             {
                 spillsCount++;
                 spills.add(ImmutableList.copyOf(pageIterator));
+                spillCommitted.add(new AtomicBoolean(true));
                 return immediateFuture(null);
+            }
+
+            @Override
+            public Pair<ListenableFuture<?>, Runnable> spillUnCommit(Iterator<Page> pageIterator)
+            {
+                spillsCount++;
+                spills.add(ImmutableList.copyOf(pageIterator));
+                AtomicBoolean isCommitted = new AtomicBoolean(false);
+                spillCommitted.add(isCommitted);
+                return ImmutablePair.of(immediateFuture(null), () -> isCommitted.set(true));
             }
 
             @Override
@@ -64,6 +81,49 @@ public class DummySpillerFactory
             public void close()
             {
                 spills.clear();
+            }
+
+            /**
+             * Capture this object's internal state, so it can be used later to restore to the same state.
+             *
+             * @param serdeProvider
+             * @return An object representing internal state of the current object
+             */
+            @Override
+            public Object capture(BlockEncodingSerdeProvider serdeProvider)
+            {
+                DummySpillerState myState = new DummySpillerState();
+                for (int i = 0; i < spills.size(); i++) {
+                    if (spillCommitted.get(i).get()) {
+                        List<Page> pages = new ArrayList<>();
+                        spills.get(i).forEach(pg -> pages.add(pg));
+                        myState.spills.add(pages);
+                    }
+                }
+                return myState;
+            }
+
+            /**
+             * Restore this object's internal state according to the snapshot
+             *
+             * @param state         an object that represents this object's snapshot state
+             * @param serdeProvider
+             */
+            @Override
+            public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+            {
+                DummySpillerState myState = (DummySpillerState) state;
+                this.spills.clear();
+                for (List<Page> s : myState.spills) {
+                    this.spills.add(s);
+                    this.spillCommitted.add(new AtomicBoolean(true));
+                }
+            }
+
+            class DummySpillerState
+                    implements Serializable
+            {
+                List<List<Page>> spills = new ArrayList<>();
             }
         };
     }

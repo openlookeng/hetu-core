@@ -309,6 +309,54 @@ public class TestOrderByOperator
         assertOperatorEquals(operatorFactory, driverContext, input, expected, revokeMemoryWhenAddingPages);
     }
 
+    @Test
+    public void testReverseOrderWithSnapshot()
+    {
+        List<Page> input = rowPagesBuilder(BIGINT, DOUBLE)
+                .row(1L, 0.1)
+                .row(2L, 0.2)
+                .pageBreak()
+                .row(-1L, -0.1)
+                .row(4L, 0.4)
+                .build();
+
+        OrderByOperatorFactory operatorFactory = new OrderByOperatorFactory(
+                0,
+                new PlanNodeId("test"),
+                ImmutableList.of(BIGINT, DOUBLE),
+                ImmutableList.of(0),
+                10,
+                ImmutableList.of(0),
+                ImmutableList.of(DESC_NULLS_LAST),
+                new PagesIndex.TestingFactory(false),
+                true,
+                Optional.of(spillerFactory),
+                new OrderingCompiler(),
+                true);
+
+        DriverContext driverContext = createDriverContext(8, TEST_SESSION);
+        MaterializedResult expected = resultBuilder(driverContext.getSession(), BIGINT)
+                .row(4L)
+                .row(2L)
+                .row(1L)
+                .row(-1L)
+                .build();
+
+        assertOperatorEqualsWithSimpleSelfStateComparison(operatorFactory, driverContext, input, expected, true, createExpectedMappingRevoke());
+    }
+
+    private Map<String, Object> createExpectedMappingRevoke()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        expectedMapping.put("operatorContext", 0);
+        expectedMapping.put("revocableMemoryContext", 1288L);
+        expectedMapping.put("localUserMemoryContext", 0L);
+        expectedMapping.put("secondaryMemoryContext", 0L);
+        expectedMapping.put("secondarySpillRunning", false);
+        expectedMapping.put("primarySpillRunning", false);
+        return expectedMapping;
+    }
+
     @Test(expectedExceptions = ExceededMemoryLimitException.class, expectedExceptionsMessageRegExp = "Query exceeded per-node user memory limit of 10B.*")
     public void testMemoryLimit()
     {

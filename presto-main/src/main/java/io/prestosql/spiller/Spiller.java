@@ -17,6 +17,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.snapshot.Restorable;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.io.Closeable;
 import java.nio.file.Path;
@@ -30,6 +32,14 @@ public interface Spiller
      * Initiate spilling of pages stream. Returns completed future once spilling has finished.
      */
     ListenableFuture<?> spill(Iterator<Page> pageIterator);
+
+    /**
+     * Initiate spilling of pages stream. Returns completed future once spilling has finished with commit function.
+     */
+    default Pair<ListenableFuture<?>, Runnable> spillUnCommit(Iterator<Page> pageIterator)
+    {
+        return ImmutablePair.of(spill(pageIterator), () -> {});
+    }
 
     /**
      * Returns list of previously spilled Pages streams.

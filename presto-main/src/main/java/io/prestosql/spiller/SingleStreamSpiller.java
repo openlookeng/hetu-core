@@ -69,4 +69,14 @@ public interface SingleStreamSpiller
     void deleteFile();
 
     Path getFile();
+
+    default void commit()
+    {
+        /* do nothing */
+    }
+
+    default boolean isCommitted()
+    {
+        return true;
+    }
 }

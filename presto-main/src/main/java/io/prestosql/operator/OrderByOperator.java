@@ -31,6 +31,7 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.Spiller;
 import io.prestosql.spiller.SpillerFactory;
 import io.prestosql.sql.gen.OrderingCompiler;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.io.Serializable;
 import java.nio.file.Path;
@@ -413,12 +414,14 @@ public class OrderByOperator
         }
         primarySpillRunning = true;
         pageIndex.sort(sortChannels, sortOrder);
-        spillInProgress = spiller.get().spill(pageIndex.getSortedPages());
+        Pair<ListenableFuture<?>, Runnable> spillState = spiller.get().spillUnCommit(pageIndex.getSortedPages());
+        spillInProgress = spillState.getLeft();
         LOG.debug("spilling to disk initiated by Order by operator using primary spiller");
         finishMemoryRevoke = () -> {
             pageIndex.clear();
             updateMemoryUsage(true);
             primarySpillRunning = false;
+            spillState.getRight().run();
         };
         return spillInProgress;
     }
@@ -523,12 +526,14 @@ public class OrderByOperator
         verify(spiller.isPresent(), "spiller not present");
         secondarySpillRunning = true;
         secondaryPageIndex.sort(sortChannels, sortOrder);
-        spill2InProgress = spiller.get().spill(secondaryPageIndex.getSortedPages());
+        Pair<ListenableFuture<?>, Runnable> spillState = spiller.get().spillUnCommit(secondaryPageIndex.getSortedPages());
+        spill2InProgress = spillState.getLeft();
         LOG.debug("spilling to disk initiated by Order by operator using secondary spiller");
         finishMemoryRevoke2 = () -> {
             secondaryPageIndex.clear();
             updateMemoryUsage(false);
             secondarySpillRunning = false;
+            spillState.getRight().run();
         };
     }
 
