@@ -150,7 +150,25 @@ Show Cubes for `orders` table:
 ```sql
     SHOW CUBES FOR orders;
 ```
+## RELOAD CUBE
 
+### Synopsis
+
+``` sql
+RELOAD CUBE cube_name
+```
+
+### Description
+Reloads the Cube if the source table has been updated.
+
+### Examples
+
+If the source table `orders` of the cube `orders_cube` gets updated then the status of the cube `orders_cube` 
+gets EXPIRED. Use the command `RELOAD CUBE cube_name` to overcome this issue as follows:
+
+```sql
+    RELOAD CUBE orders_cube
+```
 ## DROP CUBE
 
 ### Synopsis
