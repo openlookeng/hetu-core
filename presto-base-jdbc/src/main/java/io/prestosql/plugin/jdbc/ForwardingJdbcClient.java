@@ -190,6 +190,18 @@ public abstract class ForwardingJdbcClient
     }
 
     @Override
+    public void createSchema(ConnectorSession session, String schemaName)
+    {
+        getDelegate().createSchema(session, schemaName);
+    }
+
+    @Override
+    public void dropSchema(ConnectorSession session, String schemaName)
+    {
+        getDelegate().dropSchema(session, schemaName);
+    }
+
+    @Override
     public boolean supportsLimit()
     {
         return getDelegate().supportsLimit();
