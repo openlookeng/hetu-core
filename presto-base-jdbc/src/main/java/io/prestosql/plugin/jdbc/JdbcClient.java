@@ -121,6 +121,10 @@ public interface JdbcClient
 
     TableStatistics getTableStatistics(ConnectorSession session, JdbcTableHandle handle, TupleDomain<ColumnHandle> tupleDomain);
 
+    void createSchema(ConnectorSession session, String schemaName);
+
+    void dropSchema(ConnectorSession session, String schemaName);
+
     /**
      * Hetu requires catalog names to create dynamic catalogs.
      *

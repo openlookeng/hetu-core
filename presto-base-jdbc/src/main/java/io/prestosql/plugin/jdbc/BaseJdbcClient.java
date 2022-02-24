@@ -773,6 +773,28 @@ public class BaseJdbcClient
         return TableStatistics.empty();
     }
 
+    @Override
+    public void createSchema(ConnectorSession session, String schemaName)
+    {
+        execute(session, "CREATE SCHEMA " + quoted(schemaName));
+    }
+
+    @Override
+    public void dropSchema(ConnectorSession session, String schemaName)
+    {
+        execute(session, "DROP SCHEMA " + quoted(schemaName));
+    }
+
+    protected void execute(ConnectorSession session, String query)
+    {
+        try (Connection connection = connectionFactory.openConnection(JdbcIdentity.from(session))) {
+            execute(connection, query);
+        }
+        catch (SQLException e) {
+            throw new PrestoException(JDBC_ERROR, e);
+        }
+    }
+
     protected void execute(Connection connection, String query)
             throws SQLException
     {
