@@ -277,6 +277,17 @@ This section describes the most important config properties that may be used to 
 >
 > Enables to prioritize splits with larger revocable memory.
 
+### `experimental.spill-non-blocking-orderby`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Enables order by operator to use asynchronous mechanism to spill, i.e it can accumulate input even when a spill is in progress and initiate a secondary spill when the secondary data accumulate exceeds a threshold or when the primary spill is completed, the default value of the threshold is the minimum between 20MB and 5% of available free memory. This property must be used in conjunction with the `experimental.spill-enabled` property.
+>
+>
+>
+> This config property can be overridden by the `spill_non_blocking_orderby` session property.
+
 ## Exchange Properties
 
 Exchanges transfer data between openLooKeng nodes for different stages of a query. Adjusting these properties may help to resolve inter-node communication issues or improve network utilization.

@@ -69,6 +69,7 @@ is enabled, if there is not enough memory, intermediate accumulated aggregation 
 ### Order By
 
 If you're trying to sort a larger amount of data, a significant amount of memory may be needed. When spill to disk for order by is enabled, if there is not enough memory, intermediate sorted results are written to disk. They are loaded back and merged with a lower memory footprint.
+Generally when a spill is in progress the operator is blocked from taking inputs, but when `experimental.spill-non-blocking-orderby` is set to `true` order by uses asynchronous mechanism to spill (see`experimental.spill-non-blocking-orderby`).
 
 ### Window functions
 
