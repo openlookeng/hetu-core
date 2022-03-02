@@ -38,9 +38,9 @@ and statistics about the query is available by clicking the *JSON* link. These v
 ### `hetu.queryeditor-ui.execution-timeout`
 
 > -   **Type:** `duration`
-> -   **Default value:** `1 DAYS`>
+> -   **Default value:** `100 DAYS`>
 >
-> UI Execution timeout is set to 1 day as default. This could be overridden via "hetu.queryeditor-ui.execution-timeout" of "etc/config.properties"
+> UI Execution timeout is set to 100 days as default. This could be overridden via "hetu.queryeditor-ui.execution-timeout" of "etc/config.properties"
 
 ### `hetu.queryeditor-ui.max-result-count`
 

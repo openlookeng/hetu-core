@@ -35,7 +35,7 @@ public class QueryEditorConfig
     private DataSize maxResultSize = new DataSize(1, DataSize.Unit.GIGABYTE);
     private Optional<String> sharedSecret = Optional.empty();
     private Duration sessionTimeout = new Duration(1, DAYS);
-    private Duration executionTimeout = new Duration(1, DAYS);
+    private Duration executionTimeout = new Duration(100, DAYS);
 
     public boolean isAllowInsecureOverHttp()
     {
