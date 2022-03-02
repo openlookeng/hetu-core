@@ -30,13 +30,13 @@ public class TestRestoreResult
         RestoreResult restoreResult = new RestoreResult();
         restoreResult.setSnapshotResult(snapshotId, SnapshotResult.IN_PROGRESS);
         Assert.assertEquals(restoreResult.getSnapshotId(), snapshotId);
-        Assert.assertEquals(restoreResult.getSnapshotResult(), SnapshotResult.IN_PROGRESS);
+        Assert.assertEquals(restoreResult.getSnapshotInfo().getSnapshotResult(), SnapshotResult.IN_PROGRESS);
         restoreResult.setSnapshotResult(snapshotId, SnapshotResult.SUCCESSFUL);
-        Assert.assertEquals(restoreResult.getSnapshotResult(), SnapshotResult.SUCCESSFUL);
+        Assert.assertEquals(restoreResult.getSnapshotInfo().getSnapshotResult(), SnapshotResult.SUCCESSFUL);
 
         // Test equals
-        RestoreResult restoreResult2 = new RestoreResult(snapshotId, SnapshotResult.SUCCESSFUL);
-        RestoreResult restoreResult3 = new RestoreResult(snapshotId, SnapshotResult.FAILED);
+        RestoreResult restoreResult2 = new RestoreResult(snapshotId, SnapshotInfo.withStatus(SnapshotResult.SUCCESSFUL));
+        RestoreResult restoreResult3 = new RestoreResult(snapshotId, SnapshotInfo.withStatus(SnapshotResult.FAILED));
         Assert.assertTrue(restoreResult.equals(restoreResult2));
         Assert.assertFalse(restoreResult.equals(restoreResult3));
 

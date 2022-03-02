@@ -14,6 +14,7 @@
  */
 package io.prestosql.snapshot;
 
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterators;
 import io.airlift.log.Logger;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
@@ -30,6 +31,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -340,11 +342,13 @@ public class MultiInputSnapshotState
                     LOG.error("BUG! State of component %s has never been stored successfully before snapshot %d", restorableId, snapshotId);
                 }
                 else {
+                    Stopwatch timer = Stopwatch.createStarted();
                     List<?> storedStates = (List<?>) storedState.get();
                     pendingPages = storedStates.listIterator();
                     restorable.restore(pendingPages.next(), pagesSerde);
                     LOG.debug("Successfully restored state to snapshot %d for %s", snapshotId, restorableId);
-                    snapshotManager.succeededToRestore(componentId);
+                    timer.stop();
+                    snapshotManager.succeededToRestore(componentId, timer.elapsed(TimeUnit.MILLISECONDS));
                 }
             }
             catch (Exception e) {
@@ -390,7 +394,7 @@ public class MultiInputSnapshotState
             snapshot = new SnapshotState(marker);
             pendingMarkers.add(marker);
             try {
-                snapshot.states.add(restorable.capture(pagesSerde));
+                snapshot.addState(restorable, pagesSerde);
             }
             catch (Exception e) {
                 LOG.warn(e, "Failed to capture and store snapshot state");
@@ -418,10 +422,10 @@ public class MultiInputSnapshotState
                 SnapshotStateId componentId = snapshotStateIdGenerator.apply(snapshotId);
                 try {
                     if (restorable.supportsConsolidatedWrites()) {
-                        snapshotManager.storeConsolidatedState(componentId, snapshot.states);
+                        snapshotManager.storeConsolidatedState(componentId, snapshot.states, snapshot.serTime);
                     }
                     else {
-                        snapshotManager.storeState(componentId, snapshot.states);
+                        snapshotManager.storeState(componentId, snapshot.states, snapshot.serTime);
                     }
                     snapshotManager.succeededToCapture(componentId);
                     LOG.debug("Successfully saved state to snapshot %d for %s", snapshotId, restorableId);
@@ -456,10 +460,7 @@ public class MultiInputSnapshotState
             // For all pending snapshots that have not received marker from this channel,
             // need to capture the input as part of channel state.
             if (!snapshot.markedChannels.contains(channel)) {
-                if (channelSnapshot == null) {
-                    channelSnapshot = pagesSerde.serialize(page).capture(pagesSerde);
-                }
-                snapshot.states.add(channelSnapshot);
+                snapshot.addInputState(page, pagesSerde);
             }
         }
 
@@ -509,12 +510,33 @@ public class MultiInputSnapshotState
         // First entry is snapshot of the operator, followed by inputs from various channels as SerializedPage instances.
         // Inputs contain information about channels, so no need to distinguish and store them per-channel.
         private final List<Object> states = new ArrayList<>();
+        // Consolidated time taken to serialize the state
+        private long serTime;
 
         private SnapshotState(MarkerPage marker)
         {
             this.snapshotId = marker.getSnapshotId();
             this.resuming = marker.isResuming();
             this.markedChannels = new HashSet<>();
+            this.serTime = 0;
+        }
+
+        public void addState(MultiInputRestorable restorable, PagesSerde pagesSerde)
+        {
+            Stopwatch timer = Stopwatch.createStarted();
+            Object state = restorable.capture(pagesSerde);
+            timer.stop();
+            serTime += timer.elapsed(TimeUnit.MILLISECONDS);
+            states.add(state);
+        }
+
+        public void addInputState(Page page, PagesSerde pagesSerde)
+        {
+            Stopwatch timer = Stopwatch.createStarted();
+            Object channelSnapshot = pagesSerde.serialize(page).capture(pagesSerde);
+            timer.stop();
+            serTime += timer.elapsed(TimeUnit.MILLISECONDS);
+            states.add(channelSnapshot);
         }
     }
 }

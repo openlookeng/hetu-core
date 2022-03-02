@@ -311,6 +311,7 @@ public class SqlQueryScheduler
     public synchronized void cancelToResume()
     {
         if (!resumed) {
+            snapshotManager.setRestoreStartTime(System.currentTimeMillis());
             // Resume at most once for each scheduler
             resumed = true;
             new Thread(() -> {

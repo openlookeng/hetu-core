@@ -301,6 +301,12 @@ public class SqlQueryExecution
     }
 
     @Override
+    public QuerySnapshotManager getQuerySnapshotManager()
+    {
+        return snapshotManager;
+    }
+
+    @Override
     public DataSize getUserMemoryReservation()
     {
         // acquire reference to scheduler before checking finalQueryInfo, because
@@ -547,7 +553,7 @@ public class SqlQueryExecution
         }
         catch (PrestoException e) {
             if (e.getErrorCode() == NO_NODES_AVAILABLE.toErrorCode()) {
-                // Not enough worker to resume all tasks. Retrying from any saves snapshot likely wont' work either.
+                // Not enough worker to resume all tasks. Retrying from any saved snapshot likely wont' work either.
                 // Clear ongoing and existing snapshots and restart.
                 snapshotManager.invalidateAllSnapshots();
                 scheduler = createResumeScheduler(plan, rootOutputBuffers);

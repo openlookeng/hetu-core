@@ -19,6 +19,7 @@ import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.client.QueryStatusInfo;
+import io.prestosql.client.SnapshotStats;
 import io.prestosql.client.StageStats;
 import io.prestosql.client.StatementClient;
 import io.prestosql.client.StatementStats;
@@ -216,6 +217,33 @@ Spilled: 20GB
                         writeTime.getValue(SECONDS),
                         readTime.getValue(SECONDS));
                 reprintLine(summary);
+            }
+
+            // Snapshot Capture stats All: 100MB/22s/18s, Last: 40MB/10s/7s
+            SnapshotStats snapshotStats = stats.getSnapshotStats();
+            // snapshotStats should be null in case snapshot feature is disabled
+            if (snapshotStats != null) {
+                Duration allCaptureCPUTime = millis(snapshotStats.getTotalCaptureCpuTime());
+                Duration allCaptureWallTime = millis(snapshotStats.getTotalCaptureWallTime());
+                Duration lastCaptureCPUTime = millis(snapshotStats.getLastCaptureCpuTime());
+                Duration lastCaptureWallTime = millis(snapshotStats.getLastCaptureWallTime());
+                String allSnapshotsSize = FormatUtils.formatDataSize(bytes(snapshotStats.getAllCaptureSize()), true);
+                String lastSnapshotSize = FormatUtils.formatDataSize(bytes(snapshotStats.getLastCaptureSize()), true);
+                String captureSummary = String.format("Snapshot Capture: All: %s/%.1fs/%.1fs, Last: %s/%.1fs/%.1fs",
+                        allSnapshotsSize, allCaptureCPUTime.getValue(SECONDS), allCaptureWallTime.getValue(SECONDS),
+                        lastSnapshotSize, lastCaptureCPUTime.getValue(SECONDS), lastCaptureWallTime.getValue(SECONDS));
+                reprintLine(captureSummary);
+
+                // Snapshot restore stats: 1/100MB/22s/18s
+                long restoreCount = snapshotStats.getSuccessRestoreCount();
+                if (restoreCount > 0) {
+                    Duration allRestoreCPUTime = millis(snapshotStats.getTotalRestoreCpuTime());
+                    Duration allRestoreWallTime = millis(snapshotStats.getTotalRestoreWallTime());
+                    String allRestoreSize = FormatUtils.formatDataSize(bytes(snapshotStats.getTotalRestoreSize()), true);
+                    String restoreSummary = String.format(Locale.ROOT, "Snapshot Restore: %d/%s/%.1fs/%.1fs", restoreCount,
+                            allRestoreSize, allRestoreCPUTime.getValue(SECONDS), allRestoreWallTime.getValue(SECONDS));
+                    reprintLine(restoreSummary);
+                }
             }
         }
 

@@ -42,6 +42,7 @@ import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyObject;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -241,7 +242,7 @@ public class TestSingleInputSnapshotState
         singleInputSnapshotState.processPage(resume1);
         verify(snapshotManager, times(2)).storeFile(anyObject(), anyObject());
         verify(snapshotManager, times(4)).loadFile(anyObject(), anyObject());
-        verify(snapshotManager, times(1)).succeededToRestore(anyObject());
+        verify(snapshotManager, times(1)).succeededToRestore(anyObject(), eq(0L));
         verify(snapshotManager, times(2)).failedToRestore(anyObject(), anyBoolean());
     }
 
@@ -261,8 +262,8 @@ public class TestSingleInputSnapshotState
         singleInputSnapshotState.processPage(marker1);
         when(snapshotManager.loadConsolidatedState(anyObject())).thenReturn(Optional.of(0));
         singleInputSnapshotState.processPage(resume1);
-        verify(snapshotManager, times(0)).storeState(anyObject(), anyObject());
-        verify(snapshotManager, times(1)).storeConsolidatedState(anyObject(), anyObject());
+        verify(snapshotManager, times(0)).storeState(anyObject(), anyObject(), eq(0L));
+        verify(snapshotManager, times(1)).storeConsolidatedState(anyObject(), anyObject(), eq(0L));
         verify(snapshotManager, times(0)).loadState(anyObject());
         verify(snapshotManager, times(1)).loadConsolidatedState(anyObject());
     }
@@ -283,8 +284,8 @@ public class TestSingleInputSnapshotState
         singleInputSnapshotState.processPage(marker1);
         when(snapshotManager.loadState(anyObject())).thenReturn(Optional.of(0));
         singleInputSnapshotState.processPage(resume1);
-        verify(snapshotManager, times(0)).storeConsolidatedState(anyObject(), anyObject());
-        verify(snapshotManager, times(1)).storeState(anyObject(), anyObject());
+        verify(snapshotManager, times(0)).storeConsolidatedState(anyObject(), anyObject(), eq(0L));
+        verify(snapshotManager, times(1)).storeState(anyObject(), anyObject(), eq(0L));
         verify(snapshotManager, times(0)).loadConsolidatedState(anyObject());
         verify(snapshotManager, times(1)).loadState(anyObject());
     }

@@ -62,7 +62,7 @@ public class PagePublisherQueryManager
     private final Set<String> queries = Sets.newConcurrentHashSet();
     private final Map<String, PagePublisherQueryRunner> queryRunners = new ConcurrentHashMap<>();
     private static final DataCenterQueryResults FINISHED_RESULTS_DONOT_USE_HEADER = new DataCenterQueryResults("", URI.create(""), null, null, null, null,
-            new StatementStats("FINISHED", false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null), null,
+            new StatementStats("FINISHED", false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null, null), null,
             Collections.emptyList(), null, false);
 
     private final DispatchManager dispatchManager;

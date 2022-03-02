@@ -17,6 +17,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.Session;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.server.BasicQueryInfo;
+import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.QueryId;
 
 import java.util.List;
@@ -113,4 +114,9 @@ public interface QueryManager
     QueryManagerStats getStats();
 
     default void checkForQueryPruning(QueryId queryId, QueryInfo queryInfo) {}
+
+    default QuerySnapshotManager getQuerySnapshotManager(QueryId queryId)
+    {
+        return null;
+    }
 }

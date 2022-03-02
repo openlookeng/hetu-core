@@ -36,6 +36,7 @@ import io.prestosql.client.NamedClientTypeSignature;
 import io.prestosql.client.QueryError;
 import io.prestosql.client.QueryResults;
 import io.prestosql.client.RowFieldName;
+import io.prestosql.client.SnapshotStats;
 import io.prestosql.client.StageStats;
 import io.prestosql.client.StatementStats;
 import io.prestosql.client.Warning;
@@ -50,6 +51,9 @@ import io.prestosql.execution.TaskInfo;
 import io.prestosql.operator.ExchangeClient;
 import io.prestosql.operator.PipelineStats;
 import io.prestosql.operator.TaskLocation;
+import io.prestosql.snapshot.QuerySnapshotManager;
+import io.prestosql.snapshot.RestoreResult;
+import io.prestosql.snapshot.SnapshotInfo;
 import io.prestosql.spi.ErrorCode;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
@@ -86,6 +90,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
@@ -96,6 +101,7 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.airlift.concurrent.MoreFutures.addTimeout;
 import static io.prestosql.SystemSessionProperties.isExchangeCompressionEnabled;
+import static io.prestosql.SystemSessionProperties.isSnapshotEnabled;
 import static io.prestosql.execution.QueryState.FAILED;
 import static io.prestosql.execution.QueryState.RESCHEDULING;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
@@ -810,7 +816,7 @@ public class Query
         throw new IllegalArgumentException("Unsupported kind: " + parameter.getKind());
     }
 
-    private static StatementStats toStatementStats(QueryInfo queryInfo)
+    private StatementStats toStatementStats(QueryInfo queryInfo)
     {
         QueryStats queryStats = queryInfo.getQueryStats();
         //Dont print any more stats for Async Query,
@@ -837,7 +843,75 @@ public class Query
                 .setSpilledWriteTimeMillis(queryStats.getSpilledWriteTime().toMillis())
                 .setSpilledNodes(globalUniqueNodes(outputStage, true).size())
                 .setRootStage(toStageStats(outputStage))
+                .setSnapshotStats(toSnapshotStats(queryInfo.getQueryId()))
                 .build();
+    }
+
+    private SnapshotStats toSnapshotStats(QueryId queryId)
+    {
+        if (!isSnapshotEnabled(session) || queryId == null) {
+            return null;
+        }
+        AtomicLong totalCpuTimeMillis = new AtomicLong(0L);
+        AtomicLong lastSnapshotCpuTimeMillis = new AtomicLong(0L);
+        AtomicLong allSnapshotsSizeBytes = new AtomicLong(0L);
+        AtomicLong lastSnapshotSizeBytes = new AtomicLong(0L);
+        AtomicLong totalWallTimeMillis = new AtomicLong(0L);
+        AtomicLong lastWallTimeMillis = new AtomicLong(0L);
+        QuerySnapshotManager querySnapshotManager = queryManager.getQuerySnapshotManager(queryId);
+        if (querySnapshotManager != null) {
+            long lastSnapshotId = querySnapshotManager.collectSnapshotCaptureStats(eachSize -> (eachWallTime, eachCpuTime) -> {
+                allSnapshotsSizeBytes.addAndGet(eachSize);
+                totalWallTimeMillis.addAndGet(eachWallTime);
+                totalCpuTimeMillis.addAndGet(eachCpuTime);
+            }, lastSize -> (lastWallTime, lastCpuTime) -> {
+                lastSnapshotSizeBytes.set(lastSize);
+                lastSnapshotCpuTimeMillis.set(lastCpuTime);
+                lastWallTimeMillis.set(lastWallTime);
+            });
+            if (lastSnapshotId > 0) {
+                SnapshotStats.Builder builder = SnapshotStats.builder();
+                log.debug("SnapshotMetrics: totalWallTimeMillis: [%s]ms, lastWallTimeMillis: [%s]ms", totalWallTimeMillis.toString(), lastWallTimeMillis.toString());
+                log.debug("SnapshotMetrics: allSnapshotsSizeBytes: [%d], lastSnapshotSizeBytes: [%d]", allSnapshotsSizeBytes.get(), lastSnapshotSizeBytes.get());
+                log.debug("SnapshotMetrics: totalCpuTimeMillis: [%d]ms, lastSnapshotCpuTimeMillis: [%d]ms", totalCpuTimeMillis.get(), lastSnapshotCpuTimeMillis.get());
+                builder.setLastCaptureSnapshotId(lastSnapshotId)
+                        .setAllSnapshotsSizeBytes(allSnapshotsSizeBytes.get())
+                        .setLastSnapshotSizeBytes(lastSnapshotSizeBytes.get())
+                        .setTotalWallTimeMillis(totalWallTimeMillis.get())
+                        .setLastSnapshotWallTimeMillis(lastWallTimeMillis.get())
+                        .setTotalCpuTimeMillis(totalCpuTimeMillis.get())
+                        .setLastSnapshotCpuTimeMillis(lastSnapshotCpuTimeMillis.get());
+
+                // Restore stats
+                AtomicLong totalRestoreWallTime = new AtomicLong(0L);
+                AtomicLong totalRestoreCpuTime = new AtomicLong(0L);
+                AtomicLong totalRestoreSize = new AtomicLong(0L);
+                long lastRestoreSnapshotId = 0;
+                int restoreCount = 0;
+                List<RestoreResult> restoreStats = querySnapshotManager.getRestoreStats();
+                restoreCount = restoreStats.size();
+                log.debug("SnapshotMetrics: restoreCount: [%d]", restoreCount);
+                // Add restore stats if restore is happened
+                if (restoreCount > 0) {
+                    lastRestoreSnapshotId = restoreStats.get(restoreCount - 1).getSnapshotId();
+                    restoreStats.forEach(restoreResult -> {
+                        SnapshotInfo info = restoreResult.getSnapshotInfo();
+                        totalRestoreWallTime.addAndGet(info.getEndTime() - info.getBeginTime());
+                        totalRestoreCpuTime.addAndGet(info.getCpuTime());
+                        totalRestoreSize.addAndGet(info.getSizeBytes());
+                    });
+                    log.debug("SnapshotMetrics: totalRestoreWallTime: [%d]ms, totalRestoreCpuTime: [%d]ms", totalRestoreWallTime.get(), totalRestoreCpuTime.get());
+                    log.debug("SnapshotMetrics: totalRestoreSize: [%d], lastRestoreSnapshotId: [%d]", totalRestoreSize.get(), lastRestoreSnapshotId);
+                    builder.setSuccessRestoreCount(restoreCount)
+                            .setLastRestoreSnapshotId(lastRestoreSnapshotId)
+                            .setTotalRestoreWallTime(totalRestoreWallTime.get())
+                            .setTotalCpuTimeMillis(totalRestoreCpuTime.get())
+                            .setTotalRestoreSize(totalRestoreSize.get());
+                }
+                return builder.build();
+            }
+        }
+        return null;
     }
 
     private static StageStats toStageStats(StageInfo stageInfo)

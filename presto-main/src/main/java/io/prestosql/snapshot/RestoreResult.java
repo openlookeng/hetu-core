@@ -17,25 +17,27 @@ package io.prestosql.snapshot;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import static com.google.common.base.MoreObjects.toStringHelper;
+
 /**
  * RestoreResult contains information of restoring process from snapshot, and report to coordinator
  */
 public class RestoreResult
 {
     private long snapshotId;
-    private SnapshotResult snapshotResult;
+    private SnapshotInfo snapshotInfo;
 
     public RestoreResult()
     {
-        this(0, SnapshotResult.IN_PROGRESS);
+        this(0, SnapshotInfo.withStatus(SnapshotResult.IN_PROGRESS));
     }
 
     @JsonCreator
     public RestoreResult(@JsonProperty("snapshotId") long snapshotId,
-            @JsonProperty("snapshotResult") SnapshotResult snapshotResult)
+            @JsonProperty("snapshotInfo") SnapshotInfo snapshotInfo)
     {
         this.snapshotId = snapshotId;
-        this.snapshotResult = snapshotResult;
+        this.snapshotInfo = snapshotInfo;
     }
 
     @JsonProperty
@@ -45,9 +47,9 @@ public class RestoreResult
     }
 
     @JsonProperty
-    public SnapshotResult getSnapshotResult()
+    public SnapshotInfo getSnapshotInfo()
     {
-        return snapshotResult;
+        return snapshotInfo;
     }
 
     boolean setSnapshotResult(long snapshotId, SnapshotResult snapshotResult)
@@ -57,8 +59,8 @@ public class RestoreResult
             this.snapshotId = snapshotId;
             changed = true;
         }
-        if (this.snapshotResult != snapshotResult) {
-            this.snapshotResult = snapshotResult;
+        if (this.snapshotInfo.getSnapshotResult() != snapshotResult) {
+            this.snapshotInfo.setSnapshotResult(snapshotResult);
             changed = true;
         }
         return changed;
@@ -75,7 +77,16 @@ public class RestoreResult
         }
         RestoreResult that = (RestoreResult) o;
         return snapshotId == that.snapshotId &&
-                snapshotResult == that.snapshotResult;
+                snapshotInfo.getSnapshotResult() == that.snapshotInfo.getSnapshotResult();
+    }
+
+    @Override
+    public String toString()
+    {
+        return toStringHelper(this)
+                .add("snapshotId", snapshotId)
+                .add("snapshotInfo", snapshotInfo)
+                .toString();
     }
 
     @Override
