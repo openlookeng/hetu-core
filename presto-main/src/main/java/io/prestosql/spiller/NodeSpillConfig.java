@@ -32,6 +32,7 @@ public class NodeSpillConfig
 
     private int spillPrefetchReadPages = 1;
     private boolean spillUseKryoSerialization;
+    private String nodeId;
 
     @NotNull
     public DataSize getMaxSpillPerNode()
@@ -118,6 +119,18 @@ public class NodeSpillConfig
     public NodeSpillConfig setSpillUseKryoSerialization(boolean spillUseKryoSerialization)
     {
         this.spillUseKryoSerialization = spillUseKryoSerialization;
+        return this;
+    }
+
+    public String getNodeId()
+    {
+        return nodeId;
+    }
+
+    @Config("node.id")
+    public NodeSpillConfig setNodeId(String nodeId)
+    {
+        this.nodeId = nodeId;
         return this;
     }
 }

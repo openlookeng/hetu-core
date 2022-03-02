@@ -16,6 +16,7 @@ package io.prestosql.snapshot;
 
 import com.google.common.io.ByteStreams;
 import io.airlift.log.Logger;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 
 import java.io.IOException;
@@ -23,7 +24,6 @@ import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -42,13 +42,19 @@ public class SnapshotFileBasedClient
     private static final Logger LOG = Logger.get(SnapshotFileBasedClient.class);
 
     private final HetuFileSystemClient fsClient;
+    private final FileSystemClientManager fileSystemClientManager;
     private final Path rootPath;
     private final boolean useKryo;
+    private final String spillProfile;
+    private final boolean spillToHdfs;
 
-    public SnapshotFileBasedClient(HetuFileSystemClient fsClient, Path rootPath, boolean useKryo)
+    public SnapshotFileBasedClient(HetuFileSystemClient fsClient, Path rootPath, FileSystemClientManager fileSystemClientManager, String spillProfile, boolean spillToHdfs, boolean useKryo)
     {
         this.fsClient = fsClient;
         this.rootPath = rootPath;
+        this.fileSystemClientManager = fileSystemClientManager;
+        this.spillProfile = spillProfile;
+        this.spillToHdfs = spillToHdfs;
         this.useKryo = useKryo;
     }
 
@@ -90,7 +96,8 @@ public class SnapshotFileBasedClient
         fsClient.createDirectories(file.getParent());
 
         try (OutputStream outputStream = fsClient.newOutputStream(file);
-                InputStream inputStream = Files.newInputStream(sourceFile)) {
+                HetuFileSystemClient spillFs = getSpillerFileSystemClient(sourceFile);
+                InputStream inputStream = spillFs.newInputStream(sourceFile)) {
             ByteStreams.copy(inputStream, outputStream);
         }
     }
@@ -112,7 +119,8 @@ public class SnapshotFileBasedClient
         targetPath.getParent().toFile().mkdirs();
 
         try (InputStream inputStream = fsClient.newInputStream(file);
-                OutputStream outputStream = Files.newOutputStream(targetPath)) {
+                HetuFileSystemClient spillFs = getSpillerFileSystemClient(targetPath);
+                OutputStream outputStream = spillFs.newOutputStream(targetPath)) {
             ByteStreams.copy(inputStream, outputStream);
         }
         return true;
@@ -180,5 +188,10 @@ public class SnapshotFileBasedClient
         try (ObjectOutputStream oos = new ObjectOutputStream(fsClient.newOutputStream(file))) {
             oos.writeObject(path);
         }
+    }
+
+    private HetuFileSystemClient getSpillerFileSystemClient(Path filePath) throws IOException
+    {
+        return !spillToHdfs && spillProfile == null ? fileSystemClientManager.getFileSystemClient(filePath) : fileSystemClientManager.getFileSystemClient(spillProfile, filePath);
     }
 }

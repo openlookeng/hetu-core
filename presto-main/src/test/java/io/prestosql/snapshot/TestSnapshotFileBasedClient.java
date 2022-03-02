@@ -17,6 +17,7 @@ package io.prestosql.snapshot;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
 import io.prestosql.execution.TaskId;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.testing.assertions.Assert;
 import org.testng.annotations.Test;
 
@@ -36,7 +37,7 @@ public class TestSnapshotFileBasedClient
     public void testSnapshotResult()
             throws Exception
     {
-        SnapshotFileBasedClient client = new SnapshotFileBasedClient(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(ROOT_PATH_STR)), Paths.get(ROOT_PATH_STR), false);
+        SnapshotFileBasedClient client = new SnapshotFileBasedClient(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(ROOT_PATH_STR)), Paths.get(ROOT_PATH_STR), new FileSystemClientManager(), null, false, false);
         String queryId = "query1";
         LinkedHashMap<Long, SnapshotResult> map = new LinkedHashMap<>();
         map.put(3L, SnapshotResult.SUCCESSFUL);
@@ -58,7 +59,7 @@ public class TestSnapshotFileBasedClient
     public void testSnapshotStateWithKryo()
             throws Exception
     {
-        SnapshotFileBasedClient client = new SnapshotFileBasedClient(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(ROOT_PATH_STR)), Paths.get(ROOT_PATH_STR), true);
+        SnapshotFileBasedClient client = new SnapshotFileBasedClient(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(ROOT_PATH_STR)), Paths.get(ROOT_PATH_STR), new FileSystemClientManager(), null, false, true);
         String queryId = "query1";
         TaskId taskId = new TaskId(queryId, 1, 1);
         SnapshotStateId snapshotStateId = new SnapshotStateId(2, taskId, 10);
@@ -82,7 +83,7 @@ public class TestSnapshotFileBasedClient
     public void testSnapshotStateWithJava()
             throws Exception
     {
-        SnapshotFileBasedClient client = new SnapshotFileBasedClient(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(ROOT_PATH_STR)), Paths.get(ROOT_PATH_STR), false);
+        SnapshotFileBasedClient client = new SnapshotFileBasedClient(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(ROOT_PATH_STR)), Paths.get(ROOT_PATH_STR), new FileSystemClientManager(), null, false, false);
         String queryId = "query1";
         TaskId taskId = new TaskId(queryId, 1, 1);
         SnapshotStateId snapshotStateId = new SnapshotStateId(2, taskId, 10);

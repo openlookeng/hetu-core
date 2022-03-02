@@ -13,12 +13,14 @@
  */
 package io.prestosql.tests;
 
-import com.google.common.collect.ImmutableMap;
+import io.hetu.core.filesystem.HetuFileSystemClientPlugin;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.plugin.tpch.TpchPlugin;
 
 import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 
 import static io.prestosql.plugin.tpch.TpchMetadata.TINY_SCHEMA_NAME;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
@@ -43,17 +45,18 @@ public class TestDistributedSpilledQueries
                 .setSystemProperty(SystemSessionProperties.AGGREGATION_OPERATOR_UNSPILL_MEMORY_LIMIT, "128kB")
                 .build();
 
-        ImmutableMap<String, String> extraProperties = ImmutableMap.<String, String>builder()
-                .put("experimental.spiller-spill-path", Paths.get(System.getProperty("java.io.tmpdir"), "presto", "spills").toString())
-                .put("experimental.spiller-max-used-space-threshold", "1.0")
-                .put("experimental.memory-revoking-threshold", "0.0") // revoke always
-                .put("experimental.memory-revoking-target", "0.0")
-                .build();
+        Map<String, String> extraProperties = new HashMap<String, String>();
+        extraProperties.put("experimental.spiller-spill-path", Paths.get(System.getProperty("java.io.tmpdir"), "presto", "spills").toString());
+        extraProperties.put("experimental.spiller-max-used-space-threshold", "1.0");
+        extraProperties.put("experimental.memory-revoking-threshold", "0.0"); // revoke always
+        extraProperties.put("experimental.memory-revoking-target", "0.0");
+        extraProperties.put("experimental.spiller-spill-to-hdfs", "false");
 
         DistributedQueryRunner queryRunner = new DistributedQueryRunner(defaultSession, 2, extraProperties);
 
         try {
             queryRunner.installPlugin(new TpchPlugin());
+            queryRunner.installPlugin(new HetuFileSystemClientPlugin());
             queryRunner.createCatalog("tpch", "tpch");
             return queryRunner;
         }

@@ -60,6 +60,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -141,6 +142,13 @@ public class DistributedQueryRunner
             serverBuilder.add(coordinator);
 
             for (int i = 1; i < nodeCount; i++) {
+                if (!(extraProperties instanceof ImmutableMap)) {
+                    String path = extraProperties.get("experimental.spiller-spill-path");
+                    if (path != null) {
+                        String uuid = UUID.randomUUID().toString();
+                        extraProperties.replace("experimental.spiller-spill-path", path + uuid);
+                    }
+                }
                 TestingPrestoServer worker = closer.register(createTestingPrestoServer(discoveryServer.getBaseUrl(), false, extraProperties, parserOptions, environment, baseDataDir));
                 serverBuilder.add(worker);
             }

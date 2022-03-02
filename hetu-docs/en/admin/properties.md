@@ -179,7 +179,7 @@ This section describes the most important config properties that may be used to 
 >
 > Directory where spilled content will be written. It can be a comma separated list to spill simultaneously to multiple directories, which helps to utilize multiple drives installed in the system.
 >
->
+> When `experimental.spiller-spill-to-hdfs` is to `true`, `experimental.spiller-spill-path` must contain only  a single directory.
 >
 > It is not recommended to spill to system drives. Most importantly, do not spill to the drive on which the JVM logs are written, as disk overutilization might cause JVM to pause for lengthy periods, causing queries to fail.
 
@@ -268,7 +268,7 @@ This section describes the most important config properties that may be used to 
 > -   **Type:** `data size`
 > -   **Default value:** `512 MB`
 >
-> Sets memory selection threshold for revocable memory of operator to directly allocate revocable memory for remaining bytes ready to revoke. 
+> Sets memory selection threshold for revocable memory of operator to directly allocate revocable memory for remaining bytes ready to revoke.
 
 ### `experimental.prioritize-larger-spilts-memory-revoke`
 
@@ -287,6 +287,23 @@ This section describes the most important config properties that may be used to 
 >
 >
 > This config property can be overridden by the `spill_non_blocking_orderby` session property.
+
+### `experimental.spiller-spill-to-hdfs`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Enables spilling into HDFS. When this property is set to `true` the property `experimental.spiller-spill-profile` must be set and also `experimental.spiller-spill-path` must contain only a single path.
+
+### `experimental.spiller-spill-profile`
+
+> -   **Type:** `string`
+> -   **No default value.** Must be set when spilling to hdfs is enabled
+>
+>
+> This property defines the [filesystem](../develop/filesystem.md) profile used to spill. The corresponding profile must exist in `etc/filesystem`. For example, if this property is set as `experimental.spiller-spill-profile=spill-hdfs`, a profile describing this filesystem `spill-hdfs.properties` must be created in `etc/filesystem` with necessary information including authentication type, config, and keytabs (if applicable, refer [filesystem](../develop/filesystem.md) for details).
+>
+> This property is required when `experimental.spiller-spill-to-hdfs` is set to `true`. It must be included in configuration files for all coordinators and all workers. The specified file system must be accessible by all workers, and they must be able to read from and write to the path declared in `experimental.spiller-spill-path` folder in the specified file system.
 
 ## Exchange Properties
 

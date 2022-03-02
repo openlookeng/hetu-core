@@ -15,9 +15,12 @@ package io.prestosql.spiller;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.hetu.core.filesystem.HetuLocalFileSystemClient;
+import io.hetu.core.filesystem.LocalConfig;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.RowPagesBuilder;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.Page;
@@ -38,6 +41,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
 import static com.google.common.io.MoreFiles.deleteRecursively;
@@ -52,6 +56,9 @@ import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.lang.Double.doubleToLongBits;
 import static java.nio.file.Files.createTempDirectory;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
 @Test(singleThreaded = true)
@@ -72,9 +79,11 @@ public class TestBinaryFileSpiller
     {}
 
     @BeforeMethod
-    public void setUp()
+    public void setUp() throws IOException
     {
         Metadata metadata = createTestMetadataManager();
+        FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
+        when(fileSystemClientManager.getFileSystemClient(any(Path.class))).thenReturn(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(spillPath.getCanonicalPath())));
         spillerStats = new SpillerStats();
         FeaturesConfig featuresConfig = new FeaturesConfig();
         try {
@@ -85,7 +94,7 @@ public class TestBinaryFileSpiller
         }
         featuresConfig.setSpillMaxUsedSpaceThreshold(1.0);
         NodeSpillConfig nodeSpillConfig = new NodeSpillConfig();
-        singleStreamSpillerFactory = new FileSingleStreamSpillerFactory(metadata, spillerStats, featuresConfig, nodeSpillConfig);
+        singleStreamSpillerFactory = new FileSingleStreamSpillerFactory(metadata, spillerStats, featuresConfig, nodeSpillConfig, fileSystemClientManager);
         factory = new GenericSpillerFactory(singleStreamSpillerFactory);
         PagesSerdeFactory pagesSerdeFactory = new PagesSerdeFactory(metadata.getFunctionAndTypeManager().getBlockEncodingSerde(), nodeSpillConfig.isSpillCompressionEnabled());
         pagesSerde = pagesSerdeFactory.createPagesSerde();
