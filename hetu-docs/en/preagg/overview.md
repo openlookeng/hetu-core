@@ -195,7 +195,8 @@ SHOW CUBES;
    Only the following types are supported and can be merged together.
    `Integer, TinyInt, SmallInt, BigInt, Date, String`
 
-   For String data type, predicates can be merged only if they are ending with a digit. For example,
+   For String data type, predicate merge logic functionally works only if the Strings are ending with a digit and all are of same length. 
+   For example,
 
 ```sql
    INSERT INTO CUBE store_sales_cube WHERE store_id BETWEEN 'A01' AND 'A10';
@@ -206,6 +207,20 @@ After the insertion, the two predicates will be merged into `'A01' AND 'A20'`
 ```sql
    SELECT ss_store_id, sum(ss_sales_price) WHERE ss_store_id BETWEEN 'A05' AND 'A15'; - Cube would be used for this query.
 ```
+
+   Consider the following example where `store_id` values are not of same length.
+
+```sql
+   INSERT INTO CUBE store_sales_cube WHERE store_id = 'A1';
+   INSERT INTO CUBE store_sales_cube WHERE store_id = 'A2' 
+```   
+   store_id predicate will be rewritten as `store_id >= 'A1' and store < 'A3'` as per the varchar predicate merge logic;
+
+```sql   
+   INSERT INTO CUBE store_sales_cube WHERE store_id = 'A10' 
+```
+   The above query would fail because `A10` is subset of the range `store_id >= 'A1' and store < 'A3'`. So Users should be wary of this issue. 
+
 For other data types, it is difficult to identify if two predicates are continuous therefore they cannot be merged together. And because of this issue, there is
 possibility that particular Cube may not be used during query optimization even if the Cube has all the required data.
 
@@ -224,7 +239,6 @@ optimize the query. The same is applicable for predicates with <= operator. ie. 
 3. Only single column predicates can be merged.
 
 
-
 ## Open issues and Limitations
 1. StarTree Cube is only effective when the group by cardinality is considerably fewer than the number of rows in source table.
 2. A significant amount of user effort required in maintaining Cubes for large datasets.
@@ -235,7 +249,8 @@ optimize the query. The same is applicable for predicates with <= operator. ie. 
 5. OpenLooKeng CLI has been modified to ease the process of creating Cubes for larger datasets. But still there are limitations with this implementation
    as the process involves merging multiple Cube predicates into one. Only Cube predicates defined on Integer, Long and Date types can be merged properly. Support for Char, 
    String types still need to be implemented.
-   
+6. Varchar predicates can be merged only if the values are of same length.  
+
 ## Performance Optimizations on Star Tree
 1. Star Tree Query re-write optimization for same group by columns: If the group by columns of the cube and query matches, the query is 
 re-written internally to select the pre-aggregated data. If the group by columns does not matches, the additional aggregations are 
