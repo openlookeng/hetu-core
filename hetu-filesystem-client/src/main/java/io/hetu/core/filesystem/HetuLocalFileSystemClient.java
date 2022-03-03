@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.AccessDeniedException;
+import java.nio.file.FileStore;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.OpenOption;
@@ -29,6 +30,8 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Locale;
 import java.util.stream.Stream;
+
+import static java.nio.file.Files.getFileStore;
 
 /**
  * HetuFileSystemClient implementation for local file system
@@ -215,5 +218,31 @@ public class HetuLocalFileSystemClient
     @Override
     public void close()
     {
+    }
+
+    @Override
+    public long getTotalSpace(Path path) throws IOException
+    {
+        FileStore fileStore = getFileStore(path);
+        return fileStore.getTotalSpace();
+    }
+
+    @Override
+    public long getUsableSpace(Path path) throws IOException
+    {
+        FileStore fileStore = getFileStore(path);
+        return fileStore.getUsableSpace();
+    }
+
+    @Override
+    public Path createTemporaryFile(Path path, String prefix, String suffix) throws IOException
+    {
+        return Files.createTempFile(path, prefix, suffix);
+    }
+
+    @Override
+    public Path createFile(Path path) throws IOException
+    {
+        return Files.createFile(path);
     }
 }

@@ -34,6 +34,10 @@ saturation of the configured spill paths.
 
 openLooKeng treats spill paths as independent disks (see [JBOD](https://en.wikipedia.org/wiki/Non-RAID_drive_architectures#JBOD)), so there is no need to use RAID for spill.
 
+
+## Spill To HDFS
+Spilling directly into HDFS is also possible for that `experimental.spiller-spill-to-hdfs` needs to be set to `true`, `experimental.spiller-spill-profile` needs to be set and `spiller-spill-path` must contain only a single directory when we intend to spill into HDFS. (refer `experimental.spiller-spill-to-hdfs` and  `experimental.spiller-spill-profile` properties for more details )
+
 ## Spill Compression
 
 

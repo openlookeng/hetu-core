@@ -13,6 +13,8 @@
  */
 package io.prestosql.spiller;
 
+import io.prestosql.spi.filesystem.HetuFileSystemClient;
+
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -21,7 +23,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 
@@ -33,27 +34,29 @@ final class FileHolder
         implements Closeable
 {
     private final Path filePath;
+    private final HetuFileSystemClient fileSystemClient;
 
     @GuardedBy("this")
     private boolean deleted;
 
-    public FileHolder(Path filePath)
+    public FileHolder(Path filePath, HetuFileSystemClient fileSystemClient)
     {
         this.filePath = requireNonNull(filePath, "filePath is null");
+        this.fileSystemClient = requireNonNull(fileSystemClient, "fileSystemClient is null");
     }
 
     public synchronized OutputStream newOutputStream(OpenOption... options)
             throws IOException
     {
         checkState(!deleted, "File already deleted");
-        return Files.newOutputStream(filePath, options);
+        return fileSystemClient.newOutputStream(filePath, options);
     }
 
-    public synchronized InputStream newInputStream(OpenOption... options)
+    public synchronized InputStream newInputStream()
             throws IOException
     {
         checkState(!deleted, "File already deleted");
-        return Files.newInputStream(filePath, options);
+        return fileSystemClient.newInputStream(filePath);
     }
 
     @Override
@@ -65,7 +68,7 @@ final class FileHolder
         deleted = true;
 
         try {
-            Files.delete(filePath);
+            fileSystemClient.deleteIfExists(filePath);
         }
         catch (IOException e) {
             throw new UncheckedIOException(e);

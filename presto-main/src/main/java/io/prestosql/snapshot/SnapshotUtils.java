@@ -125,11 +125,13 @@ public class SnapshotUtils
     {
         if (storeType == SnapshotStoreType.FILESYSTEM) {
             String profile = snapshotConfig.getSnapshotProfile();
+            String spillProfile = snapshotConfig.getSpillProfile();
+            boolean spillToHdfs = snapshotConfig.isSpillToHdfs();
             Path root = Paths.get(rootPath);
             try {
                 HetuFileSystemClient fs = profile == null ?
                         fileSystemClientManager.getFileSystemClient(root) : fileSystemClientManager.getFileSystemClient(profile, root);
-                return new SnapshotFileBasedClient(fs, root, snapshotConfig.isSnapshotUseKryoSerialization());
+                return new SnapshotFileBasedClient(fs, root, fileSystemClientManager, spillProfile, spillToHdfs, snapshotConfig.isSnapshotUseKryoSerialization());
             }
             catch (Exception e) {
                 LOG.warn(e, "Failed to create SnapshotFileBasedClient");

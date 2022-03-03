@@ -15,6 +15,7 @@ package io.prestosql.tests;
 
 import com.google.common.collect.ImmutableMap;
 import io.airlift.units.DataSize;
+import io.hetu.core.filesystem.HetuFileSystemClientPlugin;
 import io.prestosql.Session;
 import io.prestosql.plugin.tpch.TpchConnectorFactory;
 import io.prestosql.spiller.NodeSpillConfig;
@@ -95,6 +96,7 @@ public class TestQuerySpillLimits
                 SESSION.getCatalog().get(),
                 new TpchConnectorFactory(1),
                 ImmutableMap.of());
+        queryRunner.installPlugin(new HetuFileSystemClientPlugin());
 
         return queryRunner;
     }

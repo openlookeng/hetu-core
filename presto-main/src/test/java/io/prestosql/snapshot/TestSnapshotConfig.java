@@ -29,6 +29,8 @@ public class TestSnapshotConfig
     {
         ConfigAssertions.assertRecordedDefaults(ConfigAssertions.recordDefaults(SnapshotConfig.class)
                 .setSnapshotProfile(null)
+                .setSpillProfile(null)
+                .setSpillToHdfs(false)
                 .setSnapshotIntervalType(SnapshotConfig.IntervalType.TIME)
                 .setSnapshotTimeInterval(new Duration(5, TimeUnit.MINUTES))
                 .setSnapshotSplitCountInterval(1000)
@@ -42,6 +44,8 @@ public class TestSnapshotConfig
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
                 .put("hetu.experimental.snapshot.profile", "snapshot-config-hdfs")
+                .put("experimental.spiller-spill-profile", "spill-config-hdfs")
+                .put("experimental.spiller-spill-to-hdfs", "true")
                 .put("hetu.internal.snapshot.intervalType", "SPLIT_COUNT")
                 .put("hetu.internal.snapshot.timeInterval", "3m")
                 .put("hetu.internal.snapshot.splitCountInterval", "1000000")
@@ -52,6 +56,8 @@ public class TestSnapshotConfig
 
         SnapshotConfig expected = new SnapshotConfig()
                 .setSnapshotProfile("snapshot-config-hdfs")
+                .setSpillProfile("spill-config-hdfs")
+                .setSpillToHdfs(true)
                 .setSnapshotIntervalType(SnapshotConfig.IntervalType.SPLIT_COUNT)
                 .setSnapshotTimeInterval(new Duration(3, TimeUnit.MINUTES))
                 .setSnapshotSplitCountInterval(1000000)

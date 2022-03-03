@@ -31,10 +31,12 @@ import io.airlift.slice.SliceOutput;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.PagesSerdeUtil;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.SpillContext;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.spiller.SpillCipher;
@@ -50,7 +52,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
@@ -65,13 +66,14 @@ import static io.hetu.core.transport.execution.buffer.PagesSerdeUtil.writeSerial
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spiller.FileSingleStreamSpillerFactory.SPILL_FILE_PREFIX;
 import static io.prestosql.spiller.FileSingleStreamSpillerFactory.SPILL_FILE_SUFFIX;
+import static io.prestosql.spiller.FileSingleStreamSpillerFactory.getFileSystem;
 import static java.nio.file.StandardOpenOption.APPEND;
 import static java.util.Objects.requireNonNull;
 
 @NotThreadSafe
 
 @RestorableConfig(uncapturedFields = {"closer", "serde",
-        "spillerStats", "localSpillContext", "memoryContext", "executor", "spillInProgress", "cipherIV", "spillCipher"})
+        "spillerStats", "localSpillContext", "memoryContext", "executor", "spillInProgress", "cipherIV", "spillCipher", "fileSystemClientManager", "fileSystemClient", "spillPath"})
 public class FileSingleStreamSpiller
         implements SingleStreamSpiller
 {
@@ -93,8 +95,13 @@ public class FileSingleStreamSpiller
     private boolean useDirectSerde;
     private boolean useKryo;
     private boolean compressionEnabled;
+    private Path spillPath;
+    private String spillProfile;
+    private boolean spillToHdfs;
     private Optional<SpillCipher> spillCipher;
     private byte[] cipherIV;
+    private FileSystemClientManager fileSystemClientManager;
+    private HetuFileSystemClient fileSystemClient;
 
     // Snapshot: capture page sizes that are used to update localSpillContext and spillerStats during resume
     private List<Long> pageSizeList = new LinkedList<>();
@@ -111,11 +118,18 @@ public class FileSingleStreamSpiller
             boolean compressionEnabled,
             boolean useDirectSerde,
             int spillPrefetchReadPages,
-            boolean useKryo)
+            boolean useKryo,
+            boolean spillToHdfs,
+            String spillProfile,
+            FileSystemClientManager fileSystemClientManager)
     {
         this.serde = requireNonNull(serde, "serde is null");
         this.executor = requireNonNull(executor, "executor is null");
         this.spillerStats = requireNonNull(spillerStats, "spillerStats is null");
+        this.spillPath = spillPath;
+        this.spillProfile = spillProfile;
+        this.fileSystemClientManager = requireNonNull(fileSystemClientManager, "fileSystemClient is null");
+        this.spillToHdfs = spillToHdfs;
         this.localSpillContext = spillContext.newLocalSpillContext();
         this.memoryContext = requireNonNull(memoryContext, "memoryContext is null");
         if (requireNonNull(spillCipher, "spillCipher is null").isPresent()) {
@@ -133,7 +147,13 @@ public class FileSingleStreamSpiller
         // middle of execution when close() is called (note that this applies to both readPages() and writePages() methods).
         this.memoryContext.setBytes(BUFFER_SIZE);
         try {
-            this.targetFile = closer.register(new FileHolder(Files.createTempFile(spillPath, SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX)));
+            this.fileSystemClient = getFileSystem(spillPath, spillToHdfs, spillProfile, fileSystemClientManager);
+        }
+        catch (Exception e) {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to get filesystem", e);
+        }
+        try {
+            createSpillFiles();
         }
         catch (IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to create spill file", e);
@@ -181,7 +201,7 @@ public class FileSingleStreamSpiller
     private void writePages(Iterator<Page> pageIterator)
     {
         checkState(writable, "Spilling no longer allowed. The spiller has been made non-writable on first read for subsequent reads to be consistent");
-        try (SliceOutput output = new OutputStreamSliceOutput(targetFile.newOutputStream(APPEND), BUFFER_SIZE)) {
+        try (SliceOutput output = new OutputStreamSliceOutput(getOutputStreamBasedOnSpillLocation(), BUFFER_SIZE)) {
             Stopwatch timer = Stopwatch.createStarted();
             while (pageIterator.hasNext()) {
                 Page page = pageIterator.next();
@@ -225,7 +245,7 @@ public class FileSingleStreamSpiller
     private void writePagesDirect(Iterator<Page> pageIterator)
     {
         checkState(writable, "Spilling no longer allowed. The spiller has been made non-writable on first read for subsequent reads to be consistent");
-        try (OutputStream output = getStreamForWriting(targetFile.newOutputStream(APPEND), BUFFER_SIZE)) {
+        try (OutputStream output = getStreamForWriting(getOutputStreamBasedOnSpillLocation(), BUFFER_SIZE)) {
             Stopwatch timer = Stopwatch.createStarted();
             while (pageIterator.hasNext()) {
                 Page page = pageIterator.next();
@@ -357,6 +377,21 @@ public class FileSingleStreamSpiller
         return targetFile.getFilePath();
     }
 
+    private void createSpillFiles() throws IOException
+    {
+        this.targetFile = closer.register(new FileHolder(fileSystemClient.createTemporaryFile(spillPath, SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX), fileSystemClient));
+    }
+
+    private OutputStream getOutputStreamBasedOnSpillLocation() throws IOException
+    {
+        if (spillToHdfs) {
+            return targetFile.newOutputStream();
+        }
+        else {
+            return targetFile.newOutputStream(APPEND);
+        }
+    }
+
     @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
@@ -368,6 +403,8 @@ public class FileSingleStreamSpiller
         state.compressionEnabled = this.compressionEnabled;
         state.useDirectSerde = this.useDirectSerde;
         state.useKryo = this.useKryo;
+        state.spillToHdfs = this.spillToHdfs;
+        state.spillProfile = this.spillProfile;
         return state;
     }
 
@@ -380,10 +417,12 @@ public class FileSingleStreamSpiller
             this.spilledPagesInMemorySize = myState.spilledPagesInMemorySize;
             this.pageSizeList = myState.pageSizeList;
             this.targetFile.close();
+            this.spillProfile = myState.spillProfile;
             Path path = Paths.get(myState.targetFile);
+            this.fileSystemClient = getFileSystem(path, spillToHdfs, spillProfile, fileSystemClientManager);
             // Actual file content is restored after this returns, in SingleInputSnapshotState.loadSpilledFiles
-            Files.deleteIfExists(path);
-            this.targetFile = closer.register(new FileHolder(Files.createFile(path)));
+            fileSystemClient.deleteIfExists(path);
+            this.targetFile = closer.register(new FileHolder(fileSystemClient.createFile(path), fileSystemClient));
             for (Long pageSize : pageSizeList) {
                 // restore localSpillContext and spillerStats
                 this.localSpillContext.updateBytes(pageSize);
@@ -392,6 +431,7 @@ public class FileSingleStreamSpiller
             this.compressionEnabled = myState.compressionEnabled;
             this.useDirectSerde = myState.useDirectSerde;
             this.useKryo = myState.useKryo;
+            this.spillToHdfs = myState.spillToHdfs;
         }
         catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -408,5 +448,7 @@ public class FileSingleStreamSpiller
         private boolean compressionEnabled;
         private boolean useDirectSerde;
         private boolean useKryo;
+        private boolean spillToHdfs;
+        private String spillProfile;
     }
 }
