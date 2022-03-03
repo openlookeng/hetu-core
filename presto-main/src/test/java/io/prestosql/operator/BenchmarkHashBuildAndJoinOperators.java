@@ -294,7 +294,7 @@ public class BenchmarkHashBuildAndJoinOperators
                         .collect(toImmutableList()),
                 1,
                 requireNonNull(ImmutableMap.of(), "layout is null"),
-                false));
+                false, false));
         HashBuilderOperatorFactory hashBuilderOperatorFactory = new HashBuilderOperatorFactory(
                 HASH_BUILD_OPERATOR_ID,
                 TEST_PLAN_NODE_ID,

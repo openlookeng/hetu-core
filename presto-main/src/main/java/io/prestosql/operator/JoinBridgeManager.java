@@ -15,6 +15,7 @@
 package io.prestosql.operator;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.execution.Lifespan;
@@ -30,6 +31,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static io.airlift.concurrent.MoreFutures.whenAnyComplete;
 import static io.prestosql.operator.PipelineExecutionStrategy.UNGROUPED_EXECUTION;
 import static java.util.Objects.requireNonNull;
 
@@ -162,6 +164,12 @@ public class JoinBridgeManager<T extends JoinBridge>
         return internalJoinBridgeDataManager.getOuterPositionsFuture(lifespan);
     }
 
+    public void probeOperatorFinished(Lifespan lifespan)
+    {
+        initializeIfNecessary();
+        internalJoinBridgeDataManager.probeOperatorFinish(lifespan);
+    }
+
     private static <T extends JoinBridge> InternalJoinBridgeDataManager<T> internalJoinBridgeDataManager(
             PipelineExecutionStrategy probeExecutionStrategy,
             PipelineExecutionStrategy buildExecutionStrategy,
@@ -213,6 +221,8 @@ public class JoinBridgeManager<T extends JoinBridge>
         void outerOperatorCreated(Lifespan lifespan);
 
         void outerOperatorClosed(Lifespan lifespan);
+
+        void probeOperatorFinish(Lifespan lifespan);
     }
 
     // 1 probe, 1 lookup source
@@ -252,6 +262,7 @@ public class JoinBridgeManager<T extends JoinBridge>
         public void probeOperatorFactoryClosed(Lifespan lifespan)
         {
             checkArgument(Lifespan.taskWide().equals(lifespan));
+            joinLifecycle.releaseForProbeInMem();
             joinLifecycle.releaseForProbe();
         }
 
@@ -288,6 +299,13 @@ public class JoinBridgeManager<T extends JoinBridge>
         {
             checkArgument(Lifespan.taskWide().equals(lifespan));
             joinLifecycle.releaseForOuter();
+        }
+
+        @Override
+        public void probeOperatorFinish(Lifespan lifespan)
+        {
+            checkArgument(Lifespan.taskWide().equals(lifespan));
+            joinLifecycle.releaseForProbeInMem();
         }
     }
 
@@ -331,6 +349,7 @@ public class JoinBridgeManager<T extends JoinBridge>
         public void probeOperatorFactoryClosed(Lifespan lifespan)
         {
             checkArgument(!Lifespan.taskWide().equals(lifespan));
+            data(lifespan).joinLifecycle.releaseForProbeInMem();
             data(lifespan).joinLifecycle.releaseForProbe();
         }
 
@@ -367,6 +386,13 @@ public class JoinBridgeManager<T extends JoinBridge>
         {
             checkArgument(!Lifespan.taskWide().equals(lifespan));
             data(lifespan).joinLifecycle.releaseForOuter();
+        }
+
+        @Override
+        public void probeOperatorFinish(Lifespan lifespan)
+        {
+            checkArgument(!Lifespan.taskWide().equals(lifespan));
+            data(lifespan).joinLifecycle.releaseForProbeInMem();
         }
 
         private JoinBridgeAndLifecycle<T> data(Lifespan lifespan)
@@ -421,6 +447,7 @@ public class JoinBridgeManager<T extends JoinBridge>
         @Override
         public void probeOperatorFactoryClosedForAllLifespans()
         {
+            joinLifecycle.releaseForProbeInMem();
             joinLifecycle.releaseForProbe();
         }
 
@@ -464,11 +491,18 @@ public class JoinBridgeManager<T extends JoinBridge>
             checkArgument(Lifespan.taskWide().equals(lifespan), "join bridge is not partitioned");
             joinLifecycle.releaseForOuter();
         }
+
+        @Override
+        public void probeOperatorFinish(Lifespan lifespan)
+        {
+            joinLifecycle.releaseForProbeInMem();
+        }
     }
 
     private static class JoinLifecycle
     {
         private final ReferenceCount probeReferenceCount;
+        private final ReferenceCount probeInMemReferenceCount;
         private final ReferenceCount outerReferenceCount;
 
         private final ListenableFuture<?> whenBuildAndProbeFinishes;
@@ -486,9 +520,12 @@ public class JoinBridgeManager<T extends JoinBridge>
             // * Each probe operator factory count as 1
             // * Each probe operator count as 1
             probeReferenceCount = new ReferenceCount(probeFactoryCount);
+            probeInMemReferenceCount = new ReferenceCount(probeFactoryCount);
 
-            whenBuildAndProbeFinishes = Futures.whenAllSucceed(joinBridge.whenBuildFinishes(), probeReferenceCount.getFreeFuture()).call(() -> null, directExecutor());
-            whenAllFinishes = Futures.whenAllSucceed(whenBuildAndProbeFinishes, outerReferenceCount.getFreeFuture()).call(() -> null, directExecutor());
+            ListenableFuture<?> whenMemProbeFinish = whenAnyComplete(ImmutableList.of(probeInMemReferenceCount.getFreeFuture(), probeReferenceCount.getFreeFuture()));
+            whenBuildAndProbeFinishes = Futures.whenAllSucceed(joinBridge.whenBuildFinishes(), whenMemProbeFinish).call(() -> joinBridge.whenMemProbeFinishes(), directExecutor());
+            whenAllFinishes = Futures.whenAllSucceed(whenBuildAndProbeFinishes, probeReferenceCount.getFreeFuture(), outerReferenceCount.getFreeFuture()).call(() -> null, directExecutor());
+
             whenAllFinishes.addListener(joinBridge::destroy, directExecutor());
         }
 
@@ -500,6 +537,7 @@ public class JoinBridgeManager<T extends JoinBridge>
         private void retainForProbe()
         {
             probeReferenceCount.retain();
+            probeInMemReferenceCount.retain();
         }
 
         private void releaseForProbe()
@@ -515,6 +553,11 @@ public class JoinBridgeManager<T extends JoinBridge>
         private void releaseForOuter()
         {
             outerReferenceCount.release();
+        }
+
+        public void releaseForProbeInMem()
+        {
+            probeInMemReferenceCount.release();
         }
     }
 

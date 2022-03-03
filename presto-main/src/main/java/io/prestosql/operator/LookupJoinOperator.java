@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.function.BiPredicate;
 import java.util.function.IntPredicate;
 import java.util.function.Supplier;
 
@@ -53,6 +54,7 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.airlift.concurrent.MoreFutures.addSuccessCallback;
 import static io.airlift.concurrent.MoreFutures.checkSuccess;
 import static io.airlift.concurrent.MoreFutures.getDone;
+import static io.prestosql.SystemSessionProperties.isInnerJoinSpillFilteringEnabled;
 import static io.prestosql.operator.LookupJoinOperators.JoinType.FULL_OUTER;
 import static io.prestosql.operator.LookupJoinOperators.JoinType.PROBE_OUTER;
 import static java.lang.String.format;
@@ -73,7 +75,7 @@ import static java.util.Objects.requireNonNull;
 @RestorableConfig(uncapturedFields = {"probeTypes", "joinProbeFactory", "afterClose", "hashGenerator", "lookupSourceFactory",
         "partitioningSpillerFactory", "lookupSourceProviderFuture", "lookupSourceProvider", "probe", "outputPage",
         "partitionGenerator", "spillInProgress", "unspilling", "currentPartition",
-        "unspilledLookupSource", "unspilledInputPages", "snapshotState"})
+        "unspilledLookupSource", "unspilledInputPages", "snapshotState", "afterMemOpFinish"})
 public class LookupJoinOperator
         implements Operator
 {
@@ -84,6 +86,7 @@ public class LookupJoinOperator
     private final List<Type> probeTypes;
     private final JoinProbeFactory joinProbeFactory;
     private final Runnable afterClose;
+    private Runnable afterMemOpFinish;
     private final OptionalInt lookupJoinsCount;
     private final HashGenerator hashGenerator;
     private final LookupSourceFactory lookupSourceFactory;
@@ -94,6 +97,7 @@ public class LookupJoinOperator
     private final LookupJoinPageBuilder pageBuilder;
 
     private final boolean probeOnOuterSide;
+    private final boolean spillBypassEnabled;
 
     private final ListenableFuture<LookupSourceProvider> lookupSourceProviderFuture;
     private LookupSourceProvider lookupSourceProvider;
@@ -136,7 +140,8 @@ public class LookupJoinOperator
             Runnable afterClose,
             OptionalInt lookupJoinsCount,
             HashGenerator hashGenerator,
-            PartitioningSpillerFactory partitioningSpillerFactory)
+            PartitioningSpillerFactory partitioningSpillerFactory,
+            Runnable afterMemOpFinish)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.forked = forked;
@@ -145,6 +150,7 @@ public class LookupJoinOperator
         requireNonNull(joinType, "joinType is null");
         // Cannot use switch case here, because javac will synthesize an inner class and cause IllegalAccessError
         probeOnOuterSide = joinType == PROBE_OUTER || joinType == FULL_OUTER;
+        spillBypassEnabled = probeOnOuterSide || !isInnerJoinSpillFilteringEnabled(operatorContext.getDriverContext().getSession());
 
         this.joinProbeFactory = requireNonNull(joinProbeFactory, "joinProbeFactory is null");
         this.afterClose = requireNonNull(afterClose, "afterClose is null");
@@ -159,6 +165,8 @@ public class LookupJoinOperator
 
         this.pageBuilder = new LookupJoinPageBuilder(buildOutputTypes);
         this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
+
+        this.afterMemOpFinish = afterMemOpFinish;
     }
 
     @Override
@@ -269,7 +277,9 @@ public class LookupJoinOperator
 
         Page newPage = page;
         if (spillInfoSnapshot.hasSpilled()) {
-            newPage = spillAndMaskSpilledPositions(page, spillInfoSnapshot.getSpillMask());
+            newPage = spillAndMaskSpilledPositions(page,
+                    spillInfoSnapshot.getSpillMask(),
+                    (spillBypassEnabled) ? (i, j) -> true : spillInfoSnapshot.getSpillMatcher());
             if (newPage.getPositionCount() == 0) {
                 return;
             }
@@ -295,7 +305,12 @@ public class LookupJoinOperator
         return true;
     }
 
-    private Page spillAndMaskSpilledPositions(Page page, IntPredicate spillMask)
+    private static Long getHashValue(HashGenerator hashGenerator, Object position, Object page)
+    {
+        return hashGenerator.hashPosition((int) position, (Page) page);
+    }
+
+    private Page spillAndMaskSpilledPositions(Page page, IntPredicate spillMask, BiPredicate<Integer, Long> spillMatcher)
     {
         checkState(spillInProgress.isDone(), "Previous spill still in progress");
         checkSuccess(spillInProgress, "spilling failed");
@@ -305,10 +320,11 @@ public class LookupJoinOperator
                     probeTypes,
                     getPartitionGenerator(),
                     operatorContext.getSpillContext().newLocalSpillContext(),
-                    operatorContext.newAggregateSystemMemoryContext()));
+                    operatorContext.newAggregateSystemMemoryContext(),
+                    hashGenerator::hashPosition));
         }
 
-        PartitioningSpillResult result = spiller.get().partitionAndSpill(page, spillMask);
+        PartitioningSpillResult result = spiller.get().partitionAndSpill(page, spillMask, spillMatcher);
         spillInProgress = result.getSpillingFuture();
         return result.getRetained();
     }
@@ -363,7 +379,10 @@ public class LookupJoinOperator
              * Let LookupSourceFactory know LookupSources can be disposed as far as we're concerned.
              */
             verify(partitionedConsumption == null, "partitioned consumption already started");
+            lookupSourceProvider.close();
             partitionedConsumption = lookupSourceFactory.finishProbeOperator(lookupJoinsCount);
+            afterMemOpFinish.run();
+            afterMemOpFinish = () -> {};
             unspilling = true;
         }
 
@@ -586,6 +605,7 @@ public class LookupJoinOperator
         try (Closer closer = Closer.create()) {
             // `afterClose` must be run last.
             // Closer is documented to mimic try-with-resource, which implies close will happen in reverse order.
+            closer.register(afterMemOpFinish::run);
             closer.register(afterClose::run);
 
             closer.register(pageBuilder::reset);
@@ -667,12 +687,19 @@ public class LookupJoinOperator
         private final boolean hasSpilled;
         private final long spillEpoch;
         private final IntPredicate spillMask;
+        private final BiPredicate<Integer, Long> spillMatcher;
 
         public SpillInfoSnapshot(boolean hasSpilled, long spillEpoch, IntPredicate spillMask)
+        {
+            this(hasSpilled, spillEpoch, spillMask, (a, b) -> true);
+        }
+
+        public SpillInfoSnapshot(boolean hasSpilled, long spillEpoch, IntPredicate spillMask, BiPredicate<Integer, Long> spillMatcher)
         {
             this.hasSpilled = hasSpilled;
             this.spillEpoch = spillEpoch;
             this.spillMask = requireNonNull(spillMask, "spillMask is null");
+            this.spillMatcher = requireNonNull(spillMatcher, "spillMater is null");
         }
 
         public static SpillInfoSnapshot from(LookupSourceLease lookupSourceLease)
@@ -680,7 +707,8 @@ public class LookupJoinOperator
             return new SpillInfoSnapshot(
                     lookupSourceLease.hasSpilled(),
                     lookupSourceLease.spillEpoch(),
-                    lookupSourceLease.getSpillMask());
+                    lookupSourceLease.getSpillMask(),
+                    lookupSourceLease.getSpillMatcher());
         }
 
         public static SpillInfoSnapshot noSpill()
@@ -701,6 +729,11 @@ public class LookupJoinOperator
         public IntPredicate getSpillMask()
         {
             return spillMask;
+        }
+
+        public BiPredicate<Integer, Long> getSpillMatcher()
+        {
+            return spillMatcher;
         }
     }
 
@@ -853,7 +886,10 @@ public class LookupJoinOperator
                     i -> {
                         throw new UnsupportedOperationException();
                     },
-                    i -> {}));
+                    i -> {},
+                    i -> {
+                        throw new UnsupportedOperationException();
+                    }));
         }
         else {
             this.partitionedConsumption = null;

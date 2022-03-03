@@ -157,7 +157,8 @@ public class LookupJoinOperatorFactory
                 () -> joinBridgeManager.probeOperatorClosed(driverContext.getLifespan()),
                 totalOperatorsCount,
                 probeHashGenerator,
-                partitioningSpillerFactory);
+                partitioningSpillerFactory,
+                () -> joinBridgeManager.probeOperatorFinished(driverContext.getLifespan()));
     }
 
     @Override

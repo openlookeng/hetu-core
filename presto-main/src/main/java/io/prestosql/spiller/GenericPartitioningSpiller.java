@@ -39,6 +39,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 import java.util.function.IntPredicate;
 import java.util.function.Predicate;
 
@@ -50,7 +52,7 @@ import static java.util.Objects.requireNonNull;
 
 @ThreadSafe
 @RestorableConfig(uncapturedFields = {"types", "partitionFunction", "closer",
-        "spillerFactory", "spillContext", "memoryContext", "pageBuilders"})
+        "spillerFactory", "spillContext", "memoryContext", "pageBuilders", "getRawHash"})
 public class GenericPartitioningSpiller
         implements PartitioningSpiller
 {
@@ -63,6 +65,7 @@ public class GenericPartitioningSpiller
 
     private final List<PageBuilder> pageBuilders;
     private final List<Optional<SingleStreamSpiller>> spillers;
+    private final BiFunction<Integer, Page, Long> getRawHash;
 
     private boolean readingStarted;
     private final Set<Integer> spilledPartitions = new HashSet<>();
@@ -72,7 +75,8 @@ public class GenericPartitioningSpiller
             PartitionFunction partitionFunction,
             SpillContext spillContext,
             AggregatedMemoryContext memoryContext,
-            SingleStreamSpillerFactory spillerFactory)
+            SingleStreamSpillerFactory spillerFactory,
+            BiFunction<Integer, Page, Long> getRawHash)
     {
         requireNonNull(spillContext, "spillContext is null");
 
@@ -93,6 +97,7 @@ public class GenericPartitioningSpiller
             spillers.add(Optional.empty());
         }
         this.pageBuilders = tmpPageBuilders.build();
+        this.getRawHash = getRawHash;
     }
 
     @Override
@@ -113,18 +118,24 @@ public class GenericPartitioningSpiller
     @Override
     public synchronized PartitioningSpillResult partitionAndSpill(Page page, IntPredicate spillPartitionMask)
     {
+        return partitionAndSpill(page, spillPartitionMask, (ign1, ign2) -> true);
+    }
+
+    @Override
+    public PartitioningSpillResult partitionAndSpill(Page page, IntPredicate spillPartitionMask, BiPredicate<Integer, Long> spillPartitionMatcher)
+    {
         requireNonNull(page, "page is null");
         requireNonNull(spillPartitionMask, "spillPartitionMask is null");
         checkArgument(page.getChannelCount() == types.size(), "Wrong page channel count, expected %s but got %s", types.size(), page.getChannelCount());
 
         checkState(!readingStarted, "reading already started");
-        IntArrayList unspilledPositions = partitionPage(page, spillPartitionMask);
+        IntArrayList unspilledPositions = partitionPage(page, spillPartitionMask, spillPartitionMatcher);
         ListenableFuture<?> future = flushFullBuilders();
 
         return new PartitioningSpillResult(future, page.getPositions(unspilledPositions.elements(), 0, unspilledPositions.size()));
     }
 
-    private synchronized IntArrayList partitionPage(Page page, IntPredicate spillPartitionMask)
+    private synchronized IntArrayList partitionPage(Page page, IntPredicate spillPartitionMask, BiPredicate<Integer, Long> spillPartitionMatcher)
     {
         IntArrayList unspilledPositions = new IntArrayList();
 
@@ -133,6 +144,10 @@ public class GenericPartitioningSpiller
 
             if (!spillPartitionMask.test(partition)) {
                 unspilledPositions.add(position);
+                continue;
+            }
+
+            if (getRawHash != null && !spillPartitionMatcher.test(partition, getRawHash.apply(position, page))) {
                 continue;
             }
 

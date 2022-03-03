@@ -13,6 +13,7 @@
  */
 package io.prestosql.operator;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.snapshot.MarkerPage;
@@ -45,7 +46,20 @@ public interface LookupSourceFactory
                 i -> {
                     throw new UnsupportedOperationException();
                 },
-                i -> {}));
+                i -> {},
+                i -> {
+                    throw new UnsupportedOperationException();
+                }));
+    }
+
+    default ListenableFuture<PartitionedConsumption<OuterPositionIterator>> startOuterOperator(OptionalInt lookupJoinsCount)
+    {
+        return immediateFuture(new PartitionedConsumption<>(
+                1,
+                ImmutableList.of(1),
+                i -> immediateFuture(null),
+                i -> {},
+                i -> immediateFuture(null)));
     }
 
     /**

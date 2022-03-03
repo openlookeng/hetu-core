@@ -51,11 +51,14 @@ import io.prestosql.sql.gen.JoinFilterFunctionCompiler.JoinFilterFunctionFactory
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.MaterializedRow;
 import io.prestosql.testing.TestingTaskContext;
+import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -564,6 +567,7 @@ public class TestHashJoinOperator
         checkState(buildOperatorCount == whenSpill.size());
         LookupSourceFactory lookupSourceFactory = lookupSourceFactoryManager.getJoinBridge(Lifespan.taskWide());
 
+        boolean closed = false;
         try (Operator joinOperator = joinOperatorFactory.createOperator(joinDriverContext)) {
             // build lookup source
             ListenableFuture<LookupSourceProvider> lookupSourceProvider = lookupSourceFactory.createLookupSourceProvider();
@@ -592,6 +596,10 @@ public class TestHashJoinOperator
             for (Driver buildDriver : buildDrivers) {
                 runDriverInThread(executor, buildDriver);
             }
+
+            joinOperatorFactory.noMoreOperators(joinDriverContext.getLifespan());
+            joinOperatorFactory.noMoreOperators();
+            closed = true;
 
             ValuesOperatorFactory valuesOperatorFactory = new ValuesOperatorFactory(17, new PlanNodeId("values"), probePages.build());
 
@@ -635,7 +643,10 @@ public class TestHashJoinOperator
             assertEqualsIgnoreOrder(getProperColumns(joinOperator, concat(probePages.getTypes(), buildPages.getTypes()), probePages, actualPages).getMaterializedRows(), expected.getMaterializedRows());
         }
         finally {
-            joinOperatorFactory.noMoreOperators();
+            if (!closed) {
+                joinOperatorFactory.noMoreOperators(joinDriverContext.getLifespan());
+                joinOperatorFactory.noMoreOperators();
+            }
         }
     }
 
@@ -1512,7 +1523,7 @@ public class TestHashJoinOperator
                         .collect(toImmutableList()),
                 partitionCount,
                 requireNonNull(ImmutableMap.of(), "layout is null"),
-                outer);
+                outer, false);
         JoinBridgeManager<PartitionedLookupSourceFactory> lookupSourceFactoryManager = new JoinBridgeManager<>(
                 outer,
                 UNGROUPED_EXECUTION,
@@ -1925,9 +1936,52 @@ public class TestHashJoinOperator
             matched = Booleans.asList(positions).stream().filter(e -> e).count();
         }
         else {
-            boolean[][] positions = (boolean[][]) state;
-            matched = Arrays.stream(positions).flatMap(array -> Booleans.asList(array).stream()).filter(e -> e).count();
+            ByteBuffer bb = ByteBuffer.wrap((byte[]) state);
+            List<RoaringBitmap> visitedPositions = new ArrayList<>();
+            for (int i = 0; i < (parallelBuild ? PARTITION_COUNT : 1); i++) {
+                ImmutableRoaringBitmap bm = new ImmutableRoaringBitmap(bb);
+                visitedPositions.add(new RoaringBitmap(bm));
+                bb.position(bb.position() + visitedPositions.get(i).serializedSizeInBytes());
+            }
+
+            matched = visitedPositions.stream().mapToLong(rr -> rr.getCardinality()).sum();
         }
         assertEquals(matched, 5);
+    }
+
+    @Test(timeOut = 30_000)
+    public void testBuildGracefulSpill()
+            throws Exception
+    {
+        TaskStateMachine taskStateMachine = new TaskStateMachine(new TaskId("query", 0, 0), executor);
+        TaskContext taskContext = TestingTaskContext.createTaskContext(executor, scheduledExecutor, TEST_SESSION, taskStateMachine);
+
+        // build factory
+        RowPagesBuilder buildPages = rowPagesBuilder(ImmutableList.of(VARCHAR, BIGINT))
+                .addSequencePage(4, 20, 200);
+
+        DummySpillerFactory buildSpillerFactory = new DummySpillerFactory();
+
+        BuildSideSetup buildSideSetup = setupBuildSide(true, taskContext, Ints.asList(0), buildPages, Optional.empty(), true, buildSpillerFactory);
+        instantiateBuildDrivers(buildSideSetup, taskContext);
+
+        JoinBridgeManager<PartitionedLookupSourceFactory> lookupSourceFactoryManager = buildSideSetup.getLookupSourceFactoryManager();
+        PartitionedLookupSourceFactory lookupSourceFactory = lookupSourceFactoryManager.getJoinBridge(Lifespan.taskWide());
+
+        // finish probe before any build partition is spilled
+        lookupSourceFactory.finishProbeOperator(OptionalInt.of(1));
+        lookupSourceFactory.whenMemProbeFinishes();
+
+        // spill build partition after probe is finished
+        HashBuilderOperator hashBuilderOperator = buildSideSetup.getBuildOperators().get(0);
+        hashBuilderOperator.startMemoryRevoke().get();
+        hashBuilderOperator.finishMemoryRevoke();
+        hashBuilderOperator.finish();
+
+        // hash builder operator should not deadlock waiting for spilled lookup source to be disposed
+        hashBuilderOperator.isBlocked().get();
+
+        lookupSourceFactory.destroy();
+        assertTrue(hashBuilderOperator.isFinished());
     }
 }

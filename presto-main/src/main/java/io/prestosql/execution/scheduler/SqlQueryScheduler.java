@@ -773,7 +773,7 @@ public class SqlQueryScheduler
                     }
 
                     // perform some scheduling work
-                    /* Todo(nitin) get groupSize specification from the ResourceGroupManager */
+                    /* Get groupSize specification from the ResourceGroupManager */
                     int maxSplitGroupSize = getOptimalSmallSplitGroupSize();
                     ScheduleResult result = stageSchedulers.get(stage.getStageId())
                             .schedule(maxSplitGroupSize);
