@@ -188,7 +188,7 @@ public class AuditLogResource
         }
     }
 
-    public List<String> getLogFiles(String type, String beginTime, String endTime, String user, String level)
+    public List<String> getLogFiles(String type, String beginTime, String endTime, String user, String level) throws IOException
     {
         ArrayList<String> res = new ArrayList<>();
         String logPath = eventListenerManager.getLogOutput() + "/" + type;
@@ -200,7 +200,7 @@ public class AuditLogResource
         Arrays.sort(file, (o1, o2) -> Long.valueOf(o1.lastModified()).compareTo(o2.lastModified()));
         for (File tmpFile : file) {
             if (filterTimeAndUser(beginTime, endTime, user, level, tmpFile.getName())) {
-                res.add(tmpFile.getAbsolutePath());
+                res.add(tmpFile.getCanonicalPath());
             }
         }
         return res;

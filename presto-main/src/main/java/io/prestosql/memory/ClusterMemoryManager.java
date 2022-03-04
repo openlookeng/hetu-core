@@ -549,7 +549,6 @@ public class ClusterMemoryManager
         for (InternalNode node : aliveNodes) {
             if (!nodes.containsKey(node.getNodeIdentifier()) && shouldIncludeNode(node)) {
                 nodes.put(node.getNodeIdentifier(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
-                //nodes.put(node.getInternalUri().toString(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
                 allNodes.put(node.getNodeIdentifier(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
                 eventListenerManager.eventEnhanced(new AuditLogEvent("Unknown", node.getInternalUri().toString(), "Add Node: " + node.getNodeIdentifier(), "Cluster", "INFO"));
             }

@@ -37,6 +37,7 @@ import io.prestosql.spi.queryhistory.QueryHistoryEntity;
 import io.prestosql.spi.queryhistory.QueryHistoryResult;
 
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -195,12 +196,12 @@ public class QueryHistoryService
         ArrayList<String> stateFilter = new ArrayList<>();
         ArrayList<String> failFilter = new ArrayList<>();
         for (String s : stateStr) {
-            stateFilter.add(s.toUpperCase());
+            stateFilter.add(s.toUpperCase(Locale.ENGLISH));
         }
         stateFilter.add("null");
 
         for (String s : failedStr) {
-            failFilter.add(s.toUpperCase());
+            failFilter.add(s.toUpperCase(Locale.ENGLISH));
         }
         failFilter.add("null");
         QueryHistoryResult queryHistoryResult = hetuMetaStoreManager.getHetuMetastore().getQueryHistory(startNum, pageSize, user, startTime, endTime,
