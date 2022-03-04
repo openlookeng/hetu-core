@@ -370,7 +370,7 @@ public abstract class AbstractTestStarTreeQueries
 
         assertUpdate(starTreeDisabledSession, "CREATE CUBE nation_show_create_cube_3 ON nation_show_create_cube_table_1 " +
                 "WITH (AGGREGATIONS=(count(*), count(distinct regionkey), avg(nationkey), max(regionkey))," +
-                " group=(regionkey), format= 'orc', partitioned_by = ARRAY['regionkey', 'nationkey']," +
+                " group=(regionkey), format= 'orc', partitioned_by = ARRAY['regionkey']," +
                 " FILTER = (nationkey >= 5 and name = 'PERU'))");
         originalResult = computeActual("SHOW CREATE CUBE nation_show_create_cube_3");
         newQuery = originalResult.getMaterializedRows().get(0).getFields().get(0).toString();
@@ -381,6 +381,29 @@ public abstract class AbstractTestStarTreeQueries
         assertTrue(newQuery.equals(reWrittenQuery));
         assertUpdate("DROP CUBE nation_show_create_cube_3");
         assertUpdate("DROP TABLE nation_show_create_cube_table_1");
+    }
+
+    @Test
+    public void testPartitionedByGroupOverlap()
+    {
+        computeActual("CREATE TABLE nation_partition_group_overlap_table AS SELECT * FROM nation");
+        assertQueryFails("CREATE CUBE nation_partition_group_overlap_cube ON nation_partition_group_overlap_table " +
+                "WITH (AGGREGATIONS = (sum(nationkey), count(*), max(regionkey), avg(nationkey), count(nationkey), count(DISTINCT regionkey)), " +
+                " GROUP=(nationkey), format = 'ORC', partitioned_by = ARRAY['nationkey','regionkey'])", "line 1:1: Some columns in 'nationkey,regionkey' in partitioned_by are not part of Cube.");
+        assertQueryFails("CREATE CUBE nation_partition_group_overlap_cube ON nation_partition_group_overlap_table " +
+                "WITH (AGGREGATIONS = (sum(nationkey), count(*), max(regionkey), avg(nationkey), count(nationkey), count(DISTINCT regionkey)), " +
+                " GROUP=(regionkey), format = 'ORC', partitioned_by = ARRAY['nationkey','regionkey'])", "line 1:1: Some columns in 'nationkey,regionkey' in partitioned_by are not part of Cube.");
+        assertQueryFails("CREATE CUBE nation_partition_group_overlap_cube ON nation_partition_group_overlap_table " +
+                "WITH (AGGREGATIONS = (sum(nationkey), count(*), max(regionkey), avg(nationkey), count(nationkey), count(DISTINCT regionkey)), " +
+                " GROUP=(regionkey), format = 'ORC', partitioned_by = ARRAY['nationkey'])", "line 1:1: Some columns in 'nationkey' in partitioned_by are not part of Cube.");
+        assertQueryFails("CREATE CUBE nation_partition_group_overlap_cube ON nation_partition_group_overlap_table " +
+                "WITH (AGGREGATIONS = (sum(nationkey), count(*), max(regionkey), avg(nationkey), count(nationkey), count(DISTINCT regionkey)), " +
+                " GROUP=(nationkey), format = 'ORC', partitioned_by = ARRAY['regionkey'])", "line 1:1: Some columns in 'regionkey' in partitioned_by are not part of Cube.");
+        assertUpdate("CREATE CUBE nation_partition_group_overlap_cube ON nation_partition_group_overlap_table " +
+                "WITH (AGGREGATIONS = (sum(nationkey), count(*), max(regionkey), avg(nationkey), count(nationkey), count(DISTINCT regionkey)), " +
+                " GROUP=(nationkey, regionkey), format = 'ORC', partitioned_by = ARRAY['nationkey','regionkey'])");
+        assertUpdate("DROP CUBE nation_partition_group_overlap_cube");
+        assertUpdate("DROP TABLE nation_partition_group_overlap_table");
     }
 
     @Test
@@ -629,7 +652,7 @@ public abstract class AbstractTestStarTreeQueries
         computeActual("CREATE TABLE timestamp_test_table (cint_1 int, cint_2 int, cint_3 int, cint_4 int, time_stamp TIMESTAMP)");
         computeActual("INSERT INTO timestamp_test_table (cint_1, cint_2, cint_3, cint_4, time_stamp) VALUES (4, 8 ,9 ,10 , timestamp '2021-03-15 15:20:00')");
         computeActual("CREATE CUBE timestamp_test_table_cube_1 ON timestamp_test_table " +
-                "WITH (AGGREGATIONS=(count(*))," + " group=(time_stamp), format= 'orc', partitioned_by = ARRAY['cint_1'])");
+                "WITH (AGGREGATIONS=(count(*))," + " group=(time_stamp, cint_1), format= 'orc', partitioned_by = ARRAY['cint_1'])");
         computeActual("INSERT INTO CUBE timestamp_test_table_cube_1 where time_stamp = timestamp '2021-03-15 15:20:00'");
         MaterializedResult result = computeActual("SHOW CUBES FOR timestamp_test_table");
         MaterializedRow matchingRow = result.getMaterializedRows().stream().filter(row -> row.getField(1).toString().contains("timestamp_test_table_cube_1")).findFirst().orElse(null);

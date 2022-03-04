@@ -24,6 +24,7 @@ import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.connector.TableNotFoundException;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.sql.analyzer.SemanticException;
 import io.prestosql.sql.tree.DropCube;
@@ -70,20 +71,25 @@ public class DropCubeTask
         CubeMetaStore cubeMetaStore = optionalCubeMetaStore.get();
         QualifiedObjectName fullObjectName = createQualifiedObjectName(session, statement, statement.getCubeName());
         QualifiedName cubeTableName = QualifiedName.of(fullObjectName.getCatalogName(), fullObjectName.getSchemaName(), fullObjectName.getObjectName());
-        Optional<CubeMetadata> matchedCube = cubeMetaStore.getMetadataFromCubeName(cubeTableName.toString());
-        if (!matchedCube.isPresent()) {
-            if (!statement.isExists()) {
-                throw new SemanticException(MISSING_CUBE, statement, "Cube '%s' does not exist", cubeTableName);
+        try {
+            Optional<CubeMetadata> matchedCube = cubeMetaStore.getMetadataFromCubeName(cubeTableName.toString());
+            if (!matchedCube.isPresent()) {
+                if (!statement.isExists()) {
+                    throw new SemanticException(MISSING_CUBE, statement, "Cube '%s' does not exist", cubeTableName);
+                }
+                return immediateFuture(null);
             }
+            Optional<TableHandle> tableHandle = metadata.getTableHandle(session, fullObjectName);
+            tableHandle.ifPresent(handle -> {
+                accessControl.checkCanDropTable(session.getRequiredTransactionId(), session.getIdentity(), fullObjectName);
+                metadata.dropTable(session, handle);
+            });
+            cubeMetaStore.removeCube(matchedCube.get());
+
             return immediateFuture(null);
         }
-        Optional<TableHandle> tableHandle = metadata.getTableHandle(session, fullObjectName);
-        tableHandle.ifPresent(handle -> {
-            accessControl.checkCanDropTable(session.getRequiredTransactionId(), session.getIdentity(), fullObjectName);
-            metadata.dropTable(session, handle);
-        });
-        cubeMetaStore.removeCube(matchedCube.get());
-
-        return immediateFuture(null);
+        catch (TableNotFoundException s) {
+            throw new SemanticException(MISSING_CUBE, statement, "Cube '%s' is not Found", cubeTableName.toString());
+        }
     }
 }
