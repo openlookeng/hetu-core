@@ -302,6 +302,12 @@ public class HetuHdfsFileSystemClient
         return path;
     }
 
+    @Override
+    public Stream<Path> getDirectoryStream(Path path, String prefix, String suffix) throws IOException
+    {
+        return list(path).filter(pth -> pth.getFileName().toString().startsWith(prefix) && pth.getFileName().toString().endsWith(suffix));
+    }
+
     /**
      * Getter for filesystem object (lazy instantiation)
      *

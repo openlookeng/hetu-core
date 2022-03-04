@@ -174,8 +174,7 @@ public class TestFileSingleStreamSpiller
                 1,
                 spillToHdfs,
                 spillProfile,
-                fileSystemClientManager,
-                "");
+                fileSystemClientManager);
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext);
         assertTrue(singleStreamSpiller instanceof FileSingleStreamSpiller);
@@ -187,10 +186,11 @@ public class TestFileSingleStreamSpiller
         assertEquals(memoryContext.getBytes(), 4096);
         spiller.spill(page).get();
         spiller.spill(Iterators.forArray(page, page, page)).get();
-        assertEquals(listFiles(spillPath.toPath()).stream().filter(path -> path.toString().endsWith(".bin")).count(), 1);
+        Path finalSpillPath = spillToHdfs ? spillerFactory.getSpillPaths().get(0) : spillPath.toPath();
+        assertEquals(listFiles(finalSpillPath).stream().filter(path -> path.toString().endsWith(".bin")).count(), 1);
 
         // Assert the spill codec flags match the expected configuration
-        try (InputStream is = newInputStream((listFiles(spillPath.toPath()).stream().filter(path -> path.toString().endsWith(".bin")).collect(Collectors.toList())).get(0))) {
+        try (InputStream is = newInputStream((listFiles(finalSpillPath).stream().filter(path -> path.toString().endsWith(".bin")).collect(Collectors.toList())).get(0))) {
             Iterator<SerializedPage> serializedPages = PagesSerdeUtil.readSerializedPages(new InputStreamSliceInput(is));
             assertTrue(serializedPages.hasNext(), "at least one page should be successfully read back");
             byte markers = serializedPages.next().getPageCodecMarkers();
@@ -221,7 +221,7 @@ public class TestFileSingleStreamSpiller
         }
 
         spiller.close();
-        assertEquals(listFiles(spillPath.toPath()).size(), 0);
+        assertEquals(listFiles(finalSpillPath).stream().filter(path -> path.toString().endsWith(".bin")).count(), 0);
         assertEquals(memoryContext.getBytes(), 0);
     }
 
@@ -308,13 +308,13 @@ public class TestFileSingleStreamSpiller
                 useKryo,
                 spillToHdfs,
                 spillProfile,
-                fileSystemClientManager,
-                "");
+                fileSystemClientManager);
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         long startTime = System.currentTimeMillis();
         Stopwatch spillTimer = Stopwatch.createStarted();
         long numberOfPages = pageSize.equals("1GB") ? 262144 : 512;
         Page page = buildPageBenchmark();
+        Path finalSpillPath = spillToHdfs ? spillerFactory.getSpillPaths().get(0) : spillPath.toPath();
         for (int j = 1; j <= fileCount; j++) {
             SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext);
             assertTrue(singleStreamSpiller instanceof FileSingleStreamSpiller);
@@ -346,7 +346,7 @@ public class TestFileSingleStreamSpiller
             };
 
             spiller.spill(pageIterator).get();
-            assertEquals(listFiles(spillPath.toPath()).stream().filter(path -> path.toString().endsWith(".bin")).count(), j);
+            assertEquals(listFiles(finalSpillPath).stream().filter(path -> path.toString().endsWith(".bin")).count(), j);
         }
         spillTimer.stop();
         System.out.println("Time To Spill: " + spillTimer.elapsed(TimeUnit.MILLISECONDS) + " ms Traditional Timer: " + (System.currentTimeMillis() - startTime));
@@ -364,7 +364,7 @@ public class TestFileSingleStreamSpiller
         log.debug("TimeTakenReadingFromSpill = " + (System.currentTimeMillis() - startTime));
         System.out.println("Time To Unspill: " + spillTimer.elapsed(TimeUnit.MILLISECONDS) + " ms, Traditional Timer: " + (System.currentTimeMillis() - startTime));
         spillers.stream().forEach(spiller -> spiller.close());
-        assertEquals(listFiles(spillPath.toPath()).size(), 0);
+        assertEquals(listFiles(finalSpillPath).stream().filter(path -> path.toString().endsWith(".bin")).count(), 0);
         assertEquals(memoryContext.getBytes(), 0);
     }
 
@@ -482,14 +482,14 @@ public class TestFileSingleStreamSpiller
                 useKryo,
                 spillToHdfs,
                 spillProfile,
-                fileSystemClientManager,
-                "");
+                fileSystemClientManager);
 
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
         long startTime = System.currentTimeMillis();
         Stopwatch spillTimer = Stopwatch.createStarted();
         long numberOfPages = pageSize.equals("1GB") ? 262144 : 512;
         Page page = buildPageBenchmark();
+        Path finalSpillPath = spillToHdfs ? spillerFactory.getSpillPaths().get(0) : spillPath.toPath();
         for (int j = 1; j <= fileCount; j++) {
             SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext);
             assertTrue(singleStreamSpiller instanceof FileSingleStreamSpiller);
@@ -521,12 +521,12 @@ public class TestFileSingleStreamSpiller
             };
 
             spiller.spill(pageIterator).get();
-            assertEquals(listFiles(spillPath.toPath()).stream().filter(path -> path.toString().endsWith(".bin")).count(), j);
+            assertEquals(listFiles(finalSpillPath).stream().filter(path -> path.toString().endsWith(".bin")).count(), j);
         }
         spillTimer.stop();
         long timeToSpill = spillTimer.elapsed(TimeUnit.MILLISECONDS);
         log.debug("TimeTakenToSpill = " + (System.currentTimeMillis() - startTime));
-        long spilledDiskSize = getDirectorySize(spillPath.toPath());
+        long spilledDiskSize = getDirectorySize(finalSpillPath);
 
         startTime = System.currentTimeMillis();
         spillTimer.reset();
@@ -549,7 +549,7 @@ public class TestFileSingleStreamSpiller
                 encryption, compression, useDirectSerde, pageSize, fileCount, useKryo,
                 timeToSpill, timeToUnspill, humanReadableByteCountBin(spilledDiskSize));
         spillers.stream().forEach(spiller -> spiller.close());
-        assertEquals(listFiles(spillPath.toPath()).size(), 0);
+        assertEquals(listFiles(finalSpillPath).stream().filter(path -> path.toString().endsWith(".bin")).count(), 0);
         assertEquals(memoryContext.getBytes(), 0);
     }
 

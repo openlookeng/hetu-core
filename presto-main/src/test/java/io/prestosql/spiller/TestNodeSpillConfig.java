@@ -37,7 +37,6 @@ public class TestNodeSpillConfig
                 .setSpillEncryptionEnabled(false)
                 .setSpillDirectSerdeEnabled(false)
                 .setSpillPrefetchReadPages(1)
-                .setNodeId(null)
                 .setSpillUseKryoSerialization(false));
     }
 
@@ -52,7 +51,6 @@ public class TestNodeSpillConfig
                 .put("experimental.spill-direct-serde-enabled", "true")
                 .put("experimental.spill-prefetch-read-pages", "25")
                 .put("experimental.spill-use-kryo-serialization", "true")
-                .put("node.id", "ffffffff-ffff-ffff-ffff-ffffffffffff")
                 .build();
 
         NodeSpillConfig expected = new NodeSpillConfig()
@@ -62,8 +60,7 @@ public class TestNodeSpillConfig
                 .setSpillEncryptionEnabled(true)
                 .setSpillDirectSerdeEnabled(true)
                 .setSpillPrefetchReadPages(25)
-                .setSpillUseKryoSerialization(true)
-                .setNodeId("ffffffff-ffff-ffff-ffff-ffffffffffff");
+                .setSpillUseKryoSerialization(true);
 
         assertFullMapping(properties, expected);
     }

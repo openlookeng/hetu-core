@@ -30,8 +30,10 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Locale;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static java.nio.file.Files.getFileStore;
+import static java.nio.file.Files.newDirectoryStream;
 
 /**
  * HetuFileSystemClient implementation for local file system
@@ -244,5 +246,12 @@ public class HetuLocalFileSystemClient
     public Path createFile(Path path) throws IOException
     {
         return Files.createFile(path);
+    }
+
+    @Override
+    public Stream<Path> getDirectoryStream(Path path, String prefix, String suffix) throws IOException
+    {
+        String glob = prefix + "*" + suffix;
+        return StreamSupport.stream(newDirectoryStream(path, glob).spliterator(), false);
     }
 }
