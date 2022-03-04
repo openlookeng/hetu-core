@@ -60,6 +60,9 @@ public class HetuLogUtil
     {
         String fileName = logOutput + "/" + type + "/" + level + "#" + username + "#" + getCurrentDate(logConversionPattern) + ".log";
         java.util.logging.Logger logger = java.util.logging.Logger.getLogger(type + level + username + getCurrentDate(logConversionPattern));
+        if (logOutput == null) {
+            return logger;
+        }
         try {
             if (loggerConcurrentHashMap.containsKey(fileName)) {
                 return loggerConcurrentHashMap.get(fileName);

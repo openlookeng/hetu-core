@@ -42,7 +42,7 @@ public class HetuEventListenerConfig
 
     private int auditFileCount = 1;
 
-    private String auditLogFile = "etc/log";
+    private String auditLogFile;
 
     private String auditLogConversionPattern;
 
