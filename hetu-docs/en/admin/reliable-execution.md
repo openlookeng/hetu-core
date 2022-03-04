@@ -57,21 +57,15 @@ The ability to recover from an error and resume from a snapshot does not come fo
 
 It is suggested to only turn on distributed snapshot when necessary, i.e. for queries that run for a long time. For these types of workloads, the overhead of taking snapshots becomes negligible.
 
-## Snapshot statastics
+## Snapshot statistics
 
-Snapshot capture statastics and restore statastics are displayed in CLI along with query result when CLI is launched in debug mode
+Snapshot capture and restore statistics are displayed in CLI along with query result when CLI is launched in debug mode
 
-Snapshot capture statastics covers size of snapshots captured, CPU Time taken for capturing the snapshots and Wall Time taken for capturing the snapshots during the query.  These statastics are displayed for all snapshots and for last snapshot separately.
+Snapshot capture statistics covers size of snapshots captured, CPU Time taken for capturing the snapshots and Wall Time taken for capturing the snapshots during the query.  These statistics are displayed for all snapshots and for last snapshot separately.
 
-```
-Ex: Snapshot Capture: All: 482MB/14.0s/78.0s, Last: 240MB/6.5s/50.0s
-```
+Snapshot restore statistics covers number of times restored from snapshots during query, Size of the snapshots loaded for restoring, CPU Time taken for restoring from snapshots and Wall Time taken for restoring from snapshots.  Restore statistics are displayed only when there is restore(recovery) happened during the query.
 
-Snapshot restore statastics covers number of times restored from snapshots during query, Size of the snapshots loaded for restoring, CPU Time taken for restoring from snapshots and Wall Time taken for restoring from snapshots.  Restore statastics are displayed only when there is restore(recovery) happened during the query.
-
-```j
-Ex: Snapshot Restore: 1/240MB/0.2s/5.0s
-```
+![](../images/snapshot_statistics.png)
 
 ## Configurations
 
