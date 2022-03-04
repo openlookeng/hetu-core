@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -14,16 +15,18 @@
 package io.hetu.core.eventlistener.util;
 
 import io.hetu.core.eventlistener.HetuEventListenerConfig;
-import org.apache.log4j.FileAppender;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-import org.apache.log4j.PatternLayout;
+import io.prestosql.spi.PrestoException;
 
 import java.io.File;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-
-import static java.util.Objects.requireNonNull;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.FileHandler;
+import java.util.logging.Formatter;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 public class HetuLogUtil
 {
@@ -31,12 +34,16 @@ public class HetuLogUtil
 
     private static String logOutput;
 
-    public HetuLogUtil(HetuEventListenerConfig config)
+    private static ConcurrentHashMap<String, Logger> loggerConcurrentHashMap;
+
+    private HetuLogUtil(){}
+
+    public static void create(HetuEventListenerConfig config)
     {
-        requireNonNull(config, "config is null");
-        this.logConversionPattern = config.getAuditLogConversionPattern();
-        this.logOutput = config.getAuditLogFile();
-        this.createFile(config.getAuditLogFile());
+        logConversionPattern = config.getAuditLogConversionPattern();
+        logOutput = config.getAuditLogFile();
+        loggerConcurrentHashMap = new ConcurrentHashMap<>();
+        createFile(config.getAuditLogFile());
     }
 
     private static String getCurrentDate(String logConversionPattern)
@@ -51,31 +58,57 @@ public class HetuLogUtil
 
     public static Logger getLoggerByName(String username, String level, AuditType type)
     {
-        Logger logger = Logger.getLogger(username + Thread.currentThread().getName());
-        logger.removeAllAppenders();
-        logger.setLevel(Level.INFO);
-        logger.setAdditivity(false);
-
-        FileAppender appender = new FileAppender();
-        PatternLayout layout = new PatternLayout();
-        layout.setConversionPattern("%d{yyyy-MM-dd HH:mm:ss} %p %C %m%n");
-
-        appender.setLayout(layout);
-        appender.setFile(logOutput + "/" + type + "/" + level + "#" + username + "#" + getCurrentDate(logConversionPattern) + ".log");
-        appender.setEncoding("UTF-8");
-        appender.setAppend(true);
-        appender.activateOptions();
-
-        logger.addAppender(appender);
-        return logger;
+        String fileName = logOutput + "/" + type + "/" + level + "#" + username + "#" + getCurrentDate(logConversionPattern) + ".log";
+        java.util.logging.Logger logger = java.util.logging.Logger.getLogger(type + level + username + getCurrentDate(logConversionPattern));
+        try {
+            if (loggerConcurrentHashMap.containsKey(fileName)) {
+                return loggerConcurrentHashMap.get(fileName);
+            }
+            synchronized (HetuLogUtil.class) {
+                if (loggerConcurrentHashMap.containsKey(fileName)) {
+                    return loggerConcurrentHashMap.get(fileName);
+                }
+                FileHandler fileHandler = new FileHandler(fileName, 0, 1, true);
+                fileHandler.setFormatter(new Formatter(){
+                    @Override
+                    public String format(LogRecord logRecord)
+                    {
+                        return logRecord.getMessage() + "\n";
+                    }
+                });
+                logger.addHandler(fileHandler);
+                logger.setUseParentHandlers(false);
+                loggerConcurrentHashMap.put(fileName, logger);
+                clearUnusedLogger();
+            }
+            return loggerConcurrentHashMap.get(fileName);
+        }
+        catch (IOException ex) {
+            throw new PrestoException(ListenerErrorCode.LOCAL_FILE_FILESYSTEM_ERROR,
+                    "failed to create logger writing to " + fileName, ex);
+        }
     }
 
-    private void createFile(String auditLogFile)
+    private static void clearUnusedLogger()
+    {
+        String currentTime = getCurrentDate(logConversionPattern);
+        for (String key : loggerConcurrentHashMap.keySet()) {
+            String loggerTime = key.substring(key.lastIndexOf("#") + 1, key.length() - 4);
+            if (loggerTime.compareTo(currentTime) < 0) {
+                Logger deadLogger = loggerConcurrentHashMap.get(key);
+                for (Handler h : deadLogger.getHandlers()) {
+                    h.close();
+                }
+                loggerConcurrentHashMap.remove(key);
+            }
+        }
+    }
+
+    private static void createFile(String auditLogFile)
     {
         if (auditLogFile == null) {
             return;
         }
-        System.setProperty("hetu-LogOutput", auditLogFile);
         File logFileSql = new File(auditLogFile + "/Sql");
         File logFileWebUi = new File(auditLogFile + "/WebUi");
         File logFileCluster = new File(auditLogFile + "/Cluster");

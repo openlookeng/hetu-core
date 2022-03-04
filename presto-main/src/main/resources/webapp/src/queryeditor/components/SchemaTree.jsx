@@ -46,7 +46,6 @@ function getIcon(type) {
             else {
                 return <i className="icon fa fa-server valign-middle" style={{marginLeft: "14.5px", color : 'gray'}}></i>
             }
-            // return (<i className="material-icons">source</i>);
         }
         default: {
             return (<i className="material-icons">dashboard</i>);
@@ -58,7 +57,6 @@ function renderItem(tree, item) {
     flag = item.children == undefined || item.children instanceof Array && item.children.length == 0 ;
     let style = (item.children == undefined || item.children instanceof Array && item.children.length == 0) ? { marginLeft: "14.5px",color: "gray" } : {};
     let tableStyle = {};
-    //Object.assign(tableStyle, style, { cursor: "pointer" })
     let favorite = tree.isFavorite(item);
     if (item.type == dataType.TABLE) {
         if (item.fqn == tree.selectedTableName) {
@@ -134,11 +132,6 @@ function renderItem(tree, item) {
                     }}>
                         <i className="icon fa fa-refresh valign-middle" /><span>Refresh</span>
                     </MenuItem>
-                    {/*<MenuItem data={{ item: item, tree: tree }} onClick={(e, data) => {*/}
-                    {/*    tree.showCatalog(item);*/}
-                    {/*}}>*/}
-                    {/*    <i className="icon fa fa-file-text-o show-catalog" /><span>Show Catalog</span>*/}
-                    {/*</MenuItem>*/}
                     {item.type == dataType.CATALOG ?
                         <MenuItem data={{ item: item, tree: tree }} onClick={(e, data) => {
                             tree.showCatalog(item);
@@ -170,7 +163,6 @@ function renderItem(tree, item) {
             </a>
         )
     }
-    // return (<a style={style}>{getIcon(item.type)}<span>{item.name}</span></a>);
 }
 
 function sortItems(tree, item1, item2) {
@@ -305,7 +297,6 @@ class SchemaTree extends React.Component {
         return strMap;
     }
 
-
     showCatalog(item) {
         this.state.catalog_name = item.name;
         let showText = item.name;
@@ -437,7 +428,7 @@ class SchemaTree extends React.Component {
         return { found: false, self: false };
     }
 
-    reloadItem(item) {
+    reloadItem() {
         let model = this.state.model;
         this.state.model = [];
         this.setState(this.state);

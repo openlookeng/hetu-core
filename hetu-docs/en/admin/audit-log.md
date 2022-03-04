@@ -24,8 +24,8 @@ To enable audit logging feature, the following configs must be present in `etc/e
 hetu.event.listener.type=AUDIT
 hetu.event.listener.listen.query.creation=true
 hetu.event.listener.listen.query.completion=true
-hetu.auditlog.LogOutput=/var/log/
-hetu.auditlog.LogConversionPattern=yyyy-MM-dd.HH
+hetu.auditlog.logoutput=/var/log/
+hetu.auditlog.logconversionpattern=yyyy-MM-dd.HH
 ```
 
 Other audit logging properties include: 
@@ -46,6 +46,6 @@ hetu.event.listener.listen.query.completion=true
 hetu.event.listener.audit.file=/var/log/hetu/hetu-audit.log
 hetu.event.listener.audit.filecount=1
 hetu.event.listener.audit.limit=100000
-hetu.auditlog.LogOutput=/var/log/
-hetu.auditlog.LogConversionPattern=yyyy-MM-dd.HH
+hetu.auditlog.logoutput=/var/log/
+hetu.auditlog.logconversionpattern=yyyy-MM-dd.HH
 ```

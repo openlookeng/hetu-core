@@ -115,6 +115,10 @@ body {
     background-color: #e8e6e6;
 }
 
+.collection-btn .fa-plus {
+    font-size: 75%;
+}
+
 .hetu-app {
     position: relative;
     top: 0;

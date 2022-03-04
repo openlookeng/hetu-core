@@ -23,8 +23,8 @@ openLooKeng审计日志记录功能是一个自定义事件监听器，监听ope
 hetu.event.listener.type=AUDIT
 hetu.event.listener.listen.query.creation=true
 hetu.event.listener.listen.query.completion=true
-hetu.auditlog.LogOutput=/var/log/
-hetu.auditlog.LogConversionPattern=yyyy-MM-dd.HH
+hetu.auditlog.logoutput=/var/log/
+hetu.auditlog.logconversionpattern=yyyy-MM-dd.HH
 ```
 
 其他审计日志记录属性包括：
@@ -45,6 +45,6 @@ hetu.event.listener.listen.query.completion=true
 hetu.event.listener.audit.file=/var/log/hetu/hetu-audit.log
 hetu.event.listener.audit.filecount=1
 hetu.event.listener.audit.limit=100000
-hetu.auditlog.LogOutput=/var/log/
-hetu.auditlog.LogConversionPattern=yyyy-MM-dd.HH
+hetu.auditlog.logoutput=/var/log/
+hetu.auditlog.logconversionpattern=yyyy-MM-dd.HH
 ```

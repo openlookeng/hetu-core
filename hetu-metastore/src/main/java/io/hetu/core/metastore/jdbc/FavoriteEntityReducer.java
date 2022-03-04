@@ -26,7 +26,7 @@ public class FavoriteEntityReducer
     @Override
     public void accumulate(Map<Long, FavoriteEntity> map, RowView rowView)
     {
-        FavoriteEntity favoriteEntityReducer = map.computeIfAbsent(rowView.getColumn("id", Long.class),
+        map.computeIfAbsent(rowView.getColumn("id", Long.class),
                 id -> rowView.getRow(FavoriteEntity.class));
     }
 }

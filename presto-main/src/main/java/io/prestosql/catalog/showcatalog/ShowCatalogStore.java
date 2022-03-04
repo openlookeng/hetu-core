@@ -88,18 +88,23 @@ public class ShowCatalogStore
         Set<String> localCatalogs = listCatalogNames(CatalogStoreType.LOCAL);
         Set<String> shareCatalogs = listCatalogNames(CatalogStoreType.SHARE);
         if (localCatalogs.contains(catalogName)) {
-            return localCatalogStore.getCatalogProperties(catalogName, 0, dynamicCatalogConfig.getCatalogConfigurationDir());
+            return localCatalogStore.getCatalogProperties(catalogName, CatalogConfigType.DYNAMIC, dynamicCatalogConfig.getCatalogConfigurationDir());
         }
         else if (shareCatalogs.contains(catalogName)) {
-            return shareCatalogStore.getCatalogProperties(catalogName, 0, dynamicCatalogConfig.getCatalogShareConfigurationDir());
+            return shareCatalogStore.getCatalogProperties(catalogName, CatalogConfigType.DYNAMIC, dynamicCatalogConfig.getCatalogShareConfigurationDir());
         }
         else {
-            return localCatalogStore.getCatalogProperties(catalogName, 1, staticCatalogConfig.getCatalogConfigurationDir().toString());
+            return localCatalogStore.getCatalogProperties(catalogName, CatalogConfigType.STATIC, staticCatalogConfig.getCatalogConfigurationDir().toString());
         }
     }
 
     public enum CatalogStoreType {
         LOCAL,
         SHARE
+    }
+
+    public enum CatalogConfigType {
+        DYNAMIC,
+        STATIC
     }
 }

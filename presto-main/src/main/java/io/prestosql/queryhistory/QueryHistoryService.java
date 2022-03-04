@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -13,6 +14,7 @@
  */
 package io.prestosql.queryhistory;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.base.Strings;
@@ -20,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
+import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.dispatcher.DispatchQuery;
@@ -43,16 +46,19 @@ import static java.util.Objects.requireNonNull;
 
 public class QueryHistoryService
 {
+    private static final Logger log = Logger.get(QueryHistoryService.class);
     private final HetuMetaStoreManager hetuMetaStoreManager;
+    private final QueryHistoryConfig queryHistoryConfig;
 
     private static final DataSize ZERO_BYTES = new DataSize(0, DataSize.Unit.BYTE);
     private static final Duration ZERO_MILLIS = new Duration(0, TimeUnit.MILLISECONDS);
     private static AtomicLong currentQueries = new AtomicLong(0);
 
     @Inject
-    public QueryHistoryService(HetuMetaStoreManager hetuMetaStoreManager)
+    public QueryHistoryService(HetuMetaStoreManager hetuMetaStoreManager, QueryHistoryConfig queryHistoryConfig)
     {
         this.hetuMetaStoreManager = requireNonNull(hetuMetaStoreManager, "metaStoreManager is null");
+        this.queryHistoryConfig = requireNonNull(queryHistoryConfig, "queryHistoryConfig is null");
     }
 
     public void insert(QueryInfo queryInfo)
@@ -60,71 +66,72 @@ public class QueryHistoryService
         if (queryInfo == null) {
             return;
         }
+        String user = queryInfo.getSession().getUser();
+        String source = queryInfo.getSession().getSource().get();
+        if (source == null) {
+            return;
+        }
+        String queryId = queryInfo.getQueryId().getId();
+        String resource = null;
+        if (queryInfo.getResourceGroupId().isPresent()) {
+            resource = queryInfo.getResourceGroupId().get().getLastSegment();
+        }
+        String query = queryInfo.getQuery();
+        String catalog = queryInfo.getSession().getCatalog().get();
+        String schemata = queryInfo.getSession().getSchema().get();
+        String state = queryInfo.getState().toString();
+        String failed = "null";
+        if (queryInfo.getErrorType() != null) {
+            failed = queryInfo.getErrorType().toString();
+        }
+        String createTime = queryInfo.getQueryStats().getCreateTime().toString();
+        String elapsedTime = queryInfo.getQueryStats().getElapsedTime().toString();
+        String cpuTime = queryInfo.getQueryStats().getTotalCpuTime().toString();
+        String executionTime = queryInfo.getQueryStats().getExecutionTime().toString();
+        String currentMemory = queryInfo.getQueryStats().getUserMemoryReservation().toString();
+        double cumulativeUserMemory = queryInfo.getQueryStats().getCumulativeUserMemory();
+        ObjectMapper objectMapper = new ObjectMapperProvider().get();
+        objectMapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
+        objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
+        String jsonString = null;
         try {
-            String user = queryInfo.getSession().getUser();
-            String source = queryInfo.getSession().getSource().get();
-            if (source == null) {
-                return;
-            }
-            String queryId = queryInfo.getQueryId().getId();
-            String resource = null;
-            if (queryInfo.getResourceGroupId().isPresent()) {
-                resource = queryInfo.getResourceGroupId().get().getLastSegment();
-            }
-            String query = queryInfo.getQuery();
-            String catalog = queryInfo.getSession().getCatalog().get();
-            String schemata = queryInfo.getSession().getSchema().get();
-            String state = queryInfo.getState().toString();
-            String failed = "null";
-            if (queryInfo.getErrorType() != null) {
-                failed = queryInfo.getErrorType().toString();
-            }
-            String createTime = queryInfo.getQueryStats().getCreateTime().toString();
-            String elapsedTime = queryInfo.getQueryStats().getElapsedTime().toString();
-            String cpuTime = queryInfo.getQueryStats().getTotalCpuTime().toString();
-            String executionTime = queryInfo.getQueryStats().getExecutionTime().toString();
-            String currentMemory = queryInfo.getQueryStats().getUserMemoryReservation().toString();
-            double cumulativeUserMemory = queryInfo.getQueryStats().getCumulativeUserMemory();
-            ObjectMapper objectMapper = new ObjectMapperProvider().get();
-            objectMapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
-            objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
-            String jsonString = null;
             jsonString = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(queryInfo);
-            int completedDrivers = queryInfo.getQueryStats().getCompletedDrivers();
-            int runningDrivers = queryInfo.getQueryStats().getRunningDrivers();
-            int queuedDrivers = queryInfo.getQueryStats().getQueuedDrivers();
-            String totalCpuTime = queryInfo.getQueryStats().getTotalCpuTime().toString();
-            String totalMemoryReservation = queryInfo.getQueryStats().getTotalMemoryReservation().toString();
-            String peakTotalMemoryReservation = queryInfo.getQueryStats().getPeakTotalMemoryReservation().toString();
+        }
+        catch (JsonProcessingException e) {
+            log.error(e);
+        }
+        int completedDrivers = queryInfo.getQueryStats().getCompletedDrivers();
+        int runningDrivers = queryInfo.getQueryStats().getRunningDrivers();
+        int queuedDrivers = queryInfo.getQueryStats().getQueuedDrivers();
+        String totalCpuTime = queryInfo.getQueryStats().getTotalCpuTime().toString();
+        String totalMemoryReservation = queryInfo.getQueryStats().getTotalMemoryReservation().toString();
+        String peakTotalMemoryReservation = queryInfo.getQueryStats().getPeakTotalMemoryReservation().toString();
 
-            QueryHistoryEntity queryHistoryEntity = new QueryHistoryEntity();
-            queryHistoryEntity.setQueryId(queryId);
-            queryHistoryEntity.setState(state);
-            queryHistoryEntity.setFailed(failed);
-            queryHistoryEntity.setQuery(query);
-            queryHistoryEntity.setUser(user);
-            queryHistoryEntity.setSource(source);
-            queryHistoryEntity.setResource(resource);
-            queryHistoryEntity.setCatalog(catalog);
-            queryHistoryEntity.setSchemata(schemata);
-            queryHistoryEntity.setCurrentMemory(currentMemory);
-            queryHistoryEntity.setCompletedDrivers(completedDrivers);
-            queryHistoryEntity.setRunningDrivers(runningDrivers);
-            queryHistoryEntity.setQueuedDrivers(queuedDrivers);
-            queryHistoryEntity.setCreateTime(createTime);
-            queryHistoryEntity.setExecutionTime(executionTime);
-            queryHistoryEntity.setElapsedTime(elapsedTime);
-            queryHistoryEntity.setCpuTime(cpuTime);
-            queryHistoryEntity.setTotalCpuTime(totalCpuTime);
-            queryHistoryEntity.setTotalMemoryReservation(totalMemoryReservation);
-            queryHistoryEntity.setPeakTotalMemoryReservation(peakTotalMemoryReservation);
-            queryHistoryEntity.setCumulativeUserMemory(cumulativeUserMemory);
-            hetuMetaStoreManager.getHetuMetastore().insertQueryHistory(queryHistoryEntity, jsonString);
-            currentQueries.incrementAndGet();
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-        }
+        QueryHistoryEntity queryHistoryEntity = new QueryHistoryEntity.Builder()
+                .setQueryId(queryId)
+                .setState(state)
+                .setFailed(failed)
+                .setQuery(query)
+                .setUser(user)
+                .setSource(source)
+                .setResource(resource)
+                .setCatalog(catalog)
+                .setSchemata(schemata)
+                .setCurrentMemory(currentMemory)
+                .setCompletedDrivers(completedDrivers)
+                .setRunningDrivers(runningDrivers)
+                .setQueuedDrivers(queuedDrivers)
+                .setCreateTime(createTime)
+                .setExecutionTime(executionTime)
+                .setElapsedTime(elapsedTime)
+                .setCpuTime(cpuTime)
+                .setTotalCpuTime(totalCpuTime)
+                .setTotalMemoryReservation(totalMemoryReservation)
+                .setPeakTotalMemoryReservation(peakTotalMemoryReservation)
+                .setCumulativeUserMemory(cumulativeUserMemory)
+                .build();
+        hetuMetaStoreManager.getHetuMetastore().insertQueryHistory(queryHistoryEntity, jsonString);
+        currentQueries.incrementAndGet();
     }
 
     public String getQueryDetail(String queryId)
@@ -155,23 +162,24 @@ public class QueryHistoryService
         else {
             sortOrder = "asc";
         }
-        if (sort.equals("cumulative")) {
-            sort = "cumulativeUserMemory";
-        }
-        else if (sort.equals("memory")) {
-            sort = "currentMemory";
-        }
-        else if (sort.equals("elapsed")) {
-            sort = "elapsedTime";
-        }
-        else if (sort.equals("cpu")) {
-            sort = "cpuTime";
-        }
-        else if (sort.equals("execution")) {
-            sort = "executionTime";
-        }
-        else {
-            sort = "createTime";
+        switch (sort) {
+            case "cumulative":
+                sort = "cumulativeUserMemory";
+                break;
+            case "memory":
+                sort = "currentMemory";
+                break;
+            case "elapsed":
+                sort = "elapsedTime";
+                break;
+            case "cpu":
+                sort = "cpuTime";
+                break;
+            case "execution":
+                sort = "executionTime";
+                break;
+            default:
+                sort = "createTime";
         }
         if (stateStr == null || stateStr.equals("")) {
             return new QueryHistoryResult(0, null);
@@ -201,8 +209,17 @@ public class QueryHistoryService
         return queryHistoryResult;
     }
 
-    public static Long getCurrentQueries()
+    // assign queryHistoryCount to currentQueries
+    // if queryHistoryCount > 1000, then delete the oldest 100 queryHistory
+    public Long getCurrentQueries()
     {
+        if (currentQueries.get() == 0) {
+            currentQueries.set(hetuMetaStoreManager.getHetuMetastore().getAllQueryHistoryNum());
+        }
+        if (currentQueries.get() > queryHistoryConfig.getMaxQueryHistoryCount()) {
+            hetuMetaStoreManager.getHetuMetastore().deleteQueryHistoryBatch();
+            currentQueries.set(0);
+        }
         return currentQueries.get();
     }
 

@@ -19,6 +19,7 @@ import com.google.common.io.ByteStreams;
 import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
 import io.hetu.core.common.util.SecurePathWhiteList;
+import io.prestosql.catalog.showcatalog.ShowCatalogStore;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.filesystem.FileBasedLock;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
@@ -234,13 +235,13 @@ public abstract class AbstractCatalogStore
         return new CatalogInfo(catalogName, connectorName, null, createdTime, version, catalogProperties);
     }
 
-    public Map<String, String> getCatalogProperties(String catalogName, int state, String baseDirectory)
+    public Map<String, String> getCatalogProperties(String catalogName, ShowCatalogStore.CatalogConfigType state, String baseDirectory)
             throws IOException
     {
         Properties properties = new Properties();
         CatalogFilePath catalogPath = new CatalogFilePath(baseDirectory, catalogName);
         Path path;
-        if (state == 0) {
+        if (state == ShowCatalogStore.CatalogConfigType.DYNAMIC) {
             path = catalogPath.getPropertiesPath();
         }
         else {

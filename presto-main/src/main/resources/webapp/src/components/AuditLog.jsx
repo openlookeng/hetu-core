@@ -94,8 +94,6 @@ export class AuditLog extends React.Component {
         this.onTabChange = this.onTabChange.bind(this);
         this.renderAuditLog = this.renderAuditLog.bind(this);
         this.handleDownload = this.handleDownload.bind(this);
-        // this.onChangeListLogLevel = this.onChangeListLogLevel.bind(this);
-        // this.onChangeListType = this.onChangeListType.bind(this);
     }
 
     resetTimer() {
@@ -201,33 +199,6 @@ export class AuditLog extends React.Component {
 
         this.debounceSearch();
     }
-
-    // onChangeListLogLevel(selectedItemList) {
-    //     this.state.itemListLogLevel.map(item => {this.state.checkStatusLogLevel[item.value]=false})
-    //     selectedItemList.map(item => {this.state.checkStatusLogLevel[item.value]=true})
-    //     let state = this.state;
-    //     state.selectedItemListLogLevel = selectedItemList;
-    //     let LogLevelString = "";
-    //     if (this.state.checkStatusLogLevel.INFO && this.state.checkStatusLogLevel.WARN) {
-    //         LogLevelString = "INFO,WARN";
-    //     }
-    //     else if (this.state.checkStatusLogLevel.WARN) {
-    //         LogLevelString = "WARN";
-    //     }
-    //     else if (this.state.checkStatusLogLevel.INFO) {
-    //         LogLevelString = "INFO";
-    //     }
-    //     this.state.searchStringLogLevel = LogLevelString;
-    //     this.setState(state);
-    // }
-
-    // onChangeListType(selectedItemList) {
-    //     this.state.itemListType.map(item => {this.state.checkStatusType[item.value]=false})
-    //     selectedItemList.map(item => {this.state.checkStatusType[item.value]=true})
-    //     let state = this.state;
-    //     state.selectedItemListType = selectedItemList;
-    //     this.setState(state);
-    // }
 
     renderDateRangePicker() {
         let that = this;
@@ -358,22 +329,6 @@ export class AuditLog extends React.Component {
                                            onChange={this.handleSearchStringChange} value={this.state.searchStringUser} />
                                     <input type="text" id="date-picker" className="form-control form-control-auditlog search-bar" placeholder="Date" name="Date"
                                            onFocus={this.renderDateRangePicker}  onChange={this.handleSearchStringChange} value={this.state.searchStringDate}/>
-                                    {/*<MultiSelect*/}
-                                    {/*    title={"Log Level"}*/}
-                                    {/*    itemList={this.state.itemListLogLevel}*/}
-                                    {/*    selectedItemList={this.state.selectedItemListLogLevel}*/}
-                                    {/*    changeList={this.onChangeListLogLevel}*/}
-                                    {/*    isObjectArray={true}*/}
-                                    {/*/>*/}
-                                    {/*<MultiSelect*/}
-                                    {/*    title={"Type"}*/}
-                                    {/*    itemList={this.state.itemListType}*/}
-                                    {/*    selectedItemList={this.state.selectedItemListType}*/}
-                                    {/*    changeList={this.onChangeListType}*/}
-                                    {/*    isObjectArray={true}*/}
-                                    {/*form-control form-control-auditlog select*/}
-                                    {/*/>*/}
-
                                     <select id="loglevel" className="selectpicker" data-style="select" onChange={this.handleSearchStringChange} value={this.state.searchStringLogLevel} name="LogLevel" >
                                         <option>INFO </option>
                                         <option>WARN </option>

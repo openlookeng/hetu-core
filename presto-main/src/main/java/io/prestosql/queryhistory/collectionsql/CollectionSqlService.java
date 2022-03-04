@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -15,6 +16,7 @@ package io.prestosql.queryhistory.collectionsql;
 
 import com.google.inject.Inject;
 import io.prestosql.metastore.HetuMetaStoreManager;
+import io.prestosql.queryhistory.QueryHistoryConfig;
 import io.prestosql.queryhistory.model.FavoriteInfo;
 import io.prestosql.spi.favorite.FavoriteEntity;
 import io.prestosql.spi.favorite.FavoriteResult;
@@ -24,11 +26,13 @@ import static java.util.Objects.requireNonNull;
 public class CollectionSqlService
 {
     private final HetuMetaStoreManager hetuMetaStoreManager;
+    private final QueryHistoryConfig queryHistoryConfig;
 
     @Inject
-    public CollectionSqlService(HetuMetaStoreManager hetuMetaStoreManager)
+    public CollectionSqlService(HetuMetaStoreManager hetuMetaStoreManager, QueryHistoryConfig queryHistoryConfig)
     {
         this.hetuMetaStoreManager = requireNonNull(hetuMetaStoreManager, "MetaStoreManager is null");
+        this.queryHistoryConfig = requireNonNull(queryHistoryConfig, "queryHistoryConfig is null");
     }
 
     public Boolean insert(FavoriteInfo favoriteInfo)
@@ -37,14 +41,11 @@ public class CollectionSqlService
         String query = favoriteInfo.getQuery();
         String catalog = favoriteInfo.getCatalog();
         String schema = favoriteInfo.getSchemata();
-        try {
-            hetuMetaStoreManager.getHetuMetastore().insertFavorite(new FavoriteEntity(user, query, catalog, schema));
-            return true;
-        }
-        catch (Exception e) {
-            e.printStackTrace();
+        if (hetuMetaStoreManager.getHetuMetastore().getFavorite(1, 1, user).getTotal() == queryHistoryConfig.getMaxCollectionSqlCount()) {
             return false;
         }
+        hetuMetaStoreManager.getHetuMetastore().insertFavorite(new FavoriteEntity(user, query, catalog, schema));
+        return true;
     }
 
     public Boolean delete(FavoriteInfo favoriteInfo)
@@ -53,13 +54,8 @@ public class CollectionSqlService
         String query = favoriteInfo.getQuery();
         String catalog = favoriteInfo.getCatalog();
         String schemata = favoriteInfo.getSchemata();
-        try {
-            hetuMetaStoreManager.getHetuMetastore().deleteFavorite(new FavoriteEntity(user, query, catalog, schemata));
-            return true;
-        }
-        catch (Exception e) {
-            return false;
-        }
+        hetuMetaStoreManager.getHetuMetastore().deleteFavorite(new FavoriteEntity(user, query, catalog, schemata));
+        return true;
     }
 
     public FavoriteResult query(int pageNum, int pageSize, String user)

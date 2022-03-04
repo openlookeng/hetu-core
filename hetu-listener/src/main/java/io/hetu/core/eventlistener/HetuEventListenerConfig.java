@@ -250,7 +250,7 @@ public class HetuEventListenerConfig
      * @param auditLogFile auditlogfile from properties file
      * @return config object
      */
-    @Config("hetu.auditlog.LogOutput")
+    @Config("hetu.auditlog.logoutput")
     @ConfigDescription("AuditLog event output file path")
     public HetuEventListenerConfig setAuditLogFile(String auditLogFile)
     {
@@ -264,7 +264,7 @@ public class HetuEventListenerConfig
      * @param auditLogConversionPattern auditLogConversionPattern from properties file
      * @return config object
      */
-    @Config("hetu.auditlog.LogConversionPattern")
+    @Config("hetu.auditlog.logconversionpattern")
     @ConfigDescription("define the ConversionPattern of AuditLog event")
     public HetuEventListenerConfig setAuditLogConversionPattern(String auditLogConversionPattern)
     {

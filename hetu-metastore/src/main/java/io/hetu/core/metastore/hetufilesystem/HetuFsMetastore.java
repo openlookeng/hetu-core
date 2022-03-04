@@ -807,6 +807,17 @@ public class HetuFsMetastore
     }
 
     @Override
+    public void deleteQueryHistoryBatch()
+    {
+    }
+
+    @Override
+    public long getAllQueryHistoryNum()
+    {
+        return 0;
+    }
+
+    @Override
     public String getQueryDetail(String queryId)
     {
         return null;

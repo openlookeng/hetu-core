@@ -311,18 +311,22 @@ function toggleModal(component, msg=null) {
 
 function handleCollection(e,rowIndex,parentObj) {
   let queryText = e.query;
-  let catalog = e.sessionContext.catalog;
-  let schema = e.sessionContext.schema;
-  let state = parentObj.state
-  if (state.isCollected[rowIndex] == 0) {
-    state.isCollected[rowIndex] = 1
-    CollectionAction.addToCollection(queryText,catalog,schema);
+  if(queryText.length > 1000){
+    alert("Error! Your SQL statement is too long! Please shorten it!");
   }
   else {
-    state.isCollected[rowIndex] = 0
-    CollectionAction.deleteCollection(queryText,catalog,schema);
+    let catalog = e.sessionContext.catalog;
+    let schema = e.sessionContext.schema;
+    let state = parentObj.state;
+    if (state.isCollected[rowIndex] == 0) {
+      state.isCollected[rowIndex] = 1
+      CollectionAction.addToCollection(queryText, catalog, schema);
+    } else {
+      state.isCollected[rowIndex] = 0
+      CollectionAction.deleteCollection(queryText, catalog, schema);
+    }
+    parentObj.setState(state);
   }
-  parentObj.setState(state)
 }
 
 function handleDelete(e) {
@@ -448,11 +452,8 @@ let CellRenderers = {
     return (
         <span>
             <button className="collection-btn" onClick={() => {handleCollection(collection,descIndex,parentObj)}}>
-              {parentObj.state.isCollected[descIndex] ?
-                <i className="icon-center fa fa-star icon"/>
-                  :
-                <i className="icon-center fa fa-star-o icon"/>
-              }
+              <i className="icon-center fa fa-plus icon"/>
+              <i className="icon-center fa fa-star icon"/>
             </button>
         </span>
     )

@@ -172,6 +172,18 @@ public class HetuMetastoreNone
     }
 
     @Override
+    public void deleteQueryHistoryBatch()
+    {
+        delegate.deleteQueryHistoryBatch();
+    }
+
+    @Override
+    public long getAllQueryHistoryNum()
+    {
+        return delegate.getAllQueryHistoryNum();
+    }
+
+    @Override
     public String getQueryDetail(String queryId)
     {
         return delegate.getQueryDetail(queryId);

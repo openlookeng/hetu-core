@@ -68,7 +68,7 @@ class QueryEventLogger
     protected void onQueryCreatedEvent(QueryCreatedEvent queryCreatedEvent)
     {
         QueryContext queryContext = queryCreatedEvent.getContext();
-        org.apache.log4j.Logger log = HetuLogUtil.getLoggerByName(queryContext.getUser(), "INFO", HetuLogUtil.AuditType.Sql);
+        java.util.logging.Logger log = HetuLogUtil.getLoggerByName(queryContext.getUser(), "INFO", HetuLogUtil.AuditType.Sql);
         log.info(EventUtility.toString(queryCreatedEvent));
         logger.info(EventUtility.toString(queryCreatedEvent));
     }
@@ -77,7 +77,7 @@ class QueryEventLogger
     protected void onQueryCompletedEvent(QueryCompletedEvent queryCompletedEvent)
     {
         QueryContext queryContext = queryCompletedEvent.getContext();
-        org.apache.log4j.Logger log = HetuLogUtil.getLoggerByName(queryContext.getUser(), "INFO", HetuLogUtil.AuditType.Sql);
+        java.util.logging.Logger log = HetuLogUtil.getLoggerByName(queryContext.getUser(), "INFO", HetuLogUtil.AuditType.Sql);
         log.info(EventUtility.toString(queryCompletedEvent));
         logger.info(EventUtility.toString(queryCompletedEvent));
     }

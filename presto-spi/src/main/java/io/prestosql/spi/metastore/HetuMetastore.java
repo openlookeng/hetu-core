@@ -219,6 +219,20 @@ public interface HetuMetastore
     void insertQueryHistory(QueryHistoryEntity queryHistoryEntity, String jsonString);
 
     /**
+     * delete 100 queryHistoryEntities from hetu_query_history table
+     *
+     */
+    void deleteQueryHistoryBatch();
+
+    /**
+     * get QueryHistory count from hetu_query_history table
+     *
+     * @param
+     * @return count
+     */
+    long getAllQueryHistoryNum();
+
+    /**
      * get QueryDetail from hetu_query_history table
      *
      * @param  queryId
@@ -227,7 +241,7 @@ public interface HetuMetastore
     String getQueryDetail(String queryId);
 
     /**
-     * get all QueryHistory from hetu_query_history table
+     * get all QueryHistories from hetu_query_history table
      *
      * @param startNum
      * @param pageSize
@@ -252,7 +266,7 @@ public interface HetuMetastore
                                        String sort, String sortOrder);
 
     /**
-     * insert favoriteEntity in hatu_favorite table
+     * insert favoriteEntity in hetu_favorite table
      *
      * @param  favoriteEntity queryHistory Entity
      */
@@ -266,7 +280,7 @@ public interface HetuMetastore
     void deleteFavorite(FavoriteEntity favoriteEntity);
 
     /**
-     * get all favoriteEntity from hatu_favorite table
+     * get all favoriteEntities from hetu_favorite table
      *
      * @param  user
      * @return favoriteEntities

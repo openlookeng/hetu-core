@@ -38,16 +38,8 @@ class ShowCatalog extends React.Component {
     componentWillReceiveProps(nextProps) {
         if (this.props.showText != nextProps.showText){
             this.state.catalog_name = nextProps.catalog_name;
-            // this.state.connection_password = nextProps.connection_password;
-            // this.state.connector_name = nextProps.connector_name;
-            // this.state.url = nextProps.url;
-            // this.state.user = nextProps.user;
-            // this.show = nextProps;
             this.showObj = nextProps.showText
             this.setState();
-            // this.setState({
-            //     catalog_name : nextProps.catalog_name
-            // })
         }
     }
 

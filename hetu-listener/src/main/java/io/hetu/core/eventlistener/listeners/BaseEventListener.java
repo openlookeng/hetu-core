@@ -22,6 +22,8 @@ import io.prestosql.spi.eventlistener.QueryCompletedEvent;
 import io.prestosql.spi.eventlistener.QueryCreatedEvent;
 import io.prestosql.spi.eventlistener.SplitCompletedEvent;
 
+import java.util.logging.Logger;
+
 import static java.util.Objects.requireNonNull;
 
 public abstract class BaseEventListener
@@ -62,7 +64,6 @@ public abstract class BaseEventListener
     public static EventListener create(HetuEventListenerConfig config)
     {
         Type type = config.getType();
-
         if (type == Type.AUDIT) {
             return new AuditEventLogger(config);
         }
@@ -109,19 +110,19 @@ public abstract class BaseEventListener
     @Override
     public final void auditLogged(AuditLogEvent auditLogEvent)
     {
-        org.apache.log4j.Logger log = HetuLogUtil.getLoggerByName(auditLogEvent.getUser(), auditLogEvent.getLevel(), HetuLogUtil.AuditType.valueOf(auditLogEvent.getType()));
+        Logger log = HetuLogUtil.getLoggerByName(auditLogEvent.getUser(), auditLogEvent.getLevel(), HetuLogUtil.AuditType.valueOf(auditLogEvent.getType()));
         switch (auditLogEvent.getLevel()) {
             case "INFO":
-                log.info(auditLogEvent);
+                log.info(auditLogEvent.toString());
                 break;
             case "ERROR":
-                log.error(auditLogEvent);
+                log.severe(auditLogEvent.toString());
                 break;
             case "WARN":
-                log.warn(auditLogEvent);
+                log.warning(auditLogEvent.toString());
                 break;
             case "DEBUG":
-                log.debug(auditLogEvent);
+                log.fine(auditLogEvent.toString());
                 break;
             default:
                 break;

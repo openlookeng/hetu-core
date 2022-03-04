@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -15,6 +16,7 @@ package io.prestosql.queryeditorui.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.protocol.ObjectMapperProvider;
 import io.prestosql.security.AccessControl;
 import io.prestosql.security.AccessControlUtil;
@@ -60,15 +62,18 @@ public class AuditLogResource
 
     private final ServerConfig serverConfig;
     private final GroupProvider groupProvider;
+    private final EventListenerManager eventListenerManager;
 
     @Inject
     public AuditLogResource(AccessControl accessControl,
                             ServerConfig serverConfig,
-                            GroupProvider groupProvider)
+                            GroupProvider groupProvider,
+                            EventListenerManager eventListenerManager)
     {
         this.accessControl = requireNonNull(accessControl, "httpServerInfo is null");
         this.serverConfig = requireNonNull(serverConfig, "httpServerInfo is null");
         this.groupProvider = requireNonNull(groupProvider, "groupProvider is null");
+        this.eventListenerManager = requireNonNull(eventListenerManager, "eventListenerManager is null");
     }
 
     @POST
@@ -106,7 +111,7 @@ public class AuditLogResource
         List<String> resLog = new ArrayList<>(100);
         BufferedReader br = new BufferedReader(new FileReader(logFiles.get(logFiles.size() - 1)));
         String str = null;
-        int auditLogLimit = 100;
+        int auditLogLimit = 99;
         while ((str = br.readLine()) != null) {
             resLog.add(str + System.lineSeparator());
             auditLogLimit--;
@@ -122,7 +127,7 @@ public class AuditLogResource
         out.flush();
     }
 
-    //文件下载，压缩包
+    //downloadLogFiles, return compressed package in. Zip format
     @GET
     @Path("/download")
     public void downloadLogFiles(
@@ -159,11 +164,9 @@ public class AuditLogResource
             response.flushBuffer();
             return;
         }
-        //设置压缩流：直接写入response，实现边压缩边下载
-        ZipOutputStream zipos = null;
-
-        zipos = new ZipOutputStream(new BufferedOutputStream(response.getOutputStream()));
-        zipos.setMethod(ZipOutputStream.DEFLATED); //设置压缩方法
+        //set compression stream: write response directly to achieve compression while downloading
+        ZipOutputStream zipos = new ZipOutputStream(new BufferedOutputStream(response.getOutputStream()));
+        zipos.setMethod(ZipOutputStream.DEFLATED);
 
         DataOutputStream os = null;
         for (String filePath : logFiles) {
@@ -179,22 +182,21 @@ public class AuditLogResource
             is.close();
             zipos.closeEntry();
         }
-
         os.flush();
         os.close();
         zipos.close();
     }
 
-    public static List<String> getLogFiles(String type, String beginTime, String endTime, String user, String level)
+    public List<String> getLogFiles(String type, String beginTime, String endTime, String user, String level)
     {
         ArrayList<String> res = new ArrayList<>();
-        String logPath = System.getProperty("hetu-LogOutput") + "/" + type;
+        String logPath = eventListenerManager.getLogOutput() + "/" + type;
         File f = new File(logPath);
         File[] file = f.listFiles();
-        Arrays.sort(file, (o1, o2) -> Long.valueOf(o1.lastModified()).compareTo(o2.lastModified()));
         if (file == null) {
             return res;
         }
+        Arrays.sort(file, (o1, o2) -> Long.valueOf(o1.lastModified()).compareTo(o2.lastModified()));
         for (File tmpFile : file) {
             if (filterTimeAndUser(beginTime, endTime, user, level, tmpFile.getName())) {
                 res.add(tmpFile.getAbsolutePath());
@@ -205,7 +207,7 @@ public class AuditLogResource
 
     private static Boolean filterTimeAndUser(String beginTime, String endTime, String user, String level, String filename)
     {
-        if (!filename.contains(".log")) {
+        if (!filename.contains(".log") || filename.contains(".lck") || filename.contains(".log.")) {
             return false;
         }
 

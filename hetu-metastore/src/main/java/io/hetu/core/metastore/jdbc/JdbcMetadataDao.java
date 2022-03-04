@@ -495,6 +495,16 @@ public interface JdbcMetadataDao
     void insertQueryHistory(@BindBean QueryHistoryEntity queryHistoryEntity, @Bind("jsonString") String jsonString);
 
     /**
+     * delete the oldest 100 queryHistoryEntities
+     *
+     */
+    @SqlUpdate("DELETE FROM hetu_query_history \n" +
+            "WHERE 1=1 \n" +
+            "ORDER BY id \n" +
+            "LIMIT 10")
+    void deleteQueryHistoryBatch();
+
+    /**
      * get QueryDetail
      *
      * @param  queryId
@@ -536,7 +546,7 @@ public interface JdbcMetadataDao
      * get QueryHistory counts
      *
      * @param
-     * @return QueryHistoryEntities
+     * @return counts
      */
     @SqlQuery("SELECT count(*) FROM hetu_query_history WHERE \n" +
             "(user like concat(\'%\',:user,\'%\')) AND" +
@@ -551,6 +561,15 @@ public interface JdbcMetadataDao
     long getQueryHistoryCount(@Bind("user") String user, @Bind("startTime") String startTime, @Bind("endTime") String endTime,
                               @Bind("queryId") String queryId, @Bind("query") String query, @Bind("resourceGroup") String resourceGroup,
                               @Bind("resource") String resource, @BindList("state") List<String> state, @BindList("failed") List<String> failed);
+
+    /**
+     * get all QueryHistory counts
+     *
+     * @param
+     * @return counts
+     */
+    @SqlQuery("SELECT count(1) FROM hetu_query_history")
+    long getAllQueryHistoryNum();
 
     /**
      * insert favoriteEntity

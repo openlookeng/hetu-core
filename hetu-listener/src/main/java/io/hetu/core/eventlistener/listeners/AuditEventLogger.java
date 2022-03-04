@@ -67,7 +67,7 @@ class AuditEventLogger
     protected void onQueryCreatedEvent(QueryCreatedEvent queryCreatedEvent)
     {
         QueryContext queryContext = queryCreatedEvent.getContext();
-        org.apache.log4j.Logger log = HetuLogUtil.getLoggerByName(queryContext.getUser(), "INFO", HetuLogUtil.AuditType.Sql);
+        java.util.logging.Logger log = HetuLogUtil.getLoggerByName(queryContext.getUser(), "INFO", HetuLogUtil.AuditType.Sql);
 
         log.info(queryCreatedEvent.getCreateTime().atZone(ZoneId.systemDefault()) +
                 " UserName=" + queryContext.getUser() +
@@ -77,7 +77,6 @@ class AuditEventLogger
                 " stmt={" + queryCreatedEvent.getMetadata().getQuery() +
                 "} status=" + queryCreatedEvent.getMetadata().getQueryState() + " " +
                 queryCreatedEvent.getClass().getCanonicalName());
-
         logger.info(queryCreatedEvent.getCreateTime().atZone(ZoneId.systemDefault()) +
                 " UserName=" + queryContext.getUser() +
                 " UserIp=" + queryContext.getRemoteClientAddress().orElse(null) +
@@ -92,7 +91,7 @@ class AuditEventLogger
     protected void onQueryCompletedEvent(QueryCompletedEvent queryCompletedEvent)
     {
         QueryContext queryContext = queryCompletedEvent.getContext();
-        org.apache.log4j.Logger log = HetuLogUtil.getLoggerByName(queryContext.getUser(), "INFO", HetuLogUtil.AuditType.Sql);
+        java.util.logging.Logger log = HetuLogUtil.getLoggerByName(queryContext.getUser(), "INFO", HetuLogUtil.AuditType.Sql);
         log.info(queryCompletedEvent.getCreateTime().atZone(ZoneId.systemDefault()) +
                 " UserName=" + queryContext.getUser() +
                 " UserIp=" + queryContext.getRemoteClientAddress().orElse(null) +
@@ -104,7 +103,6 @@ class AuditEventLogger
                 " stmt={" + queryCompletedEvent.getMetadata().getQuery() +
                 "} status=" + queryCompletedEvent.getMetadata().getQueryState() +
                 " " + queryCompletedEvent.getClass().getCanonicalName());
-
         logger.info(queryCompletedEvent.getCreateTime().atZone(ZoneId.systemDefault()) +
                 " UserName=" + queryContext.getUser() +
                 " UserIp=" + queryContext.getRemoteClientAddress().orElse(null) +

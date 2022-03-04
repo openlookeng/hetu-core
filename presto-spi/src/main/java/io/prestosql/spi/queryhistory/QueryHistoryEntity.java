@@ -65,53 +65,33 @@ public class QueryHistoryEntity
     @JsonCreator
     public QueryHistoryEntity()
     {
+        this(new Builder());
     }
 
     @JsonCreator
-    public QueryHistoryEntity(
-            String queryId,
-            String state,
-            String failed,
-            String query,
-            String user,
-            String source,
-            String resource,
-            String catalog,
-            String schemata,
-            String currentMemory,
-            int completedDrivers,
-            int runningDrivers,
-            int queuedDrivers,
-            String createTime,
-            String executionTime,
-            String elapsedTime,
-            String cpuTime,
-            String totalCpuTime,
-            String totalMemoryReservation,
-            String peakTotalMemoryReservation,
-            double cumulativeUserMemory)
+    public QueryHistoryEntity(Builder builder)
     {
-        this.queryId = queryId;
-        this.state = state;
-        this.failed = failed;
-        this.query = query;
-        this.user = user;
-        this.source = source;
-        this.resource = resource;
-        this.catalog = catalog;
-        this.schemata = schemata;
-        this.currentMemory = currentMemory;
-        this.completedDrivers = completedDrivers;
-        this.runningDrivers = runningDrivers;
-        this.queuedDrivers = queuedDrivers;
-        this.createTime = createTime;
-        this.executionTime = executionTime;
-        this.elapsedTime = elapsedTime;
-        this.cpuTime = cpuTime;
-        this.totalCpuTime = totalCpuTime;
-        this.totalMemoryReservation = totalMemoryReservation;
-        this.peakTotalMemoryReservation = peakTotalMemoryReservation;
-        this.cumulativeUserMemory = cumulativeUserMemory;
+        this.queryId = builder.queryId;
+        this.state = builder.state;
+        this.failed = builder.failed;
+        this.query = builder.query;
+        this.user = builder.user;
+        this.source = builder.source;
+        this.resource = builder.resource;
+        this.catalog = builder.catalog;
+        this.schemata = builder.schemata;
+        this.currentMemory = builder.currentMemory;
+        this.completedDrivers = builder.completedDrivers;
+        this.runningDrivers = builder.runningDrivers;
+        this.queuedDrivers = builder.queuedDrivers;
+        this.createTime = builder.createTime;
+        this.executionTime = builder.executionTime;
+        this.elapsedTime = builder.elapsedTime;
+        this.cpuTime = builder.cpuTime;
+        this.totalCpuTime = builder.totalCpuTime;
+        this.totalMemoryReservation = builder.totalMemoryReservation;
+        this.peakTotalMemoryReservation = builder.peakTotalMemoryReservation;
+        this.cumulativeUserMemory = builder.cumulativeUserMemory;
     }
 
     @JsonProperty
@@ -343,5 +323,170 @@ public class QueryHistoryEntity
     public void setCumulativeUserMemory(double cumulativeUserMemory)
     {
         this.cumulativeUserMemory = cumulativeUserMemory;
+    }
+
+    public Builder newBuilder()
+    {
+        return new Builder();
+    }
+
+    public static class Builder
+    {
+        private String queryId;
+        private String state;
+        private String failed;
+        private String query;
+        private String user;
+        private String source;
+        private String resource;
+        private String catalog;
+        private String schemata;
+        private String currentMemory;
+        private int completedDrivers;
+        private int runningDrivers;
+        private int queuedDrivers;
+        private String createTime;
+        private String executionTime;
+        private String elapsedTime;
+        private String cpuTime;
+        private String totalCpuTime;
+        private String totalMemoryReservation;
+        private String peakTotalMemoryReservation;
+        private double cumulativeUserMemory;
+
+        public Builder()
+        {
+        }
+
+        public Builder setQueryId(String queryId)
+        {
+            this.queryId = queryId;
+            return this;
+        }
+
+        public Builder setState(String state)
+        {
+            this.state = state;
+            return this;
+        }
+
+        public Builder setFailed(String failed)
+        {
+            this.failed = failed;
+            return this;
+        }
+
+        public Builder setQuery(String query)
+        {
+            this.query = query;
+            return this;
+        }
+
+        public Builder setUser(String user)
+        {
+            this.user = user;
+            return this;
+        }
+
+        public Builder setSource(String source)
+        {
+            this.source = source;
+            return this;
+        }
+
+        public Builder setResource(String resource)
+        {
+            this.resource = resource;
+            return this;
+        }
+
+        public Builder setCatalog(String catalog)
+        {
+            this.catalog = catalog;
+            return this;
+        }
+
+        public Builder setSchemata(String schemata)
+        {
+            this.schemata = schemata;
+            return this;
+        }
+
+        public Builder setCurrentMemory(String currentMemory)
+        {
+            this.currentMemory = currentMemory;
+            return this;
+        }
+
+        public Builder setCompletedDrivers(int completedDrivers)
+        {
+            this.completedDrivers = completedDrivers;
+            return this;
+        }
+
+        public Builder setRunningDrivers(int runningDrivers)
+        {
+            this.runningDrivers = runningDrivers;
+            return this;
+        }
+
+        public Builder setQueuedDrivers(int queuedDrivers)
+        {
+            this.queuedDrivers = queuedDrivers;
+            return this;
+        }
+
+        public Builder setCreateTime(String createTime)
+        {
+            this.createTime = createTime;
+            return this;
+        }
+
+        public Builder setExecutionTime(String executionTime)
+        {
+            this.executionTime = executionTime;
+            return this;
+        }
+
+        public Builder setElapsedTime(String elapsedTime)
+        {
+            this.elapsedTime = elapsedTime;
+            return this;
+        }
+
+        public Builder setCpuTime(String cpuTime)
+        {
+            this.cpuTime = cpuTime;
+            return this;
+        }
+
+        public Builder setTotalCpuTime(String totalCpuTime)
+        {
+            this.totalCpuTime = totalCpuTime;
+            return this;
+        }
+
+        public Builder setTotalMemoryReservation(String totalMemoryReservation)
+        {
+            this.totalMemoryReservation = totalMemoryReservation;
+            return this;
+        }
+
+        public Builder setPeakTotalMemoryReservation(String peakTotalMemoryReservation)
+        {
+            this.peakTotalMemoryReservation = peakTotalMemoryReservation;
+            return this;
+        }
+
+        public Builder setCumulativeUserMemory(double cumulativeUserMemory)
+        {
+            this.cumulativeUserMemory = cumulativeUserMemory;
+            return this;
+        }
+
+        public QueryHistoryEntity build()
+        {
+            return new QueryHistoryEntity(this);
+        }
     }
 }

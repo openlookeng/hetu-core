@@ -446,6 +446,26 @@ public class JdbcHetuMetastore
     }
 
     @Override
+    public void deleteQueryHistoryBatch()
+    {
+        runTransactionWithLock(jdbi, handle -> {
+            JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
+            transactionDao.deleteQueryHistoryBatch();
+        });
+    }
+
+    @Override
+    public long getAllQueryHistoryNum()
+    {
+        long[] ans = new long[1];
+        runTransactionWithLock(jdbi, handle -> {
+            JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
+            ans[0] = transactionDao.getAllQueryHistoryNum();
+        });
+        return ans[0];
+    }
+
+    @Override
     public String getQueryDetail(String queryId)
     {
         String[] jsonString = new String[1];

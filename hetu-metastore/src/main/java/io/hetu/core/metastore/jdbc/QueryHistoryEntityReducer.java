@@ -26,7 +26,7 @@ public class QueryHistoryEntityReducer
     @Override
     public void accumulate(Map<Long, QueryHistoryEntity> map, RowView rowView)
     {
-        QueryHistoryEntity queryHistoryEntity = map.computeIfAbsent(rowView.getColumn("id", Long.class),
+        map.computeIfAbsent(rowView.getColumn("id", Long.class),
                 id -> rowView.getRow(QueryHistoryEntity.class));
     }
 }

@@ -30,7 +30,7 @@ class CollectionActions {
             body: 'queryText=' + queryText + '&' + 'catalog=' + catalog + '&' + 'schema=' + schema
         }).then((data)=> {
             if(data==false||data=="false") {
-                alert("Error! You have a same collection query.");
+                alert("Error! Your favorite SQLs are full! Please delete some favorite SQL statement!");
             }
         });
     }

@@ -15,6 +15,8 @@
 
 package io.prestosql.catalog;
 
+import io.prestosql.catalog.showcatalog.ShowCatalogStore;
+
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
@@ -87,7 +89,7 @@ public interface CatalogStore
      */
     void releaseCatalogLock(String catalogName);
 
-    Map<String, String> getCatalogProperties(String catalogName, int state, String baseDirectory) throws IOException;
+    Map<String, String> getCatalogProperties(String catalogName, ShowCatalogStore.CatalogConfigType state, String baseDirectory) throws IOException;
 
     void close();
 }

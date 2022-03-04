@@ -40,7 +40,7 @@ public class HetuEventListenerFactory
     {
         ConfigurationFactory configurationFactory = new ConfigurationFactory(properties);
         HetuEventListenerConfig config = configurationFactory.build(HetuEventListenerConfig.class);
-        new HetuLogUtil(config);
+        HetuLogUtil.create(config);
         return BaseEventListener.create(config);
     }
 }
