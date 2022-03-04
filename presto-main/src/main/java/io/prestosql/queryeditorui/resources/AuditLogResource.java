@@ -160,31 +160,32 @@ public class AuditLogResource
 
         if (logFiles.isEmpty()) {
             response.setStatus(404);
-            response.getWriter().write("404 NOT FOUND!");
-            response.flushBuffer();
             return;
         }
         //set compression stream: write response directly to achieve compression while downloading
         ZipOutputStream zipos = new ZipOutputStream(new BufferedOutputStream(response.getOutputStream()));
         zipos.setMethod(ZipOutputStream.DEFLATED);
-
         DataOutputStream os = null;
-        for (String filePath : logFiles) {
-            File file = new File(filePath);
-            zipos.putNextEntry(new ZipEntry(file.getName()));
-            os = new DataOutputStream(zipos);
-            InputStream is = new FileInputStream(file);
-            byte[] b = new byte[1024];
-            int length = 0;
-            while ((length = is.read(b)) != -1) {
-                os.write(b, 0, length);
+        try {
+            for (String filePath : logFiles) {
+                File file = new File(filePath);
+                zipos.putNextEntry(new ZipEntry(file.getName()));
+                os = new DataOutputStream(zipos);
+                InputStream is = new FileInputStream(file);
+                byte[] b = new byte[1024];
+                int length = 0;
+                while ((length = is.read(b)) != -1) {
+                    os.write(b, 0, length);
+                }
+                is.close();
+                zipos.closeEntry();
             }
-            is.close();
-            zipos.closeEntry();
         }
-        os.flush();
-        os.close();
-        zipos.close();
+        finally {
+            os.flush();
+            os.close();
+            zipos.close();
+        }
     }
 
     public List<String> getLogFiles(String type, String beginTime, String endTime, String user, String level)
