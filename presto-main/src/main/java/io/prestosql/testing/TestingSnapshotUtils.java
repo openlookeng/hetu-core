@@ -172,5 +172,11 @@ public class TestingSnapshotUtils
         {
             return null;
         }
+
+        @Override
+        public Stream<Path> getDirectoryStream(Path path, String prefix, String suffix) throws IOException
+        {
+            return null;
+        }
     }
 }

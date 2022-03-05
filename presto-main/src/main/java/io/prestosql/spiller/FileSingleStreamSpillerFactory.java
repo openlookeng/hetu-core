@@ -35,19 +35,19 @@ import io.prestosql.sql.analyzer.FeaturesConfig;
 import javax.annotation.PreDestroy;
 
 import java.io.IOException;
-import java.nio.file.DirectoryStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.prestosql.spi.StandardErrorCode.OUT_OF_SPILL_SPACE;
 import static java.lang.String.format;
-import static java.nio.file.Files.newDirectoryStream;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
@@ -96,8 +96,7 @@ public class FileSingleStreamSpillerFactory
                 requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").isSpillUseKryoSerialization(),
                 requireNonNull(featuresConfig, "featuresConfig is null").isSpillToHdfs(),
                 requireNonNull(featuresConfig, "featuresConfig is null").getSpillProfile(),
-                requireNonNull(fileSystemClientManager, "fileSystemClientManager is null"),
-                requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").getNodeId());
+                requireNonNull(fileSystemClientManager, "fileSystemClientManager is null"));
     }
 
     @VisibleForTesting
@@ -113,11 +112,11 @@ public class FileSingleStreamSpillerFactory
             int spillPrefetchReadPages,
             boolean spillToHdfs,
             String spillProfile,
-            FileSystemClientManager fileSystemClientManager, String nodeId)
+            FileSystemClientManager fileSystemClientManager)
     {
         this(executor, blockEncodingSerde, spillerStats, spillPaths, maxUsedSpaceThreshold,
                 spillCompressionEnabled, spillEncryptionEnabled, spillDirectSerdeEnabled,
-                spillPrefetchReadPages, false, spillToHdfs, spillProfile, fileSystemClientManager, nodeId);
+                spillPrefetchReadPages, false, spillToHdfs, spillProfile, fileSystemClientManager);
     }
 
     @VisibleForTesting
@@ -134,8 +133,7 @@ public class FileSingleStreamSpillerFactory
             boolean useKryo,
             boolean spillToHdfs,
             String spillProfile,
-            FileSystemClientManager fileSystemClientManager,
-            String nodeId)
+            FileSystemClientManager fileSystemClientManager)
     {
         checkArgument(!(blockEncodingSerde instanceof KryoBlockEncodingSerde)
                         || (blockEncodingSerde instanceof KryoBlockEncodingSerde && spillDirectSerdeEnabled),
@@ -156,9 +154,10 @@ public class FileSingleStreamSpillerFactory
         this.useKryo = useKryo;
         this.fileSystemClientManager = fileSystemClientManager;
         if (spillToHdfs) {
+            String uuid = UUID.randomUUID().toString();
             List<Path> hdfsPaths = new ArrayList<>();
             for (Path path : spillPaths) {
-                hdfsPaths.add(Paths.get(path.toString(), nodeId));
+                hdfsPaths.add(Paths.get(path.toString(), uuid));
             }
             this.spillPaths = ImmutableList.copyOf(hdfsPaths);
         }
@@ -180,8 +179,8 @@ public class FileSingleStreamSpillerFactory
 
     private synchronized void cleanupOldSpillFiles(Path path, boolean spillToHdfs, String spillProfile, FileSystemClientManager fileSystemClientManager)
     {
-        try (DirectoryStream<Path> stream = newDirectoryStream(path, SPILL_FILE_GLOB)) {
-            HetuFileSystemClient fileSystemClient = getFileSystem(path, spillToHdfs, spillProfile, fileSystemClientManager);
+        try (HetuFileSystemClient fileSystemClient = getFileSystem(path, spillToHdfs, spillProfile, fileSystemClientManager);
+                Stream<Path> stream = fileSystemClient.getDirectoryStream(path, SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX)) {
             stream.forEach(spillFile -> {
                 try {
                     log.info("Deleting old spill file: " + spillFile);
@@ -273,5 +272,11 @@ public class FileSingleStreamSpillerFactory
             throw new IllegalArgumentException(
                     format("could not get filesystem for the path %s; adjust experimental.spiller-spill-path config property or filesystem permissions", path), e);
         }
+    }
+
+    @VisibleForTesting
+    protected List<Path> getSpillPaths()
+    {
+        return this.spillPaths;
     }
 }

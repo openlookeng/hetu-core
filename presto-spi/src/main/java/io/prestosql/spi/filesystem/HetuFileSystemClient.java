@@ -207,4 +207,7 @@ public interface HetuFileSystemClient
 
     Path createFile(Path path)
             throws IOException;
+
+    Stream<Path> getDirectoryStream(Path path, String prefix, String suffix)
+            throws IOException;
 }

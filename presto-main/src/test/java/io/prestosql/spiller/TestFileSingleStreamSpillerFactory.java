@@ -115,8 +115,7 @@ public class TestFileSingleStreamSpillerFactory
                 1,
                 false,
                 null,
-                fileSystemClientManager,
-                "");
+                fileSystemClientManager);
 
         assertEquals(listFiles(spillPath1.toPath()).size(), 0);
         assertEquals(listFiles(spillPath2.toPath()).size(), 0);
@@ -160,17 +159,16 @@ public class TestFileSingleStreamSpillerFactory
                 1,
                 false,
                 null,
-                fileSystemClientManager,
-                "");
+                fileSystemClientManager);
 
         spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"));
     }
 
     @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "No free space available for spill")
-    public void throwsIfNoDiskSpaceWhenHdfsSpillEnabled()
+    public void throwsIfNoDiskSpaceWhenHdfsSpillEnabled() throws IOException
     {
         List<Type> types = ImmutableList.of(BIGINT);
-        List<Path> spillPaths = ImmutableList.of(spillPath1.toPath(), spillPath2.toPath());
+        List<Path> spillPaths = ImmutableList.of(spillPath1.toPath());
         FileSingleStreamSpillerFactory spillerFactory = new FileSingleStreamSpillerFactory(
                 executor, // executor won't be closed, because we don't call destroy() on the spiller factory
                 blockEncodingSerde,
@@ -183,9 +181,8 @@ public class TestFileSingleStreamSpillerFactory
                 1,
                 true,
                 "hdfs",
-                fileSystemClientManager,
-                "");
-
+                fileSystemClientManager);
+        when(fileSystemClientManager.getFileSystemClient("hdfs", spillerFactory.getSpillPaths().get(0))).thenReturn(getLocalHdfs(spillerFactory.getSpillPaths().get(0).toString()));
         spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"));
     }
 
@@ -206,8 +203,7 @@ public class TestFileSingleStreamSpillerFactory
                 1,
                 false,
                 null,
-                fileSystemClientManager,
-                "");
+                fileSystemClientManager);
         spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"));
     }
 
@@ -228,8 +224,7 @@ public class TestFileSingleStreamSpillerFactory
                 1,
                 true,
                 "hdfs",
-                fileSystemClientManager,
-                "");
+                fileSystemClientManager);
         spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"));
     }
 
@@ -263,8 +258,7 @@ public class TestFileSingleStreamSpillerFactory
                 1,
                 false,
                 null,
-                fileSystemClientManager,
-                "");
+                fileSystemClientManager);
         spillerFactory.cleanupOldSpillFiles();
 
         assertEquals(listFiles(spillPath1.toPath()).size(), 1);
@@ -275,14 +269,7 @@ public class TestFileSingleStreamSpillerFactory
     public void testCleanupOldSpillFilesWhenSpillToHdfsEnabled()
             throws Exception
     {
-        List<Path> spillPaths = ImmutableList.of(spillPath1.toPath(), spillPath2.toPath());
-        spillPath1.mkdirs();
-
-        java.nio.file.Files.createTempFile(spillPath1.toPath(), SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX);
-        java.nio.file.Files.createTempFile(spillPath1.toPath(), SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX);
-        java.nio.file.Files.createTempFile(spillPath1.toPath(), SPILL_FILE_PREFIX, "blah");
-
-        assertEquals(listFiles(spillPath1.toPath()).size(), 3);
+        List<Path> spillPaths = ImmutableList.of(spillPath1.toPath());
 
         FileSingleStreamSpillerFactory spillerFactory = new FileSingleStreamSpillerFactory(
                 executor, // executor won't be closed, because we don't call destroy() on the spiller factory
@@ -296,10 +283,19 @@ public class TestFileSingleStreamSpillerFactory
                 1,
                 true,
                 "hdfs",
-                fileSystemClientManager,
-                "");
+                fileSystemClientManager);
+
+        Path spillPath = spillerFactory.getSpillPaths().get(0);
+        java.nio.file.Files.createDirectories(spillPath);
+
+        java.nio.file.Files.createTempFile(spillPath, SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX);
+        java.nio.file.Files.createTempFile(spillPath, SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX);
+        java.nio.file.Files.createTempFile(spillPath, SPILL_FILE_PREFIX, "blah");
+
+        assertEquals(listFiles(spillPath).size(), 3);
+        when(fileSystemClientManager.getFileSystemClient("hdfs", spillPath)).thenReturn(getLocalHdfs(spillPath.toString()));
         spillerFactory.cleanupOldSpillFiles();
 
-        assertEquals(listFiles(spillPath1.toPath()).size(), 1);
+        assertEquals(listFiles(spillPath).size(), 1);
     }
 }

@@ -142,8 +142,7 @@ public class BenchmarkBinaryFileSpiller
                     spillPrefetchReadPages,
                     false,
                     null,
-                    fileSystemClientManager,
-                    "");
+                    fileSystemClientManager);
             spillerFactory = new GenericSpillerFactory(singleStreamSpillerFactory);
             pages = createInputPages();
         }
