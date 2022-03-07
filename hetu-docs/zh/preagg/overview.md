@@ -61,8 +61,6 @@ AggregationNode
 
    2.1. 克服为更大的数据集创建Cube的限制。
 
-   2.2. 如果源表已更新，则更新Cube。
-
 ## 启用和禁用StarTree Cube
 启用：
 ```sql 
@@ -121,6 +119,14 @@ SELECT nationkey, avg(nationkey), max(regionkey) FROM nation WHERE nationkey >= 
 由于插入Cube的数据是为`nationkey >= 5`，只有匹配此条件的查询才会使用Cube。
 不符合条件的查询将继续工作，但不会使用Cube。
 
+如果Cube的源表更新，则对应的Cube自动过期。为了克服这个问题，我们通过引入**RELOAD CUBE**命令在openLooKeng CLI中添加了支持。如果Cube的状态变为“未激活”或“过期”，用户将能够手动重新加载Cube。重新加载Cube`nation_cube`的语法如下:
+
+```sql 
+RELOAD CUBE nation_cube
+```
+
+请注意，此功能仅在CLI支持。在重新加载过程中，如果发生意外错误，用户可以查看原始SQL语句，手动重新创建Cube。
+
 ## 为大型数据集构建Cube
 当前实现的限制之一是不能一次为更大的数据集构建Cube。这是由于集群内存限制。
 处理大量行需要比集群配置更多的内存。这会导致查询失败并显示消息**Query exceeded per-node user memory limit**，也就是警告查询超出每节点用户内存限制。为了克服这个问题，**INSERT INTO CUBE** SQL支持被添加了。
@@ -178,38 +184,56 @@ SHOW CUBES;
 ```
 
 **注意：**
-1. 系统将尝试将所有类型的Predicates重写为Range以查看它们是否可以合并在一起。
+
+① 系统将尝试将所有类型的Predicates重写为Range以查看它们是否可以合并在一起。
    所有连续谓词将合并为单个范围谓词，其余谓词保持不变。
 
    仅支持以下类型并且可以合并在一起。
-   `Integer, TinyInt, SmallInt, BigInt, Date`
+   `Integer, TinyInt, SmallInt, BigInt, Date, String`
 
-   对于其他数据类型，很难确定两个谓词是否连续，因此它们不能合并在一起。 
-   由于这个问题，即使Cube具有所有必需的数据，在查询优化期间也可能不会使用特定Cube。例如，
+   对于字符串数据类型，谓词合并逻辑仅在字符串以数字结尾，并且所有字符串的长度相同时才能生效。例如，
 
 ```sql
    INSERT INTO CUBE store_sales_cube WHERE store_id BETWEEN 'A01' AND 'A10';
    INSERT INTO CUBE store_sales_cube WHERE store_id BETWEEN 'A11' AND 'A20';
 ```
-   这里这两个谓词不能合并到store_id BETWEEN 'A01' AND 'A20'; 
-   因此，Cube不会用于跨越两个谓词的查询；
-
-```sql
-   SELECT ss_store_id, sum(ss_sales_price) WHERE ss_store_id BETWEEN 'A05' AND 'A15'; - Cube won't be used for optimizing this query. This is a limitation as of now.
-```
-   由于谓词重写，无法支持以下某些查询
-
-```sql   
-   INSERT INTO CUBE store_sales_cube WHERE ss_sold_date_sk > 2451911; 
-```
+   插入后，两个谓词将被合并至`'A01' AND 'A20'`。
+   
+   ```sql
+      SELECT ss_store_id, sum(ss_sales_price) WHERE ss_store_id BETWEEN 'A05' AND 'A15'; - Cube 能被这个查询语句所使用
+   ```
+   
+   以下示例中，`store_id`值的长度不相同。
+   
+   ```
+      INSERT INTO CUBE store_sales_cube WHERE store_id = 'A1';
+      INSERT INTO CUBE store_sales_cube WHERE store_id = 'A2' 
+   ```
+   
+   根据varchar谓词合并逻辑，store_id谓词将被重写为`store_id >= 'A1' and store < 'A3'`；
+   
+   ```
+      INSERT INTO CUBE store_sales_cube WHERE store_id = 'A10' 
+   ```
+   
+   上述查询将失败，因为`A10`是范围`store_id >= 'A1' and store < 'A3'`的子集。请用户注意这个问题。
+   
+   对于其他数据类型，很难识别两个谓词是否连续，因此它们无法被合并。因此，即使某些Cube具有所有所需的数据，也可能不会被用来优化查询。
+   
+② 谓词重写也有一些限制。如以下查询：
+   
+   ```sql   
+      INSERT INTO CUBE store_sales_cube WHERE ss_sold_date_sk > 2451911; 
+   ```
+   
    谓词重写为ss_sold_date_sk >= 2451912为合并连续谓词做准备。
-   由于谓词被重写，他们使用ss_sold_date_sk > 2451911谓词查询将与Cube谓词不匹配，因此不会使用Cube来优化查询。
-   这同样适用于带有<=运算符的谓词，例如，ss_sold_date_sk <= 2451911改写为ss_sold_date_sk < 2451912。
-
-```sql   
-   SELECT ss_sold_date_sk, .... FROM hive.tpcds_sf1.store_sales WHERE ss_sold_date_sk > 2451911
-```   
-3. 只能合并单列谓词。
+   由于谓词已重写，使用ss_sold_date_sk > 2451911谓词进行查询将无法匹配到Cube谓词，因此不会使用Cube优化查询。同样的情况也适用于具有<=运算符的谓词。例如 ss_sold_date_sk <= 2451911重写为ss_sold_date_sk < 2451912。
+   
+   ```sql   
+      SELECT ss_sold_date_sk, .... FROM hive.tpcds_sf1.store_sales WHERE ss_sold_date_sk > 2451911
+   ```
+   
+③ 只能合并单列谓词。
 
 ## 未解决的问题和限制
 1. StarTree Cube仅在按基数分组的数量远小于源表中的行数时有效。
@@ -218,10 +242,11 @@ SHOW CUBES;
 4. 即使源表尚未更新，在事务表上创建的Cubes也可能会自动过期。
    这是由于压缩策略将delta文件合并为单个大型ORC文件，这反过来又更改了表的最后修改时间。
    Cube状态是通过比较创建Cube时表的最后修改时间戳与执行查询时表的最后修改时间来确定的。
-5. OpenLooKeng CLI已经过修改，以简化为更大的数据集创建Cubes的过程。 
+5. openLooKeng CLI已经过修改，以简化为更大的数据集创建Cubes的过程。 
    但是这种实现仍然存在局限性，因为该过程涉及将多个Cube谓词合并为一个。
    只有定义在Integer、Long和Date类型上的Cube谓词才能正确合并。 对Char、String类型的支持仍需实现。
-   
+6. 当Varchar类型的谓词的数值长度是一样时可合并。
+
 ## Star Tree上的性能优化
 1. 对同一个group by列的星型查询重写优化：如果查询语句与Cube组匹配，则会改写查询计划将聚合运算结果重定向到Cube结果，否则将添加其他聚合结果内部应用于重写语句。
 2. 平均聚合函数的star tree表扫描优化：如果查询语句与group by列的Cube匹配，则会改写查询计划将聚合运算结果重定向到Cube的预聚合列的平均值结果，否则语句将在内部重写，以选择star tree预聚合Sum和Count结果，随后计算平均值。

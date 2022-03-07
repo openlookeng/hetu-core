@@ -390,6 +390,7 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > -   **Default value:** `10`
 >
 > The maximum number of retry for failed task performed by the coordinator before considering it as a permanent failure. This property is used only when exchange.is-timeout-failure-detection-enabled is set to false.
+
 ### `sink.max-buffer-size`
 
 > -   **Type:** `data size`
@@ -781,7 +782,7 @@ helps with cache affinity scheduling.
 > Auto-Vacuum enables the system to automatically manage vacuum jobs by constantly monitoring the tables which needs vacuum in order to maintain optimal performance.
 > Engine gets the tables from data sources that are eligible for vacuum and trigger vacuum operation for those tables.
 
-### `auto-vacuum.enabled:`
+### `auto-vacuum.enabled`
 
 > -   **Type:** `boolean`
 > -   **Default value:** `false`

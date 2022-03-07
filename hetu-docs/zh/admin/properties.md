@@ -148,6 +148,24 @@
 > 
 > 此配置属性可由`spill_window_operator`会话属性重写。
 
+### `experimental.spill-build-for-outer-join-enabled`
+
+> -   **类型：** `boolean`
+> -   **默认值：** `false`
+>
+> 为右外连接和全外连接操作启用溢出功能。
+>
+> 此config属性可被`spill_build_for_outer_join_enabled`会话属性覆盖。
+
+### `experimental.inner-join-spill-filter-enabled`
+
+> -   **类型：** `boolean`
+> -   **默认值：** `false`
+>
+> 启用基于布隆过滤器的构建侧溢出匹配，以进行探查侧溢出决策。
+>
+> 此config属性可被`inner_join_spill_filter_enabled`会话属性覆盖。
+
 ### `experimental.spill-reuse-tablescan`
 
 > - **类型**：`boolean`
@@ -163,7 +181,7 @@
 > - **无默认值。** 启用溢出时必须设置。
 > 
 > 溢出内容写入的目录。该属性可以是一个逗号分隔的列表，以同时溢出到多个目录，这有助于利用系统中安装的多个驱动器。
-> 
+> 当`experimental.spiller-spill-to-hdfs`为`true`时，`experimental.spiller-spill-path`必须只包含一个目录。
 > 不建议溢出到系统驱动器上。最重要的是，不要溢出到写入JVM日志的驱动器，因为磁盘过度使用可能导致JVM长时间暂停，从而导致查询失败。
 
 ### `experimental.spiller-max-used-space-threshold`
@@ -208,7 +226,7 @@
 >
 > 用于在Reuse Exchange中缓存页面的内存限制。
 
-### experimental.spill-compression-enabled`
+### `experimental.spill-compression-enabled`
 
 > - **类型：** `boolean`
 > - **默认值：** `false`
@@ -221,6 +239,69 @@
 > - **默认值：** `false`
 > 
 > 允许使用随机生成的密钥（每个溢出文件）来加密和解密溢出到磁盘的数据。
+
+### `experimental.spill-direct-serde-enabled`
+
+> -   **类型：** `boolean`
+> -   **默认值：** `false`
+>
+> 允许将页面直接序列化/读取到流中或从流中序列化/读取页面。
+
+### `experimental.spill-prefetch-read-pages`
+
+> -   **类型：** `integer`
+> -   **默认值：** `1`
+>
+> 设置从溢出文件读取时预取的页数。
+
+
+### `experimental.spill-use-kryo-serialization`
+
+> -   **类型：** `boolean`
+> -   **默认值：** `false`
+>
+> 启用基于Kryo的序列化以溢出到磁盘，而不使用默认的Java序列化器。
+
+
+### `experimental.revocable-memory-selection-threshold`
+
+> -   **类型：** `data size`
+> -   **默认值：** `512 MB`
+>
+> 设置运算符可撤销内存的内存选择阈值，直接为准备撤销的剩余字节分配可撤销内存。
+
+### `experimental.prioritize-larger-spilts-memory-revoke`
+
+> -   **类型：** `boolean`
+> -   **默认值：** `true`
+>
+> 启用对具有较大可撤销内存的Split进行优先级排序。
+
+### `experimental.spill-non-blocking-orderby`
+
+> -   **类型：** `boolean`
+> -   **默认值：** `false`
+>
+> 开启按照运算符排序，使用异步机制溢出。即使在溢出正在进行时，也可以累积输入，并在次要数据累积超过阈值或主溢出完成时启动次溢出。阈值的默认值是20MB到可用内存的5%之间的最小值。此属性必须与`experimental.spill-enabled`属性结合使用。
+>
+> 此config属性可被`spill_non_blocking_orderby`会话属性覆盖。
+
+### `experimental.spiller-spill-to-hdfs`
+
+> -   **类型：** `boolean`
+> -   **默认值：** `false`
+>
+> 启用溢出到HDFS。当此属性设置为`true`时，必须设置`experimental.spiller-spill-profile`属性，并且`experimental.spiller-spill-path`必须仅包含单个路径。
+
+### `experimental.spiller-spill-profile`
+
+> -   **类型：** `string`
+> -   **无默认值。** 启用溢出到HDFS时必须设置此属性。
+>
+>
+> 此属性定义用于溢出的[filesystem](../develop/filesystem.md)配置文件。对应的配置文件必须存在于`etc/filesystem`中。例如，如果此属性设置为`experimental.spiller-spill-profile=spill-hdfs`，则必须在`etc/filesystem`中创建描述此文件系统的配置文件`spill-hdfs.properties`，其中包含必要的信息，包括身份验证类型、config和keytab（如果适用，详情请参见[filesystem](../develop/filesystem.md）)。
+>
+> 当`experimental.spiller-spill-to-hdfs`设置为`true`时，必须配置此属性。所有Coordinator和Worker的配置文件中必须包含此属性。指定的文件系统必须可由所有Worker访问，并且Worker必须能够读取和写入指定文件系统中`experimental.spiller-spill-path`文件夹中指明的路径。
 
 ## 交换属性
 
@@ -266,6 +347,20 @@
 > - **默认值：** `7m`
 > 
 > 交换错误最大缓冲时间，超过该时限则查询失败。
+
+### `exchange.is-timeout-failure-detection-enabled`
+
+> -   **类型：** `boolean`
+> -   **默认值：** `true`
+>
+> 正在使用的故障检测机制。默认值是基于超时的故障检测。但是，当该属性设置为`false`时，启用基于最大重试次数的故障检测机制。
+
+### `exchange.max-retry-count`
+
+> -   **类型：** `integer`
+> -   **默认值：** `10`
+>
+> Coordinator在将失败任务视为永久失败之前对其执行的最大重试次数。仅当`exchange.is-timeout-failure-detection-enabled`设置为`false`时，才使用此属性。
 
 ### `sink.max-buffer-size`
 
@@ -634,7 +729,7 @@
 
 > 自动清空使系统能够通过持续监测需要清空的表来自动管理清空作业，以保持最佳性能。引擎从符合清空条件的数据源获取表，并触发对这些表的清空操作。
 
-### `auto-vacuum.enabled:`
+### `auto-vacuum.enabled`
 
 > - **类型：** `boolean`
 > - **默认值：** `false`
@@ -736,6 +831,13 @@
 > 此属性定义系统等待所有任务成功恢复的最大时长。如果在此超时时限内任何任务未就绪，则认为恢复失败，查询将尝试从较早快照恢复（如果可用）。
 >
 > 也可以使用`snapshot_retry_timeout`会话属性在每个查询基础上指定。
+
+### `hetu.snapshot.useKryoSerialization`
+
+> -   **类型：** `boolean`
+> -   **默认值：** `false`
+>
+> 为快照启用基于Kryo的序列化，而不是默认的Java序列化。
 
 ## HTTP客户端属性配置
 
