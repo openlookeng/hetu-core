@@ -94,7 +94,7 @@ public class RowBlockEncoding
         }
 
         int positionCount = input.readInt();
-        int[] fieldBlockOffsets = input.readInts(positionCount);
+        int[] fieldBlockOffsets = input.readInts(positionCount + 1);
         boolean[] rowIsNull;
 
         if (input.readBoolean()) {
