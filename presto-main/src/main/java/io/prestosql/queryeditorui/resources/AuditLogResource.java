@@ -79,7 +79,7 @@ public class AuditLogResource
     @POST
     @Path("/{type}")
     public void getAuditLog(
-            @FormParam("user") String user,
+            @FormParam("user") String username,
             @FormParam("beginTime") String beginTime,
             @FormParam("endTime") String endTime,
             @FormParam("level") String level,
@@ -94,16 +94,16 @@ public class AuditLogResource
             response.setStatus(400);
             return;
         }
-        user = emptyToNull(user);
-        beginTime = emptyToNull(beginTime);
-        endTime = emptyToNull(endTime);
-        level = emptyToNull(level);
-        List<String> logFiles = getLogFiles(type, beginTime, endTime, user, level);
+        String inputUsername = emptyToNull(username);
+        String inputBeginTime = emptyToNull(beginTime);
+        String inputEndTime = emptyToNull(endTime);
+        String inputLevel = emptyToNull(level);
+
+        List<String> logFiles = getLogFiles(type, inputBeginTime, inputEndTime, inputUsername, inputLevel);
         if (logFiles.isEmpty()) {
             response.setStatus(404);
             return;
         }
-
         response.reset();
         response.setCharacterEncoding("utf-8");
         response.setContentType("application/json");
@@ -111,7 +111,7 @@ public class AuditLogResource
         List<String> resLog = new ArrayList<>(100);
         BufferedReader br = new BufferedReader(new FileReader(logFiles.get(logFiles.size() - 1)));
         String str = null;
-        int auditLogLimit = 99;
+        int auditLogLimit = 99; // show 100 logs in webUI
         while ((str = br.readLine()) != null) {
             resLog.add(str + System.lineSeparator());
             auditLogLimit--;
@@ -131,7 +131,7 @@ public class AuditLogResource
     @GET
     @Path("/download")
     public void downloadLogFiles(
-            @QueryParam("user") String user,
+            @QueryParam("user") String username,
             @QueryParam("beginTime") String beginTime,
             @QueryParam("endTime") String endTime,
             @QueryParam("level") String level,
@@ -146,22 +146,21 @@ public class AuditLogResource
             response.setStatus(400);
             return;
         }
-        user = emptyToNull(user);
-        beginTime = emptyToNull(beginTime);
-        endTime = emptyToNull(endTime);
-        level = emptyToNull(level);
+        String inputUsername = emptyToNull(username);
+        String inputBeginTime = emptyToNull(beginTime);
+        String inputEndTime = emptyToNull(endTime);
+        String inputLevel = emptyToNull(level);
 
-        List<String> logFiles = getLogFiles(type, beginTime, endTime, user, level);
-
+        List<String> logFiles = getLogFiles(type, inputBeginTime, inputEndTime, inputUsername, inputLevel);
+        if (logFiles.isEmpty()) {
+            response.setStatus(404);
+            return;
+        }
         response.reset();
         response.setContentType("multipart/form-data");
         String downloadName = getCurrentDate() + "_" + filterUser.get() + "_auditLog.zip";
         response.setHeader("Content-Disposition", "attachment;fileName=" + downloadName);
 
-        if (logFiles.isEmpty()) {
-            response.setStatus(404);
-            return;
-        }
         //set compression stream: write response directly to achieve compression while downloading
         ZipOutputStream zipos = new ZipOutputStream(new BufferedOutputStream(response.getOutputStream()));
         zipos.setMethod(ZipOutputStream.DEFLATED);

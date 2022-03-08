@@ -133,21 +133,21 @@ public class QueryResource
         if (pageSize != null && pageSize <= 0) {
             return Response.status(Status.BAD_REQUEST).build();
         }
-        searchUser = nullToEmpty(searchUser);
-        searchUser = nullToEmpty(searchUser);
-        searchDate = nullToEmpty(searchDate);
-        searchSql = nullToEmpty(searchSql);
-        searchQueryId = nullToEmpty(searchQueryId);
-        resourceGroup = nullToEmpty(resourceGroup);
+
+        String inputSearchUser = nullToEmpty(searchUser);
+        String inputSearchDate = nullToEmpty(searchDate);
+        String inputSearchSql = nullToEmpty(searchSql);
+        String inputSearchQueryId = nullToEmpty(searchQueryId);
+        String inputResourceGroup = nullToEmpty(resourceGroup);
 
         String startTime = "";
         String endTime = "";
-        if (!"".equals(searchDate)) {
-            searchDate = searchDate.replaceAll(" ", "");
-            startTime = searchDate.split("~")[0];
-            endTime = searchDate.split("~")[1];
+        if (!"".equals(inputSearchDate)) {
+            inputSearchDate = inputSearchDate.replaceAll(" ", "");
+            startTime = inputSearchDate.split("~")[0];
+            endTime = inputSearchDate.split("~")[1];
         }
-        Info info = new Info(searchUser, startTime, endTime, searchQueryId, searchSql, "", resourceGroup, stateFilter, failedFilter, sortFilter, sortOrder);
+        Info info = new Info(inputSearchUser, startTime, endTime, inputSearchQueryId, inputSearchSql, "", inputResourceGroup, stateFilter, failedFilter, sortFilter, sortOrder);
         QueryHistoryResult res = queryHistoryService.Query(info, pageNum, pageSize);
         return Response.ok(res).build();
     }

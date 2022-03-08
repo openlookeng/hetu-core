@@ -48,10 +48,11 @@ public class HetuLogUtil
 
     private static String getCurrentDate(String logConversionPattern)
     {
-        if (logConversionPattern == null) {
-            logConversionPattern = "yyyy-MM-dd.HH";
+        String hetuLogConversionPattern = logConversionPattern;
+        if (hetuLogConversionPattern == null) {
+            hetuLogConversionPattern = "yyyy-MM-dd.HH";
         }
-        SimpleDateFormat formatter = new SimpleDateFormat(logConversionPattern);
+        SimpleDateFormat formatter = new SimpleDateFormat(hetuLogConversionPattern);
         String dateString = formatter.format(new Date());
         return dateString;
     }

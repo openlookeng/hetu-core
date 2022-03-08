@@ -57,17 +57,18 @@ public class LoginResource
             @Context SecurityContext securityContext,
             @Context HttpServletRequest request)
     {
-        username = emptyToNull(username);
-        password = emptyToNull(password);
-        redirectPath = emptyToNull(redirectPath);
-        Optional<NewCookie> newCookie = uiAuthenticator.checkLoginCredentials(username, password, securityContext.isSecure());
+        String localPassword = password;
+        String inputUsername = emptyToNull(username);
+        localPassword = emptyToNull(localPassword);
+        String inputRedirectPath = emptyToNull(redirectPath);
         String userAgent = request.getHeader("User-Agent");
+        Optional<NewCookie> newCookie = uiAuthenticator.checkLoginCredentials(inputUsername, localPassword, securityContext.isSecure());
         AuditLogEvent enhancedEvent = new AuditLogEvent(username, request.getRemoteAddr(), "", "WebUi", "");
         if (newCookie.isPresent()) {
             enhancedEvent.setOperation("WebUi login!, UserAgent=\'" + userAgent);
             enhancedEvent.setLevel("INFO");
             eventListenerManager.eventEnhanced(enhancedEvent);
-            return UiAuthenticator.redirectFromSuccessfulLoginResponse(redirectPath)
+            return UiAuthenticator.redirectFromSuccessfulLoginResponse(inputRedirectPath)
                     .cookie(newCookie.get()).build();
         }
         // authentication failed, redirect back to the login page
