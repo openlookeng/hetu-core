@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 import io.hetu.core.spi.cube.CubeAggregateFunction;
 import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.CubeStatus;
@@ -77,6 +78,7 @@ import io.prestosql.sql.tree.AddColumn;
 import io.prestosql.sql.tree.AliasedRelation;
 import io.prestosql.sql.tree.AllColumns;
 import io.prestosql.sql.tree.Analyze;
+import io.prestosql.sql.tree.ArrayConstructor;
 import io.prestosql.sql.tree.AssignmentItem;
 import io.prestosql.sql.tree.Call;
 import io.prestosql.sql.tree.Comment;
@@ -835,6 +837,21 @@ class StatementAnalyzer
                     throw new SemanticException(TYPE_MISMATCH, predicate, "Filter property must evaluate to a boolean: actual type '%s'", predicateType);
                 }
             });
+            List<Property> partitionedByExists = node.getProperties().stream()
+                    .filter(x -> x.getName().toString().equals("partitioned_by"))
+                    .collect(Collectors.toList());
+            if (partitionedByExists.size() != 0) {
+                ArrayConstructor values = (ArrayConstructor) partitionedByExists.get(0).getValue();
+                Set<String> partitionColumns = Sets.newHashSet(values.getValues().stream()
+                        .map(x -> x.toString())
+                        .map(x -> x.substring(1, x.length() - 1))
+                        .collect(Collectors.toList()));
+                if (!Sets.difference(partitionColumns, Sets.newHashSet(node.getGroupingSet().stream()
+                        .map(Identifier::getValue)
+                        .collect(Collectors.toList()))).isEmpty()) {
+                    throw new SemanticException(NOT_SUPPORTED, node, "Some columns in '" + String.join(",", partitionColumns) + "' in partitioned_by are not part of Cube.");
+                }
+            }
             return createAndAssignScope(node, scope, outputFields.build());
         }
 

@@ -75,8 +75,8 @@ public class Console
 
     private static final String PROMPT_NAME = "lk";
     private static final Duration EXIT_DELAY = new Duration(3, SECONDS);
-    private static final Pattern CREATE_CUBE_PATTERN = Pattern.compile("^(create)\\s*cube.*where.*", Pattern.CASE_INSENSITIVE);
-    private static final Pattern RELOAD_CUBE_PATTERN = Pattern.compile("^(reload)\\s*cube.*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CREATE_CUBE_PATTERN = Pattern.compile("^(create)\\s*cube.*where.*", Pattern.CASE_INSENSITIVE | Pattern.DOTALL | Pattern.MULTILINE);
+    private static final Pattern RELOAD_CUBE_PATTERN = Pattern.compile("^(reload)\\s*cube.*", Pattern.CASE_INSENSITIVE | Pattern.DOTALL | Pattern.MULTILINE);
 
     @Inject
     public HelpOption helpOption;
@@ -282,9 +282,14 @@ public class Console
                         if (isReloadCubeSucceed) {
                             CubeConsole cubeConsole = new CubeConsole(this);
                             queryRunner.setCubeConsole(cubeConsole);
-                            boolean isCreateCubeSucceed = cubeConsole.createCubeCommand(reloadCubeConsole.getNewQuery(), queryRunner, ClientOptions.OutputFormat.NULL, tableNameCompleter::populateCache, false, true, reader.getTerminal(), out, errorChannel);
-                            if (!isCreateCubeSucceed) {
-                                System.out.println("An Error occurred. The cube needs to be created manually. Query to create the cube: " + reloadCubeConsole.getNewQuery());
+                            if (CREATE_CUBE_PATTERN.matcher(reloadCubeConsole.getNewQuery()).matches()) {
+                                boolean isCreateCubeSucceed = cubeConsole.createCubeCommand(reloadCubeConsole.getNewQuery(), queryRunner, ClientOptions.OutputFormat.NULL, tableNameCompleter::populateCache, false, true, reader.getTerminal(), out, errorChannel);
+                                if (!isCreateCubeSucceed) {
+                                    System.out.println("An Error occurred. The cube needs to be created manually. Query to create the cube: " + reloadCubeConsole.getNewQuery());
+                                }
+                            }
+                            else {
+                                process(queryRunner, reloadCubeConsole.getNewQuery(), outputFormat, tableNameCompleter::populateCache, true, true, reader.getTerminal(), System.out, System.out);
                             }
                         }
                     }
