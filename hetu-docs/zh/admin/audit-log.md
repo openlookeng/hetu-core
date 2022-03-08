@@ -29,11 +29,11 @@ hetu.auditlog.logconversionpattern=yyyy-MM-dd.HH
 
 其他审计日志记录属性包括：
 
-`hetu.event.listener.audit.file`：可选属性，用于定义审计文件的绝对文件路径。确保运行openLooKeng服务器的进程对该目录有写权限。
+`hetu.event.listener.type`：用于定义审计日志的记录类型，允许的值为AUDIT和LOGGER。
 
-`hetu.event.listener.audit.filecount`：可选属性，用于定义要使用的文件数。
+`hetu.auditlog.logoutput`：用于定义审计文件的绝对目录路径。确保运行openLooKeng服务器的进程对该目录有写权限。
 
-`hetu.event.listener.audit.limit`：可选属性，用于定义写入任一文件的最大字节数。
+`hetu.auditlog.logconversionpattern`：用于定义审计日志的轮转模式。允许的值为yyyy-MM-dd.HH和yyyy-MM-dd。
 
 配置文件示例：
 
