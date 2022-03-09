@@ -95,7 +95,9 @@ public class VariableWidthBlockEncoding
 
         int totalSize = block.offsets[block.arrayOffset + positionCount] - block.offsets[block.arrayOffset];
         output.writeInt(totalSize);
-        output.write(block.getRawSlice(0).byteArray(), block.offsets[block.arrayOffset], totalSize);
+        if (totalSize != 0) {
+            output.write(block.getRawSlice(0).byteArray(), block.offsets[block.arrayOffset], totalSize);
+        }
     }
 
     @Override
@@ -108,8 +110,13 @@ public class VariableWidthBlockEncoding
             valuesIsNull = input.readBooleans(positionCount);
         }
         int blockSize = input.readInt();
-        Slice slice = Slices.wrappedBuffer(input.readBytes(blockSize));
-
+        Slice slice;
+        if (blockSize != 0) {
+            slice = Slices.wrappedBuffer(input.readBytes(blockSize));
+        }
+        else {
+            slice = Slices.EMPTY_SLICE;
+        }
         return new VariableWidthBlock(0, positionCount, slice, offsets, valuesIsNull);
     }
 
