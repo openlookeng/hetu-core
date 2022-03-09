@@ -31,6 +31,10 @@
 
 openLooKeng将溢出路径视为独立的磁盘（参见[JBOD](https://en.wikipedia.org/wiki/Non-RAID_drive_architectures#JBOD )），因此无需使用RAID进行溢出。
 
+## 溢出到HDFS
+
+操作可以直接溢出到HDFS。将`experimental.spiller-spill-to-hdfs`设置为`true`，配置`experimental.spiller-spill-profile`，并且`spiller-spill-path`必须仅包含一个目录。（更多详情请参见`experimental.spiller-spill-to-hdfs`和`experimental.spiller-spill-profile`属性）
+
 ## 溢出压缩
 
 当启用溢出压缩（`tuning-spilling`中的`spill-compression-enabled`属性）时，溢出页将被压缩后再写入磁盘。启用此特性可以减少磁盘I/O，但会牺牲额外的CPU负载来压缩和解压缩溢出页。
@@ -60,6 +64,7 @@ openLooKeng将溢出路径视为独立的磁盘（参见[JBOD](https://en.wikipe
 ### 排序
 
 如果尝试对大量数据进行排序，可能需要大量内存。当启用为排序溢出到磁盘时，如果内存不足，则中间排序结果将写入磁盘。结果被重新加载回来，并以较低的内存占用量合并。
+通常，当溢出正在进行时，运算符将被阻止接受输入，但当`experimental.spill-non-blocking-orderby`设置为`true`时，使用异步机制溢出（请参见`experimental.spill-non-blocking-orderby`）。
 
 ### 开窗函数
 

@@ -121,7 +121,7 @@ Since the data inserted into the Cube was for `nationkey >= 5`, only queries mat
 Queries not matching the condition would continue to work but won't use the Cube.
 
 If the source table of a Cube gets updated, the corresponding Cube gets expired automatically. In order to overcome
-this issue, we have added support in OpenLooKeng CLI by introducing **RELOAD CUBE** command. The user will have the
+this issue, we have added support in openLooKeng CLI by introducing **RELOAD CUBE** command. The user will have the
 ability to manually reload a cube if the status of the Cube becomes INACTIVE or EXPIRED. The syntax to reload the
 Cube nation_cube is as follows,
 

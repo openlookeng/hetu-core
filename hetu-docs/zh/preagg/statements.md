@@ -150,6 +150,26 @@ SHOW CUBES [ FOR table_name ];
     SHOW CUBES FOR orders;
 ```
 
+## RELOAD CUBE
+
+### 概要
+
+``` sql
+RELOAD CUBE cube_name
+```
+
+### 描述
+
+源表更新后重新加载Cube。
+
+### 示例
+
+如果Cube`orders_cube`的源表`orders`被更新，且`orders_cube`的状态为“过期”，运行`RELOAD CUBE cube_name`命令重新加载Cube：
+
+```sql
+RELOAD CUBE orders_cube
+```
+
 ## DROP CUBE
 
 ### 概要
