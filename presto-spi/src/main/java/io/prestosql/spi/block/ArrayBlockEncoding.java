@@ -83,7 +83,7 @@ public class ArrayBlockEncoding
         Input input = (Input) inputStream;
         Block values = blockEncodingSerde.readBlock(input);
         int positionCount = input.readInt();
-        int[] offsets = input.readInts(positionCount);
+        int[] offsets = input.readInts(positionCount + 1);
 
         boolean[] valueIsNull = null;
         if (input.readBoolean()) {
