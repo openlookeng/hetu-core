@@ -3134,9 +3134,7 @@ public class LocalExecutionPlanner
 
             PipelineExecutionStrategy exchangeSourcePipelineExecutionStrategy = GROUPED_EXECUTION;
             List<DriverFactoryParameters> driverFactoryParametersList = new ArrayList<>();
-            for (int i = 0; i < node.getSources().size(); i++) {
-                PlanNode sourceNode = node.getSources().get(i);
-
+            for (PlanNode sourceNode : node.getSources()) {
                 LocalExecutionPlanContext subContext = context.createSubContext();
                 PhysicalOperation source = sourceNode.accept(this, subContext);
                 driverFactoryParametersList.add(new DriverFactoryParameters(subContext, source));

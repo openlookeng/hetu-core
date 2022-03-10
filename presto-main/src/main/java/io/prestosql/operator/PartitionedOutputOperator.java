@@ -524,8 +524,8 @@ public class PartitionedOutputOperator
         {
             PagePartitionerState myState = new PagePartitionerState();
             // This was just flushed, so page builders must be empty
-            for (int i = 0; i < pageBuilders.length; i++) {
-                checkState(pageBuilders[i].isEmpty());
+            for (PageBuilder pageBuilder : pageBuilders) {
+                checkState(pageBuilder.isEmpty());
             }
             myState.rowsAdded = rowsAdded.get();
             myState.pagesAdded = pagesAdded.get();
