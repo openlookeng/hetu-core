@@ -334,7 +334,7 @@ public class Console
                             success = false;
                         }
                     }
-                    if (RELOAD_CUBE_PATTERN.matcher(statement).matches()) {
+                    else if (RELOAD_CUBE_PATTERN.matcher(statement).matches()) {
                         PrintStream out = System.out;
                         PrintStream errorChannel = System.out;
                         boolean isReloadCubeSucceed = reloadCubeConsole.reload(statement, queryRunner, ClientOptions.OutputFormat.NULL, () -> {}, false, showProgress, terminal, out, errorChannel);
@@ -345,13 +345,23 @@ public class Console
                             success = false;
                         }
                         else {
-                            boolean isCreateCubeSucceed = cubeConsole.createCubeCommand(reloadCubeConsole.getNewQuery(), queryRunner, ClientOptions.OutputFormat.NULL, () -> {}, false, showProgress, terminal, out, errorChannel);
-                            if (!isCreateCubeSucceed) {
-                                System.err.println("An Error occurred. The cube needs to be created manually. Query to create the cube: " + reloadCubeConsole.getNewQuery());
-                                if (!ignoreErrors) {
-                                    return false;
+                            if (CREATE_CUBE_PATTERN.matcher(reloadCubeConsole.getNewQuery()).matches()) {
+                                boolean isCreateCubeSucceed = cubeConsole.createCubeCommand(reloadCubeConsole.getNewQuery(), queryRunner, ClientOptions.OutputFormat.NULL, () -> {}, false, showProgress, terminal, out, errorChannel);
+                                if (!isCreateCubeSucceed) {
+                                    System.err.println("An Error occurred. The cube needs to be created manually. Query to create the cube: " + reloadCubeConsole.getNewQuery());
+                                    if (!ignoreErrors) {
+                                        return false;
+                                    }
+                                    success = false;
                                 }
-                                success = false;
+                            }
+                            else {
+                                if (!process(queryRunner, reloadCubeConsole.getNewQuery(), outputFormat, () -> {}, false, showProgress, terminal, System.out, System.err)) {
+                                    if (!ignoreErrors) {
+                                        return false;
+                                    }
+                                    success = false;
+                                }
                             }
                         }
                     }
