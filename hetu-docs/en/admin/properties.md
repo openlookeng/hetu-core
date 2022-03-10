@@ -389,7 +389,7 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > -   **Type:** `integer`
 > -   **Default value:** `10`
 >
-> The maximum number of retry for failed task performed by the coordinator before considering it as a permanent failure. This property is used only when exchange.is-timeout-failure-detection-enabled is set to false.
+> The maximum number of retry for failed task performed by the coordinator before considering it as a permanent failure. This property is used only when exchange.is-timeout-failure-detection-enabled is set to false. This value needs to be atleast 3 (minimum retry count) to take effect.
 
 ### `sink.max-buffer-size`
 

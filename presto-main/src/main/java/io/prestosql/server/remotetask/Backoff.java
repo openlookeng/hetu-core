@@ -75,14 +75,13 @@ public class Backoff
     public Backoff(int minTries, Duration maxFailureInterval, Ticker ticker, List<Duration> backoffDelayIntervals, int maxTries)
     {
         checkArgument(minTries > 0, "minTries must be at least 1");
-        checkArgument(maxTries > 0, "maxTries must be at least 1");
         requireNonNull(maxFailureInterval, "maxFailureInterval is null");
         requireNonNull(ticker, "ticker is null");
         requireNonNull(backoffDelayIntervals, "backoffDelayIntervals is null");
         checkArgument(!backoffDelayIntervals.isEmpty(), "backoffDelayIntervals must contain at least one entry");
 
         this.minTries = minTries;
-        this.maxTries = maxTries;
+        this.maxTries = (minTries < maxTries) ? maxTries : minTries;
         this.maxFailureIntervalNanos = maxFailureInterval.roundTo(NANOSECONDS);
         this.ticker = ticker;
         this.backoffDelayIntervalsNanos = backoffDelayIntervals.stream()
@@ -100,7 +99,7 @@ public class Backoff
         checkArgument(!backoffDelayIntervals.isEmpty(), "backoffDelayIntervals must contain at least one entry");
 
         this.minTries = minTries;
-        this.maxTries = minTries + MAX_RETRIES; // to guaranty higher max retry value when min retry is > MAX_RETRIES
+        this.maxTries = (minTries < MAX_RETRIES) ? MAX_RETRIES : minTries;
         this.maxFailureIntervalNanos = maxFailureInterval.roundTo(NANOSECONDS);
         this.ticker = ticker;
         this.backoffDelayIntervalsNanos = backoffDelayIntervals.stream()
@@ -136,8 +135,17 @@ public class Backoff
     {
         lastRequestStart = 0;
         firstFailureTime = 0;
-        failureCount = 0;
+        setFailureCount(0, false);
         lastFailureTime = 0;
+    }
+
+    private synchronized void setFailureCount(int n, boolean isInc)
+    {
+        if (isInc) {
+            failureCount = failureCount + n;
+            return;
+        }
+        failureCount = n;
     }
 
     /**
@@ -148,7 +156,7 @@ public class Backoff
         long now = ticker.read();
 
         lastFailureTime = now;
-        failureCount++;
+        setFailureCount(1, true);
         if (lastRequestStart != 0) {
             failureRequestTimeTotal += now - lastRequestStart;
             lastRequestStart = 0;
@@ -160,11 +168,10 @@ public class Backoff
             return false;
         }
 
-        if (failureCount < minTries) {
+        if (getFailureCount() < minTries) {
             return false;
         }
-
-        return failureCount > maxTries;
+        return getFailureCount() >= maxTries;
     }
 
     /**
@@ -186,7 +193,7 @@ public class Backoff
         long now = ticker.read();
 
         lastFailureTime = now;
-        failureCount++;
+        setFailureCount(1, true);
         if (lastRequestStart != 0) {
             failureRequestTimeTotal += now - lastRequestStart;
             lastRequestStart = 0;
@@ -198,7 +205,7 @@ public class Backoff
             return false;
         }
 
-        if (failureCount < minTries) {
+        if (getFailureCount() < minTries) {
             return false;
         }
 
@@ -208,7 +215,7 @@ public class Backoff
 
     public synchronized long getBackoffDelayNanos()
     {
-        int tmpFailureCount = (int) min(backoffDelayIntervalsNanos.length, this.failureCount);
+        int tmpFailureCount = (int) min(backoffDelayIntervalsNanos.length, getFailureCount());
         if (tmpFailureCount == 0) {
             return 0;
         }
