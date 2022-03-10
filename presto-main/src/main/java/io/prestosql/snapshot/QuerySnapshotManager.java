@@ -400,11 +400,11 @@ public class QuerySnapshotManager
             }
             else {
                 if (result == SnapshotResult.FAILED) {
-                    LOG.debug("[FATAL] Failed to resume for: " + taskId + ", snapshot " + snapshotId);
+                    LOG.debug("[FATAL] Failed to resume for: %s, snapshot %d", taskId.toString(), snapshotId);
                     updateQueryRestore(snapshotId, taskId, snapshotInfo, SnapshotComponentCounter.ComponentState.FAILED);
                 }
                 else if (result == SnapshotResult.FAILED_FATAL) {
-                    LOG.debug("Failed to resume for: " + taskId + ", snapshot " + snapshotId);
+                    LOG.debug("Failed to resume for: %s, snapshot %d", taskId.toString(), snapshotId);
                     updateQueryRestore(snapshotId, taskId, snapshotInfo, SnapshotComponentCounter.ComponentState.FAILED_FATAL);
                 }
                 else if (result == SnapshotResult.SUCCESSFUL) {

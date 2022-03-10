@@ -722,7 +722,7 @@ public class SqlQueryScheduler
             return true;
         }
 
-        log.debug("Splits scheduling throttled....!!! Used memory " + cachedMemoryUsage + " configured " + softReservedMemory);
+        log.debug("Splits scheduling throttled....!!! Used memory %d  configured %d", cachedMemoryUsage, softReservedMemory);
         return false;
     }
 

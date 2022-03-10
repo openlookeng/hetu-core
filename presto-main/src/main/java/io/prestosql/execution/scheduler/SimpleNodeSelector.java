@@ -170,10 +170,10 @@ public class SimpleNodeSelector
                         }
                     }
                 }
-                log.debug("Consumer:: Assignment size is " + assignment.size() + " ,Assignment is " + assignment + " ,Assignment Stats is " + assignmentStats);
+                log.debug("Consumer:: Assignment size is %d ,Assignment is %s ,Assignment Stats is %s", assignment.size(), assignment.toString(), assignmentStats.toString());
             }
             catch (NotImplementedException e) {
-                log.error("Not a Hive Split! Other Connector Splits not supported currently. Error: " + e);
+                log.error("Not a Hive Split! Other Connector Splits not supported currently. Error: %s", e.getMessage());
                 throw new UnsupportedOperationException("Not a Hive Split! Other Connector Splits not supported currently. Error: " + e);
             }
         }
@@ -321,7 +321,7 @@ public class SimpleNodeSelector
                 }
             }
             if (matched == false) {
-                log.debug("split not matched: " + aSplit);
+                log.debug("split not matched: %s" + aSplit.toString());
                 throw new PrestoException(GENERIC_INTERNAL_ERROR, "Producer & consumer splits are not same");
             }
         }
@@ -335,7 +335,7 @@ public class SimpleNodeSelector
         for (Map.Entry<PlanNodeId, TableInfo> entry : tables.entrySet()) {
             QualifiedObjectName qualifiedTableName = entry.getValue().getTableName();
             tableSplitAssignmentInfo.setTableSplitAssignment(qualifiedTableName, producer.getReuseTableScanMappingId(), assignment); //also sets the splitkey info internally
-            log.debug("Producer:: Assignment size is " + assignment.size() + " ,Assignment is " + assignment + " ,Assignment Stats is " + assignmentStats);
+            log.debug("Producer:: Assignment size is %d ,Assignment is %s ,Assignment Stats is %s", assignment.size(), assignment.toString(), assignmentStats.toString());
         }
     }
 

@@ -331,7 +331,7 @@ public class TaskSnapshotManager
                             snapshotUtils.storeState(newId, map, this);
                         }
                         catch (Exception e) {
-                            LOG.error(e, "Failed to store state for " + newId);
+                            LOG.error(e, "Failed to store state for %s", newId.toString());
                             snapshotResult = SnapshotResult.FAILED;
                             updateSnapshotStatus(snapshotId, snapshotResult);
                         }

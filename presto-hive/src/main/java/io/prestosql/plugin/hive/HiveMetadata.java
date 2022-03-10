@@ -111,6 +111,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -3178,7 +3179,7 @@ public class HiveMetadata
         if ((partitionedBy.size() + sortedColumnNames.size() < groupKeyNames.size()) ||
                 (partitionedBy.size() > groupKeyNames.size())) {
             //sorted columns are less than join criteria columns
-            log.debug("number of sorted columns " + sortedColumnNames.size() + "are less join column size " + groupKeyNames.size());
+            log.debug("number of sorted columns %d are less join column size %d", sortedColumnNames.size(), groupKeyNames.size());
             return partialAndFinalAggregationType;
         }
 
@@ -3225,9 +3226,9 @@ public class HiveMetadata
                         if ((null != bucketedColumns) && (bucketedColumns.size() > 0)) {
                             final String[] dbgbucketedColumns = {new String("")};
                             bucketedColumns.stream().forEach(k -> dbgbucketedColumns[0] = dbgbucketedColumns[0].concat(k + " , "));
-                            log.debug("Not matching sortedColumnNames: " + dbgSortedColumnNames + " group columns name: " + dbgGroupKeyNames + " bucketedColumns :" + dbgbucketedColumns);
+                            log.debug("Not matching sortedColumnNames: %s group columns name: %s bucketedColumns : %s", Arrays.toString(dbgSortedColumnNames), Arrays.toString(dbgGroupKeyNames), Arrays.toString(dbgbucketedColumns));
                         }
-                        log.debug("Not matching sortedColumnNames: " + dbgSortedColumnNames + " group columns name: " + dbgGroupKeyNames);
+                        log.debug("Not matching sortedColumnNames: %s group columns name: %s", Arrays.toString(dbgSortedColumnNames), Arrays.toString(dbgGroupKeyNames));
                     }
                     return partialAndFinalAggregationType;
                 }
