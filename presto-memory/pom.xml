@@ -205,7 +205,7 @@
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-test</artifactId>
-            <version>5.2.15.RELEASE</version>
+            <version>5.2.19.RELEASE</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>
