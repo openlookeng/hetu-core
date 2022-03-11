@@ -60,7 +60,7 @@ public class HetuLogUtil
     public static Logger getLoggerByName(String username, String level, AuditType type)
     {
         String fileName = logOutput + "/" + type + "/" + level + "#" + username + "#" + getCurrentDate(logConversionPattern) + ".log";
-        java.util.logging.Logger logger = java.util.logging.Logger.getLogger(type + level + username + getCurrentDate(logConversionPattern));
+        java.util.logging.Logger logger = java.util.logging.Logger.getLogger(fileName);
         if (logOutput == null) {
             return logger;
         }
