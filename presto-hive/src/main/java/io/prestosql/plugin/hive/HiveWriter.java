@@ -125,9 +125,14 @@ public class HiveWriter
         return fileWriter.getVerificationTask();
     }
 
-    public void rollback()
+    public void rollback(boolean isCancel)
     {
-        fileWriter.rollback();
+        if (isCancel) {
+            fileWriter.cancel();
+        }
+        else {
+            fileWriter.rollback();
+        }
     }
 
     public PartitionUpdate getPartitionUpdate()
