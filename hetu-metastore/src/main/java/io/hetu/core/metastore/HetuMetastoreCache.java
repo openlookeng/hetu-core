@@ -325,7 +325,7 @@ public class HetuMetastoreCache
     @Override
     public long getAllQueryHistoryNum()
     {
-        return 0;
+        return delegate.getAllQueryHistoryNum();
     }
 
     @Override

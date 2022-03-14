@@ -501,7 +501,7 @@ public interface JdbcMetadataDao
     @SqlUpdate("DELETE FROM hetu_query_history \n" +
             "WHERE 1=1 \n" +
             "ORDER BY id \n" +
-            "LIMIT 10")
+            "LIMIT 100")
     void deleteQueryHistoryBatch();
 
     /**
