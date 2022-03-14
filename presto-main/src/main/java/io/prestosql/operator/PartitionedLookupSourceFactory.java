@@ -16,7 +16,6 @@ package io.prestosql.operator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.hash.BloomFilter;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
@@ -252,7 +251,7 @@ public final class PartitionedLookupSourceFactory
 
             checkState(!spilledPartitions.containsKey(partitionIndex), "Partition already set as spilled");
             spilledPartitions.put(partitionIndex, spilledLookupSourceHandle);
-            Map<Integer, BloomFilter<Long>> spillBlooms = spilledPartitions.entrySet().stream()
+            Map<Integer, HashBuilderOperator.SpilledBlooms> spillBlooms = spilledPartitions.entrySet().stream()
                     .filter(e -> e.getValue().getSpillBloom().isPresent())
                     .collect(Collectors.toMap(x -> x.getKey(),
                             x -> x.getValue().getSpillBloom().get()));
@@ -711,9 +710,9 @@ public final class PartitionedLookupSourceFactory
     {
         private final long spillEpoch;
         private final Set<Integer> spilledPartitions;
-        private final ImmutableMap<Integer, BloomFilter<Long>> spillBlooms;
+        private final ImmutableMap<Integer, HashBuilderOperator.SpilledBlooms> spillBlooms;
 
-        SpillingInfo(long spillEpoch, Set<Integer> spilledPartitions, Map<Integer, BloomFilter<Long>> spillBlooms)
+        SpillingInfo(long spillEpoch, Set<Integer> spilledPartitions, Map<Integer, HashBuilderOperator.SpilledBlooms> spillBlooms)
         {
             this.spillEpoch = spillEpoch;
             this.spilledPartitions = ImmutableSet.copyOf(requireNonNull(spilledPartitions, "spilledPartitions is null"));
