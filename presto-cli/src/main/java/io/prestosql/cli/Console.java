@@ -271,7 +271,7 @@ public class Console
                         PrintStream errorChannel = System.out;
                         CubeConsole cubeConsole = new CubeConsole(this);
                         queryRunner.setCubeConsole(cubeConsole);
-                        boolean isCreateCubeSucceed = cubeConsole.createCubeCommand(split.statement(), queryRunner, ClientOptions.OutputFormat.NULL, tableNameCompleter::populateCache, false, true, reader.getTerminal(), out, errorChannel);
+                        cubeConsole.createCubeCommand(split.statement(), queryRunner, ClientOptions.OutputFormat.NULL, tableNameCompleter::populateCache, false, true, reader.getTerminal(), out, errorChannel);
                     }
                     else if (RELOAD_CUBE_PATTERN.matcher(split.statement()).matches()) {
                         PrintStream out = System.out;
@@ -291,6 +291,9 @@ public class Console
                             else {
                                 process(queryRunner, reloadCubeConsole.getNewQuery(), outputFormat, tableNameCompleter::populateCache, true, true, reader.getTerminal(), System.out, System.out);
                             }
+                        }
+                        if (reloadCubeConsole.isInsertAll()) {
+                            process(queryRunner, "INSERT INTO CUBE " + reloadCubeConsole.getCubeTableName(), outputFormat, tableNameCompleter::populateCache, true, true, reader.getTerminal(), System.out, System.out);
                         }
                     }
                     else {
@@ -363,6 +366,9 @@ public class Console
                                     success = false;
                                 }
                             }
+                        }
+                        if (reloadCubeConsole.isInsertAll()) {
+                            process(queryRunner, "INSERT INTO CUBE " + reloadCubeConsole.getCubeTableName(), outputFormat, () -> {}, true, showProgress, terminal, System.out, System.err);
                         }
                     }
                     else {
