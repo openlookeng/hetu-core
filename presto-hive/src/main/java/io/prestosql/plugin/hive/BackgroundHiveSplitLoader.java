@@ -205,7 +205,7 @@ public class BackgroundHiveSplitLoader
         Path path = new Path(getPartitionLocation(table, getPrunedPartitions(partitions).iterator().next().getPartition()));
         configuration = hdfsEnvironment.getConfiguration(hdfsContext, path);
         jobConf = ConfigurationUtils.toJobConf(configuration);
-        this.hoodiePathFilterSupplier = Suppliers.memoize(HoodieROTablePathFilter::new);
+        this.hoodiePathFilterSupplier = Suppliers.memoize(() -> new HoodieROTablePathFilter(configuration));
     }
 
     /**
