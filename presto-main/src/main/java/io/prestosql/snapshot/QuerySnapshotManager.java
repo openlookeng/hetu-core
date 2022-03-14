@@ -160,6 +160,8 @@ public class QuerySnapshotManager
             // resume to 0, all current snapshotIds are invalidated
             initiatedSnapshotId.clear();
             initiatedSnapshotId.add(0L);
+            // Restart query without restore step, update statistics
+            updateStatsOnQueryRestart();
         }
         else {
             // all snapshotIds including lastTriedId can be reused.
@@ -639,5 +641,16 @@ public class QuerySnapshotManager
     public List<RestoreResult> getRestoreStats()
     {
         return restoreStats;
+    }
+
+    private void updateStatsOnQueryRestart()
+    {
+        // Query going to be restarted, consider the same as one restore
+        synchronized (this.restoreResult) {
+            SnapshotInfo info = restoreResult.getSnapshotInfo();
+            info.setEndTime(System.currentTimeMillis());
+            restoreStats.add(restoreResult);
+            retryCount = 0;
+        }
     }
 }
