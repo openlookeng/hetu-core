@@ -354,25 +354,25 @@ public class HivePageSink
     {
         // Must be wrapped in doAs entirely
         // Implicit FileSystem initializations are possible in HiveRecordWriter#rollback -> RecordWriter#close
-        hdfsEnvironment.doAs(session.getUser(), this::doAbort);
+        hdfsEnvironment.doAs(session.getUser(), () -> doAbort(false));
     }
 
     @Override
     public void cancelToResume()
     {
         // Must be wrapped in doAs entirely
-        // Implicit FileSystem initializations are possible in HiveRecordWriter#rollback -> RecordWriter#close
-        hdfsEnvironment.doAs(session.getUser(), this::doAbort);
+        // Implicit FileSystem initializations are possible in HiveRecordWriter#Cancel -> RecordWriter#close
+        hdfsEnvironment.doAs(session.getUser(), () -> doAbort(true));
     }
 
-    private void doAbort()
+    private void doAbort(boolean isCancel)
     {
         Optional<Exception> rollbackException = Optional.empty();
         for (HiveWriter writer : writers) {
             // writers can contain nulls if an exception is thrown when doAppend expends the writer list
             if (writer != null) {
                 try {
-                    writer.rollback();
+                    writer.rollback(isCancel);
                 }
                 catch (Exception e) {
                     log.warn("exception '%s' while rollback on %s", e, writer);
