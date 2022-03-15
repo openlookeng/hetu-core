@@ -16,8 +16,6 @@ package io.prestosql.operator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.execution.Lifespan;
@@ -31,6 +29,7 @@ import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.BigintType;
+import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.spiller.SingleStreamSpiller;
 import io.prestosql.spiller.SingleStreamSpillerFactory;
 import io.prestosql.sql.gen.JoinFilterFunctionCompiler.JoinFilterFunctionFactory;
@@ -45,6 +44,8 @@ import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -53,6 +54,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -258,7 +260,8 @@ public class HashBuilderOperator
     private OptionalLong lookupSourceChecksum = OptionalLong.empty();
 
     private Optional<Runnable> finishMemoryRevoke = Optional.empty();
-    private BloomFilter<Long> spillBloom;
+    private SpilledBlooms spillBloom;
+    private final long expectedValues;
 
     private final SingleInputSnapshotState snapshotState;
     // Snapshot: special logic for taking an extra snapshot for HashBuilder operator, for outer joins.
@@ -317,9 +320,9 @@ public class HashBuilderOperator
         this.spillEnabled = spillEnabled;
         this.singleStreamSpillerFactory = requireNonNull(singleStreamSpillerFactory, "singleStreamSpillerFactory is null");
         this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
-
+        this.expectedValues = expectedPositions * 10;
         if (preComputedHashChannel.isPresent() && spillEnabled && isInnerJoinSpillFilteringEnabled(operatorContext.getDriverContext().getSession())) {
-            this.spillBloom = BloomFilter.create(Funnels.longFunnel(), 10_000, 0.01);
+            this.spillBloom = new SpilledBlooms();
         }
         else {
             this.spillBloom = null;
@@ -471,6 +474,9 @@ public class HashBuilderOperator
         }
         if (state == State.LOOKUP_SOURCE_BUILT) {
             finishMemoryRevoke = Optional.of(() -> {
+                if (spillBloom != null) {
+                    spillBloom.markReady();
+                }
                 lookupSourceFactory.setPartitionSpilledLookupSourceHandle(partitionIndex, spilledLookupSourceHandle);
                 lookupSourceNotNeeded = Optional.empty();
                 index.clear();
@@ -637,6 +643,9 @@ public class HashBuilderOperator
             return;
         }
         checkSuccess(spillInProgress, "spilling failed");
+        if (spillBloom != null) {
+            spillBloom.markReady();
+        }
         state = State.INPUT_SPILLED;
     }
 
@@ -773,6 +782,85 @@ public class HashBuilderOperator
         return ImmutableList.of();
     }
 
+    public class SpilledBlooms
+    {
+        AtomicBoolean isReady = new AtomicBoolean(false);
+        List<BloomFilter> blooms = new ArrayList<>(Arrays.asList(new BloomFilter(expectedValues, 0.01)));
+        int counter;
+
+        public void put(long value)
+        {
+            int current = blooms.size() - 1;
+            if (counter >= expectedValues) {
+                blooms.add(new BloomFilter(expectedValues, 0.01));
+                counter = 0;
+            }
+
+            blooms.get(current).add(value);
+            counter++;
+        }
+
+        public boolean mightContain(long value)
+        {
+            if (!isReady.get()) {
+                return true;
+            }
+
+            return blooms.stream().anyMatch(bf -> bf.test(value));
+        }
+
+        public void markReady()
+        {
+            isReady.compareAndSet(false, true);
+        }
+
+        public Object capture()
+        {
+            SpillBloomState myState = new SpillBloomState();
+            myState.counter = counter;
+            myState.isReady = isReady.get();
+
+            for (BloomFilter bf : blooms) {
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                try {
+                    bf.writeTo(bos);
+                    myState.blooms.add(bos.toByteArray());
+                }
+                catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+            return myState;
+        }
+
+        public void restore(Object state)
+        {
+            SpillBloomState myState = (SpillBloomState) state;
+            this.isReady.set(myState.isReady);
+            this.counter = myState.counter;
+
+            blooms.clear();
+            for (Object obj : myState.blooms) {
+                ByteArrayInputStream bis = new ByteArrayInputStream((byte[]) obj);
+                try {
+                    blooms.add(BloomFilter.readFrom(bis));
+                    bis.close();
+                }
+                catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+        }
+
+        private class SpillBloomState
+                implements Serializable
+        {
+            boolean isReady;
+            int counter;
+            List<Object> blooms = new ArrayList<>();
+        }
+    }
+
     @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
@@ -791,14 +879,7 @@ public class HashBuilderOperator
         }
 
         if (spillBloom != null) {
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            try {
-                spillBloom.writeTo(bos);
-                myState.spillBloom = bos.toByteArray();
-            }
-            catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
+            myState.spillBloom = spillBloom.capture();
         }
         return myState;
     }
@@ -829,13 +910,7 @@ public class HashBuilderOperator
             this.spiller.get().restore(myState.spiller, serdeProvider);
         }
         if (myState.spillBloom != null) {
-            ByteArrayInputStream bis = new ByteArrayInputStream((byte[]) myState.spillBloom);
-            try {
-                spillBloom = BloomFilter.readFrom(bis, Funnels.longFunnel());
-            }
-            catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
+            this.spillBloom.restore(myState.spillBloom);
         }
         if (oldState == State.CONSUMING_INPUT && this.state == State.SPILLING_INPUT) {
             lookupSourceFactory.setPartitionSpilledLookupSourceHandle(partitionIndex, spilledLookupSourceHandle);

@@ -14,7 +14,6 @@
 package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.hash.BloomFilter;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 
@@ -54,9 +53,9 @@ final class SpilledLookupSourceHandle
 
     private final ListenableFuture<?> unspillingOrDisposeRequested = whenAnyComplete(ImmutableList.of(unspillingRequested, disposeRequested));
 
-    private final Optional<BloomFilter<Long>> spillBloom;
+    private final Optional<HashBuilderOperator.SpilledBlooms> spillBloom;
 
-    public SpilledLookupSourceHandle(BloomFilter<Long> bloom)
+    public SpilledLookupSourceHandle(HashBuilderOperator.SpilledBlooms bloom)
     {
         spillBloom = Optional.ofNullable(bloom);
     }
@@ -66,7 +65,7 @@ final class SpilledLookupSourceHandle
         return unspillingRequested;
     }
 
-    public Optional<BloomFilter<Long>> getSpillBloom()
+    public Optional<HashBuilderOperator.SpilledBlooms> getSpillBloom()
     {
         return spillBloom;
     }
