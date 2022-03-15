@@ -38,7 +38,7 @@ import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static io.airlift.concurrent.MoreFutures.tryGetFutureValue;
+import static io.airlift.concurrent.MoreFutures.getDone;
 import static java.util.Objects.requireNonNull;
 
 @RestorableConfig(uncapturedFields = {"operatorContext", "lookupSourceFactory", "outerPositionsFuture", "probeOutputTypes", "onClose", "pageBuilder",
@@ -244,8 +244,13 @@ public class LookupOuterOperator
         }
 
         if (outerPositions == null) {
-            outerPositions = tryGetFutureValue(outerPositionsFuture).orElse(null);
+            if (!outerPositionsFuture.isDone()) {
+                return null;
+            }
+
+            outerPositions = getDone(outerPositionsFuture);
             if (outerPositions == null) {
+                close();
                 return null;
             }
         }
@@ -276,9 +281,14 @@ public class LookupOuterOperator
         if (outputPositionsFinished) {
             outerPositionsFuture = outerPositions.getNextBatch();
             outerPositions = null;
-            outerPositions = tryGetFutureValue(outerPositionsFuture).orElse(null);
+            if (!outerPositionsFuture.isDone()) {
+                return page;
+            }
+
+            outerPositions = getDone(outerPositionsFuture);
             if (outerPositions == null) {
                 close();
+                return page;
             }
         }
         return page;

@@ -30,8 +30,9 @@ public interface TrackingLookupSourceSupplier
         throw new UnsupportedOperationException();
     }
 
-    default void updateUnspilledPositions(int partition, long positions)
+    default void setUnspilledLookupSource(int partition, LookupSource lookupSource)
     {
+        /* do nothing */
     }
 
     Object captureJoinPositions();

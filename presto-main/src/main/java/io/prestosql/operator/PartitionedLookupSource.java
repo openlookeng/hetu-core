@@ -86,6 +86,12 @@ public class PartitionedLookupSource
                 }
 
                 @Override
+                public void setUnspilledLookupSource(int partition, LookupSource lookupSource)
+                {
+                    outerPositionTrackerFactory.setUnspilledPartitionLookupSource(partition, lookupSource);
+                }
+
+                @Override
                 public Object captureJoinPositions()
                 {
                     try {
@@ -443,7 +449,7 @@ public class PartitionedLookupSource
                     .set(new PartitionedLookupOuterPositionIterator(
                             new LookupSource[] {lookupSources.get(partitionNumber)},
                             new RoaringBitmap[] {visitedPositions.get(partitionNumber)},
-                            new int[] {0},
+                            new int[] {partitionNumber},
                             this));
         }
 
@@ -499,7 +505,7 @@ public class PartitionedLookupSource
                             .set(new PartitionedLookupOuterPositionIterator(
                                     new LookupSource[]{lookupSources.get(partition)},
                                     new RoaringBitmap[]{visitedPositions.get(partition)},
-                                    new int[]{0},
+                                    new int[]{partition},
                                     this));
                 }
                 return partitionDone.get(partition);
@@ -507,6 +513,14 @@ public class PartitionedLookupSource
             finally {
                 locks[partition].writeLock().unlock();
             }
+        }
+
+        public void setUnspilledPartitionLookupSource(int partition, LookupSource lookupSource)
+        {
+            verify(partition < lookupSources.size());
+            verify(lookupSources.get(partition) instanceof PartitionedLookupSourceFactory.SpilledLookupSource);
+
+            lookupSources.set(partition, lookupSource);
         }
     }
 
