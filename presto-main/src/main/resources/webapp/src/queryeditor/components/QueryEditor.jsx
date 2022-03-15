@@ -50,7 +50,7 @@ class QueryEditor
     this.stateType= {
       emptyCatalog: 1,
       emptySchema: 2,
-      emptyAll: 3
+      emptyNeither: 3
     };
     this.catalogs = [];
     this.schemas = [];
@@ -417,7 +417,7 @@ class QueryEditor
           for (const value of data){
             tablesdata.push(value.table)
           }
-          this.addCompleters(editor,tablesdata,this.stateType.emptyAll,[]);
+          this.addCompleters(editor,tablesdata,this.stateType.emptyNeither,[]);
         })
       }
     }

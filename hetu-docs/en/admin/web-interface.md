@@ -40,7 +40,7 @@ and statistics about the query is available by clicking the *JSON* link. These v
 > -   **Type:** `int`
 > -   **Default value:** `1000`
 >
-> The maximum number of query history stored by OpenLooKeng.
+> The maximum number of query history stored by openLooKeng.
 
 ### `hetu.collectionsql.max-count`
 
