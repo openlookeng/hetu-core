@@ -389,6 +389,7 @@ public final class PartitionedLookupSourceFactory
     {
         postConsumptionOuterSource = (PartitionedLookupSource) this.lookupSourceSupplier.getLookupSource();
         postConsumptionOuterSource.setPartitionLookup(lookupSource.get(), partitionNumber);
+        this.lookupSourceSupplier.setUnspilledLookupSource(partitionNumber, lookupSource.get());
         return immediateFuture(() -> postConsumptionOuterSource);
     }
 
