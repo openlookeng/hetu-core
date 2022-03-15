@@ -39,6 +39,7 @@ import io.prestosql.queryeditorui.output.persistors.CSVPersistorFactory;
 import io.prestosql.queryeditorui.output.persistors.PersistorFactory;
 import io.prestosql.queryeditorui.protocol.ExecutionStatus.ExecutionError;
 import io.prestosql.queryeditorui.protocol.ExecutionStatus.ExecutionSuccess;
+import io.prestosql.queryeditorui.resources.AuditLogResource;
 import io.prestosql.queryeditorui.resources.ConnectorResource;
 import io.prestosql.queryeditorui.resources.FilesResource;
 import io.prestosql.queryeditorui.resources.LoginResource;
@@ -90,7 +91,6 @@ public class QueryEditorUIModule
     protected void setup(Binder binder)
     {
         configBinder(binder).bindConfig(QueryEditorConfig.class);
-
         //resources
         jsonCodecBinder(binder).bindJsonCodec(ExecutionSuccess.class);
         jsonCodecBinder(binder).bindJsonCodec(ExecutionError.class);
@@ -102,7 +102,7 @@ public class QueryEditorUIModule
         jaxrsBinder(binder).bind(ConnectorResource.class);
         jaxrsBinder(binder).bind(LoginResource.class);
         jaxrsBinder(binder).bind(UserResource.class);
-
+        jaxrsBinder(binder).bind(AuditLogResource.class);
         binder.bind(SchemaService.class).in(Scopes.SINGLETON);
         binder.bind(ColumnService.class).in(Scopes.SINGLETON);
         binder.bind(PreviewTableService.class).in(Scopes.SINGLETON);

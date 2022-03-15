@@ -17,6 +17,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
+import io.prestosql.spi.eventlistener.AuditLogEvent;
 import io.prestosql.spi.eventlistener.EventListener;
 import io.prestosql.spi.eventlistener.EventListenerFactory;
 import io.prestosql.spi.eventlistener.QueryCompletedEvent;
@@ -41,6 +42,7 @@ public class EventListenerManager
     private static final Logger log = Logger.get(EventListenerManager.class);
     private static final File EVENT_LISTENER_CONFIGURATION = new File("etc/event-listener.properties");
     private static final String EVENT_LISTENER_PROPERTY_NAME = "event-listener.name";
+    private static String logOutput = "etc/log/";
 
     private final Map<String, EventListenerFactory> eventListenerFactories = new ConcurrentHashMap<>();
     private final AtomicReference<Optional<EventListener>> configuredEventListener = new AtomicReference<>(Optional.empty());
@@ -63,7 +65,7 @@ public class EventListenerManager
             String eventListenerName = properties.remove(EVENT_LISTENER_PROPERTY_NAME);
             checkArgument(!isNullOrEmpty(eventListenerName),
                     "Access control configuration %s does not contain %s", EVENT_LISTENER_CONFIGURATION.getAbsoluteFile(), EVENT_LISTENER_PROPERTY_NAME);
-
+            logOutput = properties.get("hetu.auditlog.logoutput");
             setConfiguredEventListener(eventListenerName, properties);
         }
     }
@@ -87,6 +89,11 @@ public class EventListenerManager
         log.info("-- Loaded event listener %s --", name);
     }
 
+    public String getLogOutput()
+    {
+        return logOutput;
+    }
+
     public void queryCompleted(QueryCompletedEvent queryCompletedEvent)
     {
         if (configuredEventListener.get().isPresent()) {
@@ -105,6 +112,17 @@ public class EventListenerManager
     {
         if (configuredEventListener.get().isPresent()) {
             configuredEventListener.get().get().splitCompleted(splitCompletedEvent);
+        }
+    }
+
+    //Expand event, it includes
+    //1.user login and logout
+    //2.cluster node added and deleted
+    //3.openLooKeng start and close
+    public void eventEnhanced(AuditLogEvent auditLogEvent)
+    {
+        if (configuredEventListener.get().isPresent()) {
+            configuredEventListener.get().get().auditLogged(auditLogEvent);
         }
     }
 }

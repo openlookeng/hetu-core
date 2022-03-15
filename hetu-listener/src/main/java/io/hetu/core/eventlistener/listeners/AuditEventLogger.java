@@ -16,6 +16,7 @@ package io.hetu.core.eventlistener.listeners;
 
 import io.airlift.log.Logger;
 import io.hetu.core.eventlistener.HetuEventListenerConfig;
+import io.hetu.core.eventlistener.util.HetuLogUtil;
 import io.hetu.core.eventlistener.util.ListenerErrorCode;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.eventlistener.QueryCompletedEvent;
@@ -66,6 +67,16 @@ class AuditEventLogger
     protected void onQueryCreatedEvent(QueryCreatedEvent queryCreatedEvent)
     {
         QueryContext queryContext = queryCreatedEvent.getContext();
+        java.util.logging.Logger log = HetuLogUtil.getLoggerByName(queryContext.getUser(), "INFO", HetuLogUtil.AuditType.Sql);
+
+        log.info(queryCreatedEvent.getCreateTime().atZone(ZoneId.systemDefault()) +
+                " UserName=" + queryContext.getUser() +
+                " UserIp=" + queryContext.getRemoteClientAddress().orElse(null) +
+                " queryId=" + queryCreatedEvent.getMetadata().getQueryId() +
+                " operation= " + queryCreatedEvent.getClass().getSimpleName() +
+                " stmt={" + queryCreatedEvent.getMetadata().getQuery() +
+                "} status=" + queryCreatedEvent.getMetadata().getQueryState() + " " +
+                queryCreatedEvent.getClass().getCanonicalName());
         logger.info(queryCreatedEvent.getCreateTime().atZone(ZoneId.systemDefault()) +
                 " UserName=" + queryContext.getUser() +
                 " UserIp=" + queryContext.getRemoteClientAddress().orElse(null) +
@@ -80,6 +91,18 @@ class AuditEventLogger
     protected void onQueryCompletedEvent(QueryCompletedEvent queryCompletedEvent)
     {
         QueryContext queryContext = queryCompletedEvent.getContext();
+        java.util.logging.Logger log = HetuLogUtil.getLoggerByName(queryContext.getUser(), "INFO", HetuLogUtil.AuditType.Sql);
+        log.info(queryCompletedEvent.getCreateTime().atZone(ZoneId.systemDefault()) +
+                " UserName=" + queryContext.getUser() +
+                " UserIp=" + queryContext.getRemoteClientAddress().orElse(null) +
+                " queryId=" + queryCompletedEvent.getMetadata().getQueryId() +
+                " operation= " + queryCompletedEvent.getClass().getSimpleName() +
+                " WrittenRows= " + queryCompletedEvent.getStatistics().getWrittenRows() +
+                " TotalRows= " + queryCompletedEvent.getStatistics().getTotalRows() +
+                " OutputRows= " + queryCompletedEvent.getStatistics().getOutputRows() +
+                " stmt={" + queryCompletedEvent.getMetadata().getQuery() +
+                "} status=" + queryCompletedEvent.getMetadata().getQueryState() +
+                " " + queryCompletedEvent.getClass().getCanonicalName());
         logger.info(queryCompletedEvent.getCreateTime().atZone(ZoneId.systemDefault()) +
                 " UserName=" + queryContext.getUser() +
                 " UserIp=" + queryContext.getRemoteClientAddress().orElse(null) +

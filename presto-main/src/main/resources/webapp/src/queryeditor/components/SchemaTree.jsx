@@ -23,6 +23,11 @@ import TabActions from "../actions/TabActions";
 import TabConstants from "../constants/TabConstants";
 import _ from "lodash";
 import QueryActions from "../actions/QueryActions";
+import ModalDialog from "./ModalDialog";
+import ShowCatalog from "./ShowCatalog";
+import {color} from "echarts/lib/export";
+
+let flag = true;
 
 function getIcon(type) {
     switch (type) {
@@ -35,8 +40,12 @@ function getIcon(type) {
             // return (<i className="material-icons">storage</i>);
         }
         case dataType.CATALOG: {
-            return (<i className="icon fa fa-server valign-middle"></i>);
-            // return (<i className="material-icons">source</i>);
+            if (!flag) {
+                return (<i className="icon fa fa-server valign-middle"></i>);
+            }
+            else {
+                return <i className="icon fa fa-server valign-middle" style={{marginLeft: "14.5px", color : 'gray'}}></i>
+            }
         }
         default: {
             return (<i className="material-icons">dashboard</i>);
@@ -45,9 +54,9 @@ function getIcon(type) {
 }
 
 function renderItem(tree, item) {
-    let style = (item.children == undefined || item.children instanceof Array && item.children.length == 0) ? { marginLeft: "14.5px" } : {};
+    flag = item.children == undefined || item.children instanceof Array && item.children.length == 0 ;
+    let style = (item.children == undefined || item.children instanceof Array && item.children.length == 0) ? { marginLeft: "14.5px",color: "gray" } : {};
     let tableStyle = {};
-    Object.assign(tableStyle, style, { cursor: "pointer" })
     let favorite = tree.isFavorite(item);
     if (item.type == dataType.TABLE) {
         if (item.fqn == tree.selectedTableName) {
@@ -59,7 +68,7 @@ function renderItem(tree, item) {
                     {getIcon(item.type)}<span>{item.name}</span>{favorite.found ? <i className="icon fa fa-star valign-middle schema-tree-icons favorite" /> : null}
                 </ContextMenuTrigger>
                 <ContextMenu id={item.fqn}>
-                    {favorite.found && favorite.self ?
+                    {favorite.found && favorite.self && !flag ?
                         <MenuItem data={{ item: item, tree: tree }} onClick={(e, data) => {
                             tree.removeFromFavorites(item);
                         }}>
@@ -105,7 +114,7 @@ function renderItem(tree, item) {
                             "icon fa fa-star valign-middle schema-tree-icons favoriteParent"} /> : null}
                 </ContextMenuTrigger>
                 <ContextMenu id={item.fqn}>
-                    {favorite.found && favorite.self ?
+                    {favorite.found && favorite.self && !flag ?
                         <MenuItem data={{ item: item, tree: tree }} onClick={(e, data) => {
                             tree.removeFromFavorites(item);
                         }}>
@@ -123,6 +132,14 @@ function renderItem(tree, item) {
                     }}>
                         <i className="icon fa fa-refresh valign-middle" /><span>Refresh</span>
                     </MenuItem>
+                    {item.type == dataType.CATALOG ?
+                        <MenuItem data={{ item: item, tree: tree }} onClick={(e, data) => {
+                            tree.showCatalog(item);
+                        }}>
+                            <i className="icon fa fa-file-text-o valign-middle contextmenu-icons show-catalog" /><span>Show Catalog</span>
+                        </MenuItem>
+                        : null
+                    }
                     {item.type == dataType.CATALOG ?
                         <MenuItem data={{ item: item, tree: tree }} onClick={(e, data) => {
                             tree.deleteCatalog(item);
@@ -146,7 +163,6 @@ function renderItem(tree, item) {
             </a>
         )
     }
-    // return (<a style={style}>{getIcon(item.type)}<span>{item.name}</span></a>);
 }
 
 function sortItems(tree, item1, item2) {
@@ -185,7 +201,13 @@ class SchemaTree extends React.Component {
             },
             height: 0,
             model: this.getInitialModel(),
-            name: "name"
+            name: "name",
+            show: false,
+            catalog_name:"",
+            connection_password: "",
+            connector_name: "",
+            url: "",
+            user: ""
         };
         this.selectedTableName = "";
         this.treeRef = React.createRef();
@@ -194,6 +216,7 @@ class SchemaTree extends React.Component {
             schemas: [],
             tables: []
         }
+        this.showObj = {}
         this.updateTree = this.updateTree.bind(this);
         this.selectTable = this.selectTable.bind(this);
         this.unselectTable = this.unselectTable.bind(this);
@@ -203,6 +226,9 @@ class SchemaTree extends React.Component {
         this.reloadItem = this.reloadItem.bind(this);
         this.refreshItem = this.refreshItem.bind(this);
         this.deleteCatalog = this.deleteCatalog.bind(this);
+        this.showCatalog = this.showCatalog.bind(this);
+        this.showModal = this.showModal.bind(this);
+        this._objToStrMap = this._objToStrMap.bind(this);
     }
 
     updateTree() {
@@ -254,6 +280,40 @@ class SchemaTree extends React.Component {
             return;
         }
         element.style.color = "#222222";
+    }
+
+    showModal() {
+        let newState = !this.state.show;
+        this.setState({
+            show: newState,
+        });
+    }
+
+    _objToStrMap(obj){
+        let strMap = new Map();
+        for (let k of Object.keys(obj)) {
+            strMap.set(k,obj[k]);
+        }
+        return strMap;
+    }
+
+    showCatalog(item) {
+        this.state.catalog_name = item.name;
+        let showText = item.name;
+        $.get(`../v1/showCatalog/${showText}`, function (showList) {
+            let showMap = this._objToStrMap(showList);
+            this.showObj = showList;
+            this.setState({
+                connection_password : showMap.get('connection-password'),
+                connector_name : showMap.get('connector.name'),
+                url : showMap.get('connection-url'),
+                user : showMap.get('connection-user')
+            })
+        }.bind(this))
+        let newState = !this.state.show;
+        this.setState({
+            show: newState,
+        });
     }
 
     deleteCatalog(item) {
@@ -368,7 +428,7 @@ class SchemaTree extends React.Component {
         return { found: false, self: false };
     }
 
-    reloadItem(item) {
+    reloadItem() {
         let model = this.state.model;
         this.state.model = [];
         this.setState(this.state);
@@ -406,7 +466,11 @@ class SchemaTree extends React.Component {
                 <div style={{ height: "calc(100vh - 200px)" }}>
                     <TreeView {...this.state} ref={this.treeRef}></TreeView>
                 </div>
-            </div>
+                <ModalDialog  onClose={this.showModal} header={"Show Catalog"} footer={""}
+                              show={this.state.show}>
+                    <ShowCatalog onClose={this.showModal.bind(this)} catalog_name={this.state.catalog_name} showText={this.showObj}/>
+                </ModalDialog>
+        </div>
         );
     }
 }

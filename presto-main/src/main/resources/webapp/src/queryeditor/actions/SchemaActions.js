@@ -46,10 +46,29 @@ class SchemaActions {
                 message: "Success"
             }
         }).catch((error) => {
+            //console.log('here',error);
             return {
                 result: false,
                 message: error.message
             }
+        })
+    }
+
+    fetchCatalogs(){
+         return xhr("../api/metadata/catalogs").then((data) => {
+             return data;
+         })
+     }
+
+    fetchOnlySchema(catalog){
+        return xhr("../api/metadata/schemas/"+catalog).then((data) => {
+            return data;
+        })
+    }
+
+    fetchTable(catalog,schema){
+        return xhr("../api/metadata/tables/"+catalog+"/"+schema).then((data) => {
+            return data;
         })
     }
 

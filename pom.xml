@@ -1023,7 +1023,7 @@
                 <artifactId>hadoop-distcp</artifactId>
                 <version>2.10.1</version>
             </dependency>
-            
+
             <dependency>
                 <groupId>org.apache.hudi</groupId>
                 <artifactId>hudi-hadoop-mr</artifactId>
@@ -1572,6 +1572,11 @@
                 <artifactId>calcite-core</artifactId>
                 <version>1.18.0</version>
             </dependency>
+            <dependency>
+                <groupId>org.glassfish</groupId>
+                <artifactId>javax.el</artifactId>
+                <version>3.0.1-b08</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -1850,7 +1855,7 @@
         </profile>
     </profiles>
 
-  <scm>
-    <tag>1.4.0</tag>
-  </scm>
+    <scm>
+        <tag>1.4.0</tag>
+    </scm>
 </project>

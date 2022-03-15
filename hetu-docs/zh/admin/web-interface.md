@@ -31,3 +31,17 @@ openLooKeng提供了一个用于监视和管理查询的Web界面。Web界面可
 > -   **默认值:** `false`
 >
 > 默认情况下，基于HTTP的非安全环境禁用WEB UI。可以通过配置`etc/config.properties`文件的`hetu.queryeditor-ui.allow-insecure-over-http`属性启用(例子: hetu.queryeditor-ui.allow-insecure-over-http=true)。
+
+### `hetu.queryhistory.max-count`
+
+> -   **Type:** `int`
+> -   **Default value:** `1000`
+>
+> openLooKeng储存的历史查询记录最大数量
+
+### `hetu.collectionsql.max-count`
+
+> -   **Type:** `int`
+> -   **Default value:** `100`
+>
+> 每位用户收藏sql语句条数上限.

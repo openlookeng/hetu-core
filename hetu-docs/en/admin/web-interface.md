@@ -34,3 +34,17 @@ and statistics about the query is available by clicking the *JSON* link. These v
 > -   **Default value:** `false`
 >
 > Insecure authentication over HTTP is disabled by default. This could be overridden via "hetu.queryeditor-ui.allow-insecure-over-http" property of "etc/config.properties" (e.g. hetu.queryeditor-ui.allow-insecure-over-http=true).
+
+### `hetu.queryhistory.max-count`
+
+> -   **Type:** `int`
+> -   **Default value:** `1000`
+>
+> The maximum number of query history stored by openLooKeng.
+
+### `hetu.collectionsql.max-count`
+
+> -   **Type:** `int`
+> -   **Default value:** `100`
+>
+> The Maximum number of SQL collected by each user.

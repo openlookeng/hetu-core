@@ -37,6 +37,7 @@ import io.prestosql.catalog.CatalogStoreUtil;
 import io.prestosql.catalog.DynamicCatalogConfig;
 import io.prestosql.catalog.DynamicCatalogScanner;
 import io.prestosql.catalog.DynamicCatalogStore;
+import io.prestosql.catalog.showcatalog.ShowCatalogStore;
 import io.prestosql.client.NodeVersion;
 import io.prestosql.client.ServerInfo;
 import io.prestosql.connector.CatalogConnectorStore;
@@ -514,6 +515,9 @@ public class ServerMainModule
         binder.bind(DynamicCatalogScanner.class).in(Scopes.SINGLETON);
         binder.bind(CatalogStoreUtil.class).in(Scopes.SINGLETON);
         configBinder(binder).bindConfig(DynamicCatalogConfig.class);
+
+        // show catalog
+        binder.bind(ShowCatalogStore.class).in(Scopes.SINGLETON);
 
         // plugin manager
         binder.bind(PluginManager.class).in(Scopes.SINGLETON);

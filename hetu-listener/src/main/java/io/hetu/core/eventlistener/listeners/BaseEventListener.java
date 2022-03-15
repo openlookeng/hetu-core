@@ -15,10 +15,14 @@
 package io.hetu.core.eventlistener.listeners;
 
 import io.hetu.core.eventlistener.HetuEventListenerConfig;
+import io.hetu.core.eventlistener.util.HetuLogUtil;
+import io.prestosql.spi.eventlistener.AuditLogEvent;
 import io.prestosql.spi.eventlistener.EventListener;
 import io.prestosql.spi.eventlistener.QueryCompletedEvent;
 import io.prestosql.spi.eventlistener.QueryCreatedEvent;
 import io.prestosql.spi.eventlistener.SplitCompletedEvent;
+
+import java.util.logging.Logger;
 
 import static java.util.Objects.requireNonNull;
 
@@ -60,7 +64,6 @@ public abstract class BaseEventListener
     public static EventListener create(HetuEventListenerConfig config)
     {
         Type type = config.getType();
-
         if (type == Type.AUDIT) {
             return new AuditEventLogger(config);
         }
@@ -101,6 +104,28 @@ public abstract class BaseEventListener
     {
         if (this.isListenSplitCompletion) {
             this.onSplitCompletedEvent(splitCompletedEvent);
+        }
+    }
+
+    @Override
+    public final void auditLogged(AuditLogEvent auditLogEvent)
+    {
+        Logger log = HetuLogUtil.getLoggerByName(auditLogEvent.getUser(), auditLogEvent.getLevel(), HetuLogUtil.AuditType.valueOf(auditLogEvent.getType()));
+        switch (auditLogEvent.getLevel()) {
+            case "INFO":
+                log.info(auditLogEvent.toString());
+                break;
+            case "ERROR":
+                log.severe(auditLogEvent.toString());
+                break;
+            case "WARN":
+                log.warning(auditLogEvent.toString());
+                break;
+            case "DEBUG":
+                log.fine(auditLogEvent.toString());
+                break;
+            default:
+                break;
         }
     }
 

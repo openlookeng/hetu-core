@@ -390,7 +390,7 @@ pre {
 }
 
 .query-snippet {
-    height: 138px;
+    height: 155px;
     overflow: hidden;
 }
 
@@ -449,7 +449,37 @@ pre {
     color: #092ff1;
 }
 
-/** Query List Toolbar **/
+.progress-catalog-schema-container {
+    float: left;
+    font-size: 120%;
+    color: black;
+    font-weight: bold;
+}
+
+.progress-catalog-schema {
+    margin: 0 5%;
+}
+
+.text-catalog-schema {
+    color: white;
+}
+
+.progress-state {
+    float: right;
+    color: black;
+    margin-right: 2%;
+}
+
+.query-showmore {
+    margin: 10px;
+}
+
+.modal-querytext {
+    margin: 15px;
+    word-break: break-all;
+}
+
+/** Query Monitor Toolbar **/
 /** ================== **/
 
 .toolbar-row {
@@ -518,7 +548,7 @@ pre {
     border: none;
 }
 
-.toolbar-row .input-group .form-control {
+.query-monitor .input-group .form-control {
     margin-top: 2px;
     margin-bottom: -2px;
     width: 98%;
@@ -548,6 +578,83 @@ pre {
 
 .error-type-dropdown-menu {
     margin-left: 143px;
+}
+
+/** Audit log **/
+/** ========= **/
+
+.toolbar-log {
+    padding-right: 15px;
+}
+
+.toolbar-audit {
+    background-color: #e6e6e6;
+    margin-top: 5px;
+    padding: 10px;
+    border-bottom: 1px solid black;
+    margin-bottom: 20px;
+}
+
+.toolbar-log .form-control {
+    color: #000;
+}
+
+.toolbar-log .input-group-audit  input{
+    margin-top: 2px;
+    margin-bottom: -2px;
+    width: 30%;
+    border: 1px solid #000;
+    display: inline;
+    border-radius: 0;
+}
+
+.container .toolbar-log .input-group-audit .select{
+    color: black;
+    background-color: #e6e6e6;
+    border-color: black;
+}
+
+.container .toolbar-log .input-group-audit .bootstrap-select {
+    width: 7.5%;
+    margin: 0 10px;
+}
+
+.auditlog-text {
+    overflow: auto;
+    height: auto;
+    max-height: calc(100vh - 220px);
+    padding: 20px 20px 0 20px;
+    background: white;
+    margin: 1% 0 2% 0;
+}
+
+.auditlog-row {
+    margin-bottom: 2%;
+}
+
+.container .tab-container {
+    padding: 0px;
+}
+
+.small-container {
+    padding: 0px;
+}
+
+.tab-group {
+    width: 33%;
+    text-align: center;
+    border-radius: 8px;
+    border: 1px solid gray;
+}
+
+/** Query History **/
+/** ========= **/
+
+.query-history .input-group .form-control {
+    margin-top: 2px;
+    margin-bottom: -2px;
+    width: 17%;
+    border: 1px solid #000;
 }
 
 /** Loading indicators **/

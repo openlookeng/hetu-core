@@ -27,6 +27,7 @@ import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.InternalNodeManager;
+import io.prestosql.metadata.StaticCatalogStoreConfig;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CatalogName;
 
@@ -76,6 +77,7 @@ public class DynamicCatalogStore
     public DynamicCatalogStore(ConnectorManager connectorManager,
             DataCenterConnectorManager dataCenterConnectorManager,
             DynamicCatalogConfig dynamicCatalogConfig,
+            StaticCatalogStoreConfig staticCatalogConfig,
             CatalogManager catalogManager,
             InternalNodeManager nodeManager,
             ServiceSelectorManager selectorManager,

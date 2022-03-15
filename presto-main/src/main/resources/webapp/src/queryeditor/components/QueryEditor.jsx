@@ -28,6 +28,8 @@ import CnxnMonitorStore from "../stores/CnxnMonitorStore";
 import CnxnMonitorActions from "../actions/CnxnMonitorActions";
 import SchemaStore from "../stores/SchemaStore";
 import {Form} from "react-bootstrap";
+import SchemaActions, { dataType } from "../actions/SchemaActions";
+import CollectionAction from "../actions/CollectionActions";
 
 class QueryEditor
     extends React.Component {
@@ -44,8 +46,22 @@ class QueryEditor
         schema: "runtime"
       },
       buttonState:false
-    }
-    ;
+    };
+    this.stateType= {
+      emptyCatalog: 1,
+      emptySchema: 2,
+      emptyNeither: 3
+    };
+    this.catalogs = [];
+    this.schemas = [];
+    this.sql = (
+        "select|insert|update|delete|from|where|and|or|group|by|order|limit|offset|having|as|case|" +
+        "when|else|end|type|left|right|join|on|outer|desc|asc|union|create|table|primary|key|if|" +
+        "foreign|not|references|default|null|inner|cross|natural|database|drop|grant|"+
+        "avg|count|first|last|max|min|sum|ucase|lcase|mid|len|round|rank|now|format|coalesce|ifnull|isnull|nvl|"+
+        "money|real|number|integer|true|false"
+
+    ).split('|');
     this.query = "select * from system.information_schema.tables;";
     this.queryEditorRef = React.createRef();
     this.queryContainerRef = React.createRef();
@@ -62,6 +78,7 @@ class QueryEditor
     this.closeErrorDialog = this.closeErrorDialog.bind(this);
     this.errorCollapseToggle = this.errorCollapseToggle.bind(this);
     this.getBriefErrorMessage = this.getBriefErrorMessage.bind(this);
+    this.onload = this.onload.bind(this);
   }
 
   componentDidMount() {
@@ -78,7 +95,7 @@ class QueryEditor
 
   closeErrorDialog() {
     CnxnMonitorActions.clear();
-    var state = this.state;
+    let state = this.state;
     Object.assign(state, {
       lastSubmissionResult: "",
       lastPollingError: "",
@@ -126,7 +143,7 @@ class QueryEditor
                        header={header}
                        footer={this.renderErrorDialogFooter()}
                        onClose={this.closeErrorDialog}>
-            <div style={{color: '#ff0000',padding:'10px 20px'}}>
+            <div style={{color: '#ffffff',padding:'10px 20px'}}>
               <h4 style={{alignSelf: "center"}}>
                 {this.getBriefErrorMessage()}
               </h4>
@@ -233,6 +250,11 @@ class QueryEditor
   }
 
   render() {
+    setInterval(function(){
+      SchemaActions.fetchCatalogs().then((data) => {
+        this.catalogs=data;
+      });
+    }, 10000);
     return (
       <div className="flex flex-initial flex-column">
         <div className="flex flex-row editor-menu">
@@ -249,6 +271,7 @@ class QueryEditor
                 ref={this.queryEditorRef}
                 mode="sql"
                 theme={"eclipse"}
+                onLoad={this.onload}
                 onChange={this.onChange}
                 name="editor"
                 highlightActiveLine={true}
@@ -269,7 +292,8 @@ class QueryEditor
             />
           </div>
         </div>
-      </div>);
+      </div>
+    );
   }
 
   // - Internal events ----------------------------------------------------- //
@@ -347,9 +371,92 @@ class QueryEditor
     this.setState(state);
   }
 
+  onload(){
+    SchemaActions.fetchCatalogs().then((data) => {
+      this.catalogs=data;
+    });
+  }
+
   onChange(newValue) {
+    var value = newValue.substring( newValue.lastIndexOf(";")+1,newValue.length);
+    var catalog = '';
+    var schema = '';
+    var value = value.substring(value.lastIndexOf(' ')+1,value.length).replace(/[\r\n]/g, "");
+    var index = value.indexOf('.');
+    if(index!=-1) {
+      catalog =value.substring(0,index);
+      var value = value.substring(index+1,value.length);
+      var next_index = value.indexOf('.');
+      if(next_index!=-1) {
+        schema = value.substring(0,next_index);
+      }
+    }
+    const editor= this.queryEditorRef.current.editor;
+    let currentCatalog = this.state.currentContext.catalog;
+    let currentSchema = this.state.currentContext.schema;
+    if(catalog==='') {
+      SchemaActions.fetchTable(currentCatalog,currentSchema).then((tables)=>{
+        let table_data = [];
+        for (const value of tables){
+          table_data.push(value.table)
+        }
+        this.addCompleters(editor,this.catalogs,this.stateType.emptyCatalog,table_data);
+      });
+    }
+    else if(catalog!=''&&schema==='') {
+      if(this.catalogs.includes(catalog)){
+        SchemaActions.fetchOnlySchema(catalog).then((data) => {
+          this.addCompleters(editor,data.schemas,this.stateType.emptySchema,[]);
+        })
+      }
+    }
+    else if(catalog!=''&&schema!='') {
+      if(this.catalogs.includes(catalog)&&this.schemas.includes(schema)){
+        SchemaActions.fetchTable(catalog,schema).then((data)=>{
+          let tablesdata = [];
+          for (const value of data){
+            tablesdata.push(value.table)
+          }
+          this.addCompleters(editor,tablesdata,this.stateType.emptyNeither,[]);
+        })
+      }
+    }
     this.query = newValue;
   }
+
+  addCompleters(editor,data,state,table_data) {
+    const arr = [];
+    editor.completers=arr;
+    var data_complete = [];
+    for(let val of data){
+      data_complete.push(val);
+    }
+    if(state===this.stateType.emptyCatalog) {
+      for(let val of this.sql){
+        data_complete.push(val);
+      }
+    }
+    if(state===this.stateType.emptySchema) {
+      this.schemas=data;
+    }
+    for(let val of table_data) {
+      if(!data_complete.includes(val))
+        data_complete.push(val);
+    }
+    let completers = data_complete.map(item=>({
+      name:item,
+      value:item,
+      score:100,
+      meta:'',
+    }));
+    editor.completers.push({
+      getCompletions: function (editors, session, pos, prefix, callback) {
+        callback(null, completers);
+      }
+    });
+    editor.resize();
+  }
+
 
   schemaContextHandler() {
     let model = SchemaStore.getModel();
