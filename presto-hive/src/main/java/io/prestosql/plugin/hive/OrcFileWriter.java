@@ -441,6 +441,26 @@ public class OrcFileWriter
     }
 
     @Override
+    public void cancel()
+    {
+        try {
+            if (deleteDeltaFileWriter.isPresent()) {
+                deleteDeltaFileWriter.get().cancel();
+            }
+            orcWriter.close();
+        }
+        catch (IOException ioException) {
+            /* doNothing
+            *  Issue # [I4VX53] Ignoring IOException here as the files might have been already cleared by
+            *  Coordinator in Cancel to resume flow.
+            */
+        }
+        catch (Exception e) {
+            throw new PrestoException(HIVE_WRITER_CLOSE_ERROR, "Error rolling back write to Hive", e);
+        }
+    }
+
+    @Override
     public long getValidationCpuNanos()
     {
         return validationCpuNanos;
