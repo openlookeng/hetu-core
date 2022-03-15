@@ -459,9 +459,9 @@ public class TestHttpPageBufferClient
         assertEquals(callback.getPages().size(), 0);
         assertEquals(callback.getCompletedRequests(), 11);
         assertEquals(callback.getFinishedBuffers(), 0);
-        assertEquals(callback.getFailedBuffers(), 1);
+        assertEquals(callback.getFailedBuffers(), 2);
         assertInstanceOf(callback.getFailure(), PageTransportTimeoutException.class);
-        assertContains(callback.getFailure().getMessage(), WORKER_NODE_ERROR + " (http://localhost:8080/0 - 11 failures,");
+        assertContains(callback.getFailure().getMessage(), WORKER_NODE_ERROR + " (http://localhost:8080/0 - 10 failures,");
         assertStatus(client, location, "queued", 0, 11, 11, 11, "not scheduled");
     }
 
