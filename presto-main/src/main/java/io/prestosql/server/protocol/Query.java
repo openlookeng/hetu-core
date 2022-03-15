@@ -905,7 +905,7 @@ public class Query
                     builder.setSuccessRestoreCount(restoreCount)
                             .setLastRestoreSnapshotId(lastRestoreSnapshotId)
                             .setTotalRestoreWallTime(totalRestoreWallTime.get())
-                            .setTotalCpuTimeMillis(totalRestoreCpuTime.get())
+                            .setTotalRestoreCpuTime(totalRestoreCpuTime.get())
                             .setTotalRestoreSize(totalRestoreSize.get());
                 }
                 return builder.build();
