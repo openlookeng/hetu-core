@@ -154,14 +154,17 @@ public class CubeFinishOperator
         if (state != State.HAS_OUTPUT) {
             return null;
         }
-        CubeMetadata cubeMetadata = cubeMetastore.getMetadataFromCubeName(updateMetadata.getCubeName()).get();
-        CubeMetadataBuilder builder = cubeMetastore.getBuilder(cubeMetadata);
-        builder.withCubeFilter(mergePredicates(cubeMetadata.getCubeFilter(), updateMetadata.getDataPredicateString()));
-        builder.setTableLastUpdatedTime(updateMetadata.getTableLastUpdatedTime());
-        builder.setCubeLastUpdatedTime(System.currentTimeMillis());
-        builder.setCubeStatus(READY);
-        cubeMetastore.persist(builder.build());
-        state = State.FINISHED;
+        synchronized (cubeMetastore) {
+            //handle concurrent inserts into cube.
+            CubeMetadata cubeMetadata = cubeMetastore.getMetadataFromCubeName(updateMetadata.getCubeName()).get();
+            CubeMetadataBuilder builder = cubeMetastore.getBuilder(cubeMetadata);
+            builder.withCubeFilter(mergePredicates(cubeMetadata.getCubeFilter(), updateMetadata.getDataPredicateString()));
+            builder.setTableLastUpdatedTime(updateMetadata.getTableLastUpdatedTime());
+            builder.setCubeLastUpdatedTime(System.currentTimeMillis());
+            builder.setCubeStatus(READY);
+            cubeMetastore.persist(builder.build());
+            state = State.FINISHED;
+        }
         return page;
     }
 
