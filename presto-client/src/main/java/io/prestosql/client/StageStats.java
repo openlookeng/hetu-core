@@ -29,6 +29,7 @@ public class StageStats
 {
     private final String stageId;
     private final String state;
+    private final boolean restoring;
     private final boolean done;
     private final int nodes;
     private final int totalSplits;
@@ -45,6 +46,7 @@ public class StageStats
     public StageStats(
             @JsonProperty("stageId") String stageId,
             @JsonProperty("state") String state,
+            @JsonProperty("restoring") boolean restoring,
             @JsonProperty("done") boolean done,
             @JsonProperty("nodes") int nodes,
             @JsonProperty("totalSplits") int totalSplits,
@@ -59,6 +61,7 @@ public class StageStats
     {
         this.stageId = stageId;
         this.state = requireNonNull(state, "state is null");
+        this.restoring = restoring;
         this.done = done;
         this.nodes = nodes;
         this.totalSplits = totalSplits;
@@ -82,6 +85,12 @@ public class StageStats
     public String getState()
     {
         return state;
+    }
+
+    @JsonProperty
+    public boolean isRestoring()
+    {
+        return restoring;
     }
 
     @JsonProperty
@@ -155,6 +164,7 @@ public class StageStats
     {
         return toStringHelper(this)
                 .add("state", state)
+                .add("restoring", restoring)
                 .add("done", done)
                 .add("nodes", nodes)
                 .add("totalSplits", totalSplits)
@@ -178,6 +188,7 @@ public class StageStats
     {
         private String stageId;
         private String state;
+        private boolean restoring;
         private boolean done;
         private int nodes;
         private int totalSplits;
@@ -201,6 +212,12 @@ public class StageStats
         public Builder setState(String state)
         {
             this.state = requireNonNull(state, "state is null");
+            return this;
+        }
+
+        public Builder setRestoring(boolean restoring)
+        {
+            this.restoring = restoring;
             return this;
         }
 
@@ -275,6 +292,7 @@ public class StageStats
             return new StageStats(
                     stageId,
                     state,
+                    restoring,
                     done,
                     nodes,
                     totalSplits,

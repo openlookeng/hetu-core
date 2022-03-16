@@ -661,7 +661,7 @@ final class ShowQueriesRewrite
                 String dimension = "";
                 if (cubeMetadata.getCubeFilter() != null && cubeMetadata.getCubeFilter().getSourceTablePredicate() != null) {
                     Set<Identifier> sourceFilterPredicateColumns = ExpressionUtils.getIdentifiers(sqlParser.createExpression(cubeMetadata.getCubeFilter().getSourceTablePredicate(), new ParsingOptions()));
-                    final List filterColumns = sourceFilterPredicateColumns.stream().map(i -> i.getValue()).map(String::valueOf).collect(Collectors.toList());
+                    final List<String> filterColumns = sourceFilterPredicateColumns.stream().map(Identifier::getValue).map(String::valueOf).collect(Collectors.toList());
                     dimension = cubeMetadata.getGroup().stream()
                             .filter(x -> !filterColumns.contains(x))
                             .map(String::valueOf)
@@ -674,14 +674,14 @@ final class ShowQueriesRewrite
                 }
                 String allPartitions = "";
                 if (connectorTableMetadata.getProperties().containsKey("partitioned_by")) {
-                    allPartitions = Arrays.asList(connectorTableMetadata.getProperties().get("partitioned_by").toString()
-                            .substring(1, connectorTableMetadata.getProperties().get("partitioned_by").toString().length() - 1).split(",")).stream()
+                    allPartitions = Arrays.stream(connectorTableMetadata.getProperties().get("partitioned_by").toString()
+                            .substring(1, connectorTableMetadata.getProperties().get("partitioned_by").toString().length() - 1).split(","))
                             .map(String::valueOf)
                             .map(i -> "'" + i.trim() + "'")
                             .collect(Collectors.joining(", "));
                 }
                 StringBuilder query = new StringBuilder();
-                query.append("CREATE CUBE ").append(cubeTableName.toString()).append(" ON ").append(qualifiedTableName.toString()).append(" WITH (AGGREGATIONS=(").append(aggregation).append("), GROUP=(").append(dimension).append(")");
+                query.append("CREATE CUBE ").append(cubeTableName).append(" ON ").append(qualifiedTableName).append(" WITH (AGGREGATIONS=(").append(aggregation).append("), GROUP=(").append(dimension).append(")");
                 if (connectorTableMetadata.getProperties().containsKey("format")) {
                     query.append(", format='").append(Optional.ofNullable(connectorTableMetadata.getProperties().get("format"))
                             .map(String::valueOf)

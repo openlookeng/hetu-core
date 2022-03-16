@@ -22,9 +22,12 @@ import io.airlift.log.Logger;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.execution.QueryState;
+import io.prestosql.execution.StageId;
 import io.prestosql.execution.TaskId;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
+
+import javax.annotation.Nonnull;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -59,6 +62,7 @@ public class QuerySnapshotManager
     private final QueryId queryId;
     private final SnapshotUtils snapshotUtils;
 
+    private final Map<StageId, Runnable> stageRestoreCallbacks = Collections.synchronizedMap(new LinkedHashMap<>());
     private final Set<TaskId> unfinishedTasks = Sets.newConcurrentHashSet();
     // LinkedHashMap can be used to keep ordering
     private final Map<Long, SnapshotComponentCounter<TaskId>> captureComponentCounters = Collections.synchronizedMap(new LinkedHashMap<>());
@@ -120,6 +124,11 @@ public class QuerySnapshotManager
         unfinishedTasks.add(taskId);
     }
 
+    public void setStageRestoreCompleteListener(StageId stageId, Runnable restoreCompleteListener)
+    {
+        stageRestoreCallbacks.put(stageId, restoreCompleteListener);
+    }
+
     public void snapshotInitiated(long snapshotId)
     {
         updateSnapshotStatus(snapshotId, SnapshotResult.IN_PROGRESS);
@@ -155,6 +164,7 @@ public class QuerySnapshotManager
         unfinishedTasks.clear();
         captureComponentCounters.clear();
         restoreComponentCounters.clear();
+        stageRestoreCallbacks.clear();
 
         if (!lastTriedId.isPresent()) {
             // resume to 0, all current snapshotIds are invalidated
@@ -443,7 +453,7 @@ public class QuerySnapshotManager
     {
         SnapshotComponentCounter<TaskId> counter = captureComponentCounters.computeIfAbsent(snapshotId, k ->
                 // A snapshot is considered complete if tasks either finished their snapshots or have completed
-                new SnapshotComponentCounter<>(ids -> ids.containsAll(unfinishedTasks)));
+                new SnapshotComponentCounter<>(ids -> ids.containsAll(unfinishedTasks), null));
         if (counter.updateComponent(taskId, componentState)) {
             SnapshotResult snapshotResult = counter.getSnapshotResult();
             synchronized (captureResults) {
@@ -476,7 +486,7 @@ public class QuerySnapshotManager
         // update queryToRestoredSnapshotComponentCounterMap
         SnapshotComponentCounter<TaskId> counter = restoreComponentCounters.computeIfAbsent(snapshotId, k ->
                 // A snapshot is considered complete if tasks either finished their snapshots or have completed
-                new SnapshotComponentCounter<>(ids -> ids.containsAll(unfinishedTasks)));
+                new SnapshotComponentCounter<>(ids -> ids.containsAll(unfinishedTasks), (curTaskId, ids) -> CheckAndNotifyStageRestoreCompletion(curTaskId, ids)));
 
         if (counter.updateComponent(taskId, componentState)) {
             LOG.debug("Finished restoring snapshot %d for task %s", snapshotId, taskId);
@@ -500,6 +510,21 @@ public class QuerySnapshotManager
                     // inform the listeners(ie schedulers) if query snapshot result is finished
                     queryRestoreComplete();
                 }
+            }
+        }
+    }
+
+    private void CheckAndNotifyStageRestoreCompletion(@Nonnull TaskId taskId, @Nonnull Set<TaskId> restoredTaskIds)
+    {
+        StageId stageId = taskId.getStageId();
+        List<TaskId> unfinishedStageTasks = unfinishedTasks.stream()
+                .filter(unFinishedtaskId -> unFinishedtaskId.getStageId().getId() == stageId.getId())
+                .collect(Collectors.toList());
+
+        if (restoredTaskIds.containsAll(unfinishedStageTasks)) {
+            LOG.debug("Finished restoring snapshot for stage %s", stageId.toString());
+            if (stageRestoreCallbacks.get(stageId) != null) {
+                stageRestoreCallbacks.get(stageId).run();
             }
         }
     }

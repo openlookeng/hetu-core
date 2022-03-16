@@ -389,9 +389,9 @@ Spilled: 20GB
             reprintLine("");
 
             // STAGE  S    ROWS    RPS  BYTES    BPS   QUEUED    RUN   DONE
-            String stagesHeader = format("%10s%1s  %5s  %6s  %5s  %7s  %6s  %5s  %5s",
+            String stagesHeader = format("%10s %1s  %5s  %6s  %5s  %7s  %6s  %5s  %5s",
                     "STAGE",
-                    "S",
+                    "SS",
                     "ROWS",
                     "ROWS/s",
                     "BYTES",
@@ -429,12 +429,12 @@ Spilled: 20GB
     {
         Duration elapsedTime = nanosSince(start);
 
-        // STAGE  S    ROWS  ROWS/s  BYTES  BYTES/s  QUEUED    RUN   DONE
-        // 0......Q     26M   9077M  9993G    9077M   9077M  9077M  9077M
-        //   2....R     17K    627M   673M     627M    627M   627M   627M
-        //     3..C     999    627M   673M     627M    627M   627M   627M
-        //   4....R     26M    627M   673T     627M    627M   627M   627M
-        //     5..F     29T    627M   673M     627M    627M   627M   627M
+        // STAGE  SS    ROWS  ROWS/s  BYTES  BYTES/s  QUEUED    RUN   DONE
+        // 0..... Q.     26M   9077M  9993G    9077M   9077M  9077M  9077M
+        //   2... R.     17K    627M   673M     627M    627M   627M   627M
+        //     3. C.     999    627M   673M     627M    627M   627M   627M
+        //   4... R#     26M    627M   673T     627M    627M   627M   627M
+        //     5. F.     29T    627M   673M     627M    627M   627M   627M
 
         String id = String.valueOf(stageNumberCounter.getAndIncrement());
         String name = indent + id;
@@ -451,9 +451,10 @@ Spilled: 20GB
             rowsPerSecond = FormatUtils.formatCountRate(stage.getProcessedRows(), elapsedTime, false);
         }
 
-        String stageSummary = String.format("%10s%1s  %5s  %6s  %5s  %7s  %6s  %5s  %5s",
+        String stageSummary = String.format("%10s %1s%1s  %5s  %6s  %5s  %7s  %6s  %5s  %5s",
                 name,
                 stageStateCharacter(stage.getState()),
+                stage.isRestoring() ? "#" : ".",
 
                 FormatUtils.formatCount(stage.getProcessedRows()),
                 rowsPerSecond,

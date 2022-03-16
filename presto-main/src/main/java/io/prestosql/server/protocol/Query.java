@@ -871,9 +871,6 @@ public class Query
             });
             if (lastSnapshotId > 0) {
                 SnapshotStats.Builder builder = SnapshotStats.builder();
-                log.debug("SnapshotMetrics: totalWallTimeMillis: [%s]ms, lastWallTimeMillis: [%s]ms", totalWallTimeMillis.toString(), lastWallTimeMillis.toString());
-                log.debug("SnapshotMetrics: allSnapshotsSizeBytes: [%d], lastSnapshotSizeBytes: [%d]", allSnapshotsSizeBytes.get(), lastSnapshotSizeBytes.get());
-                log.debug("SnapshotMetrics: totalCpuTimeMillis: [%d]ms, lastSnapshotCpuTimeMillis: [%d]ms", totalCpuTimeMillis.get(), lastSnapshotCpuTimeMillis.get());
                 builder.setLastCaptureSnapshotId(lastSnapshotId)
                         .setAllSnapshotsSizeBytes(allSnapshotsSizeBytes.get())
                         .setLastSnapshotSizeBytes(lastSnapshotSizeBytes.get())
@@ -890,7 +887,6 @@ public class Query
                 int restoreCount = 0;
                 List<RestoreResult> restoreStats = querySnapshotManager.getRestoreStats();
                 restoreCount = restoreStats.size();
-                log.debug("SnapshotMetrics: restoreCount: [%d]", restoreCount);
                 // Add restore stats if restore is happened
                 if (restoreCount > 0) {
                     lastRestoreSnapshotId = restoreStats.get(restoreCount - 1).getSnapshotId();
@@ -900,8 +896,6 @@ public class Query
                         totalRestoreCpuTime.addAndGet(info.getCpuTime());
                         totalRestoreSize.addAndGet(info.getSizeBytes());
                     });
-                    log.debug("SnapshotMetrics: totalRestoreWallTime: [%d]ms, totalRestoreCpuTime: [%d]ms", totalRestoreWallTime.get(), totalRestoreCpuTime.get());
-                    log.debug("SnapshotMetrics: totalRestoreSize: [%d], lastRestoreSnapshotId: [%d]", totalRestoreSize.get(), lastRestoreSnapshotId);
                     builder.setSuccessRestoreCount(restoreCount)
                             .setLastRestoreSnapshotId(lastRestoreSnapshotId)
                             .setTotalRestoreWallTime(totalRestoreWallTime.get())
@@ -937,6 +931,7 @@ public class Query
         return StageStats.builder()
                 .setStageId(String.valueOf(stageInfo.getStageId().getId()))
                 .setState(stageInfo.getState().toString())
+                .setRestoring(stageInfo.isRestoring())
                 .setDone(stageInfo.getState().isDone())
                 .setNodes(uniqueNodes.size())
                 .setTotalSplits(stageStats.getTotalDrivers())

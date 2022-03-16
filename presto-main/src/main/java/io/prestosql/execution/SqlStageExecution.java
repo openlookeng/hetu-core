@@ -134,6 +134,7 @@ public final class SqlStageExecution
 
     private final QuerySnapshotManager snapshotManager;
     private boolean throttledSchedule;
+    private boolean restoreInProgress;
 
     public static SqlStageExecution createSqlStageExecution(
             StageId stageId,
@@ -212,6 +213,7 @@ public final class SqlStageExecution
         }
 
         this.throttledSchedule = false;
+        this.restoreInProgress = false;
     }
 
     private void traverseNodesForDynamicFiltering(List<PlanNode> nodes)
@@ -324,8 +326,14 @@ public final class SqlStageExecution
 
     public synchronized void cancelToResume()
     {
+        restoreInProgress = true;
         stateMachine.transitionToRescheduling();
         getAllTasks().forEach(RemoteTask::cancelToResume);
+    }
+
+    public void restoreCompleted()
+    {
+        restoreInProgress = false;
     }
 
     public synchronized void abort()
@@ -359,7 +367,7 @@ public final class SqlStageExecution
 
     public StageInfo getStageInfo()
     {
-        return stateMachine.getStageInfo(this::getAllTaskInfo);
+        return stateMachine.getStageInfo(this::getAllTaskInfo, restoreInProgress);
     }
 
     private Iterable<TaskInfo> getAllTaskInfo()
@@ -731,6 +739,11 @@ public final class SqlStageExecution
     public String toString()
     {
         return stateMachine.toString();
+    }
+
+    public void setResuming()
+    {
+        restoreInProgress = true;
     }
 
     private class StageTaskListener

@@ -270,7 +270,7 @@ public class StageStateMachine
     {
         requireNonNull(finalTaskInfos, "finalTaskInfos is null");
         checkState(stageState.get().isDone());
-        StageInfo stageInfo = getStageInfo(() -> finalTaskInfos);
+        StageInfo stageInfo = getStageInfo(() -> finalTaskInfos, false);
         checkArgument(stageInfo.isCompleteInfo(), "finalTaskInfos are not all done");
         finalStageInfo.compareAndSet(Optional.empty(), Optional.of(stageInfo));
     }
@@ -408,7 +408,7 @@ public class StageStateMachine
                 progressPercentage);
     }
 
-    public StageInfo getStageInfo(Supplier<Iterable<TaskInfo>> taskInfosSupplier)
+    public StageInfo getStageInfo(Supplier<Iterable<TaskInfo>> taskInfosSupplier, boolean restoreInProgress)
     {
         Optional<StageInfo> localFinalStageInfo = this.finalStageInfo.get();
         if (localFinalStageInfo.isPresent()) {
@@ -599,6 +599,7 @@ public class StageStateMachine
         }
         return new StageInfo(stageId,
                 state,
+                restoreInProgress,
                 location,
                 fragment,
                 fragment.getTypes(),

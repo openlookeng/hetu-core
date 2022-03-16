@@ -363,4 +363,9 @@ public class NodeScheduler
                 .collect(toImmutableList());
         return whenAnyCompleteCancelOthers(stateChangeFutures);
     }
+
+    public void refreshNodeStates()
+    {
+        nodeManager.refreshWorkerStates();
+    }
 }

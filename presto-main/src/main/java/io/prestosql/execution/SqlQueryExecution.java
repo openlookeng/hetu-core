@@ -586,7 +586,7 @@ public class SqlQueryExecution
                 RESUME, snapshotId.isPresent() ? snapshotId.getAsLong() : null, announcer.currentSnapshotId());
 
         // build the stage execution objects (this doesn't schedule execution)
-        return createSqlQueryScheduler(
+        SqlQueryScheduler scheduler = createSqlQueryScheduler(
                 stateMachine,
                 locationFactory,
                 executionPlan,
@@ -607,7 +607,13 @@ public class SqlQueryExecution
                 heuristicIndexerManager,
                 snapshotManager,
                 // Require same number of tasks to be scheduled, but do not require it if starting from beginning
-                snapshotId.isPresent() ? queryScheduler.get().getStageTaskCounts() : null);
+                snapshotId.isPresent() ? queryScheduler.get().getStageTaskCounts() : null,
+                true);
+        if (snapshotId.isPresent() && snapshotId.getAsLong() != 0) {
+            // Restore going to happen first, mark the restore state for all stages
+            scheduler.setResuming();
+        }
+        return scheduler;
     }
 
     private void resetOutputData(PlanRoot plan, OptionalLong snapshotId)
@@ -868,7 +874,8 @@ public class SqlQueryExecution
                 dynamicFilterService,
                 heuristicIndexerManager,
                 snapshotManager,
-                null);
+                null,
+                false);
 
         queryScheduler.set(scheduler);
 

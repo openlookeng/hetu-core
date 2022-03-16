@@ -14,6 +14,7 @@
  */
 package io.prestosql.cli;
 
+import au.com.bytecode.opencsv.CSVReader;
 import com.google.common.collect.Lists;
 import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.parser.SqlParser;
@@ -22,51 +23,79 @@ import io.prestosql.sql.tree.ReloadCube;
 import org.jline.terminal.Terminal;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
+import java.io.StringReader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 public class ReloadCubeConsole
 {
-    private Console console;
+    private final Console console;
     private String newQuery;
     private String objectName;
     private String schemaName;
     private String catalogName;
-
-    public String getNewQuery()
-    {
-        return this.newQuery;
-    }
+    private String cubeTableName;
+    private boolean insertAll;
 
     public ReloadCubeConsole(Console console)
     {
         this.console = console;
     }
 
-    public boolean reload(String query, QueryRunner queryRunner, ClientOptions.OutputFormat outputFormat, Runnable schemaChanged, boolean usePager, boolean showProgress, Terminal terminal, PrintStream out, PrintStream errorChannel) throws UnsupportedEncodingException
+    public boolean reload(String query, QueryRunner queryRunner, ClientOptions.OutputFormat outputFormat, Runnable schemaChanged, boolean usePager, boolean showProgress, Terminal terminal, PrintStream out, PrintStream errorChannel)
+            throws IOException
     {
         SqlParser parser = new SqlParser();
         ReloadCube reloadCube = (ReloadCube) parser.createStatement(query, new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DOUBLE));
         if (!checkCubeName(queryRunner, reloadCube, reloadCube.getCubeName())) {
             return false;
         }
-        String cubeTableName = this.catalogName + "." + this.schemaName + "." + this.objectName;
+        this.cubeTableName = this.catalogName + "." + this.schemaName + "." + this.objectName;
         final Charset charset = StandardCharsets.UTF_8;
-        ByteArrayOutputStream stringOutputStream = new ByteArrayOutputStream();
-        String showCreateCubeQuery = "SHOW CREATE CUBE " + cubeTableName.toString();
-        if (!console.runQuery(queryRunner, showCreateCubeQuery, ClientOptions.OutputFormat.CSV, schemaChanged, false, showProgress, terminal, new PrintStream(stringOutputStream, true, charset.name()), errorChannel)) {
+        ByteArrayOutputStream showCubesOutputStream = new ByteArrayOutputStream();
+        String showCubeQuery = "SHOW CUBES";
+        if (!console.runQuery(queryRunner, showCubeQuery, ClientOptions.OutputFormat.CSV, schemaChanged, false, showProgress, terminal, new PrintStream(showCubesOutputStream, true, charset.name()), errorChannel)) {
             return false;
         }
-        this.newQuery = stringOutputStream.toString().replace("\"\"", "\"").trim();
-        this.newQuery = this.newQuery.substring(1, this.newQuery.length() - 1);
-        String dropQuery = "DROP CUBE " + cubeTableName.toString();
-        if (!console.runQuery(queryRunner, dropQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel)) {
+        String[] cubeInfo = getCubeInfo(showCubesOutputStream.toString());
+        if (cubeInfo == null) {
+            System.out.println("Cube does not exist.");
             return false;
         }
-        return true;
+        if ("Inactive".equals(cubeInfo[2])) {
+            System.out.println("Nothing to reload. The cube has no data.");
+            return false;
+        }
+        else {
+            this.insertAll = cubeInfo[5] == null || "".equals(cubeInfo[5]);
+        }
+
+        ByteArrayOutputStream showCreateCubeOutputStream = new ByteArrayOutputStream();
+        String showCreateCubeQuery = "SHOW CREATE CUBE " + this.cubeTableName;
+        if (!console.runQuery(queryRunner, showCreateCubeQuery, ClientOptions.OutputFormat.CSV, schemaChanged, false, showProgress, terminal, new PrintStream(showCreateCubeOutputStream, true, charset.name()), errorChannel)) {
+            return false;
+        }
+        try (CSVReader reader = new CSVReader(new StringReader(showCreateCubeOutputStream.toString()))) {
+            this.newQuery = reader.readNext()[0];
+        }
+        String dropQuery = "DROP CUBE " + this.cubeTableName;
+        return console.runQuery(queryRunner, dropQuery, outputFormat, schemaChanged, usePager, showProgress, terminal, out, errorChannel);
+    }
+
+    public String[] getCubeInfo(String showCubesResult)
+            throws IOException
+    {
+        List<String[]> cubes;
+        try (CSVReader reader = new CSVReader(new StringReader(showCubesResult))) {
+            cubes = reader.readAll();
+        }
+        return cubes.stream()
+                .filter(cubeInfo -> cubeInfo[1].equals(this.cubeTableName))
+                .findAny()
+                .orElse(null);
     }
 
     public boolean checkCubeName(QueryRunner queryRunner, ReloadCube node, QualifiedName name)
@@ -118,5 +147,20 @@ public class ReloadCubeConsole
             }
         }
         return true;
+    }
+
+    public String getNewQuery()
+    {
+        return this.newQuery;
+    }
+
+    public boolean isInsertAll()
+    {
+        return this.insertAll;
+    }
+
+    public String getCubeTableName()
+    {
+        return this.cubeTableName;
     }
 }

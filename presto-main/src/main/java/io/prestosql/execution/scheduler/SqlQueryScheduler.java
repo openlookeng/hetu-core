@@ -180,7 +180,8 @@ public class SqlQueryScheduler
             DynamicFilterService dynamicFilterService,
             HeuristicIndexerManager heuristicIndexerManager,
             QuerySnapshotManager snapshotManager,
-            Map<StageId, Integer> stageTaskCounts)
+            Map<StageId, Integer> stageTaskCounts,
+            boolean isResume)
     {
         SqlQueryScheduler sqlQueryScheduler = new SqlQueryScheduler(
                 queryStateMachine,
@@ -202,7 +203,8 @@ public class SqlQueryScheduler
                 dynamicFilterService,
                 heuristicIndexerManager,
                 snapshotManager,
-                stageTaskCounts);
+                stageTaskCounts,
+                isResume);
         sqlQueryScheduler.initialize();
         return sqlQueryScheduler;
     }
@@ -227,7 +229,8 @@ public class SqlQueryScheduler
             DynamicFilterService dynamicFilterService,
             HeuristicIndexerManager heuristicIndexerManager,
             QuerySnapshotManager snapshotManager,
-            Map<StageId, Integer> stageTaskCounts)
+            Map<StageId, Integer> stageTaskCounts,
+            boolean isResumeScheduler)
     {
         this.queryStateMachine = requireNonNull(queryStateMachine, "queryStateMachine is null");
         this.executionPolicy = requireNonNull(executionPolicy, "schedulerPolicyFactory is null");
@@ -270,7 +273,8 @@ public class SqlQueryScheduler
                 stageLinkageBuilder,
                 isSnapshotEnabled,
                 snapshotManager,
-                stageTaskCounts);
+                stageTaskCounts,
+                isResumeScheduler);
 
         SqlStageExecution rootStage = stageExecutions.get(0);
         rootStage.setOutputBuffers(rootOutputBuffers);
@@ -285,6 +289,7 @@ public class SqlQueryScheduler
             // snapshot is complete, because all known tasks are covered.
             for (SqlStageExecution stage : stageExecutions) {
                 snapshotManager.addNewTask(new TaskId(stage.getStageId(), 0));
+                snapshotManager.setStageRestoreCompleteListener(stage.getStageId(), stage::restoreCompleted);
             }
         }
 
@@ -429,7 +434,8 @@ public class SqlQueryScheduler
             ImmutableMap.Builder<StageId, StageLinkage> stageLinkages,
             boolean isSnapshotEnabled,
             QuerySnapshotManager snapshotManager,
-            Map<StageId, Integer> stageTaskCounts)
+            Map<StageId, Integer> stageTaskCounts,
+            boolean isResumeScheduler)
     {
         ImmutableList.Builder<SqlStageExecution> localStages = ImmutableList.builder();
 
@@ -462,6 +468,9 @@ public class SqlQueryScheduler
             CatalogName catalogName = splitSource.getCatalogName();
             if (isInternalSystemConnector(catalogName)) {
                 catalogName = null;
+            }
+            if (isResumeScheduler) {
+                nodeScheduler.refreshNodeStates();
             }
             NodeSelector nodeSelector = nodeScheduler.createNodeSelector(catalogName, keepConsumerOnFeederNodes, feederScheduledNodes);
             if (isSnapshotEnabled) {
@@ -596,7 +605,8 @@ public class SqlQueryScheduler
                     stageLinkages,
                     isSnapshotEnabled,
                     snapshotManager,
-                    stageTaskCounts);
+                    stageTaskCounts,
+                    isResumeScheduler);
             localStages.addAll(subTree);
 
             SqlStageExecution childStage = subTree.get(0);
@@ -675,6 +685,7 @@ public class SqlQueryScheduler
         return new StageInfo(
                 parent.getStageId(),
                 parent.getState(),
+                parent.isRestoring(),
                 parent.getSelf(),
                 parent.getPlan(),
                 parent.getTypes(),
@@ -905,6 +916,13 @@ public class SqlQueryScheduler
         }
 
         return future;
+    }
+
+    public void setResuming()
+    {
+        for (SqlStageExecution stageExecution : stages.values()) {
+            stageExecution.setResuming();
+        }
     }
 
     private interface ExchangeLocationsConsumer
